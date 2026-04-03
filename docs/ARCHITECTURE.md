@@ -1,0 +1,435 @@
+---
+icon: lucide/network
+---
+
+# Architecture
+
+This repository exists to manage reusable agent extensions across four different host CLIs:
+
+- Claude Code
+- Gemini CLI
+- pi.dev
+- OpenCode
+
+These tools are similar in intent, but they do not share a common packaging or marketplace standard. The architecture in this repository treats that as a first-class constraint.
+
+## Problem Statement
+
+We want a single source of truth for reusable agent behavior that can be installed by users of multiple coding agents.
+
+What is portable across hosts:
+
+- Skills written as `SKILL.md` (managed in [`nq-rdl/agent-skills`](https://github.com/nq-rdl/agent-skills), consumed here as a git submodule)
+- Prompt content
+- Reference material
+- Some MCP-backed integrations
+- Bundle metadata and release metadata
+
+What is authored in this repo and packaged per host:
+
+- Hooks
+- MCP server configurations
+- ACP integrations
+- Host-specific plugin or extension wiring
+
+What is not reliably portable:
+
+- Hook models
+- Permission models
+- Runtime plugin code
+- Command formats
+- Marketplace and install semantics
+- Update and governance controls
+
+Because of that, this repository should not try to force a universal plugin format. It should manage a shared catalog of extensions and produce host-native outputs, consuming skills from the submodule by symlink.
+
+## Core Decision
+
+The repository uses this model:
+
+```mermaid
+flowchart LR
+  A[Portable content] --> B[Bundle registry]
+  B --> C[Claude adapter]
+  B --> D[Gemini adapter]
+  B --> E[Pi adapter]
+  B --> F[OpenCode adapter]
+  C --> G[Claude marketplace plugins]
+  D --> H[Gemini extensions or release archives]
+  E --> I[Pi packages]
+  F --> J[OpenCode packages and config snippets]
+```
+
+The shared abstraction is:
+
+- one catalog
+- one bundle registry
+- one skills submodule (`nq-rdl/agent-skills`) consumed by symlink
+- authored extensions (hooks, MCP, ACP, prompts) in this repo
+- multiple native distribution targets
+
+## Platform Nuances
+
+### Claude Code
+
+Claude Code is the most marketplace-native of the four.
+
+- Native install unit: plugin
+- Native catalog unit: marketplace
+- Good fit for monorepos: yes
+- Skills: first-class
+- Hooks: first-class and event-rich
+- Governance: strong support for allowlists, managed settings, and seeded caches
+
+Implication:
+
+Claude should be treated as the reference marketplace model. Relative-path or `git-subdir` plugin distribution works well for monorepo-managed bundles.
+
+### Gemini CLI
+
+Gemini CLI is extension-native, not marketplace-native.
+
+- Native install unit: extension
+- Native discovery model: public gallery crawler over extension repos
+- Good fit for monorepos: weaker than Claude and pi
+- Skills: supported
+- Hooks: supported
+- Packaging expectation: self-contained repo or release archive with `gemini-extension.json` at the root
+
+Implication:
+
+Gemini is the main structural mismatch. A central catalog can still exist in this repo, but published Gemini artifacts usually need to become either:
+
+- dedicated extension repos, or
+- self-contained release archives
+
+### pi.dev
+
+pi.dev is package-native.
+
+- Native install unit: package
+- Native source types: npm, git, URL, local path
+- Good fit for monorepos: yes
+- Skills: supported
+- Distribution model: package manager semantics rather than marketplace catalog semantics
+
+Implication:
+
+For pi, the package is the install boundary. A marketplace can exist as a documentation and discovery layer, but native installs should remain npm or git based.
+
+### OpenCode
+
+OpenCode is the least marketplace-shaped.
+
+- Native install model: local config plus plugins, tools, agents, or npm packages
+- Runtime extension model: JS or TS plugin code and `opencode.json`
+- Good fit for monorepos: yes, if packaged around Bun or npm
+- Skills: not the same first-class portable primitive as Claude, Gemini, and pi
+- Hooks: implemented through plugin code, not shell hook configuration
+
+Implication:
+
+OpenCode should be treated as package plus config generation, not as a first-class marketplace target.
+
+## Comparison Summary
+
+| Tool | Native install unit | Native marketplace? | Monorepo-friendly | Best publication shape |
+| --- | --- | --- | --- | --- |
+| Claude Code | Plugin | Yes | Yes | Marketplace repo with plugin entries |
+| Gemini CLI | Extension | Not really | Limited | Dedicated repo or release archive per extension |
+| pi.dev | Package | Not really | Yes | npm or git package |
+| OpenCode | Package/config/plugin | Not really | Yes | npm package plus generated config |
+
+## Proposed Repository Model
+
+The repository should evolve toward this layout:
+
+```text
+docs/
+  ARCHITECTURE.md
+
+skills/                    ← git submodule (nq-rdl/agent-skills)
+
+hooks/                     ← hook definitions authored in this repo
+mcp/                       ← MCP server integrations authored in this repo
+prompts/                   ← prompt content authored in this repo
+
+registry/
+  bundles/
+    swe.yaml
+    informatics.yaml
+    hooks.yaml
+  channels/
+    stable.yaml
+    preview.yaml
+
+targets/
+  claude/
+    plugins/
+      swe/
+        skills/
+          developer -> ../../../../skills/developer   ← symlink into submodule
+        hooks/
+        plugin.json
+    templates/
+    scripts/
+  gemini/
+    templates/
+    scripts/
+  pi/
+    templates/
+    scripts/
+  opencode/
+    templates/
+    scripts/
+
+dist/
+  claude/
+  gemini/
+  pi/
+  opencode/
+```
+
+Notes:
+
+- `skills/` is a git submodule pointing to [`nq-rdl/agent-skills`](https://github.com/nq-rdl/agent-skills). Skills follow the [agents.io](https://agents.io) standard and are authored and versioned independently. After cloning, run `git submodule update --init` to populate it.
+- `hooks/`, `mcp/`, and `prompts/` are the primary authored content of this repository — the extensions themselves.
+- When a plugin or extension needs a skill, it **symlinks** into `skills/<skill>` rather than copying. This keeps one source of truth and avoids drift.
+- `registry/` declares bundles, owners, release channels, and target mappings.
+- `targets/` contains host-specific adapter templates, build logic, and plugin/extension structures.
+- `dist/` is generated output and should not be hand-edited.
+
+## Skills Submodule Sync
+
+The `skills/` submodule is pinned to a specific commit. Three mechanisms keep it in sync:
+
+### Level 1 — Local git hooks
+
+Git hooks in `.githooks/` automatically run `git submodule update --init` after checkout and merge. To activate:
+
+```bash
+git config core.hooksPath .githooks
+```
+
+This prevents developers from working against a stale `skills/` after pull or branch switch.
+
+### Level 2 — CI validation
+
+The `validate.yml` workflow runs on every PR and push to main. It:
+
+- Verifies the skills submodule is populated
+- Checks that every skill referenced in `registry/bundles/*.yaml` exists in the submodule
+- Validates that all skill symlinks under `targets/` resolve correctly
+
+### Level 3 — Automated submodule bumps
+
+Dependabot is configured (`.github/dependabot.yml`) to open weekly PRs when `nq-rdl/agent-skills` has new commits. These PRs update the pinned submodule commit and run through the validation pipeline before merge.
+
+## Registry Schema
+
+The registry should describe installable bundles, not raw files.
+
+Recommended shape:
+
+```yaml
+schemaVersion: v1
+id: swe
+displayName: SWE
+description: Software engineering workflows and coding assistance bundles.
+owners:
+  - rdl
+channels:
+  - stable
+  - preview
+skills:                        # referenced from skills/ submodule by name
+  - developer
+  - tdd
+  - secure-go
+hooks:                         # authored in hooks/ in this repo
+  - pre-commit-lint
+prompts: []
+mcp: []
+targets:
+  claude:
+    enabled: true
+    pluginName: swe
+    marketplaceName: rdl
+  gemini:
+    enabled: true
+    extensionName: swe
+    publication: github-release
+    contextFile: GEMINI.md
+  pi:
+    enabled: true
+    packageName: "@nq-rdl/pi-swe"
+    source: npm
+  opencode:
+    enabled: true
+    packageName: "@nq-rdl/opencode-swe"
+    configMode: generated-snippet
+```
+
+Required behavior of the schema:
+
+- One bundle ID maps to multiple target outputs.
+- A target can be disabled without deleting the bundle.
+- Target metadata stores install names, publication mode, and channel behavior.
+- Skills are referenced by name and resolved from the `skills/` submodule. Hooks, prompts, and MCP integrations are resolved from their respective root-level directories in this repo.
+
+## Build and Generation Rules
+
+The build system should follow these rules:
+
+1. Validate registry entries before generating any target output.
+2. Validate authored content (hooks, MCP, prompts) and referenced skills from the submodule.
+3. Resolve skill symlinks and generate host-native outputs into `dist/`.
+4. Refuse manual edits to generated output during CI.
+5. Smoke-test each generated target using the host's native install path where practical.
+
+## CI and Release Design
+
+The CI model should separate validation, generation, and publishing.
+
+### Pull Request Validation
+
+Recommended checks:
+
+- Validate bundle registry schema
+- Validate authored content structure and frontmatter
+- Verify skill symlinks resolve into the submodule
+- Generate all target outputs into a temporary `dist/`
+- Diff-check generated output for determinism
+- Build docs site
+
+Suggested workflow names:
+
+- `validate.yml`
+- `docs.yml`
+- `generate-preview.yml`
+
+### Release Workflows
+
+Recommended release stages:
+
+1. Create version tag or release input.
+2. Generate target artifacts for all enabled bundles.
+3. Publish per target.
+4. Publish or update install documentation.
+
+Target-specific publishing model:
+
+- Claude Code: publish or update marketplace content and plugin versions
+- Gemini CLI: publish self-contained extension archives or sync generated extension repos
+- pi.dev: publish npm packages
+- OpenCode: publish npm packages and update generated `opencode.json` snippets or docs
+
+### Release Channels
+
+Use at least two channels:
+
+- `stable`
+- `preview`
+
+Channel handling should remain host-native:
+
+- Claude Code: separate marketplace refs, tags, or channels
+- Gemini CLI: branch, tag, or pre-release archive
+- pi.dev: npm dist-tags such as `latest` and `next`
+- OpenCode: npm dist-tags and versioned config snippets
+
+## Exact Install Flows
+
+These are the expected end-user install shapes.
+
+### Claude Code Install Flow
+
+```bash
+claude plugin marketplace add <marketplace-source>
+claude plugin install swe@rdl --scope project
+```
+
+Expected publication target:
+
+- a marketplace repo or branch containing marketplace metadata and plugin sources
+
+### Gemini CLI Install Flow
+
+```bash
+gemini extensions install <extension-repo-or-release-url> --ref stable
+```
+
+Alternative preview flow:
+
+```bash
+gemini extensions install <extension-repo-or-release-url> --pre-release
+```
+
+Expected publication target:
+
+- one self-contained extension repo per published bundle, or
+- one GitHub Release archive per published bundle
+
+### pi.dev Install Flow
+
+```bash
+pi install npm:@nq-rdl/pi-swe@latest
+```
+
+Project-scoped install:
+
+```bash
+pi install -l npm:@nq-rdl/pi-swe@latest
+```
+
+Expected publication target:
+
+- npm package with `pi` package metadata
+
+### OpenCode Install Flow
+
+```bash
+bun add -D @nq-rdl/opencode-swe
+```
+
+Then register the generated package in `opencode.json`:
+
+```json
+{
+  "plugins": ["@nq-rdl/opencode-swe"]
+}
+```
+
+Expected publication target:
+
+- npm package plus generated config snippet or bootstrap instructions
+
+## Non-Goals
+
+This repository should not try to:
+
+- invent a fake universal runtime that hides all host differences
+- flatten hooks into a lowest-common-denominator abstraction
+- force Gemini into Claude-style marketplace semantics
+- force OpenCode into SKILL-only packaging when plugin code is the real extension boundary
+
+## Platform Requirements
+
+This repository assumes **macOS and Linux only**. The symlink-based skill resolution strategy depends on native symlink support. Windows users must run under WSL2.
+
+## Design Principles
+
+- Portable content first
+- Native distribution second
+- Generated outputs over hand-maintained copies
+- Explicit host differences over false uniformity
+- Install documentation is part of the product
+
+## Near-Term Implementation Order
+
+1. Define the bundle registry format.
+2. Create the planned repository layout.
+3. Add generators for Claude, Gemini, pi, and OpenCode outputs.
+4. Add validation and release workflows.
+5. Add smoke-test installs for at least one bundle per target.
+
+For contribution expectations and per-tool authoring guidance, see the repository root `CONTRIBUTING.md`.
