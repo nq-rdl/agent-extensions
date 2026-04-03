@@ -1,0 +1,89 @@
+name: Validate
+
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [main]
+
+jobs:
+  validate-submodule:
+    name: Validate skills submodule
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          submodules: true
+
+      - name: Verify skills submodule is populated
+        run: |
+          if [ ! -d "skills/src" ] && [ ! -f "skills/pyproject.toml" ]; then
+            echo "::error::skills/ submodule is empty or not initialized"
+            exit 1
+          fi
+          echo "skills/ submodule is populated"
+
+  validate-bundles:
+    name: Validate bundle skill references
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          submodules: true
+
+      - name: Check bundle skill references resolve
+        run: |
+          exit_code=0
+          for bundle in registry/bundles/*.yaml registry/bundles/*.yml; do
+            [ -f "$bundle" ] || continue
+            echo "Checking $bundle"
+            # Extract skill names from the skills: list
+            in_skills=false
+            while IFS= read -r line; do
+              if echo "$line" | grep -qE '^skills:'; then
+                in_skills=true
+                continue
+              fi
+              if $in_skills; then
+                if echo "$line" | grep -qE '^\s+-\s+'; then
+                  skill=$(echo "$line" | sed 's/^\s*-\s*//' | tr -d '[:space:]')
+                  if [ ! -d "skills/src/$skill" ] && [ ! -d "skills/$skill" ]; then
+                    echo "::error file=$bundle::Skill '$skill' not found in skills/ submodule"
+                    exit_code=1
+                  else
+                    echo "  ✓ $skill"
+                  fi
+                else
+                  in_skills=false
+                fi
+              fi
+            done < "$bundle"
+          done
+          exit $exit_code
+
+  validate-symlinks:
+    name: Validate skill symlinks
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          submodules: true
+
+      - name: Check all skill symlinks resolve
+        run: |
+          exit_code=0
+          while IFS= read -r link; do
+            target=$(readlink "$link")
+            if [[ "$target" == *skills/* ]] || [[ "$link" == *skills/* ]]; then
+              if [ ! -e "$link" ]; then
+                echo "::error::Broken skill symlink: $link -> $target"
+                exit_code=1
+              else
+                echo "✓ $link -> $target"
+              fi
+            fi
+          done < <(find targets/ -type l 2>/dev/null)
+          if [ $exit_code -eq 0 ]; then
+            echo "All skill symlinks are valid (or none exist yet)"
+          fi
+          exit $exit_code

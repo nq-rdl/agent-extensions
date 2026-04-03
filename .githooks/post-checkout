@@ -1,0 +1,4 @@
+#!/usr/bin/env bash
+# Sync submodules after checkout to prevent stale skills/ content.
+# Runs on: git checkout, git switch
+git submodule update --init --recursive

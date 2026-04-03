@@ -1,0 +1,4 @@
+#!/usr/bin/env bash
+# Sync submodules after merge/pull to prevent stale skills/ content.
+# Runs on: git pull, git merge
+git submodule update --init --recursive
