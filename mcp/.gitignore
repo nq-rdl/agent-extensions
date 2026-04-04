@@ -1,0 +1,7 @@
+# Per-integration dependency installs
+*/node_modules/
+
+# Common generated output
+*/build/
+*/coverage/
+*.log
