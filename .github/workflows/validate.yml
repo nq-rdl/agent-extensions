@@ -14,7 +14,7 @@ jobs:
     name: Validate skills submodule wiring
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v6
 
       - name: Verify skills submodule is declared and pinned
         run: |
@@ -48,7 +48,7 @@ jobs:
     name: Validate bundle skill references
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v6
 
       - name: Check bundle skill references resolve
         env:
@@ -103,7 +103,7 @@ jobs:
     name: Validate skill symlinks
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v6
 
       - name: Check all skill symlinks resolve
         env:
