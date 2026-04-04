@@ -4,3 +4,6 @@
 
 # generated output
 dist/
+
+# Node.js dependencies
+node_modules/
