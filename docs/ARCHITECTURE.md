@@ -192,7 +192,7 @@ dist/
 
 Notes:
 
-- `skills/` is a git submodule pointing to [`nq-rdl/agent-skills`](https://github.com/nq-rdl/agent-skills). Skills follow the [agents.io](https://agents.io) standard and are authored and versioned independently. After cloning, run `git submodule update --init` to populate it.
+- `skills/` is a git submodule pointing to [`nq-rdl/agent-skills`](https://github.com/nq-rdl/agent-skills). Skills follow the [agents.io](https://agents.io) standard and are authored and versioned independently. After cloning, run `git submodule sync --recursive && git submodule update --init` to populate it.
 - `hooks/`, `mcp/`, and `prompts/` are the primary authored content of this repository — the extensions themselves.
 - When a plugin or extension needs a skill, it **symlinks** into `skills/<skill>` rather than copying. This keeps one source of truth and avoids drift.
 - `registry/` declares bundles, owners, release channels, and target mappings.
@@ -215,11 +215,11 @@ This prevents developers from working against a stale `skills/` after pull or br
 
 ### Level 2 — CI validation
 
-The `validate.yml` workflow runs on every PR and push to main. It:
+The `validate.yml` workflow runs on every PR and push to main. It always validates the submodule wiring and, when `AGENT_SKILLS_TOKEN` is configured in GitHub Actions, hydrates the private submodule for deep validation. It:
 
-- Verifies the skills submodule is populated
-- Checks that every skill referenced in `registry/bundles/*.yaml` exists in the submodule
-- Validates that all skill symlinks under `targets/` resolve correctly
+- Verifies the `skills/` submodule is declared and pinned in git
+- When `AGENT_SKILLS_TOKEN` is configured, checks that every skill referenced in `registry/bundles/*.yaml` exists in the submodule
+- When `AGENT_SKILLS_TOKEN` is configured, validates that all skill symlinks under `targets/` resolve correctly
 
 ### Level 3 — Automated submodule bumps
 

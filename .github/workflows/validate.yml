@@ -6,36 +6,74 @@ on:
   push:
     branches: [main]
 
+permissions:
+  contents: read
+
 jobs:
   validate-submodule:
-    name: Validate skills submodule
+    name: Validate skills submodule wiring
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v5
-        with:
-          submodules: true
 
-      - name: Verify skills submodule is populated
+      - name: Verify skills submodule is declared and pinned
         run: |
-          if [ ! -d "skills/src" ] && [ ! -f "skills/pyproject.toml" ]; then
-            echo "::error::skills/ submodule is empty or not initialized"
+          path="$(git config -f .gitmodules --get submodule.skills.path || true)"
+          url="$(git config -f .gitmodules --get submodule.skills.url || true)"
+
+          if [ "$path" != "skills" ]; then
+            echo "::error::.gitmodules must declare submodule.skills.path=skills"
             exit 1
           fi
-          echo "skills/ submodule is populated"
+          if [ "$url" != "../agent-skills.git" ]; then
+            echo "::error::.gitmodules must declare submodule.skills.url=../agent-skills.git"
+            exit 1
+          fi
+
+          entry="$(git ls-tree HEAD skills || true)"
+          if [ -z "$entry" ]; then
+            echo "::error::skills/ is not pinned in the git tree"
+            exit 1
+          fi
+
+          set -- $entry
+          if [ "$1" != "160000" ] || [ "$2" != "commit" ]; then
+            echo "::error::skills/ must be committed as a git submodule entry"
+            exit 1
+          fi
+
+          echo "skills/ submodule is pinned to $3"
 
   validate-bundles:
     name: Validate bundle skill references
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v5
-        with:
-          submodules: true
 
       - name: Check bundle skill references resolve
+        env:
+          AGENT_SKILLS_TOKEN: ${{ secrets.AGENT_SKILLS_TOKEN }}
         run: |
+          shopt -s nullglob
+          bundles=(registry/bundles/*.yaml registry/bundles/*.yml)
+          if [ ${#bundles[@]} -eq 0 ]; then
+            echo "No bundle manifests to validate"
+            exit 0
+          fi
+
+          if [ -z "$AGENT_SKILLS_TOKEN" ]; then
+            echo "::error::AGENT_SKILLS_TOKEN secret is required to validate bundle skill references against the private skills submodule"
+            exit 1
+          fi
+
+          git submodule sync --recursive
+          git \
+            -c url."https://x-access-token:${AGENT_SKILLS_TOKEN}@github.com/".insteadOf="https://github.com/" \
+            -c url."https://x-access-token:${AGENT_SKILLS_TOKEN}@github.com/".insteadOf="git@github.com:" \
+            submodule update --init --depth 1 skills
+
           exit_code=0
-          for bundle in registry/bundles/*.yaml registry/bundles/*.yml; do
-            [ -f "$bundle" ] || continue
+          for bundle in "${bundles[@]}"; do
             echo "Checking $bundle"
             # Extract skill names from the skills: list
             in_skills=false
@@ -66,13 +104,44 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v5
-        with:
-          submodules: true
 
       - name: Check all skill symlinks resolve
+        env:
+          AGENT_SKILLS_TOKEN: ${{ secrets.AGENT_SKILLS_TOKEN }}
         run: |
+          mapfile -t links < <(find targets/ -type l 2>/dev/null)
+          if [ ${#links[@]} -eq 0 ]; then
+            echo "No target symlinks to validate"
+            exit 0
+          fi
+
+          needs_skills=false
+          for link in "${links[@]}"; do
+            target=$(readlink "$link")
+            if [[ "$target" == *skills/* ]] || [[ "$link" == *skills/* ]]; then
+              needs_skills=true
+              break
+            fi
+          done
+
+          if ! $needs_skills; then
+            echo "No skill symlinks to validate"
+            exit 0
+          fi
+
+          if [ -z "$AGENT_SKILLS_TOKEN" ]; then
+            echo "::error::AGENT_SKILLS_TOKEN secret is required to validate skill symlinks against the private skills submodule"
+            exit 1
+          fi
+
+          git submodule sync --recursive
+          git \
+            -c url."https://x-access-token:${AGENT_SKILLS_TOKEN}@github.com/".insteadOf="https://github.com/" \
+            -c url."https://x-access-token:${AGENT_SKILLS_TOKEN}@github.com/".insteadOf="git@github.com:" \
+            submodule update --init --depth 1 skills
+
           exit_code=0
-          while IFS= read -r link; do
+          for link in "${links[@]}"; do
             target=$(readlink "$link")
             if [[ "$target" == *skills/* ]] || [[ "$link" == *skills/* ]]; then
               if [ ! -e "$link" ]; then
@@ -82,7 +151,7 @@ jobs:
                 echo "✓ $link -> $target"
               fi
             fi
-          done < <(find targets/ -type l 2>/dev/null)
+          done
           if [ $exit_code -eq 0 ]; then
             echo "All skill symlinks are valid (or none exist yet)"
           fi
