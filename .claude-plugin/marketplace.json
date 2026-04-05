@@ -51,6 +51,13 @@
       "description": "Meta — skill review and issue reporting for skill quality",
       "version": "0.1.0",
       "keywords": ["skills", "review", "quality"]
+    },
+    {
+      "name": "hooks",
+      "source": "./plugins/hooks",
+      "description": "Hooks — forced skill evaluation when prompts mention skills",
+      "version": "0.1.0",
+      "keywords": ["hooks", "skills", "evaluation"]
     }
   ]
 }
