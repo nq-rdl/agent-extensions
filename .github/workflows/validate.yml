@@ -110,7 +110,7 @@ jobs:
         env:
           AGENT_SKILLS_TOKEN: ${{ secrets.AGENT_SKILLS_TOKEN }}
         run: |
-          mapfile -t links < <(find plugins/ gemini/ opencode/ pidev/ -type l 2>/dev/null)
+          mapfile -t links < <(find plugins/ opencode/ pidev/ -type l 2>/dev/null)
           if [ ${#links[@]} -eq 0 ]; then
             echo "No target symlinks to validate"
             exit 0
