@@ -1,0 +1,9 @@
+{
+  "name": "infra",
+  "version": "0.1.0",
+  "description": "Infrastructure — Ansible, git hooks, analytical databases",
+  "author": { "name": "nq-rdl" },
+  "repository": "https://github.com/nq-rdl/agent-extensions",
+  "license": "MIT",
+  "skills": "./skills/"
+}

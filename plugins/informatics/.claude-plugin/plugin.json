@@ -1,0 +1,9 @@
+{
+  "name": "informatics",
+  "version": "0.1.0",
+  "description": "R ecosystem — package dev, Shiny, Quarto, testing, CRAN",
+  "author": { "name": "nq-rdl" },
+  "repository": "https://github.com/nq-rdl/agent-extensions",
+  "license": "MIT",
+  "skills": "./skills/"
+}

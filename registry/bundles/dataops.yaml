@@ -1,0 +1,28 @@
+schemaVersion: v1
+id: dataops
+displayName: DataOps
+description: Data operations — CSV, Excel, PDF, Word, design documents.
+owners:
+  - rdl
+channels:
+  - stable
+skills:
+  - csv
+  - xlsx
+  - pdf
+  - docx
+  - canvas-design
+hooks: []
+prompts: []
+mcp: []
+targets:
+  claude:
+    enabled: true
+    pluginName: dataops
+    marketplaceName: rdl
+  gemini:
+    enabled: false
+  pidev:
+    enabled: false
+  opencode:
+    enabled: false

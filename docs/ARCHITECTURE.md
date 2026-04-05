@@ -147,6 +147,7 @@ The repository should evolve toward this layout:
 ```text
 docs/
   ARCHITECTURE.md
+  bundles.md
 
 skills/                    ← git submodule (nq-rdl/agent-skills)
 
@@ -157,36 +158,51 @@ prompts/                   ← prompt content authored in this repo
 registry/
   bundles/
     swe.yaml
+    infra.yaml
+    dataops.yaml
     informatics.yaml
-    hooks.yaml
+    dev-tools.yaml
+    meta.yaml
   channels/
     stable.yaml
     preview.yaml
 
-targets/
-  claude/
-    plugins/
-      swe/
-        skills/
-          developer -> ../../../../skills/developer   ← symlink into submodule
-        hooks/
-        plugin.json
-    templates/
-    scripts/
-  gemini/
-    templates/
-    scripts/
-  pi/
-    templates/
-    scripts/
-  opencode/
-    templates/
-    scripts/
+.claude-plugin/
+  marketplace.json         ← Claude Code marketplace manifest (repo root)
+
+plugins/                   ← Claude Code plugins (one per bundle)
+  swe/
+    .claude-plugin/
+      plugin.json
+    skills/
+      tdd -> ../../../skills/skills/tdd         ← symlink into submodule
+      go-secure -> ../../../skills/skills/go-secure
+
+gemini/                    ← Gemini CLI extension (all skills in one extension)
+  gemini-extension.json
+  GEMINI.md
+  skills/
+    tdd -> ../../skills/skills/tdd              ← symlink into submodule
+    ansible -> ../../skills/skills/ansible
+  templates/
+  scripts/
+
+pidev/                     ← pi.dev package (all skills in one package)
+  package.json
+  skills/
+    tdd -> ../../skills/skills/tdd              ← symlink into submodule
+    ansible -> ../../skills/skills/ansible
+  templates/
+  scripts/
+
+opencode/                  ← OpenCode target (templates and scripts, Phase 3)
+  templates/
+  scripts/
 
 dist/
   claude/
   gemini/
-  pi/
+  pidev/
   opencode/
 ```
 
@@ -194,9 +210,10 @@ Notes:
 
 - `skills/` is a git submodule pointing to [`nq-rdl/agent-skills`](https://github.com/nq-rdl/agent-skills). Skills follow the [agents.io](https://agents.io) standard and are authored and versioned independently. After cloning, run `git submodule sync --recursive && git submodule update --init` to populate it.
 - `hooks/`, `mcp/`, and `prompts/` are the primary authored content of this repository — the extensions themselves.
-- When a plugin or extension needs a skill, it **symlinks** into `skills/<skill>` rather than copying. This keeps one source of truth and avoids drift.
-- `registry/` declares bundles, owners, release channels, and target mappings.
-- `targets/` contains host-specific adapter templates, build logic, and plugin/extension structures.
+- When a plugin or extension needs a skill, it **symlinks** into `skills/skills/<skill>` rather than copying. This keeps one source of truth and avoids drift. Claude Code follows symlinks during plugin installation, so the installed plugin is self-contained.
+- `registry/` declares bundles, owners, release channels, and target mappings. The `targets:` key in bundle YAML is a logical concept referring to platform outputs, not a filesystem path.
+- `.claude-plugin/` and `plugins/` at the repo root form the Claude Code marketplace. Claude Code requires `marketplace.json` at the repo root.
+- `gemini/`, `pidev/`, and `opencode/` contain host-specific adapter templates, build logic, and extension structures.
 - `dist/` is generated output and should not be hand-edited.
 
 ## Skills Submodule Sync
@@ -219,7 +236,7 @@ The `validate.yml` workflow runs on every PR and push to main. It always validat
 
 - Verifies the `skills/` submodule is declared and pinned in git
 - When `AGENT_SKILLS_TOKEN` is configured, checks that every skill referenced in `registry/bundles/*.yaml` exists in the submodule
-- When `AGENT_SKILLS_TOKEN` is configured, validates that all skill symlinks under `targets/` resolve correctly
+- When `AGENT_SKILLS_TOKEN` is configured, validates that all skill symlinks under `plugins/`, `gemini/`, `opencode/`, and `pidev/` resolve correctly
 
 ### Level 3 — Automated submodule bumps
 
@@ -344,46 +361,57 @@ These are the expected end-user install shapes.
 ### Claude Code Install Flow
 
 ```bash
-claude plugin marketplace add <marketplace-source>
-claude plugin install swe@rdl --scope project
+/plugin marketplace add nq-rdl/agent-extensions
+/plugin install swe@rdl --scope project
 ```
 
 Expected publication target:
 
-- a marketplace repo or branch containing marketplace metadata and plugin sources
+- this repository, with `.claude-plugin/marketplace.json` at the root and plugins under `plugins/`
 
 ### Gemini CLI Install Flow
 
+Local development (from cloned repo):
+
 ```bash
-gemini extensions install <extension-repo-or-release-url> --ref stable
+gemini extensions link gemini/
 ```
 
-Alternative preview flow:
+Remote install (future — requires mirror repo or release archive):
 
 ```bash
-gemini extensions install <extension-repo-or-release-url> --pre-release
+gemini extensions install github.com/nq-rdl/gemini-agent-extensions --ref stable
 ```
 
 Expected publication target:
 
-- one self-contained extension repo per published bundle, or
-- one GitHub Release archive per published bundle
+- one self-contained extension with all skills (single mega-extension)
+- remote install via mirror repo or GitHub Release archive (Phase 2)
 
 ### pi.dev Install Flow
 
+Local development (from cloned repo):
+
 ```bash
-pi install npm:@nq-rdl/pi-swe@latest
+pi install ./pidev
+```
+
+Git install:
+
+```bash
+pi install git:github.com/nq-rdl/agent-extensions
 ```
 
 Project-scoped install:
 
 ```bash
-pi install -l npm:@nq-rdl/pi-swe@latest
+pi install -l ./pidev
 ```
 
 Expected publication target:
 
-- npm package with `pi` package metadata
+- this repository's `pidev/` directory via local path or git install
+- future: npm package `@nq-rdl/agent-extensions` with `pi` package metadata
 
 ### OpenCode Install Flow
 

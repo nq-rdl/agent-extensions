@@ -19,12 +19,12 @@ This document describes the phased rollout strategy for multi-platform support. 
 
 **Deliverables:**
 
-1. Define and validate the bundle registry schema (`registry/bundles/*.yaml`).
-2. Create the repository layout (`portable/`, `registry/`, `targets/`, `dist/`).
-3. Author at least one complete bundle with portable content.
-4. Build the generator for Claude Code target output.
+1. Define and validate the bundle registry schema (`registry/bundles/*.yaml`). ✅
+2. Create the repository layout (`plugins/`, `registry/`, `gemini/`, `pidev/`, `opencode/`). ✅
+3. Author at least one complete bundle with portable content. ✅ (6 bundles: swe, infra, dataops, informatics, dev-tools, meta)
+4. Create Claude Code marketplace with plugin symlinks into skills submodule. ✅
 5. Build the generator for pi.dev target output.
-6. Add CI validation workflow (`validate.yml`).
+6. Add CI validation workflow (`validate.yml`). ✅
 7. Smoke-test install for Claude Code plugin.
 8. Smoke-test install for pi.dev package.
 
@@ -117,5 +117,5 @@ These should be resolved before or during Phase 1:
 
 1. **Build tool choice.** What drives the generators? A Python CLI in `src/agent_extensions/`, a task runner, or standalone scripts? The repo already uses pixi and hatchling, so a Python CLI is the natural fit.
 2. **Versioning strategy.** One version for the whole repo, per-bundle versions, or per-target versions? npm targets need semver. Claude marketplace needs version refs.
-3. **Adapter template format.** What templating engine for `targets/*/templates/`? Jinja2 is already available in the Python ecosystem and is a reasonable default.
+3. **Adapter template format.** What templating engine for `gemini/templates/`, `pidev/templates/`, `opencode/templates/`? Jinja2 is already available in the Python ecosystem and is a reasonable default.
 4. **Gemini publication strategy.** Release archives or mirror repos? This must be decided before Phase 2 begins.

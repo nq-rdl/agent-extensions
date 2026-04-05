@@ -1,0 +1,34 @@
+schemaVersion: v1
+id: dev-tools
+displayName: Dev Tools
+description: Developer tools — agent dispatch, multi-agent teams, link checking, docs.
+owners:
+  - rdl
+channels:
+  - stable
+skills:
+  - cc-agent-teams
+  - cc-hooks
+  - dispatch
+  - document-release
+  - gemini-cli
+  - jules
+  - jules-dispatch-creator
+  - opencode
+  - pi-rpc
+  - lychee
+  - writerside
+hooks: []
+prompts: []
+mcp: []
+targets:
+  claude:
+    enabled: true
+    pluginName: dev-tools
+    marketplaceName: rdl
+  gemini:
+    enabled: false
+  pidev:
+    enabled: false
+  opencode:
+    enabled: false

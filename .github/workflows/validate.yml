@@ -85,7 +85,7 @@ jobs:
               if $in_skills; then
                 if echo "$line" | grep -qE '^\s+-\s+'; then
                   skill=$(echo "$line" | sed 's/^\s*-\s*//' | tr -d '[:space:]')
-                  if [ ! -d "skills/src/$skill" ] && [ ! -d "skills/$skill" ]; then
+                  if [ ! -d "skills/skills/$skill" ] && [ ! -d "skills/src/$skill" ] && [ ! -d "skills/$skill" ]; then
                     echo "::error file=$bundle::Skill '$skill' not found in skills/ submodule"
                     exit_code=1
                   else
@@ -109,7 +109,7 @@ jobs:
         env:
           AGENT_SKILLS_TOKEN: ${{ secrets.AGENT_SKILLS_TOKEN }}
         run: |
-          mapfile -t links < <(find targets/ -type l 2>/dev/null)
+          mapfile -t links < <(find plugins/ gemini/ opencode/ pidev/ -type l 2>/dev/null)
           if [ ${#links[@]} -eq 0 ]; then
             echo "No target symlinks to validate"
             exit 0

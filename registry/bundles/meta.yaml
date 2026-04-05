@@ -1,0 +1,25 @@
+schemaVersion: v1
+id: meta
+displayName: Meta
+description: Meta — skill review and issue reporting for skill quality.
+owners:
+  - rdl
+channels:
+  - stable
+skills:
+  - report-skill-issue
+  - skill-review
+hooks: []
+prompts: []
+mcp: []
+targets:
+  claude:
+    enabled: true
+    pluginName: meta
+    marketplaceName: rdl
+  gemini:
+    enabled: false
+  pidev:
+    enabled: false
+  opencode:
+    enabled: false

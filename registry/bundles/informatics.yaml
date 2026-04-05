@@ -1,0 +1,35 @@
+schemaVersion: v1
+id: informatics
+displayName: Informatics
+description: R ecosystem — package dev, Shiny, Quarto, testing, CRAN.
+owners:
+  - rdl
+channels:
+  - stable
+skills:
+  - r-expert
+  - r-lib-cli
+  - r-lib-cli-app
+  - r-lib-cran-extrachecks
+  - r-lib-lifecycle
+  - r-lib-mirai
+  - r-lib-package-dev
+  - r-lib-testing
+  - shiny-bslib
+  - shiny-bslib-theming
+  - quarto-authoring
+  - quarto-alt-text
+hooks: []
+prompts: []
+mcp: []
+targets:
+  claude:
+    enabled: true
+    pluginName: informatics
+    marketplaceName: rdl
+  gemini:
+    enabled: false
+  pidev:
+    enabled: false
+  opencode:
+    enabled: false

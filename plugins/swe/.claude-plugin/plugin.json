@@ -1,0 +1,9 @@
+{
+  "name": "swe",
+  "version": "0.1.0",
+  "description": "Software engineering — TDD, secure Go, naming, CI/CD, changelogs",
+  "author": { "name": "nq-rdl" },
+  "repository": "https://github.com/nq-rdl/agent-extensions",
+  "license": "MIT",
+  "skills": "./skills/"
+}

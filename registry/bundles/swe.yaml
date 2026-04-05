@@ -1,0 +1,30 @@
+schemaVersion: v1
+id: swe
+displayName: SWE
+description: Software engineering — TDD, secure Go, naming, CI/CD, changelogs.
+owners:
+  - rdl
+channels:
+  - stable
+skills:
+  - tdd
+  - tdd-team-workflow
+  - go-secure
+  - go-naming
+  - go-gh
+  - changie
+  - charm-tui
+hooks: []
+prompts: []
+mcp: []
+targets:
+  claude:
+    enabled: true
+    pluginName: swe
+    marketplaceName: rdl
+  gemini:
+    enabled: false
+  pidev:
+    enabled: false
+  opencode:
+    enabled: false
