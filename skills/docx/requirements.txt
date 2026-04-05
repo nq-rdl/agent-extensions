@@ -1,0 +1,4 @@
+# docx skill dependencies
+# Note: also requires pandoc binary on PATH (install via system package manager)
+defusedxml>=0.7.1
+lxml>=5.0.0
