@@ -1,9 +1,15 @@
 {
+  "description": "Forced skill evaluation when prompts mention skills",
   "hooks": {
     "UserPromptSubmit": [
       {
-        "type": "command",
-        "command": "${CLAUDE_PLUGIN_ROOT}/scripts/forced-eval-hook.sh"
+        "hooks": [
+          {
+            "type": "command",
+            "command": "${CLAUDE_PLUGIN_ROOT}/scripts/forced-eval-hook.sh",
+            "timeout": 10
+          }
+        ]
       }
     ]
   }

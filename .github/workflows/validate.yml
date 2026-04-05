@@ -157,3 +157,12 @@ jobs:
             echo "All skill symlinks are valid (or none exist yet)"
           fi
           exit $exit_code
+
+  validate-plugins:
+    name: Validate Claude Code plugin structure
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Validate plugin manifests and hooks
+        run: scripts/validate-plugin-hooks.sh
