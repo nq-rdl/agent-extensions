@@ -1,0 +1,27 @@
+schemaVersion: v1
+id: infra
+displayName: Infra
+description: Infrastructure — Ansible, git hooks, analytical databases.
+owners:
+  - rdl
+channels:
+  - stable
+skills:
+  - ansible
+  - husky
+  - lefthook
+  - starrocks
+hooks: []
+prompts: []
+mcp: []
+targets:
+  claude:
+    enabled: true
+    pluginName: infra
+    marketplaceName: rdl
+  gemini:
+    enabled: false
+  pidev:
+    enabled: false
+  opencode:
+    enabled: false
