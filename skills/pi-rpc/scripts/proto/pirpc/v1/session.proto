@@ -1,0 +1,230 @@
+// Pi.dev Session Management Service
+//
+// ConnectRPC service that manages pi.dev coding agent sessions.
+//
+// Agents call this service via curl (Connect protocol, HTTP/1.1):
+//   curl --json '{"provider":"openai-codex","model":"gpt-5.4"}' \
+//        localhost:4097/pirpc.v1.SessionService/Create
+
+syntax = "proto3";
+
+package pirpc.v1;
+
+option go_package = "github.com/nq-rdl/agent-skills/skills/pi-rpc/scripts/gen/pirpc/v1;pirpcv1";
+
+import "google/protobuf/timestamp.proto";
+
+// SessionService manages pi.dev coding agent sessions.
+// Each session corresponds to one `pi --mode rpc` subprocess.
+service SessionService {
+  // Create a new pi.dev session. Spawns a subprocess.
+  rpc Create(CreateRequest) returns (CreateResponse);
+
+  // Send a prompt and wait for the agent to finish (synchronous).
+  // Returns when agent_end event is received.
+  rpc Prompt(PromptRequest) returns (PromptResponse);
+
+  // Send a prompt without waiting (asynchronous).
+  // Returns immediately after writing to subprocess stdin.
+  rpc PromptAsync(PromptAsyncRequest) returns (PromptAsyncResponse);
+
+  // Stream events from a session's pi.dev subprocess.
+  // Server-streaming RPC — events forwarded as they arrive on stdout.
+  rpc StreamEvents(StreamEventsRequest) returns (stream SessionEvent);
+
+  // Retrieve all conversation messages from a session.
+  rpc GetMessages(GetMessagesRequest) returns (GetMessagesResponse);
+
+  // Get current session state.
+  rpc GetState(GetStateRequest) returns (GetStateResponse);
+
+  // Abort the current agent operation in a session.
+  rpc Abort(AbortRequest) returns (AbortResponse);
+
+  // Delete a session. Kills the subprocess and frees resources.
+  rpc Delete(DeleteRequest) returns (DeleteResponse);
+
+  // List all active sessions.
+  rpc List(ListRequest) returns (ListResponse);
+}
+
+// --- Create ---
+
+message CreateRequest {
+  // AI provider (e.g., "openai", "anthropic").
+  string provider = 1;
+
+  // Model identifier (e.g., "gpt-5.4", "gpt-5.4-mini").
+  string model = 2;
+
+  // Working directory for the pi.dev subprocess.
+  // Defaults to service's working directory if empty.
+  string cwd = 3;
+
+  // Optional thinking level ("off", "minimal", "low", "medium", "high").
+  string thinking_level = 4;
+}
+
+message CreateResponse {
+  // Unique session identifier.
+  string session_id = 1;
+
+  // Current session state (should be IDLE after creation).
+  SessionState state = 2;
+}
+
+// --- Prompt (synchronous) ---
+
+message PromptRequest {
+  string session_id = 1;
+  string message = 2;
+}
+
+message PromptResponse {
+  // Session state after prompt completes (IDLE or ERROR).
+  SessionState state = 1;
+
+  // Messages produced during this prompt execution.
+  repeated Message messages = 2;
+}
+
+// --- PromptAsync ---
+
+message PromptAsyncRequest {
+  string session_id = 1;
+  string message = 2;
+}
+
+message PromptAsyncResponse {
+  // Confirms the prompt was sent. Monitor via StreamEvents.
+}
+
+// --- StreamEvents ---
+
+message StreamEventsRequest {
+  string session_id = 1;
+
+  // Optional: only stream events of these types.
+  // Empty means all events.
+  repeated EventType filter = 2;
+}
+
+message SessionEvent {
+  string session_id = 1;
+  EventType type = 2;
+  google.protobuf.Timestamp timestamp = 3;
+
+  // Raw pi.dev event payload as JSON.
+  // Consumers parse this based on EventType.
+  bytes data = 4;
+}
+
+// --- GetMessages ---
+
+message GetMessagesRequest {
+  string session_id = 1;
+}
+
+message GetMessagesResponse {
+  repeated Message messages = 1;
+}
+
+// --- GetState ---
+
+message GetStateRequest {
+  string session_id = 1;
+}
+
+message GetStateResponse {
+  string session_id = 1;
+  SessionState state = 2;
+  string provider = 3;
+  string model = 4;
+  string cwd = 5;
+  int32 pid = 6;
+  google.protobuf.Timestamp created_at = 7;
+  google.protobuf.Timestamp last_activity = 8;
+  string error_message = 9;
+}
+
+// --- Abort ---
+
+message AbortRequest {
+  string session_id = 1;
+}
+
+message AbortResponse {
+  SessionState state = 1;
+}
+
+// --- Delete ---
+
+message DeleteRequest {
+  string session_id = 1;
+}
+
+message DeleteResponse {}
+
+// --- List ---
+
+message ListRequest {}
+
+message ListResponse {
+  repeated SessionSummary sessions = 1;
+}
+
+message SessionSummary {
+  string id = 1;
+  SessionState state = 2;
+  string provider = 3;
+  string model = 4;
+  google.protobuf.Timestamp created_at = 5;
+}
+
+// --- Shared Types ---
+
+enum SessionState {
+  SESSION_STATE_UNSPECIFIED = 0;
+  SESSION_STATE_CREATING = 1;
+  SESSION_STATE_RUNNING = 2;
+  SESSION_STATE_IDLE = 3;
+  SESSION_STATE_ERROR = 4;
+  SESSION_STATE_TERMINATED = 5;
+}
+
+enum EventType {
+  EVENT_TYPE_UNSPECIFIED = 0;
+  EVENT_TYPE_AGENT_START = 1;
+  EVENT_TYPE_AGENT_END = 2;
+  EVENT_TYPE_TURN_START = 3;
+  EVENT_TYPE_TURN_END = 4;
+  EVENT_TYPE_MESSAGE_UPDATE = 5;
+  EVENT_TYPE_TOOL_START = 6;
+  EVENT_TYPE_TOOL_END = 7;
+  EVENT_TYPE_COMPACTION = 8;
+  EVENT_TYPE_RETRY = 9;
+  EVENT_TYPE_ERROR = 10;
+}
+
+message Message {
+  MessageRole role = 1;
+  string content = 2;
+  repeated ToolCall tool_calls = 3;
+  string tool_call_id = 4;
+  bool is_error = 5;
+  int64 timestamp_ms = 6;
+}
+
+enum MessageRole {
+  MESSAGE_ROLE_UNSPECIFIED = 0;
+  MESSAGE_ROLE_USER = 1;
+  MESSAGE_ROLE_ASSISTANT = 2;
+  MESSAGE_ROLE_TOOL_RESULT = 3;
+}
+
+message ToolCall {
+  string id = 1;
+  string name = 2;
+  // Tool arguments as serialized JSON string.
+  string arguments_json = 3;
+}

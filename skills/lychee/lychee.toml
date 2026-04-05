@@ -1,0 +1,46 @@
+# Default lychee configuration for documentation link checking.
+# Bundled with the lychee skill — agents use this automatically.
+# Projects can override by placing their own lychee.toml in the project root
+# and passing --config to the wrapper.
+
+# Cache results to .lycheecache to avoid re-checking on repeated runs
+cache = true
+
+# Include fragment checking (e.g., #section-name anchors)
+include_fragments = true
+
+# Max concurrent requests — throttle to avoid rate limiting
+max_concurrency = 32
+
+# Timeout per request (seconds)
+timeout = 30
+
+# Max retries for transient failures
+max_retries = 3
+
+# Exclude common false-positive patterns
+exclude = [
+  # Localhost/example URLs
+  "^https?://localhost",
+  "^https?://127\\.0\\.0\\.",
+  "^https?://0\\.0\\.0\\.0",
+  "^https?://example\\.com",
+  "^https?://example\\.org",
+  # Placeholder URLs
+  "^https?://your-",
+  "^https?://\\$",
+  "^https?://\\{\\{",
+  # Email addresses (often not real in docs)
+  "^mailto:",
+  # Private GitHub repositories
+  # "^https://github\\.com/your-org/"  # add org-specific exclusions here
+]
+
+# Exclude private/loopback IPs
+exclude_all_private = true
+
+# Accept common redirect status codes
+accept = ["100..=103", "200..=299"]
+
+# File extensions to check
+extensions = ["md", "mdx", "txt", "rst", "html", "yaml", "yml", "toml", "json"]

@@ -1,0 +1,64 @@
+diff --git a/catalog/package.go b/catalog/package.go
+new file mode 100644
+index 0000000..175d126
+--- /dev/null
++++ b/catalog/package.go
+@@ -0,0 +1,7 @@
++package catalog
++
++type Package struct{}
++
++func Packages() []Package {
++	return nil
++}
+diff --git a/catalog/provider.go b/catalog/provider.go
+new file mode 100644
+index 0000000..5bd0361
+--- /dev/null
++++ b/catalog/provider.go
+@@ -0,0 +1,7 @@
++package catalog
++
++type Provider struct{}
++
++func Providers() []Provider {
++	return nil
++}
+diff --git a/catalog/store.go b/catalog/store.go
+new file mode 100644
+index 0000000..0e9a485
+--- /dev/null
++++ b/catalog/store.go
+@@ -0,0 +1,12 @@
++package catalog
++
++type Store struct {
++	Name        string
++	Environment string
++}
++
++func Stores() []Store {
++	return []Store{
++		{Name: "primary", Environment: "dev"},
++	}
++}
+diff --git a/catalog/store_test.go b/catalog/store_test.go
+new file mode 100644
+index 0000000..a30930a
+--- /dev/null
++++ b/catalog/store_test.go
+@@ -0,0 +1,14 @@
++package catalog
++
++import "testing"
++
++func TestStores(t *testing.T) {
++	stores := Stores()
++	envs := Environments()
++	if len(stores) != 1 {
++		t.Fatalf("len = %d, want 1", len(stores))
++	}
++	if stores[0].Environment != envs[0].Name {
++		t.Fatalf("environment = %q, want %q", stores[0].Environment, envs[0].Name)
++	}
++}
