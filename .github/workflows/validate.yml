@@ -62,8 +62,9 @@ jobs:
           fi
 
           if [ -z "$AGENT_SKILLS_TOKEN" ]; then
-            echo "::error::AGENT_SKILLS_TOKEN secret is required to validate bundle skill references against the private skills submodule"
-            exit 1
+            echo "::warning::AGENT_SKILLS_TOKEN not set — skipping bundle skill resolution (structural validation only)"
+            echo "Bundle manifests found: ${bundles[*]}"
+            exit 0
           fi
 
           git submodule sync --recursive
@@ -130,8 +131,8 @@ jobs:
           fi
 
           if [ -z "$AGENT_SKILLS_TOKEN" ]; then
-            echo "::error::AGENT_SKILLS_TOKEN secret is required to validate skill symlinks against the private skills submodule"
-            exit 1
+            echo "::warning::AGENT_SKILLS_TOKEN not set — skipping symlink resolution (structural validation only)"
+            exit 0
           fi
 
           git submodule sync --recursive

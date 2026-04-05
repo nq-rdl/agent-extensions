@@ -50,7 +50,7 @@ Gemini CLI expects `gemini-extension.json` at the repository root for `gemini ex
 - A **mirror repo** (`nq-rdl/gemini-agent-extensions`) with `gemini-extension.json` at root
 - A **GitHub Release archive** containing the extension as a self-contained tarball
 
-This is planned for Phase 2. See [Deployment Phases](DEPLOYMENT_PHASES.md).
+This is planned for Phase 2.
 
 ## Why one extension instead of bundles
 
