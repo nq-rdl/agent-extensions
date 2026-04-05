@@ -1,0 +1,9 @@
+{
+  "name": "hooks",
+  "version": "0.1.0",
+  "description": "Hooks — forced skill evaluation when prompts mention skills",
+  "author": { "name": "nq-rdl" },
+  "repository": "https://github.com/nq-rdl/agent-extensions",
+  "license": "MIT",
+  "hooks": "../hooks/hooks.json"
+}

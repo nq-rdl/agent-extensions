@@ -1,0 +1,24 @@
+schemaVersion: v1
+id: hooks
+displayName: Hooks
+description: Hooks — forced skill evaluation when prompts mention skills.
+owners:
+  - rdl
+channels:
+  - stable
+skills: []
+hooks:
+  - forced-eval-hook
+prompts: []
+mcp: []
+targets:
+  claude:
+    enabled: true
+    pluginName: hooks
+    marketplaceName: rdl
+  gemini:
+    enabled: false
+  pidev:
+    enabled: false
+  opencode:
+    enabled: false
