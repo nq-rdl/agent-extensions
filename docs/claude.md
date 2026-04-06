@@ -82,7 +82,7 @@ When skills are updated in the `nq-rdl/agent-skills` submodule:
 
 1. Dependabot opens a PR to bump the submodule pointer.
 2. CI validates that all skill symlinks still resolve.
-3. After merge, bump the `version` in `marketplace.json` and each affected `plugin.json`.
+3. After merge, run `bash ./scripts/bump-release-version.sh v0.2.0` with the release tag to sync `marketplace.json`, all `plugin.json` files, and the other shipped extension manifests.
 4. Users receive update prompts via `/plugin marketplace update`.
 
 ## Why bundles instead of one plugin
