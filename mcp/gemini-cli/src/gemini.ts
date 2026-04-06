@@ -263,6 +263,10 @@ async function spawnGemini(
 ): Promise<GeminiResult> {
   const binary = process.env.GEMINI_BINARY ?? "gemini";
 
+  if (cwd !== undefined && !existsSync(cwd)) {
+    throw new Error(`cwd does not exist: ${cwd}`);
+  }
+
   return new Promise((resolve, reject) => {
     const proc = spawn(binary, args, {
       cwd: cwd ?? process.cwd(),

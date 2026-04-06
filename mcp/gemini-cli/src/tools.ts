@@ -14,7 +14,19 @@ import { runGemini, runGeminiWithContext, resumeGemini } from "./gemini.js";
 import { acpAsk } from "./acpClient.js";
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { writeFileSync, mkdirSync } from "fs";
-import { dirname } from "path";
+import { dirname, resolve } from "path";
+import os from "os";
+
+const ALLOWED_OUTPUT_BASE = process.env.GEMINI_OUTPUT_DIR ?? os.homedir();
+
+function validateOutputFile(output_file: string): void {
+  const resolved = resolve(output_file);
+  if (!resolved.startsWith(ALLOWED_OUTPUT_BASE + "/")) {
+    throw new Error(
+      `output_file must be within ${ALLOWED_OUTPUT_BASE}. Got: ${output_file}`
+    );
+  }
+}
 
 /**
  * Available Gemini model IDs plus named presets.
@@ -121,6 +133,7 @@ export function registerTools(server: McpServer): void {
         allowed_tools,
       });
       if (output_file) {
+        validateOutputFile(output_file);
         mkdirSync(dirname(output_file), { recursive: true });
         const json = JSON.stringify(result, null, 2);
         writeFileSync(output_file, json, "utf-8");
@@ -211,6 +224,7 @@ export function registerTools(server: McpServer): void {
         cwd,
       });
       if (output_file) {
+        validateOutputFile(output_file);
         mkdirSync(dirname(output_file), { recursive: true });
         const json = JSON.stringify(result, null, 2);
         writeFileSync(output_file, json, "utf-8");

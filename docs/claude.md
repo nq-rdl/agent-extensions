@@ -82,7 +82,7 @@ When skills are updated in the `nq-rdl/agent-skills` submodule:
 
 1. Dependabot opens a PR to bump the submodule pointer.
 2. CI validates that all skill symlinks still resolve.
-3. After merge, run `bash ./scripts/bump-release-version.sh v0.2.0` with the release tag to sync `marketplace.json`, all `plugin.json` files, and the other shipped extension manifests.
+3. After merge, run `bash ./scripts/bump-release-version.sh <new-tag>` (e.g. `v0.3.0`) with the release tag to sync `marketplace.json`, all `plugin.json` files, and the other shipped extension manifests.
 4. Users receive update prompts via `/plugin marketplace update`.
 
 ## Why bundles instead of one plugin
@@ -91,7 +91,7 @@ Claude Code's marketplace supports fine-grained install and uninstall. Splitting
 
 - Users keep their environment lean — install only the bundles relevant to their work
 - Skills are namespaced by bundle (`/swe:tdd`, `/infra:ansible`) which helps discoverability
-- Bundles can be versioned independently in the future
+- Bundles are currently versioned together; independent per-bundle versioning may be added later
 
 ## Validation
 

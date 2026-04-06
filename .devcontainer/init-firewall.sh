@@ -19,7 +19,11 @@ if [ -n "$DOCKER_DNS_RULES" ]; then
     echo "Restoring Docker DNS rules..."
     iptables -t nat -N DOCKER_OUTPUT 2>/dev/null || true
     iptables -t nat -N DOCKER_POSTROUTING 2>/dev/null || true
-    echo "$DOCKER_DNS_RULES" | xargs -L 1 iptables -t nat
+    # Validate each rule line before applying to prevent injection from crafted iptables-save output
+    while IFS= read -r rule; do
+        [[ "$rule" =~ ^-A[[:space:]]+(PREROUTING|OUTPUT|POSTROUTING|DOCKER_OUTPUT|DOCKER_POSTROUTING) ]] || continue
+        iptables -t nat $rule
+    done <<< "$DOCKER_DNS_RULES"
 else
     echo "No Docker DNS rules to restore"
 fi

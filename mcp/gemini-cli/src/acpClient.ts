@@ -14,7 +14,7 @@
 
 import { spawn, type ChildProcess } from "child_process";
 import { createInterface, type Interface as ReadlineInterface } from "readline";
-import { mkdirSync, writeFileSync, rmSync } from "fs";
+import { mkdirSync, writeFileSync, rmSync, existsSync } from "fs";
 import { join } from "path";
 import { randomUUID } from "crypto";
 import type {
@@ -120,6 +120,10 @@ async function createSession(
     mkdirSync(contextDir, { recursive: true });
     writeFileSync(join(contextDir, "GEMINI.md"), opts.system_context, "utf-8");
     args.push("--include-directories", contextDir);
+  }
+
+  if (opts.cwd !== undefined && !existsSync(opts.cwd)) {
+    throw new Error(`cwd does not exist: ${opts.cwd}`);
   }
 
   const proc = spawn(binary, args, {
