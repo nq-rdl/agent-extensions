@@ -17,3 +17,7 @@
 ```bash
 gemini extensions add nq-rdl/agent-extensions
 ```
+
+3. `pi.dev` and OpenCode
+
+_TBA._ 
