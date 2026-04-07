@@ -12,6 +12,8 @@ jobs:
       !contains(github.event.comment.body, '@jules-security') &&
       !contains(github.event.comment.body, '@jules-docs') &&
       !contains(github.event.comment.body, '@jules-infra') &&
+      !contains(github.event.comment.body, '@jules-review') &&
+      !contains(github.event.comment.body, '@jules-skills') &&
       contains(fromJSON('["OWNER", "MEMBER"]'), github.event.comment.author_association)
     permissions:
       contents: read

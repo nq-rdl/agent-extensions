@@ -14,7 +14,8 @@ import (
 	"google.golang.org/protobuf/types/known/timestamppb"
 )
 
-// Defaults holds fallback values applied when Create requests omit provider or model.
+// Defaults holds fallback provider/model values applied when a CreateRequest
+// omits them. Set via PI_DEFAULT_PROVIDER / PI_DEFAULT_MODEL env vars.
 type Defaults struct {
 	Provider string
 	Model    string
@@ -29,8 +30,13 @@ type SessionHandler struct {
 var _ pirpcv1connect.SessionServiceHandler = (*SessionHandler)(nil)
 
 // NewSessionHandler creates a handler backed by the given session manager.
-func NewSessionHandler(mgr *session.Manager, defaults Defaults) *SessionHandler {
-	return &SessionHandler{mgr: mgr, defaults: defaults}
+// An optional Defaults value configures fallback provider/model.
+func NewSessionHandler(mgr *session.Manager, defaults ...Defaults) *SessionHandler {
+	var d Defaults
+	if len(defaults) > 0 {
+		d = defaults[0]
+	}
+	return &SessionHandler{mgr: mgr, defaults: d}
 }
 
 func (h *SessionHandler) Create(ctx context.Context, req *connect.Request[pirpcv1.CreateRequest]) (*connect.Response[pirpcv1.CreateResponse], error) {
@@ -42,8 +48,10 @@ func (h *SessionHandler) Create(ctx context.Context, req *connect.Request[pirpcv
 	if model == "" {
 		model = h.defaults.Model
 	}
-
-	id, err := h.mgr.Create(ctx, provider, model, req.Msg.Cwd, req.Msg.ThinkingLevel)
+	if req.Msg.TimeoutSeconds < 0 {
+		return nil, connect.NewError(connect.CodeInvalidArgument, fmt.Errorf("timeout_seconds must be non-negative, got %d", req.Msg.TimeoutSeconds))
+	}
+	id, err := h.mgr.Create(ctx, provider, model, req.Msg.Cwd, req.Msg.ThinkingLevel, req.Msg.TimeoutSeconds)
 	if err != nil {
 		return nil, connect.NewError(connect.CodeInternal, fmt.Errorf("create session: %w", err))
 	}

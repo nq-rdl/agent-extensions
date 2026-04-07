@@ -29,8 +29,8 @@ Work through the following phases.
 
 Before reading the codebase, ask the user two quick questions:
 
-1. **Which workflow(s)?** Available: `swe`, `security`, `docs`, `infra`. If
-   the user doesn't specify, generate all applicable ones.
+1. **Which workflow(s)?** Available: `swe`, `security`, `docs`, `infra`,
+   `ci-review`. If the user doesn't specify, generate all applicable ones.
 2. **Secret name** — What GitHub Actions secret holds the Jules API key?
    (Each team member typically has their own token; name it accordingly, e.g.
    `JK_JULES_API`, `AB_JULES_API`.)
@@ -107,6 +107,7 @@ doesn't.
 | `security` | Describe risk patterns, not specific files | `ARCHITECTURE.md`, `CLAUDE.md` |
 | `docs` | Read code first, verify every claim | `ARCHITECTURE.md`, `DESIGN.md`, `CONTRIBUTING.md` |
 | `infra` | No live infra access — repo-local validation only | `ARCHITECTURE.md`, `CONTRIBUTING.md` |
+| `ci-review` | Triggered by CI failure, not a human mention; uses `workflow_run` trigger | CI workflow definitions, `CONTRIBUTING.md` |
 
 See the per-role sections below for full guidance on each.
 
@@ -284,6 +285,46 @@ The prompt should include:
 
 ---
 
+### CI Review prompt guidance
+
+The `ci-review` role is fundamentally different from the other four roles: it is
+triggered by a **CI failure event**, not a human mention in a comment. This means:
+
+- **No issue context** — there is no issue number, title, body, or labels to
+  inject. The prompt receives the failing workflow name, failed job names, and
+  a run URL instead.
+- **No `@jules-ci-review` mention guard** — the `workflow_run` trigger cannot
+  collide with `issue_comment`-based `!contains` guards. Do NOT add
+  `!contains(github.event.comment.body, '@jules-ci-review')` to other templates.
+- **Different placeholders** — the template uses three placeholders:
+  `[SECRET_NAME]`, `[PROMPT CONTENT]`, and `[CI_WORKFLOW_NAMES]` (a JSON array
+  of workflow name strings, e.g. `["CI", "Tests"]`).
+
+**Loop prevention** — The template's `if` guard excludes `main` and any branch
+starting with `jules/`. If Jules creates fix branches with a `jules/` prefix, its
+own PRs will not re-trigger the workflow. Verify this convention holds for the
+Jules action version in use.
+
+The prompt should include:
+
+- **Project context** — enough for Jules to navigate the repo (same as other roles).
+- **CI workflow descriptions** — what each monitored workflow does and how to
+  reproduce its failure locally (e.g. `pixi run validate-skills`).
+- **Failure context** — injected by GitHub Actions; keep these interpolations verbatim:
+  - `${{ github.event.workflow_run.name }}` — the failing workflow name
+  - `${{ github.event.workflow_run.head_branch }}` — the branch that triggered it
+  - `${{ steps.failure.outputs.failed_jobs }}` — comma-separated failed job names
+  - `${{ steps.failure.outputs.run_url }}` — link to the failed run
+- **Diagnosis process** — branch on the workflow name to guide Jules toward the
+  right reproduction and fix strategy for each CI check.
+- **Fix constraints** — minimal change only; do not modify validation rules unless
+  they are the root cause.
+
+**Instructions block for ci-review** should end with:
+"Open a pull request with the fix when complete."
+
+---
+
 ### Presenting the drafts
 
 Show all requested draft prompts to the user before writing any files. For each:
@@ -313,21 +354,28 @@ reorder, or simplify it.
 
 Every workflow guards against **all other `@jules-*` handles** to prevent
 double-firing when multiple handles appear in one comment. The current handle set
-is: `@jules-swe`, `@jules-security`, `@jules-docs`, `@jules-infra`.
+is: `@jules-swe`, `@jules-security`, `@jules-docs`, `@jules-infra`, `@jules-review`, `@jules-skills`.
 
 - `author_association` must be `OWNER` or `MEMBER` only — no `COLLABORATOR`.
 - The correct pattern for the existing workflows:
-  - **SWE**: triggers on `@jules-swe`; guards against security, docs, infra
-  - **Security**: triggers on `@jules-security`; guards against swe, docs, infra
-  - **Docs**: triggers on `@jules-docs`; guards against swe, security, infra
-  - **Infra**: triggers on `@jules-infra`; guards against swe, security, docs
+  - **SWE**: triggers on `@jules-swe`; guards against security, docs, infra, review, skills
+  - **Security**: triggers on `@jules-security`; guards against swe, docs, infra, review, skills
+  - **Docs**: triggers on `@jules-docs`; guards against swe, security, infra, review, skills
+  - **Infra**: triggers on `@jules-infra`; guards against swe, security, docs, review, skills
+  - **Review**: triggers on `@jules-review`; guards against swe, security, docs, infra, skills
+  - **Skills**: triggers on `@jules-skills`; guards against swe, security, docs, infra, review
 
-**Maintenance note — adding a new workflow:** Every time a new `@jules-*` handle
-is added, all *existing* templates must be updated with a new `!contains` guard
+**Maintenance note — adding a new `issue_comment` workflow:** Every time a new
+`@jules-*` handle is added for an `issue_comment`-triggered workflow, all
+*existing* `issue_comment` templates must be updated with a new `!contains` guard
 for the new handle. The templates in `templates/` are the canonical
 source — update them, then regenerate any deployed workflows from them.
 
-### Injection prevention — all four templates use this
+**Exception — `ci-review`:** The `jules-ci-review-dispatch.yml.tmpl` template
+uses `workflow_run` and does NOT use `!contains` guards. Do NOT add a guard for
+`@jules-ci-review` to the other templates.
+
+### Injection prevention — all issue_comment templates use this
 
 Every template uses a randomised heredoc delimiter (`openssl rand -hex 8`) when
 writing `title` and `body` to `$GITHUB_OUTPUT`. This prevents a crafted issue

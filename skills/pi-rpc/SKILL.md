@@ -32,24 +32,37 @@ metadata:
 
 ## Build and Run
 
-The `dev-tools` plugin includes a `PreToolUse` hook that **auto-starts the server** when any `pi_*` MCP tool is invoked. No manual startup needed.
+You can start the server in the background using the provided wrapper script. It will automatically build the server if needed and wait until it's healthy.
 
-To start manually or for development:
+```bash
+./skills/pi-rpc/scripts/start.sh
+```
+
+To configure default provider/model via environment variables:
+
+```bash
+PI_DEFAULT_PROVIDER=anthropic PI_DEFAULT_MODEL=claude-sonnet-4 ./skills/pi-rpc/scripts/start.sh
+```
+
+Alternatively, manage it manually:
 
 ```bash
 cd skills/pi-rpc/scripts
-
 make generate   # Regenerate protobuf code (requires buf CLI)
-make build      # Build ./bin/pi-server
+make build      # Build ./bin/pi-server and ./bin/pi-cli
 make test       # Run all tests
 make serve      # Start on localhost:4097 (PI_SERVER_PORT to override)
 ```
 
-Cross-compile for all supported platforms:
+## Environment Variables
 
-```bash
-make cross-compile DESTDIR=../../plugins/dev-tools/bin
-```
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `PI_SERVER_PORT` | `4097` | Listening port for the server |
+| `PI_SERVER_URL` | `http://localhost:4097` | Server URL used by pi-cli |
+| `PI_DEFAULT_PROVIDER` | `openai` | Fallback provider when `Create` omits it |
+| `PI_DEFAULT_MODEL` | `gpt-4.1` | Fallback model when `Create` omits it |
+| `PI_BINARY` | `pi` | Path to the pi binary |
 
 ## Health Check
 
@@ -61,23 +74,14 @@ curl -sf \
   "$PI_SERVER/pirpc.v1.SessionService/List" > /dev/null && echo "ready"
 ```
 
-## Default Provider and Model
-
-The server reads default provider/model from environment variables. These are used when `Create` requests omit `provider` or `model`:
-
-| Variable | Default | Description |
-|----------|---------|-------------|
-| `PI_DEFAULT_PROVIDER` | `openai` | Fallback provider for new sessions |
-| `PI_DEFAULT_MODEL` | `gpt-5.4` | Fallback model for new sessions |
-| `PI_SERVER_PORT` | `4097` | Port the server listens on |
-
-The auto-start hook sets these automatically. Override by exporting them before invoking skills.
+If not running, start with `./skills/pi-rpc/scripts/start.sh`.
 
 ## Provider and Model Selection
 
-If the user has not specified a provider and model, the server's configured defaults (`PI_DEFAULT_PROVIDER` / `PI_DEFAULT_MODEL`) are used. To see available options, run `pi --list-models`.
+If the user specifies a provider and model, pass them to the `Create` endpoint.
+If omitted, the server applies defaults from `PI_DEFAULT_PROVIDER` / `PI_DEFAULT_MODEL` (see Environment Variables above; hardcoded fallbacks: `openai` / `gpt-4.1`).
 
-Once known, validate the provider/model pair before creating sessions:
+If explicitly specifying a provider/model pair, validate before creating sessions:
 
 ```bash
 pi --provider <PROVIDER> --model <MODEL> --mode json "Reply with OK."
@@ -91,7 +95,7 @@ All endpoints accept `Content-Type: application/json` POST requests.
 
 | Endpoint | Purpose | Key Fields |
 |----------|---------|------------|
-| `pirpc.v1.SessionService/Create` | Spawn a pi.dev subprocess | `provider`, `model`, `cwd`, `thinking_level` |
+| `pirpc.v1.SessionService/Create` | Spawn a pi.dev subprocess | `provider` (optional), `model` (optional), `cwd`, `thinking_level` |
 | `pirpc.v1.SessionService/Prompt` | Send prompt, wait for completion | `session_id`, `message` |
 | `pirpc.v1.SessionService/PromptAsync` | Send prompt, return immediately | `session_id`, `message` |
 | `pirpc.v1.SessionService/StreamEvents` | Server-streaming events | `session_id`, optional `filter` |
@@ -120,10 +124,16 @@ Sessions are killed automatically after 60 seconds of inactivity while in `RUNNI
 ```bash
 PI_SERVER="${PI_SERVER_URL:-http://localhost:4097}"
 
-# Create a session
+# Create a session (with explicit provider/model)
 SESSION=$(curl -sf \
   -H 'Content-Type: application/json' \
   -d '{"provider":"<PROVIDER>","model":"<MODEL>","cwd":"/home/user/project"}' \
+  "$PI_SERVER/pirpc.v1.SessionService/Create" | jq -r .sessionId)
+
+# Alternatively, create a session using defaults
+SESSION=$(curl -sf \
+  -H 'Content-Type: application/json' \
+  -d '{"cwd":"/home/user/project"}' \
   "$PI_SERVER/pirpc.v1.SessionService/Create" | jq -r .sessionId)
 
 # Send a prompt (synchronous — waits up to 5 minutes)
