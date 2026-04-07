@@ -1,0 +1,17 @@
+{
+  "description": "Auto-start pi-rpc server when pi_* MCP tools are invoked",
+  "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": "mcp__pi-rpc",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "${CLAUDE_PLUGIN_ROOT}/scripts/ensure-pi-server.sh",
+            "timeout": 15
+          }
+        ]
+      }
+    ]
+  }
+}

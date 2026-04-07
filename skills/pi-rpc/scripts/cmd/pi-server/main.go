@@ -13,14 +13,23 @@ import (
 	"github.com/nq-rdl/agent-skills/skills/pi-rpc/scripts/session"
 )
 
+func envOr(key, fallback string) string {
+	if v := os.Getenv(key); v != "" {
+		return v
+	}
+	return fallback
+}
+
 func main() {
-	port := os.Getenv("PI_SERVER_PORT")
-	if port == "" {
-		port = "4097"
+	port := envOr("PI_SERVER_PORT", "4097")
+
+	defaults := handler.Defaults{
+		Provider: envOr("PI_DEFAULT_PROVIDER", "openai"),
+		Model:    envOr("PI_DEFAULT_MODEL", "gpt-5.4"),
 	}
 
 	mgr := session.NewManager("pi")
-	h := handler.NewSessionHandler(mgr)
+	h := handler.NewSessionHandler(mgr, defaults)
 
 	mux := http.NewServeMux()
 	path, svcHandler := pirpcv1connect.NewSessionServiceHandler(h)
