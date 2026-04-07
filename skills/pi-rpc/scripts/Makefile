@@ -1,25 +1,24 @@
-.PHONY: build test lint generate serve clean cross-compile
+.PHONY: build build-cli test lint generate serve clean
 
-BIN     := bin/pi-server
-PKG     := ./cmd/pi-server/
-PORT    ?= 4097
-DESTDIR ?= bin
+SERVER_BIN := bin/pi-server
+CLI_BIN    := bin/pi-cli
+SERVER_PKG := ./cmd/pi-server/
+CLI_PKG    := ./cmd/pi-cli/
+PORT       ?= 4097
 
-PLATFORMS := linux/amd64 darwin/arm64 darwin/amd64
+LDFLAGS := -X main.version=$(shell git describe --tags --always --dirty 2>/dev/null || echo dev) \
+           -X main.commit=$(shell git rev-parse --short HEAD 2>/dev/null || echo none)
 
-build:
-	CGO_ENABLED=0 go build -o $(BIN) $(PKG)
+build: build-server build-cli
 
-cross-compile:
-	@for platform in $(PLATFORMS); do \
-	  os=$${platform%%/*}; arch=$${platform##*/}; \
-	  echo "Building pi-server-$$os-$$arch"; \
-	  CGO_ENABLED=0 GOOS=$$os GOARCH=$$arch \
-	    go build -o $(DESTDIR)/pi-server-$$os-$$arch $(PKG); \
-	done
+build-server:
+	CGO_ENABLED=0 go build -ldflags "$(LDFLAGS)" -o $(SERVER_BIN) $(SERVER_PKG)
+
+build-cli:
+	CGO_ENABLED=0 go build -ldflags "$(LDFLAGS)" -o $(CLI_BIN) $(CLI_PKG)
 
 test:
-	go test ./...
+	go test -race ./...
 
 lint:
 	go vet ./...
@@ -27,8 +26,8 @@ lint:
 generate:
 	buf generate
 
-serve: build
-	PI_SERVER_PORT=$(PORT) ./$(BIN)
+serve: build-server
+	PI_SERVER_PORT=$(PORT) ./$(SERVER_BIN)
 
 clean:
 	rm -rf bin/

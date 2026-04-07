@@ -327,17 +327,37 @@ func TestHandlerGetMessagesEmptyWhenNoMessageEvents(t *testing.T) {
 	}
 }
 
-func TestHandlerCreateUsesDefaults(t *testing.T) {
-	defaults := Defaults{Provider: "test-provider", Model: "test-model"}
-	client, cleanup := setupTestServerWithDefaults(t, fakePi(t), defaults)
+func TestHandlerCreateRejectsNegativeTimeout(t *testing.T) {
+	client, cleanup := setupTestServer(t)
 	defer cleanup()
 
-	// Create with empty provider/model — should use defaults
+	_, err := client.Create(context.Background(), connect.NewRequest(&pirpcv1.CreateRequest{
+		Provider:       "openai-codex",
+		Model:          "gpt-5.4",
+		Cwd:            t.TempDir(),
+		TimeoutSeconds: -1,
+	}))
+	if err == nil {
+		t.Fatal("Create with negative timeout should fail")
+	}
+	if connect.CodeOf(err) != connect.CodeInvalidArgument {
+		t.Errorf("error code = %v, want InvalidArgument", connect.CodeOf(err))
+	}
+}
+
+func TestHandlerCreateAppliesDefaults(t *testing.T) {
+	client, cleanup := setupTestServerWithDefaults(t, fakePi(t), Defaults{
+		Provider: "default-provider",
+		Model:    "default-model",
+	})
+	defer cleanup()
+
+	// Create with empty provider/model — should apply defaults
 	createResp, err := client.Create(context.Background(), connect.NewRequest(&pirpcv1.CreateRequest{
 		Cwd: t.TempDir(),
 	}))
 	if err != nil {
-		t.Fatalf("Create failed: %v", err)
+		t.Fatalf("Create with defaults failed: %v", err)
 	}
 
 	stateResp, err := client.GetState(context.Background(), connect.NewRequest(&pirpcv1.GetStateRequest{
@@ -346,27 +366,29 @@ func TestHandlerCreateUsesDefaults(t *testing.T) {
 	if err != nil {
 		t.Fatalf("GetState failed: %v", err)
 	}
-	if stateResp.Msg.Provider != "test-provider" {
-		t.Errorf("provider = %q, want %q", stateResp.Msg.Provider, "test-provider")
+	if stateResp.Msg.Provider != "default-provider" {
+		t.Errorf("provider = %q, want %q", stateResp.Msg.Provider, "default-provider")
 	}
-	if stateResp.Msg.Model != "test-model" {
-		t.Errorf("model = %q, want %q", stateResp.Msg.Model, "test-model")
+	if stateResp.Msg.Model != "default-model" {
+		t.Errorf("model = %q, want %q", stateResp.Msg.Model, "default-model")
 	}
 }
 
 func TestHandlerCreateExplicitOverridesDefaults(t *testing.T) {
-	defaults := Defaults{Provider: "default-provider", Model: "default-model"}
-	client, cleanup := setupTestServerWithDefaults(t, fakePi(t), defaults)
+	client, cleanup := setupTestServerWithDefaults(t, fakePi(t), Defaults{
+		Provider: "default-provider",
+		Model:    "default-model",
+	})
 	defer cleanup()
 
-	// Explicit values should override defaults
+	// Create with explicit values — should override defaults
 	createResp, err := client.Create(context.Background(), connect.NewRequest(&pirpcv1.CreateRequest{
 		Provider: "explicit-provider",
 		Model:    "explicit-model",
 		Cwd:      t.TempDir(),
 	}))
 	if err != nil {
-		t.Fatalf("Create failed: %v", err)
+		t.Fatalf("Create with explicit values failed: %v", err)
 	}
 
 	stateResp, err := client.GetState(context.Background(), connect.NewRequest(&pirpcv1.GetStateRequest{

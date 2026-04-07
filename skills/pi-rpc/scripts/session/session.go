@@ -270,10 +270,15 @@ func (s *Session) monitorInactivity() {
 				s.mu.Lock()
 				if s.state == StateRunning {
 					s.state = StateError
-					s.errorMsg = fmt.Sprintf(
+					timeoutMsg := fmt.Sprintf(
 						"session killed: no activity for %s (provider=%s, model=%s)",
 						s.inactivityTimeout, s.provider, s.model,
 					)
+					if s.errorMsg == "" {
+						s.errorMsg = timeoutMsg
+					} else {
+						s.errorMsg = s.errorMsg + "\n" + timeoutMsg
+					}
 				}
 				s.mu.Unlock()
 

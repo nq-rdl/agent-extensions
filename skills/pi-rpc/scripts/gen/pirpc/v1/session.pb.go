@@ -224,8 +224,10 @@ type CreateRequest struct {
 	Cwd string `protobuf:"bytes,3,opt,name=cwd,proto3" json:"cwd,omitempty"`
 	// Optional thinking level ("off", "minimal", "low", "medium", "high").
 	ThinkingLevel string `protobuf:"bytes,4,opt,name=thinking_level,json=thinkingLevel,proto3" json:"thinking_level,omitempty"`
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
+	// Optional session inactivity timeout in seconds.
+	TimeoutSeconds int32 `protobuf:"varint,5,opt,name=timeout_seconds,json=timeoutSeconds,proto3" json:"timeout_seconds,omitempty"`
+	unknownFields  protoimpl.UnknownFields
+	sizeCache      protoimpl.SizeCache
 }
 
 func (x *CreateRequest) Reset() {
@@ -284,6 +286,13 @@ func (x *CreateRequest) GetThinkingLevel() string {
 		return x.ThinkingLevel
 	}
 	return ""
+}
+
+func (x *CreateRequest) GetTimeoutSeconds() int32 {
+	if x != nil {
+		return x.TimeoutSeconds
+	}
+	return 0
 }
 
 type CreateResponse struct {
@@ -1371,12 +1380,13 @@ var File_pirpc_v1_session_proto protoreflect.FileDescriptor
 
 const file_pirpc_v1_session_proto_rawDesc = "" +
 	"\n" +
-	"\x16pirpc/v1/session.proto\x12\bpirpc.v1\x1a\x1fgoogle/protobuf/timestamp.proto\"z\n" +
+	"\x16pirpc/v1/session.proto\x12\bpirpc.v1\x1a\x1fgoogle/protobuf/timestamp.proto\"\xa3\x01\n" +
 	"\rCreateRequest\x12\x1a\n" +
 	"\bprovider\x18\x01 \x01(\tR\bprovider\x12\x14\n" +
 	"\x05model\x18\x02 \x01(\tR\x05model\x12\x10\n" +
 	"\x03cwd\x18\x03 \x01(\tR\x03cwd\x12%\n" +
-	"\x0ethinking_level\x18\x04 \x01(\tR\rthinkingLevel\"]\n" +
+	"\x0ethinking_level\x18\x04 \x01(\tR\rthinkingLevel\x12'\n" +
+	"\x0ftimeout_seconds\x18\x05 \x01(\x05R\x0etimeoutSeconds\"]\n" +
 	"\x0eCreateResponse\x12\x1d\n" +
 	"\n" +
 	"session_id\x18\x01 \x01(\tR\tsessionId\x12,\n" +
