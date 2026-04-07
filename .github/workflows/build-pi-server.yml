@@ -8,6 +8,7 @@ on:
 
 permissions:
   contents: write
+  pull-requests: write
 
 jobs:
   cross-compile:
@@ -25,14 +26,15 @@ jobs:
         working-directory: skills/pi-rpc/scripts
         run: make cross-compile DESTDIR=$GITHUB_WORKSPACE/plugins/dev-tools/bin
 
-      - name: Commit updated binaries
-        run: |
-          git config user.name "github-actions[bot]"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add plugins/dev-tools/bin/pi-server-*
-          if ! git diff --cached --quiet; then
-            git commit -m "chore(pi-rpc): rebuild pi-server binaries"
-            git push
-          else
-            echo "Binaries unchanged — nothing to commit"
-          fi
+      - name: Create PR with updated binaries
+        uses: peter-evans/create-pull-request@v7
+        with:
+          commit-message: 'chore(pi-rpc): rebuild pi-server binaries'
+          branch: chore/rebuild-pi-server-binaries
+          title: 'chore(pi-rpc): rebuild pi-server binaries'
+          body: |
+            Automated rebuild of pi-server binaries triggered by changes to `skills/pi-rpc/scripts/`.
+
+            Built platforms: `linux/amd64`, `darwin/arm64`, `darwin/amd64`
+          add-paths: plugins/dev-tools/bin/pi-server-*
+          delete-branch: true
