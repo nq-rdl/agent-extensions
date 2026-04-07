@@ -1,0 +1,38 @@
+name: Build pi-server binaries
+
+on:
+  push:
+    branches: [main]
+    paths: ['skills/pi-rpc/scripts/**']
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  cross-compile:
+    name: Cross-compile pi-server
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: skills/pi-rpc/scripts/go.mod
+          cache-dependency-path: skills/pi-rpc/scripts/go.sum
+
+      - name: Build platform binaries
+        working-directory: skills/pi-rpc/scripts
+        run: make cross-compile DESTDIR=$GITHUB_WORKSPACE/plugins/dev-tools/bin
+
+      - name: Commit updated binaries
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add plugins/dev-tools/bin/pi-server-*
+          if ! git diff --cached --quiet; then
+            git commit -m "chore(pi-rpc): rebuild pi-server binaries"
+            git push
+          else
+            echo "Binaries unchanged — nothing to commit"
+          fi

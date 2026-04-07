@@ -32,6 +32,10 @@ metadata:
 
 ## Build and Run
 
+The `dev-tools` plugin includes a `PreToolUse` hook that **auto-starts the server** when any `pi_*` MCP tool is invoked. No manual startup needed.
+
+To start manually or for development:
+
 ```bash
 cd skills/pi-rpc/scripts
 
@@ -39,6 +43,12 @@ make generate   # Regenerate protobuf code (requires buf CLI)
 make build      # Build ./bin/pi-server
 make test       # Run all tests
 make serve      # Start on localhost:4097 (PI_SERVER_PORT to override)
+```
+
+Cross-compile for all supported platforms:
+
+```bash
+make cross-compile DESTDIR=../../plugins/dev-tools/bin
 ```
 
 ## Health Check
@@ -51,11 +61,21 @@ curl -sf \
   "$PI_SERVER/pirpc.v1.SessionService/List" > /dev/null && echo "ready"
 ```
 
-If not running, start with `make serve` from `skills/pi-rpc/scripts/`.
+## Default Provider and Model
+
+The server reads default provider/model from environment variables. These are used when `Create` requests omit `provider` or `model`:
+
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `PI_DEFAULT_PROVIDER` | `openai` | Fallback provider for new sessions |
+| `PI_DEFAULT_MODEL` | `gpt-5.4` | Fallback model for new sessions |
+| `PI_SERVER_PORT` | `4097` | Port the server listens on |
+
+The auto-start hook sets these automatically. Override by exporting them before invoking skills.
 
 ## Provider and Model Selection
 
-**If the user has not specified a provider and model, ask them.** Do not assume a default. Use `pi --list-models` to show available options.
+If the user has not specified a provider and model, the server's configured defaults (`PI_DEFAULT_PROVIDER` / `PI_DEFAULT_MODEL`) are used. To see available options, run `pi --list-models`.
 
 Once known, validate the provider/model pair before creating sessions:
 

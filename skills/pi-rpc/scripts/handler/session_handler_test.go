@@ -30,9 +30,14 @@ func setupTestServer(t *testing.T) (pirpcv1connect.SessionServiceClient, func())
 
 func setupTestServerWithBinary(t *testing.T, binary string) (pirpcv1connect.SessionServiceClient, func()) {
 	t.Helper()
+	return setupTestServerWithDefaults(t, binary, Defaults{})
+}
+
+func setupTestServerWithDefaults(t *testing.T, binary string, defaults Defaults) (pirpcv1connect.SessionServiceClient, func()) {
+	t.Helper()
 
 	mgr := session.NewManager(binary)
-	h := NewSessionHandler(mgr)
+	h := NewSessionHandler(mgr, defaults)
 
 	mux := http.NewServeMux()
 	path, handler := pirpcv1connect.NewSessionServiceHandler(h)
@@ -319,5 +324,61 @@ func TestHandlerGetMessagesEmptyWhenNoMessageEvents(t *testing.T) {
 	}
 	if len(resp.Msg.Messages) != 0 {
 		t.Errorf("GetMessages returned %d messages, want 0", len(resp.Msg.Messages))
+	}
+}
+
+func TestHandlerCreateUsesDefaults(t *testing.T) {
+	defaults := Defaults{Provider: "test-provider", Model: "test-model"}
+	client, cleanup := setupTestServerWithDefaults(t, fakePi(t), defaults)
+	defer cleanup()
+
+	// Create with empty provider/model — should use defaults
+	createResp, err := client.Create(context.Background(), connect.NewRequest(&pirpcv1.CreateRequest{
+		Cwd: t.TempDir(),
+	}))
+	if err != nil {
+		t.Fatalf("Create failed: %v", err)
+	}
+
+	stateResp, err := client.GetState(context.Background(), connect.NewRequest(&pirpcv1.GetStateRequest{
+		SessionId: createResp.Msg.SessionId,
+	}))
+	if err != nil {
+		t.Fatalf("GetState failed: %v", err)
+	}
+	if stateResp.Msg.Provider != "test-provider" {
+		t.Errorf("provider = %q, want %q", stateResp.Msg.Provider, "test-provider")
+	}
+	if stateResp.Msg.Model != "test-model" {
+		t.Errorf("model = %q, want %q", stateResp.Msg.Model, "test-model")
+	}
+}
+
+func TestHandlerCreateExplicitOverridesDefaults(t *testing.T) {
+	defaults := Defaults{Provider: "default-provider", Model: "default-model"}
+	client, cleanup := setupTestServerWithDefaults(t, fakePi(t), defaults)
+	defer cleanup()
+
+	// Explicit values should override defaults
+	createResp, err := client.Create(context.Background(), connect.NewRequest(&pirpcv1.CreateRequest{
+		Provider: "explicit-provider",
+		Model:    "explicit-model",
+		Cwd:      t.TempDir(),
+	}))
+	if err != nil {
+		t.Fatalf("Create failed: %v", err)
+	}
+
+	stateResp, err := client.GetState(context.Background(), connect.NewRequest(&pirpcv1.GetStateRequest{
+		SessionId: createResp.Msg.SessionId,
+	}))
+	if err != nil {
+		t.Fatalf("GetState failed: %v", err)
+	}
+	if stateResp.Msg.Provider != "explicit-provider" {
+		t.Errorf("provider = %q, want %q", stateResp.Msg.Provider, "explicit-provider")
+	}
+	if stateResp.Msg.Model != "explicit-model" {
+		t.Errorf("model = %q, want %q", stateResp.Msg.Model, "explicit-model")
 	}
 }

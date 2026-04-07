@@ -1,2 +1,5 @@
 # SCM syntax highlighting & preventing 3-way merges
 pixi.lock merge=binary linguist-language=YAML linguist-generated=true -diff
+
+# Prebuilt Go binaries — no diff, no merge
+plugins/dev-tools/bin/pi-server-* binary
