@@ -1,0 +1,96 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Check out code
+        uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+
+      - name: Verify tag points to a commit on main
+        env:
+          SHA: ${{ github.sha }}
+        run: |
+          git fetch origin main --depth=1
+          if ! git merge-base --is-ancestor "$SHA" origin/main; then
+            echo "::error::Release tags must point to commits already on main."
+            exit 1
+          fi
+
+      - name: Extract version from tag
+        id: version
+        env:
+          TAG: ${{ github.ref_name }}
+        run: echo "version=${TAG#v}" >> "$GITHUB_OUTPUT"
+
+      - name: Bump versions in all manifests
+        env:
+          VERSION: ${{ steps.version.outputs.version }}
+        run: |
+          set -euo pipefail
+
+          # --- JSON files: update "version" fields via jq ---
+          json_files=(
+            .claude-plugin/marketplace.json
+            gemini-extension.json
+            mcp/pi-rpc/package.json
+            mcp/gemini-cli/package.json
+            pidev/package.json
+          )
+          for f in plugins/*/.claude-plugin/plugin.json; do
+            json_files+=("$f")
+          done
+
+          for f in "${json_files[@]}"; do
+            if [ -f "$f" ]; then
+              jq --arg v "$VERSION" '
+                if .version then .version = $v else . end
+                | if .metadata?.version then .metadata.version = $v else . end
+                | if .plugins then .plugins |= map(.version = $v) else . end
+              ' "$f" > "${f}.tmp" && mv "${f}.tmp" "$f"
+              echo "  ✓ $f"
+            fi
+          done
+
+          # --- TOML files: update version field ---
+          if [ -f pyproject.toml ]; then
+            sed -i "s/^version = \".*\"/version = \"${VERSION}\"/" pyproject.toml
+            echo "  ✓ pyproject.toml"
+          fi
+
+          # Verify no stale versions remain (compare against previous tag)
+          remaining=$(grep -rn "\"version\": \"0\." --include='*.json' || true)
+          if [ -n "$remaining" ]; then
+            echo "::warning::Some version strings may not have been updated:"
+            echo "$remaining"
+          fi
+
+      - name: Commit version bump
+        env:
+          TAG: ${{ github.ref_name }}
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add -A
+          if git diff --cached --quiet; then
+            echo "No version changes needed"
+          else
+            git commit -m "chore: bump versions to ${TAG}"
+            git push origin HEAD:main
+          fi
+
+      - name: Create GitHub release
+        uses: softprops/action-gh-release@v2
+        with:
+          generate_release_notes: true
