@@ -34,13 +34,19 @@ Use `stream-json` to get session IDs and streaming events. Use `json` for simple
 
 | Flag | Alias | Values |
 |------|-------|--------|
-| `--model <model>` | `-m` | `auto`, `pro`, `flash`, `flash-lite` |
+| `--model <model>` | `-m` | `auto`, `pro`, `flash`, `flash-lite`, or a full model ID |
 
 Model guidance:
 - `auto` — Gemini routes to the best model for the task (default)
 - `pro` — Gemini 2.5 Pro: highest quality, slowest, most expensive
 - `flash` — Gemini 2.5 Flash: balanced speed/quality, good for web search
 - `flash-lite` — Fastest, lowest cost; best for simple lookups
+
+Full model IDs can also be passed directly:
+- `gemini-3-flash-preview` — Current default fast model
+- `gemini-3.1-pro-preview` — Current quality model
+- `gemini-3.1-flash-lite-preview` — Lightweight 3.x model: fastest and cheapest, ideal for simple lookups and classification
+- `gemini-2.5-pro`, `gemini-2.5-flash`, `gemini-2.5-flash-lite` — Previous generation (still available)
 
 ### Approval Mode
 
@@ -95,6 +101,7 @@ This is the mechanism used to inject system context via GEMINI.md files in temp 
 |----------|-------------|
 | `GEMINI_API_KEY` | Google AI API key (required unless using OAuth) |
 | `GEMINI_MODEL` | Default model override (same values as `--model`) |
+| `GEMINI_SYSTEM_MD` | Path to a markdown file used as the system prompt (e.g. `.gemini/prompts/persona.md`). Overrides any `GEMINI.md` in the working directory. Set per-call or export globally. |
 
 ---
 
@@ -151,8 +158,14 @@ kubectl describe pod my-pod | gemini -p "Is this pod healthy? What's wrong?" --a
 
 ---
 
-## GEMINI.md (Project Context)
+## System Prompt / GEMINI.md
 
-Gemini CLI reads `GEMINI.md` files from the current working directory (and parent directories) as project context — analogous to Claude Code's `CLAUDE.md`.
+**Recommended:** Use `GEMINI_SYSTEM_MD` to override the system prompt per-call. Store prompts in `.gemini/prompts/`:
 
-Use `--include-directories <path>` to add directories containing additional `GEMINI.md` files without changing the working directory. This is the recommended way to inject per-call system context.
+```bash
+GEMINI_SYSTEM_MD=.gemini/prompts/persona.md gemini -p "Review this code" --approval-mode yolo
+```
+
+Gemini CLI also reads `GEMINI.md` files from the current working directory (and parent directories) as project context — analogous to Claude Code's `CLAUDE.md`.
+
+Use `--include-directories <path>` to add directories containing additional `GEMINI.md` files without changing the working directory. This is an alternative when you need to inject a full context directory rather than a single system prompt.

@@ -131,16 +131,15 @@ greview() {
 
 ## System Context Injection
 
-```bash
-# Create a system context file
-cat > /tmp/research-context/GEMINI.md << 'EOF'
-You are a research assistant focused on machine learning.
-Always return structured JSON with fields: title, authors, year, summary, url.
-EOF
+Use `GEMINI_SYSTEM_MD` to set a system prompt — store prompts in `.gemini/prompts/`:
 
-# Use it for all calls in this script
-gemini -p "Find papers on diffusion transformers" \
-  --include-directories /tmp/research-context \
+```bash
+# .gemini/prompts/research-assistant.md contains:
+#   You are a research assistant focused on machine learning.
+#   Always return structured JSON with fields: title, authors, year, summary, url.
+
+GEMINI_SYSTEM_MD=.gemini/prompts/research-assistant.md \
+  gemini -p "Find papers on diffusion transformers" \
   --approval-mode yolo --output-format json
 ```
 

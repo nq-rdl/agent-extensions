@@ -97,17 +97,11 @@ gemini --prompt "Compare to linear attention" \
 
 ### System context injection
 
-Write a temporary `GEMINI.md` and pass it via `--include-directories`:
+Use `GEMINI_SYSTEM_MD` to override the system prompt for a single call:
 
 ```bash
-mkdir -p /tmp/gemini-ctx
-cat > /tmp/gemini-ctx/GEMINI.md << 'EOF'
-You are a research assistant. Return results as a JSON array with fields:
-title, authors, year, summary.
-EOF
-
-gemini --prompt "Find papers on MoE architectures" \
-  --include-directories /tmp/gemini-ctx \
+GEMINI_SYSTEM_MD=.gemini/prompts/research-assistant.md \
+  gemini --prompt "Find papers on MoE architectures" \
   --approval-mode yolo --output-format json
 ```
 
@@ -173,9 +167,10 @@ Accumulate `session/update` notification text chunks to reconstruct the full ans
 |--------|-------------|-------------|
 | `fast` | `gemini-3-flash-preview` | **Default.** Most tasks — search, review, generation, analysis |
 | `quality` | `gemini-3.1-pro-preview` | Complex reasoning, architecture, nuanced writing |
-| `auto` | cheapest available | Avoid — routes to `gemini-2.5-flash-lite` regardless of task |
+| `lite` | `gemini-3.1-flash-lite-preview` | Lightweight tasks — simple lookups, classification, quick summaries. Fastest and cheapest in the 3.x family |
+| `auto` | cheapest available | Avoid — routes unpredictably regardless of task complexity |
 
-Full model IDs also accepted: `gemini-3-flash-preview`, `gemini-3.1-pro-preview`, `gemini-2.5-pro`, `gemini-2.5-flash`, `gemini-2.5-flash-lite`.
+Full model IDs also accepted: `gemini-3-flash-preview`, `gemini-3.1-pro-preview`, `gemini-3.1-flash-lite-preview`, `gemini-2.5-pro`, `gemini-2.5-flash`, `gemini-2.5-flash-lite`.
 
 Default when `--model` is omitted: `GEMINI_DEFAULT_MODEL` env var → `gemini-3-flash-preview`.
 
@@ -183,25 +178,58 @@ Default when `--model` is omitted: `GEMINI_DEFAULT_MODEL` env var → `gemini-3-
 
 ## System Context Injection
 
-Gemini reads `GEMINI.md` from the working directory as project context (analogous to `CLAUDE.md`).
+Override the system prompt with `GEMINI_SYSTEM_MD` — point it at any markdown file and Gemini uses it as its system context for that invocation.
 
-Inject per-call context via a temp file + `--include-directories`:
+Store prompts in `.gemini/prompts/` so they're versioned, discoverable, and easy to manage:
+
+```
+.gemini/prompts/
+├── security-auditor.md
+├── research-assistant.md
+└── code-reviewer.md
+```
 
 ```bash
-# This pattern sets Gemini's persona/output format for one invocation
+# Set persona + output format for one call
+GEMINI_SYSTEM_MD=.gemini/prompts/security-auditor.md \
+  gemini --prompt "Review this code" \
+  --approval-mode yolo --output-format json
+```
+
+Where `.gemini/prompts/security-auditor.md` contains:
+
+```markdown
+You are a security auditor. Flag OWASP top 10 issues only. Be concise.
+```
+
+This is the **recommended approach** for headless dispatch — no temp dirs to create or clean up. Users can manage prompts with standard file operations (edit, delete, git-track).
+
+### Persistent default
+
+Export the var in your shell profile to apply a system prompt to every Gemini invocation:
+
+```bash
+export GEMINI_SYSTEM_MD=".gemini/prompts/default.md"
+```
+
+### Alternative: `--include-directories`
+
+When you need to inject multiple context files (not just a system prompt), use a temp directory with a `GEMINI.md` inside:
+
+```bash
 TMPDIR=$(mktemp -d)
 cat > "$TMPDIR/GEMINI.md" << 'EOF'
-You are a security auditor. Flag OWASP top 10 issues only. Be concise.
+You are a research assistant. Return results as structured JSON.
 EOF
 
-gemini --prompt "Review this code" \
+gemini --prompt "Find papers on MoE architectures" \
   --include-directories "$TMPDIR" \
   --approval-mode yolo --output-format json
 
 rm -rf "$TMPDIR"
 ```
 
-For a persistent default: set `GEMINI_SYSTEM_MD=/path/to/default.md` — read this file and pass its contents as `system_context` on every call.
+Gemini also reads `GEMINI.md` from the working directory automatically (analogous to `CLAUDE.md`).
 
 ---
 
