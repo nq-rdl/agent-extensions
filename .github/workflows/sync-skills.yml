@@ -1,9 +1,15 @@
 name: Sync skills from agent-skills
 
 on:
+  repository_dispatch:
+    types: [agent-skills-release]
   schedule:
     - cron: "0 6 * * 1"  # Weekly on Monday at 06:00 UTC
   workflow_dispatch:
+    inputs:
+      tag:
+        description: "Release tag to sync from (e.g. v0.2.1). Leave empty for latest."
+        required: false
 
 permissions:
   contents: write
@@ -16,33 +22,46 @@ jobs:
     steps:
       - uses: actions/checkout@v6
 
-      - name: Clone agent-skills and copy skill directories
+      - name: Determine release tag
+        id: release
         env:
           AGENT_SKILLS_TOKEN: ${{ secrets.AGENT_SKILLS_TOKEN }}
+          DISPATCH_TAG: ${{ github.event.client_payload.tag }}
+          INPUT_TAG: ${{ github.event.inputs.tag }}
         run: |
           if [ -z "$AGENT_SKILLS_TOKEN" ]; then
             echo "::error::AGENT_SKILLS_TOKEN secret is required"
             exit 1
           fi
 
-          # Clone agent-skills (shallow, just the skills/ directory)
-          git clone --depth 1 \
+          # Priority: dispatch payload > manual input > latest release
+          if [ -n "$DISPATCH_TAG" ]; then
+            TAG="$DISPATCH_TAG"
+          elif [ -n "$INPUT_TAG" ]; then
+            TAG="$INPUT_TAG"
+          else
+            TAG=$(gh release view --repo nq-rdl/agent-skills --json tagName -q '.tagName')
+          fi
+
+          echo "tag=$TAG" >> "$GITHUB_OUTPUT"
+          echo "Syncing from agent-skills@${TAG}"
+
+      - name: Clone agent-skills at release tag
+        env:
+          AGENT_SKILLS_TOKEN: ${{ secrets.AGENT_SKILLS_TOKEN }}
+          TAG: ${{ steps.release.outputs.tag }}
+        run: |
+          git clone --branch "$TAG" --depth 1 \
             "https://x-access-token:${AGENT_SKILLS_TOKEN}@github.com/nq-rdl/agent-skills.git" \
             /tmp/agent-skills
 
-          SOURCE_SHA=$(git -C /tmp/agent-skills rev-parse HEAD)
-          echo "agent-skills HEAD: $SOURCE_SHA"
-
           # Remove existing vendored skills (preserving any non-skill files)
-          # Only remove directories that have a SKILL.md (i.e. actual skills)
           for dir in skills/*/; do
             [ -f "$dir/SKILL.md" ] && rm -rf "$dir"
           done
 
           # Copy fresh skills from agent-skills/skills/ → skills/
           cp -r /tmp/agent-skills/skills/* skills/
-
-          echo "source_sha=$SOURCE_SHA" >> "$GITHUB_ENV"
 
       - name: Check for changes
         id: changes
@@ -60,31 +79,29 @@ jobs:
         if: steps.changes.outputs.changed == 'true'
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAG: ${{ steps.release.outputs.tag }}
         run: |
-          SHORT_SHA="${source_sha:0:7}"
-          BRANCH="chore/sync-skills-${SHORT_SHA}"
+          BRANCH="chore/sync-skills-${TAG}"
 
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
 
           git checkout -b "$BRANCH"
           git add skills/
-          git commit -m "chore(skills): sync from agent-skills@${SHORT_SHA}"
+          git commit -m "chore(skills): sync from agent-skills@${TAG}"
 
           git push -u origin "$BRANCH"
 
           gh pr create \
-            --title "chore(skills): sync from agent-skills@${SHORT_SHA}" \
+            --title "chore(skills): sync from agent-skills@${TAG}" \
             --body "$(cat <<EOF
-          ## Summary
+## Summary
 
-          Automated sync of skill directories from [nq-rdl/agent-skills](https://github.com/nq-rdl/agent-skills).
+Automated sync of skill directories from [nq-rdl/agent-skills@${TAG}](https://github.com/nq-rdl/agent-skills/releases/tag/${TAG}).
 
-          Source commit: nq-rdl/agent-skills@${source_sha}
+## Changes
 
-          ## Changes
-
-          $(git diff --stat HEAD~1)
-          EOF
+$(git diff --stat HEAD~1)
+EOF
           )" \
             --label "dependencies"
