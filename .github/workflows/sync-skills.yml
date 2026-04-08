@@ -25,15 +25,9 @@ jobs:
       - name: Determine release tag
         id: release
         env:
-          AGENT_SKILLS_TOKEN: ${{ secrets.AGENT_SKILLS_TOKEN }}
           DISPATCH_TAG: ${{ github.event.client_payload.tag }}
           INPUT_TAG: ${{ github.event.inputs.tag }}
         run: |
-          if [ -z "$AGENT_SKILLS_TOKEN" ]; then
-            echo "::error::AGENT_SKILLS_TOKEN secret is required"
-            exit 1
-          fi
-
           # Priority: dispatch payload > manual input > latest release
           if [ -n "$DISPATCH_TAG" ]; then
             TAG="$DISPATCH_TAG"
@@ -48,11 +42,10 @@ jobs:
 
       - name: Clone agent-skills at release tag
         env:
-          AGENT_SKILLS_TOKEN: ${{ secrets.AGENT_SKILLS_TOKEN }}
           TAG: ${{ steps.release.outputs.tag }}
         run: |
           git clone --branch "$TAG" --depth 1 \
-            "https://x-access-token:${AGENT_SKILLS_TOKEN}@github.com/nq-rdl/agent-skills.git" \
+            https://github.com/nq-rdl/agent-skills.git \
             /tmp/agent-skills
 
           # Remove existing vendored skills (preserving any non-skill files)
