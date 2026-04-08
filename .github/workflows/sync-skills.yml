@@ -92,16 +92,14 @@ jobs:
 
           git push -u origin "$BRANCH"
 
+          BODY=$(cat <<EOF
+          Automated sync of skill directories from [nq-rdl/agent-skills@${TAG}](https://github.com/nq-rdl/agent-skills/releases/tag/${TAG}).
+
+          Changes: $(git diff --stat HEAD~1)
+          EOF
+          )
+
           gh pr create \
             --title "chore(skills): sync from agent-skills@${TAG}" \
-            --body "$(cat <<EOF
-## Summary
-
-Automated sync of skill directories from [nq-rdl/agent-skills@${TAG}](https://github.com/nq-rdl/agent-skills/releases/tag/${TAG}).
-
-## Changes
-
-$(git diff --stat HEAD~1)
-EOF
-          )" \
+            --body "$BODY" \
             --label "dependencies"
