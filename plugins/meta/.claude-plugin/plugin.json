@@ -1,8 +1,10 @@
 {
   "name": "meta",
-  "version": "0.1.1",
+  "version": "0.2.0",
   "description": "Meta — skill review and issue reporting for skill quality",
-  "author": { "name": "nq-rdl" },
+  "author": {
+    "name": "nq-rdl"
+  },
   "repository": "https://github.com/nq-rdl/agent-extensions",
   "license": "MIT",
   "skills": "./skills/"

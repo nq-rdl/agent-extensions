@@ -1,8 +1,10 @@
 {
   "name": "@nq-rdl/agent-extensions",
-  "version": "0.1.1",
+  "version": "0.2.0",
   "description": "Curated agent skills — SWE, infrastructure, data ops, R/informatics, developer tools, and meta",
-  "keywords": ["pi-package"],
+  "keywords": [
+    "pi-package"
+  ],
   "license": "MIT",
   "author": {
     "name": "nq-rdl",
@@ -13,6 +15,8 @@
     "url": "https://github.com/nq-rdl/agent-extensions"
   },
   "pi": {
-    "skills": ["./skills"]
+    "skills": [
+      "./skills"
+    ]
   }
 }
