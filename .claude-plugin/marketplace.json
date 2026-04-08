@@ -6,7 +6,7 @@
   },
   "metadata": {
     "description": "Agent extensions — curated skill bundles for Claude Code",
-    "version": "0.2.0",
+    "version": "0.2.1",
     "pluginRoot": "./plugins"
   },
   "plugins": [
@@ -14,7 +14,7 @@
       "name": "swe",
       "source": "./plugins/swe",
       "description": "Software engineering — TDD, secure Go, naming, CI/CD, changelogs",
-      "version": "0.2.0",
+      "version": "0.2.1",
       "keywords": [
         "go",
         "tdd",
@@ -26,7 +26,7 @@
       "name": "infra",
       "source": "./plugins/infra",
       "description": "Infrastructure — Ansible, git hooks, analytical databases",
-      "version": "0.2.0",
+      "version": "0.2.1",
       "keywords": [
         "ansible",
         "git-hooks",
@@ -37,7 +37,7 @@
       "name": "dataops",
       "source": "./plugins/dataops",
       "description": "Data operations — CSV, Excel, PDF, Word, design documents",
-      "version": "0.2.0",
+      "version": "0.2.1",
       "keywords": [
         "csv",
         "excel",
@@ -49,7 +49,7 @@
       "name": "informatics",
       "source": "./plugins/informatics",
       "description": "R ecosystem — package dev, Shiny, Quarto, testing, CRAN",
-      "version": "0.2.0",
+      "version": "0.2.1",
       "keywords": [
         "r",
         "shiny",
@@ -62,7 +62,7 @@
       "name": "dev-tools",
       "source": "./plugins/dev-tools",
       "description": "Developer tools — agent dispatch, multi-agent teams, link checking, docs",
-      "version": "0.2.0",
+      "version": "0.2.1",
       "keywords": [
         "agents",
         "dispatch",
@@ -76,7 +76,7 @@
       "name": "meta",
       "source": "./plugins/meta",
       "description": "Meta — skill review and issue reporting for skill quality",
-      "version": "0.2.0",
+      "version": "0.2.1",
       "keywords": [
         "skills",
         "review",
@@ -87,7 +87,7 @@
       "name": "hooks",
       "source": "./plugins/hooks",
       "description": "Hooks — forced skill evaluation when prompts mention skills",
-      "version": "0.2.0",
+      "version": "0.2.1",
       "keywords": [
         "hooks",
         "skills",

@@ -1,6 +1,6 @@
 {
   "name": "informatics",
-  "version": "0.2.0",
+  "version": "0.2.1",
   "description": "R ecosystem — package dev, Shiny, Quarto, testing, CRAN",
   "author": {
     "name": "nq-rdl"

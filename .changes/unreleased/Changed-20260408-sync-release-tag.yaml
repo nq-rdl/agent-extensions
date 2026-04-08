@@ -1,3 +1,0 @@
-kind: Changed
-body: Skill sync now clones from release tag instead of HEAD, triggered on each agent-skills release
-time: 2026-04-08T15:30:00.000000000+10:00
