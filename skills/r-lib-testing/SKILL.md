@@ -74,7 +74,7 @@ describe("matrix()", {
 
 **Use `describe()` to verify you implement the right things, use `test_that()` to ensure you do things right.**
 
-See [references/bdd.md](references/bdd.md) for comprehensive BDD patterns, nested specifications, and test-first workflows.
+See [references/bdd.rst](references/bdd.rst) for comprehensive BDD patterns, nested specifications, and test-first workflows.
 
 ## Running Tests
 
@@ -224,7 +224,7 @@ During development:
 
 ## Snapshot Testing
 
-For complex output that's difficult to verify programmatically, use snapshot tests. See [references/snapshots.md](references/snapshots.md) for complete guide.
+For complex output that's difficult to verify programmatically, use snapshot tests. See [references/snapshots.rst](references/snapshots.rst) for complete guide.
 
 **Basic pattern:**
 
@@ -271,11 +271,11 @@ local_temp_csv <- function(data, env = parent.frame()) {
 data <- readRDS(test_path("fixtures", "sample_data.rds"))
 ```
 
-See [references/fixtures.md](references/fixtures.md) for detailed fixture patterns.
+See [references/fixtures.rst](references/fixtures.rst) for detailed fixture patterns.
 
 ## Mocking
 
-Replace external dependencies during testing using `local_mocked_bindings()`. See [references/mocking.md](references/mocking.md) for comprehensive mocking strategies.
+Replace external dependencies during testing using `local_mocked_bindings()`. See [references/mocking.rst](references/mocking.rst) for comprehensive mocking strategies.
 
 **Basic pattern:**
 
@@ -386,11 +386,11 @@ data <- readRDS("fixtures/data.rds")
 
 For advanced testing scenarios, see:
 
-- **[references/bdd.md](references/bdd.md)** - BDD-style testing with describe/it, nested specifications, test-first workflows
-- **[references/snapshots.md](references/snapshots.md)** - Snapshot testing, transforms, variants
-- **[references/mocking.md](references/mocking.md)** - Mocking strategies, webfakes, httptest2
-- **[references/fixtures.md](references/fixtures.md)** - Fixture patterns, database fixtures, helper files
-- **[references/advanced.md](references/advanced.md)** - Skipping tests, secrets management, CRAN requirements, custom expectations, parallel testing
+- **[references/bdd.rst](references/bdd.rst)** - BDD-style testing with describe/it, nested specifications, test-first workflows
+- **[references/snapshots.rst](references/snapshots.rst)** - Snapshot testing, transforms, variants
+- **[references/mocking.rst](references/mocking.rst)** - Mocking strategies, webfakes, httptest2
+- **[references/fixtures.rst](references/fixtures.rst)** - Fixture patterns, database fixtures, helper files
+- **[references/advanced.rst](references/advanced.rst)** - Skipping tests, secrets management, CRAN requirements, custom expectations, parallel testing
 
 ## testthat 3 Modernizations
 

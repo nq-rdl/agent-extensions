@@ -244,4 +244,4 @@ export NVM_DIR="$HOME/.nvm"
 
 ## Reference Files
 
-- [`references/hooks-reference.md`](references/hooks-reference.md) — All 13 git hook types, v8→v9 migration notes, script patterns, and monorepo setup.
+- [`references/hooks-reference.rst`](references/hooks-reference.rst) — All 13 git hook types, v8→v9 migration notes, script patterns, and monorepo setup.

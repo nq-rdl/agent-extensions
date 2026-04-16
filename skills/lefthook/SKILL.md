@@ -20,7 +20,7 @@ Fast, language-agnostic Git hooks manager written in Go. Single binary, no
 runtime dependencies, parallel execution by default.
 
 > **See also**: The **husky** skill covers Node.js/Bun projects.
-> For a decision guide, see [references/husky-vs-lefthook.md](references/husky-vs-lefthook.md).
+> For a decision guide, see [references/husky-vs-lefthook.rst](references/husky-vs-lefthook.rst).
 >
 > **Docs**: [lefthook.dev](https://lefthook.dev) |
 > **Repo**: [evilmartians/lefthook](https://github.com/evilmartians/lefthook)

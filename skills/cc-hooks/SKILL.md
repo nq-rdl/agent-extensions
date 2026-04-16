@@ -118,9 +118,9 @@ Forward agent notifications to webhooks, Slack, or other services.
 
 | File | Contents |
 |------|----------|
-| [references/claude-code.md](references/claude-code.md) | Complete Claude Code hook reference — all 9 events, config schema, detailed examples |
-| [references/recipes.md](references/recipes.md) | Common hook patterns with full implementations |
-| [references/debugging.md](references/debugging.md) | Debugging checklist for when hooks aren't working |
+| [references/claude-code.rst](references/claude-code.rst) | Complete Claude Code hook reference — all 9 events, config schema, detailed examples |
+| [references/recipes.rst](references/recipes.rst) | Common hook patterns with full implementations |
+| [references/debugging.rst](references/debugging.rst) | Debugging checklist for when hooks aren't working |
 
 ## Example Files
 

@@ -53,7 +53,7 @@ Writerside renders diagrams directly from fenced code blocks. Two options are su
 
 **PlantUML (acceptable alternative)** — use `lang="plantuml"`. Requires Graphviz on the build system. Use when Mermaid lacks the required diagram type (use case diagrams, mind maps, JSON visualisation, detailed UML class diagrams).
 
-See [references/diagrams.md](references/diagrams.md) for syntax, examples, and a decision guide.
+See [references/diagrams.rst](references/diagrams.rst) for syntax, examples, and a decision guide.
 
 ---
 
@@ -65,7 +65,7 @@ Writerside uses the JetBrains IDE spell checker. Configure the language for your
 2. Commit `.idea/dictionaries/` to share the project dictionary with the team
 3. Add custom terms (product names, acronyms, domain vocabulary) via right-click → **Save to project-level dictionary**
 
-Prose style enforcement (banned words, substitutions) is separate — use `.wrs-style-guide.yaml`. See [references/style-guide.md](references/style-guide.md).
+Prose style enforcement (banned words, substitutions) is separate — use `.wrs-style-guide.yaml`. See [references/style-guide.rst](references/style-guide.rst).
 
 ---
 
@@ -79,7 +79,7 @@ The sidebar TOC is defined in a `.tree` file using nested `<toc-element>` tags. 
 - **Short sidebar labels** — `toc-title` attribute overrides the full topic title in the sidebar
 - **Home page** — `start-page="topic.topic"` on `<instance-profile>`
 
-See [references/navigation.md](references/navigation.md) for full tree file examples.
+See [references/navigation.rst](references/navigation.rst) for full tree file examples.
 
 ---
 
@@ -100,13 +100,13 @@ Writerside does not require choosing one mode — Markdown files can contain sem
 
 | File | Contents |
 |------|----------|
-| [references/markup-reference.md](references/markup-reference.md) | Complete semantic XML tag reference — block elements, inline elements, metadata, conditional content, with examples |
-| [references/docker-deployment.md](references/docker-deployment.md) | Docker build process — commands, environment variables, CI/CD integration, multi-instance builds |
-| [references/documentation-quality.md](references/documentation-quality.md) | Built-in inspections, quality workflow, suppressing warnings, CI integration |
-| [references/templates.md](references/templates.md) | How-to guide template and Standard Operating Procedure template with Writerside XML examples |
-| [references/linting.md](references/linting.md) | Linting strategy — Writerside inspections as primary, optional external tools, recommended workflow |
-| [references/topics.md](references/topics.md) | Topic file formats (.md vs .topic), topic IDs, metadata attributes, when to use each format |
-| [references/diagrams.md](references/diagrams.md) | Mermaid (default) and PlantUML (acceptable) — syntax, supported types, embedding, decision guide |
-| [references/style-guide.md](references/style-guide.md) | Style guide configuration (.wrs-style-guide.yaml), rule types, spell checker setup for Australian English (en-AU) |
-| [references/navigation.md](references/navigation.md) | TOC tree structure, section wrappers, navigation ordering, hidden topics, toc-title overrides |
-| [references/lists.md](references/lists.md) | Definition lists, ordered/unordered lists, multi-column lists, nested lists — Markdown and XML |
+| [references/markup-reference.rst](references/markup-reference.rst) | Complete semantic XML tag reference — block elements, inline elements, metadata, conditional content, with examples |
+| [references/docker-deployment.rst](references/docker-deployment.rst) | Docker build process — commands, environment variables, CI/CD integration, multi-instance builds |
+| [references/documentation-quality.rst](references/documentation-quality.rst) | Built-in inspections, quality workflow, suppressing warnings, CI integration |
+| [references/templates.rst](references/templates.rst) | How-to guide template and Standard Operating Procedure template with Writerside XML examples |
+| [references/linting.rst](references/linting.rst) | Linting strategy — Writerside inspections as primary, optional external tools, recommended workflow |
+| [references/topics.rst](references/topics.rst) | Topic file formats (.md vs .topic), topic IDs, metadata attributes, when to use each format |
+| [references/diagrams.rst](references/diagrams.rst) | Mermaid (default) and PlantUML (acceptable) — syntax, supported types, embedding, decision guide |
+| [references/style-guide.rst](references/style-guide.rst) | Style guide configuration (.wrs-style-guide.yaml), rule types, spell checker setup for Australian English (en-AU) |
+| [references/navigation.rst](references/navigation.rst) | TOC tree structure, section wrappers, navigation ordering, hidden topics, toc-title overrides |
+| [references/lists.rst](references/lists.rst) | Definition lists, ordered/unordered lists, multi-column lists, nested lists — Markdown and XML |
