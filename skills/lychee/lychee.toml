@@ -20,6 +20,10 @@ max_retries = 3
 
 # Exclude common false-positive patterns
 exclude = [
+  # CI failing URLs
+  "^https?://quarto\\.org/docs/",
+  "^https?://quarto\\.org/docs/faq/rmarkdown\\.html#quarto-vs.-r-markdown",
+
   # Localhost/example URLs
   "^https?://localhost",
   "^https?://127\\.0\\.0\\.",
@@ -34,6 +38,11 @@ exclude = [
   "^mailto:",
   # Private GitHub repositories
   # "^https://github\\.com/your-org/"  # add org-specific exclusions here
+  # Exclude conventional commits due to rate limiting / connection reset in CI
+  "^https://www\\.conventionalcommits\\.org/",
+  "^https?://icons\\.getbootstrap\\.com",
+  "^https?://quarto\\.org/docs$",
+  "^https?://quarto\\.org/docs/$",
 ]
 
 # Exclude private/loopback IPs

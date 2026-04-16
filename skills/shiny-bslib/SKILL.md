@@ -74,33 +74,33 @@ ui <- page_navbar(
 - **`page_fillable()`** -- Viewport-filling layout for custom arrangements
 - **`page_fluid()`** -- Scrolling layout for long-form content
 
-See [page-layouts.md](references/page-layouts.md) for detailed guidance.
+See [page-layouts.rst](references/page-layouts.rst) for detailed guidance.
 
 ### Grid Systems
 
 - **`layout_column_wrap()`** -- Uniform grid with auto-wrapping (recommended for most cases)
 - **`layout_columns()`** -- 12-column Bootstrap grid with precise control
 
-See [grid-layouts.md](references/grid-layouts.md) for detailed guidance.
+See [grid-layouts.rst](references/grid-layouts.rst) for detailed guidance.
 
 ### Cards
 
 Primary container for dashboard content. Support headers, footers, multiple body sections, and full-screen expansion.
 
-See [cards.md](references/cards.md) for detailed guidance.
+See [cards.rst](references/cards.rst) for detailed guidance.
 
 ### Value Boxes
 
 Display key metrics and KPIs with optional icons, sparklines, and built-in theming.
 
-See [value-boxes.md](references/value-boxes.md) for detailed guidance.
+See [value-boxes.rst](references/value-boxes.rst) for detailed guidance.
 
 ### Navigation
 
 - **Page-level**: `page_navbar()` for multi-page apps
 - **Component-level**: `navset_card_underline()`, `navset_tab()`, `navset_pill()` for tabbed content
 
-See [navigation.md](references/navigation.md) for detailed guidance.
+See [navigation.rst](references/navigation.rst) for detailed guidance.
 
 ### Sidebars
 
@@ -108,13 +108,13 @@ See [navigation.md](references/navigation.md) for detailed guidance.
 - **Component-level**: `layout_sidebar()` within cards
 - Supports conditional content, dynamic open/close, accordions
 
-See [sidebars.md](references/sidebars.md) for detailed guidance.
+See [sidebars.rst](references/sidebars.rst) for detailed guidance.
 
 ### Filling Layouts
 
 The fill system controls how components resize to fill available space. Key concepts: fillable containers, fill items, fill carriers. Fill activates when containers have defined heights.
 
-See [filling.md](references/filling.md) for detailed guidance.
+See [filling.rst](references/filling.rst) for detailed guidance.
 
 ### Theming
 
@@ -123,7 +123,7 @@ See [filling.md](references/filling.md) for detailed guidance.
 - **Fonts**: `font_google()` for typography
 - **Dynamic theming**: `input_dark_mode()` + `session$setCurrentTheme()`
 
-See [theming.md](references/theming.md) for detailed guidance.
+See [theming.rst](references/theming.rst) for detailed guidance.
 
 ### UI Components
 
@@ -132,7 +132,7 @@ See [theming.md](references/theming.md) for detailed guidance.
 - **Popovers** -- Click-triggered containers for secondary UI/inputs
 - **Toasts** -- Temporary notification messages
 
-See [accordions.md](references/accordions.md), [tooltips-popovers.md](references/tooltips-popovers.md), and [toasts.md](references/toasts.md).
+See [accordions.rst](references/accordions.rst), [tooltips-popovers.rst](references/tooltips-popovers.rst), and [toasts.rst](references/toasts.rst).
 
 ### Icons
 
@@ -176,7 +176,7 @@ The `title` should describe the purpose of the trigger (e.g., "More information"
 - **`input_code_editor()`** -- Code editor with syntax highlighting
 - **`input_submit_textarea()`** -- Textarea with explicit submission
 
-See [inputs.md](references/inputs.md) for detailed guidance.
+See [inputs.rst](references/inputs.rst) for detailed guidance.
 
 ## Common Workflows
 
@@ -192,7 +192,7 @@ See [inputs.md](references/inputs.md) for detailed guidance.
 
 ### Modernizing an Existing App
 
-See [migration.md](references/migration.md) for a complete mapping of legacy patterns to modern equivalents. Key steps:
+See [migration.rst](references/migration.rst) for a complete mapping of legacy patterns to modern equivalents. Key steps:
 
 1. Replace `fluidPage()` with `page_sidebar()` or `page_navbar()`
 2. Replace `fluidRow()`/`column()` with `layout_columns()`
@@ -211,7 +211,7 @@ See [migration.md](references/migration.md) for a complete mapping of legacy pat
 6. **Use `thematic::thematic_shiny()`** in the server so base R and ggplot2 plots match the app theme
 7. **Use responsive widths** like `width = "250px"` in `layout_column_wrap()` for auto-adjusting columns
 8. **Group sidebar inputs** with `accordion()` when sidebars have many controls
-9. **See [migration.md](references/migration.md)** for mapping legacy Shiny patterns to modern bslib equivalents
+9. **See [migration.rst](references/migration.rst)** for mapping legacy Shiny patterns to modern bslib equivalents
 
 ## Avoid Common Errors
 
@@ -221,17 +221,17 @@ See [migration.md](references/migration.md) for a complete mapping of legacy pat
 
 ## Reference Files
 
-- **[migration.md](references/migration.md)** -- Legacy Shiny to modern bslib migration guide
-- **[page-layouts.md](references/page-layouts.md)** -- Page-level layout functions and patterns
-- **[grid-layouts.md](references/grid-layouts.md)** -- Multi-column grid systems
-- **[cards.md](references/cards.md)** -- Card components and features
-- **[value-boxes.md](references/value-boxes.md)** -- Value boxes for metrics and KPIs
-- **[navigation.md](references/navigation.md)** -- Navigation containers and patterns
-- **[sidebars.md](references/sidebars.md)** -- Sidebar layouts and organization
-- **[filling.md](references/filling.md)** -- Fillable containers and fill items
-- **[theming.md](references/theming.md)** -- Basic theming (colors, fonts, Bootswatch). See **shiny-bslib-theming** skill for advanced theming
-- **[accordions.md](references/accordions.md)** -- Collapsible sections and sidebar organization
-- **[tooltips-popovers.md](references/tooltips-popovers.md)** -- Hover tooltips and click-triggered popovers
-- **[toasts.md](references/toasts.md)** -- Temporary notification messages
-- **[inputs.md](references/inputs.md)** -- Special bslib input widgets
-- **[best-practices.md](references/best-practices.md)** -- bslib-specific patterns and common gotchas
+- **[migration.rst](references/migration.rst)** -- Legacy Shiny to modern bslib migration guide
+- **[page-layouts.rst](references/page-layouts.rst)** -- Page-level layout functions and patterns
+- **[grid-layouts.rst](references/grid-layouts.rst)** -- Multi-column grid systems
+- **[cards.rst](references/cards.rst)** -- Card components and features
+- **[value-boxes.rst](references/value-boxes.rst)** -- Value boxes for metrics and KPIs
+- **[navigation.rst](references/navigation.rst)** -- Navigation containers and patterns
+- **[sidebars.rst](references/sidebars.rst)** -- Sidebar layouts and organization
+- **[filling.rst](references/filling.rst)** -- Fillable containers and fill items
+- **[theming.rst](references/theming.rst)** -- Basic theming (colors, fonts, Bootswatch). See **shiny-bslib-theming** skill for advanced theming
+- **[accordions.rst](references/accordions.rst)** -- Collapsible sections and sidebar organization
+- **[tooltips-popovers.rst](references/tooltips-popovers.rst)** -- Hover tooltips and click-triggered popovers
+- **[toasts.rst](references/toasts.rst)** -- Temporary notification messages
+- **[inputs.rst](references/inputs.rst)** -- Special bslib input widgets
+- **[best-practices.rst](references/best-practices.rst)** -- bslib-specific patterns and common gotchas

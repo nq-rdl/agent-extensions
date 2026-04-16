@@ -197,4 +197,4 @@ Run through this before executing `changie new`:
 
 ## Reference Files
 
-- [`references/keep-a-changelog.md`](references/keep-a-changelog.md) — Keep a Changelog 1.1.0 spec condensed: the six kinds, what not to include, SemVer mapping, and the "Unreleased" concept.
+- [`references/keep-a-changelog.rst`](references/keep-a-changelog.rst) — Keep a Changelog 1.1.0 spec condensed: the six kinds, what not to include, SemVer mapping, and the "Unreleased" concept.

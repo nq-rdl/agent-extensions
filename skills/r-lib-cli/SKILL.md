@@ -116,7 +116,7 @@ cli_text("Use {{variable}} syntax in glue")
 #> Use {variable} syntax in glue
 ```
 
-**For complete markup reference**: See [references/inline-markup.md](references/inline-markup.md) for all 50+ inline classes, edge cases, nesting rules, and advanced patterns.
+**For complete markup reference**: See [references/inline-markup.rst](references/inline-markup.rst) for all 50+ inline classes, edge cases, nesting rules, and advanced patterns.
 
 ## Pluralization Basics
 
@@ -181,7 +181,7 @@ cli_text("{nupd}/{ntotal} {qty(nupd)} file{?s} {?needs/need} updates")
 #> 3/10 files need updates
 ```
 
-**For advanced pluralization**: See [references/inline-markup.md](references/inline-markup.md) for edge cases and complex patterns.
+**For advanced pluralization**: See [references/inline-markup.rst](references/inline-markup.rst) for edge cases and complex patterns.
 
 ## CLI Conditions: Core Patterns
 
@@ -250,7 +250,7 @@ cli_inform(c(
 - `"*"` - Bullet point
 - `">"` - Arrow/pointer
 
-**For advanced error design**: See [references/conditions.md](references/conditions.md) for error design principles, rlang integration, testing strategies, and real-world patterns.
+**For advanced error design**: See [references/conditions.rst](references/conditions.rst) for error design principles, rlang integration, testing strategies, and real-world patterns.
 
 ## Basic Progress Indicators
 
@@ -297,7 +297,7 @@ process <- function() {
 }
 ```
 
-**For advanced progress**: See [references/progress.md](references/progress.md) for nested progress, custom formats, parallel processing, all progress variables, and Shiny integration.
+**For advanced progress**: See [references/progress.rst](references/progress.rst) for nested progress, custom formats, parallel processing, all progress variables, and Shiny integration.
 
 ## Semantic CLI Elements
 
@@ -452,15 +452,15 @@ process_files <- function(files, verbose = TRUE) {
 
 ### Reference Files
 
-- **[references/inline-markup.md](references/inline-markup.md)** - Complete catalog of inline classes organized by category, advanced patterns, nesting rules, and real-world examples
+- **[references/inline-markup.rst](references/inline-markup.rst)** - Complete catalog of inline classes organized by category, advanced patterns, nesting rules, and real-world examples
 
-- **[references/conditions.md](references/conditions.md)** - Advanced error design patterns, rlang integration, testing with testthat snapshots, migration guide, and anti-patterns
+- **[references/conditions.rst](references/conditions.rst)** - Advanced error design patterns, rlang integration, testing with testthat snapshots, migration guide, and anti-patterns
 
-- **[references/progress.md](references/progress.md)** - Nested progress bars, custom formats, all progress variables, parallel processing, Shiny integration, and debugging
+- **[references/progress.rst](references/progress.rst)** - Nested progress bars, custom formats, all progress variables, parallel processing, Shiny integration, and debugging
 
-- **[references/themes.md](references/themes.md)** - Complete theming system with CSS-like selectors, container functions, color palettes, custom themes, and accessibility
+- **[references/themes.rst](references/themes.rst)** - Complete theming system with CSS-like selectors, container functions, color palettes, custom themes, and accessibility
 
-- **[references/ansi-operations.md](references/ansi-operations.md)** - ANSI string operations (align, columns, nchar, etc.), hyperlinks, color detection, testing CLI output, and troubleshooting
+- **[references/ansi-operations.rst](references/ansi-operations.rst)** - ANSI string operations (align, columns, nchar, etc.), hyperlinks, color detection, testing CLI output, and troubleshooting
 
 ### External Resources
 

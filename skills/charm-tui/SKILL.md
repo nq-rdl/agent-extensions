@@ -98,35 +98,35 @@ Key v2 patterns shown:
 
 ### The Elm Architecture (Init / Update / View)
 Every Bubbletea program is a Model implementing three methods. Init runs once at startup. Update handles every incoming message and returns a (possibly mutated) model plus an optional async Cmd. View renders the current state to a string, then wraps it in `tea.NewView()`.
-→ See [references/architecture.md](references/architecture.md) for the full lifecycle, message types, and Cmd functions.
+→ See [references/architecture.rst](references/architecture.rst) for the full lifecycle, message types, and Cmd functions.
 
 ### Messages and Commands
 `tea.Msg` is any event: key press, window resize, timer tick, HTTP response. `tea.Cmd` is an async I/O function (`func() tea.Msg`) that runs off the main loop and delivers its result as a message. Never block in Update — use a Cmd instead.
-→ See [references/architecture.md](references/architecture.md)
+→ See [references/architecture.rst](references/architecture.rst)
 
 ### Bubbles Components
 Bubbles provides ready-made components (textinput, list, table, viewport, spinner, progress, filepicker, help, and more). Each is an embeddable Model with its own `Update`/`View`. You delegate to them in your parent Update.
-→ See [references/components.md](references/components.md) for all 14+ components with exact signatures.
+→ See [references/components.rst](references/components.rst) for all 14+ components with exact signatures.
 
 ### Lip Gloss Styling
 Lip Gloss styles are **immutable** — every method returns a new Style. Chain calls, then call `.Render(text)` at the end. Use `lipgloss.Color("hex")` or named constants for colors.
-→ See [references/styling.md](references/styling.md)
+→ See [references/styling.rst](references/styling.rst)
 
 ### Layout Composition
 `lipgloss.JoinHorizontal` and `lipgloss.JoinVertical` place rendered string blocks side-by-side or stacked. `lipgloss.Place` centers content in a bounding box.
-→ See [references/layout.md](references/layout.md)
+→ See [references/layout.rst](references/layout.rst)
 
 ### Composition Patterns
 Three approaches for multi-component TUIs: flat (single model, state enum), model-stack (child models as struct fields), hybrid (stack + mode enum). Focus management uses Tab/Shift-Tab cycling.
-→ See [references/patterns.md](references/patterns.md)
+→ See [references/patterns.rst](references/patterns.rst)
 
 ### Testing
 `teatest` provides `NewTestModel`, `WaitFor`, and `RequireEqualOutput` for golden-file testing. VHS records `.tape` scripts for visual regression.
-→ See [references/testing.md](references/testing.md)
+→ See [references/testing.rst](references/testing.rst)
 
 ### Fang CLI Polish
 Fang wraps a Cobra command with styled help, errors, man pages, and shell completions via `fang.Execute(ctx, cobraCmd, opts...)`.
-→ See [references/fang.md](references/fang.md)
+→ See [references/fang.rst](references/fang.rst)
 
 ---
 
@@ -161,7 +161,7 @@ Fang wraps a Cobra command with styled help, errors, man pages, and shell comple
 | Blocking I/O in Update | Return a `tea.Cmd` for async I/O |
 | Raw goroutines | `tea.Cmd` functions |
 | Calling `.Update()` without reassigning | `m.child, cmd = m.child.Update(msg)` |
-| Inventing method names | Check [references/components.md](references/components.md) |
+| Inventing method names | Check [references/components.rst](references/components.rst) |
 
 ---
 
@@ -169,11 +169,11 @@ Fang wraps a Cobra command with styled help, errors, man pages, and shell comple
 
 | File | Contents |
 |------|----------|
-| [references/architecture.md](references/architecture.md) | Model interface, Program lifecycle, all Msg/Cmd types |
-| [references/components.md](references/components.md) | All 14+ Bubbles components — constructors, fields, methods |
-| [references/styling.md](references/styling.md) | Lip Gloss Style API, colors, borders, text attributes |
-| [references/layout.md](references/layout.md) | JoinHorizontal/Vertical, Place, responsive patterns |
-| [references/patterns.md](references/patterns.md) | Composition strategies, focus management, error handling |
-| [references/testing.md](references/testing.md) | teatest, golden files, VHS tape scripts |
-| [references/fang.md](references/fang.md) | Fang v2 + Cobra CLI polish |
-| [references/recipes.md](references/recipes.md) | 5 complete runnable examples with output mockups |
+| [references/architecture.rst](references/architecture.rst) | Model interface, Program lifecycle, all Msg/Cmd types |
+| [references/components.rst](references/components.rst) | All 14+ Bubbles components — constructors, fields, methods |
+| [references/styling.rst](references/styling.rst) | Lip Gloss Style API, colors, borders, text attributes |
+| [references/layout.rst](references/layout.rst) | JoinHorizontal/Vertical, Place, responsive patterns |
+| [references/patterns.rst](references/patterns.rst) | Composition strategies, focus management, error handling |
+| [references/testing.rst](references/testing.rst) | teatest, golden files, VHS tape scripts |
+| [references/fang.rst](references/fang.rst) | Fang v2 + Cobra CLI polish |
+| [references/recipes.rst](references/recipes.rst) | 5 complete runnable examples with output mockups |

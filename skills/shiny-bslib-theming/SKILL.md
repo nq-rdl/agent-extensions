@@ -311,7 +311,7 @@ Values can be Sass expressions referencing variables, functions, and math.
 
 ## Bootstrap CSS Custom Properties
 
-See [sass-and-css-variables.md](references/sass-and-css-variables.md) for details on:
+See [sass-and-css-variables.rst](references/sass-and-css-variables.rst) for details on:
 
 - How Sass variables compile into `--bs-*` CSS custom properties
 - Runtime vs compile-time variable layers
@@ -321,7 +321,7 @@ See [sass-and-css-variables.md](references/sass-and-css-variables.md) for detail
 
 ## Dark Mode and Color Modes
 
-See [dark-mode.md](references/dark-mode.md) for details on:
+See [dark-mode.rst](references/dark-mode.rst) for details on:
 
 - Bootstrap 5.3's client-side color mode system (`data-bs-theme` attribute)
 - `input_dark_mode()` and `toggle_dark_mode()` for user-controlled switching
@@ -437,7 +437,7 @@ Aim for WCAG AA compliance: 4.5:1 for normal text, 3:1 for large text.
 3. **Use fallback fonts** with `font_collection()` to avoid FOIT on slow connections
 4. **Test across components**: inputs, buttons, cards, navs, plots, tables, modals, toasts, mobile
 5. **Check accessibility** with `bs_get_contrast()` and browser dev tools
-6. **Use CSS utility classes** for one-off styling instead of custom CSS (see [sass-and-css-variables.md](references/sass-and-css-variables.md))
+6. **Use CSS utility classes** for one-off styling instead of custom CSS (see [sass-and-css-variables.rst](references/sass-and-css-variables.rst))
 7. **Organize complex themes** in a separate `theme.R`:
 
 ```r
@@ -455,5 +455,5 @@ app_theme <- function() {
 
 ## Reference Files
 
-- **[sass-and-css-variables.md](references/sass-and-css-variables.md)** -- Bootstrap's two-layer variable system, CSS custom properties, utility classes
-- **[dark-mode.md](references/dark-mode.md)** -- Color modes, dark mode, dynamic theming, component compatibility
+- **[sass-and-css-variables.rst](references/sass-and-css-variables.rst)** -- Bootstrap's two-layer variable system, CSS custom properties, utility classes
+- **[dark-mode.rst](references/dark-mode.rst)** -- Color modes, dark mode, dynamic theming, component compatibility

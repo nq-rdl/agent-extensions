@@ -47,10 +47,10 @@ Headless mode activates when `--prompt` is provided. Gemini runs, returns a resp
 ```bash
 gemini --prompt "Summarize the key risks in this architecture" \
   --output-format json \
-  --approval-mode yolo
+  --yolo
 ```
 
-`--approval-mode yolo` is **required** for headless — without it, Gemini blocks waiting for interactive confirmation that can never arrive.
+`--yolo` is **required** for headless — without it, Gemini blocks waiting for interactive confirmation that can never arrive.
 
 ### Output format
 
@@ -76,7 +76,7 @@ Use `--output-format stream-json` if you need the `session_id` for multi-turn (t
 
 ```bash
 git diff HEAD~1 | gemini --prompt "Review this diff. Focus on security issues." \
-  --approval-mode yolo --output-format json
+  --yolo --output-format json
 ```
 
 ### Multi-turn via `--resume`
@@ -86,29 +86,23 @@ Save the `session_id` from a previous call and continue the conversation:
 ```bash
 # First turn — capture session ID
 OUTPUT=$(gemini --prompt "Explain transformer attention" \
-  --output-format stream-json --approval-mode yolo)
+  --output-format stream-json --yolo)
 SESSION_ID=$(echo "$OUTPUT" | jq -r 'select(.type=="init") | .sessionId' | head -1)
 
 # Continue the session
 gemini --prompt "Compare to linear attention" \
   --resume "$SESSION_ID" \
-  --output-format json --approval-mode yolo
+  --output-format json --yolo
 ```
 
 ### System context injection
 
-Write a temporary `GEMINI.md` and pass it via `--include-directories`:
+Use `GEMINI_SYSTEM_MD` to override the system prompt for a single call:
 
 ```bash
-mkdir -p /tmp/gemini-ctx
-cat > /tmp/gemini-ctx/GEMINI.md << 'EOF'
-You are a research assistant. Return results as a JSON array with fields:
-title, authors, year, summary.
-EOF
-
-gemini --prompt "Find papers on MoE architectures" \
-  --include-directories /tmp/gemini-ctx \
-  --approval-mode yolo --output-format json
+GEMINI_SYSTEM_MD=.gemini/prompts/research-assistant.md \
+  gemini --prompt "Find papers on MoE architectures" \
+  --yolo --output-format json
 ```
 
 ---
@@ -173,9 +167,10 @@ Accumulate `session/update` notification text chunks to reconstruct the full ans
 |--------|-------------|-------------|
 | `fast` | `gemini-3-flash-preview` | **Default.** Most tasks — search, review, generation, analysis |
 | `quality` | `gemini-3.1-pro-preview` | Complex reasoning, architecture, nuanced writing |
-| `auto` | cheapest available | Avoid — routes to `gemini-2.5-flash-lite` regardless of task |
+| `lite` | `gemini-3.1-flash-lite-preview` | Lightweight tasks — simple lookups, classification, quick summaries. Fastest and cheapest in the 3.x family |
+| `auto` | cheapest available | Avoid — routes unpredictably regardless of task complexity |
 
-Full model IDs also accepted: `gemini-3-flash-preview`, `gemini-3.1-pro-preview`, `gemini-2.5-pro`, `gemini-2.5-flash`, `gemini-2.5-flash-lite`.
+Full model IDs also accepted: `gemini-3-flash-preview`, `gemini-3.1-pro-preview`, `gemini-3.1-flash-lite-preview`, `gemini-2.5-pro`, `gemini-2.5-flash`, `gemini-2.5-flash-lite`.
 
 Default when `--model` is omitted: `GEMINI_DEFAULT_MODEL` env var → `gemini-3-flash-preview`.
 
@@ -183,25 +178,58 @@ Default when `--model` is omitted: `GEMINI_DEFAULT_MODEL` env var → `gemini-3-
 
 ## System Context Injection
 
-Gemini reads `GEMINI.md` from the working directory as project context (analogous to `CLAUDE.md`).
+Override the system prompt with `GEMINI_SYSTEM_MD` — point it at any markdown file and Gemini uses it as its system context for that invocation.
 
-Inject per-call context via a temp file + `--include-directories`:
+Store prompts in `.gemini/prompts/` so they're versioned, discoverable, and easy to manage:
+
+```
+.gemini/prompts/
+├── security-auditor.md
+├── research-assistant.md
+└── code-reviewer.md
+```
 
 ```bash
-# This pattern sets Gemini's persona/output format for one invocation
+# Set persona + output format for one call
+GEMINI_SYSTEM_MD=.gemini/prompts/security-auditor.md \
+  gemini --prompt "Review this code" \
+  --yolo --output-format json
+```
+
+Where `.gemini/prompts/security-auditor.md` contains:
+
+```markdown
+You are a security auditor. Flag OWASP top 10 issues only. Be concise.
+```
+
+This is the **recommended approach** for headless dispatch — no temp dirs to create or clean up. Users can manage prompts with standard file operations (edit, delete, git-track).
+
+### Persistent default
+
+Export the var in your shell profile to apply a system prompt to every Gemini invocation:
+
+```bash
+export GEMINI_SYSTEM_MD=".gemini/prompts/default.md"
+```
+
+### Alternative: `--include-directories`
+
+When you need to inject multiple context files (not just a system prompt), use a temp directory with a `GEMINI.md` inside:
+
+```bash
 TMPDIR=$(mktemp -d)
 cat > "$TMPDIR/GEMINI.md" << 'EOF'
-You are a security auditor. Flag OWASP top 10 issues only. Be concise.
+You are a research assistant. Return results as structured JSON.
 EOF
 
-gemini --prompt "Review this code" \
+gemini --prompt "Find papers on MoE architectures" \
   --include-directories "$TMPDIR" \
-  --approval-mode yolo --output-format json
+  --yolo --output-format json
 
 rm -rf "$TMPDIR"
 ```
 
-For a persistent default: set `GEMINI_SYSTEM_MD=/path/to/default.md` — read this file and pass its contents as `system_context` on every call.
+Gemini also reads `GEMINI.md` from the working directory automatically (analogous to `CLAUDE.md`).
 
 ---
 
@@ -214,10 +242,10 @@ Fire multiple headless processes concurrently — each is independent:
 ```bash
 # Start all searches in parallel
 gemini --prompt "Search the web for: latest MoE architecture papers 2025" \
-  --approval-mode yolo --output-format json &
+  --yolo --output-format json &
 
 gemini --prompt "Search the web for: transformer scaling laws survey 2025" \
-  --approval-mode yolo --output-format json &
+  --yolo --output-format json &
 
 wait  # collect results when both finish
 ```
@@ -227,20 +255,20 @@ wait  # collect results when both finish
 ```bash
 git diff HEAD~1 | gemini \
   --prompt "Review this diff. Focus on security issues and edge cases. Be concise." \
-  --approval-mode yolo --output-format json | jq -r '.response'
+  --yolo --output-format json | jq -r '.response'
 ```
 
 ### Multi-turn research with `--resume`
 
 ```bash
 OUTPUT=$(gemini --prompt "Explain transformer attention complexity" \
-  --output-format stream-json --approval-mode yolo)
+  --output-format stream-json --yolo)
 SESSION=$(echo "$OUTPUT" | jq -r 'select(.type=="init") | .sessionId' | head -1)
 RESPONSE=$(echo "$OUTPUT" | jq -r 'select(.type=="result") | .response' | head -1)
 
 # Drill down in the same session
 gemini --prompt "Compare the top 3 approaches by memory efficiency" \
-  --resume "$SESSION" --output-format json --approval-mode yolo | jq -r '.response'
+  --resume "$SESSION" --output-format json --yolo | jq -r '.response'
 ```
 
 ### Large output to file
@@ -248,14 +276,14 @@ gemini --prompt "Compare the top 3 approaches by memory efficiency" \
 ```bash
 cat large-document.pdf | gemini \
   --prompt "Convert this document to structured JSON" \
-  --approval-mode yolo --output-format json > /tmp/output.json
+  --yolo --output-format json > /tmp/output.json
 ```
 
 ---
 
 ## Defaults and Safety
 
-- `--approval-mode yolo` is required for headless — `default` blocks waiting for TTY confirmation
+- `--yolo` is required for headless — `default` blocks waiting for TTY confirmation
 - `--sandbox` is optional — Gemini CLI's sandbox sets `HOME=/home/node` internally, which requires a specific system setup. Disable unless your system supports it.
 - Default timeout: 5 minutes. For long tasks (large files, deep research), increase or use background processes.
 

@@ -22,61 +22,61 @@ Task: Write a new Quarto document
 Use: Follow "QMD Essentials" below, then see specific reference files
 
 Task: Convert R Markdown to Quarto
-Use: [references/conversion-rmarkdown.md](references/conversion-rmarkdown.md)
+Use: [references/conversion-rmarkdown.rst](references/conversion-rmarkdown.rst)
 
 Task: Migrate bookdown project
-Use: [references/conversion-bookdown.md](references/conversion-bookdown.md)
+Use: [references/conversion-bookdown.rst](references/conversion-bookdown.rst)
 
 Task: Migrate xaringan slides
-Use: [references/conversion-xaringan.md](references/conversion-xaringan.md)
+Use: [references/conversion-xaringan.rst](references/conversion-xaringan.rst)
 
 Task: Migrate distill article
-Use: [references/conversion-distill.md](references/conversion-distill.md)
+Use: [references/conversion-distill.rst](references/conversion-distill.rst)
 
 Task: Migrate blogdown site
-Use: [references/conversion-blogdown.md](references/conversion-blogdown.md)
+Use: [references/conversion-blogdown.rst](references/conversion-blogdown.rst)
 
 Task: Add cross-references
-Use: [references/cross-references.md](references/cross-references.md)
+Use: [references/cross-references.rst](references/cross-references.rst)
 
 Task: Configure code cells
-Use: [references/code-cells.md](references/code-cells.md)
+Use: [references/code-cells.rst](references/code-cells.rst)
 
 Task: Add figures with captions
-Use: [references/figures.md](references/figures.md)
+Use: [references/figures.rst](references/figures.rst)
 
 Task: Create tables
-Use: [references/tables.md](references/tables.md)
+Use: [references/tables.rst](references/tables.rst)
 
 Task: Add citations and bibliography
-Use: [references/citations.md](references/citations.md)
+Use: [references/citations.rst](references/citations.rst)
 
 Task: Add callout blocks
-Use: [references/callouts.md](references/callouts.md)
+Use: [references/callouts.rst](references/callouts.rst)
 
 Task: Add diagrams (Mermaid, Graphviz)
-Use: [references/diagrams.md](references/diagrams.md)
+Use: [references/diagrams.rst](references/diagrams.rst)
 
 Task: Control page layout
-Use: [references/layout.md](references/layout.md)
+Use: [references/layout.rst](references/layout.rst)
 
 Task: Use shortcodes
-Use: [references/shortcodes.md](references/shortcodes.md)
+Use: [references/shortcodes.rst](references/shortcodes.rst)
 
 Task: Add conditional content
-Use: [references/conditional-content.md](references/conditional-content.md)
+Use: [references/conditional-content.rst](references/conditional-content.rst)
 
 Task: Use divs and spans
-Use: [references/divs-and-spans.md](references/divs-and-spans.md)
+Use: [references/divs-and-spans.rst](references/divs-and-spans.rst)
 
 Task: Configure YAML front matter
-Use: [references/yaml-front-matter.md](references/yaml-front-matter.md)
+Use: [references/yaml-front-matter.rst](references/yaml-front-matter.rst)
 
 Task: Find and use extensions
-Use: [references/extensions.md](references/extensions.md)
+Use: [references/extensions.rst](references/extensions.rst)
 
 Task: Apply markdown linting rules
-Use: [references/markdown-linting.md](references/markdown-linting.md)
+Use: [references/markdown-linting.rst](references/markdown-linting.rst)
 
 ## QMD Essentials
 
@@ -114,7 +114,7 @@ Spans use bracketed syntax:
 This is [important text]{.highlight}.
 ```
 
-Details: [references/divs-and-spans.md](references/divs-and-spans.md)
+Details: [references/divs-and-spans.rst](references/divs-and-spans.rst)
 
 ### Code Cell Options Syntax
 
@@ -156,7 +156,7 @@ execute:
   warning: false
 ```
 
-Details: [references/code-cells.md](references/code-cells.md)
+Details: [references/code-cells.rst](references/code-cells.rst)
 
 ### Cross-References
 
@@ -177,7 +177,7 @@ plot(1)
 See @fig-plot for the results.
 ````
 
-Details: [references/cross-references.md](references/cross-references.md)
+Details: [references/cross-references.rst](references/cross-references.rst)
 
 ### Callout Blocks
 
@@ -197,7 +197,7 @@ This is a warning with a custom title.
 :::
 ```
 
-Details: [references/callouts.md](references/callouts.md)
+Details: [references/callouts.rst](references/callouts.rst)
 
 ### Figures
 
@@ -217,7 +217,7 @@ Main caption for the group.
 :::
 ```
 
-Details: [references/figures.md](references/figures.md)
+Details: [references/figures.rst](references/figures.rst)
 
 ### Tables
 
@@ -232,7 +232,7 @@ Table caption.
 :::
 ```
 
-Details: [references/tables.md](references/tables.md)
+Details: [references/tables.rst](references/tables.rst)
 
 ### Citations
 
@@ -248,7 +248,7 @@ bibliography: references.bib
 csl: apa.csl
 ```
 
-Details: [references/citations.md](references/citations.md)
+Details: [references/citations.rst](references/citations.rst)
 
 ## Common Workflows
 
@@ -316,7 +316,9 @@ format:
 
 ## Resources
 
-- [Quarto Documentation](https://quarto.org/docs/)
+<!-- lychee-ignore -->
+- [Quarto Documentation](https://quarto.org/)
 - [Quarto Guide](https://quarto.org/docs/guide/)
+<!-- lychee-ignore -->
 - [Quarto Extensions](https://quarto.org/docs/extensions/)
 - [Community Extensions List](https://m.canouil.dev/quarto-extensions/)
