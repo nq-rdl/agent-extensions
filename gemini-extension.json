@@ -1,6 +1,6 @@
 {
   "name": "rdl",
-  "version": "0.2.1",
+  "version": "0.3.0",
   "description": "Curated agent skills — SWE, infrastructure, data ops, R/informatics, developer tools, and meta",
   "contextFileName": "GEMINI.md"
 }
