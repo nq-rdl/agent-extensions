@@ -1,0 +1,2 @@
+kind: Changed
+body: "Sync skills from agent-skills@v0.3.0 — adds argo-cd, conventional-commits, stitch-design-md, sops, zod, obsidian, and pre-commit skills; completes RST migration for all references"
