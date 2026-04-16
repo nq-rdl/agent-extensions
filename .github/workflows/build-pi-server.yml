@@ -27,7 +27,7 @@ jobs:
         run: make cross-compile DESTDIR=$GITHUB_WORKSPACE/plugins/dev-tools/bin
 
       - name: Create PR with updated binaries
-        uses: peter-evans/create-pull-request@v7
+        uses: peter-evans/create-pull-request@v8
         with:
           commit-message: 'chore(pi-rpc): rebuild pi-server binaries'
           branch: chore/rebuild-pi-server-binaries
