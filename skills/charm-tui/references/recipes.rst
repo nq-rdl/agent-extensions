@@ -15,15 +15,15 @@ Two text inputs with Tab navigation and Enter to submit.
 
 ::
 
-   ╭──────────────────────────────╮
-   │ New User                      │
-   │                               │
-   │ Name  > Alice_                │
-   │                               │
-   │ Email >                       │
-   │                               │
-   │ [Tab] next field  [Enter] submit  [Esc] cancel │
-   ╰──────────────────────────────╯
+   ╭────────────────────────────────────────────────╮
+   │ New User                                       │
+   │                                                │
+   │ Name  > Alice_                                 │
+   │                                                │
+   │ Email >                                        │
+   │                                                │
+   │ [Tab] next  [Enter] submit  [Esc] cancel       │
+   ╰────────────────────────────────────────────────╯
 
 .. code:: go
 
@@ -163,15 +163,15 @@ Scrollable table with keyboard navigation.
 ::
 
    ┌────────────────────────────────────────────────┐
-   │ Users                                           │
-   ├──────────────┬─────┬──────────────────────────┤
-   │ Name         │ Age │ Email                    │
-   ├──────────────┼─────┼──────────────────────────┤
+   │ Users                                          │
+   ├───────────────┬─────┬──────────────────────────┤
+   │ Name          │ Age │ Email                    │
+   ├───────────────┼─────┼──────────────────────────┤
    │▶ Alice        │ 30  │ alice@example.com        │
    │  Bob          │ 25  │ bob@example.com          │
    │  Charlie      │ 35  │ charlie@example.com      │
-   ├──────────────┴─────┴──────────────────────────┤
-   │ ↑/↓ navigate • q quit                         │
+   ├───────────────┴─────┴──────────────────────────┤
+   │ ↑/↓ navigate • enter select • q quit           │
    └────────────────────────────────────────────────┘
 
 .. code:: go
@@ -277,14 +277,14 @@ Sidebar navigation + main content, responsive to terminal size.
 ::
 
    My Dashboard                              Tab: switch panel
-   ┌───────────────┬────────────────────────────────────┐
+   ┌───────────────┬─────────────────────────────────────┐
    │ [SIDEBAR]     │ [MAIN]                              │
    │               │                                     │
    │ ▶ Overview    │  Overview                           │
    │   Settings    │  ──────────                         │
    │   About       │  Welcome to the dashboard.          │
    │               │  Use Tab to switch between panels.  │
-   └───────────────┴────────────────────────────────────┘
+   └───────────────┴─────────────────────────────────────┘
 
 .. code:: go
 
@@ -590,16 +590,17 @@ Filepicker on the left, viewport preview on the right.
 
 ::
 
-   ┌──────────────────┬──────────────────────────────┐
+   ┌──────────────────┬───────────────────────────────┐
    │ /home/user/docs  │ Preview: README.md            │
-   │                  │ ─────────────────────────────  │
+   │                  │ ───────────────────────────── │
    │ 📁 ..            │ # My Project                  │
    │ 📁 projects/     │                               │
    │ 📄 README.md     │ A short description of what   │
    │ 📄 notes.txt     │ this project does.            │
    │                  │                               │
-   └──────────────────┴──────────────────────────────┘
-   │ ↑/↓ navigate • Enter select • q quit            │
+   ├──────────────────┴───────────────────────────────┤
+   │ ↑/↓ navigate • Enter select • q quit             │
+   └──────────────────────────────────────────────────┘
 
 .. code:: go
 

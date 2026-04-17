@@ -18,8 +18,8 @@ Set up, build, test, and ship Go projects in GitHub Actions using
 [`actions/setup-go`](https://github.com/actions/setup-go) (v5+).
 
 > **Reference docs** — detailed examples live in `references/`:
-> - `advanced-usage.md` — version strategies, caching, custom mirrors
-> - `build-test.md` — full workflow patterns, matrix, artifacts
+> - `advanced-usage.rst` — version strategies, caching, custom mirrors
+> - `build-test.rst` — full workflow patterns, matrix, artifacts
 
 ## Quick Start
 
@@ -27,7 +27,6 @@ Minimal CI workflow:
 
 ```yaml
 name: Go CI
-license: MIT
 on: [push, pull_request]
 jobs:
   build:

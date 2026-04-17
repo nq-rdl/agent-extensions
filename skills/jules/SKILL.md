@@ -289,4 +289,4 @@ pixi run test         # runs all tests
 pixi run lint         # runs go vet
 ```
 
-For details on the API, see `references/api-reference.md`.
+For details on the API, see `references/api-reference.rst`.

@@ -1,6 +1,13 @@
 ---
 name: obsidian-bases
-description: Create and edit Obsidian Bases (.base files) with views, filters, formulas, and summaries. Use when working with .base files, creating database-like views of notes, or when the user mentions Bases, table views, card views, filters, or formulas in Obsidian.
+license: MIT
+description: >-
+  Create and edit Obsidian Bases (.base files) with views, filters, formulas,
+  and summaries. Use when working with .base files, creating database-like
+  views of notes, or when the user mentions Bases, table views, card views,
+  filters, or formulas in Obsidian.
+metadata:
+  repo: https://github.com/nq-rdl/agent-skills
 ---
 
 # Obsidian Bases Skill
@@ -174,7 +181,7 @@ formulas:
 
 ## Key Functions
 
-Most commonly used functions. For the complete reference of all types (Date, String, Number, List, File, Link, Object, RegExp), see [FUNCTIONS_REFERENCE.md](references/FUNCTIONS_REFERENCE.rst).
+Most commonly used functions. For the complete reference of all types (Date, String, Number, List, File, Link, Object, RegExp), see [FUNCTIONS_REFERENCE.rst](references/FUNCTIONS_REFERENCE.rst).
 
 | Function | Signature | Description |
 |----------|-----------|-------------|

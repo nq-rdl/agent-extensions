@@ -393,8 +393,8 @@ When a session silently fails, walk through these four checks in order:
 
 For building OpenCode tools, plugins, agents, or MCP server integrations, see the extension docs in `references/`:
 
-- `custom-tools.md` — Custom tool authoring with `@opencode-ai/plugin`
-- `plugins.md` — Plugin bundling and lifecycle hooks
-- `agents.md` — Agent configuration (markdown + JSON)
-- `mcp-servers.md` — MCP server setup
-- `opencode-json.md` — Complete `opencode.json` schema reference
+- `custom-tools.rst` — Custom tool authoring with `@opencode-ai/plugin`
+- `plugins.rst` — Plugin bundling and lifecycle hooks
+- `agents.rst` — Agent configuration (markdown + JSON)
+- `mcp-servers.rst` — MCP server setup
+- `opencode-json.rst` — Complete `opencode.json` schema reference

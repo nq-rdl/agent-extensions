@@ -253,4 +253,4 @@ The `what` fragment must work with "was deprecated in..." appended.
 
 ## Reference
 
-See `references/lifecycle-stages.md` for detailed stage definitions and transitions.
+See `references/lifecycle-stages.rst` for detailed stage definitions and transitions.

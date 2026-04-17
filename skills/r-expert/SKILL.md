@@ -235,4 +235,4 @@ combined <- dplyr::inner_join(x, y, by = c("id", "date"))
 - [Advanced R (Hadley Wickham)](https://adv-r.hadley.nz/)
 - [R for Data Science (2e)](https://r4ds.hadley.nz/)
 - [Efficient R Programming](https://csgillespie.github.io/efficientR/)
-- `references/style-quick-ref.md` — condensed style rules for quick lookup
+- `references/style-quick-ref.rst` — condensed style rules for quick lookup

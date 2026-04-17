@@ -430,4 +430,4 @@ tryCatch({
 For less common topics — launcher customization (`#| launcher:` front matter),
 detailed `Rapp::install_pkg_cli_apps()` API options, and more complete examples
 (deduplication filter, variadic install-pkg, interactive fallback) — read
-`references/advanced.md`.
+`references/advanced.rst`.

@@ -168,4 +168,4 @@ pcsv.write_csv(tbl, path, pcsv.WriteOptions(delimiter="|"))
 - After editing the Excel workbook → run `excel-to-csv` to regenerate CSVs
 
 ## Reference Files
-- `references/reference.md` — Schema definitions, data dictionary, allowed values, and PyArrow patterns
+- `references/reference.rst` — Schema definitions, data dictionary, allowed values, and PyArrow patterns

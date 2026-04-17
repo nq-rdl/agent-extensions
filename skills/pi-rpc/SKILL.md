@@ -170,7 +170,7 @@ curl -sf \
 
 ## Reference Docs
 
-- `references/rpc.md` — Full protocol reference: session lifecycle, all dispatch examples, event types, model mapping, health check
+- `references/rpc.rst` — Full protocol reference: session lifecycle, all dispatch examples, event types, model mapping, health check
 
 ## Protobuf Contract
 
