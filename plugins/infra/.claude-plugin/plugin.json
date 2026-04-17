@@ -1,6 +1,6 @@
 {
   "name": "infra",
-  "version": "0.3.0",
+  "version": "0.3.1",
   "description": "Infrastructure — Ansible, git hooks, analytical databases",
   "author": {
     "name": "nq-rdl"
