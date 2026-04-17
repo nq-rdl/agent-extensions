@@ -291,6 +291,6 @@ cat large-document.pdf | gemini \
 
 ## Reference Docs
 
-- `references/headless.md` — Headless mode: output formats, JSONL event schema, exit codes
-- `references/cli-reference.md` — Full CLI flags reference for headless automation
-- `references/automation.md` — Shell-level automation patterns (piping, bulk processing, functions)
+- `references/headless.rst` — Headless mode: output formats, JSONL event schema, exit codes
+- `references/cli-reference.rst` — Full CLI flags reference for headless automation
+- `references/automation.rst` — Shell-level automation patterns (piping, bulk processing, functions)

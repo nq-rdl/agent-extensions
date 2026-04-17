@@ -300,7 +300,7 @@ func SafeRequestContext(r *http.Request) []slog.Attr {
 ## Security Audit Checklist
 
 Before shipping error handling code, run through the checklist in
-`references/audit-checklist.md`. It covers the decision tree for each error:
+`references/audit-checklist.rst`. It covers the decision tree for each error:
 is the caller trusted? Does the error contain sensitive data? Will it cross
 a trust boundary?
 

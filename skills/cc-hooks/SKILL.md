@@ -41,7 +41,7 @@ Hooks are defined in Claude Code's `settings.json` files under the `"hooks"` key
 | `SubagentStop` | Subagent wants to stop | Yes — same as Stop |
 | `Notification` | Agent sends a notification | No |
 | `UserPromptSubmit` | User submits a prompt | No — but can inject context |
-| `PostToolUsePreResponse` | After tool completes, before agent responds | No — can inject context |
+| `PreCompact` | Before context window compaction | No |
 
 ## Hook Structure
 
@@ -66,7 +66,7 @@ Hooks are defined in Claude Code's `settings.json` files under the `"hooks"` key
 
 **Key fields:**
 - `matcher` — optional tool name filter (e.g., `"Bash"`, `"Write"`, `"Edit"`). Without it, fires for every tool.
-- `type` — always `"command"` (shell command)
+- `type` — `"command"` (shell command, most common). Also supports `"http"` (POST event JSON to a URL), `"prompt"` (inject a static prompt), and `"agent"` (run a Claude agent prompt). See `references/claude-code.rst` for details.
 - `command` — receives event context as JSON on stdin, emits decisions on stdout
 - `timeout` — seconds before the hook is killed (action proceeds as if allowed)
 

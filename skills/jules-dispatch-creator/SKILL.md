@@ -354,16 +354,14 @@ reorder, or simplify it.
 
 Every workflow guards against **all other `@jules-*` handles** to prevent
 double-firing when multiple handles appear in one comment. The current handle set
-is: `@jules-swe`, `@jules-security`, `@jules-docs`, `@jules-infra`, `@jules-review`, `@jules-skills`.
+is: `@jules-swe`, `@jules-security`, `@jules-docs`, `@jules-infra`.
 
 - `author_association` must be `OWNER` or `MEMBER` only — no `COLLABORATOR`.
 - The correct pattern for the existing workflows:
-  - **SWE**: triggers on `@jules-swe`; guards against security, docs, infra, review, skills
-  - **Security**: triggers on `@jules-security`; guards against swe, docs, infra, review, skills
-  - **Docs**: triggers on `@jules-docs`; guards against swe, security, infra, review, skills
-  - **Infra**: triggers on `@jules-infra`; guards against swe, security, docs, review, skills
-  - **Review**: triggers on `@jules-review`; guards against swe, security, docs, infra, skills
-  - **Skills**: triggers on `@jules-skills`; guards against swe, security, docs, infra, review
+  - **SWE**: triggers on `@jules-swe`; guards against security, docs, infra
+  - **Security**: triggers on `@jules-security`; guards against swe, docs, infra
+  - **Docs**: triggers on `@jules-docs`; guards against swe, security, infra
+  - **Infra**: triggers on `@jules-infra`; guards against swe, security, docs
 
 **Maintenance note — adding a new `issue_comment` workflow:** Every time a new
 `@jules-*` handle is added for an `issue_comment`-triggered workflow, all

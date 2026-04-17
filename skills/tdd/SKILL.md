@@ -84,7 +84,7 @@ Even when TDD is optional, ensure test coverage exists before declaring done.
 
 ## Anti-Patterns
 
-See `references/testing-anti-patterns.md` for the full catalogue with gate functions.
+See `references/testing-anti-patterns.rst` for the full catalogue with gate functions.
 
 **The five violations to watch for:**
 1. Testing mock behavior instead of real behavior
@@ -99,4 +99,4 @@ See `references/testing-anti-patterns.md` for the full catalogue with gate funct
 
 ## Reference Files
 
-- `references/testing-anti-patterns.md` — Full anti-pattern catalogue with gate functions and fixes
+- `references/testing-anti-patterns.rst` — Full anti-pattern catalogue with gate functions and fixes

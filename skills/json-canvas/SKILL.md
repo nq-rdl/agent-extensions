@@ -1,6 +1,12 @@
 ---
 name: json-canvas
-description: Create and edit JSON Canvas files (.canvas) with nodes, edges, groups, and connections. Use when working with .canvas files, creating visual canvases, mind maps, flowcharts, or when the user mentions Canvas files in Obsidian.
+license: MIT
+description: >-
+  Create and edit JSON Canvas files (.canvas) with nodes, edges, groups, and
+  connections. Use when working with .canvas files, creating visual canvases,
+  mind maps, flowcharts, or when the user mentions Canvas files in Obsidian.
+metadata:
+  repo: https://github.com/nq-rdl/agent-skills
 ---
 
 # JSON Canvas Skill
@@ -236,7 +242,7 @@ If validation fails, check for duplicate IDs, dangling edge references, or malfo
 
 ## Complete Examples
 
-See [references/EXAMPLES.md](references/EXAMPLES.rst) for full canvas examples including mind maps, project boards, research canvases, and flowcharts.
+See [references/EXAMPLES.rst](references/EXAMPLES.rst) for full canvas examples including mind maps, project boards, research canvases, and flowcharts.
 
 ## References
 

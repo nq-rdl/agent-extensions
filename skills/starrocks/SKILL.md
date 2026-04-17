@@ -24,9 +24,9 @@ It supports real-time ingestion, sub-second queries, and zero-migration data lak
 analytics via external catalogs.
 
 Before writing DDL or loading data, read the relevant reference files:
-- `references/table-design.md` — Table types, partitioning, bucketing, indexing quick-ref
-- `references/data-loading.md` — Loading methods comparison and patterns
-- `references/query-acceleration.md` — Materialized views, CBO, join strategies, caching
+- `references/table-design.rst` — Table types, partitioning, bucketing, indexing quick-ref
+- `references/data-loading.rst` — Loading methods comparison and patterns
+- `references/query-acceleration.rst` — Materialized views, CBO, join strategies, caching
 
 ---
 
@@ -106,7 +106,7 @@ filtered columns first. For Primary Key tables, the primary key IS the sort key.
 - For Kafka: one Routine Load job per topic partition group; monitor via
   `information_schema.routine_load_jobs`
 
-See `references/data-loading.md` for detailed patterns per method.
+See `references/data-loading.rst` for detailed patterns per method.
 
 ---
 
@@ -182,7 +182,7 @@ GROUP BY u.name;
 - **Query cache** — caches query results; useful for repeated dashboard queries
 - **Data cache** — caches remote storage data locally (shared-data mode)
 
-See `references/query-acceleration.md` for the full acceleration toolkit.
+See `references/query-acceleration.rst` for the full acceleration toolkit.
 
 ---
 
@@ -260,6 +260,6 @@ WITH (cpu_weight = 8, mem_limit = '30%', concurrency_limit = 50);
 - [Data Unloading](https://docs.starrocks.io/docs/unloading/)
 - [Information Schema](https://docs.starrocks.io/docs/sql-reference/information_schema/)
 - [Query Acceleration](https://docs.starrocks.io/docs/category/query-acceleration/)
-- `references/table-design.md` — Table types, partitioning, bucketing, indexing quick-ref
-- `references/data-loading.md` — Loading methods comparison and patterns
-- `references/query-acceleration.md` — Materialized views, CBO, join strategies, caching
+- `references/table-design.rst` — Table types, partitioning, bucketing, indexing quick-ref
+- `references/data-loading.rst` — Loading methods comparison and patterns
+- `references/query-acceleration.rst` — Materialized views, CBO, join strategies, caching

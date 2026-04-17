@@ -376,6 +376,6 @@ with pdfplumber.open("paper.pdf") as pdf:
 
 ## PDF Creation (Brief)
 
-For creating PDFs with reportlab or manipulating with qpdf, see `references/reference.md`. Key warning:
+For creating PDFs with reportlab or manipulating with qpdf, see `references/reference.rst`. Key warning:
 
 **Never use Unicode subscript/superscript characters** (₀₁₂, ⁰¹²) in ReportLab — they render as black boxes. Use `<sub>` and `<super>` tags in Paragraph objects instead.

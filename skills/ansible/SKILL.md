@@ -24,7 +24,7 @@ metadata:
 Write, modify, debug, and optimise Ansible content.
 
 Before writing any Ansible content, read the relevant reference files:
-- `references/role-reference.md` — Role scaffolding patterns and directory conventions
+- `references/role-reference.rst` — Role scaffolding patterns and directory conventions
 
 ## Dependencies
 
@@ -96,7 +96,7 @@ roles/my_role/
     └── my_config.j2
 ```
 
-See `references/role-reference.md` for the full pattern.
+See `references/role-reference.rst` for the full pattern.
 
 ### Task Splitting by Concern
 

@@ -59,7 +59,7 @@ python scripts/comment.py /absolute/path/to/unpacked/
 | Task | Approach |
 |------|----------|
 | Read/analyze content | `pandoc` or unpack for raw XML |
-| Create new document | Use `docx-js` -- see `references/creating-documents.md` |
+| Create new document | Use `docx-js` -- see `references/creating-documents.rst` |
 | Edit existing document | Unpack, edit XML, repack -- see Editing Existing Documents below |
 
 ### Converting .doc to .docx
@@ -99,7 +99,7 @@ python scripts/accept_changes.py input.docx output.docx
 
 ## Creating New Documents
 
-See `references/creating-documents.md` for the full docx-js creation guide, including setup, page sizing, styles, lists, tables, images, hyperlinks, footnotes, tab stops, multi-column layouts, TOC, headers/footers, and all critical rules.
+See `references/creating-documents.rst` for the full docx-js creation guide, including setup, page sizing, styles, lists, tables, images, hyperlinks, footnotes, tab stops, multi-column layouts, TOC, headers/footers, and all critical rules.
 
 Key points to remember:
 - Install: `npm install -g docx`
@@ -124,7 +124,7 @@ Extracts XML, pretty-prints, merges adjacent runs, and converts smart quotes to 
 
 ### Step 2: Edit XML
 
-Edit files in `unpacked/word/`. See `references/xml-reference.md` for tracked changes, comments, and image patterns.
+Edit files in `unpacked/word/`. See `references/xml-reference.rst` for tracked changes, comments, and image patterns.
 
 **Use "Claude" as the author** for tracked changes and comments, unless the user explicitly requests use of a different name.
 
@@ -148,7 +148,7 @@ python scripts/comment.py unpacked/ 0 "Comment text with &amp; and &#x2019;"
 python scripts/comment.py unpacked/ 1 "Reply text" --parent 0  # reply to comment 0
 python scripts/comment.py unpacked/ 0 "Text" --author "Custom Author"  # custom author name
 ```
-Then add markers to document.xml (see Comments in `references/xml-reference.md`).
+Then add markers to document.xml (see Comments in `references/xml-reference.rst`).
 
 ### Step 3: Pack
 ```bash
@@ -172,4 +172,4 @@ Validates with auto-repair, condenses XML, and creates DOCX. Use `--validate fal
 
 ## XML Reference
 
-See `references/xml-reference.md` for the full XML reference, including schema compliance rules, tracked change patterns (insert, delete, reject, restore), comment markers, and image embedding via XML.
+See `references/xml-reference.rst` for the full XML reference, including schema compliance rules, tracked change patterns (insert, delete, reject, restore), comment markers, and image embedding via XML.

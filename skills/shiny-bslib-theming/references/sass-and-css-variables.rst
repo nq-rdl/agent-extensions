@@ -59,10 +59,10 @@ definitions are placed:
 ::
 
    ┌─────────────────────────────────────────┐
-   │ "defaults"     ← Your !default vars    │ ← bs_theme(...) and bs_add_variables()
+   │ "defaults"     ← Your !default vars     │ ← bs_theme(...) and bs_add_variables()
    │ Bootstrap's own !default vars           │
-   │ "declarations" ← Your declarations     │ ← Can reference $primary, $secondary, etc.
-   │ "rules"        ← Your rules            │ ← After all variable processing
+   │ "declarations" ← Your declarations      │ ← Can reference $primary, $secondary, etc.
+   │ "rules"        ← Your rules             │ ← After all variable processing
    └─────────────────────────────────────────┘
 
 This is why referencing ``$secondary`` in ``bs_theme()`` fails (it’s not

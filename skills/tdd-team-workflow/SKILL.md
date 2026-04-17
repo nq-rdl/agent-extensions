@@ -145,7 +145,7 @@ Enabled by default. When disabled in `.tdd/config.yaml`, track progress in conve
 
 Between phases: update `.tdd/active/<slug>.yaml` — set `phase`, append to `phases[]`, update `test_summary` and `updated`. On REQUEST_CHANGES: increment `cycle`, set `phase: red`.
 
-See `references/state-files.md` for the full YAML schema.
+See `references/state-files.rst` for the full YAML schema.
 
 **Session resume** — on activation, BEFORE `tdd-init.sh`: generate slug, check `.tdd/active/<slug>.yaml`. If exists: read `phase`, `cycle`, `phases[]`; determine next phase; prompt "Found cycle '<slug>' at '<phase>', cycle N/max. Resume from <next>? (y/n)". Yes → skip init/new, continue from next phase. No → `bash scripts/tdd-archive.sh <slug>`, start fresh.
 
@@ -183,6 +183,6 @@ A PreToolUse hook warns when the orchestrator uses Write/Edit on test/impl files
 
 ## References
 
-- `references/state-files.md` — `.tdd/` YAML schema reference
-- `references/orchestration-examples.md` — worked examples (all using claude:subagent)
-- `references/tdd-methodology.md` — TDD theory and principles
+- `references/state-files.rst` — `.tdd/` YAML schema reference
+- `references/orchestration-examples.rst` — worked examples (all using claude:subagent)
+- `references/tdd-methodology.rst` — TDD theory and principles
