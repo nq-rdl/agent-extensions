@@ -73,8 +73,6 @@ jobs:
           json_files=(
             .claude-plugin/marketplace.json
             gemini-extension.json
-            mcp/pi-rpc/package.json
-            mcp/gemini-cli/package.json
             pidev/package.json
           )
           for f in plugins/*/.claude-plugin/plugin.json; do

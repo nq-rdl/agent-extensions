@@ -1,0 +1,13 @@
+{
+  "mcpServers": {
+    "pi-rpc": {
+      "command": "${CLAUDE_PLUGIN_ROOT}/scripts/run-pi-rpc-mcp.sh",
+      "env": {
+        "PI_SERVER_URL": "http://localhost:4097"
+      }
+    },
+    "gemini-cli": {
+      "command": "${CLAUDE_PLUGIN_ROOT}/scripts/run-gemini-cli-mcp.sh"
+    }
+  }
+}

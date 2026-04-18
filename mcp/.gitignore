@@ -1,7 +1,5 @@
-# Per-integration dependency installs
-*/node_modules/
+# Local build output (cross-compile writes here; bin/ under each module)
+*/bin/
 
 # Common generated output
-*/build/
-*/coverage/
 *.log
