@@ -27,10 +27,12 @@ case "$SCENARIO" in
 
   echo)
     # Emit a full agent lifecycle then echo any stdin prompts back as messages.
+    # message_update uses pi's real delta format; message_end carries the complete message.
     echo '{"type":"agent_start"}'
     while IFS= read -r line; do
       MSG=$(echo "$line" | grep -o '"message":"[^"]*"' | sed 's/"message":"//;s/"//')
-      echo "{\"type\":\"message_update\",\"role\":\"assistant\",\"content\":\"echo: $MSG\"}"
+      echo "{\"type\":\"message_update\",\"delta\":{\"type\":\"text_delta\",\"text\":\"echo: $MSG\"}}"
+      echo "{\"type\":\"message_end\",\"role\":\"assistant\",\"content\":\"echo: $MSG\",\"is_error\":false}"
       echo '{"type":"agent_end"}'
     done
     ;;
