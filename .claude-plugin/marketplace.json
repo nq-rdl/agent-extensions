@@ -93,6 +93,21 @@
         "skills",
         "evaluation"
       ]
+    },
+    {
+      "name": "worktrunk",
+      "source": {
+        "source": "github",
+        "repo": "max-sixty/worktrunk"
+      },
+      "description": "Git worktree CLI for parallel AI agent workflows — config guidance and automatic Claude session tracking",
+      "version": "1.0.0",
+      "keywords": [
+        "git",
+        "worktree",
+        "agents",
+        "workflow"
+      ]
     }
   ]
 }
