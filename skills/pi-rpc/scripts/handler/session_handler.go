@@ -167,7 +167,7 @@ func (h *SessionHandler) GetMessages(ctx context.Context, req *connect.Request[p
 	events := s.Events()
 	var msgs []*pirpcv1.Message
 	for _, evt := range events {
-		if evt.Type != "message_update" {
+		if evt.Type != "message_end" && evt.Type != "message_update" {
 			continue
 		}
 		var parsed struct {
@@ -177,6 +177,10 @@ func (h *SessionHandler) GetMessages(ctx context.Context, req *connect.Request[p
 			ToolCallID string `json:"tool_call_id"`
 		}
 		if err := json.Unmarshal(evt.Raw, &parsed); err != nil {
+			continue
+		}
+		// message_update events from real pi are streaming deltas with no role/content — skip them.
+		if parsed.Role == "" && parsed.Content == "" && parsed.ToolCallID == "" {
 			continue
 		}
 		msgs = append(msgs, &pirpcv1.Message{
@@ -328,7 +332,7 @@ func eventTypeToProto(t string) pirpcv1.EventType {
 		return pirpcv1.EventType_EVENT_TYPE_TURN_START
 	case "turn_end":
 		return pirpcv1.EventType_EVENT_TYPE_TURN_END
-	case "message_update":
+	case "message_update", "message_end":
 		return pirpcv1.EventType_EVENT_TYPE_MESSAGE_UPDATE
 	case "tool_execution_start":
 		return pirpcv1.EventType_EVENT_TYPE_TOOL_START

@@ -9,7 +9,7 @@ description: >-
   Bubbletea, Bubbles, Lip Gloss, or Fang. Also trigger when reviewing or
   refactoring existing Charm-based code.
 compatibility: >-
-  Requires Go 1.24+
+  Requires Go 1.25+
 metadata:
   repo: https://github.com/nq-rdl/agent-skills
 ---

@@ -8,9 +8,9 @@ import (
 
 func TestDetectProvider(t *testing.T) {
 	tests := []struct {
-		name     string
-		content  string // empty means no file
-		want     string
+		name    string
+		content string // empty means no file
+		want    string
 	}{
 		{
 			name: "no auth file",

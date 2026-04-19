@@ -72,15 +72,50 @@ func TestRunSessionCreate(t *testing.T) {
 	}
 }
 
-func TestRunSessionCreateMissingRequiredFields(t *testing.T) {
-	// The cobra command enforces --provider and --model as required flags,
-	// but we also guard in the RunE function.
-	cmd := newSessionCreateCmd(ptrString(""))
-	cmd.SetArgs([]string{}) // no flags
-
-	err := cmd.Execute()
+func TestRunSessionCreateUnreachableServer(t *testing.T) {
+	// Documented behavior: provider/model are optional and fall through to
+	// PI_DEFAULT_PROVIDER / PI_DEFAULT_MODEL on the server side. What MUST
+	// surface to the CLI user is an RPC error when the server is not reachable.
+	err := runSessionCreate(context.Background(),
+		"http://127.0.0.1:1", // reserved port; connection must fail fast
+		"", "", "/tmp", "", 0)
 	if err == nil {
-		t.Error("expected error when provider/model not set")
+		t.Error("expected error when server is unreachable")
+	}
+}
+
+func TestRunSessionCreateDefaultsAccepted(t *testing.T) {
+	// Issue #70: empty provider/model must be forwarded verbatim so the server
+	// can apply PI_DEFAULT_PROVIDER / PI_DEFAULT_MODEL. The CLI must not
+	// reject or mutate empty values.
+	var receivedProvider, receivedModel string
+	done := make(chan struct{})
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		defer close(done)
+		var req map[string]any
+		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+			t.Errorf("decode request body: %v", err)
+			return
+		}
+		receivedProvider, _ = req["provider"].(string)
+		receivedModel, _ = req["model"].(string)
+		w.Header().Set("Content-Type", "application/json")
+		_ = json.NewEncoder(w).Encode(map[string]any{
+			"sessionId": "defaults-abc",
+			"state":     "SESSION_STATE_IDLE",
+		})
+	}))
+	defer srv.Close()
+
+	if err := runSessionCreate(context.Background(), srv.URL, "", "", t.TempDir(), "", 0); err != nil {
+		t.Fatalf("runSessionCreate with empty provider/model failed: %v", err)
+	}
+	<-done
+	if receivedProvider != "" {
+		t.Errorf("provider forwarded to server = %q, want empty string", receivedProvider)
+	}
+	if receivedModel != "" {
+		t.Errorf("model forwarded to server = %q, want empty string", receivedModel)
 	}
 }
 
@@ -258,6 +293,3 @@ func TestSessionSubcommands(t *testing.T) {
 		}
 	}
 }
-
-// ptrString is a helper for passing flag pointers to subcommand constructors in tests.
-func ptrString(s string) *string { return &s }
