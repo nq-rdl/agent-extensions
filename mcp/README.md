@@ -1,16 +1,24 @@
 # MCP Integrations
 
-Each managed MCP integration lives in its own directory under `mcp/`.
+Each MCP integration is a Go module under `mcp/`. Binaries are prebuilt for each supported platform and committed to `plugins/dev-tools/bin/mcp/`.
 
-Commit source, manifests, and tests here. Do not commit installed dependencies or generated build output.
+Build locally:
 
-Recommended layout:
+```bash
+cd mcp/pi-rpc-go      # or mcp/gemini-cli-go
+go mod download       # first time only
+make build            # current platform
+make cross-compile DESTDIR=../../plugins/dev-tools/bin/mcp
+```
+
+Layout:
 
 ```text
 mcp/
-  <integration>/
-    src/
-    test/
-    package.json
-    README.md
+  <name>-go/
+    go.mod
+    go.sum
+    Makefile
+    cmd/<name>/main.go
+    internal/
 ```
