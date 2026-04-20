@@ -81,6 +81,21 @@ CI runs `validate.yml` on every PR/push to main. It checks:
 - Bundle YAML skill references resolve to `skills/<name>/`
 - All symlinks under `plugins/`, `opencode/`, `pidev/` are not broken
 
+## Local Testing
+
+To verify skills are visible before release, install the repo as a local Claude Code marketplace:
+
+```bash
+# Single-session in-place (preferred in devcontainer — no cache copy, symlinks resolve in-place)
+claude --plugin-dir ./plugins/swe
+
+# Persistent install (workspace must stay mounted at /workspace)
+claude plugin marketplace add /workspace
+claude plugin install swe@rdl
+```
+
+See [`docs/local-testing.md`](docs/local-testing.md) for the full walkthrough including cleanup and the symlink path caveat.
+
 ## Registry Bundles
 
 `registry/bundles/*.yaml` defines what each bundle contains and which targets are enabled. Schema:
@@ -116,7 +131,7 @@ Releases are triggered by pushing a `v*` tag. The tag must point to a commit alr
 
 ## Docs
 
-The docs site uses Zensical (configured in `zensical.toml`). Source is `docs/`. Architecture decisions live in `docs/ARCHITECTURE.md`.
+The docs site uses Zensical (configured in `zensical.toml`). Source is `docs/`. Architecture decisions live in `docs/ARCHITECTURE.md`. Local install walkthrough: [`docs/local-testing.md`](docs/local-testing.md).
 
 ## Platform Notes
 
