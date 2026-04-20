@@ -111,10 +111,10 @@ Examples:
 
 func newSessionCreateCmd(serverFlag *string) *cobra.Command {
 	var (
-		provider      string
-		model         string
-		cwd           string
-		thinkingLevel string
+		provider       string
+		model          string
+		cwd            string
+		thinkingLevel  string
 		timeoutSeconds int32
 	)
 
