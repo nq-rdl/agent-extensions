@@ -11,12 +11,12 @@ permissions:
 
 jobs:
   validate-bundles:
-    name: Validate bundle skill references
+    name: Validate bundle skill + agent references
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v6
 
-      - name: Check bundle skill references resolve
+      - name: Check bundle references resolve
         run: |
           shopt -s nullglob
           bundles=(registry/bundles/*.yaml registry/bundles/*.yml)
@@ -28,23 +28,36 @@ jobs:
           exit_code=0
           for bundle in "${bundles[@]}"; do
             echo "Checking $bundle"
-            in_skills=false
+            in_section=""
             while IFS= read -r line; do
               if echo "$line" | grep -qE '^skills:'; then
-                in_skills=true
+                in_section="skills"
                 continue
               fi
-              if $in_skills; then
+              if echo "$line" | grep -qE '^agents:'; then
+                in_section="agents"
+                continue
+              fi
+              if [ -n "$in_section" ]; then
                 if echo "$line" | grep -qE '^\s+-\s+'; then
-                  skill=$(echo "$line" | sed 's/^\s*-\s*//' | tr -d '[:space:]')
-                  if [ ! -d "skills/$skill" ]; then
-                    echo "::error file=$bundle::Skill '$skill' not found in skills/"
-                    exit_code=1
-                  else
-                    echo "  ✓ $skill"
+                  item=$(echo "$line" | sed 's/^\s*-\s*//' | tr -d '[:space:]')
+                  if [ "$in_section" = "skills" ]; then
+                    if [ ! -d "skills/$item" ]; then
+                      echo "::error file=$bundle::Skill '$item' not found in skills/"
+                      exit_code=1
+                    else
+                      echo "  ✓ skill:$item"
+                    fi
+                  elif [ "$in_section" = "agents" ]; then
+                    if [ ! -f "agents/$item/agent.md" ]; then
+                      echo "::error file=$bundle::Agent '$item' not found at agents/$item/agent.md"
+                      exit_code=1
+                    else
+                      echo "  ✓ agent:$item"
+                    fi
                   fi
                 else
-                  in_skills=false
+                  in_section=""
                 fi
               fi
             done < "$bundle"
@@ -52,14 +65,14 @@ jobs:
           exit $exit_code
 
   validate-symlinks:
-    name: Validate skill symlinks
+    name: Validate skill + agent symlinks
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v6
 
-      - name: Check all skill symlinks resolve
+      - name: Check all symlinks resolve
         run: |
-          mapfile -t links < <(find plugins/ opencode/ pidev/ -type l 2>/dev/null)
+          mapfile -t links < <(find plugins/ opencode/ pidev/ .gemini/ -type l 2>/dev/null)
           if [ ${#links[@]} -eq 0 ]; then
             echo "No symlinks to validate"
             exit 0
@@ -80,13 +93,16 @@ jobs:
           exit $exit_code
 
   validate-plugins:
-    name: Validate Claude Code plugin structure
+    name: Validate Claude Code plugin structure + agents
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v6
 
-      - name: Validate plugin manifests and hooks
-        run: scripts/validate-plugin-hooks.sh
+      - name: Install PyYAML for agent frontmatter validation
+        run: python3 -m pip install --user pyyaml
+
+      - name: Validate plugin manifests, hooks, and agents
+        run: scripts/validate-plugins.sh
 
   validate-mcp-servers:
     name: Validate Go MCP servers build
