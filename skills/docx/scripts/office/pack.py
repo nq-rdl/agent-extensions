@@ -11,14 +11,13 @@ Examples:
 """
 
 import argparse
-import sys
 import shutil
+import sys
 import tempfile
 import zipfile
 from pathlib import Path
 
 import defusedxml.minidom
-
 from validators import DOCXSchemaValidator, PPTXSchemaValidator, RedliningValidator
 
 
