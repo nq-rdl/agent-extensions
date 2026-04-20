@@ -18,6 +18,14 @@ skills:
   - pi-rpc
   - lychee
   - writerside
+agents:
+  - context-architect
+  - go-mcp-expert
+  - repo-architect
+  - plan
+  - address-comments
+  - se-technical-writer
+  - research-technical-spike
 hooks: []
 prompts: []
 mcp: []
@@ -27,7 +35,8 @@ targets:
     pluginName: dev-tools
     marketplaceName: rdl
   gemini:
-    enabled: false
+    enabled: true
+    extensionName: rdl
   pidev:
     enabled: false
   opencode:
