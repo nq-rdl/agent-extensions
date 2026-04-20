@@ -100,9 +100,8 @@ jobs:
           git commit -m "chore(bin): sync pi-server binaries from agent-skills@${TAG}"
           git push -u origin "$BRANCH"
 
+          BODY="Automated sync of pi-server platform binaries from nq-rdl/agent-skills@${TAG}."$'\n\n'"All binaries verified against agent-skills checksums.txt before commit."
           gh pr create \
             --title "chore(bin): sync pi-server binaries from agent-skills@${TAG}" \
-            --body "Automated sync of pi-server platform binaries from nq-rdl/agent-skills@${TAG}.
-
-All binaries verified against agent-skills checksums.txt before commit." \
+            --body "$BODY" \
             --label "dependencies"
