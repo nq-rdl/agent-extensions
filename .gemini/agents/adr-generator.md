@@ -1,0 +1,1 @@
+../../agents/adr-generator/agent.md
