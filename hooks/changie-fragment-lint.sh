@@ -41,15 +41,15 @@ fi
 # Handles double-quoted, single-quoted, and $'...' body values
 # || true guards prevent set -e from exiting on no-match grep returns
 BODY=""
-if printf '%s' "$COMMAND" | grep -qP -- "--body\s+['\"]"; then
-  BODY=$(printf '%s' "$COMMAND" | grep -oP "(?<=--body\s')[^']*(?=')" | head -1 || true)
+if printf '%s' "$COMMAND" | grep -qP -- "--body[= ]['\"]"; then
+  BODY=$(printf '%s' "$COMMAND" | grep -oP "(?<=--body[= ]')[^']*(?=')" | head -1 || true)
   if [[ -z "$BODY" ]]; then
-    BODY=$(printf '%s' "$COMMAND" | grep -oP '(?<=--body\s")[^"]*(?=")' | head -1 || true)
+    BODY=$(printf '%s' "$COMMAND" | grep -oP '(?<=--body[= ]")[^"]*(?=")' | head -1 || true)
   fi
 fi
 
 # ── Extract --kind value ────────────────────────────────────────────────────
-KIND=$(printf '%s' "$COMMAND" | grep -oP '(?<=--kind\s)\S+' | head -1 || true)
+KIND=$(printf '%s' "$COMMAND" | grep -oP '(?<=--kind[= ])\S+' | head -1 || true)
 
 VALID_KINDS="Added Changed Deprecated Removed Fixed Security"
 WARNINGS=""
@@ -63,14 +63,13 @@ fi
 # ── Rule #1: fusion markers ─────────────────────────────────────────────────
 if [[ -z "$BLOCK_REASON" && -n "$BODY" ]]; then
   BODY_LOWER=$(printf '%s' "$BODY" | tr '[:upper:]' '[:lower:]')
-  if printf '%s' "$BODY_LOWER" | grep -qE '\balso fixes\b|\band also\b|\badditionally\b|,\s*also\s'; then
+  if printf '%s' "$BODY_LOWER" | grep -qE '\balso fixes\b|\band also\b|\badditionally\b|,\s*also\b'; then
     BLOCK_REASON="changie-fragment-lint: Rule #1 — body contains a fusion marker ('also fixes', 'and also', 'additionally', or ', also'). Split into two separate changie new calls."
   fi
 fi
 
 if [[ -n "$BLOCK_REASON" ]]; then
-  printf '{"decision":"block","reason":"%s"}' \
-    "$(printf '%s' "$BLOCK_REASON" | sed 's/"/\\"/g')"
+  jq -n --arg reason "$BLOCK_REASON" '{decision: "block", reason: $reason}'
   exit 0
 fi
 
@@ -91,9 +90,8 @@ fi
 
 # ── Rule #7: trailing period ────────────────────────────────────────────────
 if [[ -n "$BODY" ]]; then
-  # Allow ellipsis (..) but not a single trailing period
-  if printf '%s' "$BODY" | grep -qP '\.[^.]\s*$' || \
-     { printf '%s' "$BODY" | grep -qP '\.$' && ! printf '%s' "$BODY" | grep -qP '\.\.\s*$'; }; then
+  # Allow ellipsis but not a single trailing period (negative lookbehind for prior dot)
+  if printf '%s' "$BODY" | grep -qP '(?<!\.)\.\s*$'; then
     WARNINGS="${WARNINGS}[WARN] changie-fragment-lint: Rule #7 — body ends with a period; entries render as bullet items, not sentences\\n"
   fi
 fi
@@ -107,8 +105,7 @@ fi
 
 # ── Emit warnings ──────────────────────────────────────────────────────────
 if [[ -n "$WARNINGS" ]]; then
-  printf '{"context":"%s"}' \
-    "$(printf '%s' "$WARNINGS" | sed 's/"/\\"/g' | tr -d '\n')"
+  jq -n --arg context "$(printf '%s' "$WARNINGS" | tr -d '\n')" '{context: $context}'
 fi
 
 exit 0
