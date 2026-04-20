@@ -1,0 +1,17 @@
+{
+  "description": "Lint changie new commands — blocks fusion (Rule #1), missing --interactive=false, and word-count violations (Rule #2). Warns on trailing period (Rule #7) and invalid --kind. Set CHANGIE_LINT_STRICT=1 to promote word-count warnings to blocks.",
+  "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": "Bash",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash hooks/changie-fragment-lint.sh",
+            "timeout": 5
+          }
+        ]
+      }
+    ]
+  }
+}
