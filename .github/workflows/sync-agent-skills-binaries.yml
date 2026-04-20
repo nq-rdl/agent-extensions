@@ -1,0 +1,107 @@
+name: Sync agent-skills binaries
+
+on:
+  repository_dispatch:
+    types: [agent-skills-release]
+  schedule:
+    - cron: "0 7 * * 1"
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: "Release tag to sync from (e.g. v0.4.1). Leave empty for latest."
+        required: false
+
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  sync:
+    name: Sync pi-server binaries
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Determine release tag
+        id: release
+        env:
+          DISPATCH_TAG: ${{ github.event.client_payload.tag }}
+          INPUT_TAG: ${{ github.event.inputs.tag }}
+        run: |
+          if [ -n "$DISPATCH_TAG" ]; then
+            TAG="$DISPATCH_TAG"
+          elif [ -n "$INPUT_TAG" ]; then
+            TAG="$INPUT_TAG"
+          else
+            TAG=$(gh release view --repo nq-rdl/agent-skills --json tagName -q '.tagName')
+          fi
+          echo "tag=$TAG" >> "$GITHUB_OUTPUT"
+          echo "Syncing binaries from agent-skills@${TAG}"
+
+      - name: Download and verify pi-server binaries
+        env:
+          TAG: ${{ steps.release.outputs.tag }}
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+
+          VERSION="${TAG#v}"
+          DEST="plugins/dev-tools/bin"
+          TMPDIR="$(mktemp -d)"
+
+          PLATFORMS=(linux-amd64 linux-arm64 darwin-amd64 darwin-arm64)
+
+          gh release download "$TAG" \
+            --repo nq-rdl/agent-skills \
+            --pattern 'pi-server-*.tar.gz' \
+            --pattern 'checksums.txt' \
+            --dir "$TMPDIR"
+
+          cd "$TMPDIR"
+          sha256sum -c checksums.txt --ignore-missing
+
+          for PLATFORM in "${PLATFORMS[@]}"; do
+            ARCHIVE="pi-server-${VERSION}-${PLATFORM}.tar.gz"
+            if [ ! -f "$ARCHIVE" ]; then
+              echo "::warning::Missing archive: $ARCHIVE — skipping"
+              continue
+            fi
+            tar xf "$ARCHIVE"
+            install -m 755 pi-server "${GITHUB_WORKSPACE}/${DEST}/pi-server-${PLATFORM}"
+            rm -f pi-server
+            echo "  installed pi-server-${PLATFORM}"
+          done
+
+      - name: Check for changes
+        id: changes
+        run: |
+          if git diff --quiet plugins/dev-tools/bin/; then
+            echo "changed=false" >> "$GITHUB_OUTPUT"
+            echo "No binary changes detected"
+          else
+            echo "changed=true" >> "$GITHUB_OUTPUT"
+            git diff --stat plugins/dev-tools/bin/
+          fi
+
+      - name: Create pull request
+        if: steps.changes.outputs.changed == 'true'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAG: ${{ steps.release.outputs.tag }}
+        run: |
+          BRANCH="chore/sync-binaries-${TAG}"
+
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
+          git checkout -b "$BRANCH"
+          git add plugins/dev-tools/bin/
+          git commit -m "chore(bin): sync pi-server binaries from agent-skills@${TAG}"
+          git push -u origin "$BRANCH"
+
+          BODY="Automated sync of pi-server platform binaries from nq-rdl/agent-skills@${TAG}."$'\n\n'"All binaries verified against agent-skills checksums.txt before commit."
+          gh pr create \
+            --title "chore(bin): sync pi-server binaries from agent-skills@${TAG}" \
+            --body "$BODY" \
+            --label "dependencies"

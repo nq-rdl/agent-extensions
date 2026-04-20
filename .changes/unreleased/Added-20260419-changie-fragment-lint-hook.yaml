@@ -1,0 +1,3 @@
+kind: Added
+body: Adds changie-fragment-lint PreToolUse hook — blocks fusion and missing flag, warns on word count (#40)
+time: 2026-04-19T08:16:45.257126828+10:00

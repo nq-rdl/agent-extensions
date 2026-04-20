@@ -100,6 +100,22 @@ changie new --interactive=false --kind Fixed \
 | `Added changie skill with SKILL.md and references dir` | ❌ Bad | Commit message voice, no backtick, no user benefit |
 | `Updated the opencode skill to fix a bug where sessions would not terminate correctly.` | ❌ Bad | Passive voice, trailing period, vague |
 | `Fixed bug` | ❌ Bad | No context, not actionable |
+| `Fixes crash when \`extract\` runs on empty PDFs — also fixes broken retry logic in \`upload\`` | ❌ Bad | Two logical fixes fused with "also" — Rule #1 violation; split into two `changie new` calls |
+| `Fixes crash when \`extract\` runs on empty PDFs` (+ separate) `Fixes broken retry logic in \`upload\`` | ✅ Good | Each fix is its own fragment — two calls, two bullets in the release note |
+
+---
+
+## Trim Example
+
+**Before (64 words — 3× over limit):**
+
+> "tui: guide marker now stays inside the filled region when utilization > guide. At narrow bar widths the fill cell count and marker cell were rounded independently, which could place the │ past the visual fill edge. A new `guidePosition` helper snaps the marker inward so visual ordering matches numeric ordering"
+
+**After (16 words — within limit):**
+
+> "tui: keep guide marker inside the filled region when utilization exceeds the guide on narrow bars"
+
+**What was cut:** root-cause analysis, internal helper name, and implementation mechanics. Those belong in the commit message or PR description, not the changelog. The entry title carries the user-visible outcome.
 
 ---
 
@@ -185,8 +201,9 @@ These commands are reserved for release managers. Agents must not run them unles
 
 Run through this before executing `changie new`:
 
+- [ ] Exactly one logical change — if body contains "also", "and also", "additionally", or ", also" stop and split into separate `changie new` calls
 - [ ] Kind matches what changed (Added/Changed/Deprecated/Removed/Fixed/Security)
-- [ ] Body is ≤ 20 words (excluding issue ref)
+- [ ] Body is ≤ 20 words (excluding issue ref) — count the words; if >20 ask yourself "what can be cut?" and trim before continuing
 - [ ] Body uses present tense, active voice
 - [ ] Code names are wrapped in backticks
 - [ ] Em dash used for elaboration (not comma or semicolon)

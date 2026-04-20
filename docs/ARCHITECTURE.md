@@ -431,6 +431,46 @@ Expected publication target:
 
 - npm package plus generated config snippet or bootstrap instructions
 
+## Language Policy
+
+### Cross-repo scope split
+
+| Asset | Authored in | Distributed from |
+|---|---|---|
+| `mcp/*-go/` Go MCP servers | this repo | this repo (prebuilt binaries in `plugins/*/bin/mcp/`) |
+| `skills/*/scripts/` Go/Python tools | `nq-rdl/agent-skills` | vendored here via submodule |
+| `skills/pi-rpc/scripts/Makefile` | `nq-rdl/agent-skills` | vendored here; built here via `build-pi-server.yml` |
+| `skills/{csv,docx,pdf,xlsx}/scripts/` | `nq-rdl/agent-skills` | runs in-place via `ensure-deps.sh` |
+| `plugins/dev-tools/bin/` prebuilt binaries | this repo | committed here, rebuilt by CI |
+| `registry/bundles/*.yaml` | this repo | this repo |
+
+**Important**: the `skills/` submodule is owned by `nq-rdl/agent-skills`. Edits made here will be overwritten on the next `sync-skills` PR. File bugs and PRs upstream.
+
+### Per-language rules
+
+| Work type | Language | Rationale |
+|---|---|---|
+| New CLI helper or MCP server | Go (`CGO_ENABLED=0`, `GOARCH`/`GOOS` matrix) | Zero-install prebuilt binaries; no runtime dep on Bun/Node |
+| File-format or ML skill | Python + `ensure-deps.sh` | Direct library access; `ensure-deps.sh` handles bootstrapping |
+| Documentation-only skill | Markdown | No execution needed |
+| Host-specific plugin wiring | JSON/YAML/shell | Manifests and glue scripts only |
+| New TypeScript | Not permitted | Bun hard-dependency, no CI, no binary output path |
+
+### Go house style
+
+Match the style established in `skills/pi-rpc/scripts/` (cobra + `charm.land/fang/v2`, `CGO_ENABLED=0`, `-X main.version=$(git describe)` ldflags). MCP servers in `mcp/*-go/` follow the same Makefile structure with a `cross-compile` target that produces `$(DESTDIR)/<name>-<os>-<arch>` binaries.
+
+### Python / pixi
+
+`pixi` is optional — its only role in this repo is providing a reproducible docs environment (`zensical`) on linux-64. The `pixi.lock` is linux-64 only; macOS contributors should use `uv` directly. Python skill `ensure-deps.sh` scripts (vendored from agent-skills) already walk `pixi > uv > mamba > conda > pip`, so they work without pixi.
+
+### Cross-repo coordination
+
+Upstream issues/PRs to file against `nq-rdl/agent-skills`:
+
+- Add a `cross-compile` target to `skills/pi-rpc/scripts/Makefile` that matches what `build-pi-server.yml` invokes
+- Mirror this language policy in agent-skills' own docs once agreed
+
 ## Non-Goals
 
 This repository should not try to:
