@@ -199,7 +199,7 @@ func parseOutput(stdout []byte) (*Result, error) {
 		SessionID string          `json:"session_id"`
 		Stats     json.RawMessage `json:"stats"`
 	}
-	if err := json.Unmarshal([]byte(s[idx:]), &raw); err != nil {
+	if err := json.NewDecoder(strings.NewReader(s[idx:])).Decode(&raw); err != nil {
 		preview := s
 		if len(preview) > 200 {
 			preview = preview[:200]

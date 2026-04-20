@@ -157,9 +157,8 @@ func ShutdownAll() {
 
 	for _, s := range all {
 		s.cmd.Process.Signal(os.Interrupt) //nolint:errcheck
-		if s.contextDir != "" {
-			os.RemoveAll(s.contextDir)
-		}
+		// contextDir cleanup is handled exclusively by the reader goroutine
+		// after the subprocess exits — removing it here would race with it.
 	}
 }
 
@@ -212,7 +211,7 @@ func spawn(ctx context.Context, name string, opts Options) (*session, error) {
 		cwd, _ = os.Getwd()
 	}
 
-	cmd := exec.CommandContext(ctx, binary, args...)
+	cmd := exec.CommandContext(context.Background(), binary, args...)
 	cmd.Dir = cwd
 	cmd.Env = os.Environ()
 
@@ -224,8 +223,7 @@ func spawn(ctx context.Context, name string, opts Options) (*session, error) {
 	if err != nil {
 		return nil, fmt.Errorf("creating stdout pipe: %w", err)
 	}
-	// Discard stderr — Gemini CLI writes status/progress there
-	cmd.Stderr = nil
+	cmd.Stderr = os.Stderr
 
 	if err := cmd.Start(); err != nil {
 		if contextDir != "" {
@@ -249,9 +247,11 @@ func spawn(ctx context.Context, name string, opts Options) (*session, error) {
 	// Reader goroutine: processes stdout line by line until the process exits
 	go func() {
 		scanner := bufio.NewScanner(stdoutPipe)
+		scanner.Buffer(make([]byte, 64*1024), 10*1024*1024) // 10 MB — LLM responses can be large
 		for scanner.Scan() {
 			s.handleLine(scanner.Text())
 		}
+		_ = s.cmd.Wait() // reap subprocess; prevent zombie
 		// Process exited — reject all pending requests
 		s.pending.Range(func(key, val any) bool {
 			ch, _ := val.(chan rpcMessage)

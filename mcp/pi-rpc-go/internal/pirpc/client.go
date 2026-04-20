@@ -39,7 +39,10 @@ func post(endpoint string, body any) (json.RawMessage, error) {
 	}
 	defer resp.Body.Close()
 
-	raw, _ := io.ReadAll(resp.Body)
+	raw, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return nil, fmt.Errorf("reading response body from pi-rpc %s: %w", endpoint, err)
+	}
 	if resp.StatusCode != http.StatusOK {
 		return nil, fmt.Errorf("pi-rpc %s failed (%d): %s", endpoint, resp.StatusCode, raw)
 	}
