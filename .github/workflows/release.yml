@@ -51,7 +51,7 @@ jobs:
         run: echo "version=${TAG#v}" >> "$GITHUB_OUTPUT"
 
       - name: Install changie
-        uses: miniscruff/changie-action@v2
+        uses: miniscruff/changie-action@v3
         with:
           version: latest
 
@@ -73,8 +73,6 @@ jobs:
           json_files=(
             .claude-plugin/marketplace.json
             gemini-extension.json
-            mcp/pi-rpc/package.json
-            mcp/gemini-cli/package.json
             pidev/package.json
           )
           for f in plugins/*/.claude-plugin/plugin.json; do
@@ -127,7 +125,7 @@ jobs:
           cp ".changes/${version}.md" release-notes.md
 
       - name: Create GitHub release
-        uses: softprops/action-gh-release@v2
+        uses: softprops/action-gh-release@v3
         with:
           body_path: release-notes.md
           generate_release_notes: false

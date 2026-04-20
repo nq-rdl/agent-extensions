@@ -1,6 +1,6 @@
 {
   "name": "swe",
-  "version": "0.3.0",
+  "version": "0.3.1",
   "description": "Software engineering — TDD, secure Go, naming, CI/CD, changelogs",
   "author": {
     "name": "nq-rdl"

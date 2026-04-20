@@ -47,17 +47,17 @@ func (m *Manager) Create(ctx context.Context, provider, model, cwd, thinkingLeve
 		args = append(args, "--mode", "rpc", "--no-session",
 			"--provider", provider, "--model", model)
 		if thinkingLevel != "" {
-			args = append(args, "--thinking-level", thinkingLevel)
+			args = append(args, "--thinking", thinkingLevel)
 		}
 	}
 
 	s, err := NewSession(sessionCtx, Config{
-		Binary:        m.binary,
-		Args:          args,
-		Provider:      provider,
-		Model:         model,
-		Cwd:           cwd,
-		ThinkingLevel: thinkingLevel,
+		Binary:            m.binary,
+		Args:              args,
+		Provider:          provider,
+		Model:             model,
+		Cwd:               cwd,
+		ThinkingLevel:     thinkingLevel,
 		InactivityTimeout: time.Duration(timeoutSeconds) * time.Second,
 	})
 	if err != nil {
