@@ -3,6 +3,25 @@ Encrypting with Age
 
 `Age <https://age-encryption.org/>`_ is a simple, modern, and secure tool for encrypting files. It is recommended to use age over PGP if possible.
 
+Generating a Key
+----------------
+
+Generate an age identity (private + public key pair) with:
+
+.. code-block:: bash
+
+   mkdir -p "$HOME/.config/sops/age"
+   age-keygen -o "$HOME/.config/sops/age/keys.txt"
+
+The **public key** is printed to stderr — copy it into ``--age`` flags or ``.sops.yaml``. The private key is written to ``keys.txt`` and must be kept secret. Only the public key is shared with others.
+
+SOPS looks for ``keys.txt`` at decryption time using the following default paths:
+
+- **Linux**: ``$XDG_CONFIG_HOME/sops/age/keys.txt`` → falls back to ``$HOME/.config/sops/age/keys.txt``
+- **macOS**: ``$XDG_CONFIG_HOME/sops/age/keys.txt`` → falls back to ``$HOME/Library/Application Support/sops/age/keys.txt``
+
+Override the default path with the ``SOPS_AGE_KEY_FILE`` environment variable. If ``SOPS_AGE_KEY_FILE`` is set but points at a missing file, decryption fails with a confusing error — verify the path before setting the variable.
+
 Encrypting
 ----------
 
@@ -28,6 +47,17 @@ You can override the default lookup by:
 
 The contents of this key file should be a list of age X25519 identities, one per line. Lines beginning with ``#`` are considered comments and ignored.
 
+Editing in Place
+----------------
+
+Open an encrypted file in your ``$EDITOR`` without writing a plaintext copy to disk:
+
+.. code-block:: bash
+
+   sops edit secrets.yaml
+
+SOPS decrypts to a temporary file, opens it in ``$EDITOR`` (falling back to ``vi``), re-encrypts on save, and removes the temporary file. The encrypted file on disk is updated atomically — no intermediate plaintext is left behind.
+
 Using .sops.yaml
 ----------------
 
@@ -39,6 +69,23 @@ A list of age recipients can be added to ``.sops.yaml`` to make encryption easie
        - age: >-
            age1s3cqcks5genc6ru8chl0hkkd04zmxvczsvdxq99ekffe4gmvjpzsedk23c,
            age1qe5lxzzeppw5k79vxn3872272sgy224g2nzqlzy3uljs84say3yqgvd0sw
+
+Rotating Recipients
+-------------------
+
+After updating ``.sops.yaml`` with new (or removed) age recipients, re-encrypt the data key without touching the underlying plaintext values:
+
+.. code-block:: bash
+
+   sops updatekeys secrets.yaml
+
+SOPS re-wraps the symmetric data key against the current set of recipients listed in ``.sops.yaml``. The encrypted values themselves are not re-encrypted — only the encrypted copy of the data key changes. Run ``sops updatekeys`` on every file whose recipients you want to update.
+
+To rotate all files in a directory in one pass:
+
+.. code-block:: bash
+
+   find . -name "*.enc.yaml" -exec sops updatekeys {} \;
 
 Encrypting with SSH Keys
 ------------------------
