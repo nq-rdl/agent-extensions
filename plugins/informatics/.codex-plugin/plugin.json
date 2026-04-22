@@ -1,0 +1,38 @@
+{
+  "name": "informatics",
+  "version": "0.4.0",
+  "description": "R ecosystem workflows for package development, Shiny, Quarto, testing, and CRAN.",
+  "author": {
+    "name": "nq-rdl",
+    "email": "r.schnetler@uq.edu.au",
+    "url": "https://github.com/nq-rdl"
+  },
+  "homepage": "https://github.com/nq-rdl/agent-extensions",
+  "repository": "https://github.com/nq-rdl/agent-extensions",
+  "license": "MIT",
+  "keywords": [
+    "agents",
+    "skills",
+    "informatics",
+    "r",
+    "quarto"
+  ],
+  "skills": "./skills/",
+  "interface": {
+    "displayName": "Informatics",
+    "shortDescription": "R, Shiny, Quarto, and CRAN",
+    "longDescription": "Reusable R ecosystem workflows for package development, Shiny apps, Quarto authoring, testing, and CRAN preparation.",
+    "developerName": "nq-rdl",
+    "category": "Productivity",
+    "capabilities": [
+      "Read",
+      "Write"
+    ],
+    "websiteURL": "https://github.com/nq-rdl/agent-extensions",
+    "defaultPrompt": [
+      "Use Informatics to review this R package structure.",
+      "Use Informatics to improve this Shiny app.",
+      "Use Informatics to prepare this package for CRAN checks."
+    ]
+  }
+}

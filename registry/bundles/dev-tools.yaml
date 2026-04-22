@@ -26,6 +26,10 @@ targets:
     enabled: true
     pluginName: dev-tools
     marketplaceName: rdl
+  codex:
+    enabled: true
+    pluginName: dev-tools
+    marketplaceName: rdl
   gemini:
     enabled: false
   pidev:
