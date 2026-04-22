@@ -4,9 +4,7 @@ Agent guidance for this repository. Use this alongside the README for project co
 
 ## Project overview
 
-This repo is a multi-host agent extension catalog. It maintains a single source of truth for reusable agent skills and publishes host-native outputs for Claude Code, Gemini CLI, pi.dev, and OpenCode. The key constraint: each host has incompatible extension formats, so the repo adapts shared content to native targets rather than inventing a universal format.
-
-This extension provides 41 curated agent skills across six categories.
+This repo is a multi-host agent extension catalog. It maintains a single source of truth for reusable agent skills and publishes host-native outputs for Claude Code, Codex, Gemini CLI, pi.dev, and OpenCode. The key constraint: each host has incompatible extension formats, so the repo adapts shared content to native targets rather than inventing a universal format.
 
 ## Setup commands
 
@@ -22,12 +20,19 @@ git submodule sync --recursive && git submodule update --init
 
 ```
 skills/           ← git submodule (nq-rdl/agent-skills) — do not edit here
+agents/           ← authored here: one directory per agent; file inside is agent.md
+  <name>/
+    agent.md
 plugins/          ← Claude Code plugins, one per bundle
   <bundle>/
     .claude-plugin/plugin.json
-    skills/       ← symlinks into ../../skills/<skill>
+    skills/       ← symlinks into ../../../skills/<skill>
+    agents/       ← flat .md symlinks into ../../../agents/<name>/agent.md
+.gemini/          ← Gemini CLI native discovery tree
+  skills/<name>   ← symlink into ../../skills/<skill>
+  agents/<name>.md ← symlink into ../../agents/<name>/agent.md
 registry/
-  bundles/*.yaml  ← single source of truth: which skills belong to which bundle/target
+  bundles/*.yaml  ← single source of truth: which skills/agents belong to which bundle/target
 mcp/
   gemini-cli-go/  ← Go MCP server, wraps Gemini CLI as MCP tools
   pi-rpc-go/      ← Go MCP server, wraps pi.dev RPC via HTTP/ConnectRPC
@@ -36,11 +41,17 @@ hooks/            ← Claude Code hook shell scripts + JSON config
   marketplace.json ← Claude Code marketplace manifest (repo root)
 ```
 
-### How skills flow into plugins
+### How skills and agents flow into plugins
 
-Skills in `plugins/<bundle>/skills/` are **symlinks** into `skills/<skill>/`. Never copy skill content — update the submodule and resymlink. Claude Code follows symlinks during install, so the installed plugin is self-contained.
+Skills and agents reach each host as **symlinks** into the canonical source under `skills/` (submodule) or `agents/` (authored here). Never copy content — update the source and resymlink.
 
-When a bundle YAML references a skill, CI validates that `skills/<skill>/` exists and that plugin symlinks resolve. See `scripts/validate-plugin-hooks.sh` for the hooks validation logic.
+- **Skills**: `plugins/<bundle>/skills/<skill>` is a directory symlink into `skills/<skill>/` (the submodule). One symlink per skill per bundle.
+- **Agents**: `plugins/<bundle>/agents/<name>.md` is a *flat file* symlink into `agents/<name>/agent.md`. Claude Code's plugin spec expects agents as flat `.md` files under `./agents/`, so the symlink flattens the nested source layout.
+- **Gemini**: `.gemini/skills/<name>` (directory) and `.gemini/agents/<name>.md` (flat file) mirror the same sources so `gemini extensions link .` at the repo root sees both primitives.
+
+Claude Code and Gemini CLI both follow symlinks during install, so the installed extension is self-contained.
+
+When a bundle YAML references a skill or agent, CI validates that `skills/<name>/` (or `agents/<name>/agent.md`) exists and that every plugin/.gemini symlink resolves. See `scripts/validate-plugins.sh` for the validation logic (the old name `validate-plugin-hooks.sh` is kept as a back-compat symlink).
 
 ### Python skills (csv, pdf, xlsx, docx)
 
@@ -72,16 +83,18 @@ make cross-compile DESTDIR=../../plugins/dev-tools/bin/mcp
 ## Build, test, lint
 
 ```bash
-# Validate all plugin hooks.json and plugin.json files
-bash scripts/validate-plugin-hooks.sh
+# Validate all plugin hooks.json, plugin.json, and agents
+bash scripts/validate-plugins.sh
 
 # Validate only plugins touched by changed files
-bash scripts/validate-plugin-hooks.sh plugins/swe/hooks/hooks.json
+bash scripts/validate-plugins.sh plugins/swe/hooks/hooks.json
 ```
 
 CI runs `validate.yml` on every PR/push to main. It checks:
 - Bundle YAML skill references resolve to `skills/<name>/`
-- All symlinks under `plugins/`, `opencode/`, `pidev/` are not broken
+- Bundle YAML agent references resolve to `agents/<name>/agent.md`
+- All symlinks under `plugins/`, `.gemini/`, `opencode/`, `pidev/` are not broken
+- Every `agents/<name>/agent.md` has frontmatter `name` + `description`
 
 ## Testing instructions
 
@@ -106,6 +119,7 @@ See [`docs/local-testing.md`](docs/local-testing.md) for the full walkthrough in
 schemaVersion: v1
 id: swe
 skills: [tdd, go-secure]      # must exist in skills/ submodule
+agents: [debug, janitor]      # must exist in agents/<name>/agent.md
 hooks: []
 targets:
   claude:
@@ -115,7 +129,9 @@ targets:
     enabled: false
 ```
 
-When adding a skill to a bundle: (1) add it to the YAML, (2) add a symlink in `plugins/<bundle>/skills/`.
+When adding a skill to a bundle: (1) add it to the YAML, (2) add a directory symlink in `plugins/<bundle>/skills/`.
+
+When adding an agent to a bundle: (1) create `agents/<name>/agent.md`, (2) add it to the YAML `agents:` list, (3) add flat `.md` symlinks in `plugins/<bundle>/agents/<name>.md` and `.gemini/agents/<name>.md`.
 
 ## PR instructions
 
@@ -142,27 +158,3 @@ The docs site uses Zensical (configured in `zensical.toml`). Source is `docs/`. 
 - macOS and Linux only — symlink resolution requires native symlink support (WSL2 for Windows)
 - `dist/` is generated output — do not hand-edit
 - Gemini CLI requires a self-contained extension; monorepo publishing to Gemini is via release archive or mirror repo (Phase 2)
-
-## Bundles
-
-### swe — Software Engineering
-tdd, tdd-team-workflow, go-secure, go-naming, go-gh, changie, charm-tui
-
-### infra — Infrastructure
-ansible, husky, lefthook, starrocks
-
-### dataops — Data Operations
-csv, xlsx, pdf, docx, canvas-design
-
-### informatics — R Ecosystem
-r-expert, r-lib-cli, r-lib-cli-app, r-lib-cran-extrachecks, r-lib-lifecycle, r-lib-mirai, r-lib-package-dev, r-lib-testing, shiny-bslib, shiny-bslib-theming, quarto-authoring, quarto-alt-text
-
-### dev-tools — Developer Tools
-cc-agent-teams, cc-hooks, dispatch, document-release, gemini-cli, jules, jules-dispatch-creator, opencode, pi-rpc, lychee, writerside
-
-### meta — Skill Quality
-report-skill-issue, skill-review
-
-## Usage
-
-Skills activate automatically when the model identifies a relevant task. Each skill's `SKILL.md` contains detailed instructions and trigger conditions.

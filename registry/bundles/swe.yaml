@@ -15,16 +15,32 @@ skills:
   - changie
   - charm-tui
   - sops
+agents:
+  - debug
+  - janitor
+  - playwright-tester
+  - adr-generator
+  - wg-code-alchemist
+  - wg-code-sentinel
+  - gem-reviewer
+  - hlbpa
+  - api-architect
 hooks: []
 prompts: []
-mcp: []
+mcp:
+  - playwright
 targets:
   claude:
     enabled: true
     pluginName: swe
     marketplaceName: rdl
+  codex:
+    enabled: true
+    pluginName: swe
+    marketplaceName: rdl
   gemini:
-    enabled: false
+    enabled: true
+    extensionName: rdl
   pidev:
     enabled: false
   opencode:

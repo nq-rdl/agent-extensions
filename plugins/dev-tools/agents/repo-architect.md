@@ -1,0 +1,1 @@
+../../../agents/repo-architect/agent.md

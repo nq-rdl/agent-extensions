@@ -11,55 +11,57 @@ permissions:
 
 jobs:
   validate-bundles:
-    name: Validate bundle skill references
+    name: Validate bundle skill + agent references
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v6
 
-      - name: Check bundle skill references resolve
-        run: |
-          shopt -s nullglob
-          bundles=(registry/bundles/*.yaml registry/bundles/*.yml)
-          if [ ${#bundles[@]} -eq 0 ]; then
-            echo "No bundle manifests to validate"
-            exit 0
-          fi
+      - name: Install PyYAML
+        run: python3 -m pip install --user pyyaml
 
-          exit_code=0
-          for bundle in "${bundles[@]}"; do
-            echo "Checking $bundle"
-            in_skills=false
-            while IFS= read -r line; do
-              if echo "$line" | grep -qE '^skills:'; then
-                in_skills=true
-                continue
-              fi
-              if $in_skills; then
-                if echo "$line" | grep -qE '^\s+-\s+'; then
-                  skill=$(echo "$line" | sed 's/^\s*-\s*//' | tr -d '[:space:]')
-                  if [ ! -d "skills/$skill" ]; then
-                    echo "::error file=$bundle::Skill '$skill' not found in skills/"
-                    exit_code=1
-                  else
-                    echo "  ✓ $skill"
-                  fi
-                else
-                  in_skills=false
-                fi
-              fi
-            done < "$bundle"
-          done
-          exit $exit_code
+      - name: Check bundle references resolve
+        run: |
+          python3 <<'PY'
+          import sys
+          from pathlib import Path
+          import yaml
+
+          repo = Path(".")
+          bundles_dir = repo / "registry" / "bundles"
+          bundles = sorted(list(bundles_dir.glob("*.yaml")) + list(bundles_dir.glob("*.yml")))
+          if not bundles:
+              print("No bundle manifests to validate")
+              sys.exit(0)
+
+          exit_code = 0
+          for bundle in bundles:
+              print(f"Checking {bundle}")
+              with bundle.open() as f:
+                  data = yaml.safe_load(f) or {}
+              for name in data.get("skills") or []:
+                  if not (repo / "skills" / name).is_dir():
+                      print(f"::error file={bundle}::Skill '{name}' not found in skills/")
+                      exit_code = 1
+                  else:
+                      print(f"  ✓ skill:{name}")
+              for name in data.get("agents") or []:
+                  if not (repo / "agents" / name / "agent.md").is_file():
+                      print(f"::error file={bundle}::Agent '{name}' not found at agents/{name}/agent.md")
+                      exit_code = 1
+                  else:
+                      print(f"  ✓ agent:{name}")
+          sys.exit(exit_code)
+          PY
 
   validate-symlinks:
-    name: Validate skill symlinks
+    name: Validate skill + agent symlinks
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v6
 
-      - name: Check all skill symlinks resolve
+      - name: Check all symlinks resolve
         run: |
-          mapfile -t links < <(find plugins/ opencode/ pidev/ -type l 2>/dev/null)
+          mapfile -t links < <(find plugins/ opencode/ pidev/ .gemini/ -type l 2>/dev/null)
           if [ ${#links[@]} -eq 0 ]; then
             echo "No symlinks to validate"
             exit 0
@@ -80,13 +82,33 @@ jobs:
           exit $exit_code
 
   validate-plugins:
-    name: Validate Claude Code plugin structure
+    name: Validate Claude + Codex plugin structure, hooks, and agents
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v6
 
-      - name: Validate plugin manifests and hooks
-        run: scripts/validate-plugin-hooks.sh
+      - name: Install PyYAML for agent frontmatter validation
+        run: python3 -m pip install --user pyyaml
+
+      - name: Validate plugin manifests, hooks, and agents
+        run: scripts/validate-plugins.sh
+
+  validate-gemini-drift:
+    name: Check GEMINI.md + .gemini/ are regenerated
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Install PyYAML
+        run: python3 -m pip install --user pyyaml
+
+      - name: Regenerate and diff
+        run: |
+          bash scripts/generate-gemini-extension.sh
+          if ! git diff --exit-code -- GEMINI.md .gemini/; then
+            echo "::error::GEMINI.md or .gemini/ is out of sync with registry/bundles/. Run 'bash scripts/generate-gemini-extension.sh' and commit the result."
+            exit 1
+          fi
 
   validate-mcp-servers:
     name: Validate Go MCP servers build

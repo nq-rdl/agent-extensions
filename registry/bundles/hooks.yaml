@@ -16,6 +16,8 @@ targets:
     enabled: true
     pluginName: hooks
     marketplaceName: rdl
+  codex:
+    enabled: false
   gemini:
     enabled: false
   pidev:
