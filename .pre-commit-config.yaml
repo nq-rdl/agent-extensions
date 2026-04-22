@@ -6,6 +6,7 @@ repos:
       - id: validate-plugins
         name: Validate Claude Code plugins and agents
         entry: scripts/validate-plugins.sh
-        language: script
+        language: python
+        additional_dependencies: [pyyaml]
         files: ^(plugins/|agents/|registry/bundles/|\.gemini/)
         pass_filenames: true
