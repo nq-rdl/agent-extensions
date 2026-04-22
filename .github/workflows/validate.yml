@@ -16,53 +16,42 @@ jobs:
     steps:
       - uses: actions/checkout@v6
 
+      - name: Install PyYAML
+        run: python3 -m pip install --user pyyaml
+
       - name: Check bundle references resolve
         run: |
-          shopt -s nullglob
-          bundles=(registry/bundles/*.yaml registry/bundles/*.yml)
-          if [ ${#bundles[@]} -eq 0 ]; then
-            echo "No bundle manifests to validate"
-            exit 0
-          fi
+          python3 <<'PY'
+          import sys
+          from pathlib import Path
+          import yaml
 
-          exit_code=0
-          for bundle in "${bundles[@]}"; do
-            echo "Checking $bundle"
-            in_section=""
-            while IFS= read -r line; do
-              if echo "$line" | grep -qE '^skills:'; then
-                in_section="skills"
-                continue
-              fi
-              if echo "$line" | grep -qE '^agents:'; then
-                in_section="agents"
-                continue
-              fi
-              if [ -n "$in_section" ]; then
-                if echo "$line" | grep -qE '^\s+-\s+'; then
-                  item=$(echo "$line" | sed 's/^\s*-\s*//' | tr -d '[:space:]')
-                  if [ "$in_section" = "skills" ]; then
-                    if [ ! -d "skills/$item" ]; then
-                      echo "::error file=$bundle::Skill '$item' not found in skills/"
-                      exit_code=1
-                    else
-                      echo "  ✓ skill:$item"
-                    fi
-                  elif [ "$in_section" = "agents" ]; then
-                    if [ ! -f "agents/$item/agent.md" ]; then
-                      echo "::error file=$bundle::Agent '$item' not found at agents/$item/agent.md"
-                      exit_code=1
-                    else
-                      echo "  ✓ agent:$item"
-                    fi
-                  fi
-                else
-                  in_section=""
-                fi
-              fi
-            done < "$bundle"
-          done
-          exit $exit_code
+          repo = Path(".")
+          bundles_dir = repo / "registry" / "bundles"
+          bundles = sorted(list(bundles_dir.glob("*.yaml")) + list(bundles_dir.glob("*.yml")))
+          if not bundles:
+              print("No bundle manifests to validate")
+              sys.exit(0)
+
+          exit_code = 0
+          for bundle in bundles:
+              print(f"Checking {bundle}")
+              with bundle.open() as f:
+                  data = yaml.safe_load(f) or {}
+              for name in data.get("skills") or []:
+                  if not (repo / "skills" / name).is_dir():
+                      print(f"::error file={bundle}::Skill '{name}' not found in skills/")
+                      exit_code = 1
+                  else:
+                      print(f"  ✓ skill:{name}")
+              for name in data.get("agents") or []:
+                  if not (repo / "agents" / name / "agent.md").is_file():
+                      print(f"::error file={bundle}::Agent '{name}' not found at agents/{name}/agent.md")
+                      exit_code = 1
+                  else:
+                      print(f"  ✓ agent:{name}")
+          sys.exit(exit_code)
+          PY
 
   validate-symlinks:
     name: Validate skill + agent symlinks
@@ -103,6 +92,23 @@ jobs:
 
       - name: Validate plugin manifests, hooks, and agents
         run: scripts/validate-plugins.sh
+
+  validate-gemini-drift:
+    name: Check GEMINI.md + .gemini/ are regenerated
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Install PyYAML
+        run: python3 -m pip install --user pyyaml
+
+      - name: Regenerate and diff
+        run: |
+          bash scripts/generate-gemini-extension.sh
+          if ! git diff --exit-code -- GEMINI.md .gemini/; then
+            echo "::error::GEMINI.md or .gemini/ is out of sync with registry/bundles/. Run 'bash scripts/generate-gemini-extension.sh' and commit the result."
+            exit 1
+          fi
 
   validate-mcp-servers:
     name: Validate Go MCP servers build

@@ -18,9 +18,13 @@
 #   agents (new)
 #    10. Every agent listed in registry/bundles/<b>.yaml has a source file
 #        at agents/<name>/agent.md
-#    11. Every symlink under plugins/<b>/agents/*.md resolves
+#    11. Every Claude-target bundle agent has a symlink at
+#        plugins/<plugin>/agents/<name>.md (cross-checked against the bundle
+#        YAML, not just scanned from disk — catches missing symlinks)
 #    12. Every symlink under .gemini/agents/*.md resolves (if .gemini/ exists)
 #    13. Every agents/<name>/agent.md has frontmatter keys `name`, `description`
+#    14. Every mcp entry in a bundle YAML is wired in the bundle plugin's
+#        .claude-plugin/.mcp.json
 #
 # Usage:
 #   validate-plugins.sh                       # validate all plugins + agents
@@ -218,33 +222,55 @@ fi
 echo ""
 echo "Validating agents"
 
-# Collect agent names declared in bundle YAMLs (agents: top-level list).
-declare -A declared_agents
-for bundle in "$REPO_ROOT"/registry/bundles/*.yaml; do
-  [ -f "$bundle" ] || continue
-  bundle_id=$(basename "$bundle" .yaml)
-  in_agents=false
-  while IFS= read -r line; do
-    if [[ "$line" =~ ^agents: ]]; then
-      in_agents=true
-      continue
-    fi
-    if $in_agents; then
-      if [[ "$line" =~ ^[[:space:]]+-[[:space:]]+(.+)$ ]]; then
-        name="${BASH_REMATCH[1]}"
-        # Strip trailing whitespace
-        name="${name%%[[:space:]]}"
-        declared_agents["$name"]="$bundle_id"
-        src="$REPO_ROOT/agents/$name/agent.md"
-        if [ ! -f "$src" ]; then
-          error "$bundle" "Agent '$name' declared but missing source file agents/$name/agent.md"
-        fi
-      elif [[ "$line" =~ ^[^[:space:]] ]]; then
-        in_agents=false
-      fi
-    fi
-  done < "$bundle"
-done
+# Cross-check every bundle YAML: each declared agent resolves to a source file,
+# each declared Claude-targeted agent has a plugin symlink, and each declared
+# mcp: entry is wired in the bundle's .mcp.json. Uses PyYAML so inline-flow
+# lists (agents: [a, b]) and inline comments parse correctly.
+python3 - "$REPO_ROOT" <<'PY' || errors=$((errors + 1))
+import sys, json
+from pathlib import Path
+import yaml
+
+repo = Path(sys.argv[1])
+fail = False
+
+def err(path, msg):
+    global fail
+    print(f"::error file={path}::{msg}", file=sys.stderr)
+    fail = True
+
+for bundle in sorted((repo / "registry" / "bundles").glob("*.yaml")):
+    with bundle.open() as f:
+        data = yaml.safe_load(f) or {}
+    bundle_id = data.get("id") or bundle.stem
+    claude_enabled = (data.get("targets") or {}).get("claude", {}).get("enabled")
+    plugin_name = (data.get("targets") or {}).get("claude", {}).get("pluginName") or bundle_id
+
+    for name in data.get("agents") or []:
+        src = repo / "agents" / name / "agent.md"
+        if not src.is_file():
+            err(bundle, f"Agent '{name}' declared but missing source file agents/{name}/agent.md")
+        if claude_enabled:
+            link = repo / "plugins" / plugin_name / "agents" / f"{name}.md"
+            if not link.exists():
+                err(bundle, f"Agent '{name}' declared for Claude target but missing symlink plugins/{plugin_name}/agents/{name}.md")
+
+    mcp_json = repo / "plugins" / plugin_name / ".claude-plugin" / ".mcp.json"
+    declared_mcp = data.get("mcp") or []
+    if declared_mcp and not mcp_json.is_file():
+        err(bundle, f"Bundle declares mcp servers {declared_mcp} but plugins/{plugin_name}/.claude-plugin/.mcp.json does not exist")
+    elif declared_mcp:
+        try:
+            wired = set(json.loads(mcp_json.read_text()).get("mcpServers", {}).keys())
+        except json.JSONDecodeError as exc:
+            err(mcp_json, f"Invalid JSON: {exc}")
+            wired = set()
+        for key in declared_mcp:
+            if key not in wired:
+                err(bundle, f"mcp entry '{key}' not wired in plugins/{plugin_name}/.claude-plugin/.mcp.json")
+
+sys.exit(1 if fail else 0)
+PY
 
 # Validate every agents/<name>/agent.md has the required frontmatter.
 if [ -d "$REPO_ROOT/agents" ]; then

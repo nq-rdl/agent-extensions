@@ -18,6 +18,7 @@ cd "$REPO_ROOT"
 
 python3 - <<'PY'
 import os
+import shutil
 import sys
 from pathlib import Path
 import yaml
@@ -49,20 +50,27 @@ agents_dir = gemini_dir / "agents"
 skills_dir.mkdir(parents=True, exist_ok=True)
 agents_dir.mkdir(parents=True, exist_ok=True)
 
-# Clear existing symlinks that are no longer needed
-def wanted_symlinks(d: Path, wanted: set[str]):
+# Clear existing entries that are no longer needed (symlinks, stale dirs, or files)
+def prune_stale(d: Path, wanted: set[str]):
     for child in list(d.iterdir()):
-        if child.is_symlink() and child.name not in wanted:
+        if child.name in wanted:
+            continue
+        if child.is_symlink() or child.is_file():
             child.unlink()
-            print(f"removed stale symlink: {child.relative_to(REPO)}")
+            print(f"removed stale entry: {child.relative_to(REPO)}")
+        elif child.is_dir():
+            shutil.rmtree(child)
+            print(f"removed stale directory: {child.relative_to(REPO)}")
 
-wanted_symlinks(skills_dir, set(skills))
-wanted_symlinks(agents_dir, {f"{name}.md" for name in agents})
+prune_stale(skills_dir, set(skills))
+prune_stale(agents_dir, {f"{name}.md" for name in agents})
 
 # Create / refresh symlinks
 def relink(src: Path, target_rel: str):
-    if src.is_symlink() or src.exists():
+    if src.is_symlink() or src.is_file():
         src.unlink()
+    elif src.is_dir():
+        shutil.rmtree(src)
     src.symlink_to(target_rel)
     print(f"linked {src.relative_to(REPO)} -> {target_rel}")
 
