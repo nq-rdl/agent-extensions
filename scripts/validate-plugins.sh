@@ -148,11 +148,13 @@ validate_codex_marketplace() {
   count=$(jq '.plugins | length' "$marketplace_json")
   for ((i = 0; i < count; i++)); do
     entry_name=$(jq -r --argjson i "$i" '.plugins[$i].name // empty' "$marketplace_json")
-    source_path=$(jq -r --argjson i "$i" '
+    source_kind=$(jq -r --argjson i "$i" '
       if (.plugins[$i].source | type) == "object" then
-        .plugins[$i].source.path // empty
+        .plugins[$i].source.source // "local"
+      elif (.plugins[$i].source | type) == "string" then
+        "local"
       else
-        .plugins[$i].source // empty
+        empty
       end
     ' "$marketplace_json")
     install_policy=$(jq -r --argjson i "$i" '.plugins[$i].policy.installation // empty' "$marketplace_json")
@@ -160,18 +162,30 @@ validate_codex_marketplace() {
     category=$(jq -r --argjson i "$i" '.plugins[$i].category // empty' "$marketplace_json")
 
     [ -z "$entry_name" ] && error "$marketplace_json" "plugins[$i] missing required 'name' field"
-    [ -z "$source_path" ] && error "$marketplace_json" "plugins[$i] missing required source path"
+    [ -z "$source_kind" ] && error "$marketplace_json" "plugins[$i] missing required 'source' field"
     [ -z "$install_policy" ] && error "$marketplace_json" "plugins[$i] missing policy.installation"
     [ -z "$auth_policy" ] && error "$marketplace_json" "plugins[$i] missing policy.authentication"
     [ -z "$category" ] && error "$marketplace_json" "plugins[$i] missing category"
 
-    if [[ -n "$source_path" && "$source_path" != ./* ]]; then
-      error "$marketplace_json" "plugins[$i] source.path must start with './': $source_path"
-      continue
-    fi
+    # Path validation is only meaningful for local sources. Remote kinds
+    # (github, etc. — see `codex plugin marketplace add owner/repo`) carry
+    # repo/ref fields instead and don't resolve to a filesystem path.
+    if [ "$source_kind" = "local" ]; then
+      source_path=$(jq -r --argjson i "$i" '
+        if (.plugins[$i].source | type) == "object" then
+          .plugins[$i].source.path // empty
+        else
+          .plugins[$i].source // empty
+        end
+      ' "$marketplace_json")
 
-    if [[ -n "$source_path" && ! -e "$REPO_ROOT/${source_path#./}" ]]; then
-      error "$marketplace_json" "plugins[$i] source.path does not exist: $source_path"
+      if [ -z "$source_path" ]; then
+        error "$marketplace_json" "plugins[$i] local source missing 'path'"
+      elif [[ "$source_path" != ./* ]]; then
+        error "$marketplace_json" "plugins[$i] source.path must start with './': $source_path"
+      elif [ ! -e "$REPO_ROOT/${source_path#./}" ]; then
+        error "$marketplace_json" "plugins[$i] source.path does not exist: $source_path"
+      fi
     fi
   done
 }
