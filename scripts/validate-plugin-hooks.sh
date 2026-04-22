@@ -170,6 +170,14 @@ else
 fi
 
 if [ ${#plugins[@]} -eq 0 ]; then
+  # Still validate the Codex marketplace even when no plugin dirs are in scope
+  # (e.g. targeted run against only .agents/plugins/marketplace.json).
+  validate_codex_marketplace
+  if [ $errors -gt 0 ]; then
+    echo ""
+    echo "Plugin validation failed with $errors error(s)"
+    exit 1
+  fi
   echo "No plugins to validate"
   exit 0
 fi
@@ -185,12 +193,23 @@ for plugin_rel in "${plugins[@]}"; do
   echo "Validating $plugin_rel"
 
   # ── plugin manifests ─────────────────────────────────────────────────────
-  if [ -f "$claude_plugin_json" ]; then
-    validate_manifest_json "$claude_plugin_json" "claude" "$plugin_dir"
+  # If the host subdirectory exists, its plugin.json must exist too — catches
+  # partial scaffolds where someone created .claude-plugin/ (or .codex-plugin/)
+  # without the manifest file inside it.
+  if [ -d "$plugin_dir/.claude-plugin" ]; then
+    if [ -f "$claude_plugin_json" ]; then
+      validate_manifest_json "$claude_plugin_json" "claude" "$plugin_dir"
+    else
+      error "$plugin_rel" "Missing .claude-plugin/plugin.json"
+    fi
   fi
 
-  if [ -f "$codex_plugin_json" ]; then
-    validate_manifest_json "$codex_plugin_json" "codex" "$plugin_dir"
+  if [ -d "$plugin_dir/.codex-plugin" ]; then
+    if [ -f "$codex_plugin_json" ]; then
+      validate_manifest_json "$codex_plugin_json" "codex" "$plugin_dir"
+    else
+      error "$plugin_rel" "Missing .codex-plugin/plugin.json"
+    fi
   fi
 
   # ── hooks.json (optional — only validate if present) ─────────────────────
