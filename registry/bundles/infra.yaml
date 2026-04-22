@@ -19,6 +19,10 @@ targets:
     enabled: true
     pluginName: infra
     marketplaceName: rdl
+  codex:
+    enabled: true
+    pluginName: infra
+    marketplaceName: rdl
   gemini:
     enabled: false
   pidev:

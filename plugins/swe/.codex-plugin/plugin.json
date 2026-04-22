@@ -1,0 +1,38 @@
+{
+  "name": "swe",
+  "version": "0.4.0",
+  "description": "Software engineering workflows for TDD, secure Go, naming, CI/CD, and changelogs.",
+  "author": {
+    "name": "nq-rdl",
+    "email": "r.schnetler@uq.edu.au",
+    "url": "https://github.com/nq-rdl"
+  },
+  "homepage": "https://github.com/nq-rdl/agent-extensions",
+  "repository": "https://github.com/nq-rdl/agent-extensions",
+  "license": "MIT",
+  "keywords": [
+    "agents",
+    "skills",
+    "swe",
+    "go",
+    "tdd"
+  ],
+  "skills": "./skills/",
+  "interface": {
+    "displayName": "SWE",
+    "shortDescription": "TDD, Go, CI/CD, and changelogs",
+    "longDescription": "Reusable software engineering workflows for test-driven development, secure Go, naming, CI/CD, and changelog work.",
+    "developerName": "nq-rdl",
+    "category": "Productivity",
+    "capabilities": [
+      "Read",
+      "Write"
+    ],
+    "websiteURL": "https://github.com/nq-rdl/agent-extensions",
+    "defaultPrompt": [
+      "Use SWE to drive a TDD change in this repo.",
+      "Use SWE to review this Go package for secure error handling.",
+      "Use SWE to add a changie entry for this change."
+    ]
+  }
+}

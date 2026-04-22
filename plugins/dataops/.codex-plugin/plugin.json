@@ -1,0 +1,38 @@
+{
+  "name": "dataops",
+  "version": "0.4.0",
+  "description": "Data operations workflows for CSV, Excel, PDF, Word, and design documents.",
+  "author": {
+    "name": "nq-rdl",
+    "email": "r.schnetler@uq.edu.au",
+    "url": "https://github.com/nq-rdl"
+  },
+  "homepage": "https://github.com/nq-rdl/agent-extensions",
+  "repository": "https://github.com/nq-rdl/agent-extensions",
+  "license": "MIT",
+  "keywords": [
+    "agents",
+    "skills",
+    "dataops",
+    "csv",
+    "pdf"
+  ],
+  "skills": "./skills/",
+  "interface": {
+    "displayName": "DataOps",
+    "shortDescription": "CSV, Excel, PDF, and DOCX",
+    "longDescription": "Reusable data operations workflows for extraction sheets, spreadsheets, PDFs, Word documents, and design artifacts.",
+    "developerName": "nq-rdl",
+    "category": "Productivity",
+    "capabilities": [
+      "Read",
+      "Write"
+    ],
+    "websiteURL": "https://github.com/nq-rdl/agent-extensions",
+    "defaultPrompt": [
+      "Use DataOps to update this CSV extraction sheet.",
+      "Use DataOps to extract tables from this PDF.",
+      "Use DataOps to fix this Excel workbook."
+    ]
+  }
+}

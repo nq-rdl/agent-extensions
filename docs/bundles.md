@@ -4,7 +4,7 @@ icon: lucide/package
 
 # Bundles
 
-Available skill bundles distributed as Claude Code plugins and a Gemini CLI extension.
+Available skill bundles distributed as Claude Code plugins, Codex plugins, and a Gemini CLI extension.
 
 ## Install
 
@@ -19,6 +19,20 @@ Skills are distributed as 6 separate plugin bundles. Install the bundles you nee
 # Install a bundle
 /plugin install <bundle>@rdl
 ```
+
+### Codex
+
+Supported bundles are distributed as native Codex plugins:
+
+```bash
+# From a cloned copy of this repo
+git submodule update --init
+codex plugin marketplace add .
+codex
+/plugins
+```
+
+The Codex marketplace currently exposes `swe`, `infra`, `dataops`, `informatics`, `dev-tools`, and `meta`. The Claude-only `hooks` bundle is not listed because Codex hooks live in repo or user `.codex/hooks.json` files rather than inside plugins.
 
 ### Gemini CLI
 
