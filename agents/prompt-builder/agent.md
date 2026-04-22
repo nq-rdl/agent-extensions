@@ -72,7 +72,7 @@ You MUST research and integrate information from user-provided sources:
 - README.md Files: You WILL use `Read` to analyze deployment, build, or usage instructions
 - Code Files/Folders: You WILL use `Glob` and `Grep` to understand implementation patterns
 - Web Documentation: You WILL fetch documentation to gather latest standards (if WebFetch is available)
-- Provided file paths or $ARGUMENTS: You WILL read files or content explicitly specified by the user
+- Provided file paths: You WILL read files or content explicitly specified by the user
 
 #### Research Integration Requirements
 - You MUST extract key requirements, dependencies, and step-by-step processes
