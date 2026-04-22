@@ -6,22 +6,7 @@ Curated reusable agent skills and integrations published in host-native formats.
 
 ### Codex
 
-Codex uses a native repo marketplace at `.agents/plugins/marketplace.json` plus bundle-local `.codex-plugin/plugin.json` manifests.
-
-```bash
-git clone git@github.com:nq-rdl/agent-extensions.git
-cd agent-extensions
-git submodule update --init
-codex plugin marketplace add .
-codex
-/plugins
-```
-
-Install the bundles you want from the `RDL Agent Extensions` marketplace: `swe`, `infra`, `dataops`, `informatics`, `dev-tools`, and `meta`.
-
-Codex hooks do not package the same way as Claude hooks. Codex discovers hooks from `<repo>/.codex/hooks.json` or `~/.codex/hooks.json`, so the Claude-only `hooks` bundle is not exposed in the Codex marketplace.
-
-See [`docs/codex.md`](docs/codex.md) for the Codex packaging model and bundle layout.
+See [`docs/codex.md`](docs/codex.md) for installation, the native Codex marketplace model, and the bundle layout.
 
 ### Claude Code
 
