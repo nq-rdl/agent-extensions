@@ -4,8 +4,8 @@ repos:
   - repo: local
     hooks:
       - id: validate-plugins
-        name: Validate Claude Code plugins
+        name: Validate Claude and Codex plugins
         entry: scripts/validate-plugin-hooks.sh
         language: script
-        files: ^plugins/
+        files: ^(plugins/|\.agents/plugins/)
         pass_filenames: true
