@@ -20,6 +20,10 @@ targets:
     enabled: true
     pluginName: dataops
     marketplaceName: rdl
+  codex:
+    enabled: true
+    pluginName: dataops
+    marketplaceName: rdl
   gemini:
     enabled: false
   pidev:

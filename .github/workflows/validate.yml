@@ -82,7 +82,7 @@ jobs:
           exit $exit_code
 
   validate-plugins:
-    name: Validate Claude Code plugin structure + agents
+    name: Validate Claude + Codex plugin structure, hooks, and agents
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v6
