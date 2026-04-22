@@ -1,0 +1,3 @@
+kind: Added
+body: 'swe bundle: adds 9 subagents — debug, janitor, playwright-tester, adr-generator, wg-code-alchemist, wg-code-sentinel, gem-reviewer, hlbpa, api-architect. Flips gemini target to enabled.'
+time: 2026-04-21T08:23:06.187738197+10:00

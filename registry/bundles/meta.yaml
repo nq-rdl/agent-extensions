@@ -9,6 +9,12 @@ channels:
 skills:
   - report-skill-issue
   - skill-review
+agents:
+  - prompt-builder
+  - critical-thinking
+  - doublecheck
+  - se-responsible-ai-code
+  - agent-governance-reviewer
 hooks: []
 prompts: []
 mcp: []
@@ -22,7 +28,8 @@ targets:
     pluginName: meta
     marketplaceName: rdl
   gemini:
-    enabled: false
+    enabled: true
+    extensionName: rdl
   pidev:
     enabled: false
   opencode:

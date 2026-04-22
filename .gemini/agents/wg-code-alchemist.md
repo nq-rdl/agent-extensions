@@ -1,0 +1,1 @@
+../../agents/wg-code-alchemist/agent.md
