@@ -101,7 +101,7 @@
         "repo": "max-sixty/worktrunk"
       },
       "description": "Developer tools — Git worktree CLI for parallel AI agent workflows, config guidance, and automatic Claude session tracking",
-      "version": "1.0.0",
+      "version": "0.4.0",
       "keywords": [
         "git",
         "worktree",

@@ -1,29 +1,36 @@
 #!/bin/bash
-# Validate Claude Code plugin structure, hooks, and agents.
+# Validate Claude Code + Codex plugin structure, hooks, and agents.
 #
 # Checks:
-#   plugin.json
+#   Claude + Codex plugin manifests
 #     1. plugin.json is valid JSON
 #     2. plugin.json has required "name" and "description" fields
 #     3. plugin.json must NOT declare an "agents" field (Claude Code auto-discovers from ./agents/)
+#     4. Codex manifest component paths (skills, mcpServers, apps) are ./-prefixed and resolve within the plugin
+#     5. Codex interface.defaultPrompt has at most 3 entries
+#     6. If a .claude-plugin/ or .codex-plugin/ directory exists, its plugin.json must too
+#
+#   Codex marketplace
+#     7. .agents/plugins/marketplace.json is valid JSON and points at existing plugin dirs
+#     8. Each marketplace entry has name, source path, policy, and category
 #
 #   hooks.json (optional — only if present)
-#     4. hooks.json is valid JSON
-#     5. Each event maps to an array of rule groups
-#     6. Each rule group has a "hooks" array (not bare hook objects)
-#     7. Each hook entry has required "type" and "command" fields
-#     8. Event names are from the known set
-#     9. Scripts referenced via ${CLAUDE_PLUGIN_ROOT} exist relative to plugin root
+#     9. hooks.json is valid JSON
+#    10. Each event maps to an array of rule groups
+#    11. Each rule group has a "hooks" array (not bare hook objects)
+#    12. Each hook entry has required "type" and "command" fields
+#    13. Event names are from the known set
+#    14. Scripts referenced via ${CLAUDE_PLUGIN_ROOT} exist relative to plugin root
 #
 #   agents (new)
-#    10. Every agent listed in registry/bundles/<b>.yaml has a source file
+#    15. Every agent listed in registry/bundles/<b>.yaml has a source file
 #        at agents/<name>/agent.md
-#    11. Every Claude-target bundle agent has a symlink at
+#    16. Every Claude-target bundle agent has a symlink at
 #        plugins/<plugin>/agents/<name>.md (cross-checked against the bundle
 #        YAML, not just scanned from disk — catches missing symlinks)
-#    12. Every symlink under .gemini/agents/*.md resolves (if .gemini/ exists)
-#    13. Every agents/<name>/agent.md has frontmatter keys `name`, `description`
-#    14. Every mcp entry in a bundle YAML is wired in the bundle plugin's
+#    17. Every symlink under .gemini/agents/*.md resolves (if .gemini/ exists)
+#    18. Every agents/<name>/agent.md has frontmatter keys `name`, `description`
+#    19. Every mcp entry in a bundle YAML is wired in the bundle plugin's
 #        .claude-plugin/.mcp.json
 #
 # Usage:
@@ -66,6 +73,123 @@ warn() {
   echo "::warning file=$1::$2" >&2
 }
 
+# Validate a Claude or Codex plugin manifest. For Codex, also verifies
+# component paths and defaultPrompt cardinality.
+validate_manifest_json() {
+  local manifest_json="$1"
+  local manifest_kind="$2"  # "claude" or "codex"
+  local plugin_dir="$3"
+
+  if ! jq empty "$manifest_json" 2>/dev/null; then
+    error "$manifest_json" "Invalid JSON in $(basename "$manifest_json")"
+    return
+  fi
+
+  local name desc
+  name=$(jq -r '.name // empty' "$manifest_json")
+  desc=$(jq -r '.description // empty' "$manifest_json")
+  [ -z "$name" ] && error "$manifest_json" "$(basename "$manifest_json") missing required 'name' field"
+  [ -z "$desc" ] && error "$manifest_json" "$(basename "$manifest_json") missing required 'description' field"
+
+  if [ "$manifest_kind" = "claude" ]; then
+    # Claude Code auto-discovers agents from ./agents/ — no manifest field required.
+    # Reject the "agents" field if present (Claude's validator rejects it).
+    if [ -n "$(jq -r '.agents // empty' "$manifest_json")" ]; then
+      error "$manifest_json" \
+        "plugin.json must not declare an \"agents\" field — agents are auto-discovered from ./agents/"
+    fi
+    return
+  fi
+
+  # Codex-specific checks
+  local field rel_path prompt_count
+  for field in skills mcpServers apps; do
+    rel_path=$(jq -r --arg field "$field" '.[$field] // empty' "$manifest_json")
+    [ -z "$rel_path" ] && continue
+
+    if [[ "$rel_path" != ./* ]]; then
+      error "$manifest_json" "Field '$field' must be a relative path starting with './'"
+      continue
+    fi
+
+    if [ ! -e "$plugin_dir/${rel_path#./}" ]; then
+      error "$manifest_json" "Field '$field' points to a missing path: $rel_path"
+    fi
+  done
+
+  prompt_count=$(jq '(.interface.defaultPrompt // []) | length' "$manifest_json")
+  if [ "$prompt_count" -gt 3 ]; then
+    error "$manifest_json" "interface.defaultPrompt may contain at most 3 entries"
+  fi
+}
+
+# Validate the Codex marketplace manifest if present.
+validate_codex_marketplace() {
+  local marketplace_json="$REPO_ROOT/.agents/plugins/marketplace.json"
+  [ -f "$marketplace_json" ] || return
+
+  echo "Validating .agents/plugins/marketplace.json"
+
+  if ! jq empty "$marketplace_json" 2>/dev/null; then
+    error "$marketplace_json" "Invalid JSON in marketplace.json"
+    return
+  fi
+
+  local name is_array count entry_name source_path install_policy auth_policy category
+  name=$(jq -r '.name // empty' "$marketplace_json")
+  [ -z "$name" ] && error "$marketplace_json" "marketplace.json missing required 'name' field"
+
+  is_array=$(jq '.plugins | type == "array"' "$marketplace_json")
+  if [ "$is_array" != "true" ]; then
+    error "$marketplace_json" "marketplace.json field 'plugins' must be an array"
+    return
+  fi
+
+  count=$(jq '.plugins | length' "$marketplace_json")
+  for ((i = 0; i < count; i++)); do
+    entry_name=$(jq -r --argjson i "$i" '.plugins[$i].name // empty' "$marketplace_json")
+    source_kind=$(jq -r --argjson i "$i" '
+      if (.plugins[$i].source | type) == "object" then
+        .plugins[$i].source.source // "local"
+      elif (.plugins[$i].source | type) == "string" then
+        "local"
+      else
+        empty
+      end
+    ' "$marketplace_json")
+    install_policy=$(jq -r --argjson i "$i" '.plugins[$i].policy.installation // empty' "$marketplace_json")
+    auth_policy=$(jq -r --argjson i "$i" '.plugins[$i].policy.authentication // empty' "$marketplace_json")
+    category=$(jq -r --argjson i "$i" '.plugins[$i].category // empty' "$marketplace_json")
+
+    [ -z "$entry_name" ] && error "$marketplace_json" "plugins[$i] missing required 'name' field"
+    [ -z "$source_kind" ] && error "$marketplace_json" "plugins[$i] missing required 'source' field"
+    [ -z "$install_policy" ] && error "$marketplace_json" "plugins[$i] missing policy.installation"
+    [ -z "$auth_policy" ] && error "$marketplace_json" "plugins[$i] missing policy.authentication"
+    [ -z "$category" ] && error "$marketplace_json" "plugins[$i] missing category"
+
+    # Path validation is only meaningful for local sources. Remote kinds
+    # (github, etc. — see `codex plugin marketplace add owner/repo`) carry
+    # repo/ref fields instead and don't resolve to a filesystem path.
+    if [ "$source_kind" = "local" ]; then
+      source_path=$(jq -r --argjson i "$i" '
+        if (.plugins[$i].source | type) == "object" then
+          .plugins[$i].source.path // empty
+        else
+          .plugins[$i].source // empty
+        end
+      ' "$marketplace_json")
+
+      if [ -z "$source_path" ]; then
+        error "$marketplace_json" "plugins[$i] local source missing 'path'"
+      elif [[ "$source_path" != ./* ]]; then
+        error "$marketplace_json" "plugins[$i] source.path must start with './': $source_path"
+      elif [ ! -e "$REPO_ROOT/${source_path#./}" ]; then
+        error "$marketplace_json" "plugins[$i] source.path does not exist: $source_path"
+      fi
+    fi
+  done
+}
+
 # ── Determine which plugins to validate ─────────────────────────────────────
 if [ $# -gt 0 ]; then
   declare -A plugin_dirs
@@ -79,45 +203,47 @@ if [ $# -gt 0 ]; then
 else
   plugins=()
   for d in "$REPO_ROOT"/plugins/*/; do
-    [ -d "$d/.claude-plugin" ] && plugins+=("plugins/$(basename "$d")")
+    if [ -d "$d/.claude-plugin" ] || [ -d "$d/.codex-plugin" ]; then
+      plugins+=("plugins/$(basename "$d")")
+    fi
   done
 fi
 
 if [ ${#plugins[@]} -eq 0 ]; then
+  # Still validate the Codex marketplace even when no plugin dirs are in scope.
+  validate_codex_marketplace
   echo "No plugins to validate"
 else
 
 # ── Validate each plugin ────────────────────────────────────────────────────
 for plugin_rel in "${plugins[@]}"; do
   plugin_dir="$REPO_ROOT/$plugin_rel"
-  plugin_json="$plugin_dir/.claude-plugin/plugin.json"
+  claude_plugin_json="$plugin_dir/.claude-plugin/plugin.json"
+  codex_plugin_json="$plugin_dir/.codex-plugin/plugin.json"
   hooks_json="$plugin_dir/hooks/hooks.json"
   agents_dir="$plugin_dir/agents"
 
   plugin_errors=0
   echo "Validating $plugin_rel"
 
-  # ── plugin.json ──────────────────────────────────────────────────────────
-  if [ ! -f "$plugin_json" ]; then
-    error "$plugin_rel" "Missing .claude-plugin/plugin.json"
-    continue
+  # ── plugin manifests ─────────────────────────────────────────────────────
+  # If a host subdirectory exists, its plugin.json must exist too — catches
+  # partial scaffolds where someone created .claude-plugin/ (or .codex-plugin/)
+  # without the manifest file inside it.
+  if [ -d "$plugin_dir/.claude-plugin" ]; then
+    if [ -f "$claude_plugin_json" ]; then
+      validate_manifest_json "$claude_plugin_json" "claude" "$plugin_dir"
+    else
+      error "$plugin_rel" "Missing .claude-plugin/plugin.json"
+    fi
   fi
 
-  if ! jq empty "$plugin_json" 2>/dev/null; then
-    error "$plugin_json" "Invalid JSON in plugin.json"
-    continue
-  fi
-
-  name=$(jq -r '.name // empty' "$plugin_json")
-  desc=$(jq -r '.description // empty' "$plugin_json")
-  [ -z "$name" ] && error "$plugin_json" "plugin.json missing required 'name' field"
-  [ -z "$desc" ] && error "$plugin_json" "plugin.json missing required 'description' field"
-
-  # Claude Code auto-discovers agents from ./agents/ — no manifest field required.
-  # Reject the "agents" field if present (Claude's validator rejects it).
-  if [ -n "$(jq -r '.agents // empty' "$plugin_json")" ]; then
-    error "$plugin_json" \
-      "plugin.json must not declare an \"agents\" field — agents are auto-discovered from ./agents/"
+  if [ -d "$plugin_dir/.codex-plugin" ]; then
+    if [ -f "$codex_plugin_json" ]; then
+      validate_manifest_json "$codex_plugin_json" "codex" "$plugin_dir"
+    else
+      error "$plugin_rel" "Missing .codex-plugin/plugin.json"
+    fi
   fi
 
   # ── agent symlinks under plugins/<b>/agents/ ─────────────────────────────
@@ -212,6 +338,8 @@ for plugin_rel in "${plugins[@]}"; do
 
   [ "$plugin_errors" -eq 0 ] && echo "  OK"
 done
+
+validate_codex_marketplace
 
 fi
 

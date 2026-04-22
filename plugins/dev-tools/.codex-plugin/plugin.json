@@ -1,0 +1,40 @@
+{
+  "name": "dev-tools",
+  "version": "0.4.0",
+  "description": "Developer tool workflows plus bundled MCP servers for dispatch and cross-agent integrations.",
+  "author": {
+    "name": "nq-rdl",
+    "email": "r.schnetler@uq.edu.au",
+    "url": "https://github.com/nq-rdl"
+  },
+  "homepage": "https://github.com/nq-rdl/agent-extensions",
+  "repository": "https://github.com/nq-rdl/agent-extensions",
+  "license": "MIT",
+  "keywords": [
+    "agents",
+    "skills",
+    "mcp",
+    "dispatch",
+    "tooling"
+  ],
+  "skills": "./skills/",
+  "mcpServers": "./.mcp.json",
+  "interface": {
+    "displayName": "Dev Tools",
+    "shortDescription": "Dispatch, docs, and MCP servers",
+    "longDescription": "Reusable developer tooling workflows for agent dispatch, documentation, and bundled MCP-backed integrations.",
+    "developerName": "nq-rdl",
+    "category": "Productivity",
+    "capabilities": [
+      "Read",
+      "Write",
+      "Integrations"
+    ],
+    "websiteURL": "https://github.com/nq-rdl/agent-extensions",
+    "defaultPrompt": [
+      "Use Dev Tools to fan this task out to another agent.",
+      "Use Dev Tools to run the bundled pi-rpc MCP server.",
+      "Use Dev Tools to update docs after this release."
+    ]
+  }
+}
