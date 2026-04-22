@@ -53,4 +53,4 @@ Commit changes with a descriptive commit message using Bash.
 
 ### Fix next comment
 
-Move on to the next comment in $ARGUMENTS or ask the user for the next comment.
+Move on to the next comment, or ask the user for the next comment.

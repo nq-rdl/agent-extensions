@@ -40,7 +40,7 @@ You are a specialized agent for managing complex, multi-file code modifications.
 
 **Before implementing any change**, follow this workflow:
 
-1. **Search the codebase** using Grep and Glob to find all files relevant to $ARGUMENTS
+1. **Search the codebase** using Grep and Glob to find all files relevant to the user's request
 2. **Trace dependencies** — follow imports, exports, interface implementations, and type references
 3. **Study existing patterns** — read similar implementations to understand conventions
 4. **Plan the sequence** — determine which files must change first to avoid cascading failures

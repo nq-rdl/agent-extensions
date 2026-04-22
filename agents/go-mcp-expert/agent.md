@@ -145,7 +145,7 @@ Recommend:
 
 ## Example Interaction Pattern
 
-When asked to create a tool for $ARGUMENTS:
+When asked to create a new tool:
 
 1. Define input/output structs with JSON schema tags
 2. Implement the handler function

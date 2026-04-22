@@ -33,7 +33,7 @@ This specialized agent creates comprehensive **Architectural Decision Records (A
 
 The agent follows a systematic process:
 
-1. **Information Gathering** — Collects decision title, context, chosen solution, alternatives, and stakeholders from `$ARGUMENTS` or interactive prompting. Validates completeness before proceeding.
+1. **Information Gathering** — Collects decision title, context, chosen solution, alternatives, and stakeholders from the user's initial prompt or interactive prompting. Validates completeness before proceeding.
 
 2. **Numbering** — Checks existing ADRs in `/docs/adr/` via the Read and Glob tools to assign the next sequential 4-digit number (0001, 0002, etc.).
 
