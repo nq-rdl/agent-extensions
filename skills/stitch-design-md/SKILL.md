@@ -1,10 +1,10 @@
 ---
 name: stitch-design-md
+license: CC-BY-4.0
 description: >-
   Work with Google Stitch's design.md format. Use this skill when generating UI,
   designing with Stitch, or writing design.md specs. Teaches how to structure the
   spec with concrete examples and validation rules.
-license: MIT
 compatibility: >-
   Requires Google Stitch
 metadata:

@@ -1,6 +1,6 @@
 ---
 name: sops
-license: MIT
+license: CC-BY-4.0
 description: >-
   Use when encrypting or decrypting `.env`, `.yaml`, `.json`, or `.ini` secrets
   — even if the user does not say "SOPS" explicitly. Triggers on: storing

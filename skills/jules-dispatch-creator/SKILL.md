@@ -1,6 +1,6 @@
 ---
 name: jules-dispatch-creator
-license: MIT
+license: CC-BY-4.0
 description: >-
   Use when the user wants to set up, add, configure, or adapt Jules GitHub
   Actions dispatch workflows for a repository. Triggers when they say "adapt

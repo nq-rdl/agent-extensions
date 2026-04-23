@@ -1,6 +1,6 @@
 ---
 name: quarto-alt-text
-license: MIT
+license: CC-BY-4.0
 description: >-
   Generate accessible alt text for data visualizations in Quarto documents. Use
   when the user wants to add, improve, or review alt text for figures in .qmd

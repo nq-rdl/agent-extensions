@@ -1,6 +1,6 @@
 ---
 name: argo-cd
-license: MIT
+license: CC-BY-4.0
 description: >-
   Manage ArgoCD configuration, including applications, projects, repositories,
   clusters, and RBAC. Also used to sync and check the health of ArgoCD apps.

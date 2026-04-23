@@ -1,6 +1,6 @@
 ---
 name: skill-review
-license: MIT
+license: CC-BY-4.0
 description: >-
   Self-improvement loop for Claude Code skills. Spawns a high-effort Sonnet
   subagent to review the current session and produce actionable bugs and

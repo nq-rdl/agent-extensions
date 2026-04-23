@@ -1,6 +1,6 @@
 ---
 name: pi-rpc
-license: MIT
+license: CC-BY-4.0
 description: >-
   Pi.dev ConnectRPC service — spawn and manage pi.dev coding agent sessions via
   HTTP/JSON endpoints. Use when dispatching coding tasks to pi.dev, managing

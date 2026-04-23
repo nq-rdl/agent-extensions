@@ -1,6 +1,6 @@
 ---
 name: report-skill-issue
-license: MIT
+license: CC-BY-4.0
 description: >-
   Report issues with skills to their upstream repository. Use when a skill
   produces errors, unexpected behavior, incorrect output, or fails silently.

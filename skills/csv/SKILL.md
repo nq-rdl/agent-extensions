@@ -1,6 +1,6 @@
 ---
 name: csv
-license: MIT
+license: CC-BY-4.0
 description: >-
   Use when scanning, updating, validating, or summarising pipe-delimited
   CSV extraction sheets for the scoping review. Also covers converting the Excel

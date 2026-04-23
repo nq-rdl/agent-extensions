@@ -1,6 +1,6 @@
 ---
 name: charm-tui
-license: MIT
+license: CC-BY-4.0
 description: >-
   Build terminal user interfaces with the Go Charm ecosystem (Bubbletea v2,
   Bubbles v2, Lip Gloss v2, Fang v2). Use when creating TUI applications,
