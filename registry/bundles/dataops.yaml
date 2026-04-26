@@ -12,6 +12,7 @@ skills:
   - pdf
   - docx
   - canvas-design
+  - duckdb
 hooks: []
 prompts: []
 mcp: []
