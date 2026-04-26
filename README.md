@@ -42,7 +42,7 @@ A second, subtler reason `GEMINI.md` cannot be a symlink: the regen script write
 
 ## License
 
-This repo is **scope-licensed**: code and content carry different licenses (this is *not* an `OR` dual-license — there is no choice; the license depends on the file).
+This repo is **scope-licensed** (not an `OR` dual-license — the license depends on the file, not the user's choice):
 
-- **Code** — `SPDX-License-Identifier: MIT` — Go MCP servers in `mcp/`, shell scripts in `scripts/`, hooks, plugin manifests. Full text: [LICENSE](LICENSE).
-- **Documentation and skill/agent content** — `SPDX-License-Identifier: CC-BY-4.0` — `*.md` files in `agents/`, `docs/`, `skills/`, and the repo root. Full text: [LICENSE-CC-BY-4.0](LICENSE-CC-BY-4.0).
+- **Software** — `SPDX-License-Identifier: MIT`. Full text: [LICENSE](LICENSE).
+- **Media** — `SPDX-License-Identifier: CC-BY-4.0`. Full text: [LICENSE-CC-BY-4.0](LICENSE-CC-BY-4.0).
