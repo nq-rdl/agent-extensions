@@ -34,8 +34,19 @@ func NewManager(binary string) *Manager {
 	}
 }
 
+// CreateOpts bundles the parameters for Manager.Create.
+type CreateOpts struct {
+	Provider            string
+	Model               string
+	Cwd                 string
+	ThinkingLevel       string
+	TimeoutSeconds      int32
+	SystemPrompt        string
+	AppendSystemPrompts []string
+}
+
 // Create spawns a new session subprocess and adds it to the manager.
-func (m *Manager) Create(ctx context.Context, provider, model, cwd, thinkingLevel string, timeoutSeconds int32) (string, error) {
+func (m *Manager) Create(ctx context.Context, opts CreateOpts) (string, error) {
 	sessionCtx := context.Background()
 	if ctx != nil {
 		sessionCtx = context.WithoutCancel(ctx)
@@ -45,20 +56,29 @@ func (m *Manager) Create(ctx context.Context, provider, model, cwd, thinkingLeve
 	// Only add pi-specific flags when using the real pi binary
 	if m.binary == "pi" {
 		args = append(args, "--mode", "rpc", "--no-session",
-			"--provider", provider, "--model", model)
-		if thinkingLevel != "" {
-			args = append(args, "--thinking", thinkingLevel)
+			"--provider", opts.Provider, "--model", opts.Model)
+		if opts.ThinkingLevel != "" {
+			args = append(args, "--thinking", opts.ThinkingLevel)
 		}
+	}
+
+	// System-prompt flags are forwarded unconditionally (outside the binary guard)
+	// so that fake-pi can capture them in tests via the capture_args scenario.
+	if opts.SystemPrompt != "" {
+		args = append(args, "--system-prompt", opts.SystemPrompt)
+	}
+	for _, s := range opts.AppendSystemPrompts {
+		args = append(args, "--append-system-prompt", s)
 	}
 
 	s, err := NewSession(sessionCtx, Config{
 		Binary:            m.binary,
 		Args:              args,
-		Provider:          provider,
-		Model:             model,
-		Cwd:               cwd,
-		ThinkingLevel:     thinkingLevel,
-		InactivityTimeout: time.Duration(timeoutSeconds) * time.Second,
+		Provider:          opts.Provider,
+		Model:             opts.Model,
+		Cwd:               opts.Cwd,
+		ThinkingLevel:     opts.ThinkingLevel,
+		InactivityTimeout: time.Duration(opts.TimeoutSeconds) * time.Second,
 	})
 	if err != nil {
 		return "", err
@@ -72,7 +92,7 @@ func (m *Manager) Create(ctx context.Context, provider, model, cwd, thinkingLeve
 		if msg := s.ErrorMessage(); msg != "" {
 			return "", fmt.Errorf("session startup failed: %s", msg)
 		}
-		return "", fmt.Errorf("session exited immediately (provider=%s, model=%s)", provider, model)
+		return "", fmt.Errorf("session exited immediately (provider=%s, model=%s)", opts.Provider, opts.Model)
 	case <-time.After(200 * time.Millisecond):
 		// Subprocess still alive — good.
 	}

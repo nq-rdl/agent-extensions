@@ -1,6 +1,6 @@
 ---
 name: obsidian-bases
-license: MIT
+license: CC-BY-4.0
 description: >-
   Create and edit Obsidian Bases (.base files) with views, filters, formulas,
   and summaries. Use when working with .base files, creating database-like

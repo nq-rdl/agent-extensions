@@ -1,6 +1,6 @@
 ---
 name: starrocks
-license: MIT
+license: CC-BY-4.0
 description: >-
   StarRocks analytical data warehouse skill. Use when writing or reviewing
   StarRocks SQL, designing tables, choosing partition/bucket strategies,

@@ -1,6 +1,6 @@
 ---
 name: obsidian-markdown
-license: MIT
+license: CC-BY-4.0
 description: >-
   Create and edit Obsidian Flavored Markdown with wikilinks, embeds, callouts,
   properties, and other Obsidian-specific syntax. Use when working with .md

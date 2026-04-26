@@ -1,10 +1,10 @@
 ---
 name: pre-commit
+license: CC-BY-4.0
 description: >-
   Manage Git hooks with Python's pre-commit framework, using pixi. Use when the
   user asks about pre-commit, .pre-commit-config.yaml, Python git hooks, or
   wants to set up linting/formatting hooks via pre-commit.
-license: MIT
 compatibility: >-
   Requires pixi package manager
 metadata:

@@ -225,9 +225,16 @@ type CreateRequest struct {
 	// Optional thinking level ("off", "minimal", "low", "medium", "high").
 	ThinkingLevel string `protobuf:"bytes,4,opt,name=thinking_level,json=thinkingLevel,proto3" json:"thinking_level,omitempty"`
 	// Optional session inactivity timeout in seconds.
+	// 0 (default) uses the server default (60s). Negative values are rejected.
 	TimeoutSeconds int32 `protobuf:"varint,5,opt,name=timeout_seconds,json=timeoutSeconds,proto3" json:"timeout_seconds,omitempty"`
-	unknownFields  protoimpl.UnknownFields
-	sizeCache      protoimpl.SizeCache
+	// Override the system prompt for this session.
+	// Maps to pi's --system-prompt flag. Empty string uses the model default.
+	SystemPrompt string `protobuf:"bytes,6,opt,name=system_prompt,json=systemPrompt,proto3" json:"system_prompt,omitempty"`
+	// Additional system-prompt snippets appended after the base system prompt.
+	// Each element maps to one --append-system-prompt flag passed to pi.
+	AppendSystemPrompt []string `protobuf:"bytes,7,rep,name=append_system_prompt,json=appendSystemPrompt,proto3" json:"append_system_prompt,omitempty"`
+	unknownFields      protoimpl.UnknownFields
+	sizeCache          protoimpl.SizeCache
 }
 
 func (x *CreateRequest) Reset() {
@@ -293,6 +300,20 @@ func (x *CreateRequest) GetTimeoutSeconds() int32 {
 		return x.TimeoutSeconds
 	}
 	return 0
+}
+
+func (x *CreateRequest) GetSystemPrompt() string {
+	if x != nil {
+		return x.SystemPrompt
+	}
+	return ""
+}
+
+func (x *CreateRequest) GetAppendSystemPrompt() []string {
+	if x != nil {
+		return x.AppendSystemPrompt
+	}
+	return nil
 }
 
 type CreateResponse struct {
@@ -1380,13 +1401,15 @@ var File_pirpc_v1_session_proto protoreflect.FileDescriptor
 
 const file_pirpc_v1_session_proto_rawDesc = "" +
 	"\n" +
-	"\x16pirpc/v1/session.proto\x12\bpirpc.v1\x1a\x1fgoogle/protobuf/timestamp.proto\"\xa3\x01\n" +
+	"\x16pirpc/v1/session.proto\x12\bpirpc.v1\x1a\x1fgoogle/protobuf/timestamp.proto\"\xfa\x01\n" +
 	"\rCreateRequest\x12\x1a\n" +
 	"\bprovider\x18\x01 \x01(\tR\bprovider\x12\x14\n" +
 	"\x05model\x18\x02 \x01(\tR\x05model\x12\x10\n" +
 	"\x03cwd\x18\x03 \x01(\tR\x03cwd\x12%\n" +
 	"\x0ethinking_level\x18\x04 \x01(\tR\rthinkingLevel\x12'\n" +
-	"\x0ftimeout_seconds\x18\x05 \x01(\x05R\x0etimeoutSeconds\"]\n" +
+	"\x0ftimeout_seconds\x18\x05 \x01(\x05R\x0etimeoutSeconds\x12#\n" +
+	"\rsystem_prompt\x18\x06 \x01(\tR\fsystemPrompt\x120\n" +
+	"\x14append_system_prompt\x18\a \x03(\tR\x12appendSystemPrompt\"]\n" +
 	"\x0eCreateResponse\x12\x1d\n" +
 	"\n" +
 	"session_id\x18\x01 \x01(\tR\tsessionId\x12,\n" +

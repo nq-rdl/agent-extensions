@@ -223,9 +223,6 @@ func run() error {
 
 func stringArg(args map[string]any, key string) string {
 	if v, ok := args[key]; ok {
-		if v == nil {
-			return ""
-		}
 		if s, ok := v.(string); ok {
 			return s
 		}

@@ -1,6 +1,6 @@
 ---
 name: bitwarden
-license: MIT
+license: CC-BY-4.0
 description: >-
   Manage .env files and development secrets using the Bitwarden personal
   Password Manager CLI (bw). Use when the user asks to store, retrieve, or

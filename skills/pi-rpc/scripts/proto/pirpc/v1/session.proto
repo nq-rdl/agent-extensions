@@ -67,6 +67,14 @@ message CreateRequest {
   // Optional session inactivity timeout in seconds.
   // 0 (default) uses the server default (60s). Negative values are rejected.
   int32 timeout_seconds = 5;
+
+  // Override the system prompt for this session.
+  // Maps to pi's --system-prompt flag. Empty string uses the model default.
+  string system_prompt = 6;
+
+  // Additional system-prompt snippets appended after the base system prompt.
+  // Each element maps to one --append-system-prompt flag passed to pi.
+  repeated string append_system_prompt = 7;
 }
 
 message CreateResponse {

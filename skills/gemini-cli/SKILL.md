@@ -1,6 +1,6 @@
 ---
 name: gemini-cli
-license: MIT
+license: CC-BY-4.0
 description: >-
   Gemini CLI headless dispatch — spawn headless Gemini CLI processes and give
   them jobs. Use when you need to offload web search, parallel research, code

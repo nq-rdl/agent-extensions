@@ -27,12 +27,12 @@ case "$SCENARIO" in
 
   echo)
     # Emit a full agent lifecycle then echo any stdin prompts back as messages.
-    # message_update uses pi's real delta format; message_end carries the complete message.
+    # message_end uses the nested wire shape matching real pi --mode rpc output.
     echo '{"type":"agent_start"}'
     while IFS= read -r line; do
-      MSG=$(echo "$line" | grep -o '"message":"[^"]*"' | sed 's/"message":"//;s/"//')
+      MSG=$(echo "$line" | sed -n 's/.*"message":"\([^"]*\)".*/\1/p')
       echo "{\"type\":\"message_update\",\"delta\":{\"type\":\"text_delta\",\"text\":\"echo: $MSG\"}}"
-      echo "{\"type\":\"message_end\",\"role\":\"assistant\",\"content\":\"echo: $MSG\",\"is_error\":false}"
+      echo "{\"type\":\"message_end\",\"message\":{\"role\":\"assistant\",\"content\":[{\"type\":\"text\",\"text\":\"echo: $MSG\"}],\"is_error\":false}}"
       echo '{"type":"agent_end"}'
     done
     ;;
@@ -47,6 +47,40 @@ case "$SCENARIO" in
   hang)
     # Start but never emit events — triggers the inactivity watchdog.
     sleep 300
+    ;;
+
+  real_shape)
+    # Emit events matching the real `pi --mode rpc` wire format from upstream
+    # packages/agent/src/types.ts (AgentEvent union).
+    #
+    # Real events wrap the message inside a nested "message" field:
+    #   message_update: { type, message: AgentMessage, assistantMessageEvent: {...} }
+    #   message_end:    { type, message: AgentMessage }
+    #   agent_end:      { type, messages: AgentMessage[] }
+    #
+    # AgentMessage for assistant role (AssistantMessage from @mariozechner/pi-ai types.ts):
+    #   { role, content: [{type:"text",text:...},...], api, provider, model,
+    #     usage: {...}, stopReason, timestamp }
+    echo '{"type":"agent_start"}'
+    while IFS= read -r line; do
+      MSG=$(echo "$line" | sed -n 's/.*"message":"\([^"]*\)".*/\1/p')
+      # streaming delta: message_update with nested message + assistantMessageEvent
+      echo "{\"type\":\"message_update\",\"message\":{\"role\":\"assistant\",\"content\":[{\"type\":\"text\",\"text\":\"echo: $MSG\"}],\"api\":\"anthropic-messages\",\"provider\":\"anthropic\",\"model\":\"claude-sonnet-4-5\",\"usage\":{\"input\":10,\"output\":5,\"cacheRead\":0,\"cacheWrite\":0,\"totalTokens\":15,\"cost\":{\"input\":0.001,\"output\":0.002,\"cacheRead\":0,\"cacheWrite\":0,\"total\":0.003}},\"stopReason\":\"stop\",\"timestamp\":1700000000000},\"assistantMessageEvent\":{\"type\":\"text_delta\",\"contentIndex\":0,\"delta\":\"echo: $MSG\",\"partial\":{\"role\":\"assistant\",\"content\":[{\"type\":\"text\",\"text\":\"echo: $MSG\"}],\"api\":\"anthropic-messages\",\"provider\":\"anthropic\",\"model\":\"claude-sonnet-4-5\",\"usage\":{\"input\":10,\"output\":5,\"cacheRead\":0,\"cacheWrite\":0,\"totalTokens\":15,\"cost\":{\"input\":0.001,\"output\":0.002,\"cacheRead\":0,\"cacheWrite\":0,\"total\":0.003}},\"stopReason\":\"stop\",\"timestamp\":1700000000000}}}"
+      # final message_end: nested message, no flat role/content at top level
+      echo "{\"type\":\"message_end\",\"message\":{\"role\":\"assistant\",\"content\":[{\"type\":\"text\",\"text\":\"echo: $MSG\"}],\"api\":\"anthropic-messages\",\"provider\":\"anthropic\",\"model\":\"claude-sonnet-4-5\",\"usage\":{\"input\":10,\"output\":5,\"cacheRead\":0,\"cacheWrite\":0,\"totalTokens\":15,\"cost\":{\"input\":0.001,\"output\":0.002,\"cacheRead\":0,\"cacheWrite\":0,\"total\":0.003}},\"stopReason\":\"stop\",\"timestamp\":1700000000000}}"
+      echo "{\"type\":\"agent_end\",\"messages\":[{\"role\":\"user\",\"content\":\"$MSG\",\"timestamp\":1700000000000},{\"role\":\"assistant\",\"content\":[{\"type\":\"text\",\"text\":\"echo: $MSG\"}],\"api\":\"anthropic-messages\",\"provider\":\"anthropic\",\"model\":\"claude-sonnet-4-5\",\"usage\":{\"input\":10,\"output\":5,\"cacheRead\":0,\"cacheWrite\":0,\"totalTokens\":15,\"cost\":{\"input\":0.001,\"output\":0.002,\"cacheRead\":0,\"cacheWrite\":0,\"total\":0.003}},\"stopReason\":\"stop\",\"timestamp\":1700000000000}]}"
+    done
+    ;;
+
+  capture_args)
+    # Write all argv to FAKE_PI_ARGS_FILE (null-byte separated) then stay alive.
+    # Null bytes preserve any embedded newlines inside individual arguments
+    # (e.g. multi-line system prompts).
+    # Used to assert that flags like --system-prompt are forwarded by the handler.
+    if [ -n "${FAKE_PI_ARGS_FILE:-}" ]; then
+      printf '%s\000' "$@" > "$FAKE_PI_ARGS_FILE"
+    fi
+    cat
     ;;
 
   *)

@@ -1,6 +1,6 @@
 ---
 name: cc-agent-teams
-license: MIT
+license: CC-BY-4.0
 description: >-
   Claude Code agent teams — coordinate multiple independent Claude Code sessions
   working in parallel with shared task lists and inter-agent messaging. Use when

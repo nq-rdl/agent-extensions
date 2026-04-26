@@ -1,6 +1,6 @@
 ---
 name: pi-rpc
-license: MIT
+license: CC-BY-4.0
 description: >-
   Pi.dev ConnectRPC service — spawn and manage pi.dev coding agent sessions via
   HTTP/JSON endpoints. Use when dispatching coding tasks to pi.dev, managing
@@ -95,7 +95,7 @@ All endpoints accept `Content-Type: application/json` POST requests.
 
 | Endpoint | Purpose | Key Fields |
 |----------|---------|------------|
-| `pirpc.v1.SessionService/Create` | Spawn a pi.dev subprocess | `provider` (optional), `model` (optional), `cwd`, `thinking_level` (maps to pi's `--thinking` flag; alternatively use `model:suffix` notation, e.g. `"model":"gpt-5.4:xhigh"`) |
+| `pirpc.v1.SessionService/Create` | Spawn a pi.dev subprocess | `provider` (optional), `model` (optional), `cwd`, `thinking_level` (maps to pi's `--thinking` flag; alternatively use `model:suffix` notation, e.g. `"model":"gpt-5.4:xhigh"`), `system_prompt` (maps to pi's `--system-prompt`; empty = model default), `append_system_prompt` (repeated string; each element maps to one `--append-system-prompt` flag) |
 | `pirpc.v1.SessionService/Prompt` | Send prompt, wait for completion | `session_id`, `message` |
 | `pirpc.v1.SessionService/PromptAsync` | Send prompt, return immediately | `session_id`, `message` |
 | `pirpc.v1.SessionService/StreamEvents` | Server-streaming events | `session_id`, optional `filter` |
