@@ -29,3 +29,8 @@ See [`docs/local-testing.md`](docs/local-testing.md) for local/devcontainer inst
 ### `pi.dev` and OpenCode
 
 _TBA._
+
+## License
+
+- **Code** — [MIT](LICENSE) (Go MCP servers in `mcp/`, shell scripts in `scripts/`, hooks, plugin manifests).
+- **Documentation and skill/agent content** — [CC BY 4.0](LICENSE-CC-BY-4.0) (`*.md` files in `agents/`, `docs/`, `skills/`, and the repo root).
