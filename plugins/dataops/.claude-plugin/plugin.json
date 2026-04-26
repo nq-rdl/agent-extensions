@@ -1,6 +1,6 @@
 {
   "name": "dataops",
-  "version": "0.5.1",
+  "version": "0.5.2",
   "description": "Data operations — CSV, Excel, PDF, Word, design documents",
   "author": {
     "name": "nq-rdl"

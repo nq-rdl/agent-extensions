@@ -1,6 +1,6 @@
 {
   "name": "dev-tools",
-  "version": "0.5.1",
+  "version": "0.5.2",
   "description": "Developer tool workflows plus bundled MCP servers for dispatch and cross-agent integrations.",
   "author": {
     "name": "nq-rdl",
