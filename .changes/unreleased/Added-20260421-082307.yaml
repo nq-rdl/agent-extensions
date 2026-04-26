@@ -1,3 +1,0 @@
-kind: Added
-body: 'infra bundle: adds 9 subagents — postgresql-dba, mongodb-performance-advisor, terraform, terraform-iac-reviewer, terratest-module-testing, platform-sre-kubernetes, github-actions-expert, se-gitops-ci-specialist, arch-linux-expert. Flips gemini target to enabled.'
-time: 2026-04-21T08:23:07.193987037+10:00
