@@ -291,7 +291,67 @@ Required behavior of the schema:
 - One bundle ID maps to multiple target outputs.
 - A target can be disabled without deleting the bundle.
 - Target metadata stores install names, publication mode, and channel behavior.
-- Skills are referenced by name and resolved from the `skills/` submodule. Hooks, prompts, and MCP integrations are resolved from their respective root-level directories in this repo.
+- Skills are referenced by name and resolved from the `skills/` submodule. Agents are referenced by name and resolved from the top-level `agents/` directory in this repo. Hooks, prompts, and MCP integrations are resolved from their respective root-level directories in this repo.
+
+## Agents Primitive
+
+Agents are the second authored primitive (alongside skills) in this catalog. They live at the repo root in `agents/<name>/agent.md` and flow into hosts by symlink, identical in spirit to the skills submodule pattern.
+
+### Scope
+
+Agents are **subagents**: delegatable roles with focused tool allowlists and system prompts that Claude Code auto-routes based on the `description` field. A skill is knowledge that activates contextually; an agent is a role that gets invoked explicitly or by auto-delegation. The two primitives are **orthogonal**: an agent may preload skills via its frontmatter `skills:` list, but neither requires the other to exist.
+
+### Source layout
+
+```
+agents/
+  <name>/
+    agent.md          ← canonical source (flat markdown with YAML frontmatter)
+    references/       ← optional; colocated reference material (reserved for future use)
+```
+
+`agents/` is **not** part of the `nq-rdl/agent-skills` submodule. It is authored and versioned here — in the same place as hooks, prompts, and MCP servers — so the adapter layer stays co-located.
+
+### Frontmatter schema
+
+The authored frontmatter is a host-agnostic superset. Each host reads the keys it understands; unknown keys are ignored.
+
+```yaml
+---
+name: <kebab-case>
+description: >-
+  <delegation trigger; first sentence is Claude Code's match target>
+license: MIT
+tools:
+  - <host-agnostic tool name>   # Read, Edit, Grep, Bash, Write, …
+model: inherit                   # Claude Code: 'inherit' | 'opus' | 'sonnet' | 'haiku'
+maxTurns: 30                     # Claude Code key
+max_turns: 30                    # Gemini CLI key (same value; written explicitly for both)
+skills: []                       # Claude Code: optional preload
+color: blue                      # optional UI hint
+metadata:
+  upstream: https://…            # attribution link for forks
+  repo: https://github.com/nq-rdl/agent-extensions
+---
+```
+
+### Flow into hosts
+
+| Host | Discovery path | Symlink shape |
+|---|---|---|
+| Claude Code | `plugins/<bundle>/agents/<name>.md` (convention-based; no manifest declaration) | **flat file** `.md` symlink pointing to `../../../agents/<name>/agent.md` |
+| Gemini CLI | `.gemini/agents/<name>.md` at repo root | **flat file** `.md` symlink pointing to `../../agents/<name>/agent.md` |
+| pi.dev | disabled at this pass | — |
+| OpenCode | disabled at this pass | — |
+
+The flat-file shape differs from skills (which are directory symlinks). Claude Code's plugin spec expects agents as single `.md` files; the nested source layout exists so future per-agent `references/` sibling directories have a home.
+
+### Attribution
+
+Agents derived from external sources (e.g. `github/awesome-copilot`, MIT) carry two forms of attribution:
+
+1. `metadata.upstream: <url>` in the frontmatter — machine-readable, used to diff against origin on sync.
+2. An HTML comment block at the top of the body prose, naming the upstream license and noting any conversion steps (tool namespace rewrite, prose normalization, etc.).
 
 ## Build and Generation Rules
 

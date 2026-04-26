@@ -1,6 +1,12 @@
 # Agent Extensions
 
+Curated reusable agent skills and integrations published in host-native formats. Shared skills live in the `skills/` submodule; host-specific packaging for Claude Code, Codex, Gemini CLI, `pi.dev`, and OpenCode lives in this repository.
+
 ## Installation
+
+### Codex
+
+See [`docs/codex.md`](docs/codex.md) for installation, the native Codex marketplace model, and the bundle layout.
 
 ### Claude Code
 
@@ -20,6 +26,6 @@ gemini extensions add nq-rdl/agent-extensions
 
 See [`docs/local-testing.md`](docs/local-testing.md) for local/devcontainer install.
 
-3. `pi.dev` and OpenCode
+### `pi.dev` and OpenCode
 
-_TBA._ 
+_TBA._

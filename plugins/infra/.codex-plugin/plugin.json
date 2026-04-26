@@ -1,0 +1,38 @@
+{
+  "name": "infra",
+  "version": "0.4.0",
+  "description": "Infrastructure workflows for Ansible, git hooks, and analytical databases.",
+  "author": {
+    "name": "nq-rdl",
+    "email": "r.schnetler@uq.edu.au",
+    "url": "https://github.com/nq-rdl"
+  },
+  "homepage": "https://github.com/nq-rdl/agent-extensions",
+  "repository": "https://github.com/nq-rdl/agent-extensions",
+  "license": "MIT",
+  "keywords": [
+    "agents",
+    "skills",
+    "infra",
+    "ansible",
+    "databases"
+  ],
+  "skills": "./skills/",
+  "interface": {
+    "displayName": "Infra",
+    "shortDescription": "Ansible, hooks, and databases",
+    "longDescription": "Reusable infrastructure workflows for Ansible, git hook tooling, and analytical database operations.",
+    "developerName": "nq-rdl",
+    "category": "Productivity",
+    "capabilities": [
+      "Read",
+      "Write"
+    ],
+    "websiteURL": "https://github.com/nq-rdl/agent-extensions",
+    "defaultPrompt": [
+      "Use Infra to debug this Ansible role.",
+      "Use Infra to set up git hooks for this repository.",
+      "Use Infra to review this StarRocks table design."
+    ]
+  }
+}

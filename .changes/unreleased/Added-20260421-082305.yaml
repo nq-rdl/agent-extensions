@@ -1,0 +1,3 @@
+kind: Added
+body: Adds new top-level agents/ primitive and validator support. Introduces 30 subagents derived from github/awesome-copilot (MIT), plus .gemini/ native discovery tree. scripts/validate-plugin-hooks.sh renamed to scripts/validate-plugins.sh with agents checks; old name kept as back-compat symlink.
+time: 2026-04-21T08:23:05.181160499+10:00

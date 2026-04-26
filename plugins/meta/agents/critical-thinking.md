@@ -1,0 +1,1 @@
+../../../agents/critical-thinking/agent.md

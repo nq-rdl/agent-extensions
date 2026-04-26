@@ -11,6 +11,16 @@ skills:
   - husky
   - lefthook
   - starrocks
+agents:
+  - postgresql-dba
+  - mongodb-performance-advisor
+  - terraform
+  - terraform-iac-reviewer
+  - terratest-module-testing
+  - platform-sre-kubernetes
+  - github-actions-expert
+  - se-gitops-ci-specialist
+  - arch-linux-expert
 hooks: []
 prompts: []
 mcp: []
@@ -19,8 +29,13 @@ targets:
     enabled: true
     pluginName: infra
     marketplaceName: rdl
+  codex:
+    enabled: true
+    pluginName: infra
+    marketplaceName: rdl
   gemini:
-    enabled: false
+    enabled: true
+    extensionName: rdl
   pidev:
     enabled: false
   opencode:
