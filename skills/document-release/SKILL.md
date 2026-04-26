@@ -1,6 +1,6 @@
 ---
 name: document-release
-license: MIT
+license: CC-BY-4.0
 description: >-
   Post-ship documentation update. Use after shipping a feature or at session
   end to ensure README, ARCHITECTURE, CONTRIBUTING, CLAUDE.md, CHANGELOG,

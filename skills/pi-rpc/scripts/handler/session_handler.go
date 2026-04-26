@@ -51,7 +51,15 @@ func (h *SessionHandler) Create(ctx context.Context, req *connect.Request[pirpcv
 	if req.Msg.TimeoutSeconds < 0 {
 		return nil, connect.NewError(connect.CodeInvalidArgument, fmt.Errorf("timeout_seconds must be non-negative, got %d", req.Msg.TimeoutSeconds))
 	}
-	id, err := h.mgr.Create(ctx, provider, model, req.Msg.Cwd, req.Msg.ThinkingLevel, req.Msg.TimeoutSeconds)
+	id, err := h.mgr.Create(ctx, session.CreateOpts{
+		Provider:            provider,
+		Model:               model,
+		Cwd:                 req.Msg.Cwd,
+		ThinkingLevel:       req.Msg.ThinkingLevel,
+		TimeoutSeconds:      req.Msg.TimeoutSeconds,
+		SystemPrompt:        req.Msg.SystemPrompt,
+		AppendSystemPrompts: req.Msg.AppendSystemPrompt,
+	})
 	if err != nil {
 		return nil, connect.NewError(connect.CodeInternal, fmt.Errorf("create session: %w", err))
 	}
@@ -67,6 +75,9 @@ func (h *SessionHandler) Prompt(ctx context.Context, req *connect.Request[pirpcv
 	if !ok {
 		return nil, connect.NewError(connect.CodeNotFound, fmt.Errorf("session %q not found", req.Msg.SessionId))
 	}
+
+	// Record event count before sending so we can slice events added during this prompt.
+	startIdx := len(s.Events())
 
 	cmd := map[string]string{"type": "prompt", "message": req.Msg.Message}
 	data, _ := json.Marshal(cmd)
@@ -90,8 +101,10 @@ func (h *SessionHandler) Prompt(ctx context.Context, req *connect.Request[pirpcv
 		case <-ticker.C:
 			state := s.State()
 			if state == session.StateIdle || state == session.StateError || state == session.StateTerminated {
+				msgs := parseMessages(s.Events()[startIdx:])
 				return connect.NewResponse(&pirpcv1.PromptResponse{
-					State: stateToProto(state),
+					State:    stateToProto(state),
+					Messages: msgs,
 				}), nil
 			}
 		}
@@ -163,38 +176,56 @@ func (h *SessionHandler) GetMessages(ctx context.Context, req *connect.Request[p
 		return nil, connect.NewError(connect.CodeNotFound, fmt.Errorf("session %q not found", req.Msg.SessionId))
 	}
 
-	// Collect messages from buffered session events.
-	events := s.Events()
+	return connect.NewResponse(&pirpcv1.GetMessagesResponse{
+		Messages: parseMessages(s.Events()),
+	}), nil
+}
+
+// parseMessages extracts proto Messages from a slice of session events.
+// It reads message_end events using the nested wire shape emitted by real pi:
+//
+//	{"type":"message_end","message":{"role":"...","content":[{"type":"text","text":"..."}],...}}
+//
+// Text content is concatenated from all text-type content blocks.
+func parseMessages(events []session.Event) []*pirpcv1.Message {
 	var msgs []*pirpcv1.Message
 	for _, evt := range events {
-		if evt.Type != "message_end" && evt.Type != "message_update" {
+		if evt.Type != "message_end" {
 			continue
 		}
-		var parsed struct {
-			Role       string `json:"role"`
-			Content    string `json:"content"`
-			IsError    bool   `json:"is_error"`
-			ToolCallID string `json:"tool_call_id"`
+		var envelope struct {
+			Message struct {
+				Role       string `json:"role"`
+				IsError    bool   `json:"is_error"`
+				ToolCallID string `json:"tool_call_id"`
+				Content    []struct {
+					Type string `json:"type"`
+					Text string `json:"text"`
+				} `json:"content"`
+			} `json:"message"`
 		}
-		if err := json.Unmarshal(evt.Raw, &parsed); err != nil {
+		if err := json.Unmarshal(evt.Raw, &envelope); err != nil {
 			continue
 		}
-		// message_update events from real pi are streaming deltas with no role/content — skip them.
-		if parsed.Role == "" && parsed.Content == "" && parsed.ToolCallID == "" {
+		msg := envelope.Message
+		if msg.Role == "" && msg.ToolCallID == "" {
 			continue
+		}
+		var content string
+		for _, block := range msg.Content {
+			if block.Type == "text" {
+				content += block.Text
+			}
 		}
 		msgs = append(msgs, &pirpcv1.Message{
-			Role:        messageRoleToProto(parsed.Role),
-			Content:     parsed.Content,
-			IsError:     parsed.IsError,
-			ToolCallId:  parsed.ToolCallID,
+			Role:        messageRoleToProto(msg.Role),
+			Content:     content,
+			IsError:     msg.IsError,
+			ToolCallId:  msg.ToolCallID,
 			TimestampMs: evt.Timestamp.UnixMilli(),
 		})
 	}
-
-	return connect.NewResponse(&pirpcv1.GetMessagesResponse{
-		Messages: msgs,
-	}), nil
+	return msgs
 }
 
 func (h *SessionHandler) GetState(ctx context.Context, req *connect.Request[pirpcv1.GetStateRequest]) (*connect.Response[pirpcv1.GetStateResponse], error) {

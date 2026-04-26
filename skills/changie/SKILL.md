@@ -1,6 +1,6 @@
 ---
 name: changie
-license: MIT
+license: CC-BY-4.0
 description: >-
   Changelog entry creation with Changie. Use when writing a changelog entry,
   adding a new change fragment, recording what shipped, or following the Keep a

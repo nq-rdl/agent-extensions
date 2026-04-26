@@ -1,6 +1,6 @@
 ---
 name: r-lib-package-dev
-license: MIT
+license: CC-BY-4.0
 description: >-
   Orchestrates the full R package development lifecycle: project creation,
   directory structure, devtools workflow, documentation with roxygen2, code

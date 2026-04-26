@@ -1,6 +1,6 @@
 ---
 name: obsidian-cli
-license: MIT
+license: CC-BY-4.0
 description: >-
   Interact with Obsidian vaults using the Obsidian CLI to read, create, search,
   and manage notes, tasks, properties, and more. Also supports plugin and theme

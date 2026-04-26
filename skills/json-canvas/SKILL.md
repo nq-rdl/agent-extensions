@@ -1,6 +1,6 @@
 ---
 name: json-canvas
-license: MIT
+license: CC-BY-4.0
 description: >-
   Create and edit JSON Canvas files (.canvas) with nodes, edges, groups, and
   connections. Use when working with .canvas files, creating visual canvases,

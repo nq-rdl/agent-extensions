@@ -1,6 +1,6 @@
 ---
 name: shiny-bslib
-license: MIT
+license: CC-BY-4.0
 description: >-
   Build modern Shiny dashboards and applications using bslib (Bootstrap 5).
   Use when creating new Shiny apps, modernizing legacy apps (fluidPage,

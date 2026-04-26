@@ -1,6 +1,6 @@
 ---
 name: defuddle
-license: MIT
+license: CC-BY-4.0
 description: >-
   Extract clean markdown content from web pages using Defuddle CLI, removing
   clutter and navigation to save tokens. Use instead of WebFetch when the user

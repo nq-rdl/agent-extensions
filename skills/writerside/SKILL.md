@@ -1,6 +1,6 @@
 ---
 name: writerside
-license: MIT
+license: CC-BY-4.0
 description: >-
   Use when the user asks about Writerside topics, markup tags, documentation
   templates, or building/deploying Writerside projects. Covers semantic XML

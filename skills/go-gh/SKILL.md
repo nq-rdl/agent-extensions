@@ -1,6 +1,6 @@
 ---
 name: go-gh
-license: MIT
+license: CC-BY-4.0
 description: >-
   GitHub Actions CI/CD for Go projects. Use when writing or reviewing GitHub
   Actions workflows that build, test, lint, or release Go code — including
