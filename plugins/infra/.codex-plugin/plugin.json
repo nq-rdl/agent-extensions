@@ -1,6 +1,6 @@
 {
   "name": "infra",
-  "version": "0.5.3",
+  "version": "0.5.4",
   "description": "Infrastructure workflows for Ansible, git hooks, and analytical databases.",
   "author": {
     "name": "nq-rdl",

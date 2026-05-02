@@ -1,6 +1,6 @@
 {
   "name": "swe",
-  "version": "0.5.3",
+  "version": "0.5.4",
   "description": "Software engineering workflows for TDD, secure Go, naming, CI/CD, and changelogs.",
   "author": {
     "name": "nq-rdl",
