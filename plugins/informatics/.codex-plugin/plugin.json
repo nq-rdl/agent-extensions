@@ -1,6 +1,6 @@
 {
   "name": "informatics",
-  "version": "0.5.2",
+  "version": "0.5.3",
   "description": "R ecosystem workflows for package development, Shiny, Quarto, testing, and CRAN.",
   "author": {
     "name": "nq-rdl",

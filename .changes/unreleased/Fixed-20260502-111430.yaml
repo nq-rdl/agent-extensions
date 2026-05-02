@@ -1,3 +1,0 @@
-kind: Fixed
-body: 'Plugin manifest cleanup: move swe .mcp.json to plugin root (was being silently ignored inside .claude-plugin/), collapse dev-tools duplicate .mcp.json into a single root-level file using ${CLAUDE_PLUGIN_ROOT}, drop redundant skills: ./skills/ from six manifests, and update validate-plugins.sh to expect .mcp.json at plugin root per the Claude Code plugin spec (fixes #80).'
-time: 2026-05-02T11:14:30.085926095+10:00

@@ -1,3 +1,0 @@
-kind: Fixed
-body: Materialize symlinks at release time so installed plugins are self-contained (#79). The release branch is regenerated from a fresh dist/release/ tree on every tag — main keeps symlinks for development.
-time: 2026-05-02T12:03:23.671664367+10:00
