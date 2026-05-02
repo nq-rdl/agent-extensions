@@ -1,0 +1,3 @@
+kind: Fixed
+body: Point local plugin sources in `.claude-plugin/marketplace.json` at the materialized `release` branch via `git-subdir` so installed plugins resolve to real files instead of dangling symlinks (#83, follow-up to #79). `worktrunk` keeps its third-party `github` source.
+time: 2026-05-02T15:35:00.000000000+10:00

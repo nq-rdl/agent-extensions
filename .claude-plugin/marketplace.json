@@ -12,7 +12,12 @@
   "plugins": [
     {
       "name": "swe",
-      "source": "./plugins/swe",
+      "source": {
+        "source": "git-subdir",
+        "url": "nq-rdl/agent-extensions",
+        "path": "plugins/swe",
+        "ref": "release"
+      },
       "description": "Software engineering — TDD, secure Go, naming, CI/CD, changelogs",
       "version": "0.5.3",
       "keywords": [
@@ -24,7 +29,12 @@
     },
     {
       "name": "infra",
-      "source": "./plugins/infra",
+      "source": {
+        "source": "git-subdir",
+        "url": "nq-rdl/agent-extensions",
+        "path": "plugins/infra",
+        "ref": "release"
+      },
       "description": "Infrastructure — Ansible, git hooks, analytical databases",
       "version": "0.5.3",
       "keywords": [
@@ -35,7 +45,12 @@
     },
     {
       "name": "dataops",
-      "source": "./plugins/dataops",
+      "source": {
+        "source": "git-subdir",
+        "url": "nq-rdl/agent-extensions",
+        "path": "plugins/dataops",
+        "ref": "release"
+      },
       "description": "Data operations — CSV, Excel, PDF, Word, design documents",
       "version": "0.5.3",
       "keywords": [
@@ -47,7 +62,12 @@
     },
     {
       "name": "informatics",
-      "source": "./plugins/informatics",
+      "source": {
+        "source": "git-subdir",
+        "url": "nq-rdl/agent-extensions",
+        "path": "plugins/informatics",
+        "ref": "release"
+      },
       "description": "R ecosystem — package dev, Shiny, Quarto, testing, CRAN",
       "version": "0.5.3",
       "keywords": [
@@ -60,7 +80,12 @@
     },
     {
       "name": "dev-tools",
-      "source": "./plugins/dev-tools",
+      "source": {
+        "source": "git-subdir",
+        "url": "nq-rdl/agent-extensions",
+        "path": "plugins/dev-tools",
+        "ref": "release"
+      },
       "description": "Developer tools — agent dispatch, multi-agent teams, link checking, docs",
       "version": "0.5.3",
       "keywords": [
@@ -74,7 +99,12 @@
     },
     {
       "name": "meta",
-      "source": "./plugins/meta",
+      "source": {
+        "source": "git-subdir",
+        "url": "nq-rdl/agent-extensions",
+        "path": "plugins/meta",
+        "ref": "release"
+      },
       "description": "Meta — skill review and issue reporting for skill quality",
       "version": "0.5.3",
       "keywords": [
@@ -85,7 +115,12 @@
     },
     {
       "name": "hooks",
-      "source": "./plugins/hooks",
+      "source": {
+        "source": "git-subdir",
+        "url": "nq-rdl/agent-extensions",
+        "path": "plugins/hooks",
+        "ref": "release"
+      },
       "description": "Hooks — forced skill evaluation when prompts mention skills",
       "version": "0.5.3",
       "keywords": [
