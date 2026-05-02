@@ -24,30 +24,43 @@ OUTPUT_DIR="${1:-dist/release}"
 REPO_ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 cd "$REPO_ROOT"
 
+# Refuse to operate on dangerous paths. `rm -rf "$OUTPUT_DIR"` below
+# would otherwise happily delete /, the repo root, or anything outside
+# the repo if a caller passes a typo or absolute path.
+case "$OUTPUT_DIR" in
+  ""|"/"|"."|"..") echo "::error::Refusing to materialize into '$OUTPUT_DIR'." >&2; exit 1 ;;
+  *..*) echo "::error::OUTPUT_DIR may not contain '..' segments (got: $OUTPUT_DIR)." >&2; exit 1 ;;
+esac
+case "$OUTPUT_DIR" in
+  /*) abs_output="$OUTPUT_DIR" ;;
+  *)  abs_output="$REPO_ROOT/$OUTPUT_DIR" ;;
+esac
+case "$abs_output" in
+  "$REPO_ROOT"|"$REPO_ROOT/") echo "::error::Refusing to materialize into the repo root." >&2; exit 1 ;;
+  "$REPO_ROOT"/*) ;;  # ok: inside the repo
+  *) echo "::error::OUTPUT_DIR must be inside the repo (got: $abs_output)." >&2; exit 1 ;;
+esac
+
 echo "Materializing into $OUTPUT_DIR"
 rm -rf "$OUTPUT_DIR"
 mkdir -p "$OUTPUT_DIR"
 
+# rsync -a preserves permissions (incl. the executable bit on hooks
+# and scripts) and timestamps; -L dereferences symlinks so the output
+# tree is self-contained.
 for src in plugins .gemini opencode pidev; do
   [ -d "$src" ] || continue
   echo "  → $src/"
-  rsync -rL "$src/" "$OUTPUT_DIR/$src/"
+  rsync -aL "$src/" "$OUTPUT_DIR/$src/"
 done
 
-# Sanity check: rsync -L should have left zero symlinks behind.
+# Sanity check: rsync -L should have left zero symlinks behind. If any
+# survive, materialization is incomplete and the release would ship
+# dangling links to users.
 remaining=$(find "$OUTPUT_DIR" -type l 2>/dev/null | wc -l)
 if [ "$remaining" -gt 0 ]; then
   echo "::error::Materialization left $remaining symlink(s) behind:" >&2
   find "$OUTPUT_DIR" -type l >&2
-  exit 1
-fi
-
-# Sanity check: no broken targets (would mean a symlink pointed at a
-# missing file in the source tree, which the install would have hit too).
-broken=$(find "$OUTPUT_DIR" -xtype l 2>/dev/null | wc -l)
-if [ "$broken" -gt 0 ]; then
-  echo "::error::Materialization left $broken broken target(s) behind:" >&2
-  find "$OUTPUT_DIR" -xtype l >&2
   exit 1
 fi
 
