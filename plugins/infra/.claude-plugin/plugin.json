@@ -6,6 +6,5 @@
     "name": "nq-rdl"
   },
   "repository": "https://github.com/nq-rdl/agent-extensions",
-  "license": "MIT",
-  "skills": "./skills/"
+  "license": "MIT"
 }

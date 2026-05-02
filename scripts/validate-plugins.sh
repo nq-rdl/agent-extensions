@@ -31,7 +31,7 @@
 #    17. Every symlink under .gemini/agents/*.md resolves (if .gemini/ exists)
 #    18. Every agents/<name>/agent.md has frontmatter keys `name`, `description`
 #    19. Every mcp entry in a bundle YAML is wired in the bundle plugin's
-#        .claude-plugin/.mcp.json
+#        .mcp.json (at plugin root, per Claude Code plugin spec)
 #
 # Usage:
 #   validate-plugins.sh                       # validate all plugins + agents
@@ -383,10 +383,10 @@ for bundle in sorted((repo / "registry" / "bundles").glob("*.yaml")):
             if not link.exists():
                 err(bundle, f"Agent '{name}' declared for Claude target but missing symlink plugins/{plugin_name}/agents/{name}.md")
 
-    mcp_json = repo / "plugins" / plugin_name / ".claude-plugin" / ".mcp.json"
+    mcp_json = repo / "plugins" / plugin_name / ".mcp.json"
     declared_mcp = data.get("mcp") or []
     if declared_mcp and not mcp_json.is_file():
-        err(bundle, f"Bundle declares mcp servers {declared_mcp} but plugins/{plugin_name}/.claude-plugin/.mcp.json does not exist")
+        err(bundle, f"Bundle declares mcp servers {declared_mcp} but plugins/{plugin_name}/.mcp.json does not exist")
     elif declared_mcp:
         try:
             wired = set(json.loads(mcp_json.read_text()).get("mcpServers", {}).keys())
@@ -395,7 +395,7 @@ for bundle in sorted((repo / "registry" / "bundles").glob("*.yaml")):
             wired = set()
         for key in declared_mcp:
             if key not in wired:
-                err(bundle, f"mcp entry '{key}' not wired in plugins/{plugin_name}/.claude-plugin/.mcp.json")
+                err(bundle, f"mcp entry '{key}' not wired in plugins/{plugin_name}/.mcp.json")
 
 sys.exit(1 if fail else 0)
 PY
