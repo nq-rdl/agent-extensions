@@ -41,7 +41,7 @@ plugins/
 
 4. **Bundled MCP** lives at the plugin root. `plugins/dev-tools/.mcp.json` exposes the prebuilt `pi-rpc` and `gemini-cli` MCP launchers through the same wrapper scripts already shipped for Claude.
 
-    Claude and Codex each read a different file — Claude uses `plugins/dev-tools/.claude-plugin/.mcp.json` with `${CLAUDE_PLUGIN_ROOT}/scripts/...` paths, Codex uses `plugins/dev-tools/.mcp.json` with `./scripts/...` paths. When adding or changing MCP servers for this bundle, update both files together.
+    Claude and Codex now share a single `plugins/dev-tools/.mcp.json` at the plugin root. Both hosts execute MCP `command` entries with the plugin root as the working directory, so `./scripts/...` resolves correctly without depending on host-specific env-var expansion (e.g. Claude's `${CLAUDE_PLUGIN_ROOT}`).
 
 5. **Hooks are different in Codex.** Codex discovers hooks from `<repo>/.codex/hooks.json` or `~/.codex/hooks.json`, behind `features.codex_hooks = true`. Hooks are not packaged as plugin components, so the Claude-specific `hooks` bundle is intentionally not exposed in the Codex marketplace.
 
