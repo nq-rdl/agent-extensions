@@ -56,16 +56,25 @@ jobs:
           # Copy fresh skills from agent-skills/skills/ → skills/
           cp -r /tmp/agent-skills/skills/* skills/
 
+      - name: Re-sync plugin trees
+        # Plugins are installed via cp -R, which preserves symlinks but
+        # dangles their targets. plugins/<bundle>/skills/<name>/ holds a
+        # real-file copy of skills/<name>/; this step refreshes those
+        # copies so the plugin tree stays self-contained. See issue #83.
+        run: |
+          python3 -m pip install --user pyyaml
+          bash scripts/sync-plugins.sh
+
       - name: Check for changes
         id: changes
         run: |
-          if git diff --quiet skills/; then
+          if git diff --quiet skills/ plugins/; then
             echo "changed=false" >> "$GITHUB_OUTPUT"
             echo "No skill changes detected"
           else
             echo "changed=true" >> "$GITHUB_OUTPUT"
             echo "Skill changes detected:"
-            git diff --stat skills/
+            git diff --stat skills/ plugins/
           fi
 
       - name: Create pull request
@@ -80,7 +89,7 @@ jobs:
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
 
           git checkout -b "$BRANCH"
-          git add skills/
+          git add skills/ plugins/
           git commit -m "chore(skills): sync from agent-skills@${TAG}"
 
           git push -u origin "$BRANCH"

@@ -1,0 +1,38 @@
+diff --git a/catalog/package.go b/catalog/package.go
+new file mode 100644
+index 0000000..84e788c
+--- /dev/null
++++ b/catalog/package.go
+@@ -0,0 +1,13 @@
++package catalog
++
++type Package struct {
++	Name     string
++	Provider string
++}
++
++func Packages() []Package {
++	return []Package{
++		{Name: "core", Provider: "claude"},
++		{Name: "flash", Provider: "gemini"},
++	}
++}
+diff --git a/catalog/package_test.go b/catalog/package_test.go
+new file mode 100644
+index 0000000..d3af9f2
+--- /dev/null
++++ b/catalog/package_test.go
+@@ -0,0 +1,13 @@
++package catalog
++
++import "testing"
++
++func TestPackages(t *testing.T) {
++	got := Packages()
++	if len(got) != 2 {
++		t.Fatalf("len = %d, want 2", len(got))
++	}
++	if got[0].Provider != "claude" {
++		t.Fatalf("first package provider = %q, want claude", got[0].Provider)
++	}
++}

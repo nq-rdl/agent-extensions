@@ -1,0 +1,27 @@
+{
+  "description": "Prevent writing to .env and credential files",
+  "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": "Write",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash -c 'input=$(cat); path=$(echo \"$input\" | jq -r .tool_input.file_path); if echo \"$path\" | grep -qE \"\\.env$|\\.env\\.\"; then echo \"{\\\"decision\\\":\\\"block\\\",\\\"reason\\\":\\\"Blocked: cannot write to .env files\\\"}\"; fi'",
+            "timeout": 10
+          }
+        ]
+      },
+      {
+        "matcher": "Edit",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash -c 'input=$(cat); path=$(echo \"$input\" | jq -r .tool_input.file_path); if echo \"$path\" | grep -qE \"\\.env$|\\.env\\.\"; then echo \"{\\\"decision\\\":\\\"block\\\",\\\"reason\\\":\\\"Blocked: cannot edit .env files\\\"}\"; fi'",
+            "timeout": 10
+          }
+        ]
+      }
+    ]
+  }
+}

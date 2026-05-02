@@ -1,0 +1,17 @@
+{
+  "description": "Minimal example: block rm -rf commands",
+  "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": "Bash",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash -c 'input=$(cat); if echo \"$input\" | jq -r .tool_input.command | grep -qE \"rm\\s+-rf\"; then echo \"{\\\"decision\\\":\\\"block\\\",\\\"reason\\\":\\\"rm -rf blocked by hook\\\"}\"; fi'",
+            "timeout": 10
+          }
+        ]
+      }
+    ]
+  }
+}

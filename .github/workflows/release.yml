@@ -122,33 +122,6 @@ jobs:
             git push origin HEAD:main
           fi
 
-      - name: Materialize symlinks and force-push release branch
-        env:
-          TAG: ${{ github.ref_name }}
-          TOKEN: ${{ steps.app-token.outputs.token }}
-          REPO: ${{ github.repository }}
-        run: |
-          set -euo pipefail
-
-          # Ensure submodules are populated (symlink targets must exist).
-          git submodule update --init --recursive
-
-          # Dereference symlinks under plugins/, .gemini/, opencode/, pidev/
-          # into a self-contained tree at dist/release/.
-          bash scripts/materialize.sh dist/release
-
-          # Build a fresh single-commit branch from the materialized tree
-          # and force-push to `release`. History is wiped every tag — the
-          # branch is a snapshot, not a log.
-          cd dist/release
-          git init -q -b release
-          git config user.name "github-actions[bot]"
-          git config user.email "github-actions[bot]@users.noreply.github.com"
-          git add -A
-          git commit -q -m "Release ${TAG}"
-          git remote add origin "https://x-access-token:${TOKEN}@github.com/${REPO}.git"
-          git push -f origin release
-
       - name: Move tag to include release commit
         env:
           TAG: ${{ github.ref_name }}
