@@ -52,17 +52,18 @@ After adding a new skill (e.g. `sops`) to the bundle:
 3. Re-run install: `claude plugin install swe@rdl`.
 4. In the Claude REPL, type `/swe:sops` — it should autocomplete.
 
-## Symlink Caveat
+## Self-Contained Plugin Trees
 
-`plugins/<bundle>/skills/<skill>` entries are **relative symlinks** pointing three levels up:
+`plugins/<bundle>/skills/<name>/` and `plugins/<bundle>/agents/<name>.md` hold **real-file copies** of the canonical content under `skills/` and `agents/`. This is intentional — Claude Code's `claude plugin install` does a `cp -R` of the plugin source into a per-user cache, and any symlink whose target sits outside the copied tree would dangle.
 
+If you edit a skill or agent, refresh the plugin tree:
+
+```bash
+bash scripts/sync-plugins.sh           # all bundles
+bash scripts/sync-plugins.sh swe       # one bundle
 ```
-plugins/swe/skills/tdd -> ../../../skills/tdd
-```
 
-`claude plugin marketplace add` preserves symlinks but resolves them against the **absolute path at install time**. If the workspace moves (or is mounted at a different path), the resolved paths break.
-
-**Prefer `--plugin-dir` for short-lived devcontainer tests** — it loads in-place without caching, so symlinks always resolve relative to the current mount point:
+`--plugin-dir` still works for short-lived testing without caching:
 
 ```bash
 claude --plugin-dir ./plugins/swe

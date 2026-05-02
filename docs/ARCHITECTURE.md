@@ -170,28 +170,28 @@ registry/
 .claude-plugin/
   marketplace.json         ← Claude Code marketplace manifest (repo root)
 
-plugins/                   ← Claude Code plugins (one per bundle)
+plugins/                   ← Claude Code plugins (one per bundle, SELF-CONTAINED)
   swe/
     .claude-plugin/
       plugin.json
     skills/
-      tdd -> ../../../skills/skills/tdd         ← symlink into submodule
-      go-secure -> ../../../skills/skills/go-secure
+      tdd/                  ← real-file copy of skills/tdd/
+      go-secure/            ← real-file copy of skills/go-secure/
 
 gemini/                    ← Gemini CLI extension (all skills in one extension)
   gemini-extension.json
   GEMINI.md
   skills/
-    tdd -> ../../skills/skills/tdd              ← symlink into submodule
-    ansible -> ../../skills/skills/ansible
+    tdd -> ../../skills/tdd                     ← symlink (in-place link)
+    ansible -> ../../skills/ansible
   templates/
   scripts/
 
 pidev/                     ← pi.dev package (all skills in one package)
   package.json
   skills/
-    tdd -> ../../skills/skills/tdd              ← symlink into submodule
-    ansible -> ../../skills/skills/ansible
+    tdd -> ../../skills/tdd                     ← symlink (in-place link)
+    ansible -> ../../skills/ansible
   templates/
   scripts/
 
@@ -208,39 +208,29 @@ dist/
 
 Notes:
 
-- `skills/` is a git submodule pointing to [`nq-rdl/agent-skills`](https://github.com/nq-rdl/agent-skills). Skills follow the [agents.io](https://agents.io) standard and are authored and versioned independently. After cloning, run `git submodule sync --recursive && git submodule update --init` to populate it.
+- `skills/` holds real-file content vendored from [`nq-rdl/agent-skills`](https://github.com/nq-rdl/agent-skills) by the `sync-skills.yml` workflow. Skills follow the [agents.io](https://agents.io) standard and are authored and versioned in the upstream repo.
 - `hooks/`, `mcp/`, and `prompts/` are the primary authored content of this repository — the extensions themselves.
-- When a plugin or extension needs a skill, it **symlinks** into `skills/skills/<skill>` rather than copying. This keeps one source of truth and avoids drift. Claude Code follows symlinks during plugin installation, so the installed plugin is self-contained.
+- **Claude plugins** (`plugins/<bundle>/`) hold **real-file copies** of every skill and agent they ship. Claude Code installs a plugin by `cp -R`-ing its directory into a per-user cache, which preserves symlinks verbatim — and links pointing outside the copied subtree dangle in the cache. Real-file copies make the install self-contained. `scripts/sync-plugins.sh` rebuilds these copies from the canonical `skills/` and `agents/` after upstream changes.
+- **Other hosts** (`.gemini/`, `pidev/`) keep symlinks because they're consumed in-place (`gemini extensions link .`, etc.) — there's no copy step that would break the link.
 - `registry/` declares bundles, owners, release channels, and target mappings. The `targets:` key in bundle YAML is a logical concept referring to platform outputs, not a filesystem path.
 - `.claude-plugin/` and `plugins/` at the repo root form the Claude Code marketplace. Claude Code requires `marketplace.json` at the repo root.
 - `gemini/`, `pidev/`, and `opencode/` contain host-specific adapter templates, build logic, and extension structures.
 - `dist/` is generated output and should not be hand-edited.
 
-## Skills Submodule Sync
+## Skills Sync
 
-The `skills/` submodule is pinned to a specific commit. Three mechanisms keep it in sync:
+`skills/` is real content vendored from `nq-rdl/agent-skills`. Two mechanisms keep it fresh:
 
-### Level 1 — Local git hooks
+### `sync-skills.yml` — Scheduled and on-demand
 
-Git hooks in `.githooks/` automatically run `git submodule update --init` after checkout and merge. To activate:
+Runs weekly (and on `repository_dispatch` from agent-skills releases) to pull the latest content into `skills/`, then runs `scripts/sync-plugins.sh` so `plugins/<bundle>/skills/` matches. Both directories are committed together in the resulting PR — the diff shows skill changes propagated end-to-end.
 
-```bash
-git config core.hooksPath .githooks
-```
+### `validate.yml` — On every PR / push to main
 
-This prevents developers from working against a stale `skills/` after pull or branch switch.
-
-### Level 2 — CI validation
-
-The `validate.yml` workflow runs on every PR and push to main. It always validates the submodule wiring and, when `AGENT_SKILLS_TOKEN` is configured in GitHub Actions, hydrates the private submodule for deep validation. It:
-
-- Verifies the `skills/` submodule is declared and pinned in git
-- When `AGENT_SKILLS_TOKEN` is configured, checks that every skill referenced in `registry/bundles/*.yaml` exists in the submodule
-- When `AGENT_SKILLS_TOKEN` is configured, validates that all skill symlinks under `plugins/`, `gemini/`, `opencode/`, and `pidev/` resolve correctly
-
-### Level 3 — Automated submodule bumps
-
-Dependabot is configured (`.github/dependabot.yml`) to open weekly PRs when `nq-rdl/agent-skills` has new commits. These PRs update the pinned submodule commit and run through the validation pipeline before merge.
+- Verifies that every skill referenced in `registry/bundles/*.yaml` exists at `skills/<name>/`
+- Verifies that every agent referenced exists at `agents/<name>/agent.md`
+- Validates plugin manifests (`plugins/<bundle>/.claude-plugin/plugin.json`), hooks, and `.mcp.json` wiring
+- Confirms `.gemini/` and `pidev/` symlinks resolve (these stay as symlinks since their hosts use in-place linking)
 
 ## Registry Schema
 
@@ -339,7 +329,7 @@ metadata:
 
 | Host | Discovery path | Symlink shape |
 |---|---|---|
-| Claude Code | `plugins/<bundle>/agents/<name>.md` (convention-based; no manifest declaration) | **flat file** `.md` symlink pointing to `../../../agents/<name>/agent.md` |
+| Claude Code | `plugins/<bundle>/agents/<name>.md` (convention-based; no manifest declaration) | **flat file** `.md` real-file copy of `agents/<name>/agent.md` (refreshed by `scripts/sync-plugins.sh`) |
 | Gemini CLI | `.gemini/agents/<name>.md` at repo root | **flat file** `.md` symlink pointing to `../../agents/<name>/agent.md` |
 | pi.dev | disabled at this pass | — |
 | OpenCode | disabled at this pass | — |

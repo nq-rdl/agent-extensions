@@ -1,0 +1,16 @@
+{
+  "description": "Inject a completion checklist when Claude wants to stop",
+  "hooks": {
+    "Stop": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "echo '{\"reason\":\"Before completing: (1) Tests passing? (2) Linting clean? (3) Changes committed?\"}'",
+            "timeout": 5
+          }
+        ]
+      }
+    ]
+  }
+}

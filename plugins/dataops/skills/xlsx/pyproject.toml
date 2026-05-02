@@ -1,0 +1,22 @@
+[project]
+name = "xlsx-skill"
+version = "0.1.0"
+requires-python = ">=3.13,<3.14"
+dependencies = [
+    "defusedxml>=0.7.1",
+    "lxml>=5.0.0",
+    "openpyxl>=3.1.5,<4",
+    "pandas>=2.2.0,<3",
+]
+
+[tool.ty.environment]
+python-version = "3.13"
+
+[tool.ty.src]
+include = ["scripts/**/*.py"]
+
+[[tool.ty.overrides]]
+include = ["tests/**/*.py"]
+
+[tool.ty.overrides.rules]
+possibly-unresolved-reference = "warn"

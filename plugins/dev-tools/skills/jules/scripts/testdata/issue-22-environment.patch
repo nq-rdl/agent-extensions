@@ -1,0 +1,69 @@
+diff --git a/catalog/environment.go b/catalog/environment.go
+new file mode 100644
+index 0000000..e397870
+--- /dev/null
++++ b/catalog/environment.go
+@@ -0,0 +1,13 @@
++package catalog
++
++type Environment struct {
++	Name     string
++	Provider string
++	Package  string
++}
++
++func Environments() []Environment {
++	return []Environment{
++		{Name: "dev", Provider: "claude", Package: "core"},
++	}
++}
+diff --git a/catalog/environment_test.go b/catalog/environment_test.go
+new file mode 100644
+index 0000000..9a273ae
+--- /dev/null
++++ b/catalog/environment_test.go
+@@ -0,0 +1,18 @@
++package catalog
++
++import "testing"
++
++func TestEnvironments(t *testing.T) {
++	envs := Environments()
++	providers := Providers()
++	packages := Packages()
++	if len(envs) != 1 {
++		t.Fatalf("len = %d, want 1", len(envs))
++	}
++	if envs[0].Provider != providers[0].Name {
++		t.Fatalf("provider = %q, want %q", envs[0].Provider, providers[0].Name)
++	}
++	if envs[0].Package != packages[0].Name {
++		t.Fatalf("package = %q, want %q", envs[0].Package, packages[0].Name)
++	}
++}
+diff --git a/catalog/package.go b/catalog/package.go
+new file mode 100644
+index 0000000..175d126
+--- /dev/null
++++ b/catalog/package.go
+@@ -0,0 +1,7 @@
++package catalog
++
++type Package struct{}
++
++func Packages() []Package {
++	return nil
++}
+diff --git a/catalog/provider.go b/catalog/provider.go
+new file mode 100644
+index 0000000..5bd0361
+--- /dev/null
++++ b/catalog/provider.go
+@@ -0,0 +1,7 @@
++package catalog
++
++type Provider struct{}
++
++func Providers() []Provider {
++	return nil
++}

@@ -1,0 +1,10 @@
+# pdf skill dependencies
+# Note: docling downloads ~1-2 GB of ML models on first use (cached in ~/.cache/docling/)
+pymupdf4llm>=0.0.17
+pdfplumber>=0.11.9,<0.12
+pdfminer-six>=20231228
+pandas>=2.2.0,<3
+typer>=0.9.0,<1
+rich>=13.0.0,<14
+tabulate>=0.9.0
+docling>=2.0.0

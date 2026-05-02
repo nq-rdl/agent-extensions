@@ -9,28 +9,28 @@ This repo is a multi-host agent extension catalog. It maintains a single source 
 ## Setup commands
 
 ```bash
-# Activate git hooks (auto-syncs submodule after checkout/merge)
+# Activate git hooks (changie fragment lint, etc.)
 git config core.hooksPath .githooks
-
-# Hydrate the skills submodule
-git submodule sync --recursive && git submodule update --init
 ```
+
+`skills/` is vendored real content (synced from `nq-rdl/agent-skills` via the `sync-skills.yml` workflow), not a submodule — no `git submodule update` step.
 
 ## Architecture
 
 ```
-skills/           ← git submodule (nq-rdl/agent-skills) — do not edit here
-agents/           ← authored here: one directory per agent; file inside is agent.md
+skills/           ← canonical skills (synced from nq-rdl/agent-skills) — do not edit
+agents/           ← canonical agents (authored here)
   <name>/
     agent.md
-plugins/          ← Claude Code plugins, one per bundle
+plugins/          ← Claude Code plugins, one per bundle (SELF-CONTAINED — real files)
   <bundle>/
     .claude-plugin/plugin.json
-    skills/       ← symlinks into ../../../skills/<skill>
-    agents/       ← flat .md symlinks into ../../../agents/<name>/agent.md
-.gemini/          ← Gemini CLI native discovery tree
-  skills/<name>   ← symlink into ../../skills/<skill>
+    skills/<name>/       ← real-file copy of skills/<name>/
+    agents/<name>.md     ← real-file copy of agents/<name>/agent.md
+.gemini/          ← Gemini CLI native discovery tree (symlinks — linked in-place)
+  skills/<name>   ← symlink into ../../skills/<name>
   agents/<name>.md ← symlink into ../../agents/<name>/agent.md
+pidev/            ← pi.dev native tree (symlinks — used in-place)
 registry/
   bundles/*.yaml  ← single source of truth: which skills/agents belong to which bundle/target
 mcp/
@@ -38,30 +38,25 @@ mcp/
   pi-rpc-go/      ← Go MCP server, wraps pi.dev RPC via HTTP/ConnectRPC
 hooks/            ← Claude Code hook shell scripts + JSON config
 .claude-plugin/
-  marketplace.json ← Claude Code marketplace manifest (repo root)
+  marketplace.json ← Claude Code marketplace manifest (repo root, points at ./plugins/<bundle>)
 ```
 
 ### How skills and agents flow into plugins
 
-Skills and agents reach each host as **symlinks** into the canonical source under `skills/` (submodule) or `agents/` (authored here). Edit only the canonical source — files under `plugins/`, `.gemini/`, `opencode/`, and `pidev/` are either symlinks to upstream content (on `main`) or CI-materialized copies (on `release`). Never hand-edit them.
+Claude Code installs a plugin by `cp -R`-ing its source directory into a per-user cache. Symlinks survive that copy verbatim, so any link whose target sits *outside* the copied subtree dangles in the cache (this was the cause of issue #83).
 
-- **Skills**: `plugins/<bundle>/skills/<skill>` is a directory symlink into `skills/<skill>/` (the submodule). One symlink per skill per bundle.
-- **Agents**: `plugins/<bundle>/agents/<name>.md` is a *flat file* symlink into `agents/<name>/agent.md`. Claude Code's plugin spec expects agents as flat `.md` files under `./agents/`, so the symlink flattens the nested source layout.
-- **Gemini**: `.gemini/skills/<name>` (directory) and `.gemini/agents/<name>.md` (flat file) mirror the same sources so `gemini extensions link .` at the repo root sees both primitives.
+To make installs self-contained, `plugins/<bundle>/skills/<name>/` and `plugins/<bundle>/agents/<name>.md` hold **real-file copies** of the canonical content under `skills/` and `agents/`. The canonical source remains the single edit point — the plugin trees are derivative.
 
-When a bundle YAML references a skill or agent, CI validates that `skills/<name>/` (or `agents/<name>/agent.md`) exists and that every plugin/.gemini symlink resolves. See `scripts/validate-plugins.sh` for the validation logic (the old name `validate-plugin-hooks.sh` is kept as a back-compat symlink).
+- **Edit canonical content** under `skills/<name>/` (vendored from upstream) or `agents/<name>/agent.md` (authored here).
+- **Refresh plugin trees** by running `bash scripts/sync-plugins.sh` (or pass a bundle name to scope it). The script reads `registry/bundles/<b>.yaml`, removes any stale copies, and rewrites `plugins/<b>/skills/<name>/` and `plugins/<b>/agents/<name>.md` from the canonical sources.
+- **`.gemini/` and `pidev/`** stay as symlinks — those hosts link an extension in-place (`gemini extensions link .`), no copy step, so symlinks resolve correctly against the working tree.
+- **CI** validates that every bundle YAML reference resolves and that every plugin manifest is well-formed. See `scripts/validate-plugins.sh`.
 
-### How releases ship to users (materialization)
-
-Symlinks resolve in-place when a developer runs `claude --plugin-dir ./plugins/swe` or `gemini extensions link .` against a working tree. They do **not** survive `/plugin install`, which copies the plugin source into a per-user cache via `cp -R`: the symlinks come along verbatim, but their `../../../skills/<name>` targets sit outside the copied subtree and dangle.
-
-To produce self-contained installable trees, `scripts/materialize.sh` dereferences every symlink under `plugins/`, `.gemini/`, `opencode/`, and `pidev/` into a real-file copy at `dist/release/`. The release workflow runs this on every tag and force-pushes the materialized tree to the `release` branch. User-facing install paths (`marketplace.json` sources) point at that branch via `git-subdir`, so any `cp -R` of a plugin subtree resolves to real files.
-
-`main` keeps symlinks for development ergonomics; `release` is regenerated by CI and is the only ref users install from.
+When the upstream skills repo releases, `sync-skills.yml` pulls the new content into `skills/`, runs `sync-plugins.sh`, and opens a PR with both `skills/` and `plugins/` changes in the same commit.
 
 ### Python skills (csv, pdf, xlsx, docx)
 
-These skills call Python directly (no CLI wrapper). Each has a `requirements.txt` and an `ensure-deps.sh` bootstrap script (authored in `nq-rdl/agent-skills`, vendored here via submodule — do not edit). Install `uv` (recommended) or `pixi` (linux-64 only) for the docs environment; neither is required for skill execution.
+These skills call Python directly (no CLI wrapper). Each has a `requirements.txt` and an `ensure-deps.sh` bootstrap script (authored in `nq-rdl/agent-skills`, vendored here — do not edit; refresh via `sync-skills.yml`). Install `uv` (recommended) or `pixi` (linux-64 only) for the docs environment; neither is required for skill execution.
 
 ## Language Policy
 
@@ -95,17 +90,16 @@ bash scripts/validate-plugins.sh
 # Validate only plugins touched by changed files
 bash scripts/validate-plugins.sh plugins/swe/hooks/hooks.json
 
-# Materialize symlinks into a self-contained tree (what the release
-# branch will look like). Useful for local install testing.
-bash scripts/materialize.sh dist/release
-cp -R dist/release/plugins/swe /tmp/swe-install-test
-find /tmp/swe-install-test -type f   # should list all real SKILL.md / agent files
+# Refresh plugin trees from canonical skills/ and agents/. Run after
+# editing an agent or syncing skills from upstream.
+bash scripts/sync-plugins.sh           # all bundles
+bash scripts/sync-plugins.sh swe       # one bundle
 ```
 
 CI runs `validate.yml` on every PR/push to main. It checks:
 - Bundle YAML skill references resolve to `skills/<name>/`
 - Bundle YAML agent references resolve to `agents/<name>/agent.md`
-- All symlinks under `plugins/`, `.gemini/`, `opencode/`, `pidev/` are not broken
+- All symlinks under `.gemini/` and `pidev/` are not broken
 - Every `agents/<name>/agent.md` has frontmatter `name` + `description`
 
 ## Testing instructions
@@ -130,8 +124,8 @@ See [`docs/local-testing.md`](docs/local-testing.md) for the full walkthrough in
 ```yaml
 schemaVersion: v1
 id: swe
-skills: [tdd, go-secure]      # must exist in skills/ submodule
-agents: [debug, janitor]      # must exist in agents/<name>/agent.md
+skills: [tdd, go-secure]      # must exist as skills/<name>/
+agents: [debug, janitor]      # must exist as agents/<name>/agent.md
 hooks: []
 targets:
   claude:
@@ -141,9 +135,9 @@ targets:
     enabled: false
 ```
 
-When adding a skill to a bundle: (1) add it to the YAML, (2) add a directory symlink in `plugins/<bundle>/skills/`.
+When adding a skill to a bundle: (1) add it to the YAML, (2) run `bash scripts/sync-plugins.sh <bundle>` to copy `skills/<name>/` into `plugins/<bundle>/skills/<name>/`, (3) add a symlink under `.gemini/skills/<name>` if Gemini is enabled.
 
-When adding an agent to a bundle: (1) create `agents/<name>/agent.md`, (2) add it to the YAML `agents:` list, (3) add flat `.md` symlinks in `plugins/<bundle>/agents/<name>.md` and `.gemini/agents/<name>.md`.
+When adding an agent to a bundle: (1) create `agents/<name>/agent.md`, (2) add it to the YAML `agents:` list, (3) run `bash scripts/sync-plugins.sh <bundle>` to copy it into `plugins/<bundle>/agents/<name>.md`, (4) add a symlink at `.gemini/agents/<name>.md` if Gemini is enabled.
 
 ## PR instructions
 
@@ -164,10 +158,9 @@ Releases are triggered by pushing a `v*` tag. The tag must point to a commit alr
 The workflow:
 1. Verifies the tag is on `main`.
 2. Bumps versions across all manifests and commits the bump back to `main`.
-3. Runs `scripts/materialize.sh` and force-pushes the result to the `release` branch (single-commit, history wiped each release).
-4. Creates the GitHub release.
+3. Moves the tag forward to include the bump commit and creates the GitHub release.
 
-The `release` branch is what `marketplace.json` sources point at via `git-subdir` — never edit it directly; it's overwritten on every tag.
+`marketplace.json` sources are relative paths (`./plugins/<bundle>`) — installs read directly from `main` (or whatever ref the user pinned), no separate release branch involved.
 
 ## Docs
 
