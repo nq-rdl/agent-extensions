@@ -43,14 +43,11 @@ git submodule update --init
 gemini extensions link gemini/
 ```
 
-### Remote install (Phase 2)
+### Remote install
 
-Gemini CLI expects `gemini-extension.json` at the repository root for `gemini extensions install`. Since our repo has `.claude-plugin/marketplace.json` at root for Claude, remote install requires either:
-
-- A **mirror repo** (`nq-rdl/gemini-agent-extensions`) with `gemini-extension.json` at root
-- A **GitHub Release archive** containing the extension as a self-contained tarball
-
-This is planned for Phase 2.
+```bash
+gemini extensions install https://github.com/nq-rdl/agent-extensions
+```
 
 ## Why one extension instead of bundles
 
@@ -72,4 +69,4 @@ To list the extension in the [Gemini CLI gallery](https://geminicli.com/extensio
 - A tagged release
 - `gemini-extension.json` at the repo root
 
-This applies to the future mirror repo, not the monorepo.
+This applies to this repo — `gemini-extension.json` is already at the root.

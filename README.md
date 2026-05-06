@@ -21,7 +21,7 @@ See [`docs/codex.md`](docs/codex.md) for installation, the native Codex marketpl
 ### Gemini CLI
 
 ```bash
-gemini extensions add nq-rdl/agent-extensions
+gemini extensions install https://github.com/nq-rdl/agent-extensions
 ```
 
 See [`docs/local-testing.md`](docs/local-testing.md) for local/devcontainer install.

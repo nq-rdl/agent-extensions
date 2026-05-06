@@ -427,16 +427,16 @@ Local development (from cloned repo):
 gemini extensions link gemini/
 ```
 
-Remote install (future — requires mirror repo or release archive):
+Remote install:
 
 ```bash
-gemini extensions install github.com/nq-rdl/gemini-agent-extensions --ref stable
+gemini extensions install https://github.com/nq-rdl/agent-extensions
 ```
 
 Expected publication target:
 
 - one self-contained extension with all skills (single mega-extension)
-- remote install via mirror repo or GitHub Release archive (Phase 2)
+- remote install via this repo (`gemini-extension.json` at root)
 
 ### pi.dev Install Flow
 
