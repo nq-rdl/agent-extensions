@@ -1,0 +1,10 @@
+name: Notify Slack on review request
+
+on:
+  pull_request:
+    types: [review_requested]
+
+jobs:
+  notify:
+    uses: nq-rdl/.github/.github/workflows/notify-slack-review.yml@main
+    secrets: inherit
