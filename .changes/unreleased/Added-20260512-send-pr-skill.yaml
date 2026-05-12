@@ -1,3 +1,3 @@
 kind: Added
-body: New `send-pr` skill synced from agent-skills@v0.7.0 — canonical only, not yet wired into any bundle (#88)
+body: New `send-pr` skill in `swe` bundle — single command to commit, push, raise a PR, and request review (#88)
 time: 2026-05-12T19:53:14.740462647+10:00
