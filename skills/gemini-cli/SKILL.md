@@ -9,7 +9,13 @@ description: >-
   when you want to run a task in parallel without consuming your own context
   window, or when the user asks to 'use Gemini', 'search the web with Gemini',
   'dispatch to Gemini', or 'ask Gemini to...'. Also triggers when building
-  automation pipelines that batch-process files through an LLM.
+  automation pipelines that batch-process files through an LLM. Use this skill
+  whenever the user asks to configure Gemini's reasoning effort, thinking
+  budget, or thinking level — phrases like 'set reasoning effort high for
+  gemini', 'configure thinking budget', 'make gemini think harder', or any
+  request to edit .gemini/settings.json modelConfigs / customAliases /
+  overrides — since there is no CLI flag for this and users will not discover
+  it on their own.
 metadata:
   repo: https://github.com/nq-rdl/agent-skills
 ---
@@ -289,8 +295,35 @@ cat large-document.pdf | gemini \
 
 ---
 
+## Reasoning Effort / Thinking Configuration
+
+Gemini's "think harder" knob has **no CLI flag** — it's configured in `.gemini/settings.json` under `modelConfigs`. If a user asks anything like:
+
+- "set reasoning effort high for gemini"
+- "configure thinking budget"
+- "make gemini think harder for the codebaseInvestigator agent"
+- "turn off thinking for gemini-2.5-flash-lite"
+- "what's the gemini equivalent of `reasoning_effort: high`?"
+
+…load `references/reasoning-effort.rst` and walk the user through editing `.gemini/settings.json` (project) or `~/.gemini/settings.json` (user).
+
+**Pick the parameter by model family:**
+
+- Gemini **2.5** (`gemini-2.5-pro`, `-flash`, `-flash-lite`) → `thinkingConfig.thinkingBudget` (integer tokens; `-1` dynamic, `0` off, default `8192`)
+- Gemini **3** (`gemini-3-pro-preview`, `gemini-3-flash-preview`) → `thinkingConfig.thinkingLevel` (`"HIGH"` or `"LOW"` — there is **no** `MEDIUM` in the current build; this is the analog of OpenAI/Anthropic `reasoning_effort`)
+
+**Pick the scope:**
+
+- `customAliases` — redefine an alias to bake the thinking config into a model entry (applies model-wide for every caller).
+- `overrides` with `match.overrideScope` — agent-scoped (e.g. crank thinking only for `codebaseInvestigator`, leave other agents alone).
+
+**Always deep-merge into existing `settings.json`** — never overwrite the whole file. Common neighbouring keys (`general`, `ide`, `security`, `ui`, `mcpServers`) must be preserved. See the reference for a `jq`-based merge recipe.
+
+---
+
 ## Reference Docs
 
 - `references/headless.rst` — Headless mode: output formats, JSONL event schema, exit codes
 - `references/cli-reference.rst` — Full CLI flags reference for headless automation
 - `references/automation.rst` — Shell-level automation patterns (piping, bulk processing, functions)
+- `references/reasoning-effort.rst` — Configuring Gemini's reasoning effort / thinking budget / thinking level via `modelConfigs` in `settings.json`
