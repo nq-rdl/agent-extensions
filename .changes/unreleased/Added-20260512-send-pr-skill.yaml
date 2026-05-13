@@ -1,3 +1,0 @@
-kind: Added
-body: New `send-pr` skill in `swe` bundle — single command to commit, push, raise a PR, and request review (#88)
-time: 2026-05-12T19:53:14.740462647+10:00

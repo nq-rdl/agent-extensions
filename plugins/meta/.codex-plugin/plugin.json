@@ -1,6 +1,6 @@
 {
   "name": "meta",
-  "version": "0.5.4",
+  "version": "0.6.0",
   "description": "Meta workflows for reviewing skill quality and reporting problems back upstream.",
   "author": {
     "name": "nq-rdl",

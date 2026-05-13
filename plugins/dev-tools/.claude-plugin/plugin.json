@@ -1,6 +1,6 @@
 {
   "name": "dev-tools",
-  "version": "0.5.4",
+  "version": "0.6.0",
   "description": "Developer tools — agent dispatch, multi-agent teams, link checking, docs",
   "author": {
     "name": "nq-rdl"
