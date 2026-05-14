@@ -4,14 +4,14 @@ icon: lucide/network
 
 # Architecture
 
-This repository exists to manage reusable agent extensions across four different host CLIs:
+This repository exists to manage reusable agent extensions across two host CLIs that share a `/plugin` (or `/extensions`) discovery model:
 
 - Claude Code
 - Gemini CLI
-- pi.dev
-- OpenCode
 
 These tools are similar in intent, but they do not share a common packaging or marketplace standard. The architecture in this repository treats that as a first-class constraint.
+
+> Other hosts (Codex, OpenCode, pi.dev) were considered but require external CLI or packaging tooling rather than an in-host install command. They are out of scope for this repo. The `pi-rpc` skill bundled with `dev-tools` is unrelated — it is a runtime client used by Claude Code and Gemini CLI to spawn pi.dev coding agent sessions, not a publication target.
 
 ## Problem Statement
 
@@ -52,12 +52,8 @@ flowchart LR
   A[Portable content] --> B[Bundle registry]
   B --> C[Claude adapter]
   B --> D[Gemini adapter]
-  B --> E[Pi adapter]
-  B --> F[OpenCode adapter]
   C --> G[Claude marketplace plugins]
   D --> H[Gemini extensions or release archives]
-  E --> I[Pi packages]
-  F --> J[OpenCode packages and config snippets]
 ```
 
 The shared abstraction is:
@@ -103,42 +99,12 @@ Gemini is the main structural mismatch. A central catalog can still exist in thi
 - dedicated extension repos, or
 - self-contained release archives
 
-### pi.dev
-
-pi.dev is package-native.
-
-- Native install unit: package
-- Native source types: npm, git, URL, local path
-- Good fit for monorepos: yes
-- Skills: supported
-- Distribution model: package manager semantics rather than marketplace catalog semantics
-
-Implication:
-
-For pi, the package is the install boundary. A marketplace can exist as a documentation and discovery layer, but native installs should remain npm or git based.
-
-### OpenCode
-
-OpenCode is the least marketplace-shaped.
-
-- Native install model: local config plus plugins, tools, agents, or npm packages
-- Runtime extension model: JS or TS plugin code and `opencode.json`
-- Good fit for monorepos: yes, if packaged around Bun or npm
-- Skills: not the same first-class portable primitive as Claude, Gemini, and pi
-- Hooks: implemented through plugin code, not shell hook configuration
-
-Implication:
-
-OpenCode should be treated as package plus config generation, not as a first-class marketplace target.
-
 ## Comparison Summary
 
 | Tool | Native install unit | Native marketplace? | Monorepo-friendly | Best publication shape |
 | --- | --- | --- | --- | --- |
 | Claude Code | Plugin | Yes | Yes | Marketplace repo with plugin entries |
 | Gemini CLI | Extension | Not really | Limited | Dedicated repo or release archive per extension |
-| pi.dev | Package | Not really | Yes | npm or git package |
-| OpenCode | Package/config/plugin | Not really | Yes | npm package plus generated config |
 
 ## Proposed Repository Model
 
@@ -187,23 +153,9 @@ gemini/                    ← Gemini CLI extension (all skills in one extension
   templates/
   scripts/
 
-pidev/                     ← pi.dev package (all skills in one package)
-  package.json
-  skills/
-    tdd -> ../../skills/tdd                     ← symlink (in-place link)
-    ansible -> ../../skills/ansible
-  templates/
-  scripts/
-
-opencode/                  ← OpenCode target (templates and scripts, Phase 3)
-  templates/
-  scripts/
-
 dist/
   claude/
   gemini/
-  pidev/
-  opencode/
 ```
 
 Notes:
@@ -211,10 +163,10 @@ Notes:
 - `skills/` holds real-file content vendored from [`nq-rdl/agent-skills`](https://github.com/nq-rdl/agent-skills) by the `sync-skills.yml` workflow. Skills follow the [agents.io](https://agents.io) standard and are authored and versioned in the upstream repo.
 - `hooks/`, `mcp/`, and `prompts/` are the primary authored content of this repository — the extensions themselves.
 - **Claude plugins** (`plugins/<bundle>/`) hold **real-file copies** of every skill and agent they ship. Claude Code installs a plugin by `cp -R`-ing its directory into a per-user cache, which preserves symlinks verbatim — and links pointing outside the copied subtree dangle in the cache. Real-file copies make the install self-contained. `scripts/sync-plugins.sh` rebuilds these copies from the canonical `skills/` and `agents/` after upstream changes.
-- **Other hosts** (`.gemini/`, `pidev/`) keep symlinks because they're consumed in-place (`gemini extensions link .`, etc.) — there's no copy step that would break the link.
+- **Gemini CLI** (`.gemini/`) keeps symlinks because the extension is consumed in-place (`gemini extensions link .`) — there's no copy step that would break the link.
 - `registry/` declares bundles, owners, release channels, and target mappings. The `targets:` key in bundle YAML is a logical concept referring to platform outputs, not a filesystem path.
 - `.claude-plugin/` and `plugins/` at the repo root form the Claude Code marketplace. Claude Code requires `marketplace.json` at the repo root.
-- `gemini/`, `pidev/`, and `opencode/` contain host-specific adapter templates, build logic, and extension structures.
+- `gemini/` contains the Gemini CLI extension — adapter templates, build logic, and extension structures.
 - `dist/` is generated output and should not be hand-edited.
 
 ## Skills Sync
@@ -230,7 +182,7 @@ Runs weekly (and on `repository_dispatch` from agent-skills releases) to pull th
 - Verifies that every skill referenced in `registry/bundles/*.yaml` exists at `skills/<name>/`
 - Verifies that every agent referenced exists at `agents/<name>/agent.md`
 - Validates plugin manifests (`plugins/<bundle>/.claude-plugin/plugin.json`), hooks, and `.mcp.json` wiring
-- Confirms `.gemini/` and `pidev/` symlinks resolve (these stay as symlinks since their hosts use in-place linking)
+- Confirms `.gemini/` symlinks resolve (Gemini CLI consumes the extension in-place via `gemini extensions link .`)
 
 ## Registry Schema
 
@@ -266,14 +218,6 @@ targets:
     extensionName: swe
     publication: github-release
     contextFile: GEMINI.md
-  pi:
-    enabled: true
-    packageName: "@nq-rdl/pi-swe"
-    source: npm
-  opencode:
-    enabled: true
-    packageName: "@nq-rdl/opencode-swe"
-    configMode: generated-snippet
 ```
 
 Required behavior of the schema:
@@ -331,8 +275,6 @@ metadata:
 |---|---|---|
 | Claude Code | `plugins/<bundle>/agents/<name>.md` (convention-based; no manifest declaration) | **flat file** `.md` real-file copy of `agents/<name>/agent.md` (refreshed by `scripts/sync-plugins.sh`) |
 | Gemini CLI | `.gemini/agents/<name>.md` at repo root | **flat file** `.md` symlink pointing to `../../agents/<name>/agent.md` |
-| pi.dev | disabled at this pass | — |
-| OpenCode | disabled at this pass | — |
 
 The flat-file shape differs from skills (which are directory symlinks). Claude Code's plugin spec expects agents as single `.md` files; the nested source layout exists so future per-agent `references/` sibling directories have a home.
 
@@ -387,8 +329,6 @@ Target-specific publishing model:
 
 - Claude Code: publish or update marketplace content and plugin versions
 - Gemini CLI: publish self-contained extension archives or sync generated extension repos
-- pi.dev: publish npm packages
-- OpenCode: publish npm packages and update generated `opencode.json` snippets or docs
 
 ### Release Channels
 
@@ -401,8 +341,6 @@ Channel handling should remain host-native:
 
 - Claude Code: separate marketplace refs, tags, or channels
 - Gemini CLI: branch, tag, or pre-release archive
-- pi.dev: npm dist-tags such as `latest` and `next`
-- OpenCode: npm dist-tags and versioned config snippets
 
 ## Exact Install Flows
 
@@ -438,49 +376,6 @@ Expected publication target:
 - one self-contained extension with all skills (single mega-extension)
 - remote install via this repo (`gemini-extension.json` at root)
 
-### pi.dev Install Flow
-
-Local development (from cloned repo):
-
-```bash
-pi install ./pidev
-```
-
-Git install:
-
-```bash
-pi install git:github.com/nq-rdl/agent-extensions
-```
-
-Project-scoped install:
-
-```bash
-pi install -l ./pidev
-```
-
-Expected publication target:
-
-- this repository's `pidev/` directory via local path or git install
-- future: npm package `@nq-rdl/agent-extensions` with `pi` package metadata
-
-### OpenCode Install Flow
-
-```bash
-bun add -D @nq-rdl/opencode-swe
-```
-
-Then register the generated package in `opencode.json`:
-
-```json
-{
-  "plugins": ["@nq-rdl/opencode-swe"]
-}
-```
-
-Expected publication target:
-
-- npm package plus generated config snippet or bootstrap instructions
-
 ## Language Policy
 
 ### Cross-repo scope split
@@ -489,7 +384,7 @@ Expected publication target:
 |---|---|---|
 | `mcp/*-go/` Go MCP servers | this repo | this repo (prebuilt binaries in `plugins/*/bin/mcp/`) |
 | `skills/*/scripts/` Go/Python tools | `nq-rdl/agent-skills` | vendored here via submodule |
-| `skills/pi-rpc/scripts/Makefile` | `nq-rdl/agent-skills` | vendored here; built here via `build-pi-server.yml` |
+| `skills/pi-rpc/scripts/Makefile` | `nq-rdl/agent-skills` | vendored here; binaries built by `build-mcp-servers.yml` from `mcp/pi-rpc-go/` |
 | `skills/{csv,docx,pdf,xlsx}/scripts/` | `nq-rdl/agent-skills` | runs in-place via `ensure-deps.sh` |
 | `plugins/dev-tools/bin/` prebuilt binaries | this repo | committed here, rebuilt by CI |
 | `registry/bundles/*.yaml` | this repo | this repo |
@@ -518,7 +413,7 @@ Match the style established in `skills/pi-rpc/scripts/` (cobra + `charm.land/fan
 
 Upstream issues/PRs to file against `nq-rdl/agent-skills`:
 
-- Add a `cross-compile` target to `skills/pi-rpc/scripts/Makefile` that matches what `build-pi-server.yml` invokes
+- Add a `cross-compile` target to `skills/pi-rpc/scripts/Makefile` that matches what `build-mcp-servers.yml` invokes for `mcp/pi-rpc-go/`
 - Mirror this language policy in agent-skills' own docs once agreed
 
 ## Non-Goals
@@ -528,7 +423,7 @@ This repository should not try to:
 - invent a fake universal runtime that hides all host differences
 - flatten hooks into a lowest-common-denominator abstraction
 - force Gemini into Claude-style marketplace semantics
-- force OpenCode into SKILL-only packaging when plugin code is the real extension boundary
+- republish to hosts (Codex, OpenCode, pi.dev) whose install model isn't `/plugin`-style — those belong in CLI- or package-driven repos
 
 ## Platform Requirements
 
@@ -546,7 +441,7 @@ This repository assumes **macOS and Linux only**. The symlink-based skill resolu
 
 1. Define the bundle registry format.
 2. Create the planned repository layout.
-3. Add generators for Claude, Gemini, pi, and OpenCode outputs.
+3. Add generators for Claude and Gemini outputs.
 4. Add validation and release workflows.
 5. Add smoke-test installs for at least one bundle per target.
 

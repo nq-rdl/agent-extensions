@@ -4,7 +4,7 @@ icon: lucide/package
 
 # Bundles
 
-Available skill bundles distributed as Claude Code plugins, Codex plugins, and a Gemini CLI extension.
+Available skill bundles distributed as Claude Code plugins and a Gemini CLI extension.
 
 ## Install
 
@@ -20,39 +20,13 @@ Skills are distributed as 6 separate plugin bundles. Install the bundles you nee
 /plugin install <bundle>@rdl
 ```
 
-### Codex
-
-Supported bundles are distributed as native Codex plugins:
-
-```bash
-# From a cloned copy of this repo
-git submodule update --init
-codex plugin marketplace add .
-codex
-/plugins
-```
-
-The Codex marketplace currently exposes `swe`, `infra`, `dataops`, `informatics`, `dev-tools`, and `meta`. The Claude-only `hooks` bundle is not listed because Codex hooks live in repo or user `.codex/hooks.json` files rather than inside plugins.
-
 ### Gemini CLI
 
-All 41 skills are available as a single Gemini CLI extension:
+All skills are available as a single Gemini CLI extension:
 
 ```bash
 # From a cloned copy of this repo
 gemini extensions link gemini/
-```
-
-### pi.dev
-
-All 41 skills are available as a single pi.dev package:
-
-```bash
-# From a cloned copy of this repo
-pi install ./pidev
-
-# Or via git
-pi install git:github.com/nq-rdl/agent-extensions
 ```
 
 ---
@@ -154,7 +128,6 @@ Developer tools — agent dispatch, multi-agent teams, link checking, docs.
 | gemini-cli | Gemini CLI headless dispatch — spawn headless Gemini CLI processes |
 | jules | Dispatch tasks to Jules AI coding sessions |
 | jules-dispatch-creator | Set up and configure Jules GitHub Actions dispatch workflows |
-| opencode | Interact with the OpenCode server via its HTTP API |
 | pi-rpc | Pi.dev ConnectRPC service — spawn and manage pi.dev coding agent sessions |
 | lychee | Fast link checker for documentation, READMEs, and markdown files |
 | writerside | JetBrains Writerside documentation topics, markup tags, and projects |

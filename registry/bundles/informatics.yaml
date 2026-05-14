@@ -27,13 +27,5 @@ targets:
     enabled: true
     pluginName: informatics
     marketplaceName: rdl
-  codex:
-    enabled: true
-    pluginName: informatics
-    marketplaceName: rdl
   gemini:
-    enabled: false
-  pidev:
-    enabled: false
-  opencode:
     enabled: false

@@ -85,7 +85,7 @@ Backends fall into three categories. Use these to guide selection when the user 
 |----------|-------------|---------|----------|
 | **CLI tools** | Standalone coding tasks, research, web search | Create session → fire-and-forget → poll status | jules, gemini-cli |
 | **Agent teams** | Parallel subtasks needing coordination | Create team → fan out teammates → collect results | agent-teams |
-| **External services** | Tasks routed to a remote API or service | API call → await result → report | pi.swe, opencode |
+| **External services** | Tasks routed to a remote API or service | API call → await result → report | pi-rpc |
 
 ---
 
@@ -133,7 +133,7 @@ To check later: use the backend skill's status or list command.
 
 Best for: 3+ independent subtasks, parallel investigation, multi-area changes.
 
-### External Service Dispatch (pi.swe, opencode)
+### External Service Dispatch (pi-rpc)
 
 ```
 1. Activate the backend skill

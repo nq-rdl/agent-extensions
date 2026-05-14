@@ -4,9 +4,9 @@ repos:
   - repo: local
     hooks:
       - id: validate-plugins
-        name: Validate Claude Code, Codex plugins, and agents
+        name: Validate Claude Code plugins and agents
         entry: scripts/validate-plugins.sh
         language: python
         additional_dependencies: [pyyaml]
-        files: ^(plugins/|\.agents/plugins/|agents/|registry/bundles/|\.gemini/)
+        files: ^(plugins/|agents/|registry/bundles/|\.gemini/)
         pass_filenames: true
