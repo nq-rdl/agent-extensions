@@ -1,3 +1,0 @@
-kind: Removed
-body: Drops Codex publishing target — removes `.codex-plugin/` manifests, `.agents/plugins/marketplace.json`, and Codex marketplace validation
-time: 2026-05-14T14:01:46.962561+10:00
