@@ -29,14 +29,6 @@ targets:
     enabled: true
     pluginName: infra
     marketplaceName: rdl
-  codex:
-    enabled: true
-    pluginName: infra
-    marketplaceName: rdl
   gemini:
     enabled: true
     extensionName: rdl
-  pidev:
-    enabled: false
-  opencode:
-    enabled: false

@@ -61,7 +61,7 @@ jobs:
 
       - name: Check all symlinks resolve
         run: |
-          mapfile -t links < <(find plugins/ opencode/ pidev/ .gemini/ -type l 2>/dev/null)
+          mapfile -t links < <(find plugins/ .gemini/ -type l 2>/dev/null)
           if [ ${#links[@]} -eq 0 ]; then
             echo "No symlinks to validate"
             exit 0
@@ -82,7 +82,7 @@ jobs:
           exit $exit_code
 
   validate-plugins:
-    name: Validate Claude + Codex plugin structure, hooks, and agents
+    name: Validate Claude plugin structure, hooks, and agents
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v6

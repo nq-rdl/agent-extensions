@@ -4,7 +4,7 @@ Agent guidance for this repository. Use this alongside the README for project co
 
 ## Project overview
 
-This repo is a multi-host agent extension catalog. It maintains a single source of truth for reusable agent skills and publishes host-native outputs for Claude Code, Codex, Gemini CLI, pi.dev, and OpenCode. The key constraint: each host has incompatible extension formats, so the repo adapts shared content to native targets rather than inventing a universal format.
+This repo is a multi-host agent extension catalog. It maintains a single source of truth for reusable agent skills and publishes host-native outputs for Claude Code and Gemini CLI — the two host CLIs that share a `/plugin` (or `/extensions`) discovery model. The key constraint: each host has incompatible extension formats, so the repo adapts shared content to native targets rather than inventing a universal format.
 
 ## Setup commands
 
@@ -30,12 +30,11 @@ plugins/          ← Claude Code plugins, one per bundle (SELF-CONTAINED — re
 .gemini/          ← Gemini CLI native discovery tree (symlinks — linked in-place)
   skills/<name>   ← symlink into ../../skills/<name>
   agents/<name>.md ← symlink into ../../agents/<name>/agent.md
-pidev/            ← pi.dev native tree (symlinks — used in-place)
 registry/
   bundles/*.yaml  ← single source of truth: which skills/agents belong to which bundle/target
 mcp/
   gemini-cli-go/  ← Go MCP server, wraps Gemini CLI as MCP tools
-  pi-rpc-go/      ← Go MCP server, wraps pi.dev RPC via HTTP/ConnectRPC
+  pi-rpc-go/      ← Go MCP server bundled with dev-tools; wraps the local `pi --mode rpc` client used by the `pi-rpc` skill
 hooks/            ← Claude Code hook shell scripts + JSON config
 .claude-plugin/
   marketplace.json ← Claude Code marketplace manifest (repo root, points at ./plugins/<bundle>)
@@ -49,7 +48,7 @@ To make installs self-contained, `plugins/<bundle>/skills/<name>/` and `plugins/
 
 - **Edit canonical content** under `skills/<name>/` (vendored from upstream) or `agents/<name>/agent.md` (authored here).
 - **Refresh plugin trees** by running `bash scripts/sync-plugins.sh` (or pass a bundle name to scope it). The script reads `registry/bundles/<b>.yaml`, removes any stale copies, and rewrites `plugins/<b>/skills/<name>/` and `plugins/<b>/agents/<name>.md` from the canonical sources.
-- **`.gemini/` and `pidev/`** stay as symlinks — those hosts link an extension in-place (`gemini extensions link .`), no copy step, so symlinks resolve correctly against the working tree.
+- **`.gemini/`** stays as symlinks — Gemini CLI links an extension in-place (`gemini extensions link .`), no copy step, so symlinks resolve correctly against the working tree.
 - **CI** validates that every bundle YAML reference resolves and that every plugin manifest is well-formed. See `scripts/validate-plugins.sh`.
 
 When the upstream skills repo releases, `sync-skills.yml` pulls the new content into `skills/`, runs `sync-plugins.sh`, and opens a PR with both `skills/` and `plugins/` changes in the same commit.
@@ -99,7 +98,7 @@ bash scripts/sync-plugins.sh swe       # one bundle
 CI runs `validate.yml` on every PR/push to main. It checks:
 - Bundle YAML skill references resolve to `skills/<name>/`
 - Bundle YAML agent references resolve to `agents/<name>/agent.md`
-- All symlinks under `.gemini/` and `pidev/` are not broken
+- All symlinks under `.gemini/` are not broken
 - Every `agents/<name>/agent.md` has frontmatter `name` + `description`
 
 ## Testing instructions

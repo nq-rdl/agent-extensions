@@ -71,10 +71,6 @@ jobs:
           set -euo pipefail
 
           # --- Claude marketplace: metadata.version and plugin entry versions ---
-          # The Codex marketplace at .agents/plugins/marketplace.json has no
-          # versioned fields today, so it's intentionally not touched here.
-          # Version stamping for Codex happens via plugins/*/.codex-plugin/plugin.json
-          # in the generic JSON loop below.
           if [ -f .claude-plugin/marketplace.json ]; then
             jq --arg v "$VERSION" '
               if .metadata?.version then .metadata.version = $v else . end
@@ -87,9 +83,8 @@ jobs:
           # --- JSON files with a top-level version field ---
           json_files=(
             gemini-extension.json
-            pidev/package.json
           )
-          for f in plugins/*/.claude-plugin/plugin.json plugins/*/.codex-plugin/plugin.json; do
+          for f in plugins/*/.claude-plugin/plugin.json; do
             [ -f "$f" ] && json_files+=("$f")
           done
 

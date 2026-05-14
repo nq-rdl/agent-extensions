@@ -14,7 +14,6 @@ skills:
   - gemini-cli
   - jules
   - jules-dispatch-creator
-  - opencode
   - pi-rpc
   - lychee
   - writerside
@@ -34,14 +33,6 @@ targets:
     enabled: true
     pluginName: dev-tools
     marketplaceName: rdl
-  codex:
-    enabled: true
-    pluginName: dev-tools
-    marketplaceName: rdl
   gemini:
     enabled: true
     extensionName: rdl
-  pidev:
-    enabled: false
-  opencode:
-    enabled: false

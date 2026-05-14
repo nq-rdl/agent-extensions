@@ -23,14 +23,6 @@ targets:
     enabled: true
     pluginName: meta
     marketplaceName: rdl
-  codex:
-    enabled: true
-    pluginName: meta
-    marketplaceName: rdl
   gemini:
     enabled: true
     extensionName: rdl
-  pidev:
-    enabled: false
-  opencode:
-    enabled: false
