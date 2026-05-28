@@ -31,7 +31,9 @@ if command -v jq >/dev/null 2>&1; then
   prompt=$(printf '%s' "$input" | jq -r '.prompt // empty')
 elif command -v python3 >/dev/null 2>&1; then
   # JSON-aware fallback: correctly unescapes quotes, newlines, and unicode.
-  prompt=$(printf '%s' "$input" | python3 -c 'import sys, json; print(json.load(sys.stdin).get("prompt", ""))' 2>/dev/null || true)
+  # `or ""` coerces a missing or explicitly-null prompt to "", matching the
+  # jq path's `.prompt // empty`.
+  prompt=$(printf '%s' "$input" | python3 -c 'import sys, json; print(json.load(sys.stdin).get("prompt") or "")' 2>/dev/null || true)
 else
   # Last-resort best-effort: truncates on embedded escaped quotes, but only
   # the advisory intent gate depends on it, so a degraded match is acceptable.
