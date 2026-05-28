@@ -40,11 +40,16 @@ input=$(cat)
 
 if command -v jq >/dev/null 2>&1; then
   prompt=$(printf '%s' "$input" | jq -r '.prompt // empty')
+elif command -v python3 >/dev/null 2>&1; then
+  # JSON-aware fallback: correctly unescapes quotes, newlines, and unicode.
+  prompt=$(printf '%s' "$input" | python3 -c 'import sys, json; print(json.load(sys.stdin).get("prompt", ""))' 2>/dev/null || true)
 else
+  # Last-resort best-effort: truncates on embedded escaped quotes, but only
+  # the advisory intent gate depends on it, so a degraded match is acceptable.
   prompt=$(printf '%s' "$input" | grep -oP '"prompt"\s*:\s*"\K[^"]+' || true)
 fi
 
-intent='use|using|invoke|invoking|run|running|apply|applying|activate|activating|load|loading|call|calling|trigger|triggering|consider|considering|check|checking'
+intent='use|using|invoke|invoking|run|running|apply|applying|activate|activating|load|loading|call|calling|trigger|triggering'
 if ! printf '%s' "$prompt" | grep -qiE "\b(${intent})\b.{0,40}\bskills?\b|\bskills?\b.{0,40}\b(${intent})\b"; then
   exit 0
 fi
