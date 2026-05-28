@@ -1,8 +1,10 @@
 #!/bin/bash
-# UserPromptSubmit hook that forces explicit skill evaluation
+# UserPromptSubmit hook that surfaces available skills as advisory context.
 #
-# Triggers ONLY when the user's prompt contains "skill" or "skills"
-# (case-insensitive, word-boundary match). Silent no-op otherwise.
+# Triggers only when the prompt expresses intent to use a skill — an action
+# verb (use, invoke, run, apply, ...) appears near "skill"/"skills". Silent
+# no-op otherwise. Output is the skill catalogue, emitted via the
+# UserPromptSubmit additionalContext channel as advisory (not coercive) text.
 #
 # Dynamically discovers available skills from:
 #   1. Standalone skills:     ~/.claude/skills/*/SKILL.md
@@ -18,7 +20,10 @@
 set -euo pipefail
 
 # ---------------------------------------------------------------------------
-# Keyword gate — only fire when the prompt mentions "skill" or "skills"
+# Intent gate — fire only when an action verb sits near "skill"/"skills",
+# signalling intent to use one. Metalinguistic mentions ("skills should
+# always be reviewed") no longer trigger a catalogue dump. Silent no-op
+# otherwise.
 # ---------------------------------------------------------------------------
 input=$(cat)
 
@@ -28,7 +33,8 @@ else
   prompt=$(printf '%s' "$input" | grep -oP '"prompt"\s*:\s*"\K[^"]+' || true)
 fi
 
-if ! printf '%s' "$prompt" | grep -qiE '\bskills?\b'; then
+intent='use|using|invoke|invoking|run|running|apply|applying|activate|activating|load|loading|call|calling|trigger|triggering|consider|considering|check|checking'
+if ! printf '%s' "$prompt" | grep -qiE "\b(${intent})\b.{0,40}\bskills?\b|\bskills?\b.{0,40}\b(${intent})\b"; then
   exit 0
 fi
 
@@ -218,15 +224,21 @@ scan_plugin_commands() {
 }
 
 # ---------------------------------------------------------------------------
-# Build the forced evaluation prompt
+# Build the advisory skill catalogue
+#
+# Descriptive, non-coercive framing wrapped in a stable <skill-catalog> fence
+# so downstream agents can recognise it as hook-provided context rather than
+# an injected instruction. The <available_skills> / <available_commands>
+# blocks are the useful payload.
 # ---------------------------------------------------------------------------
 build_prompt() {
   local skills_block="$1"
   local commands_block="$2"
 
-  printf 'INSTRUCTION: MANDATORY SKILL ACTIVATION SEQUENCE\n'
-  printf '\n'
-  printf 'Before proceeding with ANY implementation, you MUST complete all three steps below.\n'
+  printf '<skill-catalog>\n'
+  printf 'Skills and commands available for this prompt are listed below, discovered\n'
+  printf 'from your local Claude configuration by a UserPromptSubmit hook. Consider\n'
+  printf 'whether any fit the task; if one does, load it with the Skill tool. Advisory only.\n'
   printf '\n'
   printf '<available_skills>\n%s</available_skills>\n' "$skills_block"
 
@@ -234,39 +246,26 @@ build_prompt() {
     printf '\n<available_commands>\n%s</available_commands>\n' "$commands_block"
   fi
 
-  printf '\n'
-  printf 'Step 1 — EVALUATE (print this table in your response):\n'
-  printf 'For EACH skill and command listed above, state:\n'
-  printf '  [name] — YES/NO — [one-line reason]\n'
-  printf '\n'
-  printf 'Step 2 — ACTIVATE (immediately after Step 1):\n'
-  printf '  IF any skills or commands are marked YES → Call Skill(name) for EACH one NOW.\n'
-  printf '  IF none are YES                          → State "No skills apply" and proceed to Step 3.\n'
-  printf '\n'
-  printf 'Step 3 — IMPLEMENT:\n'
-  printf '  Only after ALL Skill() calls from Step 2 have returned, proceed with implementation.\n'
-  printf '\n'
-  printf 'CRITICAL RULES:\n'
-  printf '• You MUST call the Skill() tool in Step 2. Do NOT skip to implementation.\n'
-  printf '• The evaluation table (Step 1) is WORTHLESS unless you ACTIVATE (Step 2).\n'
-  printf '• If you skip Step 2, you have violated this instruction — stop and redo.\n'
-  printf '\n'
-  printf 'Example of a correct sequence:\n'
-  printf '\n'
-  printf '  Step 1 — Evaluate:\n'
-  printf '    academic-super                  — NO  — not an academic task\n'
-  printf '    charm-tui                       — YES — building a terminal UI\n'
-  printf '    use-modern-go                   — YES — writing Go code\n'
-  printf '    frontend-design:frontend-design — NO  — not a web UI task\n'
-  printf '    commit-commands:commit          — NO  — not committing code\n'
-  printf '    (... remaining skills and commands ...)\n'
-  printf '\n'
-  printf '  Step 2 — Activate:\n'
-  printf '    > Skill(charm-tui)\n'
-  printf '    > Skill(use-modern-go)\n'
-  printf '\n'
-  printf '  Step 3 — Implement:\n'
-  printf '    (only now begin writing code)\n'
+  printf '</skill-catalog>\n'
+}
+
+# ---------------------------------------------------------------------------
+# Emit the catalogue. Preferred channel is the UserPromptSubmit
+# additionalContext field (added discreetly as system context); falls back to
+# plain stdout when jq is unavailable.
+# ---------------------------------------------------------------------------
+emit() {
+  local payload="$1"
+  if command -v jq >/dev/null 2>&1; then
+    jq -n --arg ctx "$payload" '{
+      hookSpecificOutput: {
+        hookEventName: "UserPromptSubmit",
+        additionalContext: $ctx
+      }
+    }'
+  else
+    printf '%s\n' "$payload"
+  fi
 }
 
 # ---------------------------------------------------------------------------
@@ -274,7 +273,7 @@ build_prompt() {
 # ---------------------------------------------------------------------------
 main() {
   if check_cache; then
-    cat "$CACHE_FILE"
+    emit "$(cat "$CACHE_FILE")"
     return 0
   fi
 
@@ -309,7 +308,7 @@ main() {
   local output
   output=$(build_prompt "$skills_block" "$commands_block")
   write_cache "$output"
-  printf '%s\n' "$output"
+  emit "$output"
 }
 
 main
