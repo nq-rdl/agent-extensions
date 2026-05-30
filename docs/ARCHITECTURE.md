@@ -11,7 +11,7 @@ This repository exists to manage reusable agent extensions across two host CLIs 
 
 These tools are similar in intent, but they do not share a common packaging or marketplace standard. The architecture in this repository treats that as a first-class constraint.
 
-> Other hosts (Codex, OpenCode, pi.dev) were considered but require external CLI or packaging tooling rather than an in-host install command. They are out of scope for this repo. The `pi-rpc` skill bundled with `dev-tools` is unrelated — it is a runtime client used by Claude Code and Gemini CLI to spawn pi.dev coding agent sessions, not a publication target.
+> Other hosts (Codex, OpenCode, pi.dev) were considered but require external CLI or packaging tooling rather than an in-host install command. They are out of scope for this repo.
 
 ## Problem Statement
 
@@ -384,7 +384,6 @@ Expected publication target:
 |---|---|---|
 | `mcp/*-go/` Go MCP servers | this repo | this repo (prebuilt binaries in `plugins/*/bin/mcp/`) |
 | `skills/*/scripts/` Go/Python tools | `nq-rdl/agent-skills` | vendored here via submodule |
-| `skills/pi-rpc/scripts/Makefile` | `nq-rdl/agent-skills` | vendored here; binaries built by `build-mcp-servers.yml` from `mcp/pi-rpc-go/` |
 | `skills/{csv,docx,pdf,xlsx}/scripts/` | `nq-rdl/agent-skills` | runs in-place via `ensure-deps.sh` |
 | `plugins/dev-tools/bin/` prebuilt binaries | this repo | committed here, rebuilt by CI |
 | `registry/bundles/*.yaml` | this repo | this repo |
@@ -403,7 +402,7 @@ Expected publication target:
 
 ### Go house style
 
-Match the style established in `skills/pi-rpc/scripts/` (cobra + `charm.land/fang/v2`, `CGO_ENABLED=0`, `-X main.version=$(git describe)` ldflags). MCP servers in `mcp/*-go/` follow the same Makefile structure with a `cross-compile` target that produces `$(DESTDIR)/<name>-<os>-<arch>` binaries.
+New Go CLIs and MCP servers use cobra + `charm.land/fang/v2`, `CGO_ENABLED=0`, and `-X main.version=$(git describe)` ldflags. MCP servers in `mcp/*-go/` follow a Makefile structure with a `cross-compile` target that produces `$(DESTDIR)/<name>-<os>-<arch>` binaries.
 
 ### Python / pixi
 
@@ -413,7 +412,6 @@ Match the style established in `skills/pi-rpc/scripts/` (cobra + `charm.land/fan
 
 Upstream issues/PRs to file against `nq-rdl/agent-skills`:
 
-- Add a `cross-compile` target to `skills/pi-rpc/scripts/Makefile` that matches what `build-mcp-servers.yml` invokes for `mcp/pi-rpc-go/`
 - Mirror this language policy in agent-skills' own docs once agreed
 
 ## Non-Goals

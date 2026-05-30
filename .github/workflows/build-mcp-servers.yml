@@ -4,7 +4,6 @@ on:
   push:
     branches: [main]
     paths:
-      - 'mcp/pi-rpc-go/**'
       - 'mcp/gemini-cli-go/**'
   workflow_dispatch:
 
@@ -19,8 +18,6 @@ jobs:
     strategy:
       matrix:
         server:
-          - name: pi-rpc-mcp
-            dir: mcp/pi-rpc-go
           - name: gemini-cli-mcp
             dir: mcp/gemini-cli-go
 
@@ -72,7 +69,7 @@ jobs:
           body: |
             Automated rebuild of MCP server binaries triggered by changes to `mcp/`.
 
-            Built servers: `pi-rpc-mcp`, `gemini-cli-mcp`
+            Built servers: `gemini-cli-mcp`
             Built platforms: `linux/amd64`, `linux/arm64`, `darwin/amd64`, `darwin/arm64`
           add-paths: plugins/dev-tools/bin/mcp/*
           delete-branch: true
