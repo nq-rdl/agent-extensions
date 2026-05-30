@@ -1,1 +1,0 @@
-../../agents/doublecheck/agent.md

@@ -1,6 +1,6 @@
 # Agent Extensions
 
-Curated reusable agent skills and integrations published in host-native formats. Shared skills live under `skills/`; host-specific packaging for Claude Code and Gemini CLI lives in this repository. Both hosts share a `/plugin` (Claude Code) / `/extensions` (Gemini CLI) discovery model, so the same canonical skills and agents publish into both with a thin per-host adapter.
+Curated reusable agent skills and integrations packaged as Claude Code plugins. Canonical skills live under `skills/` and agents under `agents/`; each bundle is published as a self-contained plugin under `plugins/`, listed in the repo-root Claude Code marketplace manifest (`.claude-plugin/marketplace.json`).
 
 > Other hosts (Codex, OpenCode, pi.dev) are not currently published from this repo — they require external CLI or packaging tooling rather than an in-host `/plugin` install.
 
@@ -16,23 +16,14 @@ Curated reusable agent skills and integrations published in host-native formats.
 
 2. Navigate to `/plugin` and enable bundles
 
-### Gemini CLI
-
-```bash
-gemini extensions install https://github.com/nq-rdl/agent-extensions
-```
-
 See [`docs/local-testing.md`](docs/local-testing.md) for local/devcontainer install.
 
 ## Agent File Management
 
-This repo follows two conventions for top-level agent context files. The third one is intentionally different from how most repos handle it:
+This repo keeps a single source of truth for top-level agent context files:
 
 - `AGENTS.md` — single source of truth for agent contributor guidance.
 - `CLAUDE.md` → symlink to `AGENTS.md`. Claude Code loads `CLAUDE.md` as project context; symlinking keeps the two in sync.
-- `GEMINI.md` — **not** a symlink, unlike `CLAUDE.md`. This repo is itself a Gemini CLI extension, and `GEMINI.md` is consumed as the extension's published catalog (the bundles, skills, and agents this extension provides) rather than as agent contributor guidance. It is regenerated from `registry/bundles/*.yaml` by `scripts/generate-gemini-extension.sh`, and CI fails if it drifts. To update its content, edit the registry bundles and run the regen script — don't hand-edit.
-
-A second, subtler reason `GEMINI.md` cannot be a symlink: the regen script writes via Python's `Path.write_text()`, which follows symlinks. If `GEMINI.md → AGENTS.md` existed, the next regen would silently overwrite `AGENTS.md` with the bundle catalog.
 
 ## License
 

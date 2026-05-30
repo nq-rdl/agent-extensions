@@ -1,0 +1,17 @@
+{
+  "description": "Inject project context at session start / after compaction. Phrased as declarative facts (not imperatives) so it is not mistaken for prompt injection. stdout on SessionStart is added to Claude's context.",
+  "hooks": {
+    "SessionStart": [
+      {
+        "matcher": "startup|compact",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash -c 'b=$(git branch --show-current 2>/dev/null || echo unknown); b=$(printf \"%s\" \"$b\" | tr -cd \"A-Za-z0-9._/-\"); [ -n \"$b\" ] || b=unknown; echo \"Current branch: $b. This project uses pixi and lefthook; tests run via pixi run test.\"'",
+            "timeout": 5
+          }
+        ]
+      }
+    ]
+  }
+}

@@ -4,7 +4,7 @@ Agent guidance for this repository. Use this alongside the README for project co
 
 ## Project overview
 
-This repo is a multi-host agent extension catalog. It maintains a single source of truth for reusable agent skills and publishes host-native outputs for Claude Code and Gemini CLI — the two host CLIs that share a `/plugin` (or `/extensions`) discovery model. The key constraint: each host has incompatible extension formats, so the repo adapts shared content to native targets rather than inventing a universal format.
+This repo is a Claude Code agent extension catalog. It maintains a single source of truth for reusable agent skills and agents, and publishes them as self-contained Claude Code plugins through a repo-root marketplace manifest. Canonical content lives once (under `skills/` and `agents/`); each bundle is packaged into `plugins/<bundle>/` as real-file copies so installs are self-contained.
 
 ## Setup commands
 
@@ -27,13 +27,10 @@ plugins/          ← Claude Code plugins, one per bundle (SELF-CONTAINED — re
     .claude-plugin/plugin.json
     skills/<name>/       ← real-file copy of skills/<name>/
     agents/<name>.md     ← real-file copy of agents/<name>/agent.md
-.gemini/          ← Gemini CLI native discovery tree (symlinks — linked in-place)
-  skills/<name>   ← symlink into ../../skills/<name>
-  agents/<name>.md ← symlink into ../../agents/<name>/agent.md
 registry/
-  bundles/*.yaml  ← single source of truth: which skills/agents belong to which bundle/target
+  bundles/*.yaml  ← single source of truth: which skills/agents belong to which bundle
 mcp/
-  gemini-cli-go/  ← Go MCP server, wraps Gemini CLI as MCP tools
+  <name>-go/      ← Go MCP servers, built to plugins/<bundle>/bin/mcp/
 hooks/            ← Claude Code hook shell scripts + JSON config
 .claude-plugin/
   marketplace.json ← Claude Code marketplace manifest (repo root, points at ./plugins/<bundle>)
@@ -47,7 +44,6 @@ To make installs self-contained, `plugins/<bundle>/skills/<name>/` and `plugins/
 
 - **Edit canonical content** under `skills/<name>/` (vendored from upstream) or `agents/<name>/agent.md` (authored here).
 - **Refresh plugin trees** by running `bash scripts/sync-plugins.sh` (or pass a bundle name to scope it). The script reads `registry/bundles/<b>.yaml`, removes any stale copies, and rewrites `plugins/<b>/skills/<name>/` and `plugins/<b>/agents/<name>.md` from the canonical sources.
-- **`.gemini/`** stays as symlinks — Gemini CLI links an extension in-place (`gemini extensions link .`), no copy step, so symlinks resolve correctly against the working tree.
 - **CI** validates that every bundle YAML reference resolves and that every plugin manifest is well-formed. See `scripts/validate-plugins.sh`.
 
 When the upstream skills repo releases, `sync-skills.yml` pulls the new content into `skills/`, runs `sync-plugins.sh`, and opens a PR with both `skills/` and `plugins/` changes in the same commit.
@@ -69,12 +65,12 @@ MCP servers are authored in `mcp/*-go/` in this repo and distributed as prebuilt
 
 ## MCP Servers
 
-The `gemini-cli` MCP server is a Go binary distributed under `plugins/dev-tools/bin/mcp/`. The plugin wires it via `.mcp.json` — no separate install step required.
+MCP servers are Go binaries under `mcp/<name>-go/`, cross-compiled into `plugins/dev-tools/bin/mcp/` and wired via the bundle plugin's `.mcp.json` — no separate install step required. The catalog currently ships no MCP servers.
 
 To build locally:
 
 ```bash
-cd mcp/gemini-cli-go
+cd mcp/<name>-go
 make build            # builds for the current platform
 make cross-compile DESTDIR=../../plugins/dev-tools/bin/mcp
 ```
@@ -97,7 +93,7 @@ bash scripts/sync-plugins.sh swe       # one bundle
 CI runs `validate.yml` on every PR/push to main. It checks:
 - Bundle YAML skill references resolve to `skills/<name>/`
 - Bundle YAML agent references resolve to `agents/<name>/agent.md`
-- All symlinks under `.gemini/` are not broken
+- Plugin manifests, hooks, and `.mcp.json` wiring are valid (`scripts/validate-plugins.sh`)
 - Every `agents/<name>/agent.md` has frontmatter `name` + `description`
 
 ## Testing instructions
@@ -129,13 +125,11 @@ targets:
   claude:
     enabled: true
     pluginName: swe
-  gemini:
-    enabled: false
 ```
 
-When adding a skill to a bundle: (1) add it to the YAML, (2) run `bash scripts/sync-plugins.sh <bundle>` to copy `skills/<name>/` into `plugins/<bundle>/skills/<name>/`, (3) add a symlink under `.gemini/skills/<name>` if Gemini is enabled.
+When adding a skill to a bundle: (1) add it to the YAML, (2) run `bash scripts/sync-plugins.sh <bundle>` to copy `skills/<name>/` into `plugins/<bundle>/skills/<name>/`.
 
-When adding an agent to a bundle: (1) create `agents/<name>/agent.md`, (2) add it to the YAML `agents:` list, (3) run `bash scripts/sync-plugins.sh <bundle>` to copy it into `plugins/<bundle>/agents/<name>.md`, (4) add a symlink at `.gemini/agents/<name>.md` if Gemini is enabled.
+When adding an agent to a bundle: (1) create `agents/<name>/agent.md`, (2) add it to the YAML `agents:` list, (3) run `bash scripts/sync-plugins.sh <bundle>` to copy it into `plugins/<bundle>/agents/<name>.md`.
 
 ## PR instructions
 
@@ -168,4 +162,3 @@ The docs site uses Zensical (configured in `zensical.toml`). Source is `docs/`. 
 
 - macOS and Linux only — symlink resolution requires native symlink support (WSL2 for Windows)
 - `dist/` is generated output — do not hand-edit
-- Gemini CLI requires a self-contained extension; monorepo publishing to Gemini is via release archive or mirror repo (Phase 2)

@@ -8,12 +8,12 @@ channels:
   - stable
 skills:
   - cc-agent-teams
-  - cc-hooks
+  - cc-hook
   - dispatch
   - document-release
-  - gemini-cli
   - jules
   - jules-dispatch-creator
+  - opencode
   - lychee
   - writerside
 agents:
@@ -32,6 +32,3 @@ targets:
     enabled: true
     pluginName: dev-tools
     marketplaceName: rdl
-  gemini:
-    enabled: true
-    extensionName: rdl

@@ -1,1 +1,0 @@
-../../agents/janitor/agent.md

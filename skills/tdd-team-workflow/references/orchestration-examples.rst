@@ -103,7 +103,7 @@ Orchestrator actions
 Example 3: Mixed Backend via dispatch skill
 -------------------------------------------
 
-If you have ``jules``, ``gemini-cli``, or ``pi-rpc`` installed, load the
+If you have ``jules`` or ``pi-rpc`` installed, load the
 ``dispatch`` skill to determine how to route phases to external
 backends. The dispatch skill handles session lifecycle — you just pass
 the uniform phase input format and receive the status token.

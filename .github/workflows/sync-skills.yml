@@ -105,3 +105,27 @@ jobs:
             --title "chore(skills): sync from agent-skills@${TAG}" \
             --body "$BODY" \
             --label "dependencies"
+
+  notify-failure:
+    name: Alert on sync failure
+    needs: sync
+    if: failure()
+    runs-on: ubuntu-latest
+    permissions:
+      issues: write
+    steps:
+      - name: Open or update a tracking issue
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: |
+          set -euo pipefail
+          title="sync-skills workflow failed"
+          body="The scheduled or dispatched sync-skills workflow failed (run: ${RUN_URL}). Likely cause: a bundle in registry/bundles/*.yaml references a skill or agent that no longer exists upstream after a rename or removal. sync-plugins.sh now warns instead of aborting, so check the run logs for ::warning:: lines, reconcile the registry, then re-run the sync."
+          existing=$(gh issue list --repo "$GITHUB_REPOSITORY" --state open \
+            --search "in:title $title" --json number --jq '.[0].number // empty')
+          if [ -n "$existing" ]; then
+            gh issue comment "$existing" --repo "$GITHUB_REPOSITORY" --body "$body"
+          else
+            gh issue create --repo "$GITHUB_REPOSITORY" --title "$title" --body "$body"
+          fi

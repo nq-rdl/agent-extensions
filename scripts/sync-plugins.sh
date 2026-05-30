@@ -1,5 +1,5 @@
 #!/bin/bash
-# Re-sync plugins/<bundle>/{skills,agents}/ from the canonical skills/ and
+# Re-sync plugins/<plugin>/{skills,agents}/ from the canonical skills/ and
 # agents/ trees, driven by registry/bundles/<bundle>.yaml.
 #
 # Why this exists: Claude Code installs a plugin by `cp -R`-ing its source
@@ -11,6 +11,15 @@
 # This script is the canonical way to refresh those copies after the
 # upstream skills/ or agents/ change. Run it whenever you bump the skills
 # sync or add/edit an agent.
+#
+# Resilience: a bundle that references a skill/agent with no source (e.g. an
+# upstream rename or removal that landed before the registry was updated) is
+# reported as a ::warning:: and skipped — this script never aborts the sync.
+# The authoritative gate is validate.yml's `validate-bundles` job, which fails
+# the PR so a human reconciles the registry in the same change (see issue #83
+# and the sync-skills.yml decoupling). Stale plugin copies — skills/agents no
+# longer named by the registry — are pruned so renamed or dropped entries do
+# not linger in the installed plugin tree.
 #
 # Usage:
 #   scripts/sync-plugins.sh           # sync every bundle in registry/
@@ -24,7 +33,6 @@ cd "$REPO_ROOT"
 bundles_arg="$*"
 
 python3 - "$bundles_arg" <<'PY'
-import os
 import shutil
 import sys
 from pathlib import Path
@@ -36,40 +44,71 @@ selected = sys.argv[1].split() if sys.argv[1] else []
 
 bundle_files = sorted((repo / "registry" / "bundles").glob("*.yaml"))
 if selected:
-    wanted = set(selected)
-    bundle_files = [f for f in bundle_files if f.stem in wanted]
-    missing = wanted - {f.stem for f in bundle_files}
+    wanted_bundles = set(selected)
+    bundle_files = [f for f in bundle_files if f.stem in wanted_bundles]
+    missing = wanted_bundles - {f.stem for f in bundle_files}
     if missing:
         sys.exit(f"::error::Unknown bundle(s): {', '.join(sorted(missing))}")
 
-errors = []
+warnings = 0
 
-def sync_skill(bundle: str, skill: str) -> None:
-    src = repo / "skills" / skill
-    dst = repo / "plugins" / bundle / "skills" / skill
-    if not src.is_dir():
-        errors.append(f"missing skills/{skill} (referenced by {bundle})")
+
+def warn(bundle_file: Path, message: str) -> None:
+    global warnings
+    warnings += 1
+    print(f"::warning file={bundle_file.relative_to(repo)}::{message}", file=sys.stderr)
+
+
+def prune_entries(parent: Path, keep: set) -> None:
+    # The registry is the source of truth. Remove derivative plugin copies for
+    # skills/agents that were renamed or dropped upstream so they do not linger
+    # in the installed plugin tree.
+    if not parent.exists():
         return
-    if dst.exists() or dst.is_symlink():
-        if dst.is_symlink() or dst.is_file():
-            dst.unlink()
+    for child in sorted(parent.iterdir()):
+        if child.name in keep:
+            continue
+        if child.is_symlink() or child.is_file():
+            child.unlink()
         else:
-            shutil.rmtree(dst)
+            shutil.rmtree(child)
+        print(f"  - pruned stale {child.relative_to(repo)}")
+
+
+def sync_skill(plugin: str, skill: str, bundle_file: Path) -> None:
+    src = repo / "skills" / skill
+    dst = repo / "plugins" / plugin / "skills" / skill
+    if not src.is_dir():
+        warn(
+            bundle_file,
+            f"Skill '{skill}' has no source skills/{skill}/ — skipped. "
+            "Point registry/bundles at an existing skill or remove the entry.",
+        )
+        return
+    if dst.is_symlink() or dst.is_file():
+        dst.unlink()
+    elif dst.exists():
+        shutil.rmtree(dst)
     dst.parent.mkdir(parents=True, exist_ok=True)
     shutil.copytree(src, dst, symlinks=False)
     print(f"  ✓ skill {skill}")
 
-def sync_agent(bundle: str, agent: str) -> None:
+
+def sync_agent(plugin: str, agent: str, bundle_file: Path) -> None:
     src = repo / "agents" / agent / "agent.md"
-    dst = repo / "plugins" / bundle / "agents" / f"{agent}.md"
+    dst = repo / "plugins" / plugin / "agents" / f"{agent}.md"
     if not src.is_file():
-        errors.append(f"missing agents/{agent}/agent.md (referenced by {bundle})")
+        warn(
+            bundle_file,
+            f"Agent '{agent}' has no source agents/{agent}/agent.md — skipped.",
+        )
         return
     dst.parent.mkdir(parents=True, exist_ok=True)
     if dst.is_symlink() or dst.exists():
         dst.unlink()
     shutil.copyfile(src, dst)
     print(f"  ✓ agent {agent}")
+
 
 for bundle_file in bundle_files:
     with bundle_file.open() as f:
@@ -79,17 +118,26 @@ for bundle_file in bundle_files:
     if not claude.get("enabled"):
         print(f"Skipping {bundle} (claude target disabled)")
         continue
-    print(f"Syncing {bundle}")
-    for skill in data.get("skills") or []:
-        sync_skill(bundle, skill)
-    for agent in data.get("agents") or []:
-        sync_agent(bundle, agent)
+    plugin = claude.get("pluginName") or data.get("id") or bundle
+    print(f"Syncing {bundle} -> plugins/{plugin}")
 
-if errors:
-    print("::error::sync-plugins encountered missing sources:", file=sys.stderr)
-    for e in errors:
-        print(f"  - {e}", file=sys.stderr)
-    sys.exit(1)
+    skills = list(data.get("skills") or [])
+    agents = list(data.get("agents") or [])
 
+    prune_entries(repo / "plugins" / plugin / "skills", set(skills))
+    prune_entries(repo / "plugins" / plugin / "agents", {f"{a}.md" for a in agents})
+
+    for skill in skills:
+        sync_skill(plugin, skill, bundle_file)
+    for agent in agents:
+        sync_agent(plugin, agent, bundle_file)
+
+if warnings:
+    print(
+        f"::warning::sync-plugins completed with {warnings} unresolved registry "
+        "reference(s); validate-bundles will fail the PR until the registry is "
+        "reconciled.",
+        file=sys.stderr,
+    )
 print("Done.")
 PY

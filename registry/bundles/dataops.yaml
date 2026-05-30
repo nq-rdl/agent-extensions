@@ -21,5 +21,3 @@ targets:
     enabled: true
     pluginName: dataops
     marketplaceName: rdl
-  gemini:
-    enabled: false

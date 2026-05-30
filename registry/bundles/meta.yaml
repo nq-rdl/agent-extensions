@@ -23,6 +23,3 @@ targets:
     enabled: true
     pluginName: meta
     marketplaceName: rdl
-  gemini:
-    enabled: true
-    extensionName: rdl

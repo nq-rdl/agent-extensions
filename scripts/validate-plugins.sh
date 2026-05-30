@@ -22,9 +22,8 @@
 #    12. Every Claude-target bundle agent has a symlink at
 #        plugins/<plugin>/agents/<name>.md (cross-checked against the bundle
 #        YAML, not just scanned from disk — catches missing symlinks)
-#    13. Every symlink under .gemini/agents/*.md resolves (if .gemini/ exists)
-#    14. Every agents/<name>/agent.md has frontmatter keys `name`, `description`
-#    15. Every mcp entry in a bundle YAML is wired in the bundle plugin's
+#    13. Every agents/<name>/agent.md has frontmatter keys `name`, `description`
+#    14. Every mcp entry in a bundle YAML is wired in the bundle plugin's
 #        .mcp.json (at plugin root, per Claude Code plugin spec)
 #
 # Usage:
@@ -232,7 +231,6 @@ fi
 # ── Agent-level validation ──────────────────────────────────────────────────
 # 1. Every bundle YAML agents: entry resolves to agents/<name>/agent.md
 # 2. Every agents/<name>/agent.md has frontmatter name + description
-# 3. Every .gemini/agents/*.md symlink resolves
 echo ""
 echo "Validating agents"
 
@@ -316,26 +314,6 @@ if missing:
     )
     sys.exit(1)
 PY
-  done
-fi
-
-# Validate .gemini/agents/*.md symlinks resolve.
-if [ -d "$REPO_ROOT/.gemini/agents" ]; then
-  for link in "$REPO_ROOT"/.gemini/agents/*.md; do
-    [ -e "$link" ] || [ -L "$link" ] || continue
-    if [ ! -e "$link" ]; then
-      error ".gemini/agents" "Broken agent symlink: $link -> $(readlink "$link" || echo '?')"
-    fi
-  done
-fi
-
-# Validate .gemini/skills/* symlinks resolve (directory symlinks into submodule).
-if [ -d "$REPO_ROOT/.gemini/skills" ]; then
-  for link in "$REPO_ROOT"/.gemini/skills/*; do
-    [ -e "$link" ] || [ -L "$link" ] || continue
-    if [ ! -e "$link" ]; then
-      error ".gemini/skills" "Broken skill symlink: $link -> $(readlink "$link" || echo '?')"
-    fi
   done
 fi
 

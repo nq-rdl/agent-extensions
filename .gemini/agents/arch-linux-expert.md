@@ -1,1 +1,0 @@
-../../agents/arch-linux-expert/agent.md

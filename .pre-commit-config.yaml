@@ -8,5 +8,5 @@ repos:
         entry: scripts/validate-plugins.sh
         language: python
         additional_dependencies: [pyyaml]
-        files: ^(plugins/|agents/|registry/bundles/|\.gemini/)
+        files: ^(plugins/|agents/|registry/bundles/)
         pass_filenames: true

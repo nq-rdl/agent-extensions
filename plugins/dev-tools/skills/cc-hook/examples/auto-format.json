@@ -1,0 +1,17 @@
+{
+  "description": "Run a formatter after every Edit/Write. PostToolUse runs after the tool, so the file is already on disk. jq extracts the path into a quoted variable so paths with spaces are passed as a single argument.",
+  "hooks": {
+    "PostToolUse": [
+      {
+        "matcher": "Edit|Write",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "path=$(jq -r '.tool_input.file_path // empty'); [ -n \"$path\" ] && npx prettier --write -- \"$path\"",
+            "timeout": 30
+          }
+        ]
+      }
+    ]
+  }
+}

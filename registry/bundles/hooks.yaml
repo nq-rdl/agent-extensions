@@ -16,5 +16,3 @@ targets:
     enabled: true
     pluginName: hooks
     marketplaceName: rdl
-  gemini:
-    enabled: false

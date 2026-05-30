@@ -1,0 +1,17 @@
+{
+  "description": "Block edits/writes to .env files using exit code 2 + stderr (official pattern)",
+  "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": "Edit|Write",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash -c 'path=$(jq -r \".tool_input.file_path // empty\"); if echo \"$path\" | grep -qE \"\\.env$|\\.env\\.\"; then echo \"Blocked: $path is a protected .env file\" >&2; exit 2; fi'",
+            "timeout": 10
+          }
+        ]
+      }
+    ]
+  }
+}
