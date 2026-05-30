@@ -128,7 +128,6 @@ Developer tools — agent dispatch, multi-agent teams, link checking, docs.
 | gemini-cli | Gemini CLI headless dispatch — spawn headless Gemini CLI processes |
 | jules | Dispatch tasks to Jules AI coding sessions |
 | jules-dispatch-creator | Set up and configure Jules GitHub Actions dispatch workflows |
-| pi-rpc | Pi.dev ConnectRPC service — spawn and manage pi.dev coding agent sessions |
 | lychee | Fast link checker for documentation, READMEs, and markdown files |
 | writerside | JetBrains Writerside documentation topics, markup tags, and projects |
 

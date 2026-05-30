@@ -34,7 +34,6 @@ registry/
   bundles/*.yaml  ← single source of truth: which skills/agents belong to which bundle/target
 mcp/
   gemini-cli-go/  ← Go MCP server, wraps Gemini CLI as MCP tools
-  pi-rpc-go/      ← Go MCP server bundled with dev-tools; wraps the local `pi --mode rpc` client used by the `pi-rpc` skill
 hooks/            ← Claude Code hook shell scripts + JSON config
 .claude-plugin/
   marketplace.json ← Claude Code marketplace manifest (repo root, points at ./plugins/<bundle>)
@@ -70,12 +69,12 @@ MCP servers are authored in `mcp/*-go/` in this repo and distributed as prebuilt
 
 ## MCP Servers
 
-Both MCP servers are Go binaries distributed under `plugins/dev-tools/bin/mcp/`. The plugin wires them via `.claude-plugin/.mcp.json` — no separate install step required.
+The `gemini-cli` MCP server is a Go binary distributed under `plugins/dev-tools/bin/mcp/`. The plugin wires it via `.mcp.json` — no separate install step required.
 
 To build locally:
 
 ```bash
-cd mcp/pi-rpc-go      # or mcp/gemini-cli-go
+cd mcp/gemini-cli-go
 make build            # builds for the current platform
 make cross-compile DESTDIR=../../plugins/dev-tools/bin/mcp
 ```

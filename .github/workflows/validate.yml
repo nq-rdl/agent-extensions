@@ -116,7 +116,6 @@ jobs:
     strategy:
       matrix:
         server:
-          - dir: mcp/pi-rpc-go
           - dir: mcp/gemini-cli-go
     steps:
       - uses: actions/checkout@v6
