@@ -30,7 +30,7 @@ plugins/          ← Claude Code plugins, one per bundle (SELF-CONTAINED — re
 registry/
   bundles/*.yaml  ← single source of truth: which skills/agents belong to which bundle
 mcp/
-  pi-rpc-go/      ← Go MCP server bundled with dev-tools; wraps the local `pi --mode rpc` client used by the `pi-rpc` skill
+  <name>-go/      ← Go MCP servers, built to plugins/<bundle>/bin/mcp/
 hooks/            ← Claude Code hook shell scripts + JSON config
 .claude-plugin/
   marketplace.json ← Claude Code marketplace manifest (repo root, points at ./plugins/<bundle>)
@@ -65,12 +65,12 @@ MCP servers are authored in `mcp/*-go/` in this repo and distributed as prebuilt
 
 ## MCP Servers
 
-The `pi-rpc` MCP server is a Go binary distributed under `plugins/dev-tools/bin/mcp/`. The plugin wires it via its `.mcp.json` — no separate install step required.
+MCP servers are Go binaries under `mcp/<name>-go/`, cross-compiled into `plugins/dev-tools/bin/mcp/` and wired via the bundle plugin's `.mcp.json` — no separate install step required. The catalog currently ships no MCP servers.
 
 To build locally:
 
 ```bash
-cd mcp/pi-rpc-go
+cd mcp/<name>-go
 make build            # builds for the current platform
 make cross-compile DESTDIR=../../plugins/dev-tools/bin/mcp
 ```

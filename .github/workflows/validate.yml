@@ -92,27 +92,3 @@ jobs:
 
       - name: Validate plugin manifests, hooks, and agents
         run: scripts/validate-plugins.sh
-
-  validate-mcp-servers:
-    name: Validate Go MCP servers build
-    runs-on: ubuntu-latest
-    strategy:
-      matrix:
-        server:
-          - dir: mcp/pi-rpc-go
-    steps:
-      - uses: actions/checkout@v6
-
-      - uses: actions/setup-go@v6
-        with:
-          go-version-file: ${{ matrix.server.dir }}/go.mod
-
-      - name: Download dependencies
-        working-directory: ${{ matrix.server.dir }}
-        run: go mod download
-
-      - name: Build and vet
-        working-directory: ${{ matrix.server.dir }}
-        run: |
-          go build ./...
-          go vet ./...

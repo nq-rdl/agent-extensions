@@ -6,7 +6,7 @@ icon: lucide/network
 
 This repository is a **Claude Code extension catalog**. It keeps a single source of truth for reusable agent behavior — *skills* and *agents* — and publishes them as self-contained Claude Code plugins through a repo-root marketplace manifest.
 
-> Other hosts (Codex, OpenCode, pi.dev) are **not** publication targets. They use external CLI or packaging tooling rather than Claude Code's `/plugin` marketplace model, so they belong in CLI- or package-driven repos, not here. The `pi-rpc` skill bundled with `dev-tools` is unrelated to publication — it is a runtime client Claude Code uses to spawn pi.dev coding agent sessions.
+> Other hosts (Codex, OpenCode, pi.dev) are **not** publication targets. They use external CLI or packaging tooling rather than Claude Code's `/plugin` marketplace model, so they belong in CLI- or package-driven repos, not here.
 
 ## Problem statement
 
@@ -36,8 +36,7 @@ agents/                    ← canonical agents (authored here)
     references/            ← optional colocated reference material
 
 hooks/                     ← Claude Code hook scripts + JSON config (authored here)
-mcp/                       ← Go MCP servers (authored here)
-  pi-rpc-go/
+mcp/                       ← Go MCP servers (authored here; none currently)
 
 registry/
   bundles/*.yaml           ← single source of truth: which skills/agents/hooks/mcp each bundle ships
@@ -163,7 +162,6 @@ Agents derived from external sources (e.g. `github/awesome-copilot`, MIT) carry 
 |---|---|---|
 | `mcp/*-go/` Go MCP servers | this repo | this repo (prebuilt binaries in `plugins/*/bin/mcp/`) |
 | `skills/*/scripts/` Go/Python tools | `nq-rdl/agent-skills` | vendored here |
-| `skills/pi-rpc/scripts/` | `nq-rdl/agent-skills` | vendored here; binaries built by `build-mcp-servers.yml` from `mcp/pi-rpc-go/` |
 | `skills/{csv,docx,pdf,xlsx}/scripts/` | `nq-rdl/agent-skills` | run in-place via `ensure-deps.sh` |
 | `plugins/dev-tools/bin/` prebuilt binaries | this repo | committed here, rebuilt by CI |
 | `registry/bundles/*.yaml` | this repo | this repo |
@@ -192,7 +190,7 @@ MCP servers in `mcp/*-go/` follow a Makefile with a `cross-compile` target that 
 
 ### Pull-request validation
 
-`validate.yml` validates the bundle registry, resolves skill/agent references, checks plugin manifests/hooks/`.mcp.json`, and builds the Go MCP servers. `docs.yml` builds the docs site.
+`validate.yml` validates the bundle registry, resolves skill/agent references, and checks plugin manifests/hooks/`.mcp.json`. `docs.yml` builds the docs site.
 
 ### Release
 
