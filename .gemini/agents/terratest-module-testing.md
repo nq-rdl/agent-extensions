@@ -1,1 +1,0 @@
-../../agents/terratest-module-testing/agent.md

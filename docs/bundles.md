@@ -4,13 +4,11 @@ icon: lucide/package
 
 # Bundles
 
-Available skill bundles distributed as Claude Code plugins and a Gemini CLI extension.
+Available skill bundles distributed as Claude Code plugins.
 
 ## Install
 
-### Claude Code
-
-Skills are distributed as 6 separate plugin bundles. Install the bundles you need:
+Skills are distributed as separate plugin bundles. Install the bundles you need:
 
 ```bash
 # Add the marketplace (once)
@@ -18,15 +16,6 @@ Skills are distributed as 6 separate plugin bundles. Install the bundles you nee
 
 # Install a bundle
 /plugin install <bundle>@rdl
-```
-
-### Gemini CLI
-
-All skills are available as a single Gemini CLI extension:
-
-```bash
-# From a cloned copy of this repo
-gemini extensions link gemini/
 ```
 
 ---
@@ -122,12 +111,12 @@ Developer tools — agent dispatch, multi-agent teams, link checking, docs.
 | Skill | Description |
 |-------|-------------|
 | cc-agent-teams | Claude Code agent teams — coordinate multiple independent sessions in parallel |
-| cc-hooks | Create, manage, and debug Claude Code hooks — event-driven scripts |
+| cc-hook | Create, manage, and debug Claude Code hooks — event-driven scripts |
 | dispatch | Route tasks to external coding backends (fan out, offload) |
 | document-release | Post-ship documentation update for README, ARCHITECTURE, CHANGELOG, etc. |
-| gemini-cli | Gemini CLI headless dispatch — spawn headless Gemini CLI processes |
 | jules | Dispatch tasks to Jules AI coding sessions |
 | jules-dispatch-creator | Set up and configure Jules GitHub Actions dispatch workflows |
+| opencode | OpenCode CLI — agent config, custom tools, MCP servers, and plugins |
 | pi-rpc | Pi.dev ConnectRPC service — spawn and manage pi.dev coding agent sessions |
 | lychee | Fast link checker for documentation, READMEs, and markdown files |
 | writerside | JetBrains Writerside documentation topics, markup tags, and projects |

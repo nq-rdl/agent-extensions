@@ -4,7 +4,7 @@ license: CC-BY-4.0
 description: >-
   Use this skill when the user says "dispatch", "offload", "fan out",
   "fan-out", or asks to route tasks to external coding backends. Also trigger
-  when the user asks to send work to jules, gemini-cli, agent-teams, or any
+  when the user asks to send work to jules, agent-teams, or any
   other installed dispatch target. Teaches the dispatch pattern: identify task,
   choose backend, invoke backend skill, track status.
 metadata:
@@ -23,7 +23,7 @@ Dispatch when any of these apply:
 
 - **Task too large** — exceeds current context or would dominate the session
 - **Parallel work** — multiple independent subtasks that benefit from concurrent execution
-- **Different tool is better suited** — web search, async coding, specialized model
+- **Different tool is better suited** — async coding, specialized model
 - **Fire-and-forget** — work that doesn't need immediate results
 - **User explicitly asks** — "dispatch this", "offload to jules", "fan out"
 
@@ -62,7 +62,7 @@ Select a backend. In order of preference:
 
 Activate the backend's skill and pass the task context:
 
-- Use the backend skill's primary entry point (e.g., `/jules`, `/gemini-cli`, `/agent-teams`)
+- Use the backend skill's primary entry point (e.g., `/jules`, `/agent-teams`)
 - Include: task description, relevant file paths, branch name, any constraints
 - For coding tasks: specify the target branch and expected deliverable (PR, diff, file changes)
 
@@ -83,9 +83,9 @@ Backends fall into three categories. Use these to guide selection when the user 
 
 | Category | When to use | Pattern | Examples |
 |----------|-------------|---------|----------|
-| **CLI tools** | Standalone coding tasks, research, web search | Create session → fire-and-forget → poll status | jules, gemini-cli |
+| **CLI tools** | Standalone coding tasks | Create session → fire-and-forget → poll status | jules |
 | **Agent teams** | Parallel subtasks needing coordination | Create team → fan out teammates → collect results | agent-teams |
-| **External services** | Tasks routed to a remote API or service | API call → await result → report | pi-rpc |
+| **External services** | Tasks routed to a remote API or service | API call → await result → report | pi.swe, opencode |
 
 ---
 
@@ -93,11 +93,10 @@ Backends fall into three categories. Use these to guide selection when the user 
 
 When the user doesn't specify, use this decision tree:
 
-1. **Standalone coding change** (single feature, bug fix, refactor on a branch) → CLI tool (jules for async, gemini-cli for fast iteration)
-2. **Web search or research** → gemini-cli (has built-in web search)
-3. **Multiple independent subtasks** → agent-teams (parallel execution)
-4. **Task needs a specific model or service** → whichever backend provides it
-5. **Unsure** → ask the user
+1. **Standalone coding change** (single feature, bug fix, refactor on a branch) → CLI tool (jules for async)
+2. **Multiple independent subtasks** → agent-teams (parallel execution)
+3. **Task needs a specific model or service** → whichever backend provides it
+4. **Unsure** → ask the user
 
 If multiple backends could work, prefer the simpler option. One jules session beats a team of one.
 
@@ -105,7 +104,7 @@ If multiple backends could work, prefer the simpler option. One jules session be
 
 ## Dispatch Patterns
 
-### CLI Tool Dispatch (jules, gemini-cli)
+### CLI Tool Dispatch (jules)
 
 ```
 1. Activate the backend skill
@@ -133,7 +132,7 @@ To check later: use the backend skill's status or list command.
 
 Best for: 3+ independent subtasks, parallel investigation, multi-area changes.
 
-### External Service Dispatch (pi-rpc)
+### External Service Dispatch (pi.swe, opencode)
 
 ```
 1. Activate the backend skill
@@ -163,7 +162,7 @@ After batch dispatch, report a summary:
 |---|------|---------|--------|-----------|
 | 1 | Fix login bug | jules | dispatched | session-abc |
 | 2 | Update docs | jules | dispatched | session-def |
-| 3 | Research API options | gemini-cli | dispatched | session-ghi |
+| 3 | Add unit tests | jules | dispatched | session-ghi |
 ```
 
 ---

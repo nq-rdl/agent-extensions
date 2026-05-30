@@ -36,6 +36,3 @@ targets:
     enabled: true
     pluginName: swe
     marketplaceName: rdl
-  gemini:
-    enabled: true
-    extensionName: rdl

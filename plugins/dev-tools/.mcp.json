@@ -5,9 +5,6 @@
       "env": {
         "PI_SERVER_URL": "http://localhost:4097"
       }
-    },
-    "gemini-cli": {
-      "command": "./scripts/run-gemini-cli-mcp.sh"
     }
   }
 }

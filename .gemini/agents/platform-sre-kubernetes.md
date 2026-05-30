@@ -1,1 +1,0 @@
-../../agents/platform-sre-kubernetes/agent.md

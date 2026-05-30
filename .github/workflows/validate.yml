@@ -61,7 +61,7 @@ jobs:
 
       - name: Check all symlinks resolve
         run: |
-          mapfile -t links < <(find plugins/ .gemini/ -type l 2>/dev/null)
+          mapfile -t links < <(find plugins/ -type l 2>/dev/null)
           if [ ${#links[@]} -eq 0 ]; then
             echo "No symlinks to validate"
             exit 0
@@ -93,23 +93,6 @@ jobs:
       - name: Validate plugin manifests, hooks, and agents
         run: scripts/validate-plugins.sh
 
-  validate-gemini-drift:
-    name: Check GEMINI.md + .gemini/ are regenerated
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v6
-
-      - name: Install PyYAML
-        run: python3 -m pip install --user pyyaml
-
-      - name: Regenerate and diff
-        run: |
-          bash scripts/generate-gemini-extension.sh
-          if ! git diff --exit-code -- GEMINI.md .gemini/; then
-            echo "::error::GEMINI.md or .gemini/ is out of sync with registry/bundles/. Run 'bash scripts/generate-gemini-extension.sh' and commit the result."
-            exit 1
-          fi
-
   validate-mcp-servers:
     name: Validate Go MCP servers build
     runs-on: ubuntu-latest
@@ -117,7 +100,6 @@ jobs:
       matrix:
         server:
           - dir: mcp/pi-rpc-go
-          - dir: mcp/gemini-cli-go
     steps:
       - uses: actions/checkout@v6
 

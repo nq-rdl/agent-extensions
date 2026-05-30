@@ -81,9 +81,7 @@ jobs:
           fi
 
           # --- JSON files with a top-level version field ---
-          json_files=(
-            gemini-extension.json
-          )
+          json_files=()
           for f in plugins/*/.claude-plugin/plugin.json; do
             [ -f "$f" ] && json_files+=("$f")
           done

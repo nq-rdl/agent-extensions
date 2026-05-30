@@ -1,1 +1,0 @@
-../../agents/prompt-builder/agent.md

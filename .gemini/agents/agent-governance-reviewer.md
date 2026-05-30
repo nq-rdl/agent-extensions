@@ -1,1 +1,0 @@
-../../agents/agent-governance-reviewer/agent.md

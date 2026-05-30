@@ -1,1 +1,0 @@
-../../agents/github-actions-expert/agent.md

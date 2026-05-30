@@ -27,5 +27,3 @@ targets:
     enabled: true
     pluginName: informatics
     marketplaceName: rdl
-  gemini:
-    enabled: false
