@@ -1,3 +1,0 @@
-kind: Removed
-body: Removes the `pi-rpc` skill, MCP server, and prebuilt pi-server binaries — pi.dev support dropped from `dev-tools` (#97)
-time: 2026-05-31T00:00:19.78569611+10:00
