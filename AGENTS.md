@@ -118,7 +118,7 @@ See [`docs/local-testing.md`](docs/local-testing.md) for the full walkthrough in
 ```yaml
 schemaVersion: v1
 id: swe
-skills: [tdd, go-secure]      # must exist as skills/<name>/
+skills: [go-naming, go-secure] # must exist as skills/<name>/
 agents: [debug, janitor]      # must exist as agents/<name>/agent.md
 hooks: []
 targets:
