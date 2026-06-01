@@ -267,6 +267,19 @@ for bundle in sorted((repo / "registry" / "bundles").glob("*.yaml")):
             if not link.exists():
                 err(bundle, f"Agent '{name}' declared for Claude target but missing symlink plugins/{plugin_name}/agents/{name}.md")
 
+    # Skills: declared bundle skills must resolve to a canonical source and (for
+    # Claude targets) to a self-contained plugin copy. Without this, the issue
+    # #100 scenario — registry references a skill removed upstream — passes the
+    # local `validate-plugins.sh` pre-merge check silently (audit finding #3).
+    for name in data.get("skills") or []:
+        src = repo / "skills" / name
+        if not src.is_dir():
+            err(bundle, f"Skill '{name}' declared but missing source dir skills/{name}/")
+        elif claude_enabled:
+            copy = repo / "plugins" / plugin_name / "skills" / name
+            if not copy.is_dir():
+                err(bundle, f"Skill '{name}' declared for Claude target but missing plugin copy plugins/{plugin_name}/skills/{name}/")
+
     mcp_json = repo / "plugins" / plugin_name / ".mcp.json"
     declared_mcp = data.get("mcp") or []
     if declared_mcp and not mcp_json.is_file():

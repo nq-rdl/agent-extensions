@@ -7,3 +7,7 @@ dist/
 
 # Node.js dependencies
 node_modules/
+
+# Python bytecode (pipeline-script unit tests)
+__pycache__/
+*.pyc
