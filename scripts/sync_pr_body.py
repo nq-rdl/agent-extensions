@@ -94,9 +94,9 @@ def render_pr_body(tag, changes, drift_messages=None, max_chars=60000) -> str:
         parts += [
             "",
             "### ⚠️ Reconciliation required",
-            "Upstream removed skills that bundles still reference. "
-            "`validate-bundles` will fail until the registry is reconciled "
-            "(retire/trim the bundle, refresh `marketplace.json`):",
+            "Bundles still reference skills or agents that no longer exist "
+            "upstream. `validate-bundles` will fail until the registry is "
+            "reconciled (retire/trim the bundle, refresh `marketplace.json`):",
             *[f"- {m}" for m in drift_messages],
         ]
 

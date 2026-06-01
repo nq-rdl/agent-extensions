@@ -251,7 +251,8 @@ def err(path, msg):
     print(f"::error file={path}::{msg}", file=sys.stderr)
     fail = True
 
-for bundle in sorted((repo / "registry" / "bundles").glob("*.yaml")):
+_bundles_dir = repo / "registry" / "bundles"
+for bundle in sorted(list(_bundles_dir.glob("*.yaml")) + list(_bundles_dir.glob("*.yml"))):
     with bundle.open() as f:
         data = yaml.safe_load(f) or {}
     bundle_id = data.get("id") or bundle.stem

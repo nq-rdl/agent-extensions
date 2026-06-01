@@ -29,7 +29,8 @@ def find_consistency_issues(repo) -> list[str]:
 
     # Enabled Claude-target bundles, keyed by plugin name.
     bundle_plugins: dict[str, str] = {}
-    for bf in sorted((repo / "registry" / "bundles").glob("*.yaml")):
+    bundles_dir = repo / "registry" / "bundles"
+    for bf in sorted(list(bundles_dir.glob("*.yaml")) + list(bundles_dir.glob("*.yml"))):
         with bf.open() as fh:
             data = yaml.safe_load(fh) or {}
         claude = (data.get("targets") or {}).get("claude") or {}

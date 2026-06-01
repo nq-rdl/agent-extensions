@@ -31,7 +31,11 @@ def find_unresolved_refs(repo) -> list[Problem]:
     """Return a Problem for every bundle ref that does not resolve on disk."""
     repo = Path(repo)
     problems: list[Problem] = []
-    for bundle_file in sorted((repo / "registry" / "bundles").glob("*.yaml")):
+    bundles_dir = repo / "registry" / "bundles"
+    bundle_files = sorted(
+        list(bundles_dir.glob("*.yaml")) + list(bundles_dir.glob("*.yml"))
+    )
+    for bundle_file in bundle_files:
         with bundle_file.open() as fh:
             data = yaml.safe_load(fh) or {}
         bundle = data.get("id") or bundle_file.stem

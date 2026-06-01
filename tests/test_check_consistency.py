@@ -52,6 +52,14 @@ class TestConsistency(unittest.TestCase):
             )
             self.assertEqual(check_consistency.find_consistency_issues(repo), [])
 
+    def test_scans_yml_extension_bundles(self):
+        # validate.yml globbed *.yaml AND *.yml; the consistency checker must too.
+        with tempfile.TemporaryDirectory() as tmp:
+            repo = make_repo(tmp, marketplace_plugins=[], plugin_dirs=[])
+            (repo / "registry" / "bundles" / "legacy.yml").write_text(bundle("legacy"))
+            issues = check_consistency.find_consistency_issues(repo)
+            self.assertTrue(any("legacy" in i for i in issues), issues)
+
     def test_flags_bundle_missing_from_marketplace(self):
         with tempfile.TemporaryDirectory() as tmp:
             repo = make_repo(

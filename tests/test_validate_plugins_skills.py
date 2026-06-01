@@ -6,7 +6,6 @@ a declared skill's self-contained plugin copy is absent. Before this work the
 word "skill" did not appear in the script at all.
 """
 
-import shutil
 import subprocess
 import tempfile
 import unittest
@@ -99,6 +98,21 @@ class TestSkillValidation(unittest.TestCase):
             combined = result.stdout + result.stderr
             self.assertNotIn("Traceback", combined, combined)
             self.assertNotIn("AttributeError", combined, combined)
+
+    def test_scans_yml_extension_bundles(self):
+        # validate.yml globbed *.yaml AND *.yml; the local validator must too,
+        # or a .yml bundle's missing skill bypasses the pre-merge check.
+        with tempfile.TemporaryDirectory() as tmp:
+            repo = Path(tmp)
+            base_plugin(repo)
+            write(
+                repo / "registry" / "bundles" / "legacy.yml",
+                "id: legacy\nskills:\n  - gone-skill\n"
+                "targets:\n  claude:\n    enabled: true\n    pluginName: test\n",
+            )
+            result = run_validate(repo)
+            self.assertNotEqual(result.returncode, 0, result.stdout + result.stderr)
+            self.assertIn("gone-skill", result.stdout + result.stderr)
 
 
 if __name__ == "__main__":

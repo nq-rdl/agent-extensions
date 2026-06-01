@@ -54,6 +54,17 @@ class TestUnresolvedRefs(unittest.TestCase):
             self.assertEqual(problems[0].kind, "agent")
             self.assertEqual(problems[0].name, "ghost-agent")
 
+    def test_scans_yml_extension_bundles(self):
+        # The original validate.yml globbed *.yaml AND *.yml; the extracted
+        # checker must too, or a .yml bundle silently bypasses validation.
+        with tempfile.TemporaryDirectory() as tmp:
+            repo = make_repo(tmp)
+            (repo / "registry" / "bundles" / "legacy.yml").write_text(
+                "id: legacy\nskills:\n  - ghost\n"
+            )
+            problems = check_bundle_refs.find_unresolved_refs(repo)
+            self.assertEqual([p.name for p in problems], ["ghost"])
+
     def test_returns_empty_when_all_refs_resolve(self):
         with tempfile.TemporaryDirectory() as tmp:
             repo = make_repo(
