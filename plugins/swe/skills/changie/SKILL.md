@@ -98,7 +98,7 @@ changie new --interactive=false --kind Fixed \
 | `New \`copilot-sdk\` skill for building GitHub Copilot extensions in Go — brings the full Copilot SDK API surface into your coding assistant` | ✅ Good | Em-dash elaboration, specific benefit |
 | `Fixes crash when \`extract\` runs on empty PDFs — previously silently produced an empty file (#42)` | ✅ Good | Present tense, backtick, em-dash "so what", issue ref |
 | `Added changie skill with SKILL.md and references dir` | ❌ Bad | Commit message voice, no backtick, no user benefit |
-| `Updated the opencode skill to fix a bug where sessions would not terminate correctly.` | ❌ Bad | Passive voice, trailing period, vague |
+| `Updated the jules skill to fix a bug where sessions would not terminate correctly.` | ❌ Bad | Passive voice, trailing period, vague |
 | `Fixed bug` | ❌ Bad | No context, not actionable |
 | `Fixes crash when \`extract\` runs on empty PDFs — also fixes broken retry logic in \`upload\`` | ❌ Bad | Two logical fixes fused with "also" — Rule #1 violation; split into two `changie new` calls |
 | `Fixes crash when \`extract\` runs on empty PDFs` (+ separate) `Fixes broken retry logic in \`upload\`` | ✅ Good | Each fix is its own fragment — two calls, two bullets in the release note |

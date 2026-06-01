@@ -35,7 +35,7 @@ claude plugin install swe@rdl
 claude plugin install dev-tools@rdl
 ```
 
-Then launch `claude` and type `/` — confirm the expected skills appear (e.g. `/swe:tdd`, `/swe:changie`, `/dev-tools:cc-hook`).
+Then launch `claude` and type `/` — confirm the expected skills appear (e.g. `/swe:go-secure`, `/swe:changie`, `/dev-tools:cc-hook`).
 
 You can also verify from the CLI without entering the REPL:
 

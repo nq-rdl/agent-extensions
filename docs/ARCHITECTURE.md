@@ -93,7 +93,7 @@ owners:
 channels:
   - stable
 skills:                        # resolved from skills/<name>/
-  - tdd
+  - go-naming
   - go-secure
 agents:                        # resolved from agents/<name>/agent.md
   - debug

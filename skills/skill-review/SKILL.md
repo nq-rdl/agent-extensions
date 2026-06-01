@@ -23,7 +23,7 @@ The key insight: **you don't need to read a transcript file** — you ARE in the
 
 Before spawning the reviewer, write a structured context block. Include:
 
-- **Touched skills**: which skill directories were created, modified, or discussed (be specific: `skills/charm-tui/`, `skills/pdf/`)
+- **Touched skills**: which skill directories were created, modified, or discussed (be specific: `skills/charm-tui/`, `skills/changie/`)
 - **Changes made**: new files, edits, key decisions taken
 - **Corrections made**: anything the user had to correct — wrong API names, outdated commands, broken patterns. These are the most valuable findings.
 - **APIs and patterns used**: specific function names, CLI flags, versions that came up and worked

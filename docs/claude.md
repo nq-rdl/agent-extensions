@@ -19,11 +19,9 @@ plugins/
     .claude-plugin/
       plugin.json            ← plugin manifest
     skills/
-      tdd -> ../../../skills/skills/tdd
+      changie -> ../../../skills/skills/changie
       go-secure -> ../../../skills/skills/go-secure
   infra/
-    ...
-  dataops/
     ...
   informatics/
     ...
@@ -57,21 +55,20 @@ Claude Code requires `.claude-plugin/marketplace.json` at the **repository root*
 /plugin install informatics@rdl
 
 # Use a skill (namespaced by plugin)
-/swe:tdd
+/swe:go-secure
 /infra:ansible
 ```
 
 ## Bundles
 
-Skills are split into 6 bundles so users install only what they need:
+Skills are split into bundles so users install only what they need:
 
 | Bundle | Skills | Focus |
 |--------|--------|-------|
-| swe | 7 | TDD, Go, CI/CD, changelogs |
+| swe | 8 | Go, CI/CD, changelogs, secrets |
 | infra | 4 | Ansible, git hooks, StarRocks |
-| dataops | 5 | CSV, Excel, PDF, Word, design |
 | informatics | 12 | R, Shiny, Quarto, CRAN |
-| dev-tools | 11 | Agent dispatch, Jules, link checking |
+| dev-tools | 7 | Multi-agent teams, Jules, link checking |
 | meta | 2 | Skill review, issue reporting |
 
 See [Bundles](bundles.md) for the full skill list per bundle.
@@ -90,7 +87,7 @@ When skills are updated in the `nq-rdl/agent-skills` submodule:
 Claude Code's marketplace supports fine-grained install and uninstall. Splitting into bundles means:
 
 - Users keep their environment lean — install only the bundles relevant to their work
-- Skills are namespaced by bundle (`/swe:tdd`, `/infra:ansible`) which helps discoverability
+- Skills are namespaced by bundle (`/swe:go-secure`, `/infra:ansible`) which helps discoverability
 - Bundles can be versioned independently in the future
 
 ## Validation
