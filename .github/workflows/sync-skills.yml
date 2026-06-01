@@ -25,6 +25,11 @@ jobs:
       # not run on:pull_request workflows for events raised by GITHUB_TOKEN, so
       # the previous version's sync PRs landed with ZERO CI — letting registry
       # drift (issue #100) merge unchecked. Reuses the release app credentials.
+      #
+      # REQUIRED APP PERMISSIONS: the RELEASE_APP GitHub App installation must
+      # grant BOTH "Contents: write" and "Pull requests: write". release.yml
+      # only exercises Contents (push + create release), so the Pull-requests
+      # grant may be missing — without it `gh pr create` below returns HTTP 403.
       - name: Generate app token
         id: app-token
         uses: actions/create-github-app-token@v3
@@ -104,6 +109,15 @@ jobs:
           TAG: ${{ steps.release.outputs.tag }}
         run: |
           BRANCH="chore/sync-skills-${TAG}"
+
+          # Idempotency: the branch name is deterministic, so a duplicate trigger
+          # for the same tag must not fail `git push` (which would fail the job
+          # and open a spurious "sync failed" tracking issue). Skip cleanly if the
+          # branch already exists on the remote.
+          if git ls-remote --exit-code origin "$BRANCH" >/dev/null 2>&1; then
+            echo "Branch $BRANCH already exists — duplicate trigger for $TAG; skipping."
+            exit 0
+          fi
 
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"

@@ -32,11 +32,18 @@ def classify_skill_changes(name_status_lines) -> dict:
         parts = line.split("\t") if "\t" in line else line.split(None, 1)
         if len(parts) < 2:
             continue
-        status, path = parts[0], parts[1]
-        segs = path.split("/")
-        if len(segs) < 2 or segs[0] != "skills":
-            continue
-        statuses.setdefault(segs[1], set()).add(status[0])
+        status = parts[0]
+        # Renames/copies are emitted as "R100\told\tnew" — count the old path as
+        # removed and the new path as added, not the rename char against one path.
+        if status[0] in ("R", "C") and len(parts) >= 3:
+            path_statuses = [(parts[1], "D"), (parts[2], "A")]
+        else:
+            path_statuses = [(parts[1], status[0])]
+        for path, char in path_statuses:
+            segs = path.split("/")
+            if len(segs) < 2 or segs[0] != "skills":
+                continue
+            statuses.setdefault(segs[1], set()).add(char)
 
     added, removed, modified = [], [], []
     for name, st in statuses.items():

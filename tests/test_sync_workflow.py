@@ -40,6 +40,12 @@ class TestSyncWorkflowHardening(unittest.TestCase):
     def test_flags_drift_with_checker(self):
         self.assertIn("check_bundle_refs.py", self.raw)
 
+    def test_guards_against_duplicate_branch_on_retrigger(self):
+        # The branch name is deterministic (chore/sync-skills-<tag>); a second
+        # trigger for the same tag must not fail the push and open a spurious
+        # "sync failed" issue. An idempotency guard checks the remote first.
+        self.assertIn("ls-remote", self.raw)
+
 
 if __name__ == "__main__":
     unittest.main()

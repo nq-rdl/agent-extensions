@@ -83,6 +83,23 @@ class TestSkillValidation(unittest.TestCase):
             result = run_validate(repo)
             self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
 
+    def test_does_not_crash_when_claude_target_is_null(self):
+        # `targets: {claude: null}` (a bare `claude:` key) must not crash the
+        # inline Python with AttributeError — dict.get(k, {}) returns None, not
+        # {}, when the key is present with a null value (audit/verify #1).
+        with tempfile.TemporaryDirectory() as tmp:
+            repo = Path(tmp)
+            base_plugin(repo)
+            write(repo / "skills" / "ok" / "SKILL.md", "---\nname: ok\n---\n")
+            write(
+                repo / "registry" / "bundles" / "test.yaml",
+                "id: test\nskills:\n  - ok\ntargets:\n  claude:\n",
+            )
+            result = run_validate(repo)
+            combined = result.stdout + result.stderr
+            self.assertNotIn("Traceback", combined, combined)
+            self.assertNotIn("AttributeError", combined, combined)
+
 
 if __name__ == "__main__":
     unittest.main()

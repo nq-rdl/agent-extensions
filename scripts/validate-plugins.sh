@@ -255,8 +255,11 @@ for bundle in sorted((repo / "registry" / "bundles").glob("*.yaml")):
     with bundle.open() as f:
         data = yaml.safe_load(f) or {}
     bundle_id = data.get("id") or bundle.stem
-    claude_enabled = (data.get("targets") or {}).get("claude", {}).get("enabled")
-    plugin_name = (data.get("targets") or {}).get("claude", {}).get("pluginName") or bundle_id
+    # Use `or {}` (not .get(k, {})) so a bare `claude:` (null value) does not
+    # crash with AttributeError — .get returns None for a present-but-null key.
+    claude = (data.get("targets") or {}).get("claude") or {}
+    claude_enabled = claude.get("enabled")
+    plugin_name = claude.get("pluginName") or bundle_id
 
     for name in data.get("agents") or []:
         src = repo / "agents" / name / "agent.md"

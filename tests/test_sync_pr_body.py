@@ -34,6 +34,14 @@ class TestClassify(unittest.TestCase):
         self.assertEqual(changes["removed"], ["csv"])
         self.assertEqual(changes["modified"], ["changie"])
 
+    def test_rename_counts_old_as_removed_and_new_as_added(self):
+        # `git diff --name-status` emits a rename as: R100\told\tnew
+        lines = ["R100\tskills/csv/SKILL.md\tskills/csv-v2/SKILL.md"]
+        changes = sync_pr_body.classify_skill_changes(lines)
+        self.assertEqual(changes["removed"], ["csv"])
+        self.assertEqual(changes["added"], ["csv-v2"])
+        self.assertEqual(changes["modified"], [])
+
 
 class TestRender(unittest.TestCase):
     def _changes(self):
