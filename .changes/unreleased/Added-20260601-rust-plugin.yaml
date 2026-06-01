@@ -1,0 +1,3 @@
+kind: Added
+body: New `rust` plugin exposing the `rust-explain` skill as `/rust:rust-explain` — a tutor for reading, navigating, and sanity-checking unfamiliar Rust code (lifetimes, traits, `unsafe`, numeric crates). Synced from agent-skills@v0.9.0.
+time: 2026-06-01T19:29:30.198717819+10:00
