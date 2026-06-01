@@ -88,13 +88,22 @@ bash scripts/validate-plugins.sh plugins/swe/hooks/hooks.json
 # editing an agent or syncing skills from upstream.
 bash scripts/sync-plugins.sh           # all bundles
 bash scripts/sync-plugins.sh swe       # one bundle
+
+# Bundle reference + three-way consistency checks (also run by validate.yml)
+python3 scripts/check_bundle_refs.py .   # registry refs resolve to skills/ & agents/
+python3 scripts/check_consistency.py .   # bundle <-> marketplace.json <-> plugins/ agree
+
+# Unit tests for the pipeline scripts (zero deps beyond python3 + pyyaml)
+python3 -m unittest discover -s tests -p 'test_*.py'
 ```
 
 CI runs `validate.yml` on every PR/push to main. It checks:
-- Bundle YAML skill references resolve to `skills/<name>/`
+- Bundle YAML skill references resolve to `skills/<name>/` (`scripts/check_bundle_refs.py`)
 - Bundle YAML agent references resolve to `agents/<name>/agent.md`
-- Plugin manifests, hooks, and `.mcp.json` wiring are valid (`scripts/validate-plugins.sh`)
+- Registry bundles, `marketplace.json`, and `plugins/` dirs stay in lockstep (`scripts/check_consistency.py`)
+- Plugin manifests, hooks, skills, and `.mcp.json` wiring are valid (`scripts/validate-plugins.sh`)
 - Every `agents/<name>/agent.md` has frontmatter `name` + `description`
+- The pipeline scripts' unit tests pass (`tests/`)
 
 ## Testing instructions
 

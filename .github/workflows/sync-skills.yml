@@ -20,11 +20,33 @@ jobs:
     name: Sync skills
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v6
+      # A GitHub App token (not the default GITHUB_TOKEN) is required so the
+      # pull request this job opens actually triggers validate.yml. GitHub does
+      # not run on:pull_request workflows for events raised by GITHUB_TOKEN, so
+      # the previous version's sync PRs landed with ZERO CI — letting registry
+      # drift (issue #100) merge unchecked. Reuses the release app credentials.
+      #
+      # REQUIRED APP PERMISSIONS: the RELEASE_APP GitHub App installation must
+      # grant BOTH "Contents: write" and "Pull requests: write". release.yml
+      # only exercises Contents (push + create release), so the Pull-requests
+      # grant may be missing — without it `gh pr create` below returns HTTP 403.
+      - name: Generate app token
+        id: app-token
+        uses: actions/create-github-app-token@v3
+        with:
+          app-id: ${{ vars.RELEASE_APP_ID }}
+          private-key: ${{ secrets.RELEASE_APP_PRIVATE_KEY }}
+
+      - name: Check out code
+        uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+          token: ${{ steps.app-token.outputs.token }}
 
       - name: Determine release tag
         id: release
         env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           DISPATCH_TAG: ${{ github.event.client_payload.tag }}
           INPUT_TAG: ${{ github.event.inputs.tag }}
         run: |
@@ -68,22 +90,34 @@ jobs:
       - name: Check for changes
         id: changes
         run: |
-          if git diff --quiet skills/ plugins/; then
+          # `git status --porcelain` reports untracked files, unlike a plain
+          # tracked-only diff check — so a sync that only ADDS new skill
+          # directories is no longer silently skipped (audit #5).
+          if [ -z "$(git status --porcelain skills/ plugins/)" ]; then
             echo "changed=false" >> "$GITHUB_OUTPUT"
             echo "No skill changes detected"
           else
             echo "changed=true" >> "$GITHUB_OUTPUT"
             echo "Skill changes detected:"
-            git diff --stat skills/ plugins/
+            git status --short skills/ plugins/ | head -50
           fi
 
       - name: Create pull request
         if: steps.changes.outputs.changed == 'true'
         env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_TOKEN: ${{ steps.app-token.outputs.token }}
           TAG: ${{ steps.release.outputs.tag }}
         run: |
           BRANCH="chore/sync-skills-${TAG}"
+
+          # Idempotency: the branch name is deterministic, so a duplicate trigger
+          # for the same tag must not fail `git push` (which would fail the job
+          # and open a spurious "sync failed" tracking issue). Skip cleanly if the
+          # branch already exists on the remote.
+          if git ls-remote --exit-code origin "$BRANCH" >/dev/null 2>&1; then
+            echo "Branch $BRANCH already exists — duplicate trigger for $TAG; skipping."
+            exit 0
+          fi
 
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
@@ -94,16 +128,24 @@ jobs:
 
           git push -u origin "$BRANCH"
 
-          BODY=$(cat <<EOF
-          Automated sync of skill directories from [nq-rdl/agent-skills@${TAG}](https://github.com/nq-rdl/agent-skills/releases/tag/${TAG}).
+          # Detect registry drift: bundles still referencing skills that were
+          # removed upstream. The plugin trees are auto-pruned by sync-plugins.sh,
+          # but the human-curated registry is NOT auto-edited — instead we surface
+          # exactly what to reconcile in the PR body. validate-bundles (which now
+          # runs on this PR via the app token) is the hard gate that blocks merge.
+          DRIFT="$(python3 scripts/check_bundle_refs.py . 2>&1 1>/dev/null \
+            | sed -E 's/^::error[^:]*:: *//' \
+            | grep -v 'unresolved bundle reference' || true)"
 
-          Changes: $(git diff --stat HEAD~1)
-          EOF
-          )
+          # Build a concise PR body (added/removed/modified skills + drift),
+          # instead of dumping a 60k-line `git diff --stat` that can exceed
+          # GitHub's 65,536-char body limit (audit #6).
+          git diff --name-status HEAD~1 HEAD \
+            | SYNC_DRIFT="$DRIFT" python3 scripts/sync_pr_body.py "$TAG" > /tmp/pr-body.md
 
           gh pr create \
             --title "chore(skills): sync from agent-skills@${TAG}" \
-            --body "$BODY" \
+            --body-file /tmp/pr-body.md \
             --label "dependencies"
 
   notify-failure:

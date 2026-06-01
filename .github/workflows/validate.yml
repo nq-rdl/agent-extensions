@@ -11,7 +11,7 @@ permissions:
 
 jobs:
   validate-bundles:
-    name: Validate bundle skill + agent references
+    name: Validate bundle references + registry consistency
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v6
@@ -19,39 +19,13 @@ jobs:
       - name: Install PyYAML
         run: python3 -m pip install --user pyyaml
 
+      # Logic lives in tested, importable scripts (tests/test_check_*.py) rather
+      # than inline here, so it is unit-tested and reused by sync-skills.yml.
       - name: Check bundle references resolve
-        run: |
-          python3 <<'PY'
-          import sys
-          from pathlib import Path
-          import yaml
+        run: python3 scripts/check_bundle_refs.py .
 
-          repo = Path(".")
-          bundles_dir = repo / "registry" / "bundles"
-          bundles = sorted(list(bundles_dir.glob("*.yaml")) + list(bundles_dir.glob("*.yml")))
-          if not bundles:
-              print("No bundle manifests to validate")
-              sys.exit(0)
-
-          exit_code = 0
-          for bundle in bundles:
-              print(f"Checking {bundle}")
-              with bundle.open() as f:
-                  data = yaml.safe_load(f) or {}
-              for name in data.get("skills") or []:
-                  if not (repo / "skills" / name).is_dir():
-                      print(f"::error file={bundle}::Skill '{name}' not found in skills/")
-                      exit_code = 1
-                  else:
-                      print(f"  ✓ skill:{name}")
-              for name in data.get("agents") or []:
-                  if not (repo / "agents" / name / "agent.md").is_file():
-                      print(f"::error file={bundle}::Agent '{name}' not found at agents/{name}/agent.md")
-                      exit_code = 1
-                  else:
-                      print(f"  ✓ agent:{name}")
-          sys.exit(exit_code)
-          PY
+      - name: Check registry / marketplace / plugins consistency
+        run: python3 scripts/check_consistency.py .
 
   validate-symlinks:
     name: Validate skill + agent symlinks
@@ -92,3 +66,15 @@ jobs:
 
       - name: Validate plugin manifests, hooks, and agents
         run: scripts/validate-plugins.sh
+
+  unit-tests:
+    name: Unit tests (pipeline scripts)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Install PyYAML
+        run: python3 -m pip install --user pyyaml
+
+      - name: Run pipeline-script unit tests
+        run: python3 -m unittest discover -s tests -p 'test_*.py' -v

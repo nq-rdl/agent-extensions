@@ -1,0 +1,3 @@
+kind: Fixed
+body: Hardened the agent-skills sync pipeline so issue #100-class drift cannot merge unnoticed. Sync PRs are now opened via a GitHub App token so `validate.yml` actually runs on them (bot-token PRs previously received zero CI); the PR body is a concise added/removed/modified summary with a drift callout instead of a 60k-line diff dump; change detection uses `git status --porcelain` so additions-only syncs are not skipped; `sync-plugins.sh` prunes stale plugin copies of upstream-removed skills; `validate-plugins.sh` now validates skill references and plugin copies; and a new `check_consistency.py` enforces registry↔marketplace↔plugins agreement. Pipeline logic is extracted into unit-tested scripts (`tests/`).
+time: 2026-06-01T19:59:11.057845559+10:00

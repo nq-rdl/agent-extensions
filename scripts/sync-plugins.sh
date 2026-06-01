@@ -124,8 +124,21 @@ for bundle_file in bundle_files:
     skills = list(data.get("skills") or [])
     agents = list(data.get("agents") or [])
 
-    prune_entries(repo / "plugins" / plugin / "skills", set(skills))
-    prune_entries(repo / "plugins" / plugin / "agents", {f"{a}.md" for a in agents})
+    # Keep set = registry entries that still have a canonical source. A skill or
+    # agent removed upstream but still listed in the bundle has no source, so its
+    # stale plugin copy is pruned here (and sync_skill/sync_agent below warns
+    # about the dangling registry reference). Building `keep` from the raw
+    # registry list instead would preserve orphaned copies forever — the issue
+    # #100 failure mode (audit finding #2).
+    present_skills = [s for s in skills if (repo / "skills" / s).is_dir()]
+    present_agents = [
+        a for a in agents if (repo / "agents" / a / "agent.md").is_file()
+    ]
+
+    prune_entries(repo / "plugins" / plugin / "skills", set(present_skills))
+    prune_entries(
+        repo / "plugins" / plugin / "agents", {f"{a}.md" for a in present_agents}
+    )
 
     for skill in skills:
         sync_skill(plugin, skill, bundle_file)

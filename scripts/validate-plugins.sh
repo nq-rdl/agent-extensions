@@ -251,12 +251,16 @@ def err(path, msg):
     print(f"::error file={path}::{msg}", file=sys.stderr)
     fail = True
 
-for bundle in sorted((repo / "registry" / "bundles").glob("*.yaml")):
+_bundles_dir = repo / "registry" / "bundles"
+for bundle in sorted(list(_bundles_dir.glob("*.yaml")) + list(_bundles_dir.glob("*.yml"))):
     with bundle.open() as f:
         data = yaml.safe_load(f) or {}
     bundle_id = data.get("id") or bundle.stem
-    claude_enabled = (data.get("targets") or {}).get("claude", {}).get("enabled")
-    plugin_name = (data.get("targets") or {}).get("claude", {}).get("pluginName") or bundle_id
+    # Use `or {}` (not .get(k, {})) so a bare `claude:` (null value) does not
+    # crash with AttributeError — .get returns None for a present-but-null key.
+    claude = (data.get("targets") or {}).get("claude") or {}
+    claude_enabled = claude.get("enabled")
+    plugin_name = claude.get("pluginName") or bundle_id
 
     for name in data.get("agents") or []:
         src = repo / "agents" / name / "agent.md"
@@ -266,6 +270,19 @@ for bundle in sorted((repo / "registry" / "bundles").glob("*.yaml")):
             link = repo / "plugins" / plugin_name / "agents" / f"{name}.md"
             if not link.exists():
                 err(bundle, f"Agent '{name}' declared for Claude target but missing symlink plugins/{plugin_name}/agents/{name}.md")
+
+    # Skills: declared bundle skills must resolve to a canonical source and (for
+    # Claude targets) to a self-contained plugin copy. Without this, the issue
+    # #100 scenario — registry references a skill removed upstream — passes the
+    # local `validate-plugins.sh` pre-merge check silently (audit finding #3).
+    for name in data.get("skills") or []:
+        src = repo / "skills" / name
+        if not src.is_dir():
+            err(bundle, f"Skill '{name}' declared but missing source dir skills/{name}/")
+        elif claude_enabled:
+            copy = repo / "plugins" / plugin_name / "skills" / name
+            if not copy.is_dir():
+                err(bundle, f"Skill '{name}' declared for Claude target but missing plugin copy plugins/{plugin_name}/skills/{name}/")
 
     mcp_json = repo / "plugins" / plugin_name / ".mcp.json"
     declared_mcp = data.get("mcp") or []
