@@ -1,14 +1,12 @@
 schemaVersion: v1
 id: swe
 displayName: SWE
-description: Software engineering — TDD, secure Go, naming, CI/CD, changelogs.
+description: Software engineering — secure Go, naming, CI/CD, changelogs, secrets.
 owners:
   - rdl
 channels:
   - stable
 skills:
-  - tdd
-  - tdd-team-workflow
   - go-secure
   - go-naming
   - go-gh

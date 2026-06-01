@@ -1,0 +1,3 @@
+kind: Removed
+body: Retired the `dataops` bundle — its six skills (csv, xlsx, pdf, docx, canvas-design, duckdb) were removed upstream in agent-skills@v0.9.0 — and trimmed `dispatch`/`opencode` from `dev-tools` and `tdd`/`tdd-team-workflow` from `swe`. Reconciles the registry, marketplace, plugin trees, and docs so `validate-bundles` is green again (#100).
+time: 2026-06-01T20:06:57.267137403+10:00

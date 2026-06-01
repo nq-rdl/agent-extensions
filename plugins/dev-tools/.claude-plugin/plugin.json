@@ -1,7 +1,7 @@
 {
   "name": "dev-tools",
   "version": "0.8.0",
-  "description": "Developer tools — agent dispatch, multi-agent teams, link checking, docs",
+  "description": "Developer tools — multi-agent teams, Jules dispatch, link checking, docs",
   "author": {
     "name": "nq-rdl"
   },

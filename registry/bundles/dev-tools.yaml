@@ -1,7 +1,7 @@
 schemaVersion: v1
 id: dev-tools
 displayName: Dev Tools
-description: Developer tools — agent dispatch, multi-agent teams, link checking, docs.
+description: Developer tools — multi-agent teams, Jules dispatch, link checking, docs.
 owners:
   - rdl
 channels:
@@ -9,11 +9,9 @@ channels:
 skills:
   - cc-agent-teams
   - cc-hook
-  - dispatch
   - document-release
   - jules
   - jules-dispatch-creator
-  - opencode
   - lychee
   - writerside
 agents:

@@ -22,7 +22,7 @@ Skills are distributed as separate plugin bundles. Install the bundles you need:
 
 ## swe
 
-Software engineering — TDD, secure Go, naming, CI/CD, changelogs.
+Software engineering — secure Go, naming, CI/CD, changelogs, secrets.
 
 ```bash
 /plugin install swe@rdl
@@ -30,8 +30,6 @@ Software engineering — TDD, secure Go, naming, CI/CD, changelogs.
 
 | Skill | Description |
 |-------|-------------|
-| tdd | Test-driven development concepts, cycle, and anti-patterns |
-| tdd-team-workflow | TDD orchestration — red→green→refactor→review cycle with subagents |
 | go-secure | Secure Go error handling and information leakage prevention |
 | go-naming | Go naming conventions and idiomatic identifier choices |
 | go-gh | GitHub Actions CI/CD for Go projects |
@@ -54,24 +52,6 @@ Infrastructure — Ansible, git hooks, analytical databases.
 | husky | Manage Git hooks with husky v9 |
 | lefthook | Git hooks management with Lefthook for Go and polyglot projects |
 | starrocks | StarRocks analytical data warehouse — SQL, table design, partition and bucket strategies |
-
----
-
-## dataops
-
-Data operations — CSV, Excel, PDF, Word, design documents.
-
-```bash
-/plugin install dataops@rdl
-```
-
-| Skill | Description |
-|-------|-------------|
-| csv | Scan, update, validate, or summarise pipe-delimited CSV extraction sheets |
-| xlsx | Read, write, edit, or fix Excel spreadsheet files |
-| pdf | Extract text, tables, or data from PDF files, especially academic papers |
-| docx | Create, read, edit, or manipulate Word documents (.docx) |
-| canvas-design | Create visual art in .png and .pdf documents using design philosophy |
 
 ---
 
@@ -102,7 +82,7 @@ R ecosystem — package dev, Shiny, Quarto, testing, CRAN.
 
 ## dev-tools
 
-Developer tools — agent dispatch, multi-agent teams, link checking, docs.
+Developer tools — multi-agent teams, Jules dispatch, link checking, docs.
 
 ```bash
 /plugin install dev-tools@rdl
@@ -112,11 +92,9 @@ Developer tools — agent dispatch, multi-agent teams, link checking, docs.
 |-------|-------------|
 | cc-agent-teams | Claude Code agent teams — coordinate multiple independent sessions in parallel |
 | cc-hook | Create, manage, and debug Claude Code hooks — event-driven scripts |
-| dispatch | Route tasks to external coding backends (fan out, offload) |
 | document-release | Post-ship documentation update for README, ARCHITECTURE, CHANGELOG, etc. |
 | jules | Dispatch tasks to Jules AI coding sessions |
 | jules-dispatch-creator | Set up and configure Jules GitHub Actions dispatch workflows |
-| opencode | OpenCode CLI — agent config, custom tools, MCP servers, and plugins |
 | lychee | Fast link checker for documentation, READMEs, and markdown files |
 | writerside | JetBrains Writerside documentation topics, markup tags, and projects |
 
