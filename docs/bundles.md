@@ -100,6 +100,20 @@ R ecosystem — package dev, Shiny, Quarto, testing, CRAN.
 
 ---
 
+## rust
+
+Rust — read & navigate unfamiliar Rust code, explain constructs, sanity-check correctness.
+
+```bash
+/plugin install rust@rdl
+```
+
+| Skill | Description |
+|-------|-------------|
+| rust-explain | Read & navigate unfamiliar Rust — ownership, lifetimes, traits, `unsafe`/FFI, macros, and numeric crates; correctness sanity-checks |
+
+---
+
 ## dev-tools
 
 Developer tools — agent dispatch, multi-agent teams, link checking, docs.
