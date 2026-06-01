@@ -1,0 +1,18 @@
+schemaVersion: v1
+id: rust
+displayName: Rust
+description: Rust — read & navigate unfamiliar Rust code, explain constructs, sanity-check correctness.
+owners:
+  - rdl
+channels:
+  - stable
+skills:
+  - rust-explain
+hooks: []
+prompts: []
+mcp: []
+targets:
+  claude:
+    enabled: true
+    pluginName: rust
+    marketplaceName: rdl

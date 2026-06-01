@@ -59,6 +59,18 @@
       ]
     },
     {
+      "name": "rust",
+      "source": "./plugins/rust",
+      "description": "Rust — read & navigate unfamiliar Rust code, explain constructs, sanity-check correctness",
+      "version": "0.8.0",
+      "keywords": [
+        "rust",
+        "explain",
+        "ownership",
+        "borrow-checker"
+      ]
+    },
+    {
       "name": "dev-tools",
       "source": "./plugins/dev-tools",
       "description": "Developer tools — agent dispatch, multi-agent teams, link checking, docs",
