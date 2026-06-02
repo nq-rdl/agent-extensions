@@ -1,0 +1,3 @@
+kind: Added
+body: 'Skill bundles can now group members as `<group>/<leaf>` (e.g. `go/gh`): `sync-plugins.sh` copies `skills/<group>/<leaf>/` into `plugins/<group>/skills/<leaf>/`, dropping the group prefix so Claude Code invokes `<plugin>:<leaf>`. Flat members are unchanged (verified no-diff). New `scripts/check_grouping.py` enforces the contract (name==leaf, group==pluginName, unique pluginName, no duplicate leaf). Phase 2 of the subject-grouping migration (#102, agent-skills#118).'
+time: 2026-06-02T21:52:01.996785838+10:00
