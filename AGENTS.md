@@ -24,16 +24,19 @@ agents/           ← canonical agents (authored here)
     agent.md
 plugins/          ← Claude Code plugins, one per bundle (SELF-CONTAINED — real files)
   <bundle>/
-    .claude-plugin/plugin.json
-    skills/<name>/       ← real-file copy of skills/<name>/
+    .claude-plugin/plugin.json  ← GENERATED (scripts/generate_manifests.py)
+    skills/<leaf>/       ← real-file copy of skills/<…>/<leaf>/ (group prefix dropped)
     agents/<name>.md     ← real-file copy of agents/<name>/agent.md
 registry/
-  bundles/*.yaml  ← single source of truth: which skills/agents belong to which bundle
+  bundles/*.yaml   ← single source of truth: skills/agents/keywords per bundle
+  marketplace.yaml ← marketplace metadata, plugin defaults, display order, external
+                     passthrough entries, and the rdl meta-plugin config
+VERSION           ← single version source; stamped into every generated manifest
 mcp/
   <name>-go/      ← Go MCP servers, built to plugins/<bundle>/bin/mcp/
 hooks/            ← Claude Code hook shell scripts + JSON config
 .claude-plugin/
-  marketplace.json ← Claude Code marketplace manifest (repo root, points at ./plugins/<bundle>)
+  marketplace.json ← GENERATED Claude Code marketplace manifest (repo root)
 ```
 
 ### How skills and agents flow into plugins
@@ -45,6 +48,8 @@ To make installs self-contained, `plugins/<bundle>/skills/<name>/` and `plugins/
 - **Edit canonical content** under `skills/<name>/` (vendored from upstream) or `agents/<name>/agent.md` (authored here).
 - **Refresh plugin trees** by running `bash scripts/sync-plugins.sh` (or pass a bundle name to scope it). The script reads `registry/bundles/<b>.yaml`, removes any stale copies, and rewrites `plugins/<b>/skills/<name>/` and `plugins/<b>/agents/<name>.md` from the canonical sources.
 - **CI** validates that every bundle YAML reference resolves and that every plugin manifest is well-formed. See `scripts/validate-plugins.sh`.
+
+**Grouped skills.** A bundle skill member is either flat (`go-gh`) or grouped (`go/gh`, when the upstream skill lives at `skills/go/gh/SKILL.md`). `sync-plugins.sh` copies `skills/<group>/<leaf>/` → `plugins/<group>/skills/<leaf>/`, **dropping the `<group>/` prefix**, so the plugin tree stays one level deep and Claude Code invokes `<pluginName>:<leaf>`. Grouping is authored upstream by folder layout — see `CONTRIBUTING.md` for the rules and `scripts/check_grouping.py` for the enforced contract.
 
 When the upstream skills repo releases, `sync-skills.yml` pulls the new content into `skills/`, runs `sync-plugins.sh`, and opens a PR with both `skills/` and `plugins/` changes in the same commit.
 
@@ -89,8 +94,15 @@ bash scripts/validate-plugins.sh plugins/swe/hooks/hooks.json
 bash scripts/sync-plugins.sh           # all bundles
 bash scripts/sync-plugins.sh swe       # one bundle
 
-# Bundle reference + three-way consistency checks (also run by validate.yml)
+# Regenerate plugin.json + marketplace.json from the registry. These manifests
+# are GENERATED — never hand-edit them. Run after changing a bundle's
+# description/keywords, marketplace.yaml, or VERSION.
+python3 scripts/generate_manifests.py .          # write manifests
+python3 scripts/generate_manifests.py . --check  # CI gate: fail on drift
+
+# Bundle reference + grouping + three-way consistency checks (also run by validate.yml)
 python3 scripts/check_bundle_refs.py .   # registry refs resolve to skills/ & agents/
+python3 scripts/check_grouping.py .      # grouping contract: name==leaf, group==pluginName, …
 python3 scripts/check_consistency.py .   # bundle <-> marketplace.json <-> plugins/ agree
 
 # Unit tests for the pipeline scripts (zero deps beyond python3 + pyyaml)
@@ -100,6 +112,8 @@ python3 -m unittest discover -s tests -p 'test_*.py'
 CI runs `validate.yml` on every PR/push to main. It checks:
 - Bundle YAML skill references resolve to `skills/<name>/` (`scripts/check_bundle_refs.py`)
 - Bundle YAML agent references resolve to `agents/<name>/agent.md`
+- The skill-grouping contract holds (`scripts/check_grouping.py`)
+- Generated `plugin.json` + `marketplace.json` match the registry (`scripts/generate_manifests.py --check`)
 - Registry bundles, `marketplace.json`, and `plugins/` dirs stay in lockstep (`scripts/check_consistency.py`)
 - Plugin manifests, hooks, skills, and `.mcp.json` wiring are valid (`scripts/validate-plugins.sh`)
 - Every `agents/<name>/agent.md` has frontmatter `name` + `description`
@@ -116,6 +130,11 @@ claude --plugin-dir ./plugins/swe
 # Persistent install (workspace must stay mounted at /workspace)
 claude plugin marketplace add /workspace
 claude plugin install swe@rdl
+
+# One command installs every subject via the rdl meta-plugin (it declares each
+# subject as a dependency). Requires Claude Code ≥ 2.1.110; prune needs ≥ 2.1.121.
+claude plugin install rdl@rdl
+claude plugin uninstall rdl --prune   # remove the set + orphaned dependencies
 ```
 
 See [`docs/local-testing.md`](docs/local-testing.md) for the full walkthrough including cleanup and the symlink path caveat.
@@ -127,8 +146,10 @@ See [`docs/local-testing.md`](docs/local-testing.md) for the full walkthrough in
 ```yaml
 schemaVersion: v1
 id: swe
-skills: [go-naming, go-secure] # must exist as skills/<name>/
-agents: [debug, janitor]      # must exist as agents/<name>/agent.md
+description: Software engineering — secure Go, naming, …  # canonical (no trailing period)
+keywords: [go, ci-cd, security]   # marketplace keywords (generated into the manifests)
+skills: [go-naming, go-secure]    # flat <leaf>, or grouped <group>/<leaf>; must exist under skills/
+agents: [debug, janitor]          # must exist as agents/<name>/agent.md
 hooks: []
 targets:
   claude:
@@ -136,7 +157,9 @@ targets:
     pluginName: swe
 ```
 
-When adding a skill to a bundle: (1) add it to the YAML, (2) run `bash scripts/sync-plugins.sh <bundle>` to copy `skills/<name>/` into `plugins/<bundle>/skills/<name>/`.
+The bundle's `description` + `keywords` (plus `registry/marketplace.yaml` and `VERSION`) **generate** `plugins/<bundle>/.claude-plugin/plugin.json` and the bundle's `marketplace.json` entry — do not hand-edit those (CI `generate_manifests.py --check` enforces it). After editing a bundle's `description`/`keywords`, run `python3 scripts/generate_manifests.py .`.
+
+When adding a skill to a bundle: (1) add it to the YAML (flat `<leaf>` or grouped `<group>/<leaf>`), (2) run `bash scripts/sync-plugins.sh <bundle>` to copy `skills/<…>/<leaf>/` into `plugins/<bundle>/skills/<leaf>/`.
 
 When adding an agent to a bundle: (1) create `agents/<name>/agent.md`, (2) add it to the YAML `agents:` list, (3) run `bash scripts/sync-plugins.sh <bundle>` to copy it into `plugins/<bundle>/agents/<name>.md`.
 
@@ -158,7 +181,7 @@ Releases are triggered by pushing a `v*` tag. The tag must point to a commit alr
 
 The workflow:
 1. Verifies the tag is on `main`.
-2. Bumps versions across all manifests and commits the bump back to `main`.
+2. Writes the release version to `VERSION`, regenerates all manifests from the registry (`scripts/generate_manifests.py`), and commits the result back to `main`.
 3. Moves the tag forward to include the bump commit and creates the GitHub release.
 
 `marketplace.json` sources are relative paths (`./plugins/<bundle>`) — installs read directly from `main` (or whatever ref the user pinned), no separate release branch involved.
