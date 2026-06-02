@@ -1,0 +1,10 @@
+{
+  "name": "lucid",
+  "version": "0.6.0",
+  "description": "Lucid visual collaboration (Lucidchart / Lucidspark) via the hosted Lucid MCP server",
+  "author": {
+    "name": "nq-rdl"
+  },
+  "repository": "https://github.com/nq-rdl/agent-extensions",
+  "license": "MIT"
+}
