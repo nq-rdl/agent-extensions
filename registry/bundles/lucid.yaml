@@ -1,0 +1,21 @@
+schemaVersion: v1
+id: lucid
+displayName: Lucid
+description: Lucid — visual collaboration boards and diagrams (Lucidchart / Lucidspark) via the hosted Lucid MCP server.
+owners:
+  - rdl
+channels:
+  - stable
+skills: []
+agents: []
+hooks: []
+prompts: []
+mcp:
+  - lucid
+targets:
+  claude:
+    enabled: true
+    pluginName: lucid
+    marketplaceName: rdl
+  gemini:
+    enabled: false
