@@ -8,9 +8,10 @@
 
 | Item | Role | State |
 |---|---|---|
-| [#101](https://github.com/nq-rdl/agent-extensions/issues/101) | **Strategy** — retire domain bundles, regroup by subject | open → close on completion |
+| [#101](https://github.com/nq-rdl/agent-extensions/issues/101) | **Strategy** — retire domain bundles, regroup by subject | **closed in #108** (proposal adopted; execution tracked here + via #118) |
 | [agent-skills#118](https://github.com/nq-rdl/agent-skills/pull/118) | **Phase 1 mechanism (source side)** — upstream grouping contract + validators | PR open, **not merged**; upstream still flat |
-| [#102](https://github.com/nq-rdl/agent-extensions/issues/102) | **Phase 2 mechanism (packaging side)** — `agent-extensions` sync + packaging | open → close on completion |
+| [#102](https://github.com/nq-rdl/agent-extensions/issues/102) | **Phase 2 mechanism (packaging side)** — `agent-extensions` sync + packaging | **closed in #108** (mechanism shipped) |
+| [#109](https://github.com/nq-rdl/agent-extensions/issues/109) | **Tracker** — outstanding/deferred Phase-3 work | **closed in #108**; remaining work tracked by this spec (§5/§7) + #118 |
 | **This spec** | **Umbrella** — apply #101's policy via the #118/#102 mechanism | — |
 
 Together these meet **both** #101 and #102: the policy (this spec + `CONTRIBUTING.md`) rides on
@@ -86,8 +87,15 @@ plugins cheap to maintain (the meta-plugin's dependency list is generated too). 
 
 ### D-5 — Issues
 
-**Update #101 and #102 now** with this consolidated plan; **close both on completion** (the work
-satisfies both). Link this spec from each.
+**#101, #102, and #109 are closed in PR #108** (the mechanism PR), which ships the Phase-2
+packaging mechanism, manifest generation (D-3), and the `rdl` meta-plugin (D-1). The closures
+record the **decisions + machinery** — not a claim that the Phase-3 *content* migration has run.
+The remaining `#118`-gated work is tracked by **this spec** (§5 placement map + §7 phases, §6
+Codex task) and the upstream **`agent-skills#118`** PR — not by an open issue. This spec is linked
+from each closed issue.
+
+*(Earlier plan was to "close on completion"; superseded — the machinery shipped early in #108, so
+the issues close with it and this spec becomes the durable tracker for what's left.)*
 
 ## 5. Placement map (final, tunable)
 
@@ -117,14 +125,20 @@ the consolidation review — to remove or keep.*
 
 ## 7. Migration phases
 
+> **Status (post-#108):** PR #108 delivered the Phase-2 *mechanism* plus D-3 (manifest generation)
+> and D-1 (`rdl` meta-plugin) ahead of the content migration, and **closed #101/#102/#109** (D-5).
+> What remains is the `#118`-gated Phase-3 *content* migration below — tracked here, not by an open
+> issue. Phase 1 (`agent-skills#118`) is still unmerged, so Phase 3 has not started.
+
 1. **Phase 1 — agent-skills#118 (source):** land upstream contract + validators; pilot one group.
    **Must merge + release first.**
 2. **Phase 2 — #102 (packaging):** `sync-plugins.sh` leaf handling, grouped `sync-skills.yml`,
    `validate.yml` MF-1/MF-3, first grouped bundle. Verify flat bundles re-sync **no-diff**
    (backward compatible → incremental migration, no big-bang).
-3. **Phase 3 — #101 rollout (this spec):** migrate subjects per §5; add manifest generation (D-3)
-   + the `rdl` meta-plugin (D-1); retire domain bundles; slim `AGENTS.md` / move policy to
-   `CONTRIBUTING.md` (D-4); update + close #101/#102 (D-5).
+3. **Phase 3 — #101 rollout (this spec):** migrate subjects per §5; retire domain bundles; slim
+   `AGENTS.md` / move policy to `CONTRIBUTING.md` (D-4). (Manifest generation (D-3) and the `rdl`
+   meta-plugin (D-1) already shipped in #108; issue bookkeeping is done — see the status note above
+   and D-5.)
 
 A detailed implementation plan follows in the writing-plans step.
 
