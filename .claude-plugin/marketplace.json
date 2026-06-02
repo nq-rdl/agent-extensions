@@ -96,8 +96,8 @@
     {
       "name": "lucid",
       "source": "./plugins/lucid",
-      "description": "Lucid — visual collaboration (Lucidchart / Lucidspark) via the hosted Lucid MCP server",
-      "version": "0.6.0",
+      "description": "Lucid — visual collaboration boards and diagrams (Lucidchart / Lucidspark) via the hosted Lucid MCP server",
+      "version": "0.8.0",
       "keywords": [
         "lucid",
         "lucidchart",
@@ -119,6 +119,17 @@
         "worktree",
         "agents",
         "workflow"
+      ]
+    },
+    {
+      "name": "rdl",
+      "source": "./plugins/rdl",
+      "description": "Install the full RDL agent-extensions set — every subject plugin in one command.",
+      "version": "0.8.0",
+      "keywords": [
+        "meta",
+        "install",
+        "rdl"
       ]
     }
   ]

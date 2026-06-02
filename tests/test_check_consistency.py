@@ -93,6 +93,21 @@ class TestConsistency(unittest.TestCase):
             issues = check_consistency.find_consistency_issues(repo)
             self.assertTrue(any("orphan" in i for i in issues), issues)
 
+    def test_meta_plugin_not_flagged_as_orphan(self):
+        # The rdl meta-plugin has a marketplace entry + plugins/rdl/ dir but no
+        # content bundle by design — marketplace.yaml meta.enabled whitelists it.
+        with tempfile.TemporaryDirectory() as tmp:
+            repo = make_repo(
+                tmp,
+                bundles={"swe": bundle("swe")},
+                marketplace_plugins=[mkt("swe"), mkt("rdl")],
+                plugin_dirs=["swe", "rdl"],
+            )
+            (repo / "registry" / "marketplace.yaml").write_text(
+                "meta:\n  name: rdl\n  enabled: true\n"
+            )
+            self.assertEqual(check_consistency.find_consistency_issues(repo), [])
+
     def test_ignores_external_github_source(self):
         with tempfile.TemporaryDirectory() as tmp:
             repo = make_repo(
