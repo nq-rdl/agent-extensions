@@ -75,9 +75,17 @@ def prune_entries(parent: Path, keep: set) -> None:
         print(f"  - pruned stale {child.relative_to(repo)}")
 
 
+def leaf(member: str) -> str:
+    # A bundle skill member is either flat `<leaf>` (e.g. go-gh) or grouped
+    # `<group>/<leaf>` (e.g. go/gh). The plugin tree is always keyed by leaf —
+    # the `<group>/` prefix is dropped on copy so the tree stays one level deep
+    # and Claude Code invokes `<group>:<leaf>` (spec §3 / CONTRIBUTING §6).
+    return member.rsplit("/", 1)[-1]
+
+
 def sync_skill(plugin: str, skill: str, bundle_file: Path) -> None:
     src = repo / "skills" / skill
-    dst = repo / "plugins" / plugin / "skills" / skill
+    dst = repo / "plugins" / plugin / "skills" / leaf(skill)
     if not src.is_dir():
         warn(
             bundle_file,
@@ -131,11 +139,12 @@ for bundle_file in bundle_files:
     # registry list instead would preserve orphaned copies forever — the issue
     # #100 failure mode (audit finding #2).
     present_skills = [s for s in skills if (repo / "skills" / s).is_dir()]
+    present_skill_leaves = {leaf(s) for s in present_skills}
     present_agents = [
         a for a in agents if (repo / "agents" / a / "agent.md").is_file()
     ]
 
-    prune_entries(repo / "plugins" / plugin / "skills", set(present_skills))
+    prune_entries(repo / "plugins" / plugin / "skills", present_skill_leaves)
     prune_entries(
         repo / "plugins" / plugin / "agents", {f"{a}.md" for a in present_agents}
     )

@@ -66,5 +66,65 @@ class TestPruneStaleCopies(unittest.TestCase):
             )
 
 
+class TestGroupedMembers(unittest.TestCase):
+    """Grouped members `<group>/<leaf>` copy to plugins/<plugin>/skills/<leaf>/,
+    dropping the `<group>/` prefix so the plugin tree stays one level deep
+    (spec §3 / CONTRIBUTING §6). Flat members must stay byte-identical (no-diff)."""
+
+    def test_grouped_member_drops_group_prefix(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            repo = Path(tmp)
+            write(
+                repo / "registry" / "bundles" / "obsidian.yaml",
+                "id: obsidian\nskills:\n  - obsidian/bases\n"
+                "targets:\n  claude:\n    enabled: true\n    pluginName: obsidian\n",
+            )
+            write(repo / "skills" / "obsidian" / "bases" / "SKILL.md", "---\nname: bases\n---\n")
+            run_sync(repo)
+            self.assertTrue(
+                (repo / "plugins" / "obsidian" / "skills" / "bases" / "SKILL.md").is_file(),
+                "grouped member must land at plugins/obsidian/skills/bases/ (prefix dropped)",
+            )
+            self.assertFalse(
+                (repo / "plugins" / "obsidian" / "skills" / "obsidian").exists(),
+                "group prefix must NOT appear in the plugin tree",
+            )
+
+    def test_flat_member_unchanged(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            repo = Path(tmp)
+            write(
+                repo / "registry" / "bundles" / "swe.yaml",
+                "id: swe\nskills:\n  - go-gh\n"
+                "targets:\n  claude:\n    enabled: true\n    pluginName: swe\n",
+            )
+            write(repo / "skills" / "go-gh" / "SKILL.md", "---\nname: go-gh\n---\n")
+            run_sync(repo)
+            self.assertTrue(
+                (repo / "plugins" / "swe" / "skills" / "go-gh" / "SKILL.md").is_file(),
+                "flat member must remain at plugins/swe/skills/go-gh/ (unchanged)",
+            )
+
+    def test_grouped_prune_keys_on_leaf(self):
+        # A grouped member's stale sibling (a leaf no longer listed) must be pruned
+        # by LEAF name, since the plugin tree is keyed by leaf.
+        with tempfile.TemporaryDirectory() as tmp:
+            repo = Path(tmp)
+            write(
+                repo / "registry" / "bundles" / "obsidian.yaml",
+                "id: obsidian\nskills:\n  - obsidian/bases\n"
+                "targets:\n  claude:\n    enabled: true\n    pluginName: obsidian\n",
+            )
+            write(repo / "skills" / "obsidian" / "bases" / "SKILL.md", "---\nname: bases\n---\n")
+            # Pre-existing stale leaf copy from a removed member.
+            write(repo / "plugins" / "obsidian" / "skills" / "cli" / "SKILL.md", "x")
+            run_sync(repo)
+            self.assertTrue((repo / "plugins" / "obsidian" / "skills" / "bases").is_dir())
+            self.assertFalse(
+                (repo / "plugins" / "obsidian" / "skills" / "cli").exists(),
+                "stale leaf 'cli' must be pruned (keep-set is keyed by leaf)",
+            )
+
+
 if __name__ == "__main__":
     unittest.main()
