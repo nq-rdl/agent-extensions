@@ -64,38 +64,23 @@ jobs:
           changie batch "$version"
           changie merge
 
-      - name: Bump versions in all manifests
+      - name: Stamp version and regenerate manifests
         env:
           VERSION: ${{ steps.version.outputs.version }}
         run: |
           set -euo pipefail
+          python3 -m pip install --user pyyaml
 
-          # --- Claude marketplace: metadata.version and plugin entry versions ---
-          if [ -f .claude-plugin/marketplace.json ]; then
-            jq --arg v "$VERSION" '
-              if .metadata?.version then .metadata.version = $v else . end
-              | if .plugins then .plugins |= map(.version = $v) else . end
-            ' .claude-plugin/marketplace.json > .claude-plugin/marketplace.json.tmp
-            mv .claude-plugin/marketplace.json.tmp .claude-plugin/marketplace.json
-            echo "  ✓ .claude-plugin/marketplace.json"
-          fi
+          # Single version source: VERSION drives every generated manifest.
+          echo "$VERSION" > VERSION
 
-          # --- JSON files with a top-level version field ---
-          json_files=()
-          for f in plugins/*/.claude-plugin/plugin.json; do
-            [ -f "$f" ] && json_files+=("$f")
-          done
+          # Regenerate plugin.json + marketplace.json from the registry (D-3).
+          # Replaces the previous per-file jq version bumps — generate_manifests.py
+          # is the sole writer of these files, so versions can never drift and the
+          # metadata is reconciled from the single registry source each release.
+          python3 scripts/generate_manifests.py .
 
-          for f in "${json_files[@]}"; do
-            if [ -f "$f" ]; then
-              jq --arg v "$VERSION" '
-                if .version then .version = $v else . end
-              ' "$f" > "${f}.tmp" && mv "${f}.tmp" "$f"
-              echo "  ✓ $f"
-            fi
-          done
-
-          # --- TOML files: update version field ---
+          # --- TOML files: update version field (if present) ---
           if [ -f pyproject.toml ]; then
             sed -i "s/^version = \".*\"/version = \"${VERSION}\"/" pyproject.toml
             echo "  ✓ pyproject.toml"
