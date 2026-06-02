@@ -1,7 +1,8 @@
 schemaVersion: v1
 id: hooks
 displayName: Hooks
-description: Hooks — forced skill evaluation when prompts mention skills.
+description: Hooks — forced skill evaluation when prompts mention skills
+keywords: [hooks, skills, evaluation]
 owners:
   - rdl
 channels:

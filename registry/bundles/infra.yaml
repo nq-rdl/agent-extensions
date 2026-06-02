@@ -1,7 +1,8 @@
 schemaVersion: v1
 id: infra
 displayName: Infra
-description: Infrastructure — Ansible, git hooks, analytical databases.
+description: Infrastructure — Ansible, git hooks, analytical databases
+keywords: [ansible, git-hooks, starrocks]
 owners:
   - rdl
 channels:

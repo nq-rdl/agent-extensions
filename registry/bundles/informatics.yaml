@@ -1,7 +1,8 @@
 schemaVersion: v1
 id: informatics
 displayName: Informatics
-description: R ecosystem — package dev, Shiny, Quarto, testing, CRAN.
+description: R ecosystem — package dev, Shiny, Quarto, testing, CRAN
+keywords: [r, shiny, quarto, cran, tidyverse]
 owners:
   - rdl
 channels:

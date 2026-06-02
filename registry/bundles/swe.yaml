@@ -1,7 +1,8 @@
 schemaVersion: v1
 id: swe
 displayName: SWE
-description: Software engineering — secure Go, naming, CI/CD, changelogs, secrets.
+description: Software engineering — secure Go, naming, CI/CD, changelogs, secrets
+keywords: [go, ci-cd, security, changelog]
 owners:
   - rdl
 channels:
