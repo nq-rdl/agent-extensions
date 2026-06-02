@@ -82,6 +82,30 @@ class TestUnresolvedRefs(unittest.TestCase):
             self.assertEqual(problems[0].bundle, "named-by-file")
 
 
+class TestGroupedRefs(unittest.TestCase):
+    """A grouped member `<group>/<leaf>` resolves against skills/<group>/<leaf>/.
+    pathlib joins the slash transparently, so the resolver needs no special
+    casing — these tests lock that behavior (spec §3 / CONTRIBUTING §6)."""
+
+    def test_resolves_grouped_member(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            repo = make_repo(
+                tmp, bundles={"obsidian": "id: obsidian\nskills:\n  - obsidian/bases\n"}
+            )
+            f = repo / "skills" / "obsidian" / "bases" / "SKILL.md"
+            f.parent.mkdir(parents=True, exist_ok=True)
+            f.write_text("---\nname: bases\n---\n")
+            self.assertEqual(check_bundle_refs.find_unresolved_refs(repo), [])
+
+    def test_flags_missing_grouped_member(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            repo = make_repo(
+                tmp, bundles={"obsidian": "id: obsidian\nskills:\n  - obsidian/missing\n"}
+            )
+            problems = check_bundle_refs.find_unresolved_refs(repo)
+            self.assertEqual([p.name for p in problems], ["obsidian/missing"])
+
+
 class TestCli(unittest.TestCase):
     def test_main_exits_1_and_reports_name_on_drift(self):
         with tempfile.TemporaryDirectory() as tmp:
