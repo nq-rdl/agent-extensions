@@ -25,7 +25,7 @@ agents/           ← canonical agents (authored here)
 plugins/          ← Claude Code plugins, one per bundle (SELF-CONTAINED — real files)
   <bundle>/
     .claude-plugin/plugin.json  ← GENERATED (scripts/generate_manifests.py)
-    skills/<leaf>/       ← real-file copy of skills/<…>/<leaf>/ (group prefix dropped)
+    skills/<leaf>/       ← real-file copy of skills/<source>/ (renamed to <leaf> per the registry map)
     agents/<name>.md     ← real-file copy of agents/<name>/agent.md
 registry/
   bundles/*.yaml   ← single source of truth: skills/agents/keywords per bundle
@@ -49,7 +49,7 @@ To make installs self-contained, `plugins/<bundle>/skills/<name>/` and `plugins/
 - **Refresh plugin trees** by running `bash scripts/sync-plugins.sh` (or pass a bundle name to scope it). The script reads `registry/bundles/<b>.yaml`, removes any stale copies, and rewrites `plugins/<b>/skills/<name>/` and `plugins/<b>/agents/<name>.md` from the canonical sources.
 - **CI** validates that every bundle YAML reference resolves and that every plugin manifest is well-formed. See `scripts/validate-plugins.sh`.
 
-**Grouped skills.** A bundle skill member is either flat (`go-gh`) or grouped (`go/gh`, when the upstream skill lives at `skills/go/gh/SKILL.md`). `sync-plugins.sh` copies `skills/<group>/<leaf>/` → `plugins/<group>/skills/<leaf>/`, **dropping the `<group>/` prefix**, so the plugin tree stays one level deep and Claude Code invokes `<pluginName>:<leaf>`. Grouping is authored upstream by folder layout — see `CONTRIBUTING.md` for the rules and `scripts/check_grouping.py` for the enforced contract.
+**Grouped skills.** A bundle skill member is either a flat string (`go-gh` → `leaf == go-gh`) or an explicit `{source, leaf}` mapping (`{source: go-gh, leaf: gh}`). `sync-plugins.sh` copies the flat upstream `skills/<source>/` → `plugins/<pluginName>/skills/<leaf>/`, **renaming to the leaf**, so the plugin tree stays one level deep and Claude Code invokes `<pluginName>:<leaf>` (the leaf folder drives invocation; the upstream `name:` is only a display label). Grouping is owned **here** in the registry — the upstream `skills/` tree stays flat. See `CONTRIBUTING.md` §6 for the rules and `scripts/check_grouping.py` for the enforced contract.
 
 When the upstream skills repo releases, `sync-skills.yml` pulls the new content into `skills/`, runs `sync-plugins.sh`, and opens a PR with both `skills/` and `plugins/` changes in the same commit.
 
@@ -102,7 +102,7 @@ python3 scripts/generate_manifests.py . --check  # CI gate: fail on drift
 
 # Bundle reference + grouping + three-way consistency checks (also run by validate.yml)
 python3 scripts/check_bundle_refs.py .   # registry refs resolve to skills/ & agents/
-python3 scripts/check_grouping.py .      # grouping contract: name==leaf, group==pluginName, …
+python3 scripts/check_grouping.py .      # grouping contract: valid member shape, unique leaf + pluginName
 python3 scripts/check_consistency.py .   # bundle <-> marketplace.json <-> plugins/ agree
 
 # Unit tests for the pipeline scripts (zero deps beyond python3 + pyyaml)
@@ -148,7 +148,7 @@ schemaVersion: v1
 id: swe
 description: Software engineering — secure Go, naming, …  # canonical (no trailing period)
 keywords: [go, ci-cd, security]   # marketplace keywords (generated into the manifests)
-skills: [go-naming, go-secure]    # flat <leaf>, or grouped <group>/<leaf>; must exist under skills/
+skills: [go-naming, go-secure]    # flat <name>, or {source, leaf} map; source must exist under skills/
 agents: [debug, janitor]          # must exist as agents/<name>/agent.md
 hooks: []
 targets:
@@ -159,7 +159,7 @@ targets:
 
 The bundle's `description` + `keywords` (plus `registry/marketplace.yaml` and `VERSION`) **generate** `plugins/<bundle>/.claude-plugin/plugin.json` and the bundle's `marketplace.json` entry — do not hand-edit those (CI `generate_manifests.py --check` enforces it). After editing a bundle's `description`/`keywords`, run `python3 scripts/generate_manifests.py .`.
 
-When adding a skill to a bundle: (1) add it to the YAML (flat `<leaf>` or grouped `<group>/<leaf>`), (2) run `bash scripts/sync-plugins.sh <bundle>` to copy `skills/<…>/<leaf>/` into `plugins/<bundle>/skills/<leaf>/`.
+When adding a skill to a bundle: (1) add it to the YAML (flat `<name>`, or a `{source, leaf}` map to repackage a flat upstream skill under a new leaf), (2) run `bash scripts/sync-plugins.sh <bundle>` to copy `skills/<source>/` into `plugins/<bundle>/skills/<leaf>/`.
 
 When adding an agent to a bundle: (1) create `agents/<name>/agent.md`, (2) add it to the YAML `agents:` list, (3) run `bash scripts/sync-plugins.sh <bundle>` to copy it into `plugins/<bundle>/agents/<name>.md`.
 

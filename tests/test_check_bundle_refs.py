@@ -82,28 +82,27 @@ class TestUnresolvedRefs(unittest.TestCase):
             self.assertEqual(problems[0].bundle, "named-by-file")
 
 
-class TestGroupedRefs(unittest.TestCase):
-    """A grouped member `<group>/<leaf>` resolves against skills/<group>/<leaf>/.
-    pathlib joins the slash transparently, so the resolver needs no special
-    casing — these tests lock that behavior (spec §3 / CONTRIBUTING §6)."""
+class TestMappedRefs(unittest.TestCase):
+    """An explicit ``{source, leaf}`` member resolves against the FLAT upstream
+    ``skills/<source>/`` — grouping is owned in the registry, not upstream
+    (Option-2). The reported name on drift is the source (what to fix on disk)."""
 
-    def test_resolves_grouped_member(self):
+    def test_resolves_mapped_member_against_flat_source(self):
         with tempfile.TemporaryDirectory() as tmp:
             repo = make_repo(
-                tmp, bundles={"obsidian": "id: obsidian\nskills:\n  - obsidian/bases\n"}
+                tmp,
+                skills=["go-gh"],
+                bundles={"go": "id: go\nskills:\n  - source: go-gh\n    leaf: gh\n"},
             )
-            f = repo / "skills" / "obsidian" / "bases" / "SKILL.md"
-            f.parent.mkdir(parents=True, exist_ok=True)
-            f.write_text("---\nname: bases\n---\n")
             self.assertEqual(check_bundle_refs.find_unresolved_refs(repo), [])
 
-    def test_flags_missing_grouped_member(self):
+    def test_flags_mapped_member_by_source(self):
         with tempfile.TemporaryDirectory() as tmp:
             repo = make_repo(
-                tmp, bundles={"obsidian": "id: obsidian\nskills:\n  - obsidian/missing\n"}
+                tmp, bundles={"go": "id: go\nskills:\n  - source: go-gh\n    leaf: gh\n"}
             )
             problems = check_bundle_refs.find_unresolved_refs(repo)
-            self.assertEqual([p.name for p in problems], ["obsidian/missing"])
+            self.assertEqual([p.name for p in problems], ["go-gh"])
 
 
 class TestCli(unittest.TestCase):

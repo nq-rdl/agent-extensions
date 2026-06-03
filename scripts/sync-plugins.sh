@@ -75,21 +75,30 @@ def prune_entries(parent: Path, keep: set) -> None:
         print(f"  - pruned stale {child.relative_to(repo)}")
 
 
-def leaf(member: str) -> str:
-    # A bundle skill member is either flat `<leaf>` (e.g. go-gh) or grouped
-    # `<group>/<leaf>` (e.g. go/gh). The plugin tree is always keyed by leaf —
-    # the `<group>/` prefix is dropped on copy so the tree stays one level deep
-    # and Claude Code invokes `<group>:<leaf>` (spec §3 / CONTRIBUTING §6).
-    return member.rsplit("/", 1)[-1]
+def normalize(member):
+    # Mirror scripts/_registry.py::normalize_member (the heredoc boundary makes
+    # importing it awkward — keep the two in step). A bundle skill member is
+    # either a flat string `<name>` (source == leaf) or an explicit
+    # {source, leaf} mapping packaging the flat upstream skills/<source>/ under a
+    # different leaf, so Claude Code invokes `<pluginName>:<leaf>` (Option-2
+    # grouping, spec §3 / CONTRIBUTING §6). Returns (source, leaf), or None if
+    # malformed — sync stays resilient and warns rather than aborting.
+    if isinstance(member, str):
+        return member, member
+    if isinstance(member, dict):
+        source, leaf = member.get("source"), member.get("leaf")
+        if isinstance(source, str) and source and isinstance(leaf, str) and leaf:
+            return source, leaf
+    return None
 
 
-def sync_skill(plugin: str, skill: str, bundle_file: Path) -> None:
-    src = repo / "skills" / skill
-    dst = repo / "plugins" / plugin / "skills" / leaf(skill)
+def sync_skill(plugin: str, source: str, leaf: str, bundle_file: Path) -> None:
+    src = repo / "skills" / source
+    dst = repo / "plugins" / plugin / "skills" / leaf
     if not src.is_dir():
         warn(
             bundle_file,
-            f"Skill '{skill}' has no source skills/{skill}/ — skipped. "
+            f"Skill '{source}' has no source skills/{source}/ — skipped. "
             "Point registry/bundles at an existing skill or remove the entry.",
         )
         return
@@ -99,7 +108,7 @@ def sync_skill(plugin: str, skill: str, bundle_file: Path) -> None:
         shutil.rmtree(dst)
     dst.parent.mkdir(parents=True, exist_ok=True)
     shutil.copytree(src, dst, symlinks=False)
-    print(f"  ✓ skill {skill}")
+    print(f"  ✓ skill {source} -> {leaf}" if source != leaf else f"  ✓ skill {source}")
 
 
 def sync_agent(plugin: str, agent: str, bundle_file: Path) -> None:
@@ -132,14 +141,31 @@ for bundle_file in bundle_files:
     skills = list(data.get("skills") or [])
     agents = list(data.get("agents") or [])
 
-    # Keep set = registry entries that still have a canonical source. A skill or
-    # agent removed upstream but still listed in the bundle has no source, so its
-    # stale plugin copy is pruned here (and sync_skill/sync_agent below warns
-    # about the dangling registry reference). Building `keep` from the raw
-    # registry list instead would preserve orphaned copies forever — the issue
-    # #100 failure mode (audit finding #2).
-    present_skills = [s for s in skills if (repo / "skills" / s).is_dir()]
-    present_skill_leaves = {leaf(s) for s in present_skills}
+    # Normalize each member to (source, leaf); a malformed member is warned about
+    # and dropped so the sync stays resilient. validate.yml's check_grouping is
+    # the authoritative gate that fails the PR on a malformed member.
+    norm_skills = []
+    for member in skills:
+        sl = normalize(member)
+        if sl is None:
+            warn(
+                bundle_file,
+                f"Malformed skill member {member!r} — expected a string or a "
+                "{source, leaf} mapping; skipped.",
+            )
+            continue
+        norm_skills.append(sl)
+
+    # Keep set = registry entries that still have a canonical source, keyed by
+    # LEAF (the plugin tree is keyed by leaf). A skill or agent removed upstream
+    # but still listed in the bundle has no source, so its stale plugin copy is
+    # pruned here (and sync_skill/sync_agent below warns about the dangling
+    # registry reference). Building `keep` from the raw registry list instead
+    # would preserve orphaned copies forever — the issue #100 failure mode
+    # (audit finding #2).
+    present_skill_leaves = {
+        leaf for (source, leaf) in norm_skills if (repo / "skills" / source).is_dir()
+    }
     present_agents = [
         a for a in agents if (repo / "agents" / a / "agent.md").is_file()
     ]
@@ -149,8 +175,8 @@ for bundle_file in bundle_files:
         repo / "plugins" / plugin / "agents", {f"{a}.md" for a in present_agents}
     )
 
-    for skill in skills:
-        sync_skill(plugin, skill, bundle_file)
+    for source, leaf in norm_skills:
+        sync_skill(plugin, source, leaf, bundle_file)
     for agent in agents:
         sync_agent(plugin, agent, bundle_file)
 

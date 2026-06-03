@@ -8,9 +8,11 @@ release), see [`AGENTS.md`](AGENTS.md) and [`docs/ARCHITECTURE.md`](docs/ARCHITE
 
 > **Status:** adopted grouping model. The *strategy* (retire legacy domain bundles — `swe`,
 > `infra`, `informatics`, `dev-tools`, `meta`, `hooks` — and regroup by subject) is
-> [#101](https://github.com/nq-rdl/agent-extensions/issues/101); the *mechanism* (the cross-repo
-> grouping contract + sync/packaging) is [#102](https://github.com/nq-rdl/agent-extensions/issues/102)
-> and [agent-skills#118](https://github.com/nq-rdl/agent-skills/pull/118). Design:
+> [#101](https://github.com/nq-rdl/agent-extensions/issues/101); the *mechanism* (the
+> registry-owned `{source, leaf}` mapping + sync/packaging) is
+> [#102](https://github.com/nq-rdl/agent-extensions/issues/102). Grouping is owned **here** in
+> `agent-extensions`, so the upstream `agent-skills` tree stays flat — no upstream restructure is
+> required (the earlier upstream-grouping plan, agent-skills#118, was closed as superseded). Design:
 > `docs/specs/2026-06-02-plugin-grouping-design.md`.
 
 Every skill and agent is invoked as **`<subject>:<facet>`** — the `subject` is the plugin, the
@@ -47,8 +49,8 @@ subject.
   Ordering lives in the skill **content** — each stage points to the next; the namespace does
   not enforce order.
 
-The facet is the **leaf folder name** chosen upstream (see rule 6) — there is no separate
-rename step.
+The facet is the **leaf** you set in the registry mapping (see rule 6); the upstream skill stays
+flat and is renamed to the leaf at sync time.
 
 ### 4. No-tool subjects → name the workflow
 
@@ -68,26 +70,29 @@ skill paired with a `debug` agent. Do **not** add a skill just to describe an ag
 `description` already does that. An **agent-only plugin** (e.g. `terraform`, `postgres`) is fine
 when a subject has agents but no skill.
 
-### 6. How grouping is expressed across the two repos (the #102 contract)
+### 6. How grouping is expressed (owned here in `agent-extensions`)
 
-Skills are authored upstream in [`nq-rdl/agent-skills`](https://github.com/nq-rdl/agent-skills),
-and **grouping is expressed upstream by folder layout** (per
-[#102](https://github.com/nq-rdl/agent-extensions/issues/102) / agent-skills#118):
+Skills are authored upstream in [`nq-rdl/agent-skills`](https://github.com/nq-rdl/agent-skills) as
+a **flat** library — `skills/<skill>/SKILL.md`, one level, no group folders. **Grouping is a
+packaging decision and lives here**, in the bundle registry (per
+[#102](https://github.com/nq-rdl/agent-extensions/issues/102)):
 
-- A skill is either **flat** `skills/<skill>/SKILL.md` (standalone) or **grouped**
-  `skills/<group>/<leaf>/SKILL.md` (exactly one level; a group folder holds no direct `SKILL.md`).
-- **Group folder == plugin name** (the subject); **leaf folder == facet**; frontmatter
-  **`name:` == leaf folder**.
-- Here in `agent-extensions`, the bundle sets `pluginName: <group>` and lists members
-  path-qualified as `<group>/<leaf>`. `scripts/sync-plugins.sh` copies `skills/<group>/<leaf>/` →
-  `plugins/<group>/skills/<leaf>/`, **dropping the `<group>/` prefix** — so the plugin tree is one
-  level deep and Claude Code invokes `<group>:<leaf>`.
-- Validators enforce: `name:` == leaf · group == `pluginName` · no duplicate leaf within a bundle ·
-  `pluginName` unique across bundles.
+- A bundle sets `pluginName: <subject>` and lists each skill member as either:
+  - a **flat string** `<name>` — packaged as-is (`leaf == <name>`); or
+  - an explicit **`{source, leaf}` mapping** — packages the flat upstream `skills/<source>/` under a
+    different `leaf` (e.g. `{source: go-gh, leaf: gh}` → `go:gh`).
+- `scripts/sync-plugins.sh` copies `skills/<source>/` → `plugins/<subject>/skills/<leaf>/`, renaming
+  to the leaf — so the plugin tree is one level deep and Claude Code invokes `<subject>:<leaf>`.
+  **The leaf folder name drives invocation** (verified by smoke test 2026-06-03); the upstream
+  frontmatter `name:` survives only as a cosmetic display label, so it is left untouched (no
+  vendored-content rewrite).
+- Validators (`scripts/check_grouping.py`) enforce: every member has a valid shape · no duplicate
+  leaf within a bundle · `pluginName` unique across bundles.
 
-So to add `obsidian:bases`, create `skills/obsidian/bases/SKILL.md` upstream — **not**
-`skills/obsidian-bases/`. Agents are authored here under `agents/<name>/agent.md` and placed by
-subject in the registry. See [`AGENTS.md`](AGENTS.md) for the mechanical add-and-sync steps.
+So to add `obsidian:bases`, the upstream skill stays flat `skills/obsidian-bases/`; the registry
+maps `{source: obsidian-bases, leaf: bases}` under `pluginName: obsidian`. Agents are authored here
+under `agents/<name>/agent.md` and placed by subject in the registry. See [`AGENTS.md`](AGENTS.md)
+for the mechanical add-and-sync steps.
 
 ### 7. Manifests are generated; new subjects join the `rdl` meta-plugin
 

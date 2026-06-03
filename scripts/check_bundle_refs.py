@@ -18,6 +18,8 @@ from pathlib import Path
 
 import yaml
 
+from _registry import normalize_member
+
 
 @dataclass(frozen=True)
 class Problem:
@@ -40,9 +42,18 @@ def find_unresolved_refs(repo) -> list[Problem]:
             data = yaml.safe_load(fh) or {}
         bundle = data.get("id") or bundle_file.stem
         rel = str(bundle_file.relative_to(repo))
-        for name in data.get("skills") or []:
-            if not (repo / "skills" / name).is_dir():
-                problems.append(Problem(bundle, "skill", name, rel))
+        for member in data.get("skills") or []:
+            # A member is flat ``<name>`` or an explicit ``{source, leaf}`` map;
+            # either way it resolves against the FLAT upstream skills/<source>/.
+            # Malformed shapes are check_grouping.py's to report, so skip them
+            # here (keeps the two checkers' failures independent, as the docstring
+            # promises) rather than crashing on bad input.
+            try:
+                source, _leaf = normalize_member(member)
+            except ValueError:
+                continue
+            if not (repo / "skills" / source).is_dir():
+                problems.append(Problem(bundle, "skill", source, rel))
         for name in data.get("agents") or []:
             if not (repo / "agents" / name / "agent.md").is_file():
                 problems.append(Problem(bundle, "agent", name, rel))

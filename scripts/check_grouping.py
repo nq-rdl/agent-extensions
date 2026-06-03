@@ -1,23 +1,27 @@
 #!/usr/bin/env python3
-"""Enforce the cross-repo skill-grouping contract (spec §3 / CONTRIBUTING §6).
+"""Enforce the Option-2 skill-grouping contract (spec §3 / CONTRIBUTING §6).
 
-A bundle skill member is either flat ``<leaf>`` (e.g. ``go-gh``) or grouped
-``<group>/<leaf>`` (e.g. ``go/gh``). Claude Code invokes ``<pluginName>:<leaf>``,
-and ``sync-plugins.sh`` copies ``skills/<group>/<leaf>/`` into
-``plugins/<pluginName>/skills/<leaf>/`` (dropping the ``<group>/`` prefix). For
-that to be coherent, this checker asserts, per enabled Claude bundle:
+A bundle skill member is either a flat string ``<leaf>`` (``source == leaf``) or
+an explicit ``{source, leaf}`` mapping that packages the flat upstream skill
+``skills/<source>/`` under a different leaf (e.g. ``go-gh`` -> ``go:gh``).
+``sync-plugins.sh`` copies ``skills/<source>/`` ->
+``plugins/<pluginName>/skills/<leaf>/`` and Claude Code invokes
+``<pluginName>:<leaf>`` — the leaf *folder* name drives invocation (verified by
+smoke test; the upstream frontmatter ``name`` survives only as a display label).
+
+Grouping is owned here in the registry, so the upstream ``skills/`` tree stays
+flat: there are no upstream group folders and no frontmatter ``name`` to
+reconcile. This checker asserts, per enabled Claude bundle:
 
   * ``pluginName`` is unique across all bundles.
-  * grouped member ``g/l``: ``g == pluginName``; the group folder ``skills/g/``
-    has no direct ``SKILL.md`` (a flat skill is never descended into); and
-    ``skills/g/l/SKILL.md`` frontmatter ``name == l``.
-  * flat member ``m``: ``skills/m/SKILL.md`` frontmatter ``name == m``.
+  * every member has a valid shape (a string, or a ``{source, leaf}`` mapping
+    with non-empty string values).
   * no duplicate leaf within a bundle (two members must not collide on the same
     ``plugins/<pluginName>/skills/<leaf>/`` destination).
 
 Source-existence is checked separately by ``check_bundle_refs.py``; this checker
-only validates *grouping* and is silent about members whose source is absent
-(so the two checkers report independent, non-duplicated failures).
+only validates *grouping*, so the two report independent, non-duplicated
+failures.
 
 CLI:
     python3 scripts/check_grouping.py [REPO_ROOT]
@@ -30,23 +34,7 @@ from pathlib import Path
 
 import yaml
 
-
-def _frontmatter_name(skill_md: Path) -> str | None:
-    """Return the ``name`` from a SKILL.md's YAML frontmatter, or None if the
-    file/frontmatter/name is absent or unparseable (existence is another
-    checker's job — we only compare names when we can read one)."""
-    if not skill_md.is_file():
-        return None
-    text = skill_md.read_text(encoding="utf-8")
-    if not text.startswith("---\n"):
-        return None
-    parts = text.split("---\n", 2)
-    if len(parts) < 3:
-        return None
-    try:
-        return (yaml.safe_load(parts[1]) or {}).get("name")
-    except yaml.YAMLError:
-        return None
+from _registry import normalize_member
 
 
 def find_grouping_issues(repo) -> list[str]:
@@ -73,32 +61,11 @@ def find_grouping_issues(repo) -> list[str]:
 
         leaves: set[str] = set()
         for member in data.get("skills") or []:
-            if "/" in member:
-                group, leaf = member.split("/", 1)
-                if group != plugin:
-                    issues.append(
-                        f"{bf.stem}: member '{member}' group '{group}' != "
-                        f"pluginName '{plugin}'"
-                    )
-                if (repo / "skills" / group / "SKILL.md").is_file():
-                    issues.append(
-                        f"{bf.stem}: group folder skills/{group}/ has a direct "
-                        "SKILL.md — a flat skill must not be descended into as a group"
-                    )
-                name = _frontmatter_name(repo / "skills" / group / leaf / "SKILL.md")
-                if name is not None and name != leaf:
-                    issues.append(
-                        f"{bf.stem}: skills/{member}/ frontmatter name '{name}' "
-                        f"!= leaf '{leaf}'"
-                    )
-            else:
-                leaf = member
-                name = _frontmatter_name(repo / "skills" / member / "SKILL.md")
-                if name is not None and name != member:
-                    issues.append(
-                        f"{bf.stem}: skills/{member}/ frontmatter name '{name}' "
-                        f"!= '{member}'"
-                    )
+            try:
+                _source, leaf = normalize_member(member)
+            except ValueError as exc:
+                issues.append(f"{bf.stem}: {exc}")
+                continue
             if leaf in leaves:
                 issues.append(f"{bf.stem}: duplicate leaf '{leaf}' within the bundle")
             leaves.add(leaf)

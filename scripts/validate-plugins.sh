@@ -275,14 +275,29 @@ for bundle in sorted(list(_bundles_dir.glob("*.yaml")) + list(_bundles_dir.glob(
     # Claude targets) to a self-contained plugin copy. Without this, the issue
     # #100 scenario — registry references a skill removed upstream — passes the
     # local `validate-plugins.sh` pre-merge check silently (audit finding #3).
-    for name in data.get("skills") or []:
-        src = repo / "skills" / name
+    for member in data.get("skills") or []:
+        # A member is flat `<name>` (source == leaf) or an explicit {source, leaf}
+        # mapping packaging a flat upstream skill under a different leaf. The
+        # canonical source is skills/<source>/; the plugin copy is keyed by LEAF
+        # (sync-plugins.sh drops the source name). Mirrors _registry.normalize_member.
+        if isinstance(member, str):
+            source, leaf = member, member
+        elif (
+            isinstance(member, dict)
+            and isinstance(member.get("source"), str) and member.get("source")
+            and isinstance(member.get("leaf"), str) and member.get("leaf")
+        ):
+            source, leaf = member["source"], member["leaf"]
+        else:
+            err(bundle, f"Malformed skill member {member!r} — expected a string or {{source, leaf}} mapping")
+            continue
+        src = repo / "skills" / source
         if not src.is_dir():
-            err(bundle, f"Skill '{name}' declared but missing source dir skills/{name}/")
+            err(bundle, f"Skill '{source}' declared but missing source dir skills/{source}/")
         elif claude_enabled:
-            copy = repo / "plugins" / plugin_name / "skills" / name
+            copy = repo / "plugins" / plugin_name / "skills" / leaf
             if not copy.is_dir():
-                err(bundle, f"Skill '{name}' declared for Claude target but missing plugin copy plugins/{plugin_name}/skills/{name}/")
+                err(bundle, f"Skill '{source}' declared for Claude target but missing plugin copy plugins/{plugin_name}/skills/{leaf}/")
 
     mcp_json = repo / "plugins" / plugin_name / ".mcp.json"
     declared_mcp = data.get("mcp") or []

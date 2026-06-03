@@ -66,28 +66,29 @@ class TestPruneStaleCopies(unittest.TestCase):
             )
 
 
-class TestGroupedMembers(unittest.TestCase):
-    """Grouped members `<group>/<leaf>` copy to plugins/<plugin>/skills/<leaf>/,
-    dropping the `<group>/` prefix so the plugin tree stays one level deep
-    (spec §3 / CONTRIBUTING §6). Flat members must stay byte-identical (no-diff)."""
+class TestMappedMembers(unittest.TestCase):
+    """An explicit {source, leaf} member copies the FLAT upstream skills/<source>/
+    to plugins/<plugin>/skills/<leaf>/ — renaming to the leaf so the plugin tree
+    stays one level deep and Claude Code invokes <plugin>:<leaf> (Option-2
+    grouping). Flat string members stay byte-identical (no-diff)."""
 
-    def test_grouped_member_drops_group_prefix(self):
+    def test_mapped_member_renames_source_to_leaf(self):
         with tempfile.TemporaryDirectory() as tmp:
             repo = Path(tmp)
             write(
-                repo / "registry" / "bundles" / "obsidian.yaml",
-                "id: obsidian\nskills:\n  - obsidian/bases\n"
-                "targets:\n  claude:\n    enabled: true\n    pluginName: obsidian\n",
+                repo / "registry" / "bundles" / "go.yaml",
+                "id: go\nskills:\n  - source: go-gh\n    leaf: gh\n"
+                "targets:\n  claude:\n    enabled: true\n    pluginName: go\n",
             )
-            write(repo / "skills" / "obsidian" / "bases" / "SKILL.md", "---\nname: bases\n---\n")
+            write(repo / "skills" / "go-gh" / "SKILL.md", "---\nname: go-gh\n---\n")
             run_sync(repo)
             self.assertTrue(
-                (repo / "plugins" / "obsidian" / "skills" / "bases" / "SKILL.md").is_file(),
-                "grouped member must land at plugins/obsidian/skills/bases/ (prefix dropped)",
+                (repo / "plugins" / "go" / "skills" / "gh" / "SKILL.md").is_file(),
+                "mapped member must land at plugins/go/skills/gh/ (renamed to leaf)",
             )
             self.assertFalse(
-                (repo / "plugins" / "obsidian" / "skills" / "obsidian").exists(),
-                "group prefix must NOT appear in the plugin tree",
+                (repo / "plugins" / "go" / "skills" / "go-gh").exists(),
+                "the flat source name must NOT appear in the plugin tree",
             )
 
     def test_flat_member_unchanged(self):
@@ -105,24 +106,24 @@ class TestGroupedMembers(unittest.TestCase):
                 "flat member must remain at plugins/swe/skills/go-gh/ (unchanged)",
             )
 
-    def test_grouped_prune_keys_on_leaf(self):
-        # A grouped member's stale sibling (a leaf no longer listed) must be pruned
+    def test_mapped_prune_keys_on_leaf(self):
+        # A mapped member's stale sibling (a leaf no longer listed) must be pruned
         # by LEAF name, since the plugin tree is keyed by leaf.
         with tempfile.TemporaryDirectory() as tmp:
             repo = Path(tmp)
             write(
-                repo / "registry" / "bundles" / "obsidian.yaml",
-                "id: obsidian\nskills:\n  - obsidian/bases\n"
-                "targets:\n  claude:\n    enabled: true\n    pluginName: obsidian\n",
+                repo / "registry" / "bundles" / "go.yaml",
+                "id: go\nskills:\n  - source: go-gh\n    leaf: gh\n"
+                "targets:\n  claude:\n    enabled: true\n    pluginName: go\n",
             )
-            write(repo / "skills" / "obsidian" / "bases" / "SKILL.md", "---\nname: bases\n---\n")
+            write(repo / "skills" / "go-gh" / "SKILL.md", "---\nname: go-gh\n---\n")
             # Pre-existing stale leaf copy from a removed member.
-            write(repo / "plugins" / "obsidian" / "skills" / "cli" / "SKILL.md", "x")
+            write(repo / "plugins" / "go" / "skills" / "naming" / "SKILL.md", "x")
             run_sync(repo)
-            self.assertTrue((repo / "plugins" / "obsidian" / "skills" / "bases").is_dir())
+            self.assertTrue((repo / "plugins" / "go" / "skills" / "gh").is_dir())
             self.assertFalse(
-                (repo / "plugins" / "obsidian" / "skills" / "cli").exists(),
-                "stale leaf 'cli' must be pruned (keep-set is keyed by leaf)",
+                (repo / "plugins" / "go" / "skills" / "naming").exists(),
+                "stale leaf 'naming' must be pruned (keep-set is keyed by leaf)",
             )
 
 
