@@ -2,7 +2,7 @@
   "name": "rdl",
   "owner": {
     "name": "nq-rdl",
-    "email": "r.schnetler@uq.edu.au"
+    "email": "tsv-datalab@health.qld.gov.au"
   },
   "metadata": {
     "description": "Agent extensions — curated skill bundles for Claude Code",

@@ -1,0 +1,3 @@
+kind: Removed
+body: 'Removes the stale `docs/superpowers` plan doc — the grouping mechanism it described already shipped in #108'
+time: 2026-06-03T20:38:55.326067674+10:00
