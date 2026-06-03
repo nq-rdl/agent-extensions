@@ -7,7 +7,7 @@
 name: rdl
 owner:
   name: nq-rdl
-  email: r.schnetler@uq.edu.au
+  email: tsv-datalab@health.qld.gov.au
 description: Agent extensions — curated skill bundles for Claude Code
 pluginRoot: ./plugins
 

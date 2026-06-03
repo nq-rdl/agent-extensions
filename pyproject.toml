@@ -1,5 +1,5 @@
 [project]
-authors = [{name = "Rudolf J", email = "r.schnetler@uq.edu.au"}]
+authors = [{name = "rdl", email = "tsv-datalab@health.qld.gov.au"}]
 dependencies = []
 name = "agent-extensions"
 requires-python = ">= 3.11"
