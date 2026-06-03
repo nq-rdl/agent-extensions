@@ -82,6 +82,29 @@ class TestUnresolvedRefs(unittest.TestCase):
             self.assertEqual(problems[0].bundle, "named-by-file")
 
 
+class TestMappedRefs(unittest.TestCase):
+    """An explicit ``{source, leaf}`` member resolves against the FLAT upstream
+    ``skills/<source>/`` — grouping is owned in the registry, not upstream
+    (Option-2). The reported name on drift is the source (what to fix on disk)."""
+
+    def test_resolves_mapped_member_against_flat_source(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            repo = make_repo(
+                tmp,
+                skills=["go-gh"],
+                bundles={"go": "id: go\nskills:\n  - source: go-gh\n    leaf: gh\n"},
+            )
+            self.assertEqual(check_bundle_refs.find_unresolved_refs(repo), [])
+
+    def test_flags_mapped_member_by_source(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            repo = make_repo(
+                tmp, bundles={"go": "id: go\nskills:\n  - source: go-gh\n    leaf: gh\n"}
+            )
+            problems = check_bundle_refs.find_unresolved_refs(repo)
+            self.assertEqual([p.name for p in problems], ["go-gh"])
+
+
 class TestCli(unittest.TestCase):
     def test_main_exits_1_and_reports_name_on_drift(self):
         with tempfile.TemporaryDirectory() as tmp:

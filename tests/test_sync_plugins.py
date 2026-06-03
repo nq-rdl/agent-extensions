@@ -66,5 +66,66 @@ class TestPruneStaleCopies(unittest.TestCase):
             )
 
 
+class TestMappedMembers(unittest.TestCase):
+    """An explicit {source, leaf} member copies the FLAT upstream skills/<source>/
+    to plugins/<plugin>/skills/<leaf>/ — renaming to the leaf so the plugin tree
+    stays one level deep and Claude Code invokes <plugin>:<leaf> (Option-2
+    grouping). Flat string members stay byte-identical (no-diff)."""
+
+    def test_mapped_member_renames_source_to_leaf(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            repo = Path(tmp)
+            write(
+                repo / "registry" / "bundles" / "go.yaml",
+                "id: go\nskills:\n  - source: go-gh\n    leaf: gh\n"
+                "targets:\n  claude:\n    enabled: true\n    pluginName: go\n",
+            )
+            write(repo / "skills" / "go-gh" / "SKILL.md", "---\nname: go-gh\n---\n")
+            run_sync(repo)
+            self.assertTrue(
+                (repo / "plugins" / "go" / "skills" / "gh" / "SKILL.md").is_file(),
+                "mapped member must land at plugins/go/skills/gh/ (renamed to leaf)",
+            )
+            self.assertFalse(
+                (repo / "plugins" / "go" / "skills" / "go-gh").exists(),
+                "the flat source name must NOT appear in the plugin tree",
+            )
+
+    def test_flat_member_unchanged(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            repo = Path(tmp)
+            write(
+                repo / "registry" / "bundles" / "swe.yaml",
+                "id: swe\nskills:\n  - go-gh\n"
+                "targets:\n  claude:\n    enabled: true\n    pluginName: swe\n",
+            )
+            write(repo / "skills" / "go-gh" / "SKILL.md", "---\nname: go-gh\n---\n")
+            run_sync(repo)
+            self.assertTrue(
+                (repo / "plugins" / "swe" / "skills" / "go-gh" / "SKILL.md").is_file(),
+                "flat member must remain at plugins/swe/skills/go-gh/ (unchanged)",
+            )
+
+    def test_mapped_prune_keys_on_leaf(self):
+        # A mapped member's stale sibling (a leaf no longer listed) must be pruned
+        # by LEAF name, since the plugin tree is keyed by leaf.
+        with tempfile.TemporaryDirectory() as tmp:
+            repo = Path(tmp)
+            write(
+                repo / "registry" / "bundles" / "go.yaml",
+                "id: go\nskills:\n  - source: go-gh\n    leaf: gh\n"
+                "targets:\n  claude:\n    enabled: true\n    pluginName: go\n",
+            )
+            write(repo / "skills" / "go-gh" / "SKILL.md", "---\nname: go-gh\n---\n")
+            # Pre-existing stale leaf copy from a removed member.
+            write(repo / "plugins" / "go" / "skills" / "naming" / "SKILL.md", "x")
+            run_sync(repo)
+            self.assertTrue((repo / "plugins" / "go" / "skills" / "gh").is_dir())
+            self.assertFalse(
+                (repo / "plugins" / "go" / "skills" / "naming").exists(),
+                "stale leaf 'naming' must be pruned (keep-set is keyed by leaf)",
+            )
+
+
 if __name__ == "__main__":
     unittest.main()

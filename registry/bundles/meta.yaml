@@ -1,7 +1,8 @@
 schemaVersion: v1
 id: meta
 displayName: Meta
-description: Meta — skill review and issue reporting for skill quality.
+description: Meta — skill review and issue reporting for skill quality
+keywords: [skills, review, quality]
 owners:
   - rdl
 channels:

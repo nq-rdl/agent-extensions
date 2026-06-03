@@ -1,0 +1,20 @@
+{
+  "name": "rdl",
+  "version": "0.8.0",
+  "description": "Install the full RDL agent-extensions set — every subject plugin in one command.",
+  "dependencies": [
+    "swe",
+    "infra",
+    "informatics",
+    "rust",
+    "dev-tools",
+    "meta",
+    "hooks",
+    "lucid"
+  ],
+  "author": {
+    "name": "nq-rdl"
+  },
+  "repository": "https://github.com/nq-rdl/agent-extensions",
+  "license": "MIT"
+}

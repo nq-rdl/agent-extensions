@@ -1,0 +1,59 @@
+# Marketplace-level metadata and entries NOT backed by a local bundle.
+#
+# plugin.json and marketplace.json are GENERATED from this file plus
+# registry/bundles/*.yaml and VERSION by scripts/generate_manifests.py.
+# Do NOT hand-edit the generated manifests — CI (generate_manifests.py --check)
+# fails if they drift. This is the structural fix for #100's metadata rot.
+name: rdl
+owner:
+  name: nq-rdl
+  email: r.schnetler@uq.edu.au
+description: Agent extensions — curated skill bundles for Claude Code
+pluginRoot: ./plugins
+
+# Constant fields stamped into every generated plugins/<p>/.claude-plugin/plugin.json.
+pluginDefaults:
+  author:
+    name: nq-rdl
+  repository: https://github.com/nq-rdl/agent-extensions
+  license: MIT
+
+# Marketplace display order for LOCAL plugins. Any enabled bundle missing from
+# this list is appended alphabetically (with a ::warning::). External entries
+# (below) follow, in list order.
+order:
+  - swe
+  - infra
+  - informatics
+  - rust
+  - dev-tools
+  - meta
+  - hooks
+  - lucid
+
+# Marketplace entries with a non-local source (external plugins). Preserved
+# verbatim; the generator only injects the shared version.
+external:
+  - name: worktrunk
+    source:
+      source: github
+      repo: max-sixty/worktrunk
+    description: Developer tools — Git worktree CLI for parallel AI agent workflows, config guidance, and automatic Claude session tracking
+    keywords:
+      - git
+      - worktree
+      - agents
+      - workflow
+
+# D-1 meta-plugin: a content-less plugin that declares every local subject plugin
+# as a dependency, so `claude plugin install rdl@rdl` installs the whole set and
+# `claude plugin uninstall rdl --prune` cleans up. The dependency list is
+# generated from the enabled bundles. Emitted only when enabled.
+meta:
+  name: rdl
+  enabled: true
+  description: Install the full RDL agent-extensions set — every subject plugin in one command.
+  keywords:
+    - meta
+    - install
+    - rdl

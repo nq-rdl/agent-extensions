@@ -57,6 +57,17 @@ def find_consistency_issues(repo) -> list[str]:
             d.name for d in plugins_root.iterdir() if (d / ".claude-plugin").is_dir()
         }
 
+    # The generated rdl meta-plugin (D-1) has a marketplace entry and a
+    # plugins/<name>/ dir but intentionally no content bundle — it only declares
+    # the other plugins as dependencies. Whitelist it so it is not flagged as an
+    # orphan marketplace entry / plugin dir.
+    meta_plugins: set[str] = set()
+    mkt_yaml = repo / "registry" / "marketplace.yaml"
+    if mkt_yaml.is_file():
+        meta = (yaml.safe_load(mkt_yaml.read_text()) or {}).get("meta") or {}
+        if meta.get("enabled") and meta.get("name"):
+            meta_plugins.add(meta["name"])
+
     issues: list[str] = []
     for plugin, stem in sorted(bundle_plugins.items()):
         if plugin not in local_marketplace:
@@ -68,12 +79,12 @@ def find_consistency_issues(repo) -> list[str]:
                 f"bundle '{stem}' (plugin '{plugin}') has no plugins/{plugin}/ directory"
             )
     for name in sorted(local_marketplace):
-        if name not in bundle_plugins:
+        if name not in bundle_plugins and name not in meta_plugins:
             issues.append(
                 f"marketplace plugin '{name}' has no enabled bundle in registry/bundles/"
             )
     for name in sorted(plugin_dirs):
-        if name not in bundle_plugins:
+        if name not in bundle_plugins and name not in meta_plugins:
             issues.append(
                 f"plugins/{name}/ has no enabled bundle in registry/bundles/"
             )
