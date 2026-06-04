@@ -18,5 +18,3 @@ targets:
     enabled: true
     pluginName: lucid
     marketplaceName: rdl
-  gemini:
-    enabled: false

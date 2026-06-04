@@ -6,7 +6,7 @@ icon: lucide/network
 
 This repository is a **Claude Code extension catalog**. It keeps a single source of truth for reusable agent behavior — *skills* and *agents* — and publishes them as self-contained Claude Code plugins through a repo-root marketplace manifest.
 
-> Other hosts (Codex, OpenCode, pi.dev) are **not** publication targets. They use external CLI or packaging tooling rather than Claude Code's `/plugin` marketplace model, so they belong in CLI- or package-driven repos, not here.
+> Claude Code is the **only** publication target. Tools with a different install model (their own CLI or package manager) are out of scope — they belong in CLI- or package-driven repos, not here.
 
 ## Problem statement
 
@@ -81,31 +81,30 @@ Runs weekly, on `workflow_dispatch`, and on a `repository_dispatch` fired by an 
 
 ## Registry schema
 
-The registry describes installable bundles, not raw files.
+The registry describes installable subject plugins, not raw files. One bundle = one subject.
 
 ```yaml
 schemaVersion: v1
-id: swe
-displayName: SWE
-description: Software engineering workflows and coding assistance.
+id: go
+displayName: Go
+description: Go — idiomatic naming, secure error handling, and GitHub Actions CI/CD
 owners:
   - rdl
 channels:
   - stable
-skills:                        # resolved from skills/<name>/
-  - go-naming
-  - go-secure
+skills:                        # flat <name> (resolved from skills/<name>/), or a
+  - {source: go-gh, leaf: gh}  #   {source, leaf} map → invokes as /go:gh
+  - {source: go-naming, leaf: naming}
+  - {source: go-secure, leaf: secure}
 agents:                        # resolved from agents/<name>/agent.md
-  - debug
-  - janitor
+  - go-mcp-expert
 hooks: []                      # resolved from hooks/
 prompts: []
-mcp:                           # wired into the plugin's .mcp.json
-  - playwright
+mcp: []                        # wired into the plugin's .mcp.json (e.g. playwright, lucid)
 targets:
   claude:
     enabled: true
-    pluginName: swe
+    pluginName: go
     marketplaceName: rdl
 ```
 
@@ -163,7 +162,7 @@ Agents derived from external sources (e.g. `github/awesome-copilot`, MIT) carry 
 | `mcp/*-go/` Go MCP servers | this repo | this repo (prebuilt binaries in `plugins/*/bin/mcp/`) |
 | `skills/*/scripts/` Go/Python tools | `nq-rdl/agent-skills` | vendored here |
 | `skills/{csv,docx,pdf,xlsx}/scripts/` | `nq-rdl/agent-skills` | run in-place via `ensure-deps.sh` |
-| `plugins/dev-tools/bin/` prebuilt binaries | this repo | committed here, rebuilt by CI |
+| `plugins/<subject>/bin/` prebuilt binaries | this repo | committed here, rebuilt by CI |
 | `registry/bundles/*.yaml` | this repo | this repo |
 
 **Important:** the `skills/` tree is owned by `nq-rdl/agent-skills`. Edits made here are overwritten on the next `sync-skills` PR — file bugs and PRs upstream.
@@ -210,7 +209,9 @@ Releases are triggered by pushing a `v*` tag pointing at a commit already on `ma
 
 ```bash
 /plugin marketplace add nq-rdl/agent-extensions
-/plugin install swe@rdl --scope project
+/plugin install rdl@rdl                 # the meta-plugin installs every subject
+# …or install a single subject:
+/plugin install go@rdl --scope project
 ```
 
 Publication target: this repository, with `.claude-plugin/marketplace.json` at the root and plugins under `plugins/`.
@@ -230,7 +231,7 @@ macOS and Linux only — the skill-resolution strategy depends on native symlink
 
 This repository should not:
 
-- republish to hosts whose install model isn't Claude Code's `/plugin` marketplace (Codex, OpenCode, pi.dev) — those belong in CLI- or package-driven repos;
+- republish to hosts whose install model isn't Claude Code's `/plugin` marketplace — those belong in CLI- or package-driven repos;
 - hand-edit vendored skill content (it is owned upstream and overwritten on sync);
 - hand-edit generated output under `dist/`.
 

@@ -1,0 +1,20 @@
+schemaVersion: v1
+id: starrocks
+displayName: StarRocks
+description: StarRocks — analytical SQL, table design, data loading, and query tuning
+keywords: [starrocks, sql, olap, data-warehouse]
+owners:
+  - rdl
+channels:
+  - stable
+skills:
+  - {source: starrocks, leaf: sql}
+agents: []
+hooks: []
+prompts: []
+mcp: []
+targets:
+  claude:
+    enabled: true
+    pluginName: starrocks
+    marketplaceName: rdl

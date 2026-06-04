@@ -11,10 +11,10 @@ How to install this repo as a local Claude Code marketplace to verify skills are
 Single-session in-place test (no persistence, no cache copy):
 
 ```bash
-claude --plugin-dir ./plugins/swe
+claude --plugin-dir ./plugins/go
 ```
 
-Skills from that bundle are immediately available in the session. Nothing is written to `~/.claude`.
+Skills from that subject plugin are immediately available in the session. Nothing is written to `~/.claude`.
 
 ## Devcontainer Quickstart
 
@@ -30,12 +30,13 @@ claude plugin marketplace add /workspace
 # Confirm it registered
 claude plugin marketplace list
 
-# Install a bundle from the local marketplace
-claude plugin install swe@rdl
-claude plugin install dev-tools@rdl
+# Install every subject in one command via the meta-plugin…
+claude plugin install rdl@rdl
+# …or install a single subject
+claude plugin install go@rdl
 ```
 
-Then launch `claude` and type `/` — confirm the expected skills appear (e.g. `/swe:go-secure`, `/swe:changie`, `/dev-tools:cc-hook`).
+Then launch `claude` and type `/` — confirm the expected skills appear (e.g. `/go:secure`, `/git:changie`, `/claude-code:hook`).
 
 You can also verify from the CLI without entering the REPL:
 
@@ -45,12 +46,14 @@ claude plugin list
 
 ## Verifying a New Skill Is Visible
 
-After adding a new skill (e.g. `sops`) to the bundle:
+After mapping a new skill (e.g. `go-secure` → `/go:secure`) into a subject bundle:
 
-1. Ensure `registry/bundles/swe.yaml` lists `- sops` under `skills:`.
-2. Ensure `plugins/swe/skills/sops` symlink exists and resolves: `test -e plugins/swe/skills/sops && echo ok`.
-3. Re-run install: `claude plugin install swe@rdl`.
-4. In the Claude REPL, type `/swe:sops` — it should autocomplete.
+1. Ensure `registry/bundles/go.yaml` lists it under `skills:` — flat `- go-secure`, or a
+   `- {source: go-secure, leaf: secure}` mapping to rename the facet.
+2. Ensure the real-file copy exists: `test -d plugins/go/skills/secure && echo ok`
+   (run `bash scripts/sync-plugins.sh go` if it does not).
+3. Re-run install: `claude plugin install go@rdl`.
+4. In the Claude REPL, type `/go:secure` — it should autocomplete.
 
 ## Self-Contained Plugin Trees
 
@@ -60,13 +63,13 @@ If you edit a skill or agent, refresh the plugin tree:
 
 ```bash
 bash scripts/sync-plugins.sh           # all bundles
-bash scripts/sync-plugins.sh swe       # one bundle
+bash scripts/sync-plugins.sh go        # one bundle
 ```
 
 `--plugin-dir` still works for short-lived testing without caching:
 
 ```bash
-claude --plugin-dir ./plugins/swe
+claude --plugin-dir ./plugins/go
 ```
 
 ## Cleanup

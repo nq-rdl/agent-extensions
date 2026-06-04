@@ -70,14 +70,14 @@ MCP servers are authored in `mcp/*-go/` in this repo and distributed as prebuilt
 
 ## MCP Servers
 
-MCP servers are Go binaries under `mcp/<name>-go/`, cross-compiled into `plugins/dev-tools/bin/mcp/` and wired via the bundle plugin's `.mcp.json` — no separate install step required. The catalog currently ships no MCP servers.
+MCP servers are Go binaries under `mcp/<name>-go/`, cross-compiled into `plugins/<subject>/bin/mcp/` (the subject plugin that wires the server) and referenced via that plugin's `.mcp.json` — no separate install step required. The catalog currently ships no Go MCP servers; the hosted Lucid (`lucid`) and Playwright (`playwright`) servers are wired by URL/command, not as committed binaries.
 
 To build locally:
 
 ```bash
 cd mcp/<name>-go
 make build            # builds for the current platform
-make cross-compile DESTDIR=../../plugins/dev-tools/bin/mcp
+make cross-compile DESTDIR=../../plugins/<subject>/bin/mcp
 ```
 
 ## Build, test, lint
@@ -87,12 +87,12 @@ make cross-compile DESTDIR=../../plugins/dev-tools/bin/mcp
 bash scripts/validate-plugins.sh
 
 # Validate only plugins touched by changed files
-bash scripts/validate-plugins.sh plugins/swe/hooks/hooks.json
+bash scripts/validate-plugins.sh plugins/hooks/hooks/hooks.json
 
 # Refresh plugin trees from canonical skills/ and agents/. Run after
 # editing an agent or syncing skills from upstream.
 bash scripts/sync-plugins.sh           # all bundles
-bash scripts/sync-plugins.sh swe       # one bundle
+bash scripts/sync-plugins.sh go        # one bundle
 
 # Regenerate plugin.json + marketplace.json from the registry. These manifests
 # are GENERATED — never hand-edit them. Run after changing a bundle's
@@ -125,11 +125,11 @@ To verify skills are visible before release, install the repo as a local Claude 
 
 ```bash
 # Single-session in-place (preferred in devcontainer — no cache copy, symlinks resolve in-place)
-claude --plugin-dir ./plugins/swe
+claude --plugin-dir ./plugins/go
 
 # Persistent install (workspace must stay mounted at /workspace)
 claude plugin marketplace add /workspace
-claude plugin install swe@rdl
+claude plugin install go@rdl
 
 # One command installs every subject via the rdl meta-plugin (it declares each
 # subject as a dependency). Requires Claude Code ≥ 2.1.110; prune needs ≥ 2.1.121.
@@ -141,20 +141,28 @@ See [`docs/local-testing.md`](docs/local-testing.md) for the full walkthrough in
 
 ## Registry Bundles
 
-`registry/bundles/*.yaml` defines what each bundle contains and which targets are enabled. Schema:
+`registry/bundles/*.yaml` defines what each **subject** plugin contains and which targets are
+enabled. One bundle = one subject = one plugin (see `CONTRIBUTING.md` for the grouping rules).
+Schema:
 
 ```yaml
 schemaVersion: v1
-id: swe
-description: Software engineering — secure Go, naming, …  # canonical (no trailing period)
-keywords: [go, ci-cd, security]   # marketplace keywords (generated into the manifests)
-skills: [go-naming, go-secure]    # flat <name>, or {source, leaf} map; source must exist under skills/
-agents: [debug, janitor]          # must exist as agents/<name>/agent.md
+id: go
+displayName: Go
+description: Go — idiomatic naming, secure error handling, and GitHub Actions CI/CD  # no trailing period
+keywords: [go, naming, security, ci-cd]   # marketplace keywords (generated into the manifests)
+skills:                                    # flat <name> (leaf == name), or {source, leaf} to rename
+  - {source: go-gh, leaf: gh}              #   → invokes as /go:gh
+  - {source: go-naming, leaf: naming}      #   → /go:naming
+agents: [go-mcp-expert]                    # must exist as agents/<name>/agent.md (subagent)
 hooks: []
+prompts: []
+mcp: []                                    # wired in plugins/<pluginName>/.mcp.json
 targets:
   claude:
     enabled: true
-    pluginName: swe
+    pluginName: go
+    marketplaceName: rdl
 ```
 
 The bundle's `description` + `keywords` (plus `registry/marketplace.yaml` and `VERSION`) **generate** `plugins/<bundle>/.claude-plugin/plugin.json` and the bundle's `marketplace.json` entry — do not hand-edit those (CI `generate_manifests.py --check` enforces it). After editing a bundle's `description`/`keywords`, run `python3 scripts/generate_manifests.py .`.

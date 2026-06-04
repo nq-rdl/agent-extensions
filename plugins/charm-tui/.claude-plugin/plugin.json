@@ -1,0 +1,10 @@
+{
+  "name": "charm-tui",
+  "version": "0.9.0",
+  "description": "Charm — build terminal UIs with Bubbletea, Lip Gloss, and Fang",
+  "author": {
+    "name": "nq-rdl"
+  },
+  "repository": "https://github.com/nq-rdl/agent-extensions",
+  "license": "MIT"
+}

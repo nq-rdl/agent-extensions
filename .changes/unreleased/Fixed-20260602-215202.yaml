@@ -1,3 +1,0 @@
-kind: Fixed
-body: 'Reconciled `lucid` manifest drift surfaced by manifest generation: the marketplace and plugin descriptions are unified to the single registry value and the stale `0.6.0` version is corrected to `0.8.0` (#100).'
-time: 2026-06-02T21:52:02.010140195+10:00

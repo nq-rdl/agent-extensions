@@ -1,0 +1,20 @@
+schemaVersion: v1
+id: mongodb
+displayName: MongoDB
+description: MongoDB — query and index performance analysis against a live cluster
+keywords: [mongodb, performance, database]
+owners:
+  - rdl
+channels:
+  - stable
+skills: []
+agents:
+  - mongodb-performance-advisor
+hooks: []
+prompts: []
+mcp: []
+targets:
+  claude:
+    enabled: true
+    pluginName: mongodb
+    marketplaceName: rdl

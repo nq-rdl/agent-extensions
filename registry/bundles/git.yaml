@@ -1,0 +1,27 @@
+schemaVersion: v1
+id: git
+displayName: Git
+description: Git workflow — hooks, changelogs, conventional commits, pull requests, and releases
+keywords: [git, hooks, changelog, pull-request]
+owners:
+  - rdl
+channels:
+  - stable
+skills:
+  - changie
+  - conventional-commits
+  - document-release
+  - husky
+  - lefthook
+  - pre-commit
+  - send-pr
+agents:
+  - address-comments
+hooks: []
+prompts: []
+mcp: []
+targets:
+  claude:
+    enabled: true
+    pluginName: git
+    marketplaceName: rdl

@@ -1,0 +1,26 @@
+schemaVersion: v1
+id: review
+displayName: Review
+description: Code review — security, clean code, governance, responsible AI, and fact-checking
+keywords: [review, security, clean-code, governance]
+owners:
+  - rdl
+channels:
+  - stable
+skills: []
+agents:
+  - gem-reviewer
+  - wg-code-sentinel
+  - wg-code-alchemist
+  - critical-thinking
+  - doublecheck
+  - agent-governance-reviewer
+  - se-responsible-ai-code
+hooks: []
+prompts: []
+mcp: []
+targets:
+  claude:
+    enabled: true
+    pluginName: review
+    marketplaceName: rdl

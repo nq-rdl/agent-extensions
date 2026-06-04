@@ -22,14 +22,41 @@ pluginDefaults:
 # this list is appended alphabetically (with a ::warning::). External entries
 # (below) follow, in list order.
 order:
-  - swe
-  - infra
-  - informatics
+  - go
   - rust
-  - dev-tools
-  - meta
-  - hooks
+  - r
+  - shiny
+  - quarto
+  - obsidian
+  - writerside
+  - zod
+  - defuddle
+  - git
+  - github-actions
+  - jules
+  - terraform
+  - kubernetes
+  - argo-cd
+  - ansible
+  - arch-linux
+  - starrocks
+  - postgres
+  - mongodb
+  - sops
+  - bitwarden
+  - pixi
+  - lychee
+  - charm-tui
+  - claude-code
+  - playwright
+  - skill
+  - review
+  - planning
+  - debug
+  - docs
+  - research
   - lucid
+  - hooks
 
 # Marketplace entries with a non-local source (external plugins). Preserved
 # verbatim; the generator only injects the shared version.

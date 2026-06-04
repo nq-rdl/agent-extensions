@@ -1,3 +1,0 @@
-kind: Added
-body: 'Skill bundles can now group members under a subject plugin via an explicit `{source, leaf}` mapping (e.g. `{source: go-gh, leaf: gh}` → `go:gh`): `sync-plugins.sh` copies the flat upstream `skills/<source>/` into `plugins/<pluginName>/skills/<leaf>/`, renaming to the leaf so Claude Code invokes `<plugin>:<leaf>`. Grouping is owned in the registry, so the upstream `agent-skills` tree stays flat. Flat string members are unchanged (verified no-diff). New `scripts/check_grouping.py` enforces the contract (valid member shape, unique pluginName, no duplicate leaf). Part of the subject-grouping migration (#102).'
-time: 2026-06-02T21:52:01.996785838+10:00

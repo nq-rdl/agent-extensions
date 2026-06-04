@@ -1,0 +1,20 @@
+schemaVersion: v1
+id: pixi
+displayName: Pixi
+description: Pixi — manage Python projects, environments, and dependencies
+keywords: [pixi, python, environments]
+owners:
+  - rdl
+channels:
+  - stable
+skills:
+  - {source: pixi, leaf: env}
+agents: []
+hooks: []
+prompts: []
+mcp: []
+targets:
+  claude:
+    enabled: true
+    pluginName: pixi
+    marketplaceName: rdl

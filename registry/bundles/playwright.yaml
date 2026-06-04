@@ -1,0 +1,21 @@
+schemaVersion: v1
+id: playwright
+displayName: Playwright
+description: Playwright — generate and debug end-to-end browser tests
+keywords: [playwright, e2e, testing, browser]
+owners:
+  - rdl
+channels:
+  - stable
+skills: []
+agents:
+  - playwright-tester
+hooks: []
+prompts: []
+mcp:
+  - playwright
+targets:
+  claude:
+    enabled: true
+    pluginName: playwright
+    marketplaceName: rdl

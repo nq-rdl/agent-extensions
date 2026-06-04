@@ -1,0 +1,21 @@
+schemaVersion: v1
+id: debug
+displayName: Debug
+description: Debugging and cleanup — systematic diagnosis and tech-debt removal
+keywords: [debug, cleanup, tech-debt]
+owners:
+  - rdl
+channels:
+  - stable
+skills: []
+agents:
+  - debug
+  - janitor
+hooks: []
+prompts: []
+mcp: []
+targets:
+  claude:
+    enabled: true
+    pluginName: debug
+    marketplaceName: rdl

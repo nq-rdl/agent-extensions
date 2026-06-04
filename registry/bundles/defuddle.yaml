@@ -1,0 +1,20 @@
+schemaVersion: v1
+id: defuddle
+displayName: Defuddle
+description: Defuddle — extract clean Markdown from cluttered web pages
+keywords: [defuddle, extraction, web]
+owners:
+  - rdl
+channels:
+  - stable
+skills:
+  - {source: defuddle, leaf: extract}
+agents: []
+hooks: []
+prompts: []
+mcp: []
+targets:
+  claude:
+    enabled: true
+    pluginName: defuddle
+    marketplaceName: rdl

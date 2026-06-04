@@ -1,0 +1,20 @@
+schemaVersion: v1
+id: ansible
+displayName: Ansible
+description: Ansible — author, debug, and optimise playbooks, roles, and inventories
+keywords: [ansible, playbook, automation]
+owners:
+  - rdl
+channels:
+  - stable
+skills:
+  - {source: ansible, leaf: playbook}
+agents: []
+hooks: []
+prompts: []
+mcp: []
+targets:
+  claude:
+    enabled: true
+    pluginName: ansible
+    marketplaceName: rdl

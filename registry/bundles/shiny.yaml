@@ -1,0 +1,21 @@
+schemaVersion: v1
+id: shiny
+displayName: Shiny
+description: Shiny — modern dashboards with bslib and Bootstrap 5 theming
+keywords: [shiny, bslib, bootstrap, theming]
+owners:
+  - rdl
+channels:
+  - stable
+skills:
+  - {source: shiny-bslib, leaf: bslib}
+  - {source: shiny-bslib-theming, leaf: bslib-theming}
+agents: []
+hooks: []
+prompts: []
+mcp: []
+targets:
+  claude:
+    enabled: true
+    pluginName: shiny
+    marketplaceName: rdl

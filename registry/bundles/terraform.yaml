@@ -1,0 +1,22 @@
+schemaVersion: v1
+id: terraform
+displayName: Terraform
+description: Terraform — generate compliant HCL, review IaC for state safety, and author Terratest suites
+keywords: [terraform, iac, hcl, terratest]
+owners:
+  - rdl
+channels:
+  - stable
+skills: []
+agents:
+  - terraform
+  - terraform-iac-reviewer
+  - terratest-module-testing
+hooks: []
+prompts: []
+mcp: []
+targets:
+  claude:
+    enabled: true
+    pluginName: terraform
+    marketplaceName: rdl

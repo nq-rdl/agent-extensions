@@ -1,3 +1,0 @@
-kind: Added
-body: '`plugin.json` and `marketplace.json` are now generated from the registry (`registry/bundles/*.yaml` + `registry/marketplace.yaml` + `VERSION`) by `scripts/generate_manifests.py`, with a `--check` CI gate that fails on drift — the structural fix for #100 metadata rot. Release versioning now flows from a single `VERSION` file.'
-time: 2026-06-02T21:52:20.154169019+10:00

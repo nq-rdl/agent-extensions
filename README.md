@@ -1,22 +1,25 @@
 # Agent Extensions
 
-Curated reusable agent skills and integrations packaged as Claude Code plugins. Canonical skills live under `skills/` and agents under `agents/`; each bundle is published as a self-contained plugin under `plugins/`, listed in the repo-root Claude Code marketplace manifest (`.claude-plugin/marketplace.json`).
+Curated reusable agent skills and agents packaged as Claude Code plugins. Each **subject** (a tool, library, language, or workflow) is one plugin: skills are invoked as `/<subject>:<facet>` (e.g. `/go:secure`, `/git:send-pr`) and agents are delegated as subagents. Canonical skills live under `skills/` and agents under `agents/`; each subject is published as a self-contained plugin under `plugins/`, listed in the repo-root marketplace manifest (`.claude-plugin/marketplace.json`).
 
-> Other hosts (Codex, OpenCode, pi.dev) are not currently published from this repo — they require external CLI or packaging tooling rather than an in-host `/plugin` install.
+Claude Code is the only publication target.
 
 ## Installation
 
 ### Claude Code
 
-1. Enable the marketplace
-
 ```bash
+# Add the marketplace (once)
 /plugin marketplace add nq-rdl/agent-extensions
+
+# Install every subject in one command via the rdl meta-plugin
+/plugin install rdl@rdl
+
+# …or install a single subject
+/plugin install go@rdl
 ```
 
-2. Navigate to `/plugin` and enable bundles
-
-See [`docs/local-testing.md`](docs/local-testing.md) for local/devcontainer install.
+See [`docs/bundles.md`](docs/bundles.md) for the full subject list and [`docs/local-testing.md`](docs/local-testing.md) for local/devcontainer install.
 
 ## Agent File Management
 

@@ -1,0 +1,22 @@
+schemaVersion: v1
+id: obsidian
+displayName: Obsidian
+description: Obsidian — Bases databases, the CLI, and Obsidian-flavored Markdown
+keywords: [obsidian, bases, cli, markdown]
+owners:
+  - rdl
+channels:
+  - stable
+skills:
+  - {source: obsidian-bases, leaf: bases}
+  - {source: obsidian-cli, leaf: cli}
+  - {source: obsidian-markdown, leaf: markdown}
+agents: []
+hooks: []
+prompts: []
+mcp: []
+targets:
+  claude:
+    enabled: true
+    pluginName: obsidian
+    marketplaceName: rdl

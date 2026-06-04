@@ -1,0 +1,10 @@
+{
+  "name": "shiny",
+  "version": "0.9.0",
+  "description": "Shiny — modern dashboards with bslib and Bootstrap 5 theming",
+  "author": {
+    "name": "nq-rdl"
+  },
+  "repository": "https://github.com/nq-rdl/agent-extensions",
+  "license": "MIT"
+}

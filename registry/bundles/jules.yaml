@@ -1,0 +1,21 @@
+schemaVersion: v1
+id: jules
+displayName: Jules
+description: Jules — dispatch AI coding sessions and scaffold GitHub Actions dispatch workflows
+keywords: [jules, dispatch, github-actions]
+owners:
+  - rdl
+channels:
+  - stable
+skills:
+  - {source: jules, leaf: dispatch}
+  - {source: jules-dispatch-creator, leaf: dispatch-creator}
+agents: []
+hooks: []
+prompts: []
+mcp: []
+targets:
+  claude:
+    enabled: true
+    pluginName: jules
+    marketplaceName: rdl

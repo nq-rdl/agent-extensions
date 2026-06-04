@@ -6,14 +6,15 @@ release), see [`AGENTS.md`](AGENTS.md) and [`docs/ARCHITECTURE.md`](docs/ARCHITE
 
 ## Plugin grouping: one plugin per subject
 
-> **Status:** adopted grouping model. The *strategy* (retire legacy domain bundles — `swe`,
-> `infra`, `informatics`, `dev-tools`, `meta`, `hooks` — and regroup by subject) is
+> **Status:** live. The legacy domain bundles (`swe`, `infra`, `informatics`, `dev-tools`, `meta`)
+> have been **retired** and every skill and agent is now grouped by subject (`go`, `git`, `r`,
+> `terraform`, `review`, …). The *strategy* is
 > [#101](https://github.com/nq-rdl/agent-extensions/issues/101); the *mechanism* (the
 > registry-owned `{source, leaf}` mapping + sync/packaging) is
 > [#102](https://github.com/nq-rdl/agent-extensions/issues/102). Grouping is owned **here** in
 > `agent-extensions`, so the upstream `agent-skills` tree stays flat — no upstream restructure is
 > required (the earlier upstream-grouping plan, agent-skills#118, was closed as superseded). Design:
-> `docs/specs/2026-06-02-plugin-grouping-design.md`.
+> `docs/specs/2026-06-02-plugin-grouping-design.md`; rollout: `docs/specs/2026-06-05-plugin-mapping-migration.md`.
 
 Every skill and agent is invoked as **`<subject>:<facet>`** — the `subject` is the plugin, the
 `facet` is what it does. The rules below decide both halves. The colon is always present for
@@ -101,3 +102,45 @@ for the mechanical add-and-sync steps.
 it is also registered as a dependency of the **`rdl` meta-plugin**, so `claude plugin install
 rdl@rdl` keeps installing the full set. CI consistency checks fail if registry, generated
 manifests, and the meta-plugin dependency list disagree.
+
+## Packaging a new skill into a plugin
+
+A skill synced from `nq-rdl/agent-skills` lands in `skills/<name>/` but is **not installable
+until you map it into a bundle**. The `sync-skills` workflow only copies — it never maps (it can't
+decide the subject for you). The sync PR flags every unmapped skill under "📦 Action required".
+Here is the full loop, using a hypothetical `sql-review-analyse` upstream skill that should become
+`sql-review:analyse`:
+
+1. **Pick the subject and facet** (the rules above). Subject → the plugin (`sql-review`); facet →
+   the action/stage leaf (`analyse`). Never repeat the subject in the facet.
+2. **Choose or create the bundle.** If `registry/bundles/sql-review.yaml` exists, add to it;
+   otherwise copy an existing single-subject bundle (e.g. `registry/bundles/sops.yaml`) and set
+   `id`, `displayName`, `description` (no trailing period), `keywords`, and
+   `targets.claude.pluginName: sql-review`.
+3. **Add the skill member.** Under `skills:`, write either a flat string (when the upstream name
+   already equals the leaf you want) or a `{source, leaf}` mapping to rename:
+   ```yaml
+   skills:
+     - {source: sql-review-analyse, leaf: analyse}   # → /sql-review:analyse
+   ```
+4. **If it is a brand-new subject, add it to the marketplace order.** Append `sql-review` to the
+   `order:` list in `registry/marketplace.yaml` (otherwise it is appended alphabetically with a
+   CI `::warning::`). It joins the `rdl` meta-plugin automatically.
+5. **Build the plugin tree and manifests:**
+   ```bash
+   bash scripts/sync-plugins.sh sql-review     # copies skills/<source>/ → plugins/sql-review/skills/<leaf>/
+   python3 scripts/generate_manifests.py .     # writes plugin.json + marketplace.json
+   python3 scripts/generate_bundles_doc.py .   # refreshes docs/bundles.md
+   ```
+6. **Validate** exactly what CI will:
+   ```bash
+   python3 scripts/check_bundle_refs.py .   && \
+   python3 scripts/check_grouping.py .      && \
+   python3 scripts/generate_manifests.py . --check && \
+   python3 scripts/check_consistency.py .   && \
+   bash scripts/validate-plugins.sh
+   ```
+
+Adding an **agent** follows the same loop: author `agents/<name>/agent.md` (with frontmatter
+`name` + `description`), list it under a bundle's `agents:`, then run steps 5–6. An agent-only
+subject (no skill) is fine — give it its own bundle with an empty `skills: []`.

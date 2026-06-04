@@ -1,0 +1,25 @@
+schemaVersion: v1
+id: planning
+displayName: Planning
+description: Planning — implementation strategy, file-level sequencing, API/repo architecture, and ADRs
+keywords: [planning, architecture, adr]
+owners:
+  - rdl
+channels:
+  - stable
+skills: []
+agents:
+  - plan
+  - context-architect
+  - repo-architect
+  - api-architect
+  - hlbpa
+  - adr-generator
+hooks: []
+prompts: []
+mcp: []
+targets:
+  claude:
+    enabled: true
+    pluginName: planning
+    marketplaceName: rdl

@@ -1,3 +1,0 @@
-kind: Removed
-body: Removed two stale docs pages — `docs/claude.md` (superseded by `docs/ARCHITECTURE.md`; it still described the pre-#83 symlink/submodule model) and `docs/tdd-workflow-review.md` (a review of the `tdd-team-workflow` skill retired in #100).
-time: 2026-06-02T06:48:28.953502249+10:00

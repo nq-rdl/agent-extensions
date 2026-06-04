@@ -140,8 +140,11 @@ jobs:
           # Build a concise PR body (added/removed/modified skills + drift),
           # instead of dumping a 60k-line `git diff --stat` that can exceed
           # GitHub's 65,536-char body limit (audit #6).
+          # Pass the repo root so the PR body can flag synced-but-unmapped skills
+          # (copied from upstream but not yet referenced by any bundle, so not
+          # installable until a maintainer maps them — see CONTRIBUTING).
           git diff --name-status HEAD~1 HEAD \
-            | SYNC_DRIFT="$DRIFT" python3 scripts/sync_pr_body.py "$TAG" > /tmp/pr-body.md
+            | SYNC_DRIFT="$DRIFT" python3 scripts/sync_pr_body.py "$TAG" . > /tmp/pr-body.md
 
           gh pr create \
             --title "chore(skills): sync from agent-skills@${TAG}" \

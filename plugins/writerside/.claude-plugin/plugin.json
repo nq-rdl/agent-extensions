@@ -1,0 +1,10 @@
+{
+  "name": "writerside",
+  "version": "0.9.0",
+  "description": "Writerside — author and build JetBrains Writerside documentation",
+  "author": {
+    "name": "nq-rdl"
+  },
+  "repository": "https://github.com/nq-rdl/agent-extensions",
+  "license": "MIT"
+}

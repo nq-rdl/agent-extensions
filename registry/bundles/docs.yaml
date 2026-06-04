@@ -1,0 +1,20 @@
+schemaVersion: v1
+id: docs
+displayName: Docs
+description: Technical writing — developer docs, tutorials, ADRs, and guides
+keywords: [docs, technical-writing]
+owners:
+  - rdl
+channels:
+  - stable
+skills: []
+agents:
+  - se-technical-writer
+hooks: []
+prompts: []
+mcp: []
+targets:
+  claude:
+    enabled: true
+    pluginName: docs
+    marketplaceName: rdl

@@ -1,0 +1,20 @@
+schemaVersion: v1
+id: postgres
+displayName: Postgres
+description: PostgreSQL administration — schema design, query optimisation, backups, and tuning
+keywords: [postgresql, database, dba]
+owners:
+  - rdl
+channels:
+  - stable
+skills: []
+agents:
+  - postgresql-dba
+hooks: []
+prompts: []
+mcp: []
+targets:
+  claude:
+    enabled: true
+    pluginName: postgres
+    marketplaceName: rdl
