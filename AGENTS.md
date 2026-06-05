@@ -100,6 +100,10 @@ bash scripts/sync-plugins.sh go        # one bundle
 python3 scripts/generate_manifests.py .          # write manifests
 python3 scripts/generate_manifests.py . --check  # CI gate: fail on drift
 
+# Regenerate docs/bundles.md from the registry (also a --check CI gate).
+python3 scripts/generate_bundles_doc.py .          # write
+python3 scripts/generate_bundles_doc.py . --check  # CI gate: fail on drift
+
 # Bundle reference + grouping + three-way consistency checks (also run by validate.yml)
 python3 scripts/check_bundle_refs.py .   # registry refs resolve to skills/ & agents/
 python3 scripts/check_grouping.py .      # grouping contract: valid member shape, unique leaf + pluginName

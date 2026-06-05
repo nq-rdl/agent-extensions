@@ -79,7 +79,7 @@ external:
 meta:
   name: rdl
   enabled: true
-  description: Install the full RDL agent-extensions set — every subject plugin in one command.
+  description: Install the full RDL agent-extensions set — every subject plugin in one command
   keywords:
     - meta
     - install

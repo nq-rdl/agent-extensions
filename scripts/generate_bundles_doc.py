@@ -7,7 +7,7 @@ bundles long after they were regrouped by subject). This is the same metadata-ro
 failure mode as #100, so the fix is the same: generate the doc from the single
 source of truth and gate it in CI.
 
-The doc depends ONLY on `registry/` (+ `VERSION`), never on upstream skill
+The doc depends ONLY on `registry/`, never on upstream skill
 frontmatter — so it changes only when a maintainer deliberately edits a bundle,
 not on every cosmetic skills sync. That keeps the `--check` gate quiet.
 
@@ -49,7 +49,7 @@ def _enabled_bundles(repo: Path) -> dict[str, dict]:
                 continue
             leaves.append(leaf)
         out[plugin] = {
-            "description": data.get("description", ""),
+            "description": data.get("description") or "",
             "skills": leaves,
             "agents": list(data.get("agents") or []),
             "mcp": list(data.get("mcp") or []),
@@ -105,7 +105,7 @@ def generate(repo) -> str:
 
     for plugin in order:
         b = enabled[plugin]
-        lines += ["---", "", f"## {plugin}", "", b["description"] + ".", ""]
+        lines += ["---", "", f"## {plugin}", "", b["description"].rstrip(".") + ".", ""]
         if b["skills"]:
             lines.append("**Skills**")
             lines.append("")

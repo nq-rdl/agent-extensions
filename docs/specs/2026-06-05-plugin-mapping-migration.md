@@ -94,7 +94,7 @@ carried Codex/Gemini multi-host packaging remnants, contrary to the "Claude Code
 ## 6. Verification
 
 `check_bundle_refs` · `check_grouping` · `generate_manifests --check` · `generate_bundles_doc
---check` · `check_consistency` · `validate-plugins.sh` · **67 unit tests** — all green. 35 subject
+--check` · `check_consistency` · `validate-plugins.sh` · **79 unit tests** — all green. 35 subject
 plugins + `worktrunk` + `rdl` = 37 marketplace entries; `rdl` declares all 35 subjects as deps.
 
 ## 7. Open questions / follow-ups (tunable)

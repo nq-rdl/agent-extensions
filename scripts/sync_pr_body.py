@@ -157,7 +157,8 @@ def render_pr_body(tag, changes, drift_messages=None, mapped_sources=None, max_c
             "### ⚠️ Reconciliation required",
             "Bundles still reference skills or agents that no longer exist "
             "upstream. `validate-bundles` will fail until the registry is "
-            "reconciled (retire/trim the bundle, refresh `marketplace.json`):",
+            "reconciled — edit the bundle YAML in `registry/bundles/`, then run "
+            "`python3 scripts/generate_manifests.py .` to regenerate the manifests):",
             *[f"- {m}" for m in drift_messages],
         ]
 
