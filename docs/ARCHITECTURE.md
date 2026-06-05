@@ -40,7 +40,7 @@ mcp/                       ← Go MCP servers (authored here; none currently)
 
 registry/
   bundles/*.yaml           ← single source of truth: which skills/agents/hooks/mcp each bundle ships
-  marketplace.yaml         ← marketplace metadata, plugin defaults, display order, rdl meta-plugin config
+  marketplace.yaml         ← marketplace metadata, plugin defaults, display order, external plugin entries, and the rdl meta-plugin config
 
 .claude-plugin/
   marketplace.json         ← Claude Code marketplace manifest (repo root)
@@ -75,7 +75,7 @@ Runs weekly, on `workflow_dispatch`, and on a `repository_dispatch` fired by an 
 
 ### `validate.yml` — on every PR / push to main
 
-- `validate-bundles`: every skill in a bundle YAML resolves to `skills/<name>/`, every agent to `agents/<name>/agent.md`.
+- `validate-bundles`: bundle references resolve, the grouping contract holds, and the generated manifests + `docs/bundles.md` match the registry (`check_bundle_refs`, `check_grouping`, `generate_manifests --check`, `generate_bundles_doc --check`, `check_consistency`).
 - `validate-symlinks`: any symlink under `plugins/` resolves (plugin trees are real-file copies, so this is a guardrail against accidental links).
 - `validate-plugins`: plugin manifests (`plugin.json`), hooks, and `.mcp.json` wiring are well-formed (`scripts/validate-plugins.sh`).
 - `unit-tests`: the pipeline scripts' unit tests pass (`python3 -m unittest discover -s tests`).
@@ -198,8 +198,9 @@ MCP servers in `mcp/*-go/` follow a Makefile with a `cross-compile` target that 
 Releases are triggered by pushing a `v*` tag pointing at a commit already on `main`. The release workflow (GitHub App token: `RELEASE_APP_ID` / `RELEASE_APP_PRIVATE_KEY`):
 
 1. Verifies the tag is on `main`.
-2. Writes the release version to `VERSION`, regenerates all manifests from the registry (`scripts/generate_manifests.py`), and commits the result back to `main`.
-3. Moves the tag forward to include the bump commit and creates the GitHub release.
+2. Batches and merges the changie changelog for the version — idempotent: it skips the batch when `.changes/<version>.md` is already present (e.g. a pre-batched release PR).
+3. Writes the release version to `VERSION`, regenerates all manifests from the registry (`scripts/generate_manifests.py`), and commits the result back to `main`.
+4. Moves the tag forward to include the bump commit and creates the GitHub release.
 
 `marketplace.json` plugin sources are relative paths (`./plugins/<bundle>`), so installs read directly from the pinned ref — no separate release branch.
 

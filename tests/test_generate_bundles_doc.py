@@ -26,12 +26,14 @@ meta:
 """
 
 
-def _bundle(p, d, enabled=True, skills="[]", agents="[]"):
+def _bundle(p, d, enabled=True, skills="[]", agents="[]", mcp="[]", hooks="[]"):
     return (
         f"id: {p}\n"
         f"description: {d}\n"
         f"skills: {skills}\n"
         f"agents: {agents}\n"
+        f"mcp: {mcp}\n"
+        f"hooks: {hooks}\n"
         "targets:\n"
         "  claude:\n"
         f"    enabled: {str(enabled).lower()}\n"
@@ -103,12 +105,32 @@ class TestGenerate(unittest.TestCase):
             )
             out = generate_bundles_doc.generate(repo)  # must not raise TypeError
             self.assertIn("## go", out)
+            self.assertNotRegex(out, r"\n\.\n")  # empty description → no bare-period line
 
     def test_no_double_period(self):
         with tempfile.TemporaryDirectory() as t:
             out = generate_bundles_doc.generate(make_repo(t, go_desc="Go tools."))
             self.assertIn("Go tools.", out)
             self.assertNotIn("Go tools..", out)
+
+    def test_mcp_and_hooks_rendered(self):
+        with tempfile.TemporaryDirectory() as t:
+            repo = make_repo(t)
+            (repo / "registry" / "bundles" / "go.yaml").write_text(
+                _bundle("go", "Go tools", mcp="[playwright]", hooks="[format]")
+            )
+            out = generate_bundles_doc.generate(repo)
+            self.assertIn("**MCP server(s):** `playwright`", out)
+            self.assertIn("**Hooks:** `format`", out)
+
+    def test_meta_disabled_omits_install_command(self):
+        with tempfile.TemporaryDirectory() as t:
+            repo = make_repo(t)
+            (repo / "registry" / "marketplace.yaml").write_text(
+                "name: rdl\norder: [go, infra]\nmeta:\n  name: rdl\n  enabled: false\n"
+            )
+            out = generate_bundles_doc.generate(repo)
+            self.assertNotIn("/plugin install rdl@rdl", out)
 
 
 class TestCheck(unittest.TestCase):

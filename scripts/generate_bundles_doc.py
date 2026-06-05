@@ -45,7 +45,11 @@ def _enabled_bundles(repo: Path) -> dict[str, dict]:
         for m in data.get("skills") or []:
             try:
                 _src, leaf = normalize_member(m)
-            except ValueError:
+            except ValueError as exc:
+                print(
+                    f"::warning::Skipping malformed skill member {m!r} in {plugin!r}: {exc}",
+                    file=sys.stderr,
+                )
                 continue
             leaves.append(leaf)
         out[plugin] = {
@@ -105,7 +109,10 @@ def generate(repo) -> str:
 
     for plugin in order:
         b = enabled[plugin]
-        lines += ["---", "", f"## {plugin}", "", b["description"].rstrip(".") + ".", ""]
+        lines += ["---", "", f"## {plugin}", ""]
+        desc = b["description"].rstrip(".")
+        if desc:
+            lines += [desc + ".", ""]
         if b["skills"]:
             lines.append("**Skills**")
             lines.append("")

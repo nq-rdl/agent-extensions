@@ -148,6 +148,18 @@ class TestGenerate(unittest.TestCase):
             repo = make_repo(t)
             self.assertNotEqual(generate_manifests.check(repo), [])
 
+    def test_null_description_renders_empty_string(self):
+        # `description: null` (present-but-null key) must not propagate JSON null
+        # into the manifest — the `or ""` guard collapses it to an empty string.
+        with tempfile.TemporaryDirectory() as t:
+            repo = make_repo(t)
+            (repo / "registry" / "bundles" / "swe.yaml").write_text(
+                "id: swe\ndescription: null\nkeywords: [x]\n"
+                "targets:\n  claude:\n    enabled: true\n    pluginName: swe\n"
+            )
+            pj = generate_manifests.generate(repo)["plugins"]["swe"]
+            self.assertEqual(pj["description"], "")
+
     def test_disabled_bundle_excluded(self):
         with tempfile.TemporaryDirectory() as t:
             repo = make_repo(t)

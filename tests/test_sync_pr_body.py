@@ -149,6 +149,34 @@ class TestMain(unittest.TestCase):
         self.assertIn("new-skill", out.getvalue())
         self.assertIn("dataops", out.getvalue())
 
+    def test_main_with_repo_arg_flags_unmapped_added_skills(self):
+        # The production invocation is `sync_pr_body.py <tag> <repo>`; the repo
+        # arg enables the "map these to publish" section for synced-but-unmapped
+        # skills. Exercise that end-to-end wiring (argv → mapped_skill_sources →
+        # render_pr_body), which the single-arg test above does not cover.
+        import tempfile
+
+        out = io.StringIO()
+        old_stdin = sys.stdin
+        with tempfile.TemporaryDirectory() as tmp:
+            bundles = Path(tmp) / "registry" / "bundles"
+            bundles.mkdir(parents=True)
+            (bundles / "go.yaml").write_text("id: go\nskills:\n  - mapped-skill\n")
+            sys.stdin = io.StringIO(
+                "A\tskills/mapped-skill/SKILL.md\nA\tskills/orphan-skill/SKILL.md\n"
+            )
+            try:
+                with contextlib.redirect_stdout(out):
+                    rc = sync_pr_body.main(["v0.9.0", tmp])
+            finally:
+                sys.stdin = old_stdin
+        body = out.getvalue()
+        self.assertEqual(rc, 0)
+        self.assertIn("map these to publish", body)
+        unmapped_section = body.split("map these to publish", 1)[1]
+        self.assertIn("orphan-skill", unmapped_section)       # unmapped → flagged
+        self.assertNotIn("mapped-skill", unmapped_section)    # mapped → not flagged
+
 
 if __name__ == "__main__":
     unittest.main()

@@ -195,8 +195,9 @@ Releases are triggered by pushing a `v*` tag. The tag must point to a commit alr
 
 The workflow:
 1. Verifies the tag is on `main`.
-2. Writes the release version to `VERSION`, regenerates all manifests from the registry (`scripts/generate_manifests.py`), and commits the result back to `main`.
-3. Moves the tag forward to include the bump commit and creates the GitHub release.
+2. Batches and merges the changie changelog for the version — idempotent: it skips the batch when `.changes/<version>.md` is already present (e.g. a pre-batched release PR).
+3. Writes the release version to `VERSION`, regenerates all manifests from the registry (`scripts/generate_manifests.py`), and commits the result back to `main`.
+4. Moves the tag forward to include the bump commit and creates the GitHub release.
 
 `marketplace.json` sources are relative paths (`./plugins/<bundle>`) — installs read directly from `main` (or whatever ref the user pinned), no separate release branch involved.
 

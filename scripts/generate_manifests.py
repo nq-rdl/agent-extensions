@@ -42,7 +42,7 @@ def _enabled_bundles(repo: Path) -> dict[str, dict]:
             continue
         plugin = claude.get("pluginName") or data.get("id") or bf.stem
         out[plugin] = {
-            "description": data.get("description", ""),
+            "description": data.get("description") or "",
             "keywords": list(data.get("keywords") or []),
         }
     return out
