@@ -48,7 +48,8 @@ claude plugin list
 
 After mapping a new skill (e.g. `go-secure` → `/go:secure`) into a subject bundle:
 
-1. Ensure `registry/bundles/go.yaml` lists it under `skills:` — flat `- go-secure`, or a
+1. Ensure `registry/bundles/go.yaml` lists it under `skills:`. A flat `- go-secure` publishes it
+   as `/go:go-secure` (the leaf defaults to the source name); to invoke it as `/go:secure`, use a
    `- {source: go-secure, leaf: secure}` mapping to rename the facet.
 2. Ensure the real-file copy exists: `test -d plugins/go/skills/secure && echo ok`
    (run `bash scripts/sync-plugins.sh go` if it does not).
