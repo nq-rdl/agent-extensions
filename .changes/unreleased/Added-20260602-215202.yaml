@@ -1,3 +1,0 @@
-kind: Added
-body: 'New `rdl` meta-plugin: `claude plugin install rdl@rdl` installs every subject plugin in one command (it declares each as a same-marketplace dependency), and `claude plugin uninstall rdl --prune` removes the set plus orphaned dependencies. Part of #101.'
-time: 2026-06-02T21:52:02.00556148+10:00

@@ -1,3 +1,0 @@
-kind: Added
-body: Add `lucid` plugin wiring the hosted Lucid MCP server (Lucidchart / Lucidspark) over Streamable HTTP — installable standalone via `/plugin`, authenticated with OAuth (no API key)
-time: 2026-06-02T10:00:00+10:00

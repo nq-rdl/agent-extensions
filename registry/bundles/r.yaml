@@ -1,0 +1,27 @@
+schemaVersion: v1
+id: r
+displayName: R
+description: R — language expertise, package development, CLI apps, CRAN, lifecycle, async, and testing
+keywords: [r, tidyverse, package-dev, cran]
+owners:
+  - rdl
+channels:
+  - stable
+skills:
+  - {source: r-expert, leaf: expert}
+  - {source: r-lib-cli, leaf: lib-cli}
+  - {source: r-lib-cli-app, leaf: lib-cli-app}
+  - {source: r-lib-cran-extrachecks, leaf: lib-cran-extrachecks}
+  - {source: r-lib-lifecycle, leaf: lib-lifecycle}
+  - {source: r-lib-mirai, leaf: lib-mirai}
+  - {source: r-lib-package-dev, leaf: lib-package-dev}
+  - {source: r-lib-testing, leaf: lib-testing}
+agents: []
+hooks: []
+prompts: []
+mcp: []
+targets:
+  claude:
+    enabled: true
+    pluginName: r
+    marketplaceName: rdl

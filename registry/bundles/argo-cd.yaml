@@ -1,0 +1,20 @@
+schemaVersion: v1
+id: argo-cd
+displayName: Argo CD
+description: Argo CD — GitOps application management and sync for Kubernetes
+keywords: [argo-cd, gitops, kubernetes, cd]
+owners:
+  - rdl
+channels:
+  - stable
+skills:
+  - {source: argo-cd, leaf: manage}
+agents: []
+hooks: []
+prompts: []
+mcp: []
+targets:
+  claude:
+    enabled: true
+    pluginName: argo-cd
+    marketplaceName: rdl

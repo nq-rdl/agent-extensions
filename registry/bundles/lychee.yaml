@@ -1,0 +1,20 @@
+schemaVersion: v1
+id: lychee
+displayName: Lychee
+description: Lychee — fast link checking for docs and Markdown
+keywords: [lychee, links, docs]
+owners:
+  - rdl
+channels:
+  - stable
+skills:
+  - {source: lychee, leaf: check}
+agents: []
+hooks: []
+prompts: []
+mcp: []
+targets:
+  claude:
+    enabled: true
+    pluginName: lychee
+    marketplaceName: rdl

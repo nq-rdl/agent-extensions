@@ -1,0 +1,10 @@
+{
+  "name": "obsidian",
+  "version": "0.9.0",
+  "description": "Obsidian — Bases databases, the CLI, and Obsidian-flavored Markdown",
+  "author": {
+    "name": "nq-rdl"
+  },
+  "repository": "https://github.com/nq-rdl/agent-extensions",
+  "license": "MIT"
+}

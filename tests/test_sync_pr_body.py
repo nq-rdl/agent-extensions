@@ -80,6 +80,56 @@ class TestRender(unittest.TestCase):
         self.assertLessEqual(len(body), 60000)
 
 
+class TestUnmappedSection(unittest.TestCase):
+    """A synced skill is copied but not installable until a bundle maps it; the
+    PR body must flag exactly which added skills are still unmapped."""
+
+    def _changes(self):
+        return {"added": ["zod", "go-gh"], "removed": [], "modified": []}
+
+    def test_flags_added_skills_that_no_bundle_maps(self):
+        body = sync_pr_body.render_pr_body(
+            "v0.9.0", self._changes(), mapped_sources={"go-gh"}
+        )
+        # go-gh is mapped → not flagged; zod is unmapped → flagged.
+        self.assertIn("map these to publish", body.lower())
+        self.assertIn("`zod`", body)
+        action_block = body.split("Action required")[1]
+        self.assertNotIn("`go-gh`", action_block)
+
+    def test_no_section_when_all_added_skills_mapped(self):
+        body = sync_pr_body.render_pr_body(
+            "v0.9.0", self._changes(), mapped_sources={"go-gh", "zod"}
+        )
+        self.assertNotIn("map these to publish", body.lower())
+
+    def test_no_section_when_mapped_sources_unknown(self):
+        # mapped_sources=None (no repo passed) → degrade gracefully, no section.
+        body = sync_pr_body.render_pr_body("v0.9.0", self._changes())
+        self.assertNotIn("map these to publish", body.lower())
+
+    def test_mapped_skill_sources_reads_flat_and_mapping_members(self):
+        import tempfile
+
+        with tempfile.TemporaryDirectory() as tmp:
+            bundles = Path(tmp) / "registry" / "bundles"
+            bundles.mkdir(parents=True)
+            (bundles / "go.yaml").write_text(
+                "id: go\nskills:\n  - {source: go-gh, leaf: gh}\n"
+            )
+            (bundles / "git.yaml").write_text("id: git\nskills:\n  - changie\n")
+            sources = sync_pr_body.mapped_skill_sources(tmp)
+            self.assertEqual(sources, {"go-gh", "changie"})
+
+    def test_mapped_skill_sources_returns_none_when_registry_absent(self):
+        # "unknown" must be None, not set() — an empty set would falsely flag
+        # every added skill as unmapped.
+        import tempfile
+
+        with tempfile.TemporaryDirectory() as tmp:
+            self.assertIsNone(sync_pr_body.mapped_skill_sources(tmp))
+
+
 class TestMain(unittest.TestCase):
     def test_main_reads_name_status_from_stdin_and_drift_from_env(self):
         out = io.StringIO()
@@ -98,6 +148,34 @@ class TestMain(unittest.TestCase):
         self.assertEqual(rc, 0)
         self.assertIn("new-skill", out.getvalue())
         self.assertIn("dataops", out.getvalue())
+
+    def test_main_with_repo_arg_flags_unmapped_added_skills(self):
+        # The production invocation is `sync_pr_body.py <tag> <repo>`; the repo
+        # arg enables the "map these to publish" section for synced-but-unmapped
+        # skills. Exercise that end-to-end wiring (argv → mapped_skill_sources →
+        # render_pr_body), which the single-arg test above does not cover.
+        import tempfile
+
+        out = io.StringIO()
+        old_stdin = sys.stdin
+        with tempfile.TemporaryDirectory() as tmp:
+            bundles = Path(tmp) / "registry" / "bundles"
+            bundles.mkdir(parents=True)
+            (bundles / "go.yaml").write_text("id: go\nskills:\n  - mapped-skill\n")
+            sys.stdin = io.StringIO(
+                "A\tskills/mapped-skill/SKILL.md\nA\tskills/orphan-skill/SKILL.md\n"
+            )
+            try:
+                with contextlib.redirect_stdout(out):
+                    rc = sync_pr_body.main(["v0.9.0", tmp])
+            finally:
+                sys.stdin = old_stdin
+        body = out.getvalue()
+        self.assertEqual(rc, 0)
+        self.assertIn("map these to publish", body)
+        unmapped_section = body.split("map these to publish", 1)[1]
+        self.assertIn("orphan-skill", unmapped_section)       # unmapped → flagged
+        self.assertNotIn("mapped-skill", unmapped_section)    # mapped → not flagged
 
 
 if __name__ == "__main__":

@@ -1,0 +1,10 @@
+{
+  "name": "postgres",
+  "version": "0.9.0",
+  "description": "PostgreSQL administration — schema design, query optimisation, backups, and tuning",
+  "author": {
+    "name": "nq-rdl"
+  },
+  "repository": "https://github.com/nq-rdl/agent-extensions",
+  "license": "MIT"
+}

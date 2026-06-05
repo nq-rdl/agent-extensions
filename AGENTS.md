@@ -70,14 +70,14 @@ MCP servers are authored in `mcp/*-go/` in this repo and distributed as prebuilt
 
 ## MCP Servers
 
-MCP servers are Go binaries under `mcp/<name>-go/`, cross-compiled into `plugins/dev-tools/bin/mcp/` and wired via the bundle plugin's `.mcp.json` — no separate install step required. The catalog currently ships no MCP servers.
+MCP servers are Go binaries under `mcp/<name>-go/`, cross-compiled into `plugins/<subject>/bin/mcp/` (the subject plugin that wires the server) and referenced via that plugin's `.mcp.json` — no separate install step required. The catalog currently ships no Go MCP servers; the hosted Lucid (`lucid`) and Playwright (`playwright`) servers are wired by URL/command, not as committed binaries.
 
 To build locally:
 
 ```bash
 cd mcp/<name>-go
 make build            # builds for the current platform
-make cross-compile DESTDIR=../../plugins/dev-tools/bin/mcp
+make cross-compile DESTDIR=../../plugins/<subject>/bin/mcp
 ```
 
 ## Build, test, lint
@@ -87,18 +87,22 @@ make cross-compile DESTDIR=../../plugins/dev-tools/bin/mcp
 bash scripts/validate-plugins.sh
 
 # Validate only plugins touched by changed files
-bash scripts/validate-plugins.sh plugins/swe/hooks/hooks.json
+bash scripts/validate-plugins.sh plugins/hooks/hooks/hooks.json
 
 # Refresh plugin trees from canonical skills/ and agents/. Run after
 # editing an agent or syncing skills from upstream.
 bash scripts/sync-plugins.sh           # all bundles
-bash scripts/sync-plugins.sh swe       # one bundle
+bash scripts/sync-plugins.sh go        # one bundle
 
 # Regenerate plugin.json + marketplace.json from the registry. These manifests
 # are GENERATED — never hand-edit them. Run after changing a bundle's
 # description/keywords, marketplace.yaml, or VERSION.
 python3 scripts/generate_manifests.py .          # write manifests
 python3 scripts/generate_manifests.py . --check  # CI gate: fail on drift
+
+# Regenerate docs/bundles.md from the registry (also a --check CI gate).
+python3 scripts/generate_bundles_doc.py .          # write
+python3 scripts/generate_bundles_doc.py . --check  # CI gate: fail on drift
 
 # Bundle reference + grouping + three-way consistency checks (also run by validate.yml)
 python3 scripts/check_bundle_refs.py .   # registry refs resolve to skills/ & agents/
@@ -114,8 +118,10 @@ CI runs `validate.yml` on every PR/push to main. It checks:
 - Bundle YAML agent references resolve to `agents/<name>/agent.md`
 - The skill-grouping contract holds (`scripts/check_grouping.py`)
 - Generated `plugin.json` + `marketplace.json` match the registry (`scripts/generate_manifests.py --check`)
+- Generated `docs/bundles.md` matches the registry (`scripts/generate_bundles_doc.py --check`)
 - Registry bundles, `marketplace.json`, and `plugins/` dirs stay in lockstep (`scripts/check_consistency.py`)
 - Plugin manifests, hooks, skills, and `.mcp.json` wiring are valid (`scripts/validate-plugins.sh`)
+- Any symlink under `plugins/` resolves (`validate-symlinks` — plugin trees are real-file copies, so this guards against accidental links)
 - Every `agents/<name>/agent.md` has frontmatter `name` + `description`
 - The pipeline scripts' unit tests pass (`tests/`)
 
@@ -124,12 +130,12 @@ CI runs `validate.yml` on every PR/push to main. It checks:
 To verify skills are visible before release, install the repo as a local Claude Code marketplace:
 
 ```bash
-# Single-session in-place (preferred in devcontainer — no cache copy, symlinks resolve in-place)
-claude --plugin-dir ./plugins/swe
+# Single-session in-place (preferred in devcontainer — no cache copy, reads files directly from the working tree)
+claude --plugin-dir ./plugins/go
 
 # Persistent install (workspace must stay mounted at /workspace)
 claude plugin marketplace add /workspace
-claude plugin install swe@rdl
+claude plugin install go@rdl
 
 # One command installs every subject via the rdl meta-plugin (it declares each
 # subject as a dependency). Requires Claude Code ≥ 2.1.110; prune needs ≥ 2.1.121.
@@ -137,24 +143,32 @@ claude plugin install rdl@rdl
 claude plugin uninstall rdl --prune   # remove the set + orphaned dependencies
 ```
 
-See [`docs/local-testing.md`](docs/local-testing.md) for the full walkthrough including cleanup and the symlink path caveat.
+See [`docs/local-testing.md`](docs/local-testing.md) for the full walkthrough including cleanup and self-contained plugin tree details.
 
 ## Registry Bundles
 
-`registry/bundles/*.yaml` defines what each bundle contains and which targets are enabled. Schema:
+`registry/bundles/*.yaml` defines what each **subject** plugin contains and which targets are
+enabled. One bundle = one subject = one plugin (see `CONTRIBUTING.md` for the grouping rules).
+Schema:
 
 ```yaml
 schemaVersion: v1
-id: swe
-description: Software engineering — secure Go, naming, …  # canonical (no trailing period)
-keywords: [go, ci-cd, security]   # marketplace keywords (generated into the manifests)
-skills: [go-naming, go-secure]    # flat <name>, or {source, leaf} map; source must exist under skills/
-agents: [debug, janitor]          # must exist as agents/<name>/agent.md
+id: go
+displayName: Go
+description: Go — idiomatic naming, secure error handling, and GitHub Actions CI/CD  # no trailing period
+keywords: [go, naming, security, ci-cd]   # marketplace keywords (generated into the manifests)
+skills:                                    # flat <name> (leaf == name), or {source, leaf} to rename
+  - {source: go-gh, leaf: gh}              #   → invokes as /go:gh
+  - {source: go-naming, leaf: naming}      #   → /go:naming
+agents: [go-mcp-expert]                    # must exist as agents/<name>/agent.md (subagent)
 hooks: []
+prompts: []
+mcp: []                                    # wired in plugins/<pluginName>/.mcp.json
 targets:
   claude:
     enabled: true
-    pluginName: swe
+    pluginName: go
+    marketplaceName: rdl
 ```
 
 The bundle's `description` + `keywords` (plus `registry/marketplace.yaml` and `VERSION`) **generate** `plugins/<bundle>/.claude-plugin/plugin.json` and the bundle's `marketplace.json` entry — do not hand-edit those (CI `generate_manifests.py --check` enforces it). After editing a bundle's `description`/`keywords`, run `python3 scripts/generate_manifests.py .`.
@@ -181,8 +195,9 @@ Releases are triggered by pushing a `v*` tag. The tag must point to a commit alr
 
 The workflow:
 1. Verifies the tag is on `main`.
-2. Writes the release version to `VERSION`, regenerates all manifests from the registry (`scripts/generate_manifests.py`), and commits the result back to `main`.
-3. Moves the tag forward to include the bump commit and creates the GitHub release.
+2. Batches and merges the changie changelog for the version — idempotent: it skips the batch when `.changes/<version>.md` is already present (e.g. a pre-batched release PR).
+3. Writes the release version to `VERSION`, regenerates all manifests from the registry (`scripts/generate_manifests.py`), and commits the result back to `main`.
+4. Moves the tag forward to include the bump commit and creates the GitHub release.
 
 `marketplace.json` sources are relative paths (`./plugins/<bundle>`) — installs read directly from `main` (or whatever ref the user pinned), no separate release branch involved.
 
@@ -192,5 +207,5 @@ The docs site uses Zensical (configured in `zensical.toml`). Source is `docs/`. 
 
 ## Platform Notes
 
-- macOS and Linux only — symlink resolution requires native symlink support (WSL2 for Windows)
-- `dist/` is generated output — do not hand-edit
+- macOS and Linux only — the build and sync scripts require POSIX shell tooling (WSL2 for Windows)
+- Generated outputs (`plugins/` trees, `plugins/*/.claude-plugin/plugin.json`, `.claude-plugin/marketplace.json`, `docs/bundles.md`) are produced by the generator scripts — do not hand-edit

@@ -1,0 +1,20 @@
+schemaVersion: v1
+id: writerside
+displayName: Writerside
+description: Writerside — author and build JetBrains Writerside documentation
+keywords: [writerside, docs, authoring]
+owners:
+  - rdl
+channels:
+  - stable
+skills:
+  - {source: writerside, leaf: authoring}
+agents: []
+hooks: []
+prompts: []
+mcp: []
+targets:
+  claude:
+    enabled: true
+    pluginName: writerside
+    marketplaceName: rdl

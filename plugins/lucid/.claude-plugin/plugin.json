@@ -1,6 +1,6 @@
 {
   "name": "lucid",
-  "version": "0.8.0",
+  "version": "0.9.0",
   "description": "Lucid — visual collaboration boards and diagrams (Lucidchart / Lucidspark) via the hosted Lucid MCP server",
   "author": {
     "name": "nq-rdl"

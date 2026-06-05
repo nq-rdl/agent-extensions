@@ -1,0 +1,21 @@
+schemaVersion: v1
+id: research
+displayName: Research
+description: Research — technical-spike validation and prompt engineering
+keywords: [research, spike, prompts]
+owners:
+  - rdl
+channels:
+  - stable
+skills: []
+agents:
+  - research-technical-spike
+  - prompt-builder
+hooks: []
+prompts: []
+mcp: []
+targets:
+  claude:
+    enabled: true
+    pluginName: research
+    marketplaceName: rdl

@@ -1,0 +1,21 @@
+schemaVersion: v1
+id: skill
+displayName: Skill
+description: Skill authoring — review skill quality and report skill issues upstream
+keywords: [skills, review, quality]
+owners:
+  - rdl
+channels:
+  - stable
+skills:
+  - {source: skill-review, leaf: review}
+  - {source: report-skill-issue, leaf: report-issue}
+agents: []
+hooks: []
+prompts: []
+mcp: []
+targets:
+  claude:
+    enabled: true
+    pluginName: skill
+    marketplaceName: rdl

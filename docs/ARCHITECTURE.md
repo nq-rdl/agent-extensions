@@ -6,7 +6,7 @@ icon: lucide/network
 
 This repository is a **Claude Code extension catalog**. It keeps a single source of truth for reusable agent behavior — *skills* and *agents* — and publishes them as self-contained Claude Code plugins through a repo-root marketplace manifest.
 
-> Other hosts (Codex, OpenCode, pi.dev) are **not** publication targets. They use external CLI or packaging tooling rather than Claude Code's `/plugin` marketplace model, so they belong in CLI- or package-driven repos, not here.
+> Claude Code is the **only** publication target. Tools with a different install model (their own CLI or package manager) are out of scope — they belong in CLI- or package-driven repos, not here.
 
 ## Problem statement
 
@@ -40,6 +40,7 @@ mcp/                       ← Go MCP servers (authored here; none currently)
 
 registry/
   bundles/*.yaml           ← single source of truth: which skills/agents/hooks/mcp each bundle ships
+  marketplace.yaml         ← marketplace metadata, plugin defaults, display order, external plugin entries, and the rdl meta-plugin config
 
 .claude-plugin/
   marketplace.json         ← Claude Code marketplace manifest (repo root)
@@ -74,38 +75,38 @@ Runs weekly, on `workflow_dispatch`, and on a `repository_dispatch` fired by an 
 
 ### `validate.yml` — on every PR / push to main
 
-- `validate-bundles`: every skill in a bundle YAML resolves to `skills/<name>/`, every agent to `agents/<name>/agent.md`.
+- `validate-bundles`: bundle references resolve, the grouping contract holds, and the generated manifests + `docs/bundles.md` match the registry (`check_bundle_refs`, `check_grouping`, `generate_manifests --check`, `generate_bundles_doc --check`, `check_consistency`).
 - `validate-symlinks`: any symlink under `plugins/` resolves (plugin trees are real-file copies, so this is a guardrail against accidental links).
 - `validate-plugins`: plugin manifests (`plugin.json`), hooks, and `.mcp.json` wiring are well-formed (`scripts/validate-plugins.sh`).
-- `validate-mcp-servers`: the Go MCP servers under `mcp/*-go/` build and vet.
+- `unit-tests`: the pipeline scripts' unit tests pass (`python3 -m unittest discover -s tests`).
 
 ## Registry schema
 
-The registry describes installable bundles, not raw files.
+The registry describes installable subject plugins, not raw files. One bundle = one subject.
 
 ```yaml
 schemaVersion: v1
-id: swe
-displayName: SWE
-description: Software engineering workflows and coding assistance.
+id: go
+displayName: Go
+description: Go — idiomatic naming, secure error handling, and GitHub Actions CI/CD
+keywords: [go, naming, security, ci-cd]   # marketplace keywords (generated into the manifests)
 owners:
   - rdl
 channels:
   - stable
-skills:                        # resolved from skills/<name>/
-  - go-naming
-  - go-secure
+skills:                        # flat <name> (resolved from skills/<name>/), or a
+  - {source: go-gh, leaf: gh}  #   {source, leaf} map → invokes as /go:gh
+  - {source: go-naming, leaf: naming}
+  - {source: go-secure, leaf: secure}
 agents:                        # resolved from agents/<name>/agent.md
-  - debug
-  - janitor
+  - go-mcp-expert
 hooks: []                      # resolved from hooks/
 prompts: []
-mcp:                           # wired into the plugin's .mcp.json
-  - playwright
+mcp: []                        # wired into the plugin's .mcp.json (e.g. playwright, lucid)
 targets:
   claude:
     enabled: true
-    pluginName: swe
+    pluginName: go
     marketplaceName: rdl
 ```
 
@@ -163,7 +164,7 @@ Agents derived from external sources (e.g. `github/awesome-copilot`, MIT) carry 
 | `mcp/*-go/` Go MCP servers | this repo | this repo (prebuilt binaries in `plugins/*/bin/mcp/`) |
 | `skills/*/scripts/` Go/Python tools | `nq-rdl/agent-skills` | vendored here |
 | `skills/{csv,docx,pdf,xlsx}/scripts/` | `nq-rdl/agent-skills` | run in-place via `ensure-deps.sh` |
-| `plugins/dev-tools/bin/` prebuilt binaries | this repo | committed here, rebuilt by CI |
+| `plugins/<subject>/bin/` prebuilt binaries | this repo | committed here, rebuilt by CI |
 | `registry/bundles/*.yaml` | this repo | this repo |
 
 **Important:** the `skills/` tree is owned by `nq-rdl/agent-skills`. Edits made here are overwritten on the next `sync-skills` PR — file bugs and PRs upstream.
@@ -197,8 +198,9 @@ MCP servers in `mcp/*-go/` follow a Makefile with a `cross-compile` target that 
 Releases are triggered by pushing a `v*` tag pointing at a commit already on `main`. The release workflow (GitHub App token: `RELEASE_APP_ID` / `RELEASE_APP_PRIVATE_KEY`):
 
 1. Verifies the tag is on `main`.
-2. Bumps versions across `marketplace.json` and every `plugins/*/.claude-plugin/plugin.json`, and commits the bump back to `main`.
-3. Moves the tag forward to include the bump commit and creates the GitHub release.
+2. Batches and merges the changie changelog for the version — idempotent: it skips the batch when `.changes/<version>.md` is already present (e.g. a pre-batched release PR).
+3. Writes the release version to `VERSION`, regenerates all manifests from the registry (`scripts/generate_manifests.py`), and commits the result back to `main`.
+4. Moves the tag forward to include the bump commit and creates the GitHub release.
 
 `marketplace.json` plugin sources are relative paths (`./plugins/<bundle>`), so installs read directly from the pinned ref — no separate release branch.
 
@@ -210,14 +212,16 @@ Releases are triggered by pushing a `v*` tag pointing at a commit already on `ma
 
 ```bash
 /plugin marketplace add nq-rdl/agent-extensions
-/plugin install swe@rdl --scope project
+/plugin install rdl@rdl                 # the meta-plugin installs every subject
+# …or install a single subject:
+/plugin install go@rdl --scope project
 ```
 
 Publication target: this repository, with `.claude-plugin/marketplace.json` at the root and plugins under `plugins/`.
 
 ## Platform requirements
 
-macOS and Linux only — the skill-resolution strategy depends on native symlink support. Windows users must run under WSL2.
+macOS and Linux only — the build and sync scripts require POSIX shell tooling (`bash`, `find`, `cp -R`). Windows users must run under WSL2.
 
 ## Design principles
 
@@ -230,8 +234,8 @@ macOS and Linux only — the skill-resolution strategy depends on native symlink
 
 This repository should not:
 
-- republish to hosts whose install model isn't Claude Code's `/plugin` marketplace (Codex, OpenCode, pi.dev) — those belong in CLI- or package-driven repos;
+- republish to hosts whose install model isn't Claude Code's `/plugin` marketplace — those belong in CLI- or package-driven repos;
 - hand-edit vendored skill content (it is owned upstream and overwritten on sync);
-- hand-edit generated output under `dist/`.
+- hand-edit generated output (`plugins/*/` trees, `plugin.json`, `marketplace.json`, `docs/bundles.md`) — run the generator scripts instead.
 
 For contribution expectations and authoring guidance, see the repository-root `AGENTS.md`.

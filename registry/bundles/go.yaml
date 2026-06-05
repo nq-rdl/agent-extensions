@@ -1,0 +1,23 @@
+schemaVersion: v1
+id: go
+displayName: Go
+description: Go — idiomatic naming, secure error handling, and GitHub Actions CI/CD
+keywords: [go, naming, security, ci-cd]
+owners:
+  - rdl
+channels:
+  - stable
+skills:
+  - {source: go-gh, leaf: gh}
+  - {source: go-naming, leaf: naming}
+  - {source: go-secure, leaf: secure}
+agents:
+  - go-mcp-expert
+hooks: []
+prompts: []
+mcp: []
+targets:
+  claude:
+    enabled: true
+    pluginName: go
+    marketplaceName: rdl

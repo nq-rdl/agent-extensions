@@ -1,0 +1,10 @@
+{
+  "name": "argo-cd",
+  "version": "0.9.0",
+  "description": "Argo CD — GitOps application management and sync for Kubernetes",
+  "author": {
+    "name": "nq-rdl"
+  },
+  "repository": "https://github.com/nq-rdl/agent-extensions",
+  "license": "MIT"
+}

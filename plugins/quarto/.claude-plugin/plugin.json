@@ -1,0 +1,10 @@
+{
+  "name": "quarto",
+  "version": "0.9.0",
+  "description": "Quarto — document authoring and accessible figure alt text",
+  "author": {
+    "name": "nq-rdl"
+  },
+  "repository": "https://github.com/nq-rdl/agent-extensions",
+  "license": "MIT"
+}

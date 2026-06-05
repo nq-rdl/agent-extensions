@@ -1,0 +1,20 @@
+schemaVersion: v1
+id: sops
+displayName: SOPS
+description: SOPS — encrypt and decrypt secrets with Age and Vault transit
+keywords: [sops, secrets, encryption, age]
+owners:
+  - rdl
+channels:
+  - stable
+skills:
+  - {source: sops, leaf: encrypt}
+agents: []
+hooks: []
+prompts: []
+mcp: []
+targets:
+  claude:
+    enabled: true
+    pluginName: sops
+    marketplaceName: rdl

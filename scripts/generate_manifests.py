@@ -25,10 +25,6 @@ from pathlib import Path
 
 import yaml
 
-# plugin.json key order — kept explicit so generated output is byte-identical to
-# the hand-written manifests it replaces (a no-diff requirement).
-_PLUGIN_KEYS = ("name", "version", "description", "author", "repository", "license")
-
 
 def _read_yaml(path: Path) -> dict:
     with path.open() as fh:
@@ -46,7 +42,7 @@ def _enabled_bundles(repo: Path) -> dict[str, dict]:
             continue
         plugin = claude.get("pluginName") or data.get("id") or bf.stem
         out[plugin] = {
-            "description": data.get("description", ""),
+            "description": data.get("description") or "",
             "keywords": list(data.get("keywords") or []),
         }
     return out

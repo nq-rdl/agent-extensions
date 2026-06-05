@@ -1,0 +1,20 @@
+schemaVersion: v1
+id: kubernetes
+displayName: Kubernetes
+description: Kubernetes — SRE-grade rollouts, HA design, and incident response
+keywords: [kubernetes, sre, reliability]
+owners:
+  - rdl
+channels:
+  - stable
+skills: []
+agents:
+  - platform-sre-kubernetes
+hooks: []
+prompts: []
+mcp: []
+targets:
+  claude:
+    enabled: true
+    pluginName: kubernetes
+    marketplaceName: rdl

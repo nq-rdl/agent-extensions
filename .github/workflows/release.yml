@@ -39,9 +39,20 @@ jobs:
           fi
 
       - name: Check for unreleased changes
+        env:
+          TAG: ${{ github.ref_name }}
         run: |
-          if [ -z "$(ls .changes/unreleased/ 2>/dev/null | grep -v .gitkeep)" ]; then
-            echo "::error::No unreleased changelog entries found. Nothing to release."
+          version="${TAG#v}"
+          # Releasable when there are unreleased fragments to batch OR this
+          # version was already batched ahead of the tag (e.g. a release PR ran
+          # `changie batch <version>`). Fail only when neither holds — genuinely
+          # nothing to ship.
+          if [ -n "$(ls .changes/unreleased/ 2>/dev/null | grep -v .gitkeep)" ]; then
+            echo "Unreleased fragments present — will batch ${version}."
+          elif [ -f ".changes/${version}.md" ]; then
+            echo "Changelog .changes/${version}.md already batched — skipping batch."
+          else
+            echo "::error::No unreleased entries and no .changes/${version}.md. Nothing to release."
             exit 1
           fi
 
@@ -61,7 +72,18 @@ jobs:
           TAG: ${{ github.ref_name }}
         run: |
           version="${TAG#v}"
-          changie batch "$version"
+          # Idempotent: only batch when this version has not already been batched
+          # (a release PR may pre-run `changie batch <version>`). `changie merge`
+          # deterministically rebuilds CHANGELOG.md from the per-version files, so
+          # it is always safe to run.
+          if [ -f ".changes/${version}.md" ]; then
+            echo "Skipping batch — .changes/${version}.md already exists."
+            if [ -n "$(ls .changes/unreleased/ 2>/dev/null | grep -v .gitkeep)" ]; then
+              echo "::warning::Unreleased fragments remain but ${version} is already batched — they will ship in a later version."
+            fi
+          else
+            changie batch "$version"
+          fi
           changie merge
 
       - name: Stamp version and regenerate manifests

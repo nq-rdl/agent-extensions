@@ -1,0 +1,20 @@
+schemaVersion: v1
+id: bitwarden
+displayName: Bitwarden
+description: Bitwarden — manage .env files and secrets via the Bitwarden CLI
+keywords: [bitwarden, secrets, cli, env]
+owners:
+  - rdl
+channels:
+  - stable
+skills:
+  - {source: bitwarden, leaf: secrets}
+agents: []
+hooks: []
+prompts: []
+mcp: []
+targets:
+  claude:
+    enabled: true
+    pluginName: bitwarden
+    marketplaceName: rdl

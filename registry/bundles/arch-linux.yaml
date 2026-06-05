@@ -1,0 +1,20 @@
+schemaVersion: v1
+id: arch-linux
+displayName: Arch Linux
+description: Arch Linux — pacman, rolling-release maintenance, and system administration
+keywords: [arch-linux, pacman, sysadmin]
+owners:
+  - rdl
+channels:
+  - stable
+skills: []
+agents:
+  - arch-linux-expert
+hooks: []
+prompts: []
+mcp: []
+targets:
+  claude:
+    enabled: true
+    pluginName: arch-linux
+    marketplaceName: rdl

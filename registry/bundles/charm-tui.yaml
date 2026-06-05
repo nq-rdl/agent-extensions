@@ -1,0 +1,20 @@
+schemaVersion: v1
+id: charm-tui
+displayName: Charm
+description: Charm — build terminal UIs with Bubbletea, Lip Gloss, and Fang
+keywords: [charm, tui, bubbletea, go]
+owners:
+  - rdl
+channels:
+  - stable
+skills:
+  - {source: charm-tui, leaf: build}
+agents: []
+hooks: []
+prompts: []
+mcp: []
+targets:
+  claude:
+    enabled: true
+    pluginName: charm-tui
+    marketplaceName: rdl

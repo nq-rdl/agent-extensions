@@ -1,0 +1,10 @@
+{
+  "name": "claude-code",
+  "version": "0.9.0",
+  "description": "Claude Code — agent-team coordination and hook authoring",
+  "author": {
+    "name": "nq-rdl"
+  },
+  "repository": "https://github.com/nq-rdl/agent-extensions",
+  "license": "MIT"
+}

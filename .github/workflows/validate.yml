@@ -30,6 +30,9 @@ jobs:
       - name: Check generated manifests are in sync
         run: python3 scripts/generate_manifests.py . --check
 
+      - name: Check generated bundles doc is in sync
+        run: python3 scripts/generate_bundles_doc.py . --check
+
       - name: Check registry / marketplace / plugins consistency
         run: python3 scripts/check_consistency.py .
 

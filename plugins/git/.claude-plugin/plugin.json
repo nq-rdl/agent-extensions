@@ -1,0 +1,10 @@
+{
+  "name": "git",
+  "version": "0.9.0",
+  "description": "Git workflow — hooks, changelogs, conventional commits, pull requests, and releases",
+  "author": {
+    "name": "nq-rdl"
+  },
+  "repository": "https://github.com/nq-rdl/agent-extensions",
+  "license": "MIT"
+}

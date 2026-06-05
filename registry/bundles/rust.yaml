@@ -1,14 +1,15 @@
 schemaVersion: v1
 id: rust
 displayName: Rust
-description: Rust — read & navigate unfamiliar Rust code, explain constructs, sanity-check correctness
+description: Rust — read and navigate unfamiliar Rust, explain constructs, sanity-check correctness
 keywords: [rust, explain, ownership, borrow-checker]
 owners:
   - rdl
 channels:
   - stable
 skills:
-  - rust-explain
+  - {source: rust-explain, leaf: explain}
+agents: []
 hooks: []
 prompts: []
 mcp: []

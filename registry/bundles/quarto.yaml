@@ -1,0 +1,21 @@
+schemaVersion: v1
+id: quarto
+displayName: Quarto
+description: Quarto — document authoring and accessible figure alt text
+keywords: [quarto, authoring, accessibility, alt-text]
+owners:
+  - rdl
+channels:
+  - stable
+skills:
+  - {source: quarto-authoring, leaf: authoring}
+  - {source: quarto-alt-text, leaf: alt-text}
+agents: []
+hooks: []
+prompts: []
+mcp: []
+targets:
+  claude:
+    enabled: true
+    pluginName: quarto
+    marketplaceName: rdl
