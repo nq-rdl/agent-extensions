@@ -137,6 +137,7 @@ Here is the full loop, using a hypothetical `sql-review-analyse` upstream skill 
    python3 scripts/check_bundle_refs.py .   && \
    python3 scripts/check_grouping.py .      && \
    python3 scripts/generate_manifests.py . --check && \
+   python3 scripts/generate_bundles_doc.py . --check && \
    python3 scripts/check_consistency.py .   && \
    bash scripts/validate-plugins.sh
    ```

@@ -40,6 +40,7 @@ mcp/                       ← Go MCP servers (authored here; none currently)
 
 registry/
   bundles/*.yaml           ← single source of truth: which skills/agents/hooks/mcp each bundle ships
+  marketplace.yaml         ← marketplace metadata, plugin defaults, display order, rdl meta-plugin config
 
 .claude-plugin/
   marketplace.json         ← Claude Code marketplace manifest (repo root)
@@ -77,7 +78,7 @@ Runs weekly, on `workflow_dispatch`, and on a `repository_dispatch` fired by an 
 - `validate-bundles`: every skill in a bundle YAML resolves to `skills/<name>/`, every agent to `agents/<name>/agent.md`.
 - `validate-symlinks`: any symlink under `plugins/` resolves (plugin trees are real-file copies, so this is a guardrail against accidental links).
 - `validate-plugins`: plugin manifests (`plugin.json`), hooks, and `.mcp.json` wiring are well-formed (`scripts/validate-plugins.sh`).
-- `validate-mcp-servers`: the Go MCP servers under `mcp/*-go/` build and vet.
+- `unit-tests`: the pipeline scripts' unit tests pass (`python3 -m unittest discover -s tests`).
 
 ## Registry schema
 
@@ -88,6 +89,7 @@ schemaVersion: v1
 id: go
 displayName: Go
 description: Go — idiomatic naming, secure error handling, and GitHub Actions CI/CD
+keywords: [go, naming, security, ci-cd]   # marketplace keywords (generated into the manifests)
 owners:
   - rdl
 channels:
@@ -196,7 +198,7 @@ MCP servers in `mcp/*-go/` follow a Makefile with a `cross-compile` target that 
 Releases are triggered by pushing a `v*` tag pointing at a commit already on `main`. The release workflow (GitHub App token: `RELEASE_APP_ID` / `RELEASE_APP_PRIVATE_KEY`):
 
 1. Verifies the tag is on `main`.
-2. Bumps versions across `marketplace.json` and every `plugins/*/.claude-plugin/plugin.json`, and commits the bump back to `main`.
+2. Writes the release version to `VERSION`, regenerates all manifests from the registry (`scripts/generate_manifests.py`), and commits the result back to `main`.
 3. Moves the tag forward to include the bump commit and creates the GitHub release.
 
 `marketplace.json` plugin sources are relative paths (`./plugins/<bundle>`), so installs read directly from the pinned ref — no separate release branch.
@@ -218,7 +220,7 @@ Publication target: this repository, with `.claude-plugin/marketplace.json` at t
 
 ## Platform requirements
 
-macOS and Linux only — the skill-resolution strategy depends on native symlink support. Windows users must run under WSL2.
+macOS and Linux only — the build and sync scripts require POSIX shell tooling (`bash`, `find`, `cp -R`). Windows users must run under WSL2.
 
 ## Design principles
 
@@ -233,6 +235,6 @@ This repository should not:
 
 - republish to hosts whose install model isn't Claude Code's `/plugin` marketplace — those belong in CLI- or package-driven repos;
 - hand-edit vendored skill content (it is owned upstream and overwritten on sync);
-- hand-edit generated output under `dist/`.
+- hand-edit generated output (`plugins/*/` trees, `plugin.json`, `marketplace.json`, `docs/bundles.md`) — run the generator scripts instead.
 
 For contribution expectations and authoring guidance, see the repository-root `AGENTS.md`.

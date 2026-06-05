@@ -48,7 +48,7 @@ carried Codex/Gemini multi-host packaging remnants, contrary to the "Claude Code
 
 ### 4.1 Registry (the only hand-authored change)
 - Deleted `registry/bundles/{dev-tools,informatics,infra,meta,swe}.yaml`.
-- Authored **33 subject bundles** (+ rewrote `rust`, `lucid`); kept `hooks`. Total **35 bundles**.
+- Authored **32 subject bundles** (+ rewrote `rust`, `lucid`); kept `hooks`. Total **35 bundles**.
 - Rewrote the `order:` list in `registry/marketplace.yaml` to the 35 subjects.
 
 ### 4.2 Generated / derived (by existing + new scripts)

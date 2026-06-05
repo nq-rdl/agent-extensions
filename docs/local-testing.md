@@ -83,7 +83,7 @@ claude plugin marketplace remove rdl
 
 ## Why Not Copy Into `.claude/`?
 
-Copying plugin directories directly into `~/.claude/plugins/` bypasses the marketplace metadata and breaks the relative symlinks (they'd point into the cache path, not back to `skills/`). Always use `claude plugin marketplace add` or `--plugin-dir` as the entry point.
+Copying plugin directories directly into `~/.claude/plugins/` bypasses the marketplace metadata (installed plugins won't appear in `claude plugin list` and can't be pruned). Always use `claude plugin marketplace add` or `--plugin-dir` as the entry point.
 
 ## References
 

@@ -118,8 +118,10 @@ CI runs `validate.yml` on every PR/push to main. It checks:
 - Bundle YAML agent references resolve to `agents/<name>/agent.md`
 - The skill-grouping contract holds (`scripts/check_grouping.py`)
 - Generated `plugin.json` + `marketplace.json` match the registry (`scripts/generate_manifests.py --check`)
+- Generated `docs/bundles.md` matches the registry (`scripts/generate_bundles_doc.py --check`)
 - Registry bundles, `marketplace.json`, and `plugins/` dirs stay in lockstep (`scripts/check_consistency.py`)
 - Plugin manifests, hooks, skills, and `.mcp.json` wiring are valid (`scripts/validate-plugins.sh`)
+- Any symlink under `plugins/` resolves (`validate-symlinks` — plugin trees are real-file copies, so this guards against accidental links)
 - Every `agents/<name>/agent.md` has frontmatter `name` + `description`
 - The pipeline scripts' unit tests pass (`tests/`)
 
@@ -128,7 +130,7 @@ CI runs `validate.yml` on every PR/push to main. It checks:
 To verify skills are visible before release, install the repo as a local Claude Code marketplace:
 
 ```bash
-# Single-session in-place (preferred in devcontainer — no cache copy, symlinks resolve in-place)
+# Single-session in-place (preferred in devcontainer — no cache copy, reads files directly from the working tree)
 claude --plugin-dir ./plugins/go
 
 # Persistent install (workspace must stay mounted at /workspace)
@@ -141,7 +143,7 @@ claude plugin install rdl@rdl
 claude plugin uninstall rdl --prune   # remove the set + orphaned dependencies
 ```
 
-See [`docs/local-testing.md`](docs/local-testing.md) for the full walkthrough including cleanup and the symlink path caveat.
+See [`docs/local-testing.md`](docs/local-testing.md) for the full walkthrough including cleanup and self-contained plugin tree details.
 
 ## Registry Bundles
 
@@ -204,5 +206,5 @@ The docs site uses Zensical (configured in `zensical.toml`). Source is `docs/`. 
 
 ## Platform Notes
 
-- macOS and Linux only — symlink resolution requires native symlink support (WSL2 for Windows)
-- `dist/` is generated output — do not hand-edit
+- macOS and Linux only — the build and sync scripts require POSIX shell tooling (WSL2 for Windows)
+- Generated outputs (`plugins/` trees, `plugins/*/.claude-plugin/plugin.json`, `.claude-plugin/marketplace.json`, `docs/bundles.md`) are produced by the generator scripts — do not hand-edit
