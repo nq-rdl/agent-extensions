@@ -1,6 +1,6 @@
 {
   "name": "skill",
-  "version": "0.10.0",
+  "version": "0.11.0",
   "description": "Skill authoring — review skill quality and report skill issues upstream",
   "author": {
     "name": "nq-rdl"

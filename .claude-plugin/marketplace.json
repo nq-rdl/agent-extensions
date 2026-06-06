@@ -6,7 +6,7 @@
   },
   "metadata": {
     "description": "Agent extensions — curated skill bundles for Claude Code",
-    "version": "0.10.0",
+    "version": "0.11.0",
     "pluginRoot": "./plugins"
   },
   "plugins": [
@@ -14,7 +14,7 @@
       "name": "go",
       "source": "./plugins/go",
       "description": "Go — idiomatic naming, secure error handling, and GitHub Actions CI/CD",
-      "version": "0.10.0",
+      "version": "0.11.0",
       "keywords": [
         "go",
         "naming",
@@ -26,7 +26,7 @@
       "name": "rust",
       "source": "./plugins/rust",
       "description": "Rust — read and navigate unfamiliar Rust, explain constructs, sanity-check correctness",
-      "version": "0.10.0",
+      "version": "0.11.0",
       "keywords": [
         "rust",
         "explain",
@@ -38,7 +38,7 @@
       "name": "r",
       "source": "./plugins/r",
       "description": "R — language expertise, package development, CLI apps, CRAN, lifecycle, async, and testing",
-      "version": "0.10.0",
+      "version": "0.11.0",
       "keywords": [
         "r",
         "tidyverse",
@@ -50,7 +50,7 @@
       "name": "shiny",
       "source": "./plugins/shiny",
       "description": "Shiny — modern dashboards with bslib and Bootstrap 5 theming",
-      "version": "0.10.0",
+      "version": "0.11.0",
       "keywords": [
         "shiny",
         "bslib",
@@ -62,7 +62,7 @@
       "name": "quarto",
       "source": "./plugins/quarto",
       "description": "Quarto — document authoring and accessible figure alt text",
-      "version": "0.10.0",
+      "version": "0.11.0",
       "keywords": [
         "quarto",
         "authoring",
@@ -74,7 +74,7 @@
       "name": "obsidian",
       "source": "./plugins/obsidian",
       "description": "Obsidian — Bases databases, the CLI, and Obsidian-flavored Markdown",
-      "version": "0.10.0",
+      "version": "0.11.0",
       "keywords": [
         "obsidian",
         "bases",
@@ -86,7 +86,7 @@
       "name": "writerside",
       "source": "./plugins/writerside",
       "description": "Writerside — author and build JetBrains Writerside documentation",
-      "version": "0.10.0",
+      "version": "0.11.0",
       "keywords": [
         "writerside",
         "docs",
@@ -97,7 +97,7 @@
       "name": "zod",
       "source": "./plugins/zod",
       "description": "Zod — TypeScript-first schema declaration and validation",
-      "version": "0.10.0",
+      "version": "0.11.0",
       "keywords": [
         "zod",
         "schema",
@@ -109,7 +109,7 @@
       "name": "defuddle",
       "source": "./plugins/defuddle",
       "description": "Defuddle — extract clean Markdown from cluttered web pages",
-      "version": "0.10.0",
+      "version": "0.11.0",
       "keywords": [
         "defuddle",
         "extraction",
@@ -120,7 +120,7 @@
       "name": "git",
       "source": "./plugins/git",
       "description": "Git workflow — hooks, changelogs, conventional commits, pull requests, and releases",
-      "version": "0.10.0",
+      "version": "0.11.0",
       "keywords": [
         "git",
         "hooks",
@@ -132,7 +132,7 @@
       "name": "github-actions",
       "source": "./plugins/github-actions",
       "description": "GitHub Actions — secure CI/CD workflows, SHA pinning, OIDC, and GitOps delivery",
-      "version": "0.10.0",
+      "version": "0.11.0",
       "keywords": [
         "github-actions",
         "ci-cd",
@@ -144,7 +144,7 @@
       "name": "jules",
       "source": "./plugins/jules",
       "description": "Jules — dispatch AI coding sessions and scaffold GitHub Actions dispatch workflows",
-      "version": "0.10.0",
+      "version": "0.11.0",
       "keywords": [
         "jules",
         "dispatch",
@@ -155,7 +155,7 @@
       "name": "terraform",
       "source": "./plugins/terraform",
       "description": "Terraform — generate compliant HCL, review IaC for state safety, and author Terratest suites",
-      "version": "0.10.0",
+      "version": "0.11.0",
       "keywords": [
         "terraform",
         "iac",
@@ -167,7 +167,7 @@
       "name": "kubernetes",
       "source": "./plugins/kubernetes",
       "description": "Kubernetes — SRE-grade rollouts, HA design, and incident response",
-      "version": "0.10.0",
+      "version": "0.11.0",
       "keywords": [
         "kubernetes",
         "sre",
@@ -178,7 +178,7 @@
       "name": "argo-cd",
       "source": "./plugins/argo-cd",
       "description": "Argo CD — GitOps application management and sync for Kubernetes",
-      "version": "0.10.0",
+      "version": "0.11.0",
       "keywords": [
         "argo-cd",
         "gitops",
@@ -190,7 +190,7 @@
       "name": "ansible",
       "source": "./plugins/ansible",
       "description": "Ansible — author, debug, and optimise playbooks, roles, and inventories",
-      "version": "0.10.0",
+      "version": "0.11.0",
       "keywords": [
         "ansible",
         "playbook",
@@ -201,7 +201,7 @@
       "name": "arch-linux",
       "source": "./plugins/arch-linux",
       "description": "Arch Linux — pacman, rolling-release maintenance, and system administration",
-      "version": "0.10.0",
+      "version": "0.11.0",
       "keywords": [
         "arch-linux",
         "pacman",
@@ -212,7 +212,7 @@
       "name": "starrocks",
       "source": "./plugins/starrocks",
       "description": "StarRocks — analytical SQL, table design, data loading, and query tuning",
-      "version": "0.10.0",
+      "version": "0.11.0",
       "keywords": [
         "starrocks",
         "sql",
@@ -224,7 +224,7 @@
       "name": "postgres",
       "source": "./plugins/postgres",
       "description": "PostgreSQL administration — schema design, query optimisation, backups, and tuning",
-      "version": "0.10.0",
+      "version": "0.11.0",
       "keywords": [
         "postgresql",
         "database",
@@ -235,7 +235,7 @@
       "name": "mongodb",
       "source": "./plugins/mongodb",
       "description": "MongoDB — query and index performance analysis against a live cluster",
-      "version": "0.10.0",
+      "version": "0.11.0",
       "keywords": [
         "mongodb",
         "performance",
@@ -246,7 +246,7 @@
       "name": "sops",
       "source": "./plugins/sops",
       "description": "SOPS — encrypt and decrypt secrets with Age and Vault transit",
-      "version": "0.10.0",
+      "version": "0.11.0",
       "keywords": [
         "sops",
         "secrets",
@@ -258,7 +258,7 @@
       "name": "bitwarden",
       "source": "./plugins/bitwarden",
       "description": "Bitwarden — manage .env files and secrets via the Bitwarden CLI",
-      "version": "0.10.0",
+      "version": "0.11.0",
       "keywords": [
         "bitwarden",
         "secrets",
@@ -270,7 +270,7 @@
       "name": "pixi",
       "source": "./plugins/pixi",
       "description": "Pixi — manage Python projects, environments, and dependencies",
-      "version": "0.10.0",
+      "version": "0.11.0",
       "keywords": [
         "pixi",
         "python",
@@ -281,7 +281,7 @@
       "name": "lychee",
       "source": "./plugins/lychee",
       "description": "Lychee — fast link checking for docs and Markdown",
-      "version": "0.10.0",
+      "version": "0.11.0",
       "keywords": [
         "lychee",
         "links",
@@ -292,7 +292,7 @@
       "name": "charm-tui",
       "source": "./plugins/charm-tui",
       "description": "Charm — build terminal UIs with Bubbletea, Lip Gloss, and Fang",
-      "version": "0.10.0",
+      "version": "0.11.0",
       "keywords": [
         "charm",
         "tui",
@@ -304,7 +304,7 @@
       "name": "claude-code",
       "source": "./plugins/claude-code",
       "description": "Claude Code — agent-team coordination and hook authoring",
-      "version": "0.10.0",
+      "version": "0.11.0",
       "keywords": [
         "claude-code",
         "agents",
@@ -315,7 +315,7 @@
       "name": "playwright",
       "source": "./plugins/playwright",
       "description": "Playwright — generate and debug end-to-end browser tests",
-      "version": "0.10.0",
+      "version": "0.11.0",
       "keywords": [
         "playwright",
         "e2e",
@@ -327,7 +327,7 @@
       "name": "skill",
       "source": "./plugins/skill",
       "description": "Skill authoring — review skill quality and report skill issues upstream",
-      "version": "0.10.0",
+      "version": "0.11.0",
       "keywords": [
         "skills",
         "review",
@@ -338,7 +338,7 @@
       "name": "review",
       "source": "./plugins/review",
       "description": "Code review — security, clean code, governance, responsible AI, and fact-checking",
-      "version": "0.10.0",
+      "version": "0.11.0",
       "keywords": [
         "review",
         "security",
@@ -350,7 +350,7 @@
       "name": "planning",
       "source": "./plugins/planning",
       "description": "Planning — implementation strategy, file-level sequencing, API/repo architecture, and ADRs",
-      "version": "0.10.0",
+      "version": "0.11.0",
       "keywords": [
         "planning",
         "architecture",
@@ -361,7 +361,7 @@
       "name": "debug",
       "source": "./plugins/debug",
       "description": "Debugging and cleanup — systematic diagnosis and tech-debt removal",
-      "version": "0.10.0",
+      "version": "0.11.0",
       "keywords": [
         "debug",
         "cleanup",
@@ -372,7 +372,7 @@
       "name": "docs",
       "source": "./plugins/docs",
       "description": "Technical writing — developer docs, tutorials, ADRs, and guides",
-      "version": "0.10.0",
+      "version": "0.11.0",
       "keywords": [
         "docs",
         "technical-writing"
@@ -382,7 +382,7 @@
       "name": "research",
       "source": "./plugins/research",
       "description": "Research — technical-spike validation and prompt engineering",
-      "version": "0.10.0",
+      "version": "0.11.0",
       "keywords": [
         "research",
         "spike",
@@ -393,7 +393,7 @@
       "name": "lucid",
       "source": "./plugins/lucid",
       "description": "Lucid — visual collaboration boards and diagrams (Lucidchart / Lucidspark) via the hosted Lucid MCP server",
-      "version": "0.10.0",
+      "version": "0.11.0",
       "keywords": [
         "lucid",
         "lucidchart",
@@ -406,7 +406,7 @@
       "name": "hooks",
       "source": "./plugins/hooks",
       "description": "Hooks — forced skill evaluation when prompts mention skills",
-      "version": "0.10.0",
+      "version": "0.11.0",
       "keywords": [
         "hooks",
         "skills",
@@ -420,7 +420,7 @@
         "repo": "max-sixty/worktrunk"
       },
       "description": "Developer tools — Git worktree CLI for parallel AI agent workflows, config guidance, and automatic Claude session tracking",
-      "version": "0.10.0",
+      "version": "0.11.0",
       "keywords": [
         "git",
         "worktree",
@@ -432,7 +432,7 @@
       "name": "rdl",
       "source": "./plugins/rdl",
       "description": "Install the full RDL agent-extensions set — every subject plugin in one command",
-      "version": "0.10.0",
+      "version": "0.11.0",
       "keywords": [
         "meta",
         "install",
