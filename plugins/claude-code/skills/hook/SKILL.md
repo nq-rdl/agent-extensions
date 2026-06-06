@@ -1,5 +1,5 @@
 ---
-name: cc-hook
+name: hook
 license: CC-BY-4.0
 description: >-
   Create, manage, and debug Claude Code hooks — user-defined commands that run

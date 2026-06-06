@@ -1,5 +1,5 @@
 ---
-name: obsidian-cli
+name: cli
 license: CC-BY-4.0
 description: >-
   Interact with Obsidian vaults using the Obsidian CLI to read, create, search,

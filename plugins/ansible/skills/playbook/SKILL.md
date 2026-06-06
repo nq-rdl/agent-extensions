@@ -1,5 +1,5 @@
 ---
-name: ansible
+name: playbook
 license: CC-BY-4.0
 description: >-
   Use this skill whenever the user wants to create, modify, debug, or optimise

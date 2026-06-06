@@ -1,5 +1,5 @@
 ---
-name: report-skill-issue
+name: report-issue
 license: CC-BY-4.0
 description: >-
   Report issues with skills to their upstream repository. Use when a skill

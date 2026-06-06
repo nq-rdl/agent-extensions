@@ -84,11 +84,14 @@ packaging decision and lives here**, in the bundle registry (per
     different `leaf` (e.g. `{source: go-gh, leaf: gh}` → `go:gh`).
 - `scripts/sync-plugins.sh` copies `skills/<source>/` → `plugins/<subject>/skills/<leaf>/`, renaming
   to the leaf — so the plugin tree is one level deep and Claude Code invokes `<subject>:<leaf>`.
-  **The leaf folder name drives invocation** (verified by smoke test 2026-06-03); the upstream
-  frontmatter `name:` survives only as a cosmetic display label, so it is left untouched (no
-  vendored-content rewrite).
-- Validators (`scripts/check_grouping.py`) enforce: every member has a valid shape · no duplicate
-  leaf within a bundle · `pluginName` unique across bundles.
+  **The leaf folder name drives invocation**, but the frontmatter `name:` is the label Claude Code
+  shows in `/`-autocomplete and listings — so the sync also rewrites the **copy's** `name:` to the
+  leaf, keeping label and invocation in step (without it, `/go` recommends `go-gh` instead of
+  `go:gh`). The canonical `skills/` source is never touched; only the derivative plugin copy is
+  reconciled.
+- Validators enforce: every member has a valid shape · no duplicate leaf within a bundle ·
+  `pluginName` unique across bundles (`scripts/check_grouping.py`) · each plugin skill copy's
+  `name:` equals its leaf (`scripts/validate-plugins.sh`).
 
 So to add `obsidian:bases`, the upstream skill stays flat `skills/obsidian-bases/`; the registry
 maps `{source: obsidian-bases, leaf: bases}` under `pluginName: obsidian`. Agents are authored here

@@ -26,6 +26,12 @@
 #    14. Every mcp entry in a bundle YAML is wired in the bundle plugin's
 #        .mcp.json (at plugin root, per Claude Code plugin spec)
 #
+#   skills
+#    15. Every bundle skill resolves to a canonical skills/<source>/ and (for
+#        Claude targets) to a plugin copy at plugins/<plugin>/skills/<leaf>/
+#    16. Each plugin skill copy's frontmatter `name:` equals its leaf folder, so
+#        the /-autocomplete label matches the <plugin>:<leaf> invocation
+#
 # Usage:
 #   validate-plugins.sh                       # validate all plugins + agents
 #   validate-plugins.sh plugins/swe/...       # validate only plugins touched by changed files
@@ -251,6 +257,24 @@ def err(path, msg):
     print(f"::error file={path}::{msg}", file=sys.stderr)
     fail = True
 
+
+def frontmatter_name(skill_md):
+    # The leading YAML frontmatter `name:` of a SKILL.md, or None if the file is
+    # missing, has no frontmatter, or sets no name (an absent name is valid —
+    # Claude Code falls back to the directory name).
+    if not skill_md.is_file():
+        return None
+    parts = skill_md.read_text(encoding="utf-8").split("---\n", 2)
+    if len(parts) < 3 or parts[0].strip():
+        return None
+    try:
+        fm = yaml.safe_load(parts[1]) or {}
+    except yaml.YAMLError:
+        return None
+    val = fm.get("name")
+    return val if isinstance(val, str) else None
+
+
 _bundles_dir = repo / "registry" / "bundles"
 for bundle in sorted(list(_bundles_dir.glob("*.yaml")) + list(_bundles_dir.glob("*.yml"))):
     with bundle.open() as f:
@@ -298,6 +322,21 @@ for bundle in sorted(list(_bundles_dir.glob("*.yaml")) + list(_bundles_dir.glob(
             copy = repo / "plugins" / plugin_name / "skills" / leaf
             if not copy.is_dir():
                 err(bundle, f"Skill '{source}' declared for Claude target but missing plugin copy plugins/{plugin_name}/skills/{leaf}/")
+            else:
+                # The plugin copy's frontmatter `name:` is the label Claude Code
+                # shows in /-autocomplete and listings; it must equal the leaf so
+                # the label agrees with the <plugin>:<leaf> invocation (else `/go`
+                # recommends `go-gh` instead of `go:gh`). sync-plugins.sh
+                # reconciles this on copy; this guards a hand-edited or stale tree.
+                copy_name = frontmatter_name(copy / "SKILL.md")
+                if copy_name is not None and copy_name != leaf:
+                    err(
+                        copy / "SKILL.md",
+                        f"plugin skill name: '{copy_name}' must equal its leaf "
+                        f"'{leaf}' so the /-autocomplete label matches the "
+                        f"{plugin_name}:{leaf} invocation — re-run "
+                        f"scripts/sync-plugins.sh {bundle_id}",
+                    )
 
     mcp_json = repo / "plugins" / plugin_name / ".mcp.json"
     declared_mcp = data.get("mcp") or []

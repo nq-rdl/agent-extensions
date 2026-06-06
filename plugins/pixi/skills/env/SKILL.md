@@ -1,5 +1,5 @@
 ---
-name: pixi
+name: env
 license: CC-BY-4.0
 description: >-
   Use this skill to help agents manage Python projects, dependencies, environments,
