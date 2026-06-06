@@ -1,5 +1,4 @@
 ---
-name: schema
 license: CC-BY-4.0
 description: >-
   Use this skill when defining, validating, or inferring types from data schemas using the Zod library. Useful for input validation, API response checking, and generating TypeScript types from runtime schemas.

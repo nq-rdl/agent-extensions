@@ -1,5 +1,4 @@
 ---
-name: bslib
 license: CC-BY-4.0
 description: >-
   Build modern Shiny dashboards and applications using bslib (Bootstrap 5).

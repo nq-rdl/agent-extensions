@@ -1,5 +1,4 @@
 ---
-name: document-release
 license: CC-BY-4.0
 description: >-
   Post-ship documentation update. Use after shipping a feature or at session

@@ -1,5 +1,4 @@
 ---
-name: changie
 license: CC-BY-4.0
 description: >-
   Changelog entry creation with Changie. Use when writing a changelog entry,

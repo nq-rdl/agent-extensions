@@ -1,5 +1,4 @@
 ---
-name: lib-package-dev
 license: CC-BY-4.0
 description: >-
   Orchestrates the full R package development lifecycle: project creation,

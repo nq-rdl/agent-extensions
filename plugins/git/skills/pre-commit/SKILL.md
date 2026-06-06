@@ -1,5 +1,4 @@
 ---
-name: pre-commit
 license: CC-BY-4.0
 description: >-
   Manage Git hooks with Python's pre-commit framework, using pixi. Use when the

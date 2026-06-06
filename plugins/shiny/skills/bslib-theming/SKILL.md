@@ -1,5 +1,4 @@
 ---
-name: bslib-theming
 license: CC-BY-4.0
 description: >-
   Advanced theming for Shiny apps using bslib and Bootstrap 5. Use when

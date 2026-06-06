@@ -1,5 +1,4 @@
 ---
-name: authoring
 license: CC-BY-4.0
 description: >-
   Writing and authoring Quarto documents (.qmd), including code cell options,

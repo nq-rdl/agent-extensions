@@ -29,8 +29,9 @@
 #   skills
 #    15. Every bundle skill resolves to a canonical skills/<source>/ and (for
 #        Claude targets) to a plugin copy at plugins/<plugin>/skills/<leaf>/
-#    16. Each plugin skill copy's frontmatter `name:` equals its leaf folder, so
-#        the /-autocomplete label matches the <plugin>:<leaf> invocation
+#    16. Each plugin skill copy carries NO frontmatter `name:`, so the
+#        /-autocomplete label falls back to the <plugin>:<leaf> invocation
+#        (a present `name:` overrides it with a bare, un-prefixed label)
 #
 # Usage:
 #   validate-plugins.sh                       # validate all plugins + agents
@@ -259,12 +260,15 @@ def err(path, msg):
 
 
 def frontmatter_name(skill_md):
-    """Return the SKILL.md leading-frontmatter `name:` (str), or None when the
-    file is missing, has no frontmatter block, or sets no `name` key — all valid,
-    since Claude Code falls back to the directory name.
+    """Return the SKILL.md frontmatter `name:` coerced to str, or None when the
+    file is missing, has no frontmatter block, has no `name` key, or sets it to
+    null. An absent/null name is valid — Claude Code then labels the skill by its
+    `<plugin>:<leaf>` id. Any present, non-null value (string, number, bool, …)
+    is returned as a str: Claude Code coerces it via `String(name)` into a bare
+    label, so the caller's guard must reject it regardless of YAML type.
 
     Raise ValueError when a frontmatter block IS present but is unparseable YAML,
-    so the caller fails validation instead of silently skipping the name==leaf
+    so the caller fails validation instead of silently skipping the no-name
     guard on a broken header (mirrors the agent-frontmatter check below).
     """
     if not skill_md.is_file():
@@ -277,7 +281,7 @@ def frontmatter_name(skill_md):
     except yaml.YAMLError as exc:
         raise ValueError(f"invalid YAML frontmatter: {exc}") from exc
     val = fm.get("name")
-    return val if isinstance(val, str) else None
+    return None if val is None else str(val)
 
 
 _bundles_dir = repo / "registry" / "bundles"
@@ -328,23 +332,24 @@ for bundle in sorted(list(_bundles_dir.glob("*.yaml")) + list(_bundles_dir.glob(
             if not copy.is_dir():
                 err(bundle, f"Skill '{source}' declared for Claude target but missing plugin copy plugins/{plugin_name}/skills/{leaf}/")
             else:
-                # The plugin copy's frontmatter `name:` is the label Claude Code
-                # shows in /-autocomplete and listings; it must equal the leaf so
-                # the label agrees with the <plugin>:<leaf> invocation (else `/go`
-                # recommends `go-gh` instead of `go:gh`). sync-plugins.sh
-                # reconciles this on copy; this guards a hand-edited or stale tree.
+                # Claude Code labels a plugin skill in /-autocomplete as
+                # `frontmatter.name || <plugin>:<leaf>` — so a present `name:`
+                # (ANY value) overrides the namespaced id with a bare label
+                # (`/go` would list `gh`, not `go:gh`). The copy must carry NO
+                # `name:` at all. sync-plugins.sh strips it on copy; this guards
+                # a hand-edited or stale tree.
                 try:
                     copy_name = frontmatter_name(copy / "SKILL.md")
                 except ValueError as exc:
                     err(copy / "SKILL.md", str(exc))
                     copy_name = None
-                if copy_name is not None and copy_name != leaf:
+                if copy_name is not None:
                     err(
                         copy / "SKILL.md",
-                        f"plugin skill name: '{copy_name}' must equal its leaf "
-                        f"'{leaf}' so the /-autocomplete label matches the "
-                        f"{plugin_name}:{leaf} invocation — re-run "
-                        f"scripts/sync-plugins.sh {bundle_id}",
+                        f"plugin skill copy must carry NO frontmatter name: "
+                        f"(found '{copy_name}') so the /-autocomplete label "
+                        f"falls back to the {plugin_name}:{leaf} invocation — "
+                        f"re-run scripts/sync-plugins.sh {bundle_id}",
                     )
 
     mcp_json = repo / "plugins" / plugin_name / ".mcp.json"

@@ -1,5 +1,4 @@
 ---
-name: explain
 license: CC-BY-4.0
 description: >-
   Teaching assistant for reading and navigating Rust code. Use when reading an

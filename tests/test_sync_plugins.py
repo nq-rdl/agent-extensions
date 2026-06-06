@@ -74,7 +74,8 @@ class TestMappedMembers(unittest.TestCase):
     """An explicit {source, leaf} member copies the FLAT upstream skills/<source>/
     to plugins/<plugin>/skills/<leaf>/ — renaming to the leaf so the plugin tree
     stays one level deep and Claude Code invokes <plugin>:<leaf> (Option-2
-    grouping). Flat string members stay byte-identical (no-diff)."""
+    grouping). A flat string member keeps its FOLDER name (no rename); its copy's
+    frontmatter name: is still stripped (see TestNameStrip)."""
 
     def test_mapped_member_renames_source_to_leaf(self):
         with tempfile.TemporaryDirectory() as tmp:
@@ -95,7 +96,7 @@ class TestMappedMembers(unittest.TestCase):
                 "the flat source name must NOT appear in the plugin tree",
             )
 
-    def test_flat_member_unchanged(self):
+    def test_flat_member_folder_not_renamed(self):
         with tempfile.TemporaryDirectory() as tmp:
             repo = Path(tmp)
             write(
@@ -107,7 +108,7 @@ class TestMappedMembers(unittest.TestCase):
             run_sync(repo)
             self.assertTrue(
                 (repo / "plugins" / "swe" / "skills" / "go-gh" / "SKILL.md").is_file(),
-                "flat member must remain at plugins/swe/skills/go-gh/ (unchanged)",
+                "flat member keeps its folder name plugins/swe/skills/go-gh/ (no rename)",
             )
 
     def test_mapped_prune_keys_on_leaf(self):
@@ -147,18 +148,19 @@ def _skill_name(skill_md: Path) -> str | None:
     except yaml.YAMLError:
         return None
     val = fm.get("name")
-    return val if isinstance(val, str) else None
+    return None if val is None else str(val)
 
 
-class TestNameReconciliation(unittest.TestCase):
-    """The plugin copy's frontmatter ``name:`` must match the leaf folder so the
-    invocation (``<plugin>:<leaf>``) and the display label Claude Code shows in
-    /-autocomplete agree. sync renames the *folder* to the leaf; without also
-    rewriting ``name:`` the user sees the stale upstream label (issue: ``/go``
-    recommends ``go-gh`` instead of ``go:gh``). The canonical skills/ tree keeps
-    its flat upstream name — only the derivative plugin copy is reconciled."""
+class TestNameStrip(unittest.TestCase):
+    """The plugin copy must carry NO frontmatter ``name:``. Claude Code labels a
+    plugin skill in /-autocomplete as ``frontmatter.name || <plugin>:<leaf>`` —
+    so ANY ``name:`` (the upstream ``go-gh`` or the leaf ``gh``) overrides the
+    namespaced id with a bare label, and the user typing ``/go`` sees ``go-gh`` /
+    ``gh`` instead of ``go:gh`` (issue #112). Stripping the copy's ``name:`` lets
+    the label fall back to ``<plugin>:<leaf>``. The canonical skills/ tree keeps
+    its flat upstream name — only the derivative plugin copy is stripped."""
 
-    def test_mapped_member_rewrites_name_to_leaf(self):
+    def test_mapped_member_strips_name(self):
         with tempfile.TemporaryDirectory() as tmp:
             repo = Path(tmp)
             write(
@@ -172,20 +174,19 @@ class TestNameReconciliation(unittest.TestCase):
             )
             run_sync(repo)
             copy = repo / "plugins" / "go" / "skills" / "gh" / "SKILL.md"
-            self.assertEqual(
+            self.assertIsNone(
                 _skill_name(copy),
-                "gh",
-                "plugin copy name: must be reconciled to the leaf so the label "
-                "matches the go:gh invocation",
+                "plugin copy name: must be stripped so the /-autocomplete label "
+                "falls back to the go:gh invocation",
             )
             # Canonical source must stay flat (untouched upstream label).
             self.assertEqual(
                 _skill_name(repo / "skills" / "go-gh" / "SKILL.md"),
                 "go-gh",
-                "canonical skills/ name: must NOT be rewritten",
+                "canonical skills/ name: must NOT be touched",
             )
 
-    def test_name_rewrite_preserves_other_frontmatter_and_body(self):
+    def test_strip_preserves_other_frontmatter_and_body(self):
         with tempfile.TemporaryDirectory() as tmp:
             repo = Path(tmp)
             write(
@@ -198,11 +199,40 @@ class TestNameReconciliation(unittest.TestCase):
                 "---\nname: go-gh\nlicense: CC-BY-4.0\n---\n# Heading\n\nbody text\n",
             )
             run_sync(repo)
-            text = (repo / "plugins" / "go" / "skills" / "gh" / "SKILL.md").read_text()
+            copy = repo / "plugins" / "go" / "skills" / "gh" / "SKILL.md"
+            text = copy.read_text()
+            self.assertIsNone(_skill_name(copy), "name: must be gone")
             self.assertIn("license: CC-BY-4.0", text)
             self.assertIn("# Heading", text)
             self.assertIn("body text", text)
             self.assertNotIn("go-gh", text)
+
+    def test_block_scalar_name_is_stripped_without_orphans(self):
+        # A folded/block scalar name: must be removed whole — key line AND its
+        # indented continuation — so the strip never leaves orphaned lines that
+        # corrupt the frontmatter. (No real skill uses this, but the strip must
+        # not be able to emit broken YAML.)
+        with tempfile.TemporaryDirectory() as tmp:
+            repo = Path(tmp)
+            write(
+                repo / "registry" / "bundles" / "go.yaml",
+                "id: go\nskills:\n  - source: go-gh\n    leaf: gh\n"
+                "targets:\n  claude:\n    enabled: true\n    pluginName: go\n",
+            )
+            write(
+                repo / "skills" / "go-gh" / "SKILL.md",
+                "---\nname: >-\n  go\n  gh\nlicense: CC-BY-4.0\n---\nbody\n",
+            )
+            run_sync(repo)
+            copy = repo / "plugins" / "go" / "skills" / "gh" / "SKILL.md"
+            self.assertIsNone(_skill_name(copy), "block-scalar name: must be gone")
+            text = copy.read_text()
+            self.assertIn("license: CC-BY-4.0", text)
+            self.assertNotIn("go\n  gh", text)
+            # Frontmatter must still parse — no orphaned continuation lines.
+            fm = yaml.safe_load(text.split("---\n", 2)[1]) or {}
+            self.assertNotIn("name", fm)
+            self.assertEqual(fm.get("license"), "CC-BY-4.0")
 
     def test_absent_name_is_left_untouched(self):
         # An absent name: is valid — Claude Code falls back to the directory name,
@@ -223,7 +253,11 @@ class TestNameReconciliation(unittest.TestCase):
                 "no name: key — sync must leave the file byte-for-byte untouched",
             )
 
-    def test_flat_member_name_matches_folder(self):
+    def test_flat_member_name_is_stripped(self):
+        # Even a flat member whose upstream name already equals its folder must
+        # have the copy's name stripped: `frontmatter.name || <plugin>:<leaf>`
+        # means a present `name: changie` shows the bare `changie`, not
+        # `git:changie`.
         with tempfile.TemporaryDirectory() as tmp:
             repo = Path(tmp)
             write(
@@ -236,10 +270,9 @@ class TestNameReconciliation(unittest.TestCase):
                 "---\nname: changie\n---\nbody\n",
             )
             run_sync(repo)
-            self.assertEqual(
+            self.assertIsNone(
                 _skill_name(repo / "plugins" / "git" / "skills" / "changie" / "SKILL.md"),
-                "changie",
-                "flat member name stays equal to its folder (idempotent rewrite)",
+                "flat member's copy name must be stripped so the label is git:changie",
             )
 
 

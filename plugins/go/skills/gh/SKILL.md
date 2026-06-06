@@ -1,5 +1,4 @@
 ---
-name: gh
 license: CC-BY-4.0
 description: >-
   GitHub Actions CI/CD for Go projects. Use when writing or reviewing GitHub

@@ -1,5 +1,4 @@
 ---
-name: dispatch
 license: CC-BY-4.0
 description: >-
   Use when dispatching tasks to Jules, creating or monitoring Jules AI coding

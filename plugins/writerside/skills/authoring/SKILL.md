@@ -1,5 +1,4 @@
 ---
-name: authoring
 license: CC-BY-4.0
 description: >-
   Use when the user asks about Writerside topics, markup tags, documentation

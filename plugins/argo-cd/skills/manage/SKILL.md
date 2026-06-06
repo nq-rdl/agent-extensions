@@ -1,5 +1,4 @@
 ---
-name: manage
 license: CC-BY-4.0
 description: >-
   Manage ArgoCD configuration, including applications, projects, repositories,

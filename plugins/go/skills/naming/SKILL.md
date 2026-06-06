@@ -1,5 +1,4 @@
 ---
-name: naming
 license: CC-BY-4.0
 description: >-
   Go naming conventions and idiomatic identifier choices. Use when writing new

@@ -1,5 +1,4 @@
 ---
-name: lib-cli
 license: CC-BY-4.0
 description: >-
   Comprehensive R package for command-line interface styling, semantic messaging,

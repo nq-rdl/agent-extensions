@@ -1,5 +1,4 @@
 ---
-name: agent-teams
 license: CC-BY-4.0
 description: >-
   Claude Code agent teams — coordinate multiple independent Claude Code sessions

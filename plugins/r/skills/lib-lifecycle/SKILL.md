@@ -1,5 +1,4 @@
 ---
-name: lib-lifecycle
 license: CC-BY-4.0
 description: >-
   Guidance for managing R package lifecycle according to tidyverse principles

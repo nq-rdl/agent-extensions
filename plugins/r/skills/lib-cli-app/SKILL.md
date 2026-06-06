@@ -1,5 +1,4 @@
 ---
-name: lib-cli-app
 license: CC-BY-4.0
 description: >-
   Build command-line apps in R using the Rapp package. Use when creating

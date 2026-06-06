@@ -1,5 +1,4 @@
 ---
-name: lefthook
 license: CC-BY-4.0
 description: >-
   Git hooks management with Lefthook. Use when writing or reviewing git hook

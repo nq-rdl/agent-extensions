@@ -1,5 +1,4 @@
 ---
-name: check
 license: CC-BY-4.0
 description: >-
   Fast link checker for documentation, READMEs, skills, and any text/markdown files.
