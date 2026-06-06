@@ -1,5 +1,5 @@
 ---
-name: sops
+name: encrypt
 license: CC-BY-4.0
 description: >-
   Use when encrypting or decrypting `.env`, `.yaml`, `.json`, or `.ini` secrets

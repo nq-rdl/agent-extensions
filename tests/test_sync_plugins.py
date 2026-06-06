@@ -8,11 +8,15 @@ The script derives its repo root from its own location, so each test copies the
 real script into a throwaway fixture and runs it there.
 """
 
+from __future__ import annotations
+
 import shutil
 import subprocess
 import tempfile
 import unittest
 from pathlib import Path
+
+import yaml
 
 REPO = Path(__file__).resolve().parent.parent
 SCRIPT = REPO / "scripts" / "sync-plugins.sh"
@@ -124,6 +128,118 @@ class TestMappedMembers(unittest.TestCase):
             self.assertFalse(
                 (repo / "plugins" / "go" / "skills" / "naming").exists(),
                 "stale leaf 'naming' must be pruned (keep-set is keyed by leaf)",
+            )
+
+
+def _skill_name(skill_md: Path) -> str | None:
+    """Return the frontmatter ``name:`` value of a SKILL.md, or None.
+
+    Parses the leading YAML frontmatter block the same way the production
+    ``frontmatter_name`` helper in scripts/validate-plugins.sh does, so the test
+    and the code under test agree on what counts as a name."""
+    if not skill_md.is_file():
+        return None
+    parts = skill_md.read_text().split("---\n", 2)
+    if len(parts) < 3 or parts[0].strip():
+        return None
+    try:
+        fm = yaml.safe_load(parts[1]) or {}
+    except yaml.YAMLError:
+        return None
+    val = fm.get("name")
+    return val if isinstance(val, str) else None
+
+
+class TestNameReconciliation(unittest.TestCase):
+    """The plugin copy's frontmatter ``name:`` must match the leaf folder so the
+    invocation (``<plugin>:<leaf>``) and the display label Claude Code shows in
+    /-autocomplete agree. sync renames the *folder* to the leaf; without also
+    rewriting ``name:`` the user sees the stale upstream label (issue: ``/go``
+    recommends ``go-gh`` instead of ``go:gh``). The canonical skills/ tree keeps
+    its flat upstream name — only the derivative plugin copy is reconciled."""
+
+    def test_mapped_member_rewrites_name_to_leaf(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            repo = Path(tmp)
+            write(
+                repo / "registry" / "bundles" / "go.yaml",
+                "id: go\nskills:\n  - source: go-gh\n    leaf: gh\n"
+                "targets:\n  claude:\n    enabled: true\n    pluginName: go\n",
+            )
+            write(
+                repo / "skills" / "go-gh" / "SKILL.md",
+                "---\nname: go-gh\nlicense: CC-BY-4.0\ndescription: x\n---\nbody\n",
+            )
+            run_sync(repo)
+            copy = repo / "plugins" / "go" / "skills" / "gh" / "SKILL.md"
+            self.assertEqual(
+                _skill_name(copy),
+                "gh",
+                "plugin copy name: must be reconciled to the leaf so the label "
+                "matches the go:gh invocation",
+            )
+            # Canonical source must stay flat (untouched upstream label).
+            self.assertEqual(
+                _skill_name(repo / "skills" / "go-gh" / "SKILL.md"),
+                "go-gh",
+                "canonical skills/ name: must NOT be rewritten",
+            )
+
+    def test_name_rewrite_preserves_other_frontmatter_and_body(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            repo = Path(tmp)
+            write(
+                repo / "registry" / "bundles" / "go.yaml",
+                "id: go\nskills:\n  - source: go-gh\n    leaf: gh\n"
+                "targets:\n  claude:\n    enabled: true\n    pluginName: go\n",
+            )
+            write(
+                repo / "skills" / "go-gh" / "SKILL.md",
+                "---\nname: go-gh\nlicense: CC-BY-4.0\n---\n# Heading\n\nbody text\n",
+            )
+            run_sync(repo)
+            text = (repo / "plugins" / "go" / "skills" / "gh" / "SKILL.md").read_text()
+            self.assertIn("license: CC-BY-4.0", text)
+            self.assertIn("# Heading", text)
+            self.assertIn("body text", text)
+            self.assertNotIn("go-gh", text)
+
+    def test_absent_name_is_left_untouched(self):
+        # An absent name: is valid — Claude Code falls back to the directory name,
+        # which is already the leaf — so sync must not inject one. Keeps sync, the
+        # validator, and the docs in agreement (and avoids a needless rewrite).
+        with tempfile.TemporaryDirectory() as tmp:
+            repo = Path(tmp)
+            write(
+                repo / "registry" / "bundles" / "go.yaml",
+                "id: go\nskills:\n  - source: go-gh\n    leaf: gh\n"
+                "targets:\n  claude:\n    enabled: true\n    pluginName: go\n",
+            )
+            write(repo / "skills" / "go-gh" / "SKILL.md", "---\nlicense: x\n---\nbody\n")
+            run_sync(repo)
+            self.assertEqual(
+                (repo / "plugins" / "go" / "skills" / "gh" / "SKILL.md").read_text(),
+                "---\nlicense: x\n---\nbody\n",
+                "no name: key — sync must leave the file byte-for-byte untouched",
+            )
+
+    def test_flat_member_name_matches_folder(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            repo = Path(tmp)
+            write(
+                repo / "registry" / "bundles" / "git.yaml",
+                "id: git\nskills:\n  - changie\n"
+                "targets:\n  claude:\n    enabled: true\n    pluginName: git\n",
+            )
+            write(
+                repo / "skills" / "changie" / "SKILL.md",
+                "---\nname: changie\n---\nbody\n",
+            )
+            run_sync(repo)
+            self.assertEqual(
+                _skill_name(repo / "plugins" / "git" / "skills" / "changie" / "SKILL.md"),
+                "changie",
+                "flat member name stays equal to its folder (idempotent rewrite)",
             )
 
 

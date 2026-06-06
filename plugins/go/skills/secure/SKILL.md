@@ -1,5 +1,5 @@
 ---
-name: go-secure
+name: secure
 license: CC-BY-4.0
 description: >-
   Secure Go error handling and information leakage prevention. Use whenever

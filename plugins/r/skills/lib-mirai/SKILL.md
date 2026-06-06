@@ -1,5 +1,5 @@
 ---
-name: r-lib-mirai
+name: lib-mirai
 license: CC-BY-4.0
 description: >-
   Help users write correct R code for async, parallel, and distributed

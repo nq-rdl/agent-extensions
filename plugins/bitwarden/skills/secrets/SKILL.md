@@ -1,5 +1,5 @@
 ---
-name: bitwarden
+name: secrets
 license: CC-BY-4.0
 description: >-
   Manage .env files and development secrets using the Bitwarden personal

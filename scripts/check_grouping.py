@@ -6,12 +6,17 @@ an explicit ``{source, leaf}`` mapping that packages the flat upstream skill
 ``skills/<source>/`` under a different leaf (e.g. ``go-gh`` -> ``go:gh``).
 ``sync-plugins.sh`` copies ``skills/<source>/`` ->
 ``plugins/<pluginName>/skills/<leaf>/`` and Claude Code invokes
-``<pluginName>:<leaf>`` — the leaf *folder* name drives invocation (verified by
-smoke test; the upstream frontmatter ``name`` survives only as a display label).
+``<pluginName>:<leaf>`` — the leaf *folder* name drives invocation. The
+frontmatter ``name`` is the label Claude Code shows in /-autocomplete and
+listings, so it must agree with the leaf or the user sees the wrong command
+(``/go`` would otherwise recommend ``go-gh`` instead of ``go:gh``). On copy,
+``sync-plugins.sh`` reconciles the plugin copy's ``name`` to the leaf, and
+``validate-plugins.sh`` guards that name == leaf.
 
 Grouping is owned here in the registry, so the upstream ``skills/`` tree stays
-flat: there are no upstream group folders and no frontmatter ``name`` to
-reconcile. This checker asserts, per enabled Claude bundle:
+flat: there are no upstream group folders; the frontmatter ``name`` reconcile
+happens on the derivative plugin copy, never the canonical source. This checker
+asserts, per enabled Claude bundle:
 
   * ``pluginName`` is unique across all bundles.
   * every member has a valid shape (a string, or a ``{source, leaf}`` mapping

@@ -1,5 +1,5 @@
 ---
-name: defuddle
+name: extract
 license: CC-BY-4.0
 description: >-
   Extract clean markdown content from web pages using Defuddle CLI, removing

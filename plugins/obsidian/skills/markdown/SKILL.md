@@ -1,5 +1,5 @@
 ---
-name: obsidian-markdown
+name: markdown
 license: CC-BY-4.0
 description: >-
   Create and edit Obsidian Flavored Markdown with wikilinks, embeds, callouts,

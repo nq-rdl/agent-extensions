@@ -1,5 +1,5 @@
 ---
-name: jules-dispatch-creator
+name: dispatch-creator
 license: CC-BY-4.0
 description: >-
   Use when the user wants to set up, add, configure, or adapt Jules GitHub

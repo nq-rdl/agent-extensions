@@ -1,5 +1,5 @@
 ---
-name: charm-tui
+name: build
 license: CC-BY-4.0
 description: >-
   Build terminal user interfaces with the Go Charm ecosystem (Bubbletea v2,

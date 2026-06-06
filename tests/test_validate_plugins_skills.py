@@ -82,6 +82,86 @@ class TestSkillValidation(unittest.TestCase):
             result = run_validate(repo)
             self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
 
+    def test_fails_when_plugin_copy_name_mismatches_leaf(self):
+        # The copy landed at the right leaf folder (gh) but kept the stale
+        # upstream label (name: go-gh), so /-autocomplete shows go-gh while the
+        # command is go:gh. The guard must fail this.
+        with tempfile.TemporaryDirectory() as tmp:
+            repo = Path(tmp)
+            base_plugin(repo, plugin="go")
+            write(repo / "skills" / "go-gh" / "SKILL.md", "---\nname: go-gh\n---\n")
+            write(
+                repo / "plugins" / "go" / "skills" / "gh" / "SKILL.md",
+                "---\nname: go-gh\n---\n",
+            )
+            write(
+                repo / "registry" / "bundles" / "go.yaml",
+                "id: go\nskills:\n  - source: go-gh\n    leaf: gh\n"
+                "targets:\n  claude:\n    enabled: true\n    pluginName: go\n",
+            )
+            result = run_validate(repo)
+            combined = result.stdout + result.stderr
+            self.assertNotEqual(result.returncode, 0, combined)
+            self.assertIn("go-gh", combined)
+            self.assertIn("go:gh", combined)
+
+    def test_passes_when_plugin_copy_name_matches_leaf(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            repo = Path(tmp)
+            base_plugin(repo, plugin="go")
+            write(repo / "skills" / "go-gh" / "SKILL.md", "---\nname: go-gh\n---\n")
+            write(
+                repo / "plugins" / "go" / "skills" / "gh" / "SKILL.md",
+                "---\nname: gh\n---\n",
+            )
+            write(
+                repo / "registry" / "bundles" / "go.yaml",
+                "id: go\nskills:\n  - source: go-gh\n    leaf: gh\n"
+                "targets:\n  claude:\n    enabled: true\n    pluginName: go\n",
+            )
+            result = run_validate(repo)
+            self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+
+    def test_passes_when_plugin_copy_has_no_name(self):
+        # An absent name: is valid — Claude Code falls back to the directory
+        # name — so the guard must not flag it.
+        with tempfile.TemporaryDirectory() as tmp:
+            repo = Path(tmp)
+            base_plugin(repo, plugin="go")
+            write(repo / "skills" / "go-gh" / "SKILL.md", "---\nname: go-gh\n---\n")
+            write(
+                repo / "plugins" / "go" / "skills" / "gh" / "SKILL.md",
+                "---\nlicense: CC-BY-4.0\n---\nbody\n",
+            )
+            write(
+                repo / "registry" / "bundles" / "go.yaml",
+                "id: go\nskills:\n  - source: go-gh\n    leaf: gh\n"
+                "targets:\n  claude:\n    enabled: true\n    pluginName: go\n",
+            )
+            result = run_validate(repo)
+            self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+
+    def test_fails_when_plugin_copy_frontmatter_unparseable(self):
+        # A frontmatter block that is present but not valid YAML must fail
+        # validation, not silently skip the name==leaf guard on a broken header.
+        with tempfile.TemporaryDirectory() as tmp:
+            repo = Path(tmp)
+            base_plugin(repo, plugin="go")
+            write(repo / "skills" / "go-gh" / "SKILL.md", "---\nname: go-gh\n---\n")
+            write(
+                repo / "plugins" / "go" / "skills" / "gh" / "SKILL.md",
+                "---\nname: [unterminated\n---\nbody\n",
+            )
+            write(
+                repo / "registry" / "bundles" / "go.yaml",
+                "id: go\nskills:\n  - source: go-gh\n    leaf: gh\n"
+                "targets:\n  claude:\n    enabled: true\n    pluginName: go\n",
+            )
+            result = run_validate(repo)
+            combined = result.stdout + result.stderr
+            self.assertNotEqual(result.returncode, 0, combined)
+            self.assertIn("frontmatter", combined)
+
     def test_does_not_crash_when_claude_target_is_null(self):
         # `targets: {claude: null}` (a bare `claude:` key) must not crash the
         # inline Python with AttributeError — dict.get(k, {}) returns None, not

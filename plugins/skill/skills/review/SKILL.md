@@ -1,5 +1,5 @@
 ---
-name: skill-review
+name: review
 license: CC-BY-4.0
 description: >-
   Self-improvement loop for Claude Code skills. Spawns a high-effort Sonnet

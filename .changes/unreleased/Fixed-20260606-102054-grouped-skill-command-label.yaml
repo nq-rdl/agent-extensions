@@ -1,0 +1,3 @@
+kind: Fixed
+body: Grouped skill commands now show their namespaced name in `/`-autocomplete — `/go` recommends `go:gh`, not `go-gh`
+time: 2026-06-06T10:20:54.464799808+10:00

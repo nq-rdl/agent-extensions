@@ -1,5 +1,5 @@
 ---
-name: starrocks
+name: sql
 license: CC-BY-4.0
 description: >-
   StarRocks analytical data warehouse skill. Use when writing or reviewing
