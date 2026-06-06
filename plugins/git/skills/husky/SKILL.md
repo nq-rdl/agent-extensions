@@ -1,5 +1,4 @@
 ---
-name: husky
 license: CC-BY-4.0
 description: >-
   Manage Git hooks with husky v9. Use when the user asks about git hooks

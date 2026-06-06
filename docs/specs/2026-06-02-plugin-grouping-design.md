@@ -45,12 +45,17 @@ merge-and-release gate.
 - **Sync (`sync-plugins.sh`):** copies `skills/<source>/` → `plugins/<subject>/skills/<leaf>/`,
   renaming to the leaf → plugin tree stays one level deep.
 - **Claude Code invokes `<subject>:<leaf>`.** The **leaf folder name drives invocation** —
-  confirmed by smoke test (2026-06-03): a skill at `plugins/<p>/skills/<leaf>/` registers as
-  `<p>:<leaf>`, while the upstream frontmatter `name:` survives only as a cosmetic `userFacingName`
-  (display label). So vendored copies stay **byte-identical** — no frontmatter rewrite.
+  a skill at `plugins/<p>/skills/<leaf>/` registers as `<p>:<leaf>`. The `/`-autocomplete label,
+  however, is `userFacingName = frontmatter.name || <p>:<leaf>` — so a present `name:` (the upstream
+  `go-gh` **or** the leaf `gh`) *overrides* the namespaced id with a bare, un-prefixed label
+  (verified 2026-06-06 against CC 2.1.167's debug log: `Skill prompt: showing "go:named"
+  (userFacingName="named")`). The earlier "keep byte-identical" plan therefore showed `go-gh`, and
+  the name==leaf rewrite (#112) showed `gh`; **both were wrong**. The fix: sync **strips the copy's
+  `name:`** so the label falls back to `<p>:<leaf>`.
 - **Validators (`check_grouping.py`):** valid member shape · no dup leaf per bundle · `pluginName`
   unique across bundles. `check_bundle_refs.py` resolves each member's `source` against
-  `skills/<source>/`; `validate-plugins.sh` checks the plugin copy by **leaf**.
+  `skills/<source>/`; `validate-plugins.sh` checks the plugin copy by **leaf** and guards that it
+  carries no frontmatter `name:`.
 
 To get `go:gh`: leave `skills/go-gh/` flat; map `{source: go-gh, leaf: gh}` under `pluginName: go`.
 To get `obsidian:bases`: leave `skills/obsidian-bases/` flat; map `{source: obsidian-bases, leaf:
@@ -151,8 +156,8 @@ the consolidation review — to remove or keep.*
    upstream tree stays flat, so there is no upstream merge/release gate.
 2. **Phase 2 — packaging mechanism (built + tested):** registry `{source, leaf}` mapping,
    `sync-plugins.sh` leaf rename, `check_grouping.py` / `check_bundle_refs.py` /
-   `validate-plugins.sh` updates, unit tests. Flat bundles re-sync **no-diff** (verified) →
-   incremental migration, no big-bang.
+   `validate-plugins.sh` updates, unit tests. Flat bundles re-sync cleanly (only the `name:`
+   strip differs, per the 2026-06-06 correction) → incremental migration, no big-bang.
 3. **Phase 3 — #101 rollout (this spec):** migrate subjects per §5 by adding `{source, leaf}`
    mappings + new bundles (a **registry-only** change); retire domain bundles; slim `AGENTS.md` /
    move policy to `CONTRIBUTING.md` (D-4). (D-3 + D-1 already shipped in #108.)
@@ -165,6 +170,7 @@ A detailed implementation plan follows in the writing-plans step.
 - Plugin trees are one level (`plugins/<subject>/skills/<leaf>/`); `<subject>:<leaf>` resolves
   under `claude --plugin-dir`.
 - `claude plugin install rdl@rdl` installs every subject; `autoremove` cleans up.
-- No `<subject>:<subject>` redundant names; existing flat bundles re-sync with no diff mid-migration.
+- No `<subject>:<subject>` redundant names; existing flat bundles re-sync cleanly (only the `name:`
+  strip differs) mid-migration.
 - `marketplace.json` + `plugin.json` are generated and consistency-checked in CI.
 - No Codex artifacts introduced by this work.

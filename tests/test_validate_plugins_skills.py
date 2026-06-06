@@ -82,9 +82,9 @@ class TestSkillValidation(unittest.TestCase):
             result = run_validate(repo)
             self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
 
-    def test_fails_when_plugin_copy_name_mismatches_leaf(self):
-        # The copy landed at the right leaf folder (gh) but kept the stale
-        # upstream label (name: go-gh), so /-autocomplete shows go-gh while the
+    def test_fails_when_plugin_copy_keeps_upstream_name(self):
+        # The copy landed at the right leaf folder (gh) but kept the upstream
+        # label (name: go-gh), so /-autocomplete shows the bare go-gh while the
         # command is go:gh. The guard must fail this.
         with tempfile.TemporaryDirectory() as tmp:
             repo = Path(tmp)
@@ -105,7 +105,11 @@ class TestSkillValidation(unittest.TestCase):
             self.assertIn("go-gh", combined)
             self.assertIn("go:gh", combined)
 
-    def test_passes_when_plugin_copy_name_matches_leaf(self):
+    def test_fails_when_plugin_copy_name_equals_leaf(self):
+        # A name equal to the leaf (gh) is ALSO wrong: `frontmatter.name ||
+        # <plugin>:<leaf>` makes the label the bare `gh`, not `go:gh`. Any
+        # present name fails — this is the case the earlier name==leaf rewrite
+        # (issue #112) produced and shipped twice.
         with tempfile.TemporaryDirectory() as tmp:
             repo = Path(tmp)
             base_plugin(repo, plugin="go")
@@ -120,11 +124,35 @@ class TestSkillValidation(unittest.TestCase):
                 "targets:\n  claude:\n    enabled: true\n    pluginName: go\n",
             )
             result = run_validate(repo)
-            self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+            combined = result.stdout + result.stderr
+            self.assertNotEqual(result.returncode, 0, combined)
+            self.assertIn("go:gh", combined)
+
+    def test_fails_when_plugin_copy_name_is_non_string(self):
+        # A non-string name (e.g. `name: 123`) still triggers the bare-label bug
+        # — Claude Code coerces it via String(name). The guard must reject any
+        # present, non-null name regardless of YAML type, not just strings.
+        with tempfile.TemporaryDirectory() as tmp:
+            repo = Path(tmp)
+            base_plugin(repo, plugin="go")
+            write(repo / "skills" / "go-gh" / "SKILL.md", "---\nname: go-gh\n---\n")
+            write(
+                repo / "plugins" / "go" / "skills" / "gh" / "SKILL.md",
+                "---\nname: 123\n---\n",
+            )
+            write(
+                repo / "registry" / "bundles" / "go.yaml",
+                "id: go\nskills:\n  - source: go-gh\n    leaf: gh\n"
+                "targets:\n  claude:\n    enabled: true\n    pluginName: go\n",
+            )
+            result = run_validate(repo)
+            combined = result.stdout + result.stderr
+            self.assertNotEqual(result.returncode, 0, combined)
+            self.assertIn("go:gh", combined)
 
     def test_passes_when_plugin_copy_has_no_name(self):
-        # An absent name: is valid — Claude Code falls back to the directory
-        # name — so the guard must not flag it.
+        # No name: is required — Claude Code then labels the skill by its
+        # <plugin>:<leaf> id — so the guard must pass it.
         with tempfile.TemporaryDirectory() as tmp:
             repo = Path(tmp)
             base_plugin(repo, plugin="go")
@@ -143,7 +171,7 @@ class TestSkillValidation(unittest.TestCase):
 
     def test_fails_when_plugin_copy_frontmatter_unparseable(self):
         # A frontmatter block that is present but not valid YAML must fail
-        # validation, not silently skip the name==leaf guard on a broken header.
+        # validation, not silently skip the no-name guard on a broken header.
         with tempfile.TemporaryDirectory() as tmp:
             repo = Path(tmp)
             base_plugin(repo, plugin="go")

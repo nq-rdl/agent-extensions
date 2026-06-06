@@ -1,0 +1,3 @@
+kind: Fixed
+body: Plugin skills now show their `<plugin>:<leaf>` name in `/`-autocomplete — `/go` lists `go:gh`, not bare `gh` (#112)
+time: 2026-06-06T14:37:05.517691483+10:00

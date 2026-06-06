@@ -93,22 +93,27 @@ def normalize(member):
     return None
 
 
-def reconcile_skill_name(dst: Path, leaf: str) -> None:
-    """Rewrite the plugin copy's SKILL.md frontmatter ``name:`` to the leaf.
+def strip_skill_name(dst: Path) -> None:
+    """Delete the plugin copy's SKILL.md frontmatter ``name:`` line.
 
-    Claude Code invokes a plugin skill by its LEAF folder (``<plugin>:<leaf>``)
-    but shows the frontmatter ``name:`` as the label in /-autocomplete and
-    listings. The flat upstream skill keeps its catalog-wide name (e.g.
-    ``go-gh``); copied verbatim, that label disagrees with the invocation — the
-    user typing ``/go`` sees ``go-gh`` instead of ``go:gh``. Rewriting the
-    *copy's* ``name:`` to the leaf keeps label == invocation, the convention
-    every working plugin follows (folder == name).
+    Claude Code computes a plugin skill's invocation id as ``<plugin>:<leaf>``
+    (the LEAF folder always drives invocation). The label it shows in
+    /-autocomplete and listings, however, is::
 
-    Only the derivative plugin copy is touched; the canonical ``skills/`` tree
-    stays flat with the upstream name. A SKILL.md with no frontmatter, or a
-    frontmatter with no ``name:`` key, is left untouched — an absent name is
-    valid (Claude Code falls back to the directory name, which is already the
-    leaf). Idempotent.
+        userFacingName = frontmatter.name || "<plugin>:<leaf>"
+
+    i.e. a frontmatter ``name:`` *overrides* the namespaced id with a bare,
+    un-prefixed string. So **any** ``name:`` value — the upstream ``go-gh`` or
+    the leaf ``gh`` — makes ``/go`` list a bare ``go-gh`` / ``gh`` instead of
+    ``go:gh``. (This is why both the byte-identical copy and the earlier
+    name==leaf rewrite were wrong; see issue #112.) The only way to get the
+    namespaced label is to carry **no** ``name:`` at all, letting Claude Code
+    fall back to ``<plugin>:<leaf>``.
+
+    So the plugin copy must drop its frontmatter ``name:`` line. Only the
+    derivative copy is touched; the canonical ``skills/`` tree stays flat with
+    its upstream name. A SKILL.md with no frontmatter, or no ``name:`` key, is
+    left untouched. Idempotent.
     """
     skill_md = dst / "SKILL.md"
     if not skill_md.is_file():
@@ -116,13 +121,29 @@ def reconcile_skill_name(dst: Path, leaf: str) -> None:
     text = skill_md.read_text()
     parts = text.split("---\n", 2)
     if len(parts) < 3 or parts[0].strip():
-        return  # no leading YAML frontmatter block — nothing to reconcile
-    # Callable replacement so the leaf is inserted literally: a string replacement
-    # would interpret backslashes / `\1`-style text in the leaf as regex
-    # backreferences (raising or corrupting output).
-    new_fm, n = re.subn(r"(?m)^name:.*$", lambda _m: f"name: {leaf}", parts[1], count=1)
-    if n and new_fm != parts[1]:  # n == 0 -> no name: key, leave it untouched
-        parts[1] = new_fm
+        return  # no leading YAML frontmatter block — nothing to strip
+    # Drop the top-level ``name:`` key. Upstream skill names are always simple
+    # one-line scalars, but handle a block/folded scalar (``name: |`` / ``name:
+    # >``) too: remove the key line *and* its indented continuation body, so the
+    # strip can never leave orphaned lines that corrupt the frontmatter. Every
+    # other key, comment, and the body are preserved byte-for-byte.
+    lines = parts[1].splitlines(keepends=True)
+    out, i, removed = [], 0, False
+    while i < len(lines):
+        if not removed and re.match(r"^name:(\s|$)", lines[i]):
+            removed = True
+            value = lines[i].split(":", 1)[1].strip()
+            i += 1
+            if value[:1] in ("|", ">"):  # block/folded scalar — skip its body
+                while i < len(lines) and (
+                    lines[i].strip() == "" or lines[i][:1] in (" ", "\t")
+                ):
+                    i += 1
+            continue
+        out.append(lines[i])
+        i += 1
+    if removed:
+        parts[1] = "".join(out)
         skill_md.write_text("---\n".join(parts))
 
 
@@ -142,7 +163,7 @@ def sync_skill(plugin: str, source: str, leaf: str, bundle_file: Path) -> None:
         shutil.rmtree(dst)
     dst.parent.mkdir(parents=True, exist_ok=True)
     shutil.copytree(src, dst, symlinks=False)
-    reconcile_skill_name(dst, leaf)
+    strip_skill_name(dst)
     print(f"  ✓ skill {source} -> {leaf}" if source != leaf else f"  ✓ skill {source}")
 
 

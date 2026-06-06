@@ -1,5 +1,4 @@
 ---
-name: conventional-commits
 license: CC-BY-4.0
 description: >-
   Provides guidance on writing commit messages using the Conventional Commits

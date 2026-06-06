@@ -4,7 +4,8 @@ A bundle skill member is either a flat string (``leaf == source``) or an
 explicit ``{source, leaf}`` mapping (a flat upstream skill packaged under a
 different leaf, e.g. ``go-gh`` -> ``go:gh``). Grouping is owned in the registry;
 the upstream ``skills/`` tree stays flat, so there are no upstream group folders
-and no frontmatter ``name`` to reconcile (the leaf folder drives invocation).
+(the leaf folder drives invocation; sync-plugins.sh strips the plugin copy's
+frontmatter ``name`` so the /-autocomplete label falls back to ``<plugin>:<leaf>``).
 
 The checker enforces only the structural invariants that keep the generated
 plugin tree coherent: valid member shape, no duplicate leaf within a bundle, and

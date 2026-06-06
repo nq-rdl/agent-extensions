@@ -1,5 +1,4 @@
 ---
-name: expert
 license: CC-BY-4.0
 description: >-
   R language expert skill. Use when writing, reviewing, or debugging R code,

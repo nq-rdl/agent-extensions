@@ -1,5 +1,4 @@
 ---
-name: alt-text
 license: CC-BY-4.0
 description: >-
   Generate accessible alt text for data visualizations in Quarto documents. Use
