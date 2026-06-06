@@ -137,10 +137,15 @@ def _skill_name(skill_md: Path) -> str | None:
     Parses the leading YAML frontmatter block the same way the production
     ``frontmatter_name`` helper in scripts/validate-plugins.sh does, so the test
     and the code under test agree on what counts as a name."""
+    if not skill_md.is_file():
+        return None
     parts = skill_md.read_text().split("---\n", 2)
     if len(parts) < 3 or parts[0].strip():
         return None
-    fm = yaml.safe_load(parts[1]) or {}
+    try:
+        fm = yaml.safe_load(parts[1]) or {}
+    except yaml.YAMLError:
+        return None
     val = fm.get("name")
     return val if isinstance(val, str) else None
 
