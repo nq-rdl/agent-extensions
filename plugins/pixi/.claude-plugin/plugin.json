@@ -1,6 +1,6 @@
 {
   "name": "pixi",
-  "version": "0.9.0",
+  "version": "0.10.0",
   "description": "Pixi — manage Python projects, environments, and dependencies",
   "author": {
     "name": "nq-rdl"

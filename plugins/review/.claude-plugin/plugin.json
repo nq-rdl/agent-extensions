@@ -1,6 +1,6 @@
 {
   "name": "review",
-  "version": "0.9.0",
+  "version": "0.10.0",
   "description": "Code review — security, clean code, governance, responsible AI, and fact-checking",
   "author": {
     "name": "nq-rdl"
