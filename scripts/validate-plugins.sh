@@ -259,9 +259,14 @@ def err(path, msg):
 
 
 def frontmatter_name(skill_md):
-    # The leading YAML frontmatter `name:` of a SKILL.md, or None if the file is
-    # missing, has no frontmatter, or sets no name (an absent name is valid —
-    # Claude Code falls back to the directory name).
+    """Return the SKILL.md leading-frontmatter `name:` (str), or None when the
+    file is missing, has no frontmatter block, or sets no `name` key — all valid,
+    since Claude Code falls back to the directory name.
+
+    Raise ValueError when a frontmatter block IS present but is unparseable YAML,
+    so the caller fails validation instead of silently skipping the name==leaf
+    guard on a broken header (mirrors the agent-frontmatter check below).
+    """
     if not skill_md.is_file():
         return None
     parts = skill_md.read_text(encoding="utf-8").split("---\n", 2)
@@ -269,8 +274,8 @@ def frontmatter_name(skill_md):
         return None
     try:
         fm = yaml.safe_load(parts[1]) or {}
-    except yaml.YAMLError:
-        return None
+    except yaml.YAMLError as exc:
+        raise ValueError(f"invalid YAML frontmatter: {exc}") from exc
     val = fm.get("name")
     return val if isinstance(val, str) else None
 
@@ -328,7 +333,11 @@ for bundle in sorted(list(_bundles_dir.glob("*.yaml")) + list(_bundles_dir.glob(
                 # the label agrees with the <plugin>:<leaf> invocation (else `/go`
                 # recommends `go-gh` instead of `go:gh`). sync-plugins.sh
                 # reconciles this on copy; this guards a hand-edited or stale tree.
-                copy_name = frontmatter_name(copy / "SKILL.md")
+                try:
+                    copy_name = frontmatter_name(copy / "SKILL.md")
+                except ValueError as exc:
+                    err(copy / "SKILL.md", str(exc))
+                    copy_name = None
                 if copy_name is not None and copy_name != leaf:
                     err(
                         copy / "SKILL.md",

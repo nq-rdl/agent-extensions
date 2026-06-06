@@ -94,15 +94,22 @@ def normalize(member):
 
 
 def reconcile_skill_name(dst: Path, leaf: str) -> None:
-    # Claude Code invokes a plugin skill by its LEAF folder (<plugin>:<leaf>), but
-    # the frontmatter `name:` is what it shows as the label in /-autocomplete and
-    # `/help` listings. The flat upstream skill keeps its catalog-wide name (e.g.
-    # `go-gh`); copied verbatim, that label disagrees with the invocation — the
-    # user typing `/go` sees `go-gh` instead of `go:gh`. Rewrite the
-    # COPY's `name:` to the leaf so label == invocation, matching the convention
-    # every working plugin follows (folder == name). The canonical skills/ tree is
-    # never touched — it stays flat with the upstream name; only this derivative
-    # plugin copy is reconciled. Idempotent for flat members (name already == leaf).
+    """Rewrite the plugin copy's SKILL.md frontmatter ``name:`` to the leaf.
+
+    Claude Code invokes a plugin skill by its LEAF folder (``<plugin>:<leaf>``)
+    but shows the frontmatter ``name:`` as the label in /-autocomplete and
+    listings. The flat upstream skill keeps its catalog-wide name (e.g.
+    ``go-gh``); copied verbatim, that label disagrees with the invocation — the
+    user typing ``/go`` sees ``go-gh`` instead of ``go:gh``. Rewriting the
+    *copy's* ``name:`` to the leaf keeps label == invocation, the convention
+    every working plugin follows (folder == name).
+
+    Only the derivative plugin copy is touched; the canonical ``skills/`` tree
+    stays flat with the upstream name. A SKILL.md with no frontmatter, or a
+    frontmatter with no ``name:`` key, is left untouched — an absent name is
+    valid (Claude Code falls back to the directory name, which is already the
+    leaf). Idempotent.
+    """
     skill_md = dst / "SKILL.md"
     if not skill_md.is_file():
         return
@@ -110,10 +117,11 @@ def reconcile_skill_name(dst: Path, leaf: str) -> None:
     parts = text.split("---\n", 2)
     if len(parts) < 3 or parts[0].strip():
         return  # no leading YAML frontmatter block — nothing to reconcile
-    new_fm, n = re.subn(r"(?m)^name:.*$", f"name: {leaf}", parts[1], count=1)
-    if n == 0:
-        new_fm = f"name: {leaf}\n" + parts[1]  # frontmatter had no name: key — add one
-    if new_fm != parts[1]:
+    # Callable replacement so the leaf is inserted literally: a string replacement
+    # would interpret backslashes / `\1`-style text in the leaf as regex
+    # backreferences (raising or corrupting output).
+    new_fm, n = re.subn(r"(?m)^name:.*$", lambda _m: f"name: {leaf}", parts[1], count=1)
+    if n and new_fm != parts[1]:  # n == 0 -> no name: key, leave it untouched
         parts[1] = new_fm
         skill_md.write_text("---\n".join(parts))
 

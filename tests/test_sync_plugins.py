@@ -16,6 +16,8 @@ import tempfile
 import unittest
 from pathlib import Path
 
+import yaml
+
 REPO = Path(__file__).resolve().parent.parent
 SCRIPT = REPO / "scripts" / "sync-plugins.sh"
 
@@ -130,13 +132,17 @@ class TestMappedMembers(unittest.TestCase):
 
 
 def _skill_name(skill_md: Path) -> str | None:
-    """Return the frontmatter ``name:`` value of a SKILL.md, or None."""
-    for line in skill_md.read_text().splitlines():
-        if line.strip() in ("---", ""):
-            continue
-        if line.startswith("name:"):
-            return line.split(":", 1)[1].strip()
-    return None
+    """Return the frontmatter ``name:`` value of a SKILL.md, or None.
+
+    Parses the leading YAML frontmatter block the same way the production
+    ``frontmatter_name`` helper in scripts/validate-plugins.sh does, so the test
+    and the code under test agree on what counts as a name."""
+    parts = skill_md.read_text().split("---\n", 2)
+    if len(parts) < 3 or parts[0].strip():
+        return None
+    fm = yaml.safe_load(parts[1]) or {}
+    val = fm.get("name")
+    return val if isinstance(val, str) else None
 
 
 class TestNameReconciliation(unittest.TestCase):
@@ -192,6 +198,25 @@ class TestNameReconciliation(unittest.TestCase):
             self.assertIn("# Heading", text)
             self.assertIn("body text", text)
             self.assertNotIn("go-gh", text)
+
+    def test_absent_name_is_left_untouched(self):
+        # An absent name: is valid — Claude Code falls back to the directory name,
+        # which is already the leaf — so sync must not inject one. Keeps sync, the
+        # validator, and the docs in agreement (and avoids a needless rewrite).
+        with tempfile.TemporaryDirectory() as tmp:
+            repo = Path(tmp)
+            write(
+                repo / "registry" / "bundles" / "go.yaml",
+                "id: go\nskills:\n  - source: go-gh\n    leaf: gh\n"
+                "targets:\n  claude:\n    enabled: true\n    pluginName: go\n",
+            )
+            write(repo / "skills" / "go-gh" / "SKILL.md", "---\nlicense: x\n---\nbody\n")
+            run_sync(repo)
+            self.assertEqual(
+                (repo / "plugins" / "go" / "skills" / "gh" / "SKILL.md").read_text(),
+                "---\nlicense: x\n---\nbody\n",
+                "no name: key — sync must leave the file byte-for-byte untouched",
+            )
 
     def test_flat_member_name_matches_folder(self):
         with tempfile.TemporaryDirectory() as tmp:
