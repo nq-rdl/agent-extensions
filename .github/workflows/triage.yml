@@ -11,5 +11,4 @@ jobs:
     uses: nq-rdl/.github/.github/workflows/auto-triage.yml@main
     with:
       domain: RSE
-      lead: JoshKeoghTHHS
     secrets: inherit
