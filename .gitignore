@@ -11,3 +11,6 @@ node_modules/
 # Python bytecode (pipeline-script unit tests)
 __pycache__/
 *.pyc
+
+# macOS
+.DS_Store
