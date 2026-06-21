@@ -303,12 +303,14 @@
     {
       "name": "claude-code",
       "source": "./plugins/claude-code",
-      "description": "Claude Code — agent-team coordination and hook authoring",
+      "description": "Claude Code — agent-team coordination, hook authoring, and web-session setup",
       "version": "0.11.0",
       "keywords": [
         "claude-code",
         "agents",
-        "hooks"
+        "hooks",
+        "web",
+        "setup"
       ]
     },
     {

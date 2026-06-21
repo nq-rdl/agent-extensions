@@ -1,7 +1,7 @@
 {
   "name": "claude-code",
   "version": "0.11.0",
-  "description": "Claude Code — agent-team coordination and hook authoring",
+  "description": "Claude Code — agent-team coordination, hook authoring, and web-session setup",
   "author": {
     "name": "nq-rdl"
   },
