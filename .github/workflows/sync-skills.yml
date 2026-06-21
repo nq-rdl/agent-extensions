@@ -108,6 +108,7 @@ jobs:
           GH_TOKEN: ${{ steps.app-token.outputs.token }}
           TAG: ${{ steps.release.outputs.tag }}
         run: |
+          set -euo pipefail
           BRANCH="chore/sync-skills-${TAG}"
 
           git config user.name "github-actions[bot]"
@@ -131,8 +132,14 @@ jobs:
           fi
 
           # If an open PR for this branch already exists, the sync is complete.
-          EXISTING_PR="$(gh pr list --head "$BRANCH" --state open \
-            --json number --jq '.[0].number // empty')"
+          # Treat a `gh pr list` failure (auth/network/rate-limit) as fatal rather
+          # than an empty result: otherwise a transient error reads as "no PR" and
+          # falls through to a duplicate `gh pr create`.
+          if ! EXISTING_PR="$(gh pr list --head "$BRANCH" --base main --state open \
+            --json number --jq '.[0].number // empty')"; then
+            echo "::error::gh pr list failed for $BRANCH" >&2
+            exit 1
+          fi
           if [ -n "$EXISTING_PR" ]; then
             echo "PR #$EXISTING_PR is already open for $BRANCH; nothing to do."
             exit 0
@@ -159,7 +166,14 @@ jobs:
           git diff --name-status origin/main...origin/"$BRANCH" \
             | SYNC_DRIFT="$DRIFT" python3 scripts/sync_pr_body.py "$TAG" . > /tmp/pr-body.md
 
+          # Pass --head/--base explicitly: on the branch-reuse path above we only
+          # fetch "$BRANCH" and never check it out, so HEAD stays on the default
+          # branch. gh defaults --head to the current branch, which would target
+          # the wrong head (main) on a re-run — the exact path this step exists to
+          # support. Being explicit also hardens the fresh-branch path.
           gh pr create \
+            --head "$BRANCH" \
+            --base main \
             --title "chore(skills): sync from agent-skills@${TAG}" \
             --body-file /tmp/pr-body.md \
             --label "dependencies"
