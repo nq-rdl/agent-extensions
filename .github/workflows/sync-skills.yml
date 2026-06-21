@@ -110,23 +110,33 @@ jobs:
         run: |
           BRANCH="chore/sync-skills-${TAG}"
 
-          # Idempotency: the branch name is deterministic, so a duplicate trigger
-          # for the same tag must not fail `git push` (which would fail the job
-          # and open a spurious "sync failed" tracking issue). Skip cleanly if the
-          # branch already exists on the remote.
-          if git ls-remote --exit-code origin "$BRANCH" >/dev/null 2>&1; then
-            echo "Branch $BRANCH already exists — duplicate trigger for $TAG; skipping."
-            exit 0
-          fi
-
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
 
-          git checkout -b "$BRANCH"
-          git add skills/ plugins/
-          git commit -m "chore(skills): sync from agent-skills@${TAG}"
+          # Idempotent + re-runnable: a previous run can push the branch but then
+          # fail before opening the PR — e.g. when the RELEASE_APP token lacks
+          # "Pull requests: write" the `gh pr create` below returns HTTP 403
+          # AFTER the push already landed (issue #121). So treat "branch exists"
+          # and "PR exists" as independent steps instead of assuming a branch
+          # implies a PR. Re-running the workflow then completes the PR for the
+          # already-pushed branch rather than skipping it.
+          if git ls-remote --exit-code origin "$BRANCH" >/dev/null 2>&1; then
+            echo "Branch $BRANCH already exists on remote — reusing it (re-run or duplicate trigger)."
+            git fetch origin "$BRANCH"
+          else
+            git checkout -b "$BRANCH"
+            git add skills/ plugins/
+            git commit -m "chore(skills): sync from agent-skills@${TAG}"
+            git push -u origin "$BRANCH"
+          fi
 
-          git push -u origin "$BRANCH"
+          # If an open PR for this branch already exists, the sync is complete.
+          EXISTING_PR="$(gh pr list --head "$BRANCH" --state open \
+            --json number --jq '.[0].number // empty')"
+          if [ -n "$EXISTING_PR" ]; then
+            echo "PR #$EXISTING_PR is already open for $BRANCH; nothing to do."
+            exit 0
+          fi
 
           # Detect registry drift: bundles still referencing skills that were
           # removed upstream. The plugin trees are auto-pruned by sync-plugins.sh,
@@ -143,7 +153,10 @@ jobs:
           # Pass the repo root so the PR body can flag synced-but-unmapped skills
           # (copied from upstream but not yet referenced by any bundle, so not
           # installable until a maintainer maps them — see CONTRIBUTING).
-          git diff --name-status HEAD~1 HEAD \
+          # Diff the branch against main (three-dot = merge-base..branch tip) so
+          # the body is correct whether the sync commit was made this run or by
+          # a prior run whose branch we are reusing.
+          git diff --name-status origin/main...origin/"$BRANCH" \
             | SYNC_DRIFT="$DRIFT" python3 scripts/sync_pr_body.py "$TAG" . > /tmp/pr-body.md
 
           gh pr create \
@@ -166,7 +179,12 @@ jobs:
         run: |
           set -euo pipefail
           title="sync-skills workflow failed"
-          body="The scheduled or dispatched sync-skills workflow failed (run: ${RUN_URL}). Likely cause: a bundle in registry/bundles/*.yaml references a skill or agent that no longer exists upstream after a rename or removal. sync-plugins.sh now warns instead of aborting, so check the run logs for ::warning:: lines, reconcile the registry, then re-run the sync."
+          body="The scheduled or dispatched sync-skills workflow failed (run: ${RUN_URL}). Check the run logs for the failing step. Common causes:
+
+          - **App permissions** — a failure at the \`gh pr create\` step with \`Resource not accessible by integration (createPullRequest)\` means the RELEASE_APP GitHub App installation is missing **Pull requests: write** (Contents: write alone lets the branch push but not the PR open). Grant it in the App's installation permissions, then re-run.
+          - **Registry drift** — a bundle in registry/bundles/*.yaml references a skill or agent that no longer exists upstream after a rename or removal. sync-plugins.sh warns (\`::warning::\`) instead of aborting, so check the logs for those lines and reconcile the registry.
+
+          The sync branch is pushed before the PR is opened, and the workflow is idempotent: once the cause is fixed, simply re-run it and it will open the PR for the already-pushed branch."
           existing=$(gh issue list --repo "$GITHUB_REPOSITORY" --state open \
             --search "in:title $title" --json number --jq '.[0].number // empty')
           if [ -n "$existing" ]; then

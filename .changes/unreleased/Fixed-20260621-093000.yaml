@@ -1,0 +1,2 @@
+kind: Fixed
+body: sync-skills workflow is now idempotent and re-runnable — it reuses an already-pushed sync branch and opens the PR only when one is not already open, so a run that pushed the branch but failed at `gh pr create` (e.g. the RELEASE_APP app token missing Pull-requests:write) can be re-run to completion. The failure tracking issue now names the actual likely cause (app permissions vs. registry drift).
