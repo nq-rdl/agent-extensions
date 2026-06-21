@@ -1,0 +1,2 @@
+kind: Added
+body: '`asctl`, the agentskills.io spec validator (Go CLI under `tools/asctl/`), imported from the former `nq-rdl/agent-skills` repo. CI now validates every skill under `skills/` with `asctl repo-check` via a new `validate-skills` job.'

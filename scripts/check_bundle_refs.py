@@ -4,7 +4,7 @@
 Every skill named in ``registry/bundles/*.yaml`` must resolve to
 ``skills/<name>/`` and every agent to ``agents/<name>/agent.md``. This logic was
 previously inlined in ``.github/workflows/validate.yml``; extracting it here
-makes it unit-testable and reusable (e.g. by ``sync-skills.yml`` to flag drift).
+makes it unit-testable and reusable.
 
 CLI:
     python3 scripts/check_bundle_refs.py [REPO_ROOT]

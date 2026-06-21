@@ -14,7 +14,7 @@ We want one place to author and version reusable agent extensions, and a determi
 
 What is authored once and reused:
 
-- **Skills** written as `SKILL.md` (managed upstream in [`nq-rdl/agent-skills`](https://github.com/nq-rdl/agent-skills), vendored here as real files)
+- **Skills** written as `SKILL.md` (authored here; validated against the [agentskills.io](https://agentskills.io) spec by `asctl`)
 - **Agents** written as `agent.md` (authored in this repo)
 - Reference material colocated with each skill/agent
 - MCP server integrations
@@ -29,7 +29,7 @@ The repository's core decision is that **the canonical content lives once and th
 ## Repository layout
 
 ```text
-skills/                    ← canonical skills (vendored from nq-rdl/agent-skills) — do not edit here
+skills/                    ← canonical skills (authored here; validated by tools/asctl)
 agents/                    ← canonical agents (authored here)
   <name>/
     agent.md
@@ -37,6 +37,8 @@ agents/                    ← canonical agents (authored here)
 
 hooks/                     ← Claude Code hook scripts + JSON config (authored here)
 mcp/                       ← Go MCP servers (authored here; none currently)
+tools/
+  asctl/                   ← Go CLI: agentskills.io spec validator for skills/ (authored here)
 
 registry/
   bundles/*.yaml           ← single source of truth: which skills/agents/hooks/mcp each bundle ships
@@ -60,18 +62,22 @@ Claude Code installs a plugin by `cp -R`-ing its source directory into a per-use
 
 To make installs self-contained, `plugins/<bundle>/skills/<name>/` and `plugins/<bundle>/agents/<name>.md` hold **real-file copies** of the canonical content. The canonical source under `skills/` and `agents/` remains the single edit point; the plugin trees are derivative and rebuilt by `scripts/sync-plugins.sh`.
 
-- **Edit canonical content** under `skills/<name>/` (vendored — file bugs/PRs upstream) or `agents/<name>/agent.md` (authored here).
+- **Edit canonical content** under `skills/<name>/` or `agents/<name>/agent.md` (both authored here).
 - **Refresh plugin trees** with `bash scripts/sync-plugins.sh` (optionally scoped to a bundle). The script reads `registry/bundles/<b>.yaml`, prunes stale copies, and rewrites the plugin tree from the canonical sources.
 
-## Skills sync
+## Skills
 
-`skills/` is real content vendored from `nq-rdl/agent-skills`. Two mechanisms keep it fresh.
+`skills/` is canonical content authored in this repo. It was formerly vendored from `nq-rdl/agent-skills` through a `repository_dispatch` + clone-and-overwrite sync; that repo has been merged here and the sync removed (it was the single biggest source of operational brittleness — a non-atomic cross-repo handoff that could push a branch but then fail to open the PR). Skills are now authored directly, validated by `asctl`, and packaged into plugin trees by `scripts/sync-plugins.sh`.
 
-### `sync-skills.yml` — scheduled and on release
+### `asctl` — the skills spec validator
 
-Runs weekly, on `workflow_dispatch`, and on a `repository_dispatch` fired by an agent-skills release. It clones agent-skills at the latest release tag, replaces `skills/`, runs `scripts/sync-plugins.sh`, and opens a PR.
+`tools/asctl/` is a Go CLI imported from the former agent-skills repo. `asctl repo-check` validates every skill directory under `skills/` (frontmatter, structure, and prompt generation) against the [agentskills.io](https://agentskills.io) spec. It runs in CI as the `validate-skills` job, and locally:
 
-**Decoupling (resilience):** the registry in this repo names skills/agents by upstream directory name. When upstream renames or removes a skill, that registry reference goes stale. To prevent a stale reference from silently blocking the entire sync (the failure mode behind a multi-week sync outage), `sync-plugins.sh` **never aborts** on a missing source — it emits a `::warning::` and skips that entry, so the skills PR always opens. The authoritative gate is `validate.yml`'s `validate-bundles` job, which fails the PR until a human reconciles the registry in the same change. `sync-skills.yml` also opens/updates a tracking issue if the workflow fails, so breakage is never silent.
+```bash
+go -C tools/asctl build -o /tmp/asctl ./cmd/asctl/ && /tmp/asctl repo-check
+```
+
+**Registry resilience:** the registry names skills/agents by directory name, so a rename or removal can leave a stale reference. `scripts/sync-plugins.sh` reports it as a `::warning::` and skips it (it never aborts); the authoritative gate is `validate.yml`'s `validate-bundles` job, which fails the PR until a human reconciles the registry in the same change.
 
 ### `validate.yml` — on every PR / push to main
 
@@ -79,6 +85,7 @@ Runs weekly, on `workflow_dispatch`, and on a `repository_dispatch` fired by an 
 - `validate-symlinks`: any symlink under `plugins/` resolves (plugin trees are real-file copies, so this is a guardrail against accidental links).
 - `validate-plugins`: plugin manifests (`plugin.json`), hooks, and `.mcp.json` wiring are well-formed (`scripts/validate-plugins.sh`).
 - `unit-tests`: the pipeline scripts' unit tests pass (`python3 -m unittest discover -s tests`).
+- `validate-skills`: every skill under `skills/` passes `asctl repo-check` (agentskills.io spec + prompt generation), built from `tools/asctl/`.
 
 ## Registry schema
 
@@ -121,7 +128,7 @@ Agents are the second authored primitive (alongside skills). They live at `agent
 
 A skill is knowledge that activates contextually; an agent is a delegatable role with a focused tool allowlist and system prompt that Claude Code auto-routes on its `description`. The two are orthogonal: an agent may preload skills via frontmatter, but neither requires the other.
 
-`agents/` is authored and versioned in **this** repo (not vendored from agent-skills), alongside hooks, prompts, and MCP servers.
+`agents/` is authored and versioned in this repo alongside hooks, prompts, and MCP servers.
 
 ### Frontmatter schema
 
@@ -157,17 +164,18 @@ Agents derived from external sources (e.g. `github/awesome-copilot`, MIT) carry 
 
 ## Language policy
 
-### Cross-repo scope split
+### Asset ownership
 
 | Asset | Authored in | Distributed from |
 |---|---|---|
 | `mcp/*-go/` Go MCP servers | this repo | this repo (prebuilt binaries in `plugins/*/bin/mcp/`) |
-| `skills/*/scripts/` Go/Python tools | `nq-rdl/agent-skills` | vendored here |
-| `skills/{csv,docx,pdf,xlsx}/scripts/` | `nq-rdl/agent-skills` | run in-place via `ensure-deps.sh` |
+| `tools/asctl/` Go spec validator | this repo | this repo (built in CI; not shipped in plugins) |
+| `skills/*/scripts/` Go/Python tools | this repo | bundled into plugin skill trees |
+| `skills/{csv,docx,pdf,xlsx}/scripts/` | this repo | run in-place via `ensure-deps.sh` |
 | `plugins/<subject>/bin/` prebuilt binaries | this repo | committed here, rebuilt by CI |
 | `registry/bundles/*.yaml` | this repo | this repo |
 
-**Important:** the `skills/` tree is owned by `nq-rdl/agent-skills`. Edits made here are overwritten on the next `sync-skills` PR — file bugs and PRs upstream.
+**Note:** `skills/` is canonical and authored here. The former `nq-rdl/agent-skills` repo (the prior upstream source) has been merged into this repo and archived — edit skills directly here.
 
 ### Per-language rules
 
@@ -227,7 +235,7 @@ macOS and Linux only — the build and sync scripts require POSIX shell tooling 
 
 - One canonical source per skill/agent; generated plugin trees over hand-maintained copies.
 - Self-contained installs (real-file copies, not cross-subtree symlinks).
-- Sync resilience: content flows even when the registry is momentarily stale; correctness is enforced as a PR gate, and failures are never silent.
+- Registry resilience: plugin generation continues even when a registry reference is momentarily stale (warn-and-skip); correctness is enforced as a PR gate.
 - Install documentation is part of the product.
 
 ## Non-goals
@@ -235,7 +243,6 @@ macOS and Linux only — the build and sync scripts require POSIX shell tooling 
 This repository should not:
 
 - republish to hosts whose install model isn't Claude Code's `/plugin` marketplace — those belong in CLI- or package-driven repos;
-- hand-edit vendored skill content (it is owned upstream and overwritten on sync);
 - hand-edit generated output (`plugins/*/` trees, `plugin.json`, `marketplace.json`, `docs/bundles.md`) — run the generator scripts instead.
 
 For contribution expectations and authoring guidance, see the repository-root `AGENTS.md`.

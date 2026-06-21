@@ -13,12 +13,12 @@ This repo is a Claude Code agent extension catalog. It maintains a single source
 git config core.hooksPath .githooks
 ```
 
-`skills/` is vendored real content (synced from `nq-rdl/agent-skills` via the `sync-skills.yml` workflow), not a submodule — no `git submodule update` step.
+`skills/` is canonical content authored in this repo (formerly vendored from `nq-rdl/agent-skills`, now merged here), not a submodule. Skills are validated against the agentskills.io spec by `asctl` — the Go CLI under `tools/asctl/` (`asctl repo-check`).
 
 ## Architecture
 
 ```
-skills/           ← canonical skills (synced from nq-rdl/agent-skills) — do not edit
+skills/           ← canonical skills (authored here; validated by tools/asctl)
 agents/           ← canonical agents (authored here)
   <name>/
     agent.md
@@ -34,6 +34,8 @@ registry/
 VERSION           ← single version source; stamped into every generated manifest
 mcp/
   <name>-go/      ← Go MCP servers, built to plugins/<bundle>/bin/mcp/
+tools/
+  asctl/          ← Go CLI: agentskills.io spec validator for skills/
 hooks/            ← Claude Code hook shell scripts + JSON config
 .claude-plugin/
   marketplace.json ← GENERATED Claude Code marketplace manifest (repo root)
@@ -45,17 +47,17 @@ Claude Code installs a plugin by `cp -R`-ing its source directory into a per-use
 
 To make installs self-contained, `plugins/<bundle>/skills/<name>/` and `plugins/<bundle>/agents/<name>.md` hold **real-file copies** of the canonical content under `skills/` and `agents/`. The canonical source remains the single edit point — the plugin trees are derivative.
 
-- **Edit canonical content** under `skills/<name>/` (vendored from upstream) or `agents/<name>/agent.md` (authored here).
+- **Edit canonical content** under `skills/<name>/` or `agents/<name>/agent.md` (both authored here).
 - **Refresh plugin trees** by running `bash scripts/sync-plugins.sh` (or pass a bundle name to scope it). The script reads `registry/bundles/<b>.yaml`, removes any stale copies, and rewrites `plugins/<b>/skills/<name>/` and `plugins/<b>/agents/<name>.md` from the canonical sources.
 - **CI** validates that every bundle YAML reference resolves and that every plugin manifest is well-formed. See `scripts/validate-plugins.sh`.
 
-**Grouped skills.** A bundle skill member is either a flat string (`go-gh` → `leaf == go-gh`) or an explicit `{source, leaf}` mapping (`{source: go-gh, leaf: gh}`). `sync-plugins.sh` copies the flat upstream `skills/<source>/` → `plugins/<pluginName>/skills/<leaf>/`, **renaming to the leaf**, so the plugin tree stays one level deep and Claude Code invokes `<pluginName>:<leaf>` (the leaf folder drives invocation). Claude Code labels a skill in `/`-autocomplete as `frontmatter.name || <pluginName>:<leaf>` — so a present `name:` (the upstream `go-gh` **or** the leaf `gh`) overrides the namespaced id with a bare, un-prefixed label, and `/go` lists `go-gh`/`gh` instead of `go:gh`. To get the namespaced label, sync **strips the copy's `name:` entirely** so the label falls back to `<pluginName>:<leaf>`. The canonical `skills/` tree is never touched; grouping is owned **here** in the registry and stays flat. See `CONTRIBUTING.md` §6 for the rules, `scripts/check_grouping.py` for the contract, and `scripts/validate-plugins.sh` for the no-name guard.
+**Grouped skills.** A bundle skill member is either a flat string (`go-gh` → `leaf == go-gh`) or an explicit `{source, leaf}` mapping (`{source: go-gh, leaf: gh}`). `sync-plugins.sh` copies the flat canonical `skills/<source>/` → `plugins/<pluginName>/skills/<leaf>/`, **renaming to the leaf**, so the plugin tree stays one level deep and Claude Code invokes `<pluginName>:<leaf>` (the leaf folder drives invocation). Claude Code labels a skill in `/`-autocomplete as `frontmatter.name || <pluginName>:<leaf>` — so a present `name:` (the upstream `go-gh` **or** the leaf `gh`) overrides the namespaced id with a bare, un-prefixed label, and `/go` lists `go-gh`/`gh` instead of `go:gh`. To get the namespaced label, sync **strips the copy's `name:` entirely** so the label falls back to `<pluginName>:<leaf>`. The canonical `skills/` tree is never touched; grouping is owned **here** in the registry and stays flat. See `CONTRIBUTING.md` §6 for the rules, `scripts/check_grouping.py` for the contract, and `scripts/validate-plugins.sh` for the no-name guard.
 
-When the upstream skills repo releases, `sync-skills.yml` pulls the new content into `skills/`, runs `sync-plugins.sh`, and opens a PR with both `skills/` and `plugins/` changes in the same commit.
+Skills and agents are authored directly under `skills/` and `agents/`. After editing one, run `bash scripts/sync-plugins.sh` to refresh the plugin trees; CI's `validate-skills` job runs `asctl repo-check` to validate `skills/` against the agentskills.io spec.
 
 ### Python skills (csv, pdf, xlsx, docx)
 
-These skills call Python directly (no CLI wrapper). Each has a `requirements.txt` and an `ensure-deps.sh` bootstrap script (authored in `nq-rdl/agent-skills`, vendored here — do not edit; refresh via `sync-skills.yml`). Install `uv` (recommended) or `pixi` (linux-64 only) for the docs environment; neither is required for skill execution.
+These skills call Python directly (no CLI wrapper). Each has a `requirements.txt` and an `ensure-deps.sh` bootstrap script. Install `uv` (recommended) or `pixi` (linux-64 only) for the docs environment; neither is required for skill execution.
 
 ## Language Policy
 
@@ -64,9 +66,9 @@ These skills call Python directly (no CLI wrapper). Each has a `requirements.txt
 | New CLI helper or MCP server | Go (`CGO_ENABLED=0`, prebuilt binaries) |
 | File-format or ML skills | Python + `ensure-deps.sh` |
 | Documentation-only skill | Markdown |
-| New TypeScript | Not permitted in either repo |
+| New TypeScript | Not permitted |
 
-MCP servers are authored in `mcp/*-go/` in this repo and distributed as prebuilt binaries under `plugins/<bundle>/bin/mcp/`. See `docs/ARCHITECTURE.md` for the cross-repo scope split.
+MCP servers are authored in `mcp/*-go/` and distributed as prebuilt binaries under `plugins/<bundle>/bin/mcp/`. See `docs/ARCHITECTURE.md` for the full language and packaging policy.
 
 ## MCP Servers
 
@@ -90,7 +92,7 @@ bash scripts/validate-plugins.sh
 bash scripts/validate-plugins.sh plugins/hooks/hooks/hooks.json
 
 # Refresh plugin trees from canonical skills/ and agents/. Run after
-# editing an agent or syncing skills from upstream.
+# editing a skill or agent.
 bash scripts/sync-plugins.sh           # all bundles
 bash scripts/sync-plugins.sh go        # one bundle
 
@@ -111,6 +113,10 @@ python3 scripts/check_consistency.py .   # bundle <-> marketplace.json <-> plugi
 
 # Unit tests for the pipeline scripts (zero deps beyond python3 + pyyaml)
 python3 -m unittest discover -s tests -p 'test_*.py'
+
+# Build + run the skills spec validator (Go), and its unit tests
+go -C tools/asctl build -o /tmp/asctl ./cmd/asctl/ && /tmp/asctl repo-check
+go -C tools/asctl test ./...
 ```
 
 CI runs `validate.yml` on every PR/push to main. It checks:
@@ -124,6 +130,7 @@ CI runs `validate.yml` on every PR/push to main. It checks:
 - Any symlink under `plugins/` resolves (`validate-symlinks` — plugin trees are real-file copies, so this guards against accidental links)
 - Every `agents/<name>/agent.md` has frontmatter `name` + `description`
 - The pipeline scripts' unit tests pass (`tests/`)
+- Skills validate against the agentskills.io spec (`asctl repo-check`, built from `tools/asctl/`)
 
 ## Testing instructions
 
@@ -207,5 +214,5 @@ The docs site uses Zensical (configured in `zensical.toml`). Source is `docs/`. 
 
 ## Platform Notes
 
-- macOS and Linux only — the build and sync scripts require POSIX shell tooling (WSL2 for Windows)
+- macOS and Linux only — the build scripts require POSIX shell tooling (WSL2 for Windows)
 - Generated outputs (`plugins/` trees, `plugins/*/.claude-plugin/plugin.json`, `.claude-plugin/marketplace.json`, `docs/bundles.md`) are produced by the generator scripts — do not hand-edit

@@ -9,17 +9,16 @@
 # plugin's tree on `main` so the install is self-contained.
 #
 # This script is the canonical way to refresh those copies after the
-# upstream skills/ or agents/ change. Run it whenever you bump the skills
-# sync or add/edit an agent.
+# canonical skills/ or agents/ trees change. Run it whenever you add or edit
+# a skill or agent.
 #
-# Resilience: a bundle that references a skill/agent with no source (e.g. an
-# upstream rename or removal that landed before the registry was updated) is
-# reported as a ::warning:: and skipped — this script never aborts the sync.
-# The authoritative gate is validate.yml's `validate-bundles` job, which fails
-# the PR so a human reconciles the registry in the same change (see issue #83
-# and the sync-skills.yml decoupling). Stale plugin copies — skills/agents no
-# longer named by the registry — are pruned so renamed or dropped entries do
-# not linger in the installed plugin tree.
+# Resilience: a bundle that references a skill/agent with no source (e.g. a
+# rename or removal that landed before the registry was updated) is reported
+# as a ::warning:: and skipped — this script never aborts. The authoritative
+# gate is validate.yml's `validate-bundles` job, which fails the PR so a human
+# reconciles the registry in the same change (see issue #83). Stale plugin
+# copies — skills/agents no longer named by the registry — are pruned so
+# renamed or dropped entries do not linger in the installed plugin tree.
 #
 # Usage:
 #   scripts/sync-plugins.sh           # sync every bundle in registry/

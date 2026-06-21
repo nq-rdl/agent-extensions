@@ -20,7 +20,7 @@ jobs:
         run: python3 -m pip install --user pyyaml
 
       # Logic lives in tested, importable scripts (tests/test_check_*.py) rather
-      # than inline here, so it is unit-tested and reused by sync-skills.yml.
+      # than inline here, so it is unit-tested and reusable.
       - name: Check bundle references resolve
         run: python3 scripts/check_bundle_refs.py .
 
@@ -87,3 +87,25 @@ jobs:
 
       - name: Run pipeline-script unit tests
         run: python3 -m unittest discover -s tests -p 'test_*.py' -v
+
+  validate-skills:
+    name: Validate skills against the agentskills.io spec (asctl)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      # asctl is the spec validator for skills/ (imported from the former
+      # nq-rdl/agent-skills repo when it was merged here). It replaces the
+      # upstream-side validation that the old vendoring sync relied on.
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: tools/asctl/go.mod
+          cache: true
+          cache-dependency-path: tools/asctl/go.sum
+
+      - name: Build asctl
+        run: CGO_ENABLED=0 go -C tools/asctl build -o "$RUNNER_TEMP/asctl" ./cmd/asctl/
+
+      - name: Validate all skills (spec + prompt generation)
+        run: |
+          "$RUNNER_TEMP/asctl" repo-check

@@ -12,8 +12,8 @@ release), see [`AGENTS.md`](AGENTS.md) and [`docs/ARCHITECTURE.md`](docs/ARCHITE
 > [#101](https://github.com/nq-rdl/agent-extensions/issues/101); the *mechanism* (the
 > registry-owned `{source, leaf}` mapping + sync/packaging) is
 > [#102](https://github.com/nq-rdl/agent-extensions/issues/102). Grouping is owned **here** in
-> `agent-extensions`, so the upstream `agent-skills` tree stays flat — no upstream restructure is
-> required (the earlier upstream-grouping plan, agent-skills#118, was closed as superseded). Design:
+> `agent-extensions`, so the canonical `skills/` tree stays flat — no restructuring of the skill
+> sources is required (the earlier grouping-in-source plan, agent-skills#118, was closed as superseded). Design:
 > `docs/specs/2026-06-02-plugin-grouping-design.md`; rollout: `docs/specs/2026-06-05-plugin-mapping-migration.md`.
 
 Every skill and agent is invoked as **`<subject>:<facet>`** — the `subject` is the plugin, the
@@ -50,8 +50,8 @@ subject.
   Ordering lives in the skill **content** — each stage points to the next; the namespace does
   not enforce order.
 
-The facet is the **leaf** you set in the registry mapping (see rule 6); the upstream skill stays
-flat and is renamed to the leaf at sync time.
+The facet is the **leaf** you set in the registry mapping (see rule 6); the canonical skill stays
+flat and is renamed to the leaf when the plugin tree is generated.
 
 ### 4. No-tool subjects → name the workflow
 
@@ -73,28 +73,27 @@ when a subject has agents but no skill.
 
 ### 6. How grouping is expressed (owned here in `agent-extensions`)
 
-Skills are authored upstream in [`nq-rdl/agent-skills`](https://github.com/nq-rdl/agent-skills) as
-a **flat** library — `skills/<skill>/SKILL.md`, one level, no group folders. **Grouping is a
-packaging decision and lives here**, in the bundle registry (per
+Skills are authored in this repo as a **flat** library — `skills/<skill>/SKILL.md`, one level, no
+group folders. **Grouping is a packaging decision** expressed in the bundle registry (per
 [#102](https://github.com/nq-rdl/agent-extensions/issues/102)):
 
 - A bundle sets `pluginName: <subject>` and lists each skill member as either:
   - a **flat string** `<name>` — packaged as-is (`leaf == <name>`); or
-  - an explicit **`{source, leaf}` mapping** — packages the flat upstream `skills/<source>/` under a
+  - an explicit **`{source, leaf}` mapping** — packages the flat `skills/<source>/` under a
     different `leaf` (e.g. `{source: go-gh, leaf: gh}` → `go:gh`).
 - `scripts/sync-plugins.sh` copies `skills/<source>/` → `plugins/<subject>/skills/<leaf>/`, renaming
   to the leaf — so the plugin tree is one level deep and Claude Code invokes `<subject>:<leaf>`.
   **The leaf folder name drives invocation.** Claude Code labels the skill in `/`-autocomplete as
-  `frontmatter.name || <subject>:<leaf>` — so a present `name:` (the upstream `go-gh` **or** the
+  `frontmatter.name || <subject>:<leaf>` — so a present `name:` (the canonical `go-gh` **or** the
   leaf `gh`) *overrides* the namespaced id with a bare, un-prefixed label, and `/go` lists
-  `go-gh`/`gh` instead of `go:gh`. So the sync **strips the copy's `name:` entirely**, letting the
+  `go-gh`/`gh` instead of `go:gh`. So `sync-plugins.sh` **strips the copy's `name:` entirely**, letting the
   label fall back to `<subject>:<leaf>`. The canonical `skills/` source is never touched; only the
   derivative plugin copy is stripped.
 - Validators enforce: every member has a valid shape · no duplicate leaf within a bundle ·
   `pluginName` unique across bundles (`scripts/check_grouping.py`) · each plugin skill copy carries
   **no** frontmatter `name:` (`scripts/validate-plugins.sh`).
 
-So to add `obsidian:bases`, the upstream skill stays flat `skills/obsidian-bases/`; the registry
+So to add `obsidian:bases`, the canonical skill stays flat `skills/obsidian-bases/`; the registry
 maps `{source: obsidian-bases, leaf: bases}` under `pluginName: obsidian`. Agents are authored here
 under `agents/<name>/agent.md` and placed by subject in the registry. See [`AGENTS.md`](AGENTS.md)
 for the mechanical add-and-sync steps.
@@ -109,11 +108,10 @@ manifests, and the meta-plugin dependency list disagree.
 
 ## Packaging a new skill into a plugin
 
-A skill synced from `nq-rdl/agent-skills` lands in `skills/<name>/` but is **not installable
-until you map it into a bundle**. The `sync-skills` workflow only copies — it never maps (it can't
-decide the subject for you). The sync PR flags every unmapped skill under "📦 Action required".
-Here is the full loop, using a hypothetical `sql-review-analyse` upstream skill that should become
-`sql-review:analyse`:
+A new skill authored under `skills/<name>/` is **not installable until you map it into a bundle**
+— authoring the `SKILL.md` only adds it to the flat library; the registry decides which plugin
+(subject) it belongs to. Here is the full loop, using a hypothetical `sql-review-analyse` skill
+that should become `sql-review:analyse`:
 
 1. **Pick the subject and facet** (the rules above). Subject → the plugin (`sql-review`); facet →
    the action/stage leaf (`analyse`). Never repeat the subject in the facet.
@@ -121,8 +119,8 @@ Here is the full loop, using a hypothetical `sql-review-analyse` upstream skill 
    otherwise copy an existing single-subject bundle (e.g. `registry/bundles/sops.yaml`) and set
    `id`, `displayName`, `description` (no trailing period), `keywords`, and
    `targets.claude.pluginName: sql-review`.
-3. **Add the skill member.** Under `skills:`, write either a flat string (when the upstream name
-   already equals the leaf you want) or a `{source, leaf}` mapping to rename:
+3. **Add the skill member.** Under `skills:`, write either a flat string (when the skill's
+   directory name already equals the leaf you want) or a `{source, leaf}` mapping to rename:
    ```yaml
    skills:
      - {source: sql-review-analyse, leaf: analyse}   # → /sql-review:analyse
