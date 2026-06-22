@@ -1,0 +1,3 @@
+kind: Changed
+body: 'Claude Code on the web setup: enable the `pr-review-toolkit` and `gopls-lsp` plugins from the official marketplace in `.claude/settings.json`, and provision `gopls` (the Go language server) via the SessionStart bootstrap hook for cloud sessions'
+time: 2026-06-22T07:36:41.308702479Z
