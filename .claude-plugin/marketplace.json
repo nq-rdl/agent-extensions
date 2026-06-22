@@ -94,18 +94,6 @@
       ]
     },
     {
-      "name": "zod",
-      "source": "./plugins/zod",
-      "description": "Zod — TypeScript-first schema declaration and validation",
-      "version": "0.11.0",
-      "keywords": [
-        "zod",
-        "schema",
-        "validation",
-        "typescript"
-      ]
-    },
-    {
       "name": "defuddle",
       "source": "./plugins/defuddle",
       "description": "Defuddle — extract clean Markdown from cluttered web pages",

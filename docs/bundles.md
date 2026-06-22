@@ -114,16 +114,6 @@ Writerside — author and build JetBrains Writerside documentation.
 
 ---
 
-## zod
-
-Zod — TypeScript-first schema declaration and validation.
-
-**Skills**
-
-- `/zod:schema`
-
----
-
 ## defuddle
 
 Defuddle — extract clean Markdown from cluttered web pages.
