@@ -42,7 +42,7 @@ tools/
 
 registry/
   bundles/*.yaml           ← single source of truth: which skills/agents/hooks/mcp each bundle ships
-  marketplace.yaml         ← marketplace metadata, plugin defaults, display order, external plugin entries, and the rdl meta-plugin config
+  marketplace.yaml         ← marketplace metadata, plugin defaults, display order, and the rdl meta-plugin config
 
 .claude-plugin/
   marketplace.json         ← Claude Code marketplace manifest (repo root)
