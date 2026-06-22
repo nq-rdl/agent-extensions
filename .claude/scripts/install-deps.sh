@@ -1,26 +1,23 @@
 #!/usr/bin/env bash
 #
-# install-deps.sh — provision this repo's dependencies, locally and on Claude
-# Code on the web. Exposed as `make install-deps`.
+# install-deps.sh — SessionStart hook for Claude Code on the web.
 #
-# THREE INVOCATION MODES (one engine):
-#   1. `make install-deps` (human dev, local) — installs the dev toolchain
-#      (lefthook, changie, gopls, python/jq) so a contributor can run the git
-#      hooks and pipeline scripts. The web-only runtime steps are skipped.
-#   2. Pre-snapshot Setup-script field on Claude Code on the web, set to
-#      `CLAUDE_CODE_REMOTE=true make install-deps` — runs BEFORE Claude starts,
-#      so it pre-seeds the plugins (ensure_plugins) into the environment snapshot.
-#      This is the ONLY way plugin /<plugin>:<skill> commands appear on the FIRST
-#      session: Claude enumerates skills at startup, before any SessionStart hook.
-#   3. SessionStart hook (`install-deps.sh --session`) — runs every session. A
-#      no-op on a local machine (so it never disturbs a contributor); on the web
-#      it self-heals the dev toolchain + plugin install for resumed sessions.
+# Invoked from .claude/settings.json (SessionStart). A no-op unless running inside
+# an Anthropic-managed cloud VM (CLAUDE_CODE_REMOTE=true), so the same committed
+# hook is safe for every local contributor.
 #
-# WHY PLUGINS ARE INSTALLED HERE: Claude Code on the web registers the
-# extraKnownMarketplaces from .claude/settings.json at session start but does NOT
-# install the enabledPlugins from them (verified live, 2.1.185) — `enabledPlugins`
-# only *enables* an already-installed plugin. So this script installs the declared
-# set explicitly (ensure_plugins), reading it straight from settings.json.
+# PLUGINS ARE NOT INSTALLED HERE (primarily). Claude Code on the web installs the
+# plugins declared in .claude/settings.json (enabledPlugins + extraKnownMarketplaces)
+# at session start from their marketplaces — see the web docs' "what carries over"
+# table — so their /<plugin>:<skill> commands surface without any Setup script or
+# `make`. This hook only provisions what that declarative path does NOT cover:
+#   * the per-session tooling a base image may lack — the GitHub CLI (PR/CI
+#     automation) and the Codex CLI (a second opinion via `codex exec`);
+#   * the project dev toolchain + services (lefthook, changie, gopls, python/jq,
+#     the Docker daemon) via the optional project seam (install-deps.local.sh);
+#   * a cheap idempotent PLUGIN SELF-HEAL (ensure_plugins) that retries the
+#     declarative install only if a transient marketplace fetch failed at session
+#     start (the docs' "requires network access to reach the marketplace source").
 #
 # This engine is PORTABLE: it carries no project-specific dependencies. Anything
 # specific to one repo belongs in .claude/scripts/install-deps.local.sh (sourced
@@ -469,26 +466,26 @@ persist_path() {
   fi
 }
 
-# Install the plugins declared in .claude/settings.json (enabledPlugins == true).
+# Self-heal the plugins declared in .claude/settings.json (enabledPlugins == true).
 #
-# WHY THIS EXISTS: Claude Code on the web registers extraKnownMarketplaces at
-# session start but does NOT install enabledPlugins from them. Confirmed live on
-# 2.1.185 (issue #161 follow-up): a fresh cloud VM has all marketplaces registered
-# yet `claude plugin list` is empty and no /<plugin>:<skill> command surfaces —
-# `enabledPlugins` only *enables* an already-installed plugin, it does not
-# *install* it. The "declared plugins install at session start" model assumed in
-# #160 does not hold, so this repo installs the enabled set explicitly here.
+# WHY THIS EXISTS: Claude Code on the web installs the plugins declared in
+# .claude/settings.json (enabledPlugins + extraKnownMarketplaces) at session start
+# from their marketplaces — see the web docs' "what carries over" table — so this
+# is NOT the primary install path. It is a belt-and-suspenders RETRY for the case
+# the docs flag as a failure mode: "requires network access to reach the
+# marketplace source." If a transient marketplace fetch failed at session start,
+# this reinstalls the declared set; normally every plugin is already present and
+# this is a quiet no-op.
 #
 # CAVEAT (timing): Claude enumerates skills at process startup, BEFORE SessionStart
-# hooks finish, so plugins installed here surface their commands from the NEXT
-# session, not the one that installs them. That is the accepted tradeoff for a dev
-# env — the install persists and self-heals; a guaranteed first-session path would
-# need a pre-snapshot Setup-script, which this repo deliberately does not use.
+# hooks finish, so anything this retry installs surfaces from the NEXT session, not
+# the one that installs it — acceptable for a self-heal, since the platform's own
+# session-start install is the first-session path.
 #
-# Idempotent: skips any plugin already in `claude plugin list`, so a resume is a
-# quiet no-op. Non-fatal: a failed install logs a warning and the session
-# continues. Reads the enabled set straight from settings.json (single source of
-# truth) so it cannot drift from what announce-capabilities.sh verifies.
+# Idempotent: skips any plugin already in `claude plugin list`. Non-fatal: a failed
+# install logs a warning and the session continues. Reads the enabled set straight
+# from settings.json (single source of truth) so it cannot drift from what
+# announce-capabilities.sh verifies.
 ensure_plugins() {
   command -v claude >/dev/null 2>&1 || { log "claude CLI not on PATH — skipping plugin install."; return 0; }
   command -v jq >/dev/null 2>&1 || { log "jq not available — cannot read enabledPlugins; skipping plugin install."; return 0; }
@@ -524,9 +521,9 @@ ensure_plugins() {
     fi
   done
   log "Plugin install: ${n_ok} installed, ${n_fail} failed, $(( ${#plugins[@]} - n_ok - n_fail )) already present."
-  # When we installed >=1 plugin THIS session, leave a marker for
-  # announce-capabilities.sh (the next SessionStart hook) to surface the
-  # commit + next-session guidance once. Best-effort: never fail the hook on it.
+  # When the self-heal actually had to install >=1 plugin THIS session (i.e. the
+  # platform's own session-start install did not complete), leave a marker for
+  # announce-capabilities.sh to surface the gap once. Best-effort: never fail on it.
   if [ "$n_ok" -gt 0 ]; then
     printf '%s\n' "$n_ok" > "${TMPDIR:-/tmp}/rdl-web-setup-installed" 2>/dev/null || true
   fi
@@ -539,19 +536,10 @@ ensure_plugins() {
 # can be exercised against stubbed external tools. SUDO/LOG/PROJECT_DIR and the
 # CLAUDE_CODE_REMOTE gate live in here so sourcing never touches the environment.
 main() {
-  # Mode: `--session` marks the passive SessionStart-hook invocation (runs every
-  # session); without it we were invoked deliberately, via `make install-deps`.
-  local session_mode=0
-  [ "${1:-}" = "--session" ] && session_mode=1
-  local remote=0
-  [ "${CLAUDE_CODE_REMOTE:-}" = "true" ] && remote=1
-
-  # As the SessionStart hook on a LOCAL machine, do nothing — the committed hook
-  # must never disturb a contributor mid-session. (`make install-deps` by hand is
-  # NOT --session, so it still provisions the local dev toolchain below.)
-  if [ "$session_mode" -eq 1 ] && [ "$remote" -ne 1 ]; then
-    exit 0
-  fi
+  # SessionStart hook for Claude Code on the web. A no-op on a local machine so the
+  # same committed hook never disturbs a contributor; everything below runs only in
+  # a cloud session.
+  [ "${CLAUDE_CODE_REMOTE:-}" = "true" ] || exit 0
 
   # SUDO is intentionally exposed as a global for the sourced project hook
   # (install-deps.local.sh) to use when starting daemons (e.g. dockerd).
@@ -575,11 +563,10 @@ main() {
   # is two levels up) so it also works when run by hand.
   PROJECT_DIR="${CLAUDE_PROJECT_DIR:-$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)}"
 
-  # --- Dev toolchain (EVERY mode) — source the project seam --------------------
+  # --- Project dev toolchain — source the project seam ------------------------
   # The portable engine carries no project deps. THIS repo's dev toolchain
-  # (lefthook, changie, gopls, python/jq) + git-hook wiring lives in the project
-  # seam, sourced here so it provisions in ALL modes: `make install-deps` for a
-  # local contributor, and every web session. A subshell inherits main()'s helpers
+  # (lefthook, changie, gopls, python/jq, the Docker daemon) + git-hook wiring
+  # lives in the project seam, sourced here. A subshell inherits main()'s helpers
   # and globals (log, $LOG, $PROJECT_DIR, $SUDO, $CLAUDE_ENV_FILE, persist_path),
   # so its file/system side effects persist.
   #
@@ -593,17 +580,6 @@ main() {
     log "Provisioning dev toolchain (install-deps.local.sh)…"
     # shellcheck source=/dev/null
     ( source "$local_hook" ) || log "WARNING: project bootstrap hook reported errors (see ${LOG})."
-  fi
-
-  # --- Web runtime (REMOTE only) ----------------------------------------------
-  # gh, codex and the plugin pre-seed provision a Claude Code on the web session
-  # — or `CLAUDE_CODE_REMOTE=true make install-deps`, the documented Setup-script
-  # field that pre-seeds plugins into the snapshot before Claude enumerates skills.
-  # A local contributor already has their own gh/codex, so `make install-deps`
-  # (mode 1) skips this whole block.
-  if [ "$remote" -ne 1 ]; then
-    log "install-deps complete (local dev toolchain; web runtime skipped — set CLAUDE_CODE_REMOTE=true for the web pre-seed)."
-    exit 0
   fi
 
   # --- GitHub CLI + token -----------------------------------------------------
@@ -662,10 +638,11 @@ main() {
     fi
   fi
 
-  # --- Plugin install (cheap no-op once installed) ----------------------------
-  # Claude Code on the web does NOT install enabledPlugins for us (it only
-  # registers the marketplaces), so install the declared set explicitly. See the
-  # ensure_plugins header for the why + the session-timing caveat.
+  # --- Plugin self-heal (cheap no-op once installed) --------------------------
+  # Claude Code on the web installs the plugins declared in .claude/settings.json
+  # at session start (docs: "what carries over"). This is only a belt-and-suspenders
+  # retry for the case where that did not complete (e.g. a transient marketplace
+  # network failure) — idempotent, so normally a no-op. See the ensure_plugins header.
   ensure_plugins
 
   log "install-deps complete."

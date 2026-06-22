@@ -1,14 +1,14 @@
 #!/usr/bin/env bash
 #
 # install-deps.local.sh — THIS repo's dev toolchain (project-specific). Sourced
-# by .claude/scripts/install-deps.sh in EVERY mode (it is the "dev toolchain"
-# step, before the remote-only web runtime), so it provisions both `make
-# install-deps` for a local contributor and every web session. It is the project
-# seam: the portable engine carries no project deps, they all live here.
+# by .claude/scripts/install-deps.sh (the SessionStart hook) on every Claude Code
+# on the web session, as its "dev toolchain" step. It is the project seam: the
+# portable engine carries no project deps, they all live here.
 #
-# PLUGINS are NOT installed here — install-deps.sh's ensure_plugins does that
-# (Claude Code on the web registers the marketplaces but does not install the
-# enabledPlugins). This seam provisions the tooling needed to WORK ON this repo:
+# PLUGINS are NOT installed here — the platform installs the declared plugins at
+# session start; install-deps.sh's ensure_plugins is only a self-heal that retries
+# if a transient marketplace fetch failed. This seam provisions the tooling needed
+# to WORK ON this repo:
 #   * lefthook + changie — installed from CHECKSUM-PINNED GitHub releases into
 #     ~/.local/bin (github.com is the reliably-allowlisted source on the cloud
 #     sandbox), mirroring install-deps.sh's ensure_gh. They back the local git
@@ -20,8 +20,8 @@
 #     NO running daemon (no systemd), so a cloud session that needs containers
 #     (devcontainer smoke tests, testcontainers, image builds) must start dockerd
 #     itself. ensure_docker is idempotent: a no-op when `docker info` already
-#     answers (a local dev's Docker Desktop, or a resume), so it is safe in every
-#     mode. See the "Docker on Claude Code web" note in the cc-web-setup skill.
+#     answers (a resume, or a base image that started it). See the "Docker on
+#     Claude Code web" note in the cc-web-setup skill.
 #   * PATH persistence, `lefthook install`, and an origin/main fetch for changie's
 #     merge-base diffs.
 #
@@ -308,14 +308,12 @@ ensure_changie  || true
 ensure_gopls    || true
 ensure_python_jq
 ensure_pyyaml
-# The Docker daemon is a web-runtime concern. A local contributor's Docker Desktop
-# already runs dockerd; starting it under `make install-deps` would, when Docker is
-# installed-but-stopped and sudo is non-interactive, hang ~30s polling a daemon that
-# never comes up. So only manage it on the web (where there is no daemon and no
-# systemd). ensure_docker is itself idempotent, but the gate avoids the local hang.
-if [ "${CLAUDE_CODE_REMOTE:-}" = "true" ]; then
-  ensure_docker || true
-fi
+# The Docker daemon: the web runner ships the docker CLI + dockerd binary but no
+# running daemon and no systemd to start one, so a cloud session that needs
+# containers must start dockerd itself. This seam only runs on the web (the hook
+# gates on CLAUDE_CODE_REMOTE), and ensure_docker is idempotent (a no-op when
+# `docker info` already answers), so it is safe here.
+ensure_docker || true
 
 # Persist ~/.local/bin (lefthook, changie, gh, codex) for subsequent Bash tool
 # commands. persist_path is provided by install-deps.sh; guard for standalone runs.

@@ -336,17 +336,17 @@ test_persist_path_readonly_warns() {
 # ---------------------------------------------------------------------------
 # main() gate + project hook seam (subprocess)
 # ---------------------------------------------------------------------------
-test_gate_session_local_noop() {
-  # As the SessionStart hook (--session) on a LOCAL machine (no CLAUDE_CODE_REMOTE)
-  # => must be an immediate no-op (exit 0), no output.
+test_gate_local_noop() {
+  # On a LOCAL machine (no CLAUDE_CODE_REMOTE) the SessionStart hook must be an
+  # immediate no-op (exit 0), no output — it never disturbs a contributor.
   local out; out="$WORK/gate.out"
-  if CLAUDE_CODE_REMOTE='' bash "$SCRIPT" --session >"$out" 2>&1; then
-    ok "gate: --session no-op exit 0 when CLAUDE_CODE_REMOTE unset"
+  if CLAUDE_CODE_REMOTE='' bash "$SCRIPT" >"$out" 2>&1; then
+    ok "gate: no-op exit 0 when CLAUDE_CODE_REMOTE unset"
   else
-    fail "gate: --session non-zero exit when CLAUDE_CODE_REMOTE unset"
+    fail "gate: non-zero exit when CLAUDE_CODE_REMOTE unset"
   fi
-  [ -s "$out" ] && fail "gate: --session produced output when it should be silent" \
-    || ok "gate: --session produced no output (true no-op)"
+  [ -s "$out" ] && fail "gate: produced output when it should be silent" \
+    || ok "gate: produced no output (true no-op)"
 }
 
 test_local_hook_sourced() {
@@ -372,31 +372,6 @@ test_local_hook_sourced() {
     || fail "local-hook: project seam was NOT sourced. Out: $(cat "$out" 2>/dev/null)"
 }
 
-test_make_local_dev_toolchain() {
-  # `make install-deps` path: invoked WITHOUT --session and WITHOUT remote =>
-  # provisions the dev toolchain (sources the local seam) and exits 0, but SKIPS
-  # the web runtime. The seam sentinel proves it ran; the "web runtime skipped"
-  # line proves the remote block was skipped.
-  local proj d out; proj="$(mktemp -d "$WORK/proj.XXXXXX")"; d="$(new_stub_dir)"; out="$WORK/make.out"
-  mkdir -p "$proj/.claude/scripts"
-  printf 'touch "%s/make-sentinel"\n' "$WORK" > "$proj/.claude/scripts/install-deps.local.sh"
-  rm -f "$WORK/make-sentinel"
-  write_stub "$d" id "echo 1000"   # non-root: SUDO='sudo -n'
-  # shellcheck disable=SC2030,SC2031
-  if ( export PATH="$d:/usr/bin:/bin" HOME="$WORK/make-home" CLAUDE_CODE_REMOTE='' \
-         CLAUDE_PROJECT_DIR="$proj" TMPDIR="$WORK"; bash "$SCRIPT" ) >"$out" 2>&1; then
-    ok "make-local: exits 0 (dev toolchain, no remote)"
-  else
-    fail "make-local: exited non-zero. Out: $(cat "$out" 2>/dev/null)"
-  fi
-  [ -e "$WORK/make-sentinel" ] \
-    && ok "make-local: dev toolchain (install-deps.local.sh) was sourced" \
-    || fail "make-local: dev toolchain was NOT sourced. Out: $(cat "$out" 2>/dev/null)"
-  grep -q 'web runtime skipped' "$out" \
-    && ok "make-local: web runtime was skipped" \
-    || fail "make-local: did not report skipping the web runtime. Out: $(cat "$out" 2>/dev/null)"
-}
-
 test_gh_pin_match
 test_gh_pin_mismatch
 test_gh_missing_sha256sum
@@ -411,9 +386,8 @@ test_sandbox_creates
 test_sandbox_respects_existing
 test_persist_path
 test_persist_path_readonly_warns
-test_gate_session_local_noop
+test_gate_local_noop
 test_local_hook_sourced
-test_make_local_dev_toolchain
 
 echo ""
 echo "install-deps: ${PASS} passed, ${FAIL} failed"

@@ -102,7 +102,8 @@ fi
 # DECLARED. The intended set is .claude/settings.json (enabledPlugins == true);
 # the *loaded* set comes from `claude plugin list`. Reporting the declared set
 # alone produced a false positive — the banner looked healthy while the slash
-# menu was empty because the plugins had not been pre-seeded pre-snapshot (see
+# menu was empty because the platform's session-start install of a declared plugin
+# had not completed (its marketplace source was unreachable — see
 # docs/notes/claude-code-web-issues.md). Cross-check the two so a declared plugin
 # that did not install is surfaced, not hidden. When the claude CLI is
 # unavailable (some Action runners) we cannot verify, so fall back to declared.
@@ -184,22 +185,22 @@ fi
 if [ "${#missing_plugins[@]}" -gt 0 ]; then
   uniq_missing="$(printf '%s\n' "${missing_plugins[@]}" | join_comma)"
   add "**⚠️ Declared but NOT installed:** $uniq_missing"
-  add "Enabled in .claude/settings.json but absent from \`claude plugin list\`, so their \`/plugin:skill\` commands will not appear. On Claude Code (web) the platform registers the marketplaces but does NOT install the plugins; \`install-deps.sh\` installs them. This line usually means that install failed — the marketplace was unreachable (check the environment's network access) or the id is wrong — see CONTRIBUTING.md § \"Claude Code on the web\"."
+  add "Enabled in .claude/settings.json but absent from \`claude plugin list\`. On Claude Code (web) declared plugins install at session start from their marketplace (web docs, \"what carries over\"), so this line means that install did not complete — usually the marketplace source was unreachable (check the environment's network access) or the plugin id is wrong. install-deps.sh retries the install as a self-heal, so it should clear on the next session — see CONTRIBUTING.md § \"Claude Code on the web\"."
   add ""
 fi
 
-# Freshly-installed-this-session note. install-deps.sh's ensure_plugins drops a
-# marker (the install count) when it installed >=1 plugin THIS session. Surface
-# the commit + next-session guidance once, then consume the marker. Honest about
-# the unknown: a hook-installed plugin can only surface from the NEXT session
-# (Claude scans skills at startup, before these hooks run), and only if the
-# environment carries the plugin cache forward — which is unconfirmed for web.
+# Self-heal note. install-deps.sh's ensure_plugins drops a marker (the count) when
+# its retry actually had to install >=1 plugin THIS session — i.e. the platform's
+# own session-start install did not complete and the self-heal stepped in. Surface
+# it once (so the gap is visible), then consume the marker. A hook-installed plugin
+# surfaces from the NEXT session (Claude scans skills at startup, before hooks run);
+# the platform's session-start install is the first-session path.
 fresh_marker="${TMPDIR:-/tmp}/rdl-web-setup-installed"
 if [ "${CLAUDE_CODE_REMOTE:-}" = "true" ] && [ -f "$fresh_marker" ]; then
   n_fresh="$(cat "$fresh_marker" 2>/dev/null)"
   rm -f "$fresh_marker" 2>/dev/null || true
   add "## Claude Code web setup"
-  add "✅ Claude Code web setup active — ${n_fresh:-some} plugin(s) installed this session. Their \`/plugin:skill\` commands appear from your **next** session (Claude scans skills at startup, before these hooks run). **Commit your \`.claude/\` changes** so every future environment provisions them automatically. If a command is still missing next session, the \"Declared but NOT installed\" line will flag it — that means this environment does not carry the plugin cache across sessions and the pre-snapshot Setup-script is needed instead."
+  add "ℹ️ The platform's session-start plugin install did not complete, so install-deps.sh's self-heal installed ${n_fresh:-some} declared plugin(s) this session. Their \`/plugin:skill\` commands appear from your **next** session (Claude scans skills at startup, before these hooks run). If this recurs, the marketplace source is likely intermittently unreachable — check the environment's network access."
   add ""
 fi
 
@@ -212,9 +213,10 @@ context="$(printf '%s\n' "${lines[@]}")"
 # .claude/ are picked up once all SessionStart hooks return. Gate on
 # CLAUDE_CODE_REMOTE so a local session does not pay for a needless re-scan.
 # NOTE: this re-scan covers loose ~/.claude/skills/ only, NOT the plugin install
-# cache (confirmed in #160). Plugins are installed by install-deps.sh's
-# ensure_plugins this session, but Claude already enumerated skills at startup, so
-# their /plugin:skill commands surface from the NEXT session, not via this re-scan.
+# cache (confirmed in #160). The platform installs declared plugins at session
+# start; if anything is still missing, install-deps.sh's ensure_plugins self-heal
+# installs it, but Claude already enumerated skills at startup, so a just-installed
+# plugin's /plugin:skill commands surface from the NEXT session, not via this re-scan.
 if command -v jq >/dev/null 2>&1; then
   if [ "${CLAUDE_CODE_REMOTE:-}" = "true" ]; then
     jq -cn --arg ctx "$context" \
