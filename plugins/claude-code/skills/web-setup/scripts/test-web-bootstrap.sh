@@ -229,7 +229,6 @@ test_codex_authjson_drops_stale_token() {
   local proj d out envf home; proj="$(mktemp -d "$WORK/aj-proj.XXXXXX")"; d="$(new_stub_dir)"
   out="$WORK/aj.out"; envf="$WORK/aj-envfile"; : > "$envf"; home="$WORK/aj-home"; mkdir -p "$home"
   mkdir -p "$proj/scripts"
-  printf '#!/usr/bin/env bash\nexit 0\n' > "$proj/scripts/cc-web-setup.sh"; chmod +x "$proj/scripts/cc-web-setup.sh"
   # gh pinned so ensure_gh short-circuits with no download.
   write_stub "$d" gh "echo 'gh version ${GH_PIN} (2026-01-01)'"
   write_stub "$d" id "echo 0"
@@ -352,9 +351,7 @@ test_local_hook_sourced() {
   # CLAUDE_CODE_REMOTE=true with a project hook present => hook is sourced, exit 0.
   local proj d out; proj="$(mktemp -d "$WORK/proj.XXXXXX")"; d="$(new_stub_dir)"; out="$WORK/lh.out"
   mkdir -p "$proj/scripts"
-  # A cc-web-setup.sh that no-ops (so the self-heal call is cheap) and a local hook
-  # that drops a sentinel.
-  printf '#!/usr/bin/env bash\nexit 0\n' > "$proj/scripts/cc-web-setup.sh"; chmod +x "$proj/scripts/cc-web-setup.sh"
+  # A local hook that drops a sentinel.
   printf 'touch "%s/lh-sentinel"\n' "$WORK" > "$proj/scripts/web-bootstrap.local.sh"
   rm -f "$WORK/lh-sentinel"
   # Stub gh to the pinned version so ensure_gh short-circuits; no codex creds so codex is skipped.

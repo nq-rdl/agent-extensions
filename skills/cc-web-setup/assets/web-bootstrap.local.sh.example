@@ -5,8 +5,8 @@
 # This file is the sanctioned seam for project-specific provisioning. If it
 # exists next to scripts/web-bootstrap.sh, the portable hook sources it near the
 # end of its run (inside the CLAUDE_CODE_REMOTE=true gate), AFTER the generic
-# engine (gh CLI, codex CLI, plugin pre-seed self-heal, PATH persistence, git
-# hooks) has run. Put anything specific to THIS repo here so the portable script
+# engine (gh CLI, codex CLI, PATH persistence) has run. Put anything specific to
+# THIS repo here so the portable script
 # stays generic and re-syncable.
 #
 # It is sourced (not executed), so it shares web-bootstrap.sh's helpers and

@@ -1,9 +1,11 @@
 # --- Claude Code on the web provisioning (added by claude-code:web-setup) -----
-# Run this ONCE from the web environment's *setup script* (the bash that runs
-# before Claude starts, whose filesystem is captured in the environment
-# snapshot). Installing plugins here — before the snapshot — bakes their skills
-# into the image so they are available on the FIRST session. Exposed as a make
-# target for convenience; the web setup script should call `make cc-web-setup`.
+# OPTIONAL. Plugins do NOT need this — they install from .claude/settings.json at
+# session start in the cloud. This target is only for baking HEAVY, non-plugin
+# dependencies (language toolchains, container runtimes, large caches) into the
+# environment snapshot ONCE, before Claude starts. Put those steps in
+# scripts/cc-web-setup.local.sh; wire this by setting the web environment's setup
+# script to `make cc-web-setup`. Skip it entirely if the repo has no heavy
+# pre-snapshot deps.
 .PHONY: cc-web-setup
-cc-web-setup: ## Provision a Claude Code on the web VM (plugin pre-seed) — run by the cloud setup script
+cc-web-setup: ## (Optional) Bake heavy non-plugin deps into the Claude Code on the web snapshot
 	@bash scripts/cc-web-setup.sh

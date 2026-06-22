@@ -96,9 +96,11 @@ if command -v jq >/dev/null 2>&1; then
   done
 fi
 
-# Enabled plugins — read the authoritative enabledPlugins map from the project
-# settings (true => enabled). This is checked out in both web and Action runs
-# and avoids listing un-enabled marketplace plugins or version-dir noise.
+# Configured plugins — read the enabledPlugins map from the project settings
+# (true => requested). This reflects what settings.json ASKS Claude Code to
+# install; it does NOT confirm the plugin actually installed (e.g. a plugin whose
+# @marketplace is missing from extraKnownMarketplaces installs nothing, with no
+# error). So this is reported as "configured", not "installed/available".
 plugins=()
 if command -v jq >/dev/null 2>&1 && [ -f "$PROJECT_DIR/.claude/settings.json" ]; then
   while IFS= read -r p; do
@@ -134,8 +136,8 @@ fi
 
 if [ "${#plugins[@]}" -gt 0 ]; then
   uniq_plugins="$(printf '%s\n' "${plugins[@]}" | join_comma)"
-  add "**Enabled plugins:** $uniq_plugins"
-  add "Their skills are available via the Skill tool (\`/plugin:skill\`) — list and invoke as relevant."
+  add "**Configured plugins (installation not verified):** $uniq_plugins"
+  add "These are requested in .claude/settings.json; if installed, their skills are available via the Skill tool (\`/plugin:skill\`). If a plugin's commands/skills are absent, its \`@marketplace\` may be missing from \`extraKnownMarketplaces\` (it then installs nothing, silently) — verify the marketplace is declared."
   add ""
 fi
 
