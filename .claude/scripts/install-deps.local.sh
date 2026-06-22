@@ -308,7 +308,14 @@ ensure_changie  || true
 ensure_gopls    || true
 ensure_python_jq
 ensure_pyyaml
-ensure_docker   || true
+# The Docker daemon is a web-runtime concern. A local contributor's Docker Desktop
+# already runs dockerd; starting it under `make install-deps` would, when Docker is
+# installed-but-stopped and sudo is non-interactive, hang ~30s polling a daemon that
+# never comes up. So only manage it on the web (where there is no daemon and no
+# systemd). ensure_docker is itself idempotent, but the gate avoids the local hang.
+if [ "${CLAUDE_CODE_REMOTE:-}" = "true" ]; then
+  ensure_docker || true
+fi
 
 # Persist ~/.local/bin (lefthook, changie, gh, codex) for subsequent Bash tool
 # commands. persist_path is provided by install-deps.sh; guard for standalone runs.

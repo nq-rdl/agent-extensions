@@ -54,4 +54,7 @@
 #   log "WARNING: dockerd did not become ready within 30s (see ${LOG})."
 #   return 1
 # }
-# ensure_docker || true
+# # Only manage dockerd on the web — a local Docker Desktop already runs it, and
+# # starting a stopped daemon under non-interactive sudo would hang ~30s on
+# # `make install-deps`. The seam runs in every mode, so gate the start.
+# [ "${CLAUDE_CODE_REMOTE:-}" = "true" ] && { ensure_docker || true; }
