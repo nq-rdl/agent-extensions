@@ -342,7 +342,7 @@ Wait for targeted feedback or approval before writing any files.
 
 Once the user approves, write only the workflow file(s) requested in Phase 0.
 
-Read the relevant template from `templates/<workflow>-dispatch.yml.tmpl`,
+Read the relevant template from `assets/<workflow>-dispatch.yml.tmpl`,
 located in the same directory as this SKILL.md — not the project's working
 directory.
 Replace `[PROMPT CONTENT]` with the approved prompt, indented **12 spaces** (the
@@ -366,7 +366,7 @@ is: `@jules-swe`, `@jules-security`, `@jules-docs`, `@jules-infra`.
 **Maintenance note — adding a new `issue_comment` workflow:** Every time a new
 `@jules-*` handle is added for an `issue_comment`-triggered workflow, all
 *existing* `issue_comment` templates must be updated with a new `!contains` guard
-for the new handle. The templates in `templates/` are the canonical
+for the new handle. The templates in `assets/` are the canonical
 source — update them, then regenerate any deployed workflows from them.
 
 **Exception — `ci-review`:** The `jules-ci-review-dispatch.yml.tmpl` template

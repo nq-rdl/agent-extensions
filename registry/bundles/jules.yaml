@@ -10,7 +10,7 @@ channels:
 skills:
   - {source: jules, leaf: dispatch}
   - {source: jules-dispatch-creator, leaf: dispatch-creator}
-agents: []
+agents: [jules-orchestrator]
 hooks: []
 prompts: []
 mcp: []

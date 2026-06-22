@@ -9,6 +9,7 @@ import (
 
 	"github.com/nq-rdl/agent-extensions/tools/asctl/internal/parser"
 	"github.com/nq-rdl/agent-extensions/tools/asctl/internal/prompt"
+	"github.com/nq-rdl/agent-extensions/tools/asctl/internal/structure"
 	"github.com/nq-rdl/agent-extensions/tools/asctl/internal/validator"
 )
 
@@ -85,6 +86,7 @@ func ValidateSkillDirs(skillDirs []string) []string {
 
 	for _, dir := range skillDirs {
 		errs := validator.Validate(dir)
+		errs = append(errs, structure.ValidateStructure(dir)...)
 		if len(errs) > 0 {
 			for _, e := range errs {
 				errors = append(errors, dir+": "+e)

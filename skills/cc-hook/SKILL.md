@@ -164,13 +164,13 @@ to `/cc-hook:create`, `/cc-hook:debug`, and `/cc-hook:audit`.
 
 | Goal | Event | Example |
 |------|-------|---------|
-| Block destructive shell commands | `PreToolUse` (Bash) | `examples/block-rm-rf.json` |
-| Protect sensitive files | `PreToolUse` (Edit/Write) | `examples/protect-env-files.json` |
-| Continue until tasks done (judgment) | `Stop` (prompt) | `examples/prompt-hook-stop.json` |
-| Require tests/lint before stopping | `Stop` (command) | `examples/stop-checklist.json` |
-| Inject safe project context | `SessionStart` | `examples/safe-context-injection.json` |
-| Auto-format edited files | `PostToolUse` (Edit/Write) | `examples/auto-format.json` |
-| Auto-approve a known prompt | `PermissionRequest` | `examples/auto-approve-exit-plan.json` |
+| Block destructive shell commands | `PreToolUse` (Bash) | `assets/block-rm-rf.json` |
+| Protect sensitive files | `PreToolUse` (Edit/Write) | `assets/protect-env-files.json` |
+| Continue until tasks done (judgment) | `Stop` (prompt) | `assets/prompt-hook-stop.json` |
+| Require tests/lint before stopping | `Stop` (command) | `assets/stop-checklist.json` |
+| Inject safe project context | `SessionStart` | `assets/safe-context-injection.json` |
+| Auto-format edited files | `PostToolUse` (Edit/Write) | `assets/auto-format.json` |
+| Auto-approve a known prompt | `PermissionRequest` | `assets/auto-approve-exit-plan.json` |
 
 ## Reference files
 
@@ -189,10 +189,10 @@ to `/cc-hook:create`, `/cc-hook:debug`, and `/cc-hook:audit`.
 
 | File | What it does |
 |------|-------------|
-| [examples/block-rm-rf.json](examples/block-rm-rf.json) | Deny `rm -rf` via `permissionDecision` |
-| [examples/protect-env-files.json](examples/protect-env-files.json) | Block edits/writes to `.env` files |
-| [examples/stop-checklist.json](examples/stop-checklist.json) | Continue the turn until checks pass (`decision: block`) |
-| [examples/prompt-hook-stop.json](examples/prompt-hook-stop.json) | Model-judged completion check (`type: prompt`) |
-| [examples/safe-context-injection.json](examples/safe-context-injection.json) | Inject context with injection-safe phrasing |
-| [examples/auto-format.json](examples/auto-format.json) | Run a formatter after edits (`PostToolUse`) |
-| [examples/auto-approve-exit-plan.json](examples/auto-approve-exit-plan.json) | Auto-approve `ExitPlanMode` (`PermissionRequest`) |
+| [assets/block-rm-rf.json](assets/block-rm-rf.json) | Deny `rm -rf` via `permissionDecision` |
+| [assets/protect-env-files.json](assets/protect-env-files.json) | Block edits/writes to `.env` files |
+| [assets/stop-checklist.json](assets/stop-checklist.json) | Continue the turn until checks pass (`decision: block`) |
+| [assets/prompt-hook-stop.json](assets/prompt-hook-stop.json) | Model-judged completion check (`type: prompt`) |
+| [assets/safe-context-injection.json](assets/safe-context-injection.json) | Inject context with injection-safe phrasing |
+| [assets/auto-format.json](assets/auto-format.json) | Run a formatter after edits (`PostToolUse`) |
+| [assets/auto-approve-exit-plan.json](assets/auto-approve-exit-plan.json) | Auto-approve `ExitPlanMode` (`PermissionRequest`) |

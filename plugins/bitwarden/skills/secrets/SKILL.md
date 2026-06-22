@@ -255,6 +255,6 @@ export AWS_SECRET_ACCESS_KEY="$(bw get item "aws-credentials" | jq -r '.fields[]
 
 | File | What it does |
 |------|-------------|
-| [examples/bw-env.sh](examples/bw-env.sh) | Drop-in shell functions for .zshrc / .bashrc |
-| [examples/load-github.sh](examples/load-github.sh) | On-demand GitHub token loader (Gruntwork pattern) |
-| [examples/bw-env-format.env](examples/bw-env-format.env) | Example .env format suitable for `eval` loading |
+| [scripts/bw-env.sh](scripts/bw-env.sh) | Drop-in shell functions for .zshrc / .bashrc |
+| [scripts/load-github.sh](scripts/load-github.sh) | On-demand GitHub token loader (Gruntwork pattern) |
+| [assets/bw-env-format.env](assets/bw-env-format.env) | Example .env format suitable for `eval` loading |
