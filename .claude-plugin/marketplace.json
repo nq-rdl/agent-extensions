@@ -316,12 +316,13 @@
     {
       "name": "skill",
       "source": "./plugins/skill",
-      "description": "Skill authoring — review skill quality and report skill issues upstream",
+      "description": "Skill quality — audit skills for non-inferable value, review changes, and report issues upstream",
       "version": "0.11.0",
       "keywords": [
         "skills",
         "review",
-        "quality"
+        "quality",
+        "audit"
       ]
     },
     {
