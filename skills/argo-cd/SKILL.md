@@ -7,7 +7,7 @@ description: >-
   Use when the user mentions GitOps, Argo, application deployment, Kustomize/Helm
   in ArgoCD context, or asks to install/use the argocd CLI.
 metadata:
-  repo: https://github.com/nq-rdl/agent-skills
+  repo: https://github.com/nq-rdl/agent-extensions
 ---
 
 # ArgoCD Skill

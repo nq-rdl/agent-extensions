@@ -10,7 +10,7 @@ description: >-
 compatibility: >-
   Requires JetBrains Writerside or Docker for builds
 metadata:
-  repo: https://github.com/nq-rdl/agent-skills
+  repo: https://github.com/nq-rdl/agent-extensions
 ---
 
 # Writerside Skill

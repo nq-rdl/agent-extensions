@@ -7,7 +7,7 @@ description: >-
   (pyproject.toml, workspaces, cross-compilation), managing dependencies, security,
   and migrating from other tools like uv.
 metadata:
-  repo: https://github.com/nq-rdl/agent-skills
+  repo: https://github.com/nq-rdl/agent-extensions
 ---
 
 # pixi — Package management for reproducible environments

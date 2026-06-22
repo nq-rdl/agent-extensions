@@ -8,7 +8,7 @@ description: >-
   posts, or any standard web page. Do NOT use for URLs ending in .md — those
   are already markdown, use WebFetch directly.
 metadata:
-  repo: https://github.com/nq-rdl/agent-skills
+  repo: https://github.com/nq-rdl/agent-extensions
 ---
 
 # Defuddle

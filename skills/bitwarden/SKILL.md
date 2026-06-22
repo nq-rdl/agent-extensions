@@ -9,7 +9,7 @@ description: >-
   on: "bitwarden .env", "bw CLI secrets", "load API keys from bitwarden",
   "store credentials in bitwarden", "inject env vars from bitwarden".
 metadata:
-  repo: https://github.com/nq-rdl/agent-skills
+  repo: https://github.com/nq-rdl/agent-extensions
 ---
 
 # Bitwarden Personal PM — .env & Dev Secrets

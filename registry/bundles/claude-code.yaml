@@ -1,8 +1,8 @@
 schemaVersion: v1
 id: claude-code
 displayName: Claude Code
-description: Claude Code — agent-team coordination and hook authoring
-keywords: [claude-code, agents, hooks]
+description: Claude Code — agent-team coordination, hook authoring, and web-session setup
+keywords: [claude-code, agents, hooks, web, setup]
 owners:
   - rdl
 channels:
@@ -10,6 +10,7 @@ channels:
 skills:
   - {source: cc-agent-teams, leaf: agent-teams}
   - {source: cc-hook, leaf: hook}
+  - {source: cc-web-setup, leaf: web-setup}
 agents: []
 hooks: []
 prompts: []

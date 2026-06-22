@@ -8,7 +8,7 @@ description: >-
   outdated", "CHANGELOG needs polish", "review project docs before finishing",
   "check all docs are consistent".
 metadata:
-  repo: https://github.com/nq-rdl/agent-skills
+  repo: https://github.com/nq-rdl/agent-extensions
 ---
 
 ## Step 0: Detect base branch

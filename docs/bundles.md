@@ -314,12 +314,13 @@ Charm — build terminal UIs with Bubbletea, Lip Gloss, and Fang.
 
 ## claude-code
 
-Claude Code — agent-team coordination and hook authoring.
+Claude Code — agent-team coordination, hook authoring, and web-session setup.
 
 **Skills**
 
 - `/claude-code:agent-teams`
 - `/claude-code:hook`
+- `/claude-code:web-setup`
 
 ---
 

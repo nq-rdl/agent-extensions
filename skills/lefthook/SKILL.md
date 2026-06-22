@@ -11,7 +11,7 @@ description: >-
 compatibility: >-
   Requires lefthook binary
 metadata:
-  repo: https://github.com/nq-rdl/agent-skills
+  repo: https://github.com/nq-rdl/agent-extensions
 ---
 
 # Lefthook

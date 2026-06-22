@@ -10,7 +10,7 @@ description: >-
   name something in Go. Covers Effective Go, Google Go Style Guide, and
   community conventions.
 metadata:
-  repo: https://github.com/nq-rdl/agent-skills
+  repo: https://github.com/nq-rdl/agent-extensions
 ---
 
 # Go Naming Conventions

@@ -1,0 +1,9 @@
+# --- Claude Code on the web provisioning (added by claude-code:web-setup) -----
+# Run this ONCE from the web environment's *setup script* (the bash that runs
+# before Claude starts, whose filesystem is captured in the environment
+# snapshot). Installing plugins here — before the snapshot — bakes their skills
+# into the image so they are available on the FIRST session. Exposed as a make
+# target for convenience; the web setup script should call `make cc-web-setup`.
+.PHONY: cc-web-setup
+cc-web-setup: ## Provision a Claude Code on the web VM (plugin pre-seed) — run by the cloud setup script
+	@bash scripts/cc-web-setup.sh

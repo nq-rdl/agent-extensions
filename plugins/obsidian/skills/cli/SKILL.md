@@ -9,7 +9,7 @@ description: >-
   operations from the command line, or develop and debug Obsidian plugins and
   themes.
 metadata:
-  repo: https://github.com/nq-rdl/agent-skills
+  repo: https://github.com/nq-rdl/agent-extensions
 ---
 
 # Obsidian CLI
