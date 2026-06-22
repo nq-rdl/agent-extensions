@@ -43,6 +43,12 @@ CHANGIE_PIN="1.24.2"
 CHANGIE_SHA256_x86_64="31535a9d8dc548d6d8f315762bfd5b1fba34e707b7600748c8bb8a609649007d"
 CHANGIE_SHA256_aarch64="c21bf5509c3cd6e86e0f290b497a12bed52849c40566d171c5d1cbdef19b156c"
 
+# gopls — the Go language server, wired by the gopls-lsp@claude-plugins-official
+# plugin (it runs the bare `gopls` command). Installed from source with `go
+# install` (gopls ships no prebuilt GitHub release asset), so the pin is a module
+# version rather than a checksummed binary; Go's module proxy + go.sum verify it.
+GOPLS_PIN="0.22.0"
+
 # True iff the lefthook on PATH reports EXACTLY the pinned version. `lefthook
 # version` prints a bare `X.Y.Z`, so a plain substring grep for the pin would also
 # match a longer release (2.1.9 ⊂ 2.1.90), wrongly short-circuiting the install
@@ -153,6 +159,44 @@ ensure_changie() {
   changie_is_pinned
 }
 
+# True iff the gopls on PATH reports EXACTLY the pinned version. `gopls version`
+# prints `golang.org/x/tools/gopls vX.Y.Z`, so the leading `v` (a non-version
+# char) and a trailing whitespace/EOL boundary fence the pin in — same anchoring
+# as changie_is_pinned, guarding against 0.22.0 ⊂ 0.22.00.
+gopls_is_pinned() {
+  command -v gopls >/dev/null 2>&1 || return 1
+  gopls version 2>/dev/null | grep -Eq "(^|[^0-9.])${GOPLS_PIN//./\\.}([[:space:]]|\$)"
+}
+
+# Install gopls from source with `go install` into GOPATH/bin (or GOBIN), pinned
+# to GOPLS_PIN. Needs the Go toolchain (present on the base image) and module-
+# proxy network access; both the download and go.sum verification are handled by
+# `go install`. Idempotent + pin-aware: short-circuit only when the gopls on PATH
+# already reports the pin, so a base image shipping a different gopls is replaced
+# rather than silently used. Non-fatal — a missing toolchain or offline proxy
+# logs a warning and the gopls-lsp plugin simply stays inert this session.
+ensure_gopls() {
+  local gobin
+  gobin="$(go env GOBIN 2>/dev/null)"
+  [ -n "$gobin" ] || gobin="$(go env GOPATH 2>/dev/null)/bin"
+  export PATH="${gobin}:${PATH}"
+  if gopls_is_pinned; then
+    return 0
+  fi
+  if ! command -v go >/dev/null 2>&1; then
+    log "WARNING: go toolchain not found — cannot install gopls (gopls-lsp plugin will be inert)."
+    return 1
+  fi
+  log "Installing gopls ${GOPLS_PIN} via 'go install' (golang.org/x/tools/gopls@v${GOPLS_PIN})…"
+  if ! go install "golang.org/x/tools/gopls@v${GOPLS_PIN}" >>"$LOG" 2>&1; then
+    log "WARNING: 'go install gopls' failed — the module proxy may be off the network allowlist (see ${LOG})."
+    return 1
+  fi
+  # Honest final signal: confirm the pinned gopls is what now resolves
+  # (boundary-aware — the same check as the short-circuit above).
+  gopls_is_pinned
+}
+
 # python3 + jq are expected on the base image (the registry pipeline scripts and
 # the JSON/settings tooling need them). Verify-present; warn but never fail.
 ensure_python_jq() {
@@ -190,6 +234,7 @@ export PATH="${HOME}/.local/bin:${PATH}"
 
 ensure_lefthook || true
 ensure_changie  || true
+ensure_gopls    || true
 ensure_python_jq
 ensure_pyyaml
 
@@ -197,6 +242,14 @@ ensure_pyyaml
 # commands. persist_path is provided by web-bootstrap.sh; guard for standalone runs.
 if command -v persist_path >/dev/null 2>&1; then
   persist_path "${HOME}/.local/bin"
+  # GOPATH/bin (gopls, and any other `go install`-ed tool) so the gopls-lsp
+  # plugin and Bash tool shells resolve gopls in later turns.
+  if command -v go >/dev/null 2>&1; then
+    _gobin="$(go env GOBIN 2>/dev/null)"
+    [ -n "$_gobin" ] || _gobin="$(go env GOPATH 2>/dev/null)/bin"
+    [ -n "$_gobin" ] && persist_path "$_gobin"
+    unset _gobin
+  fi
 fi
 
 # Wire local git hooks so commits made in the session run the same
