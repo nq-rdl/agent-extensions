@@ -1,0 +1,3 @@
+kind: Fixed
+body: '`Claude Code on the web`: trim `.claude/settings.json` `enabledPlugins` to the catalog-dev core (`skill`, `claude-code`, `hooks`, `git`, `github-actions`, `go`, `review`) and `extraKnownMarketplaces` to `rdl`, so the pre-snapshot `make cc-web-setup` bake stays fast and reliable instead of installing the whole 44-plugin catalog; document the required web *Setup script* field in `CONTRIBUTING.md` as the only guaranteed first-session path (`reloadSkills` does not re-scan plugin-cache skills)'
+time: 2026-06-22T09:32:02.647571835Z

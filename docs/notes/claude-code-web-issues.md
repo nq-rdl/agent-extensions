@@ -17,19 +17,24 @@ appear in the first session's slash menu. They show only from the *second* sessi
 runs before SessionStart hooks finish"*). A plugin installed by a SessionStart hook
 therefore lands after enumeration.
 
-**Our fix (this repo, committed, no manual step).** The `CLAUDE_CODE_REMOTE`-gated
-SessionStart hook installs the plugins (`.claude/hooks/cc-web-setup.sh`), and
-`announce-capabilities.sh` returns `reloadSkills: true`, which per the docs makes
-Claude *"re-scan the skill and command directories after the SessionStart hooks
-complete, so skills the hook installed are available in the same session."*
+**Our fix (two layers).** The guaranteed path is the **pre-snapshot Setup-script
+field** (`make cc-web-setup`), which installs the plugins before Claude enumerates —
+see `CONTRIBUTING.md` § "Claude Code on the web". As a fallback, the
+`CLAUDE_CODE_REMOTE`-gated SessionStart hook also installs the plugins
+(`.claude/hooks/cc-web-setup.sh`) and `announce-capabilities.sh` returns
+`reloadSkills: true` — but, as confirmed below, that re-scan does not pick up
+plugin-cache skills, so the hook only self-heals for the *next* session.
 
-**The open question to raise.** The docs only document/exemplify the `reloadSkills`
-re-scan for **loose** skills under `~/.claude/skills/` (e.g. a `git clone` into that
-dir). They do **not** state whether the re-scan also covers **plugin-cache** skills
-installed via `claude plugin install` (which live under the plugin install cache,
-not `~/.claude/skills/`). If it does not, hook-installed *plugin* skills still only
-surface next session, and the pre-snapshot Setup-script (`make cc-web-setup`) is the
-only guaranteed first-session path.
+**Confirmed empirically (2026-06-22).** `reloadSkills` does **not** re-scan
+**plugin-cache** skills. In a fresh web session the SessionStart hook installed all
+declared plugins (`claude plugin list` → all `√ enabled`, their `SKILL.md` files
+present under `~/.claude/plugins/cache/rdl/...`) and `announce-capabilities.sh`
+returned `reloadSkills: true` — yet the only skills in the slash menu were Claude
+Code's built-ins; **no** `/<plugin>:<skill>` command surfaced, and a manual
+`/reload-skills` reported "no changes". So the docs' `reloadSkills` re-scan covers
+only loose `~/.claude/skills/`, not the plugin install cache. **The pre-snapshot
+Setup-script field (`make cc-web-setup`) is therefore the only guaranteed
+first-session path** — the SessionStart hook is a self-heal, not a substitute.
 
 **Ask upstream.** (a) Confirm/document whether `reloadSkills` re-scans plugin-cache
 skills, not just loose `~/.claude/skills/`; and (b) ideally install `enabledPlugins`

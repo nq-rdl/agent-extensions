@@ -183,3 +183,15 @@ that should become `sql-review:analyse`:
 Adding an **agent** follows the same loop: author `agents/<name>/agent.md` (with frontmatter
 `name` + `description`), list it under a bundle's `agents:`, then run steps 5–6. An agent-only
 subject (no skill) is fine — give it its own bundle with an empty `skills: []`.
+
+## Claude Code on the web
+
+This repo is set up to run in [Claude Code on the web](https://code.claude.com/docs/en/claude-code-on-the-web). For a web environment, there is **one manual step** that is not (and cannot be) committed to the repo:
+
+> **Set the environment's *Setup script* field to `make cc-web-setup`.**
+
+That field lives in the Claude Code web environment settings UI, so it must be set once per environment. **Without it, the catalog's `/<plugin>:<skill>` commands do not appear in the first session** — this is the single most common "skills aren't showing up" cause.
+
+**Why the Setup-script field is required.** Claude Code enumerates plugin skills at *process startup*, **before** any `SessionStart` hook runs. The *Setup script* runs once **before the environment snapshot is taken**, so installing the enabled plugins there (`make cc-web-setup` → [`.claude/hooks/cc-web-setup.sh`](.claude/hooks/cc-web-setup.sh)) bakes them into the image — they are present in the plugin cache when Claude enumerates, so their commands are available on the **first** session. The `SessionStart` hook ([`.claude/hooks/web-bootstrap.sh`](.claude/hooks/web-bootstrap.sh)) calls the same script only as a **self-heal**; it lands the plugins *after* enumeration, and `reloadSkills` does **not** re-scan plugin-cache skills (only loose `~/.claude/skills/`), so without the Setup-script field those skills never surface. See [`docs/notes/claude-code-web-issues.md`](docs/notes/claude-code-web-issues.md).
+
+**Which plugins get pre-seeded** is read straight from `enabledPlugins` (and the marketplaces from `extraKnownMarketplaces`) in [`.claude/settings.json`](.claude/settings.json) — the single source of truth; `cc-web-setup.sh` never hard-codes a list. The enabled set is deliberately the **catalog-dev core** — the plugins used to *work on this repo* (`skill`, `claude-code`, `hooks`, `git`, `github-actions`, `go`, `review`) — **not** the whole published catalog. Keeping the set small keeps the pre-snapshot bake fast and reliable. To add one, set it `true` in `enabledPlugins` (and register its marketplace under `extraKnownMarketplaces` if it is not an `@rdl` plugin); the next provisioning picks it up automatically.
