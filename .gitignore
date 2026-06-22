@@ -14,3 +14,8 @@ __pycache__/
 
 # macOS
 .DS_Store
+
+# Local/personal Claude Code overrides — never committed. Holds machine-local
+# settings, including the optional rdl-self-shadow fix for contributors whose
+# user-scope config enables rdl@rdl: {"enabledPlugins": {"rdl@rdl": false}}
+.claude/settings.local.json
