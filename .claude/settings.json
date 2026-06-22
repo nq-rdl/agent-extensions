@@ -25,6 +25,7 @@
   },
   "enabledPlugins": {
     "codex@openai-codex": true,
+    "pr-review-toolkit@claude-plugins-official": true,
     "superpowers@claude-plugins-official": true
   },
   "extraKnownMarketplaces": {
