@@ -3,11 +3,10 @@
 # install-deps.local.sh — OPTIONAL per-project dev toolchain for install-deps.sh.
 #
 # This is the sanctioned seam for project-specific provisioning. If it exists at
-# .claude/scripts/install-deps.local.sh, install-deps.sh sources it as its "dev
-# toolchain" step in EVERY mode — `make install-deps` for a local contributor and
-# every web session — BEFORE the remote-only web runtime (gh/codex/plugin
-# pre-seed). Put anything specific to THIS repo here (language toolchains, the
-# Docker daemon, git-hook wiring) so the portable engine stays generic.
+# .claude/scripts/install-deps.local.sh, install-deps.sh (the SessionStart hook)
+# sources it as its "dev toolchain" step on every Claude Code on the web session.
+# Put anything specific to THIS repo here (language toolchains, the Docker daemon,
+# git-hook wiring) so the portable engine stays generic.
 #
 # It is sourced (not executed), so it shares install-deps.sh's helpers and
 # globals: log(), $LOG (verbose sink), $PROJECT_DIR, $SUDO, $CLAUDE_ENV_FILE.
@@ -54,7 +53,6 @@
 #   log "WARNING: dockerd did not become ready within 30s (see ${LOG})."
 #   return 1
 # }
-# # Only manage dockerd on the web — a local Docker Desktop already runs it, and
-# # starting a stopped daemon under non-interactive sudo would hang ~30s on
-# # `make install-deps`. The seam runs in every mode, so gate the start.
-# [ "${CLAUDE_CODE_REMOTE:-}" = "true" ] && { ensure_docker || true; }
+# # The seam only runs on the web (the hook gates on CLAUDE_CODE_REMOTE) and
+# # ensure_docker is idempotent (a no-op when `docker info` already answers).
+# ensure_docker || true

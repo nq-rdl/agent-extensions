@@ -1,123 +1,84 @@
-# Notes — issues to raise for the `claude-code` plugin / Claude Code on the web
+# Notes — Claude Code on the web plugin visibility
 
-Working notes captured while debugging "plugin skill commands are not visible in
-Claude Code on the web" (branch `claude/skill-commands-visibility-pfjssk`). These
-are candidates to file as issues — against the **`claude-code`** plugin in this
-repo (the `cc-web-setup` / `web-setup` skill) where we own the fix, and against
-**upstream Claude Code** where the root cause is the harness.
+Working notes from debugging "plugin skill commands are not visible in Claude Code
+on the web." Kept as the record of what was tried, what was wrong, and the upstream
+asks that still stand.
 
-## Resolution — CORRECTED (2026-06-22, issue #161)
+## Resolution (2026-06-22, post-#162) — plugins install declaratively
 
-> **Earlier "resolution" (below this block) was WRONG and is kept only for the
-> record.** It claimed the platform installs `enabledPlugins` at session start, so
-> no setup script / `make` was needed. **It does not.** Verified live on Claude
-> Code 2.1.185: a fresh web VM had every `extraKnownMarketplaces` entry registered
-> yet `claude plugin list` **empty** and no `/<plugin>:<skill>` in the menu;
-> `claude plugin install` then worked instantly (network fine). So
-> `extraKnownMarketplaces` makes plugins *known* and `enabledPlugins` only
-> *enables* an already-installed plugin — **neither installs one.** When the
-> "declarative is enough" belief led us to delete the install machinery, nothing
-> installed the plugins at all.
+**The official docs settle it.** Per the
+[Use Claude Code on the web "what carries over" table](https://code.claude.com/docs/en/claude-code-on-the-web):
 
-**The actual mechanism (now shipped):**
+> **Plugins declared in `.claude/settings.json`** — carries over: **Yes** —
+> *"Installed at session start from the marketplace you declared. **Requires
+> network access to reach the marketplace source.**"*
 
-- A repo script must run `claude plugin install` for the declared set.
-  `.claude/scripts/install-deps.sh` (`ensure_plugins`, reading `enabledPlugins`
-  from `settings.json`) does this, exposed as `make install-deps`.
-- Claude enumerates skills at **startup, before** any SessionStart hook, so a
-  hook-installed plugin surfaces only from the **next** session. The plugin cache
-  **does** persist across sessions in an environment (confirmed: a resume reported
-  "already present" and the skills loaded), so the hook is enough from session 2 —
-  but the **first** session of a new environment needs a **pre-snapshot** install.
-- That pre-snapshot install is the environment's **Setup-script field** set to
-  `CLAUDE_CODE_REMOTE=true make install-deps`. The `install-deps.sh --session`
-  SessionStart hook self-heals resumes; `announce-capabilities.sh` cross-checks
-  `claude plugin list` and flags "Declared but NOT installed".
+So the platform installs the declared plugins at session start. The original empty
+slash menu was the documented failure mode — the marketplace source could not be
+reached *as a whole* because the web set was headed by the **self-referential
+`rdl@rdl` meta-plugin** that re-clones this repo and fans out to dozens of deps
+(#160). Scoping `.claude/settings.json` to a small set of **external** dev-helper
+plugins fixed the original problem.
 
-The self-referential `rdl@rdl` point still stands: do not enable a repo's own meta
-marketplace inside that repo's dev env (it re-clones + fans out and breaks the
-batch). The `make cc-web-setup` name is retired in favour of `make install-deps`.
+**Where we went wrong (and corrected on the simplify branch).** A single live
+observation of an empty `claude plugin list` (one session, on `main`) led us to
+conclude the platform does *not* install declared plugins, and to build machinery
+to install them ourselves: a root `Makefile` / `make install-deps`, a
+`CLAUDE_CODE_REMOTE=true make install-deps` **Setup-script-field** entrypoint, and a
+three-mode `install-deps.sh` (#161/#162). That was overbuilt — and the Setup-script
+field also hard-failed environment startup (`make: No rule to make target
+'install-deps'`, a CWD/branch issue). The corrected design:
 
-### Superseded resolution (kept for the record)
+- **Plugins: declarative only** (`enabledPlugins` + `extraKnownMarketplaces`). No
+  setup script, no `make`, no manual Setup-script field.
+- **`install-deps.sh`**: a `CLAUDE_CODE_REMOTE`-gated **SessionStart hook** that
+  provisions only non-plugin tooling (gh/codex CLIs, the project dev toolchain +
+  Docker via the `install-deps.local.sh` seam) **plus** an idempotent
+  `ensure_plugins` **self-heal** (see the open question below).
+- **`announce-capabilities.sh`**: keeps the "Declared but NOT installed" canary so a
+  marketplace-reachability failure is surfaced, not masked.
+- **Removed**: the `Makefile`, the `make install-deps` Setup-script guidance, and the
+  three-mode engine. The Setup-script field is for caching heavy *packages*, not
+  plugins.
 
-The practical fix was **not** the `cc-web-setup` pre-seed. Claude Code on the web
-installs the plugins declared in `.claude/settings.json` (`enabledPlugins` +
-`extraKnownMarketplaces`) **at session start from their marketplaces** (web docs,
-"what carries over" table), so their `/<plugin>:<skill>` commands surface on the
-first session with no setup script and no `make`. This repo's earlier failure was
-self-inflicted: it declared 44 plugins headed by the **self-referential `rdl@rdl`
-meta-plugin** (which re-clones this repo and fans out to 35 deps), breaking the
-session-start install as a whole — so *nothing*, not even `superpowers`, surfaced.
-Scoping `.claude/settings.json` to a small set of **external** dev-helper plugins
-(the same path that gives `nq-rdl/dataops` its `/superpowers:*`) resolved it, and
-the `.claude/hooks/cc-web-setup.sh` + `make cc-web-setup` self-heal machinery was
-removed as unnecessary. The notes below are kept as the historical investigation
-and the upstream asks (which still stand).
+**Process lesson:** read the one authoritative doc table before building around a
+single live observation. The docs were reachable the whole time.
 
-## 1. Does `reloadSkills` re-scan plugin-cache skills? (upstream Claude Code)
+## Open question — is `ensure_plugins` (the self-heal) actually needed?
 
-**Symptom.** On a fresh web environment, `/<plugin>:<skill>` commands declared via
-`.claude/settings.json` (`extraKnownMarketplaces` + `enabledPlugins`) do **not**
-appear in the first session's slash menu. They show only from the *second* session.
+The docs say the platform installs declared plugins at session start. Yet we *did*
+observe a session where `claude plugin list` was empty despite reachable
+marketplaces, and where our hook's `claude plugin install` was what populated them.
+Two readings:
 
-**Root cause.** Claude Code enumerates plugin skills at process startup, **before**
-`SessionStart` hooks finish (confirmed: hooks docs say *"Skill discovery normally
-runs before SessionStart hooks finish"*). A plugin installed by a SessionStart hook
-therefore lands after enumeration.
+- **Docs are right; it was transient.** Then `ensure_plugins` is redundant — the
+  platform retries each session, and a hook-installed plugin can't surface until the
+  next session anyway (skills enumerate before SessionStart hooks).
+- **The platform's auto-install is unreliable in practice here.** Then
+  `ensure_plugins` is the belt-and-suspenders that makes plugins appear at all.
 
-**Our fix (two layers).** The guaranteed path is the **pre-snapshot Setup-script
-field** (`make cc-web-setup`), which installs the plugins before Claude enumerates —
-see `CONTRIBUTING.md` § "Claude Code on the web". As a fallback, the
-`CLAUDE_CODE_REMOTE`-gated SessionStart hook also installs the plugins
-(`.claude/hooks/cc-web-setup.sh`) and `announce-capabilities.sh` returns
-`reloadSkills: true` — but, as confirmed below, that re-scan does not pick up
-plugin-cache skills, so the hook only self-heals for the *next* session.
+We kept it as a cheap, idempotent self-heal because the empirical evidence (we
+watched the platform not install, and the hook install + persist) outweighs a
+docs-only argument. If repeated observation shows the platform installs reliably,
+delete `ensure_plugins` and rely purely on the declarative path. **Ask upstream:**
+document the retry/idempotency behavior of the session-start plugin install, and
+whether it re-attempts after a transient marketplace failure.
 
-**Confirmed empirically (2026-06-22).** `reloadSkills` does **not** re-scan
-**plugin-cache** skills. In a fresh web session the SessionStart hook installed all
-declared plugins (`claude plugin list` → all `√ enabled`, their `SKILL.md` files
-present under `~/.claude/plugins/cache/rdl/...`) and `announce-capabilities.sh`
-returned `reloadSkills: true` — yet the only skills in the slash menu were Claude
-Code's built-ins; **no** `/<plugin>:<skill>` command surfaced, and a manual
-`/reload-skills` reported "no changes". So the docs' `reloadSkills` re-scan covers
-only loose `~/.claude/skills/`, not the plugin install cache. **The pre-snapshot
-Setup-script field (`make cc-web-setup`) is therefore the only guaranteed
-first-session path** — the SessionStart hook is a self-heal, not a substitute.
+## Open question — does `reloadSkills` re-scan the plugin cache? (upstream)
 
-**Ask upstream.** (a) Confirm/document whether `reloadSkills` re-scans plugin-cache
-skills, not just loose `~/.claude/skills/`; and (b) ideally install `enabledPlugins`
-from known marketplaces *before* skill enumeration on web so no hook dance is needed.
+Claude enumerates plugin skills at **process startup, before** `SessionStart` hooks
+finish (hooks docs: *"Skill discovery normally runs before SessionStart hooks
+finish"*). Empirically, `announce-capabilities.sh` returning `reloadSkills: true` did
+**not** surface plugin-cache skills mid-session — `/reload-skills` reported "no
+changes." So that re-scan appears to cover loose `~/.claude/skills/` only, not the
+plugin install cache. **Ask upstream:** confirm/document the `reloadSkills` scope,
+and ideally have the platform install `enabledPlugins` *before* skill enumeration so
+no hook involvement is ever needed.
 
-## 2. `announce-capabilities.sh` reports enabled, not installed (this repo) — FIXED
+## Note — Docker daemon is not running on web runners
 
-`announce-capabilities.sh` listed `enabledPlugins` from `settings.json` as
-"Enabled plugins" without verifying they actually installed/loaded. This produced
-a false-positive that masked issue #1 (the announcement looked healthy while the
-slash menu was empty).
-
-**Fixed.** The hook now cross-checks the declared set against `claude plugin list`:
-it reports only verified-installed plugins under **"Enabled plugins (installed)"**
-and surfaces any declared-but-not-installed plugins under a **"⚠️ Declared but NOT
-installed"** line with the `make cc-web-setup` remedy. It falls back to the declared
-set when the `claude` CLI is unavailable (some Action runners).
-
-## 3. `cc-web-setup` skill assumed a `scripts/` layout only (this repo)
-
-The shipped skill template wires hooks under `scripts/`, but this repo keeps them
-under `.claude/hooks/`. The skill should document/support both layouts (or the
-discrepancy will keep biting repos that follow the `.claude/hooks/` convention).
-
-## 4. Docker daemon is not running on web runners (documented; verify upstream)
-
-Web runners ship the `docker` CLI + `dockerd` binary but **no running daemon** and
-no systemd. Anything needing containers (devcontainer smoke tests, testcontainers,
-k3d) must start `dockerd` itself in the `web-bootstrap.local.sh` seam (now wired
-here via `ensure_docker`, and documented in the `cc-web-setup` skill). Worth a docs
-issue upstream so this is discoverable rather than tribal knowledge.
-
-## 5. Pre-seed should read `settings.json` (consider upstreaming to the skill asset)
-
-This repo's `cc-web-setup.sh` reads the marketplaces + enabled plugins straight
-from `.claude/settings.json` (single source of truth) instead of the skill asset's
-hardcoded-with-env-override list. Consider folding the settings-driven approach
-back into `skills/cc-web-setup/assets/cc-web-setup.sh` so the two cannot drift.
+Web runners ship the `docker` CLI + `dockerd` binary but **no running daemon** and no
+systemd. Anything needing containers (devcontainer smoke tests, testcontainers, k3d)
+must start `dockerd` itself in the `install-deps.local.sh` seam (wired here via
+`ensure_docker`, documented in the `cc-web-setup` skill). Worth a docs issue upstream
+so it is discoverable rather than tribal knowledge.
