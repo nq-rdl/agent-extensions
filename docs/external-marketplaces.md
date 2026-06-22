@@ -31,9 +31,11 @@ root). Each is a real Claude Code marketplace (has
 | `svelte` | `sveltejs/ai-tools` | `svelte` | Svelte 5 authoring + the Svelte MCP server |
 
 **Anthropic's `pr-review-toolkit`** (six PR-review agents) is *not* in the table
-because its marketplace, `claude-plugins-official`, ships with Claude Code and is
-auto-available — so it needs no `extraKnownMarketplaces` entry, only an
-`enabledPlugins` line.
+because it comes from `claude-plugins-official`, the catalog bundled with Claude
+Code. That marketplace is auto-available in the desktop/CLI, but on Claude Code
+(web) it must be registered explicitly in `extraKnownMarketplaces` for its
+enabled plugins (`pr-review-toolkit`, `superpowers`, `gopls-lsp`) to resolve and
+install — so it appears in `.claude/settings.json` alongside the curated set.
 
 ## How it's wired
 
