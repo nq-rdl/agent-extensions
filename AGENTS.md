@@ -9,9 +9,16 @@ This repo is a Claude Code agent extension catalog. It maintains a single source
 ## Setup commands
 
 ```bash
-# Activate git hooks (changie fragment lint, etc.)
-git config core.hooksPath .githooks
+# Activate local git hooks (pre-commit + pre-push CI parity, via lefthook)
+lefthook install
 ```
+
+Local hooks mirror CI so failures surface before you push. **pre-commit** runs
+fast checks (gofmt/vet/build of `tools/asctl`, `asctl repo-check`, plugin
+validation, generated-artifact drift, lychee links); **pre-push** runs `asctl`
+tests, the pipeline unit tests, a non-blocking SkillSpector scan, and a hard
+changie-fragment gate. Prereqs: `lefthook`, Go, `python3` + `pyyaml`; optional
+`lychee` and Docker. Bypass with `LEFTHOOK=0` or `git commit --no-verify`.
 
 `skills/` is canonical content authored in this repo (formerly vendored from `nq-rdl/agent-skills`, now merged here), not a submodule. Skills are validated against the agentskills.io spec by `asctl` — the Go CLI under `tools/asctl/` (`asctl repo-check`).
 
@@ -130,7 +137,14 @@ CI runs `validate.yml` on every PR/push to main. It checks:
 - Any symlink under `plugins/` resolves (`validate-symlinks` — plugin trees are real-file copies, so this guards against accidental links)
 - Every `agents/<name>/agent.md` has frontmatter `name` + `description`
 - The pipeline scripts' unit tests pass (`tests/`)
-- Skills validate against the agentskills.io spec (`asctl repo-check`, built from `tools/asctl/`)
+- Skills validate against the agentskills.io spec **and the directory-structure standard** (`asctl repo-check`, built from `tools/asctl/`)
+
+Three more workflows run on PRs alongside `validate.yml`:
+- `changelog-check.yml` — fails if no changie fragment was added (bypass with the `skip-changelog` label)
+- `link-check.yml` — lychee link check over changed `skills/**/*.md`
+- `skillspector.yml` — NVIDIA SkillSpector scan over `skills/`; informational, uploads SARIF to code scanning (non-gating)
+
+The same checks run locally via `lefthook` (see Setup commands).
 
 ## Testing instructions
 
