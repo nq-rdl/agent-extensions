@@ -4,8 +4,6 @@
     "CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS": "1"
   },
   "model": "opus",
-  "alwaysThinkingEnabled": true,
-  "effortLevel": "xhigh",
   "hooks": {
     "SessionStart": [
       {
@@ -24,6 +22,7 @@
     ]
   },
   "enabledPlugins": {
+    "rdl@rdl": true,
     "codex@openai-codex": true,
     "gopls-lsp@claude-plugins-official": true,
     "pr-review-toolkit@claude-plugins-official": true,
@@ -32,9 +31,51 @@
     "motherduck-skills@motherduck-skills": true,
     "astral@astral-sh": true,
     "modern-go-guidelines@goland-claude-marketplace": true,
-    "svelte@svelte": true
+    "svelte@svelte": true,
+    "go@rdl": true,
+    "rust@rdl": true,
+    "r@rdl": true,
+    "shiny@rdl": true,
+    "quarto@rdl": true,
+    "obsidian@rdl": true,
+    "writerside@rdl": true,
+    "zod@rdl": true,
+    "defuddle@rdl": true,
+    "git@rdl": true,
+    "github-actions@rdl": true,
+    "jules@rdl": true,
+    "terraform@rdl": true,
+    "kubernetes@rdl": true,
+    "argo-cd@rdl": true,
+    "ansible@rdl": true,
+    "arch-linux@rdl": true,
+    "starrocks@rdl": true,
+    "postgres@rdl": true,
+    "mongodb@rdl": true,
+    "sops@rdl": true,
+    "bitwarden@rdl": true,
+    "pixi@rdl": true,
+    "lychee@rdl": true,
+    "charm-tui@rdl": true,
+    "claude-code@rdl": true,
+    "playwright@rdl": true,
+    "skill@rdl": true,
+    "review@rdl": true,
+    "planning@rdl": true,
+    "debug@rdl": true,
+    "docs@rdl": true,
+    "research@rdl": true,
+    "lucid@rdl": true,
+    "hooks@rdl": true
   },
   "extraKnownMarketplaces": {
+    "rdl": {
+      "source": {
+        "source": "github",
+        "repo": "nq-rdl/agent-extensions"
+      },
+      "autoUpdate": true
+    },
     "openai-codex": {
       "source": {
         "source": "github",
@@ -84,5 +125,7 @@
       },
       "autoUpdate": true
     }
-  }
+  },
+  "alwaysThinkingEnabled": true,
+  "effortLevel": "xhigh"
 }

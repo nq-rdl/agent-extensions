@@ -6,10 +6,14 @@
 # unless running inside an Anthropic-managed cloud VM (CLAUDE_CODE_REMOTE=true),
 # so it never touches a local contributor's machine.
 #
-# PLUGINS are provisioned DECLARATIVELY: Claude Code on the web installs the
-# plugins declared in .claude/settings.json (extraKnownMarketplaces +
-# enabledPlugins) at session start, so this repo ships no pre-snapshot setup
-# script. This per-session hook only provisions what settings.json cannot:
+# PLUGINS: the authoritative pre-seed runs from the web environment's *Setup
+# script* field (`make cc-web-setup` → .claude/hooks/cc-web-setup.sh), which runs
+# before Claude starts and is captured in the snapshot, so plugin skills are
+# present on the FIRST session. Claude enumerates skills at startup, BEFORE this
+# hook, so a plugin installed here only surfaces its skills NEXT session — hence
+# this hook calls cc-web-setup.sh purely as a SELF-HEAL for environments whose
+# Setup-script field is not wired (the skills then arrive the following session).
+# This per-session hook also provisions what the snapshot cannot:
 #   * the portable per-session tooling a base image may lack — the GitHub CLI
 #     (PR/CI automation) and the Codex CLI (a second opinion via `codex exec`),
 #     persisting both on PATH for later Bash commands;
@@ -552,7 +556,21 @@ main() {
     fi
   fi
 
-  # --- 3. SOURCE PROJECT HOOK (optional, project-specific) --------------------
+  # --- 3. Plugin pre-seed self-heal -------------------------------------------
+  # The authoritative pre-seed is the environment's Setup-script field
+  # (`make cc-web-setup`), which runs pre-snapshot so skills are present on the
+  # first session. Call it again here as a SELF-HEAL for environments whose
+  # Setup-script field is not wired: the install lands after Claude has already
+  # enumerated skills this session, so the /<plugin>:<skill> commands surface on
+  # the NEXT session — but at least they then exist. Non-fatal (|| true).
+  local cc_web_setup="${PROJECT_DIR}/.claude/hooks/cc-web-setup.sh"
+  if [ -f "$cc_web_setup" ]; then
+    log "Self-healing plugin pre-seed (cc-web-setup.sh)…"
+    CLAUDE_PROJECT_DIR="$PROJECT_DIR" bash "$cc_web_setup" >>"$LOG" 2>&1 \
+      || log "WARNING: plugin pre-seed reported errors (see ${LOG})."
+  fi
+
+  # --- 4. SOURCE PROJECT HOOK (optional, project-specific) --------------------
   # The portable engine above carries no project dependencies. Repo-specific glue
   # — language toolchains on PATH, container runtimes, git-hook wiring (.husky /
   # .githooks / lefthook), fetching the default branch for merge-base checks, etc.

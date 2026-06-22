@@ -112,6 +112,47 @@ Offer to scaffold a commented `scripts/web-bootstrap.local.sh` from
 `assets/web-bootstrap.local.sh.example`. Do **not** create it unless the repo actually needs
 project-specific steps.
 
+### Docker on Claude Code on the web
+
+A web runner is **not** a laptop: it ships the `docker` CLI and the `dockerd`
+binary but **no running daemon**, and there is **no systemd / service manager**
+to start one. On a developer machine Docker Desktop (or a systemd unit) keeps
+`dockerd` up; in a cloud session nothing does. So any repo that needs containers
+in a web session — devcontainer smoke tests, `testcontainers`, k3d/k8s-in-docker,
+building images — **must start `dockerd` itself**.
+
+This is per-session, project-specific work, so it belongs in the `web-bootstrap.local.sh`
+seam, **not** in the portable engine (not every repo wants Docker) and **not** in the
+pre-snapshot setup script (a daemon is runtime state, not snapshot filesystem state — it
+does not survive into a new session). The portable `web-bootstrap.sh` exposes the `$SUDO`
+global specifically so the local hook can start daemons like this. The pattern (proven in
+DataOps and shipped commented in `assets/web-bootstrap.local.sh.example`):
+
+```bash
+ensure_docker() {
+  command -v dockerd >/dev/null 2>&1 || return 0   # Docker not provisioned here.
+  docker info >/dev/null 2>&1 && return 0           # Already up.
+  # shellcheck disable=SC2086  # $SUDO word-splits into argv ('' as root, 'sudo -n' otherwise)
+  nohup $SUDO dockerd >>"$LOG" 2>&1 &               # nohup+bg: outlive the sourced subshell
+  local i; for i in $(seq 1 30); do docker info >/dev/null 2>&1 && return 0; sleep 1; done
+  log "WARNING: dockerd did not become ready within 30s (see ${LOG})."; return 1
+}
+ensure_docker || true
+```
+
+Key points to convey:
+
+- **Idempotent + non-fatal.** No-op when `docker info` already answers (a resume, or a base
+  image that started it); a runner lacking the privileges/cgroups to run `dockerd` logs a
+  warning and the session continues without containers — never fail the parent hook.
+- **`nohup … &`** so the daemon outlives the subshell the parent hook sources the local hook
+  in (a reparented-to-init `dockerd` keeps serving later Bash tool turns).
+- **`$SUDO`** is empty when the session already runs as root and `sudo -n` under an
+  unprivileged `remoteUser` (e.g. the devcontainer `node` user) — leave it unquoted so
+  `sudo -n` splits into argv.
+- **Poll the socket.** `dockerd` needs a second or two to create `/var/run/docker.sock`;
+  return only once `docker info` succeeds so the next step does not race a half-up daemon.
+
 ## Phase 5 — Verify
 
 - Run `CLAUDE_CODE_REMOTE=true bash scripts/web-bootstrap.sh` and confirm it exits 0. (Cloud

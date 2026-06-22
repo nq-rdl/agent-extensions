@@ -1,0 +1,3 @@
+kind: Fixed
+body: 'Claude Code on the web — plugin /<plugin>:<skill> commands now appear on the first session: a pre-snapshot pre-seed (`make cc-web-setup` → `.claude/hooks/cc-web-setup.sh`) installs the declared marketplaces/plugins before Claude enumerates skills, and `rdl@rdl` is enabled so this repo''s own plugins surface too'
+time: 2026-06-22T08:55:38.095320185Z
