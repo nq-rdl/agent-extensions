@@ -1,0 +1,3 @@
+kind: Fixed
+body: '`.devcontainer`: drop podman-only `runArgs` (`--userns=keep-id`, `--security-opt=label=disable`) so `devcontainer up` starts under Docker as well as podman. Bind-mount uid alignment now relies on Dev Containers'' `updateRemoteUserUID` (the container `node` user is synced to the host uid on start) instead of assuming the host runs as uid 1000; rootless podman users can re-add `--userns=keep-id`. `--cap-add=NET_ADMIN`/`NET_RAW` (needed by `init-firewall.sh`) are retained'
+time: 2026-06-22T00:00:01.000000000Z
