@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
 #
 # web-bootstrap.local.sh — project-specific PER-SESSION provisioning for
-# agent-extensions. Sourced by scripts/web-bootstrap.sh near the end of its run
-# (inside the CLAUDE_CODE_REMOTE=true gate), AFTER the portable engine has
+# agent-extensions. Sourced by .claude/hooks/web-bootstrap.sh near the end of its
+# run (inside the CLAUDE_CODE_REMOTE=true gate), AFTER the portable engine has
 # installed gh/codex and persisted PATH.
 #
 # PLUGINS are provisioned DECLARATIVELY: Claude Code on the web installs the
@@ -30,7 +30,7 @@ if ! command -v log >/dev/null 2>&1; then
   log() { printf '[web-bootstrap.local] %s\n' "$*"; }
 fi
 : "${LOG:=/dev/null}"
-: "${PROJECT_DIR:=$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)}"
+: "${PROJECT_DIR:=$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)}"
 
 # Pinned tool releases. Update the pin and BOTH per-arch checksums together — the
 # SHA-256 values are the upstream-published release checksums (lefthook's
@@ -43,13 +43,24 @@ CHANGIE_PIN="1.24.2"
 CHANGIE_SHA256_x86_64="31535a9d8dc548d6d8f315762bfd5b1fba34e707b7600748c8bb8a609649007d"
 CHANGIE_SHA256_aarch64="c21bf5509c3cd6e86e0f290b497a12bed52849c40566d171c5d1cbdef19b156c"
 
+# True iff the lefthook on PATH reports EXACTLY the pinned version. `lefthook
+# version` prints a bare `X.Y.Z`, so a plain substring grep for the pin would also
+# match a longer release (2.1.9 ⊂ 2.1.90), wrongly short-circuiting the install
+# onto an unpinned binary. Anchor the pin between line-start (or a non-version
+# char) and a trailing whitespace/EOL boundary, dots escaped to match literally —
+# mirrors web-bootstrap.sh's codex_is_pinned.
+lefthook_is_pinned() {
+  command -v lefthook >/dev/null 2>&1 || return 1
+  lefthook version 2>/dev/null | grep -Eq "(^|[^0-9.])${LEFTHOOK_PIN//./\\.}([[:space:]]|\$)"
+}
+
 # Install lefthook from a checksum-pinned GitHub release (a RAW binary asset, not
 # a tarball) into ~/.local/bin. Idempotent + pin-aware: short-circuit ONLY when
 # the lefthook on PATH already reports the pinned version, so a base image
 # shipping a different lefthook is replaced rather than silently used.
 ensure_lefthook() {
   export PATH="${HOME}/.local/bin:${PATH}"
-  if command -v lefthook >/dev/null 2>&1 && lefthook version 2>/dev/null | grep -qF "${LEFTHOOK_PIN}"; then
+  if lefthook_is_pinned; then
     return 0
   fi
   local tool
@@ -79,8 +90,19 @@ ensure_lefthook() {
     log "WARNING: failed to install lefthook into ${HOME}/.local/bin (see ${LOG})."; rm -rf "$tmp"; return 1
   fi
   rm -rf "$tmp"
-  # Honest final signal: confirm the pinned lefthook is what now resolves.
-  lefthook version 2>/dev/null | grep -qF "${LEFTHOOK_PIN}"
+  # Honest final signal: confirm the pinned lefthook is what now resolves
+  # (boundary-aware — the same check as the short-circuit above).
+  lefthook_is_pinned
+}
+
+# True iff the changie on PATH reports EXACTLY the pinned version. `changie
+# --version` prints `changie version vX.Y.Z`, so a plain substring grep for the
+# pin would also match a longer release (1.24.2 ⊂ 1.24.20). Anchored as in
+# lefthook_is_pinned: the leading `v` (a non-version char) and a whitespace/EOL
+# boundary fence the pin in.
+changie_is_pinned() {
+  command -v changie >/dev/null 2>&1 || return 1
+  changie --version 2>/dev/null | grep -Eq "(^|[^0-9.])${CHANGIE_PIN//./\\.}([[:space:]]|\$)"
 }
 
 # Install changie from a checksum-pinned GitHub release tarball into ~/.local/bin.
@@ -88,7 +110,7 @@ ensure_lefthook() {
 # binary at its root. Idempotent + pin-aware.
 ensure_changie() {
   export PATH="${HOME}/.local/bin:${PATH}"
-  if command -v changie >/dev/null 2>&1 && changie --version 2>/dev/null | grep -qF "${CHANGIE_PIN}"; then
+  if changie_is_pinned; then
     return 0
   fi
   local tool
@@ -126,8 +148,9 @@ ensure_changie() {
     log "WARNING: failed to extract the changie tarball (see ${LOG})."; rm -rf "$tmp"; return 1
   fi
   rm -rf "$tmp"
-  # Honest final signal: confirm the pinned changie is what now resolves.
-  changie --version 2>/dev/null | grep -qF "${CHANGIE_PIN}"
+  # Honest final signal: confirm the pinned changie is what now resolves
+  # (boundary-aware — the same check as the short-circuit above).
+  changie_is_pinned
 }
 
 # python3 + jq are expected on the base image (the registry pipeline scripts and

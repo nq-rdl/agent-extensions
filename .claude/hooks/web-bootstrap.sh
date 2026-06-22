@@ -6,28 +6,33 @@
 # unless running inside an Anthropic-managed cloud VM (CLAUDE_CODE_REMOTE=true),
 # so it never touches a local contributor's machine.
 #
-# The heavy provisioning (Claude plugin pre-seed) lives in
-# scripts/cc-web-setup.sh, which the web environment's *setup script* should run
-# ONCE before the snapshot (`make cc-web-setup`) so plugin skills are available
-# on the FIRST session — Claude enumerates skills at startup, so a plugin
-# installed by this hook only surfaces next session. This per-session hook then:
-#   * self-heals by running cc-web-setup.sh when the environment was not
-#     pre-provisioned (on that path, plugin skills only arrive next session);
-#   * provisions the portable per-session tooling a snapshot cannot carry: the
-#     GitHub CLI (PR/CI automation) and the Codex CLI (a second opinion via
-#     `codex exec`), persisting both on PATH for later Bash commands;
-#   * sources an optional project hook (web-bootstrap.local.sh) for repo-specific
-#     glue (language toolchains, container runtimes, git-hook wiring, …).
+# PLUGINS are provisioned DECLARATIVELY: Claude Code on the web installs the
+# plugins declared in .claude/settings.json (extraKnownMarketplaces +
+# enabledPlugins) at session start, so this repo ships no pre-snapshot setup
+# script. This per-session hook only provisions what settings.json cannot:
+#   * the portable per-session tooling a base image may lack — the GitHub CLI
+#     (PR/CI automation) and the Codex CLI (a second opinion via `codex exec`),
+#     persisting both on PATH for later Bash commands;
+#   * an optional project hook (web-bootstrap.local.sh) for repo-specific glue
+#     (language toolchains, container runtimes, git-hook wiring, …).
 #
 # This script is PORTABLE: it carries no project-specific dependencies. Anything
-# specific to one repo belongs in scripts/web-bootstrap.local.sh (sourced below).
+# specific to one repo belongs in .claude/hooks/web-bootstrap.local.sh (sourced below).
 #
 # Output discipline: SessionStart stdout is injected into Claude's context, so
 # verbose tool output goes to $LOG and only concise status lines reach stdout.
 #
 # Every step is non-fatal: a SessionStart hook that exits non-zero can disrupt
 # session start, so problems are logged and the script always exits 0.
-set -uo pipefail
+#
+# Apply strict mode ONLY when executed as the hook, not when the test harness
+# sources this file: `set` mutates global shell options, so an unguarded `set`
+# here would leak -u/pipefail into the caller's shell and break the
+# sourceable-for-tests guarantee noted at the bottom. Same BASH_SOURCE[0] == $0
+# test as the main() guard.
+if [ "${BASH_SOURCE[0]}" = "${0}" ]; then
+  set -uo pipefail
+fi
 
 # Only colorize on a TTY — cloud SessionStart stdout is non-TTY and injected into
 # the model context, where ANSI escapes are just noise.
@@ -484,21 +489,11 @@ main() {
   ( umask 077; : > "$LOG" ) 2>/dev/null || LOG=/dev/null
 
   # Resolve the repo root. The hook exports CLAUDE_PROJECT_DIR; fall back to the
-  # script's own location so it also works when run by hand.
-  PROJECT_DIR="${CLAUDE_PROJECT_DIR:-$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)}"
+  # script's own location (this file lives at .claude/hooks/, so the repo root is
+  # two levels up) so it also works when run by hand.
+  PROJECT_DIR="${CLAUDE_PROJECT_DIR:-$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)}"
 
-  # --- 1. provisioning self-heal (plugin pre-seed) ----------------------------
-  # Normally already done ONCE by the environment setup script (`make
-  # cc-web-setup`) before the snapshot, which is what makes plugin skills available
-  # this session. Re-running is idempotent, so this self-heals environments whose
-  # setup script does not run it — though on that path plugin skills only surface
-  # next session.
-  if [ -f "${PROJECT_DIR}/scripts/cc-web-setup.sh" ]; then
-    bash "${PROJECT_DIR}/scripts/cc-web-setup.sh" \
-      || log "WARNING: cc-web-setup reported errors (see ${TMPDIR:-/tmp}/rdl-cc-web-setup.log)."
-  fi
-
-  # --- 2. GitHub CLI + token (every session) ----------------------------------
+  # --- 1. GitHub CLI + token (every session) ----------------------------------
   # Provision gh so PR/CI automation can run from the cloud session, and report
   # whether the environment injected a GitHub token. gh reads GH_TOKEN (or
   # GITHUB_TOKEN) straight from the env — no `gh auth login` — so we just verify it
@@ -519,7 +514,7 @@ main() {
     log "WARNING: gh CLI not available (install failed — see ${LOG})."
   fi
 
-  # --- 3. Codex CLI install + auth (every session; quiet no-op without creds) --
+  # --- 2. Codex CLI install + auth (every session; quiet no-op without creds) --
   # Install the Codex CLI and authenticate it so `codex exec` works headlessly.
   # Two supported credential inputs, in priority order:
   #   * CODEX_AUTH_JSON   — the full contents of a ~/.codex/auth.json captured from
@@ -554,11 +549,11 @@ main() {
     fi
   fi
 
-  # --- 4. SOURCE PROJECT HOOK (optional, project-specific) --------------------
+  # --- 3. SOURCE PROJECT HOOK (optional, project-specific) --------------------
   # The portable engine above carries no project dependencies. Repo-specific glue
   # — language toolchains on PATH, container runtimes, git-hook wiring (.husky /
   # .githooks / lefthook), fetching the default branch for merge-base checks, etc.
-  # — belongs in scripts/web-bootstrap.local.sh, sourced here if present. A subshell
+  # — belongs in .claude/hooks/web-bootstrap.local.sh, sourced here if present. A subshell
   # inherits main()'s helpers and globals (log, $LOG, $PROJECT_DIR, $SUDO,
   # $CLAUDE_ENV_FILE, persist_path), so its file/system side effects persist.
   #
@@ -568,7 +563,7 @@ main() {
   # stops its variable edits from leaking back; it does NOT sandbox the code (a
   # project hook legitimately needs the session's git/gh credentials). Signal a
   # soft failure with a non-zero exit/return — it is logged, never fatal.
-  local local_hook="${PROJECT_DIR}/scripts/web-bootstrap.local.sh"
+  local local_hook="${PROJECT_DIR}/.claude/hooks/web-bootstrap.local.sh"
   if [ -f "$local_hook" ]; then
     log "Running project bootstrap hook (web-bootstrap.local.sh)…"
     # shellcheck source=/dev/null
@@ -580,7 +575,7 @@ main() {
 }
 
 # Run the imperative body only when executed, not when sourced. The hook is
-# invoked by direct exec ("$CLAUDE_PROJECT_DIR"/scripts/web-bootstrap.sh from the
+# invoked by direct exec ("$CLAUDE_PROJECT_DIR"/.claude/hooks/web-bootstrap.sh from the
 # SessionStart hook), so BASH_SOURCE[0] == $0 holds for the real run and the test
 # harness (which sources this file) skips main and just exercises the functions.
 if [ "${BASH_SOURCE[0]}" = "${0}" ]; then
