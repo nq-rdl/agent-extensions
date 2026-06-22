@@ -53,6 +53,7 @@ pre-commit:
         python3 scripts/check_bundle_refs.py .
         python3 scripts/check_grouping.py .
         python3 scripts/check_consistency.py .
+        bash scripts/sync-plugins.sh --check
         python3 scripts/generate_manifests.py . --check
         python3 scripts/generate_bundles_doc.py . --check
 

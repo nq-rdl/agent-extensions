@@ -12,7 +12,8 @@
 # manifest (no SKILL.md at skills/ root) and emit paths like "bitwarden/SKILL.md"
 # instead of "skills/bitwarden/SKILL.md". So we scan each skill directory
 # individually and, for SARIF output, prepend the "skills/<name>/" prefix to
-# every finding location and merge the per-skill runs into one report.
+# every finding location and merge the findings into a SINGLE SARIF run (the
+# CodeQL upload-sarif action rejects multiple runs that share one category).
 #
 # Env vars:
 #   SKILLSPECTOR_REF     SkillSpector git ref to build/pin (default: pinned SHA below).
@@ -81,38 +82,45 @@ if [ "${#skills[@]}" -eq 0 ]; then
 fi
 
 # merge_sarif <outdir> <dest>: combine the per-skill SARIF reports in <outdir>
-# into one SARIF document at <dest>, prepending each finding's location with its
-# "skills/<name>/" prefix (SkillSpector emits paths relative to the scanned skill
-# dir, e.g. "SKILL.md"). Each skill keeps its own SARIF run so per-skill tool
-# metadata and any ruleIndex references stay valid. Per-skill files that are not
-# valid SARIF (e.g. an empty report from a failed scan) are skipped.
+# into a SARIF document with a SINGLE run at <dest>, prepending each finding's
+# location with its "skills/<name>/" prefix (SkillSpector emits paths relative to
+# the scanned skill dir, e.g. "SKILL.md"). One run is required: the CodeQL
+# upload-sarif action rejects multiple runs that share one category. SkillSpector
+# emits no tool.driver.rules and references rules only by ruleId string (no
+# ruleIndex), so the results concatenate directly with no rule/index remapping.
+# Per-skill files that are not valid SARIF (e.g. an empty report from a failed
+# scan) are skipped.
 merge_sarif() {
   local outdir="$1" dest="$2"
-  local runs_acc schema="" f name
-  runs_acc="$(mktemp)"
-  echo '[]' >"$runs_acc"
+  local results_acc schema="" version="" tool="" f name
+  results_acc="$(mktemp)"
+  echo '[]' >"$results_acc"
   for f in "$outdir"/*.report; do
     [ -f "$f" ] || continue
-    jq -e '.runs' "$f" >/dev/null 2>&1 || continue # skip non-SARIF/empty reports
+    jq -e '.runs[0]' "$f" >/dev/null 2>&1 || continue # skip non-SARIF/empty reports
     name="$(basename "$f" .report)"
-    if [ -z "$schema" ]; then
-      schema="$(jq -r '."$schema" // "https://json.schemastore.org/sarif-2.1.0.json"' "$f")"
+    if [ -z "$schema" ]; then # capture the SARIF envelope + tool from the first run
+      schema="$(jq -r '."$schema" // empty' "$f")"
+      version="$(jq -r '.version // empty' "$f")"
+      tool="$(jq -c '.runs[0].tool' "$f")"
     fi
-    # Rewrite this skill's runs: prepend the prefix to each relative finding uri.
+    # Collect this skill's results, prefixing each relative finding location uri.
     jq --arg p "skills/$name/" '
-      [ .runs[]
-        | .results = ( (.results // [])
-            | map( .locations = ( (.locations // [])
-                | map( if (.physicalLocation.artifactLocation.uri | type) == "string"
-                       then .physicalLocation.artifactLocation.uri = ($p + .physicalLocation.artifactLocation.uri)
-                       else . end ) ) ) )
-      ]' "$f" >"$f.runs"
-    jq -s '.[0] + .[1]' "$runs_acc" "$f.runs" >"$runs_acc.next"
-    mv "$runs_acc.next" "$runs_acc"
+      [ .runs[].results[]?
+        | .locations = ( (.locations // [])
+            | map( if (.physicalLocation.artifactLocation.uri | type) == "string"
+                   then .physicalLocation.artifactLocation.uri = ($p + .physicalLocation.artifactLocation.uri)
+                   else . end ) ) ]' "$f" >"$f.res"
+    jq -s '.[0] + .[1]' "$results_acc" "$f.res" >"$results_acc.next"
+    mv "$results_acc.next" "$results_acc"
   done
-  jq -n --arg schema "$schema" --slurpfile runs "$runs_acc" \
-    '{ "$schema": $schema, "version": "2.1.0", "runs": $runs[0] }' >"$dest"
-  rm -f "$runs_acc"
+  [ -n "$schema" ] || schema="https://json.schemastore.org/sarif-2.1.0.json"
+  [ -n "$version" ] || version="2.1.0"
+  [ -n "$tool" ] || tool='{"driver":{"name":"skillspector"}}'
+  jq -n --arg schema "$schema" --arg version "$version" \
+    --argjson tool "$tool" --slurpfile results "$results_acc" \
+    '{ "$schema": $schema, version: $version, runs: [ { tool: $tool, results: $results[0] } ] }' >"$dest"
+  rm -f "$results_acc"
 }
 
 # Per-skill reports land here (a host temp dir, mounted read-write into the

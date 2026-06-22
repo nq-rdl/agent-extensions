@@ -23,24 +23,38 @@
 # Usage:
 #   scripts/sync-plugins.sh           # sync every bundle in registry/
 #   scripts/sync-plugins.sh swe       # sync only the named bundle(s)
+#   scripts/sync-plugins.sh --check   # report (don't fix) any plugin copy that
+#                                     # has drifted from its canonical source;
+#                                     # exits non-zero on drift (CI / hook gate)
 
 set -euo pipefail
 
 REPO_ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 cd "$REPO_ROOT"
 
-bundles_arg="$*"
+check=0
+args=()
+for a in "$@"; do
+  if [ "$a" = "--check" ]; then
+    check=1
+  else
+    args+=("$a")
+  fi
+done
+bundles_arg="${args[*]:-}"
 
-python3 - "$bundles_arg" <<'PY'
+python3 - "$check" "$bundles_arg" <<'PY'
 import re
 import shutil
 import sys
+import tempfile
 from pathlib import Path
 
 import yaml
 
 repo = Path.cwd()
-selected = sys.argv[1].split() if sys.argv[1] else []
+check = sys.argv[1] == "1"
+selected = sys.argv[2].split() if sys.argv[2] else []
 
 bundle_files = sorted((repo / "registry" / "bundles").glob("*.yaml"))
 if selected:
@@ -51,6 +65,29 @@ if selected:
         sys.exit(f"::error::Unknown bundle(s): {', '.join(sorted(missing))}")
 
 warnings = 0
+
+# In --check mode we record (never fix) every place a plugin copy diverges from
+# its canonical source, then exit non-zero so CI/hooks fail until the author
+# reruns the sync. Nothing on disk is modified.
+drift = []
+
+
+def compare_trees(expected: Path, actual: Path):
+    # Differences between the expected skill tree (canonical copy + name strip)
+    # and the actual plugin copy: missing files, stale files, or differing bytes.
+    if not actual.exists():
+        return ["missing skill copy — run sync-plugins.sh"]
+    msgs = []
+    exp_files = {p.relative_to(expected) for p in expected.rglob("*") if p.is_file()}
+    act_files = {p.relative_to(actual) for p in actual.rglob("*") if p.is_file()}
+    for rel in sorted(exp_files - act_files):
+        msgs.append(f"missing file {rel}")
+    for rel in sorted(act_files - exp_files):
+        msgs.append(f"stale file {rel}")
+    for rel in sorted(exp_files & act_files):
+        if (expected / rel).read_bytes() != (actual / rel).read_bytes():
+            msgs.append(f"content differs: {rel}")
+    return msgs
 
 
 def warn(bundle_file: Path, message: str) -> None:
@@ -67,6 +104,12 @@ def prune_entries(parent: Path, keep: set) -> None:
         return
     for child in sorted(parent.iterdir()):
         if child.name in keep:
+            continue
+        if check:
+            drift.append(
+                f"{child.relative_to(repo)}: stale (not named by the registry; "
+                "would be pruned by sync-plugins.sh)"
+            )
             continue
         if child.is_symlink() or child.is_file():
             child.unlink()
@@ -156,6 +199,16 @@ def sync_skill(plugin: str, source: str, leaf: str, bundle_file: Path) -> None:
             "Point registry/bundles at an existing skill or remove the entry.",
         )
         return
+    if check:
+        # Build what the plugin copy *should* be (canonical copy + name strip) in
+        # a throwaway temp dir, then compare — never touch plugins/.
+        with tempfile.TemporaryDirectory() as td:
+            expected = Path(td) / leaf
+            shutil.copytree(src, expected, symlinks=False)
+            strip_skill_name(expected)
+            for d in compare_trees(expected, dst):
+                drift.append(f"plugins/{plugin}/skills/{leaf}: {d}")
+        return
     if dst.is_symlink() or dst.is_file():
         dst.unlink()
     elif dst.exists():
@@ -175,6 +228,15 @@ def sync_agent(plugin: str, agent: str, bundle_file: Path) -> None:
             f"Agent '{agent}' has no source agents/{agent}/agent.md — skipped.",
         )
         return
+    if check:
+        if not dst.is_file():
+            drift.append(f"plugins/{plugin}/agents/{agent}.md: missing — run sync-plugins.sh")
+        elif dst.read_bytes() != src.read_bytes():
+            drift.append(
+                f"plugins/{plugin}/agents/{agent}.md: content differs from "
+                f"agents/{agent}/agent.md"
+            )
+        return
     dst.parent.mkdir(parents=True, exist_ok=True)
     if dst.is_symlink() or dst.exists():
         dst.unlink()
@@ -191,7 +253,7 @@ for bundle_file in bundle_files:
         print(f"Skipping {bundle} (claude target disabled)")
         continue
     plugin = claude.get("pluginName") or data.get("id") or bundle
-    print(f"Syncing {bundle} -> plugins/{plugin}")
+    print(f"{'Checking' if check else 'Syncing'} {bundle} -> plugins/{plugin}")
 
     skills = list(data.get("skills") or [])
     agents = list(data.get("agents") or [])
@@ -234,6 +296,26 @@ for bundle_file in bundle_files:
         sync_skill(plugin, source, leaf, bundle_file)
     for agent in agents:
         sync_agent(plugin, agent, bundle_file)
+
+if check:
+    if drift:
+        print(
+            "::error::plugin trees are out of sync with canonical skills/ and agents/.",
+            file=sys.stderr,
+        )
+        print(
+            "The plugins/ copies are derived from skills/ and agents/; refresh them with:",
+            file=sys.stderr,
+        )
+        print(
+            "  bash scripts/sync-plugins.sh   (then commit the updated plugins/ tree)",
+            file=sys.stderr,
+        )
+        for d in drift:
+            print(f"  - {d}", file=sys.stderr)
+        sys.exit(1)
+    print("plugin trees are in sync with canonical skills/ and agents/.")
+    sys.exit(0)
 
 if warnings:
     print(
