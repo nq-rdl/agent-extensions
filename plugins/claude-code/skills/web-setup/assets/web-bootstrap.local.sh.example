@@ -28,10 +28,29 @@
 #   fi
 # fi
 
-# # Start the Docker daemon (k3d / testcontainers need it).
-# if command -v docker >/dev/null 2>&1 && ! docker info >/dev/null 2>&1; then
-#   if command -v dockerd >/dev/null 2>&1; then
-#     nohup $SUDO dockerd >>"${TMPDIR:-/tmp}/dockerd.log" 2>&1 &
-#     disown 2>/dev/null || true
-#   fi
-# fi
+# # Start the Docker daemon (devcontainer smoke tests / k3d / testcontainers need it).
+# #
+# # WHY THIS IS A CLAUDE-CODE-WEB CONCERN: the web runner ships the docker CLI and
+# # the dockerd binary but NO running daemon — and no systemd to start one — unlike
+# # a laptop where Docker Desktop / a systemd unit keeps dockerd up. So a cloud
+# # session that needs containers must start dockerd ITSELF, here in the per-session
+# # seam (the portable engine deliberately does not — not every repo wants Docker).
+# # web-bootstrap.sh exposes $SUDO precisely for starting daemons like this.
+# ensure_docker() {
+#   command -v dockerd >/dev/null 2>&1 || return 0   # Docker not provisioned here.
+#   docker info >/dev/null 2>&1 && return 0           # Already up (resume / base image).
+#   log "Starting Docker daemon (dockerd) for the session…"
+#   # nohup + background so the daemon outlives this sourced subshell; $SUDO is
+#   # empty when root, `sudo -n` under an unprivileged remoteUser (unquoted so it
+#   # word-splits into argv).
+#   # shellcheck disable=SC2086
+#   nohup $SUDO dockerd >>"$LOG" 2>&1 &
+#   local i
+#   for i in $(seq 1 30); do
+#     docker info >/dev/null 2>&1 && { log "Docker daemon ready."; return 0; }
+#     sleep 1
+#   done
+#   log "WARNING: dockerd did not become ready within 30s (see ${LOG})."
+#   return 1
+# }
+# ensure_docker || true

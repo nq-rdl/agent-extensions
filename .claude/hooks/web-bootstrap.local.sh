@@ -5,11 +5,10 @@
 # run (inside the CLAUDE_CODE_REMOTE=true gate), AFTER the portable engine has
 # installed gh/codex and persisted PATH.
 #
-# PLUGINS are provisioned DECLARATIVELY: Claude Code on the web installs the
-# plugins declared in .claude/settings.json (extraKnownMarketplaces +
-# enabledPlugins) at session start, so this repo ships NO pre-snapshot setup
-# script. All project-specific provisioning therefore lives HERE, in the
-# per-session hook:
+# PLUGINS are installed by Claude Code on the web itself, from the enabledPlugins
+# / extraKnownMarketplaces declared in .claude/settings.json — not from here and
+# not from any setup script. This per-session local hook provisions the
+# project-specific tooling the snapshot cannot:
 #   * lefthook + changie — installed from CHECKSUM-PINNED GitHub releases into
 #     ~/.local/bin (github.com is the reliably-allowlisted source on the cloud
 #     sandbox), mirroring web-bootstrap.sh's ensure_gh. They back the local git
@@ -17,6 +16,11 @@
 #     same checks as CI.
 #   * python3 / jq / pyyaml — the registry pipeline scripts (generate_manifests.py
 #     etc., invoked by the lefthook hooks) need them; verify + best-effort install.
+#   * the Docker daemon — the web runner ships the docker CLI + dockerd binary but
+#     NO running daemon (no systemd), so a cloud session that needs containers
+#     (devcontainer smoke tests, testcontainers, image builds) must start dockerd
+#     itself; see ensure_docker below and the "Docker on Claude Code web" note in
+#     the cc-web-setup skill.
 #   * PATH persistence, `lefthook install`, and an origin/main fetch for changie's
 #     merge-base diffs.
 #
@@ -31,6 +35,9 @@ if ! command -v log >/dev/null 2>&1; then
 fi
 : "${LOG:=/dev/null}"
 : "${PROJECT_DIR:=$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)}"
+# $SUDO is provided by web-bootstrap.sh (empty when root, `sudo -n` otherwise).
+# Default it so a standalone run of this file is safe under `set -u`.
+: "${SUDO:=}"
 
 # Pinned tool releases. Update the pin and BOTH per-arch checksums together — the
 # SHA-256 values are the upstream-published release checksums (lefthook's
@@ -249,6 +256,47 @@ ensure_pyyaml() {
   fi
 }
 
+# Start the Docker daemon for THIS session.
+#
+# WHY THIS IS A CLAUDE-CODE-WEB CONCERN: the web runner ships the docker CLI and
+# the dockerd binary but NOT a running daemon — and no systemd/service manager to
+# start one — unlike a laptop where Docker Desktop or a systemd unit keeps dockerd
+# up. So anything that needs containers in a cloud session (devcontainer smoke
+# tests, testcontainers, k8s-in-docker, building images) must start dockerd
+# itself. The PORTABLE engine deliberately does not (not every repo wants Docker);
+# it belongs in this per-session project seam — which is exactly why web-bootstrap.sh
+# exposes $SUDO "for the sourced project hook to use when starting daemons (e.g.
+# dockerd)".
+#
+# Idempotent: a quiet no-op when the daemon already answers (a resume, or a base
+# image that started it). Non-fatal: a runner lacking the privileges/cgroups to
+# run dockerd logs a warning and the session continues without containers.
+ensure_docker() {
+  command -v dockerd >/dev/null 2>&1 || return 0   # Docker not provisioned here.
+  if docker info >/dev/null 2>&1; then
+    return 0                                         # Already up.
+  fi
+  log "Starting Docker daemon (dockerd) for the session…"
+  # nohup + background so the daemon outlives this sourced subshell (the parent
+  # hook sources us in `( … )`); a reparented-to-init dockerd keeps running for
+  # later Bash tool turns. $SUDO is empty when already root, `sudo -n` under an
+  # unprivileged remoteUser (e.g. the devcontainer `node` user) — unquoted so
+  # `sudo -n` word-splits into argv.
+  # shellcheck disable=SC2086  # intentional word-split of $SUDO
+  nohup $SUDO dockerd >>"$LOG" 2>&1 &
+  # dockerd takes a second or two to create /var/run/docker.sock and listen.
+  local i
+  for i in $(seq 1 30); do
+    if docker info >/dev/null 2>&1; then
+      log "Docker daemon ready (Server $(docker version --format '{{.Server.Version}}' 2>/dev/null))."
+      return 0
+    fi
+    sleep 1
+  done
+  log "WARNING: dockerd did not become ready within 30s — containers unavailable this session (see ${LOG})."
+  return 1
+}
+
 # --- run -------------------------------------------------------------------
 # Make ~/.local/bin resolvable in THIS process (for the installs + the lefthook
 # call below) and persist it for later Bash tool shells.
@@ -259,6 +307,7 @@ ensure_changie  || true
 ensure_gopls    || true
 ensure_python_jq
 ensure_pyyaml
+ensure_docker   || true
 
 # Persist ~/.local/bin (lefthook, changie, gh, codex) for subsequent Bash tool
 # commands. persist_path is provided by web-bootstrap.sh; guard for standalone runs.

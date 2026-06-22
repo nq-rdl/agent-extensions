@@ -29,21 +29,34 @@ directory; you copy them into the target repo and merge the settings idempotentl
 
 ## Background you must understand before acting
 
-Claude Code on the web has **two** provisioning mechanisms, and this setup uses both:
+The hard fact this whole setup works around: **Claude Code enumerates plugin skills and
+slash-commands at process startup, BEFORE `SessionStart` hooks finish**
+([hooks docs](https://code.claude.com/docs/en/hooks)). So a plugin a hook installs would,
+by default, only surface its `/<plugin>:<skill>` commands on the *next* session. There are
+two committed levers to beat that, and **the SessionStart hook is the primary one** — it
+needs **no** manual, non-committable environment setting:
 
-1. **Setup script** — bash that runs **once, before Claude starts**, whose filesystem
-   is captured in the environment snapshot. Configured in the web environment's
-   settings UI (not the repo), but the *script it runs* lives in the repo at
-   `scripts/cc-web-setup.sh`. The user wires it by setting the environment's **Setup
-   script** field to `make cc-web-setup` (or `bash scripts/cc-web-setup.sh`). Plugins
-   installed here are available on the **first** session (Claude enumerates skills at
-   startup, before any hook runs).
-2. **SessionStart hook** — `scripts/web-bootstrap.sh`, runs **every session** (cloud
-   *and* local), gated on `CLAUDE_CODE_REMOTE=true` so it is a no-op on a contributor's
-   laptop. It self-heals the plugin pre-seed and provisions per-session tooling.
+1. **SessionStart hook (PRIMARY — committed, zero manual setup).** `scripts/web-bootstrap.sh`
+   runs **every session**, gated on `CLAUDE_CODE_REMOTE=true` (a no-op on a contributor's
+   laptop). On a cloud session it installs the declared marketplaces/plugins
+   (`scripts/cc-web-setup.sh`), and then `scripts/announce-capabilities.sh` (which runs
+   *after* it) returns `reloadSkills: true`, which asks Claude Code to **re-scan the skill
+   and command directories once all SessionStart hooks return** — so freshly-installed
+   skills can surface *this* session, not next. This is the idiomatic, all-in-repo answer:
+   "if `CLAUDE_CODE_REMOTE`, install + reload."
+2. **Setup script (OPTIONAL fallback — guaranteed first-session).** Bash that runs **once,
+   before Claude starts**, whose filesystem is captured in the environment snapshot.
+   Configured in the web environment's settings UI (not the repo); it runs
+   `scripts/cc-web-setup.sh` via the **Setup script** field set to `make cc-web-setup`.
+   Because it installs *before* enumeration, plugin skills are guaranteed present on the
+   first session.
 
-You cannot set the environment Setup-script field for the user (it is not in the repo).
-**Tell them** to set it to `make cc-web-setup` after you finish.
+> **Caveat to convey honestly.** The docs document the `reloadSkills` re-scan for loose
+> `~/.claude/skills/` skills; whether it also re-scans **plugin-cache** skills (installed
+> via `claude plugin install`) is **unconfirmed upstream**. If a team observes that plugin
+> skills still only appear from the *second* session, the Setup-script fallback (lever 2)
+> is the guaranteed fix. Track this as an upstream issue. Either way, lever 1 requires no
+> manual step, so it is what you wire by default.
 
 ## Phase 0 — Confirm context
 
@@ -112,6 +125,47 @@ Offer to scaffold a commented `scripts/web-bootstrap.local.sh` from
 `assets/web-bootstrap.local.sh.example`. Do **not** create it unless the repo actually needs
 project-specific steps.
 
+### Docker on Claude Code on the web
+
+A web runner is **not** a laptop: it ships the `docker` CLI and the `dockerd`
+binary but **no running daemon**, and there is **no systemd / service manager**
+to start one. On a developer machine Docker Desktop (or a systemd unit) keeps
+`dockerd` up; in a cloud session nothing does. So any repo that needs containers
+in a web session — devcontainer smoke tests, `testcontainers`, k3d/k8s-in-docker,
+building images — **must start `dockerd` itself**.
+
+This is per-session, project-specific work, so it belongs in the `web-bootstrap.local.sh`
+seam, **not** in the portable engine (not every repo wants Docker) and **not** in the
+pre-snapshot setup script (a daemon is runtime state, not snapshot filesystem state — it
+does not survive into a new session). The portable `web-bootstrap.sh` exposes the `$SUDO`
+global specifically so the local hook can start daemons like this. The pattern (proven in
+DataOps and shipped commented in `assets/web-bootstrap.local.sh.example`):
+
+```bash
+ensure_docker() {
+  command -v dockerd >/dev/null 2>&1 || return 0   # Docker not provisioned here.
+  docker info >/dev/null 2>&1 && return 0           # Already up.
+  # shellcheck disable=SC2086  # $SUDO word-splits into argv ('' as root, 'sudo -n' otherwise)
+  nohup $SUDO dockerd >>"$LOG" 2>&1 &               # nohup+bg: outlive the sourced subshell
+  local i; for i in $(seq 1 30); do docker info >/dev/null 2>&1 && return 0; sleep 1; done
+  log "WARNING: dockerd did not become ready within 30s (see ${LOG})."; return 1
+}
+ensure_docker || true
+```
+
+Key points to convey:
+
+- **Idempotent + non-fatal.** No-op when `docker info` already answers (a resume, or a base
+  image that started it); a runner lacking the privileges/cgroups to run `dockerd` logs a
+  warning and the session continues without containers — never fail the parent hook.
+- **`nohup … &`** so the daemon outlives the subshell the parent hook sources the local hook
+  in (a reparented-to-init `dockerd` keeps serving later Bash tool turns).
+- **`$SUDO`** is empty when the session already runs as root and `sudo -n` under an
+  unprivileged `remoteUser` (e.g. the devcontainer `node` user) — leave it unquoted so
+  `sudo -n` splits into argv.
+- **Poll the socket.** `dockerd` needs a second or two to create `/var/run/docker.sock`;
+  return only once `docker info` succeeds so the next step does not race a half-up daemon.
+
 ## Phase 5 — Verify
 
 - Run `CLAUDE_CODE_REMOTE=true bash scripts/web-bootstrap.sh` and confirm it exits 0. (Cloud
@@ -124,9 +178,14 @@ project-specific steps.
 
 Tell the user, concisely:
 - What was created/merged (list the files + the settings keys touched).
-- **The one manual step:** set the web environment's **Setup script** field to
-  `make cc-web-setup` so plugin skills are baked into the snapshot and available on the
-  first session (otherwise they only appear from the second session onward).
+- **No manual step is required.** The committed SessionStart hook installs the plugins on
+  every cloud session (gated on `CLAUDE_CODE_REMOTE`) and requests a same-session re-scan
+  via `reloadSkills: true`, so skills surface without touching the web environment UI.
+- **Optional fallback:** *only if* plugin skills still appear from the second session
+  (i.e. the `reloadSkills` re-scan does not reach the plugin cache), set the web
+  environment's **Setup script** field to `make cc-web-setup` to bake the plugins into the
+  snapshot before enumeration — a guaranteed first-session fix. Frame this as a fallback,
+  not a required step.
 - That `web-bootstrap.sh` is safe locally (no-op unless `CLAUDE_CODE_REMOTE=true`).
 - How to add project-specific deps via `scripts/*.local.sh`.
 - That Codex CLI provisioning activates only when `CODEX_AUTH_JSON` or `CODEX_ACCESS_TOKEN`

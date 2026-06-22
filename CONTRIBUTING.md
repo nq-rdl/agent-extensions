@@ -183,3 +183,11 @@ that should become `sql-review:analyse`:
 Adding an **agent** follows the same loop: author `agents/<name>/agent.md` (with frontmatter
 `name` + `description`), list it under a bundle's `agents:`, then run steps 5–6. An agent-only
 subject (no skill) is fine — give it its own bundle with an empty `skills: []`.
+
+## Claude Code on the web
+
+Cloud sessions ([Claude Code on the web](https://code.claude.com/docs/en/claude-code-on-the-web)) run on a fresh VM with only a clone of this repo. The dev-helper plugins enabled here are **external** — they help you *work on* this catalog (Go/LSP, PR review, Python tooling, git worktrees, general workflows); they are deliberately **not** this catalog's own `rdl` plugins. A session for developing the catalog should not install the catalog.
+
+`.claude/settings.json` declares them under `enabledPlugins` with their sources under `extraKnownMarketplaces`. Per the [web docs](https://code.claude.com/docs/en/claude-code-on-the-web), **plugins declared in `.claude/settings.json` are installed at session start from the marketplace you declared** (it must be reachable — `github.com` is on the default *Trusted* allowlist), so their `/<plugin>:<skill>` commands surface on the first session. This is the same path that gives `nq-rdl/dataops` its `/superpowers:*` commands — **no setup script and no `make` required.**
+
+To add a dev-helper plugin: set it `true` in `enabledPlugins` and register its marketplace under `extraKnownMarketplaces`. Keep the set small and **external** — do not enable the `rdl` marketplace or the `rdl@rdl` meta-plugin here.

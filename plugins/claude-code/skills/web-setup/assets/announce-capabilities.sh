@@ -143,9 +143,25 @@ context="$(printf '%s\n' "${lines[@]}")"
 
 # --- emit ------------------------------------------------------------------
 
+# On a cloud session, also request a same-session skill/command re-scan via
+# `reloadSkills: true`. Claude Code enumerates skills at startup, BEFORE
+# SessionStart hooks finish, so the plugins the bootstrap hook just pre-seeded
+# (cc-web-setup.sh) would otherwise only surface NEXT session. This hook runs
+# AFTER the bootstrap hook (settings.json order), so by the time we emit this the
+# install has completed; Claude re-scans the skill/command directories once all
+# SessionStart hooks return. Gate on CLAUDE_CODE_REMOTE so a local session (no
+# pre-seed) does not pay for a needless re-scan. NOTE: the docs only document the
+# re-scan for loose ~/.claude/skills/ — whether it also covers plugin-cache
+# skills is unconfirmed; the env Setup-script field remains the guaranteed
+# first-session fallback.
 if command -v jq >/dev/null 2>&1; then
-  jq -cn --arg ctx "$context" \
-    '{hookSpecificOutput: {hookEventName: "SessionStart", additionalContext: $ctx}}'
+  if [ "${CLAUDE_CODE_REMOTE:-}" = "true" ]; then
+    jq -cn --arg ctx "$context" \
+      '{hookSpecificOutput: {hookEventName: "SessionStart", additionalContext: $ctx, reloadSkills: true}}'
+  else
+    jq -cn --arg ctx "$context" \
+      '{hookSpecificOutput: {hookEventName: "SessionStart", additionalContext: $ctx}}'
+  fi
 else
   printf '%s\n' "$context"
 fi

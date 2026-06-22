@@ -6,10 +6,11 @@
 # unless running inside an Anthropic-managed cloud VM (CLAUDE_CODE_REMOTE=true),
 # so it never touches a local contributor's machine.
 #
-# PLUGINS are provisioned DECLARATIVELY: Claude Code on the web installs the
-# plugins declared in .claude/settings.json (extraKnownMarketplaces +
-# enabledPlugins) at session start, so this repo ships no pre-snapshot setup
-# script. This per-session hook only provisions what settings.json cannot:
+# PLUGINS are NOT installed here. Claude Code on the web installs the plugins
+# declared in .claude/settings.json (enabledPlugins + extraKnownMarketplaces) at
+# session start from their marketplaces — see the web docs' "what carries over"
+# table — so their /<plugin>:<skill> commands surface without any hook or Setup
+# script. This per-session hook only provisions what that cannot:
 #   * the portable per-session tooling a base image may lack — the GitHub CLI
 #     (PR/CI automation) and the Codex CLI (a second opinion via `codex exec`),
 #     persisting both on PATH for later Bash commands;
