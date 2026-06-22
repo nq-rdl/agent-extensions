@@ -1,0 +1,37 @@
+#!/usr/bin/env bash
+#
+# web-bootstrap.local.sh — OPTIONAL per-project extension to web-bootstrap.sh.
+#
+# This file is the sanctioned seam for project-specific provisioning. If it
+# exists next to scripts/web-bootstrap.sh, the portable hook sources it near the
+# end of its run (inside the CLAUDE_CODE_REMOTE=true gate), AFTER the generic
+# engine (gh CLI, codex CLI, plugin pre-seed self-heal, PATH persistence, git
+# hooks) has run. Put anything specific to THIS repo here so the portable script
+# stays generic and re-syncable.
+#
+# It is sourced (not executed), so it shares web-bootstrap.sh's helpers and
+# globals: log(), $LOG (verbose sink), $PROJECT_DIR, $SUDO, $CLAUDE_ENV_FILE.
+# Keep every step non-fatal — the parent hook must always exit 0 — and route
+# verbose output to "$LOG" so it does not pollute the model context.
+#
+# Rename to `web-bootstrap.local.sh` (drop `.example`) and commit it to enable.
+#
+# Example: bring up the bits DataOps needs (pixi on PATH, docker, k3d, shellcheck).
+# Everything below is illustrative — delete what you do not need.
+
+# # Persist pixi on PATH for later Bash tool commands.
+# if [ -n "${CLAUDE_ENV_FILE:-}" ] && [ -x "${HOME}/.pixi/bin/pixi" ]; then
+#   if ! grep -qF 'HOME/.pixi/bin' "$CLAUDE_ENV_FILE" 2>/dev/null; then
+#     # shellcheck disable=SC2016
+#     echo 'export PATH="$HOME/.pixi/bin:$PATH"' >> "$CLAUDE_ENV_FILE"
+#     log "Persisted ~/.pixi/bin on PATH via CLAUDE_ENV_FILE."
+#   fi
+# fi
+
+# # Start the Docker daemon (k3d / testcontainers need it).
+# if command -v docker >/dev/null 2>&1 && ! docker info >/dev/null 2>&1; then
+#   if command -v dockerd >/dev/null 2>&1; then
+#     nohup $SUDO dockerd >>"${TMPDIR:-/tmp}/dockerd.log" 2>&1 &
+#     disown 2>/dev/null || true
+#   fi
+# fi
