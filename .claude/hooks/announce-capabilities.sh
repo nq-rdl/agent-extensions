@@ -8,7 +8,9 @@
 # sandbox) where it would otherwise have no cheap way to discover what was
 # provisioned. This is the awareness companion to the explicit plugin install
 # done in the Claude workflows (see .github/workflows/claude*.yml) and the
-# enabledPlugins in .claude/settings.json.
+# enabledPlugins in .claude/settings.json. Plugins are reported as *installed*
+# (verified against `claude plugin list`), not merely declared, so a plugin that
+# failed to install is flagged rather than silently announced as present.
 #
 # Output contract (Claude Code SessionStart hook): emit a single JSON object
 # with hookSpecificOutput.additionalContext, or — as a fallback — plain text on
@@ -96,15 +98,55 @@ if command -v jq >/dev/null 2>&1; then
   done
 fi
 
-# Enabled plugins — read the authoritative enabledPlugins map from the project
-# settings (true => enabled). This is checked out in both web and Action runs
-# and avoids listing un-enabled marketplace plugins or version-dir noise.
-plugins=()
+# Enabled plugins — report what is actually INSTALLED + enabled, not merely
+# DECLARED. The intended set is .claude/settings.json (enabledPlugins == true);
+# the *loaded* set comes from `claude plugin list`. Reporting the declared set
+# alone produced a false positive — the banner looked healthy while the slash
+# menu was empty because the plugins had not been pre-seeded pre-snapshot (see
+# docs/notes/claude-code-web-issues.md). Cross-check the two so a declared plugin
+# that did not install is surfaced, not hidden. When the claude CLI is
+# unavailable (some Action runners) we cannot verify, so fall back to declared.
+declared_plugins=()
 if command -v jq >/dev/null 2>&1 && [ -f "$PROJECT_DIR/.claude/settings.json" ]; then
   while IFS= read -r p; do
-    [ -n "$p" ] && plugins+=("$p")
+    [ -n "$p" ] && declared_plugins+=("$p")
   done < <(jq -r '(.enabledPlugins // {}) | to_entries[] | select(.value == true) | .key' \
              "$PROJECT_DIR/.claude/settings.json" 2>/dev/null)
+fi
+
+# Actually installed + enabled plugin ids, parsed from `claude plugin list`
+# (each plugin is a `> <id>` line followed by a `Status: … enabled` line). Empty
+# when the CLI is missing or errors — the signal we treat as "cannot verify".
+installed_enabled=()
+have_plugin_list=0
+if command -v claude >/dev/null 2>&1; then
+  _pl="$(claude plugin list 2>/dev/null)"
+  if [ -n "$_pl" ]; then
+    have_plugin_list=1
+    while IFS= read -r id; do
+      [ -n "$id" ] && installed_enabled+=("$id")
+    done < <(printf '%s\n' "$_pl" | awk '
+      /^[[:space:]]*>[[:space:]]/ { id = $2; next }
+      /Status:/ { if (id != "" && /enabled/) print id; id = ""; next }
+    ')
+  fi
+fi
+
+# Partition the declared set into verified-loaded vs declared-but-missing — but
+# only when we have a plugin list to verify against (else report declared as-is).
+plugins=()
+missing_plugins=()
+if [ "$have_plugin_list" -eq 1 ]; then
+  installed_blob="$(printf '%s\n' ${installed_enabled[@]+"${installed_enabled[@]}"})"
+  for d in ${declared_plugins[@]+"${declared_plugins[@]}"}; do
+    if printf '%s\n' "$installed_blob" | grep -qxF -- "$d"; then
+      plugins+=("$d")
+    else
+      missing_plugins+=("$d")
+    fi
+  done
+else
+  plugins=(${declared_plugins[@]+"${declared_plugins[@]}"})
 fi
 
 # --- render ----------------------------------------------------------------
@@ -134,8 +176,15 @@ fi
 
 if [ "${#plugins[@]}" -gt 0 ]; then
   uniq_plugins="$(printf '%s\n' "${plugins[@]}" | join_comma)"
-  add "**Enabled plugins:** $uniq_plugins"
+  add "**Enabled plugins (installed):** $uniq_plugins"
   add "Their skills are available via the Skill tool (\`/plugin:skill\`) — list and invoke as relevant."
+  add ""
+fi
+
+if [ "${#missing_plugins[@]}" -gt 0 ]; then
+  uniq_missing="$(printf '%s\n' "${missing_plugins[@]}" | join_comma)"
+  add "**⚠️ Declared but NOT installed:** $uniq_missing"
+  add "Enabled in .claude/settings.json but absent from \`claude plugin list\`, so their \`/plugin:skill\` commands will not appear. On Claude Code (web) this means the pre-snapshot pre-seed did not run — set the environment's Setup-script field to \`make cc-web-setup\` (see CONTRIBUTING.md § \"Claude Code on the web\")."
   add ""
 fi
 

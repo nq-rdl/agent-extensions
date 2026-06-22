@@ -40,13 +40,18 @@ first-session path** — the SessionStart hook is a self-heal, not a substitute.
 skills, not just loose `~/.claude/skills/`; and (b) ideally install `enabledPlugins`
 from known marketplaces *before* skill enumeration on web so no hook dance is needed.
 
-## 2. `announce-capabilities.sh` reports enabled, not installed (this repo)
+## 2. `announce-capabilities.sh` reports enabled, not installed (this repo) — FIXED
 
-`announce-capabilities.sh` lists `enabledPlugins` from `settings.json` as
+`announce-capabilities.sh` listed `enabledPlugins` from `settings.json` as
 "Enabled plugins" without verifying they actually installed/loaded. This produced
 a false-positive that masked issue #1 (the announcement looked healthy while the
-slash menu was empty). Consider verifying against `claude plugin list` and marking
-declared-but-not-installed plugins.
+slash menu was empty).
+
+**Fixed.** The hook now cross-checks the declared set against `claude plugin list`:
+it reports only verified-installed plugins under **"Enabled plugins (installed)"**
+and surfaces any declared-but-not-installed plugins under a **"⚠️ Declared but NOT
+installed"** line with the `make cc-web-setup` remedy. It falls back to the declared
+set when the `claude` CLI is unavailable (some Action runners).
 
 ## 3. `cc-web-setup` skill assumed a `scripts/` layout only (this repo)
 
