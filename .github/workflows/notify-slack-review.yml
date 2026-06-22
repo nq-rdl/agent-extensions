@@ -4,6 +4,10 @@ on:
   pull_request:
     types: [review_requested]
 
+# The called reusable workflow only reads event context and posts to a Slack
+# webhook — it makes no GitHub API calls, so the default token needs nothing.
+permissions: {}
+
 jobs:
   notify:
     uses: nq-rdl/.github/.github/workflows/auto-slack-review.yml@main
