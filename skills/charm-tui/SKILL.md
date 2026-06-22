@@ -11,7 +11,7 @@ description: >-
 compatibility: >-
   Requires Go 1.25+
 metadata:
-  repo: https://github.com/nq-rdl/agent-skills
+  repo: https://github.com/nq-rdl/agent-extensions
 ---
 
 # Charm TUI Skill

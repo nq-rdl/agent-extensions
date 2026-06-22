@@ -15,7 +15,7 @@ description: >-
 argument-hint: "What hook do you want to create or debug? (e.g. 'block rm -rf', 'format on save', 'why is my Stop hook ignored')"
 user-invocable: true
 metadata:
-  repo: https://github.com/nq-rdl/agent-skills
+  repo: https://github.com/nq-rdl/agent-extensions
 ---
 
 # Claude Code Hooks

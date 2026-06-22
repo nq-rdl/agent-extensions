@@ -8,7 +8,7 @@ description: >-
   Also trigger when the user asks about CI for Go, GitHub Actions Go templates,
   or how to test Go on multiple versions in CI.
 metadata:
-  repo: https://github.com/nq-rdl/agent-skills
+  repo: https://github.com/nq-rdl/agent-extensions
 ---
 
 # GitHub Actions for Go

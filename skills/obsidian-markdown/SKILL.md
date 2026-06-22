@@ -7,7 +7,7 @@ description: >-
   files in Obsidian, or when the user mentions wikilinks, callouts, frontmatter,
   tags, embeds, or Obsidian notes.
 metadata:
-  repo: https://github.com/nq-rdl/agent-skills
+  repo: https://github.com/nq-rdl/agent-extensions
 ---
 
 # Obsidian Flavored Markdown Skill

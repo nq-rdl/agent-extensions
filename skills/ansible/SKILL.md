@@ -16,7 +16,7 @@ description: >-
 compatibility: >-
   Requires Python 3.11+, ansible-core 2.16+, ansible-lint 24.0+
 metadata:
-  repo: https://github.com/nq-rdl/agent-skills
+  repo: https://github.com/nq-rdl/agent-extensions
 ---
 
 # Ansible Skill

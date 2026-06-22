@@ -7,7 +7,7 @@ description: >-
   using Rapp (the alternative Rscript front-end). Also use for shebang
   scripts, exec/ directory in R packages, or subcommand-based R tools.
 metadata:
-  repo: https://github.com/nq-rdl/agent-skills
+  repo: https://github.com/nq-rdl/agent-extensions
 ---
 
 # Building CLI Apps with Rapp

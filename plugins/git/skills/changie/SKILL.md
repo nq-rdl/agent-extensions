@@ -8,7 +8,7 @@ description: >-
 compatibility: >-
   Requires changie CLI
 metadata:
-  repo: https://github.com/nq-rdl/agent-skills
+  repo: https://github.com/nq-rdl/agent-extensions
 ---
 
 # Changie Skill

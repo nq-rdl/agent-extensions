@@ -8,7 +8,7 @@ description: >-
   skill behaving incorrectly during normal use. Even if the user doesn't
   explicitly ask, offer to report the issue if you observe a clear skill defect.
 metadata:
-  repo: https://github.com/nq-rdl/agent-skills
+  repo: https://github.com/nq-rdl/agent-extensions
 ---
 
 # Report Skill Issue

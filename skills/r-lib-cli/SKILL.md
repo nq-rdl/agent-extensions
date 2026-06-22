@@ -14,7 +14,7 @@ description: >-
   Also use when migrating from base R message/warning/stop, debugging cli code,
   or improving existing cli usage.
 metadata:
-  repo: https://github.com/nq-rdl/agent-skills
+  repo: https://github.com/nq-rdl/agent-extensions
 ---
 
 # CLI for R Packages

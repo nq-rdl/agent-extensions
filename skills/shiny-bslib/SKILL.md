@@ -11,7 +11,7 @@ description: >-
 compatibility: >-
   Requires R, shiny (>= 1.8.1), bslib (>= 0.9.0)
 metadata:
-  repo: https://github.com/nq-rdl/agent-skills
+  repo: https://github.com/nq-rdl/agent-extensions
 ---
 
 # Modern Shiny Apps with bslib

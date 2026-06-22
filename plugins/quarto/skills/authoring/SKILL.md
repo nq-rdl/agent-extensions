@@ -8,7 +8,7 @@ description: >-
   migrating R Markdown (.Rmd), bookdown, blogdown, xaringan, and distill projects
   to Quarto, and creating Quarto websites, books, presentations, and reports.
 metadata:
-  repo: https://github.com/nq-rdl/agent-skills
+  repo: https://github.com/nq-rdl/agent-extensions
 ---
 
 # Quarto Authoring

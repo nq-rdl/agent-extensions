@@ -13,7 +13,7 @@ description: >-
 argument-hint: "Paste Rust + your question, or name a construct to explain (e.g. 'explain this lifetime', 'why doesn't this compile')"
 user-invocable: true
 metadata:
-  repo: https://github.com/nq-rdl/agent-skills
+  repo: https://github.com/nq-rdl/agent-extensions
 ---
 
 # Rust Explain — Read & Navigate Rust Code

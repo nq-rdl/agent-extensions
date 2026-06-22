@@ -9,7 +9,7 @@ description: >-
   when the user is adding Jules to an existing GitHub project and needs tailored
   workflow YAML files.
 metadata:
-  repo: https://github.com/nq-rdl/agent-skills
+  repo: https://github.com/nq-rdl/agent-extensions
 ---
 
 # Jules Dispatch Workflow Adapter

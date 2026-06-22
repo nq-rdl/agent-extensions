@@ -7,7 +7,7 @@ description: >-
   files. Triggers for requests about accessibility, figure descriptions, fig-alt,
   screen reader support, or making Quarto documents more accessible.
 metadata:
-  repo: https://github.com/nq-rdl/agent-skills
+  repo: https://github.com/nq-rdl/agent-extensions
 ---
 
 # Write Chart Alt Text
