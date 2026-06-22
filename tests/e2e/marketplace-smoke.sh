@@ -6,6 +6,11 @@
 set -uo pipefail
 cd "$(git rev-parse --show-toplevel)" || exit 2
 MP=".claude-plugin/marketplace.json"
+# Preflight: the static assertions below shell out to jq against $MP. Without
+# this gate a missing jq binary or missing/invalid marketplace file would make
+# the `jq -e ... 2>/dev/null` checks fall through to a false GREEN.
+command -v jq >/dev/null 2>&1 || { echo "FATAL: jq not found (required for marketplace.json assertions)" >&2; exit 2; }
+jq -e . "$MP" >/dev/null 2>&1 || { echo "FATAL: $MP missing or not valid JSON" >&2; exit 2; }
 fail=0
 pass() { printf '  PASS  %s\n' "$1"; }
 bad()  { printf '  FAIL  %s\n' "$1"; fail=1; }
@@ -36,10 +41,17 @@ if [ "${1:-}" = "--live" ]; then
   if claude plugin validate "$ws" >/tmp/smoke-validate.out 2>&1; then pass "live: plugin validate"; else bad "live: plugin validate failed"; tail -3 /tmp/smoke-validate.out; fi
   claude plugin marketplace add "$ws" >/tmp/smoke-add.out 2>&1 || true   # idempotent; "already added" is fine
   if claude plugin install rdl@rdl >/tmp/smoke-install.out 2>&1; then pass "live: install rdl@rdl"; else bad "live: install rdl@rdl failed"; tail -3 /tmp/smoke-install.out; fi
-  list="$(claude plugin list 2>&1)"
-  printf '%s\n' "$list" | grep -qiw zod && bad "live: zod still installed" || pass "live: zod not installed"
-  # Word-bounded match for the 'skill' plugin name (not a substring of e.g. 'skills').
-  printf '%s\n' "$list" | grep -Eq '(^|[^[:alnum:]_])skill([^[:alnum:]_]|$)' && pass "live: skill plugin installed" || bad "live: skill plugin missing"
+  # Verify `plugin list` itself succeeded before drawing conclusions from its
+  # output — otherwise an errored listing has no "zod" line and false-PASSes the
+  # removal assertion below.
+  if list="$(claude plugin list 2>&1)"; then
+    printf '%s\n' "$list" | grep -qiw zod && bad "live: zod still installed" || pass "live: zod not installed"
+    # Case-insensitive (matches line 'zod' check) word-bounded match for the
+    # 'skill' plugin name (not a substring of e.g. 'skills').
+    printf '%s\n' "$list" | grep -Eiq '(^|[^[:alnum:]_])skill([^[:alnum:]_]|$)' && pass "live: skill plugin installed" || bad "live: skill plugin missing"
+  else
+    bad "live: plugin list failed"; printf '%s\n' "$list" | tail -3
+  fi
 fi
 
 echo
