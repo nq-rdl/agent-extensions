@@ -142,6 +142,32 @@ When a skill ships more than its `SKILL.md`, sort each extra file into exactly o
 
 If a file is neither runnable nor `.rst` prose, it belongs in `assets/`.
 
+## Skill content conventions
+
+A skill must encode a **gap the fresh model cannot see** — not restate public
+knowledge. Before writing or accepting skill content, apply these:
+
+### Prefer the non-inferable delta
+Ask Biggs's test: *"could a fresh model write this verbatim, with no prior
+struggle?"* If yes, cut it. Don't restate public specs or style guides; encode
+the gaps, gotchas, and project-specific decisions instead. Empirically
+(SkillsBench), wins concentrate in **concise** skills carrying verifier-facing,
+non-inferable detail — "comprehensive" prose scores worst and can displace the
+model's own stronger default.
+
+### Pin versions
+When a skill encodes a library or tool API surface, pin the version in
+`compatibility:` so drift is visible and reviewable. An unpinned API recital is
+how stale guidance (e.g. a deprecated method form) silently overrides the
+model's newer, correct default.
+
+### Add a verify-canonical guard
+For fast-moving or correctness-critical subjects, include a one-line "verify
+against the canonical source when being wrong would mislead," and point to the
+authoritative docs. See `skills/rust-explain/SKILL.md` for the model pattern.
+
+References: Biggs, *You're Probably Using Agent Skills Wrong*; SkillsBench (arXiv 2602.12670).
+
 ## Packaging a new skill into a plugin
 
 A new skill authored under `skills/<name>/` is **not installable until you map it into a bundle**

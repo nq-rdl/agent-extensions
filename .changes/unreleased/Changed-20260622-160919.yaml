@@ -1,0 +1,3 @@
+kind: Changed
+body: 'Adopt a skill-authoring convention (CONTRIBUTING.md ''Skill content conventions''): prefer the non-inferable delta (Biggs + SkillsBench), pin versions in compatibility:, and add a verify-canonical guard; cross-linked from AGENTS.md.'
+time: 2026-06-22T16:09:19.375702396+10:00
