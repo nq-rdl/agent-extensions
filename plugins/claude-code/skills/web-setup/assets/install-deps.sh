@@ -16,8 +16,9 @@
 #   * the project dev toolchain + services (lefthook, changie, gopls, python/jq,
 #     the Docker daemon) via the optional project seam (install-deps.local.sh);
 #   * a cheap idempotent PLUGIN SELF-HEAL (ensure_plugins) that retries the
-#     declarative install only if a transient marketplace fetch failed at session
-#     start (the docs' "requires network access to reach the marketplace source").
+#     declarative install if it did not complete at session start — refreshing the
+#     marketplace index first (`claude plugin marketplace update`) so a stale local
+#     copy, not just an unreachable source, is recovered.
 #
 # This engine is PORTABLE: it carries no project-specific dependencies. Anything
 # specific to one repo belongs in .claude/scripts/install-deps.local.sh (sourced
@@ -471,11 +472,15 @@ persist_path() {
 # WHY THIS EXISTS: Claude Code on the web installs the plugins declared in
 # .claude/settings.json (enabledPlugins + extraKnownMarketplaces) at session start
 # from their marketplaces — see the web docs' "what carries over" table — so this
-# is NOT the primary install path. It is a belt-and-suspenders RETRY for the case
-# the docs flag as a failure mode: "requires network access to reach the
-# marketplace source." If a transient marketplace fetch failed at session start,
-# this reinstalls the declared set; normally every plugin is already present and
-# this is a quiet no-op.
+# is NOT the primary install path. It is a belt-and-suspenders RETRY for when that
+# did not complete. Two failure modes are covered: (1) a STALE local marketplace
+# index — the marketplace is registered but its index was never fetched/refreshed
+# before this hook ran, so `claude plugin install` fails with "Plugin not found in
+# marketplace … your local copy may be out of date"; and (2) the docs' "requires
+# network access to reach the marketplace source." `claude plugin install` does NOT
+# refresh the index itself, so on a failed install this runs `claude plugin
+# marketplace update <marketplace>` and retries once (which fixes case 1). Normally
+# every plugin is already present and this is a quiet no-op.
 #
 # CAVEAT (timing): Claude enumerates skills at process startup, BEFORE SessionStart
 # hooks finish, so anything this retry installs surfaces from the NEXT session, not
@@ -503,7 +508,7 @@ ensure_plugins() {
   local installed_blob
   installed_blob="$(claude plugin list 2>/dev/null | awk '/^[[:space:]]*>[[:space:]]/ { print $2 }')"
 
-  local n_ok=0 n_fail=0
+  local n_ok=0 n_fail=0 mkt
   for p in "${plugins[@]}"; do
     if printf '%s\n' "$installed_blob" | grep -qxF -- "$p"; then
       continue
@@ -512,11 +517,28 @@ ensure_plugins() {
     if claude plugin install "$p" </dev/null >>"$LOG" 2>&1; then
       log "  ${p}: installed."
       n_ok=$((n_ok + 1))
+      continue
+    fi
+    # First attempt failed. The usual cause on a fresh cloud VM is a STALE local
+    # marketplace index: the marketplace is registered (from extraKnownMarketplaces)
+    # but its index was never fetched/refreshed before this hook ran, so the install
+    # reports "Plugin not found in marketplace … your local copy may be out of date —
+    # try `claude plugin marketplace update`". `claude plugin install` does NOT do
+    # that refresh itself, so refresh the plugin's marketplace and retry once. The id
+    # is `<plugin>@<marketplace>`, so the marketplace is the suffix after the last '@'
+    # (refreshing marketplace M also freshens M's other plugins, so each stale
+    # marketplace ends up updated at most once per run).
+    mkt="${p##*@}"
+    log "  ${p}: first attempt failed; refreshing marketplace '${mkt}' and retrying…"
+    claude plugin marketplace update "$mkt" </dev/null >>"$LOG" 2>&1 || true
+    if claude plugin install "$p" </dev/null >>"$LOG" 2>&1; then
+      log "  ${p}: installed (after refreshing marketplace '${mkt}')."
+      n_ok=$((n_ok + 1))
     else
-      # The marketplace is normally pre-registered by the platform from
-      # extraKnownMarketplaces; a failure here usually means it was unreachable or
-      # the id is wrong. Non-fatal — announce-capabilities.sh flags the gap.
-      log "  WARNING: could not install ${p} (see ${LOG})."
+      # Still failing against a freshly-updated index => no longer a stale local
+      # copy. Now it usually means the marketplace source is unreachable (network)
+      # or the plugin id is wrong. Non-fatal — announce-capabilities.sh flags the gap.
+      log "  WARNING: could not install ${p} even after refreshing marketplace '${mkt}' — its source may be unreachable (network) or the id wrong (see ${LOG})."
       n_fail=$((n_fail + 1))
     fi
   done

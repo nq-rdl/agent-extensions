@@ -185,7 +185,7 @@ fi
 if [ "${#missing_plugins[@]}" -gt 0 ]; then
   uniq_missing="$(printf '%s\n' "${missing_plugins[@]}" | join_comma)"
   add "**⚠️ Declared but NOT installed:** $uniq_missing"
-  add "Enabled in .claude/settings.json but absent from \`claude plugin list\`. On Claude Code (web) declared plugins install at session start from their marketplace (web docs, \"what carries over\"), so this line means that install did not complete — usually the marketplace source was unreachable (check the environment's network access) or the plugin id is wrong. install-deps.sh retries the install as a self-heal, so it should clear on the next session — see CONTRIBUTING.md § \"Claude Code on the web\"."
+  add "Enabled in .claude/settings.json but absent from \`claude plugin list\`. On Claude Code (web) declared plugins install at session start from their marketplace (web docs, \"what carries over\"), so this line means that install did not complete — commonly the marketplace's local index was stale (the install reports \"not found in marketplace … local copy may be out of date\"), or its source was unreachable (check the environment's network access), or the plugin id is wrong. install-deps.sh's self-heal refreshes the marketplace index (\`claude plugin marketplace update\`) and retries, so it should clear on the next session — see CONTRIBUTING.md § \"Claude Code on the web\"."
   add ""
 fi
 
