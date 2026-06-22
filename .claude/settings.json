@@ -6,10 +6,51 @@
         "source": "github",
         "repo": "openai/codex-plugin-cc"
       },
-      "autoUpdate": false
+      "autoUpdate": true
+    },
+    "worktrunk": {
+      "source": {
+        "source": "github",
+        "repo": "max-sixty/worktrunk"
+      },
+      "autoUpdate": true
+    },
+    "motherduck-skills": {
+      "source": {
+        "source": "github",
+        "repo": "motherduckdb/agent-skills"
+      },
+      "autoUpdate": true
+    },
+    "astral-sh": {
+      "source": {
+        "source": "github",
+        "repo": "astral-sh/claude-code-plugins"
+      },
+      "autoUpdate": true
+    },
+    "goland-claude-marketplace": {
+      "source": {
+        "source": "github",
+        "repo": "JetBrains/go-modern-guidelines"
+      },
+      "autoUpdate": true
+    },
+    "svelte": {
+      "source": {
+        "source": "github",
+        "repo": "sveltejs/ai-tools"
+      },
+      "autoUpdate": true
     }
   },
   "enabledPlugins": {
-    "codex@openai-codex": true
+    "codex@openai-codex": true,
+    "worktrunk@worktrunk": true,
+    "motherduck-skills@motherduck-skills": true,
+    "astral@astral-sh": true,
+    "modern-go-guidelines@goland-claude-marketplace": true,
+    "svelte@svelte": true,
+    "pr-review-toolkit@claude-plugins-official": true
   }
 }

@@ -5,8 +5,8 @@ The registry is the single source of truth:
 
   * ``VERSION``                    — one version, stamped into every manifest.
   * ``registry/marketplace.yaml``  — marketplace metadata, plugin defaults,
-                                      display order, external passthrough
-                                      entries, and the rdl meta-plugin config.
+                                      display order, and the rdl meta-plugin
+                                      config.
   * ``registry/bundles/*.yaml``    — per-subject name/description/keywords.
 
 This is the structural fix for #100's metadata rot: hand-edited manifests can no
@@ -81,16 +81,6 @@ def generate(repo) -> dict:
                 "description": enabled[p]["description"],
                 "version": version,
                 "keywords": enabled[p]["keywords"],
-            }
-        )
-    for ext in mkt.get("external") or []:
-        plugins.append(
-            {
-                "name": ext["name"],
-                "source": ext["source"],
-                "description": ext.get("description", ""),
-                "version": version,
-                "keywords": list(ext.get("keywords") or []),
             }
         )
     if meta.get("enabled"):

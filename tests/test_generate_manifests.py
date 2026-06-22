@@ -30,6 +30,8 @@ pluginDefaults:
   repository: https://github.com/nq-rdl/agent-extensions
   license: MIT
 order: [swe, infra]
+# Legacy key — the external passthrough mechanism was removed; the generator
+# must IGNORE this, not re-host it as a plugin.
 external:
   - name: worktrunk
     source: {source: github, repo: max-sixty/worktrunk}
@@ -86,13 +88,14 @@ class TestGenerate(unittest.TestCase):
                 },
             )
 
-    def test_external_passthrough_with_version(self):
+    def test_external_key_ignored(self):
+        # The external passthrough mechanism was removed: a legacy `external:`
+        # key in marketplace.yaml must be ignored, not re-hosted as a plugin.
         with tempfile.TemporaryDirectory() as t:
             m = generate_manifests.generate(make_repo(t))["marketplace"]
-            wt = next(p for p in m["plugins"] if p["name"] == "worktrunk")
-            self.assertEqual(wt["source"], {"source": "github", "repo": "max-sixty/worktrunk"})
-            self.assertEqual(wt["version"], "1.2.3")
-            self.assertEqual(list(wt.keys()), ["name", "source", "description", "version", "keywords"])
+            names = [p["name"] for p in m["plugins"]]
+            self.assertNotIn("worktrunk", names)
+            self.assertEqual(names, ["swe", "infra", "rdl"])
 
     def test_meta_plugin_marketplace_entry(self):
         with tempfile.TemporaryDirectory() as t:

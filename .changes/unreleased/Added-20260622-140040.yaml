@@ -1,0 +1,3 @@
+kind: Added
+body: 'Curated a set of external Claude Code marketplaces in `.claude/settings.json` (`extraKnownMarketplaces`, all auto-update): worktrunk, MotherDuck, Astral (ruff/uv/ty), JetBrains modern-go-guidelines, OpenAI Codex, and Svelte; plus enabled Anthropic''s `pr-review-toolkit` from the auto-available official marketplace. Documented in docs/external-marketplaces.md.'
+time: 2026-06-22T14:00:40.688765417+10:00
