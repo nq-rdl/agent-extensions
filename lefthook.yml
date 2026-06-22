@@ -56,10 +56,18 @@ pre-commit:
         python3 scripts/generate_manifests.py . --check
         python3 scripts/generate_bundles_doc.py . --check
 
-    # --- Docs link health (skips cleanly when lychee is not installed) ---
+    # --- Docs link health. With lychee installed, a broken link in a staged
+    #     skill .md fails the commit (the old `|| true` wrongly swallowed real
+    #     failures). When lychee is absent we skip cleanly; CI (link-check.yml)
+    #     still enforces link health over the full skills/ tree. ---
     - name: lychee-links
       glob: "skills/**/*.md"
-      run: command -v lychee >/dev/null 2>&1 && skills/lychee/scripts/check-links.sh {staged_files} || true
+      run: |
+        if command -v lychee >/dev/null 2>&1; then
+          skills/lychee/scripts/check-links.sh {staged_files}
+        else
+          echo "lychee not installed; skipping link check (CI still enforces it)."
+        fi
 
 commit-msg:
   # Non-blocking changie reminder. Prints a hint when no fragment was staged on

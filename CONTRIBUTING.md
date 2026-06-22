@@ -115,7 +115,8 @@ builds `asctl` and runs `asctl repo-check` on every PR and push).
 
 The rules:
 
-1. **`SKILL.md` is required** at the skill root — it is the skill.
+1. **`SKILL.md` is required** at the skill root — it is the skill. The filename must be exactly
+   `SKILL.md` (uppercase); a lowercase `skill.md` is rejected.
 2. **Only three non-hidden subdirectories are allowed:** `scripts/`, `references/`, and `assets/`.
    Any other non-hidden subdirectory is an error.
 3. **`references/` is `.rst`-only.** Every file under `references/` (at any depth) must be `.rst`;

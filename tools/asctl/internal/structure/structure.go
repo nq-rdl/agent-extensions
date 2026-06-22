@@ -16,9 +16,10 @@ import (
 // allowedSubdirs are the only non-hidden subdirectories a skill may contain.
 var allowedSubdirs = []string{"assets", "references", "scripts"}
 
-// allowedTopLevelFiles lists non-hidden files permitted at the skill root in
-// addition to SKILL.md. Kept small and explicit (see CONTRIBUTING.md §6).
-var allowedTopLevelFiles = []string{"SKILL.md", "skill.md", "lychee.toml"}
+// allowedTopLevelFiles lists the non-hidden files permitted at the skill root:
+// SKILL.md (the manifest — required, exact uppercase) and the optional
+// lychee.toml link-check config. Kept small and explicit (see CONTRIBUTING.md §6).
+var allowedTopLevelFiles = []string{"SKILL.md", "lychee.toml"}
 
 // isHidden reports whether a directory entry name is dot-prefixed. Hidden
 // entries (e.g. .evals, .git) are ignored entirely by the structure lint.
@@ -45,10 +46,15 @@ func ValidateStructure(skillDir string) []string {
 			errors = append(errors, checkSubdir(skillDir, name)...)
 			continue
 		}
+		if name == "skill.md" {
+			errors = append(errors,
+				"skill manifest must be named exactly SKILL.md (uppercase); rename skill.md to SKILL.md")
+			continue
+		}
 		if !slices.Contains(allowedTopLevelFiles, name) {
 			errors = append(errors, fmt.Sprintf(
-				"disallowed top-level file %q; allowed top-level files: SKILL.md, lychee.toml (put other files under assets/, scripts/, or references/)",
-				name))
+				"disallowed top-level file %q; allowed top-level files: %s (put other files under assets/, scripts/, or references/)",
+				name, strings.Join(allowedTopLevelFiles, ", ")))
 		}
 	}
 	return errors

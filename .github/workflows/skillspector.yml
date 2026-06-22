@@ -24,8 +24,13 @@ jobs:
           echo "exit=$?" >> "$GITHUB_OUTPUT"
           set -e
 
+      # continue-on-error keeps this step informational: on fork PRs the
+      # GITHUB_TOKEN is read-only, so security-events:write is denied and
+      # upload-sarif fails. Swallow that (and any transient code-scanning API
+      # error) so the supposedly non-gating check never fails the PR.
       - name: Upload SARIF
         if: always() && hashFiles('skillspector.sarif') != ''
+        continue-on-error: true
         uses: github/codeql-action/upload-sarif@v3
         with:
           sarif_file: skillspector.sarif

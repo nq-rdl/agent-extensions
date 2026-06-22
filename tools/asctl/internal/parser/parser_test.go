@@ -78,29 +78,16 @@ func TestReadProperties_explicitNilDescription(t *testing.T) {
 	}
 }
 
-func TestReadProperties_lowercaseSkillMD(t *testing.T) {
-	dir := t.TempDir()
-	if err := os.WriteFile(filepath.Join(dir, "skill.md"), []byte("---\nname: x\ndescription: y\n---\n"), 0o644); err != nil {
-		t.Fatal(err)
-	}
-	props, err := parser.ReadProperties(dir)
-	if err != nil {
-		t.Fatalf("unexpected error with skill.md (lowercase): %v", err)
-	}
-	if props.Name != "x" {
-		t.Errorf("Name = %q, want %q", props.Name, "x")
-	}
-}
-
-func TestFindSkillMD_prefersUppercase(t *testing.T) {
+func TestFindSkillMD_requiresUppercase(t *testing.T) {
+	// Only an exact-uppercase SKILL.md is recognized as the manifest. (The
+	// lowercase-only case is enforced portably by the structure lint, which is
+	// ReadDir-based and so works on case-insensitive filesystems too; FindSkillMD
+	// uses os.Stat and cannot distinguish case on macOS.)
 	dir := t.TempDir()
 	upper := filepath.Join(dir, "SKILL.md")
-	lower := filepath.Join(dir, "skill.md")
 	os.WriteFile(upper, []byte("---\nname: u\ndescription: u\n---\n"), 0o644)
-	os.WriteFile(lower, []byte("---\nname: l\ndescription: l\n---\n"), 0o644)
 
-	found := parser.FindSkillMD(dir)
-	if found != upper {
-		t.Errorf("FindSkillMD returned %q, want SKILL.md path", found)
+	if found := parser.FindSkillMD(dir); found != upper {
+		t.Errorf("FindSkillMD returned %q, want %q", found, upper)
 	}
 }

@@ -6,17 +6,27 @@
 # backstop, so this script is the single source of truth for the pinned ref,
 # image build, and invocation.
 #
+# SkillSpector treats its directory argument as ONE skill: it reads the SKILL.md
+# at that directory's root and emits finding paths relative to it. Scanning
+# skills/ as a single directory would therefore give every nested skill an empty
+# manifest (no SKILL.md at skills/ root) and emit paths like "bitwarden/SKILL.md"
+# instead of "skills/bitwarden/SKILL.md". So we scan each skill directory
+# individually and, for SARIF output, prepend the "skills/<name>/" prefix to
+# every finding location and merge the per-skill runs into one report.
+#
 # Env vars:
 #   SKILLSPECTOR_REF     SkillSpector git ref to build/pin (default: pinned SHA below).
 #   SKILLSPECTOR_FORMAT  Output format: terminal|json|markdown|sarif (default: terminal).
 #   SKILLSPECTOR_OUTPUT  Report filename (relative to repo root). When set, the
-#                        workspace is mounted read-write so the report can be written.
+#                        per-skill reports are combined and written there (SARIF
+#                        runs are merged with repository-relative paths).
 #   SKILLSPECTOR_SKIP    Set to 1 to skip the scan entirely (escape hatch).
 #
-# Exit codes: 0 = clean, 1 = risk_score > 50 (a finding), 2 = execution error
-# (missing/failed Docker, or a SkillSpector internal error). Both callers (the CI
-# workflow and the pre-push hook) report findings for visibility but do not fail
-# on them — findings surface as code-scanning alerts via the CI SARIF upload.
+# Exit codes: 0 = clean, 1 = a finding (risk_score > 50 for some skill), 2 =
+# execution error (missing/failed Docker, or a SkillSpector internal error on
+# some skill). Both callers (the CI workflow and the pre-push hook) report
+# findings for visibility but do not fail on them — findings surface as
+# code-scanning alerts via the CI SARIF upload.
 set -euo pipefail
 
 # Pinned for reproducible, supply-chain-safe scans. No upstream release tags
@@ -29,6 +39,7 @@ SKILLSPECTOR_REF="${SKILLSPECTOR_REF:-a5092dd9b9521ff57a9b53612bb129ce78019002}"
 # URL below).
 SKILLSPECTOR_TAG="$(printf '%s' "$SKILLSPECTOR_REF" | tr -c 'A-Za-z0-9_.-' '-' | sed 's/^[.-]*//')"
 IMAGE="skillspector:${SKILLSPECTOR_TAG:-pinned}"
+FORMAT="${SKILLSPECTOR_FORMAT:-terminal}"
 
 if [ "${SKILLSPECTOR_SKIP:-0}" = "1" ]; then
   echo "skillspector: SKILLSPECTOR_SKIP=1 set; skipping scan."
@@ -54,17 +65,112 @@ if ! docker image inspect "$IMAGE" >/dev/null 2>&1; then
 fi
 
 REPO_ROOT="$(git rev-parse --show-toplevel)"
+SKILLS_DIR="$REPO_ROOT/skills"
 
-args=(scan /scan/skills --no-llm --format "${SKILLSPECTOR_FORMAT:-terminal}")
+# Enumerate the immediate skill directories (those with a SKILL.md), portably
+# (no GNU-only `find -printf`, so this also works on macOS).
+skills=()
+for d in "$SKILLS_DIR"/*/; do
+  [ -f "${d}SKILL.md" ] || continue
+  skills+=("$(basename "$d")")
+done
 
-if [ -n "${SKILLSPECTOR_OUTPUT:-}" ]; then
-  # Need to write the report into the workspace: mount read-write. Run as the host
-  # user (with a writable HOME) so the report isn't left root-owned on the host.
-  echo "skillspector: scanning skills/ (-> ${SKILLSPECTOR_OUTPUT})..." >&2
-  args+=(--output "/scan/${SKILLSPECTOR_OUTPUT}")
-  exec docker run --rm --user "$(id -u):$(id -g)" -e HOME=/tmp \
-    -v "${REPO_ROOT}:/scan" "$IMAGE" "${args[@]}"
-else
-  echo "skillspector: scanning skills/ (static analysis)..." >&2
-  exec docker run --rm -v "${REPO_ROOT}:/scan:ro" "$IMAGE" "${args[@]}"
+if [ "${#skills[@]}" -eq 0 ]; then
+  echo "skillspector: no skills found under skills/; nothing to scan." >&2
+  exit 0
 fi
+
+# merge_sarif <outdir> <dest>: combine the per-skill SARIF reports in <outdir>
+# into one SARIF document at <dest>, prepending each finding's location with its
+# "skills/<name>/" prefix (SkillSpector emits paths relative to the scanned skill
+# dir, e.g. "SKILL.md"). Each skill keeps its own SARIF run so per-skill tool
+# metadata and any ruleIndex references stay valid. Per-skill files that are not
+# valid SARIF (e.g. an empty report from a failed scan) are skipped.
+merge_sarif() {
+  local outdir="$1" dest="$2"
+  local runs_acc schema="" f name
+  runs_acc="$(mktemp)"
+  echo '[]' >"$runs_acc"
+  for f in "$outdir"/*.report; do
+    [ -f "$f" ] || continue
+    jq -e '.runs' "$f" >/dev/null 2>&1 || continue # skip non-SARIF/empty reports
+    name="$(basename "$f" .report)"
+    if [ -z "$schema" ]; then
+      schema="$(jq -r '."$schema" // "https://json.schemastore.org/sarif-2.1.0.json"' "$f")"
+    fi
+    # Rewrite this skill's runs: prepend the prefix to each relative finding uri.
+    jq --arg p "skills/$name/" '
+      [ .runs[]
+        | .results = ( (.results // [])
+            | map( .locations = ( (.locations // [])
+                | map( if (.physicalLocation.artifactLocation.uri | type) == "string"
+                       then .physicalLocation.artifactLocation.uri = ($p + .physicalLocation.artifactLocation.uri)
+                       else . end ) ) ) )
+      ]' "$f" >"$f.runs"
+    jq -s '.[0] + .[1]' "$runs_acc" "$f.runs" >"$runs_acc.next"
+    mv "$runs_acc.next" "$runs_acc"
+  done
+  jq -n --arg schema "$schema" --slurpfile runs "$runs_acc" \
+    '{ "$schema": $schema, "version": "2.1.0", "runs": $runs[0] }' >"$dest"
+  rm -f "$runs_acc"
+}
+
+# Per-skill reports land here (a host temp dir, mounted read-write into the
+# container). The repo itself is mounted read-only — we never write into it.
+OUTDIR="$(mktemp -d)"
+trap 'rm -rf "$OUTDIR"' EXIT
+
+want_output=""
+[ -n "${SKILLSPECTOR_OUTPUT:-}" ] && want_output=1
+
+# The SARIF merge runs on the host with jq; fail clearly if it is missing rather
+# than aborting mid-merge under `set -e`. (Terminal mode needs no jq.)
+if [ -n "$want_output" ] && [ "$FORMAT" = "sarif" ] && ! command -v jq >/dev/null 2>&1; then
+  echo "error: jq is required to merge the per-skill SARIF reports but was not found." >&2
+  exit 2
+fi
+
+echo "skillspector: scanning ${#skills[@]} skill(s) individually (static analysis)..." >&2
+
+# Run every per-skill scan inside a single container (avoids one container start
+# per skill). The container loops over the skill names passed as positional
+# args, scanning each as its own skill root and writing one report per skill to
+# /out when an output file is requested. Its exit code is the aggregate: 2 if any
+# skill errored, else 1 if any skill had a finding, else 0.
+set +e
+docker run --rm --user "$(id -u):$(id -g)" -e HOME=/tmp \
+  -e SS_FMT="$FORMAT" -e SS_WANT_OUTPUT="$want_output" \
+  -v "${REPO_ROOT}:/scan:ro" -v "${OUTDIR}:/out" \
+  --entrypoint sh "$IMAGE" -c '
+    rc=0
+    for name in "$@"; do
+      if [ -n "$SS_WANT_OUTPUT" ]; then
+        skillspector scan "/scan/skills/$name" --no-llm --format "$SS_FMT" --output "/out/$name.report"
+      else
+        printf "\n===== skills/%s =====\n" "$name"
+        skillspector scan "/scan/skills/$name" --no-llm --format "$SS_FMT"
+      fi
+      s=$?
+      if [ "$s" -eq 2 ]; then rc=2; elif [ "$s" -eq 1 ] && [ "$rc" -ne 2 ]; then rc=1; fi
+    done
+    exit $rc
+  ' sh "${skills[@]}"
+scan_rc=$?
+set -e
+
+# Combine the per-skill reports into the requested output file.
+if [ -n "$want_output" ]; then
+  out_path="${REPO_ROOT}/${SKILLSPECTOR_OUTPUT}"
+  if [ "$FORMAT" = "sarif" ]; then
+    merge_sarif "$OUTDIR" "$out_path"
+  else
+    # Non-SARIF output: concatenate the per-skill reports verbatim.
+    : >"$out_path"
+    for name in "${skills[@]}"; do
+      [ -f "$OUTDIR/$name.report" ] && cat "$OUTDIR/$name.report" >>"$out_path"
+    done
+  fi
+  echo "skillspector: wrote merged report -> ${SKILLSPECTOR_OUTPUT}" >&2
+fi
+
+exit "$scan_rc"

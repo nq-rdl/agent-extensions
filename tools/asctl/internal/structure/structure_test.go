@@ -9,8 +9,8 @@ import (
 	"github.com/nq-rdl/agent-extensions/tools/asctl/internal/structure"
 )
 
-// file describes a single file to create relative to the skill root. An empty
-// path component list is ignored. Directories are created as needed.
+// file describes a single file to create relative to the skill root, with
+// parent directories created as needed.
 type file struct {
 	path    string // slash-separated, relative to the skill dir
 	content string
@@ -156,6 +156,23 @@ func TestValidateStructure(t *testing.T) {
 				t.Fatalf("expected an error containing %q, got: %v", tt.wantSub, errs)
 			}
 		})
+	}
+}
+
+// TestValidateStructure_lowercaseManifestRejected guards the rule that the
+// manifest filename must be exactly SKILL.md (uppercase): a lowercase-only
+// skill.md must be rejected so such a skill fails repo-check rather than
+// slipping through. Uses a manual fixture (not buildSkill, which always injects
+// an uppercase SKILL.md) and is portable to case-insensitive filesystems
+// because ValidateStructure reads the real on-disk entry name via os.ReadDir.
+func TestValidateStructure_lowercaseManifestRejected(t *testing.T) {
+	dir := t.TempDir()
+	if err := os.WriteFile(filepath.Join(dir, "skill.md"), []byte("---\nname: x\ndescription: y\n---\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	errs := structure.ValidateStructure(dir)
+	if !containsSubstr(errs, "SKILL.md") {
+		t.Fatalf("expected a SKILL.md-naming error for lowercase-only skill.md, got: %v", errs)
 	}
 }
 

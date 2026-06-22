@@ -30,14 +30,15 @@ func trimmedString(v any) string {
 	return strings.TrimSpace(fmt.Sprintf("%v", v))
 }
 
-// FindSkillMD returns the path to the SKILL.md file in skillDir.
-// Prefers SKILL.md (uppercase), falls back to skill.md. Returns "" if not found.
+// FindSkillMD returns the path to SKILL.md in skillDir, or "" if it is absent.
+// The manifest filename must be exactly SKILL.md (uppercase) — see
+// CONTRIBUTING.md §6. There is no lowercase fallback: a lowercase skill.md is
+// rejected by the structure lint, so discovery and packaging never encounter an
+// unrecognized manifest name.
 func FindSkillMD(skillDir string) string {
-	for _, name := range []string{"SKILL.md", "skill.md"} {
-		p := filepath.Join(skillDir, name)
-		if _, err := os.Stat(p); err == nil {
-			return p
-		}
+	p := filepath.Join(skillDir, "SKILL.md")
+	if _, err := os.Stat(p); err == nil {
+		return p
 	}
 	return ""
 }
