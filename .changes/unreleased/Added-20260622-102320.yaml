@@ -1,3 +1,0 @@
-kind: Added
-body: 'asctl repo-check now enforces the skill directory-structure standard: allowed subdirs, rst-only references, and no in-skill agents'
-time: 2026-06-22T10:23:20.368688365+10:00
