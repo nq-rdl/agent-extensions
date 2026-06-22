@@ -27,7 +27,8 @@
 # execution error (missing/failed Docker, or a SkillSpector internal error on
 # some skill). Both callers (the CI workflow and the pre-push hook) report
 # findings for visibility but do not fail on them — findings surface as
-# code-scanning alerts via the CI SARIF upload.
+# code-scanning alerts via the CI SARIF upload, emitted at SARIF level "note" so
+# the auto-created code-scanning PR check stays informational (see merge_sarif).
 set -euo pipefail
 
 # Pinned for reproducible, supply-chain-safe scans. No upstream release tags
@@ -88,8 +89,10 @@ fi
 # upload-sarif action rejects multiple runs that share one category. SkillSpector
 # emits no tool.driver.rules and references rules only by ruleId string (no
 # ruleIndex), so the results concatenate directly with no rule/index remapping.
-# Per-skill files that are not valid SARIF (e.g. an empty report from a failed
-# scan) are skipped.
+# Every result is also downgraded to SARIF level "note" so the code-scanning PR
+# check GitHub auto-creates from the upload never gates the PR (see the inline
+# comment at the result-collection step below). Per-skill files that are not
+# valid SARIF (e.g. an empty report from a failed scan) are skipped.
 merge_sarif() {
   local outdir="$1" dest="$2"
   local results_acc schema="" version="" tool="" f name
@@ -104,9 +107,19 @@ merge_sarif() {
       version="$(jq -r '.version // empty' "$f")"
       tool="$(jq -c '.runs[0].tool' "$f")"
     fi
-    # Collect this skill's results, prefixing each relative finding location uri.
+    # Collect this skill's results, prefixing each relative finding location uri
+    # and downgrading every result to SARIF level "note". The downgrade is what
+    # actually keeps SkillSpector non-gating: uploading the SARIF makes GitHub
+    # code scanning auto-create a separate PR check (named "skillspector", owned
+    # by the GitHub Advanced Security app) that fails on any *new* "error"-level
+    # alert — independent of this workflow's own continue-on-error / informational
+    # summary. Emitting every finding at "note" keeps them visible in the Security
+    # tab (category "skillspector") as informational alerts without failing the PR
+    # check. Real per-skill severity is still surfaced by the terminal scan (the
+    # lefthook pre-push hook) and reflected in this script's aggregate exit code.
     jq --arg p "skills/$name/" '
       [ .runs[].results[]?
+        | .level = "note"
         | .locations = ( (.locations // [])
             | map( if (.physicalLocation.artifactLocation.uri | type) == "string"
                    then .physicalLocation.artifactLocation.uri = ($p + .physicalLocation.artifactLocation.uri)
