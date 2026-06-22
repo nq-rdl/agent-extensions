@@ -349,8 +349,10 @@ test_persist_path_readonly_warns() {
 # subshell), so one stub models every case the self-heal must handle:
 #   * installed        — `> <id>` lines returned by `plugin list` (seed = already present)
 #   * refreshed.<mkt>  — sentinel; `plugin install` succeeds IFF present (absent = stale index)
+#   * badids           — plugin ids whose `plugin install` fails even with a fresh index (wrong id)
 #   * unreachable      — marketplaces whose `marketplace update` fails (network down)
-#   * refreshes        — one line appended per successful `marketplace update` (call counter)
+#   * refreshes        — one line appended per SUCCESSFUL `marketplace update`
+#   * update_attempts  — one line appended per `marketplace update` INVOCATION (memoization counter)
 write_claude_stub() { # <stub_dir> ; reads $STATE at runtime
   write_stub "$1" claude '
 case "$1 $2" in
@@ -358,6 +360,9 @@ case "$1 $2" in
     cat "$STATE/installed" 2>/dev/null; exit 0 ;;
   "plugin install")
     p="$3"; mkt="${p##*@}"
+    if grep -qxF "$p" "$STATE/badids" 2>/dev/null; then
+      echo "Plugin \"$p\" not found in marketplace \"$mkt\"." >&2; exit 1
+    fi
     if [ -f "$STATE/refreshed.$mkt" ]; then
       printf "> %s\n" "$p" >> "$STATE/installed"; echo "installed $p"; exit 0
     fi
@@ -365,6 +370,7 @@ case "$1 $2" in
     exit 1 ;;
   "plugin marketplace")
     [ "$3" = "update" ] || exit 0
+    printf "%s\n" "$4" >> "$STATE/update_attempts"
     if grep -qxF "$4" "$STATE/unreachable" 2>/dev/null; then
       echo "marketplace update failed: $4" >&2; exit 1
     fi
@@ -444,19 +450,55 @@ test_plugins_already_present_noop() {
     || fail "plugins already-present: refreshed unnecessarily"
 }
 
-# When the marketplace is genuinely unreachable, a refresh does not help: the
-# install is counted as failed and the warning names the refreshed marketplace.
+# When the marketplace update itself fails (unreachable), the diagnostic must NOT
+# claim the index was refreshed — it says the marketplace could not be refreshed.
 test_plugins_unreachable_fails_after_refresh() {
   read -r d log proj state <<<"$(setup_plugins_case pp4)"
   printf 'bad@m3\n' > "$state/declared"
   printf 'm3\n' > "$state/unreachable"              # `marketplace update` fails
   run_ensure_plugins "$d" "$log" "$proj" "$state"
   grep -q 'Plugin install: 0 installed, 1 failed, 0 already present' "$log" \
-    && ok "plugins unreachable: counted as failed after the refresh+retry" \
+    && ok "plugins unreachable: counted as failed" \
     || fail "plugins unreachable: wrong summary. Log: $(cat "$log" 2>/dev/null)"
+  grep -qF "marketplace 'm3' could not be refreshed" "$log" \
+    && ok "plugins unreachable: warning says refresh failed (not 'even after refreshing')" \
+    || fail "plugins unreachable: warning text missing/inaccurate. Log: $(cat "$log" 2>/dev/null)"
   grep -qF "even after refreshing marketplace 'm3'" "$log" \
-    && ok "plugins unreachable: warning names the refreshed marketplace" \
-    || fail "plugins unreachable: warning text missing. Log: $(cat "$log" 2>/dev/null)"
+    && fail "plugins unreachable: wrongly claims it refreshed when the update failed" \
+    || ok "plugins unreachable: does NOT claim a refresh that did not happen"
+}
+
+# Memoization (the review fix): several plugins from ONE unreachable marketplace
+# must trigger `marketplace update` at most ONCE, not once per plugin.
+test_plugins_shared_marketplace_refreshes_once() {
+  read -r d log proj state <<<"$(setup_plugins_case pp5)"
+  printf 'a@m4\nb@m4\nc@m4\n' > "$state/declared"
+  printf 'm4\n' > "$state/unreachable"
+  run_ensure_plugins "$d" "$log" "$proj" "$state"
+  grep -q 'Plugin install: 0 installed, 3 failed, 0 already present' "$log" \
+    && ok "plugins shared-mkt: all three counted as failed" \
+    || fail "plugins shared-mkt: wrong summary. Log: $(cat "$log" 2>/dev/null)"
+  [ "$(grep -cxF m4 "$state/update_attempts" 2>/dev/null)" = "1" ] \
+    && ok "plugins shared-mkt: marketplace refreshed exactly once (memoized)" \
+    || fail "plugins shared-mkt: update attempts = [$(cat "$state/update_attempts" 2>/dev/null)] (want m4 once)"
+}
+
+# Refresh succeeds but the install still fails => wrong plugin id, and the warning
+# must say so (distinct from the unreachable wording above).
+test_plugins_wrong_id_after_successful_refresh() {
+  read -r d log proj state <<<"$(setup_plugins_case pp6)"
+  printf 'bad@m5\n' > "$state/declared"
+  printf 'bad@m5\n' > "$state/badids"               # install fails even on a fresh index
+  run_ensure_plugins "$d" "$log" "$proj" "$state"
+  grep -q 'Plugin install: 0 installed, 1 failed, 0 already present' "$log" \
+    && ok "plugins wrong-id: counted as failed after refresh+retry" \
+    || fail "plugins wrong-id: wrong summary. Log: $(cat "$log" 2>/dev/null)"
+  [ "$(grep -cxF m5 "$state/update_attempts" 2>/dev/null)" = "1" ] \
+    && ok "plugins wrong-id: marketplace was refreshed once" \
+    || fail "plugins wrong-id: expected one m5 refresh, got [$(cat "$state/update_attempts" 2>/dev/null)]"
+  grep -qF "even after refreshing marketplace 'm5'" "$log" \
+    && ok "plugins wrong-id: warning attributes failure to the plugin id" \
+    || fail "plugins wrong-id: warning text missing. Log: $(cat "$log" 2>/dev/null)"
 }
 
 # ---------------------------------------------------------------------------
@@ -516,6 +558,8 @@ test_plugins_healthy_index_no_refresh
 test_plugins_stale_index_recovers
 test_plugins_already_present_noop
 test_plugins_unreachable_fails_after_refresh
+test_plugins_shared_marketplace_refreshes_once
+test_plugins_wrong_id_after_successful_refresh
 test_gate_local_noop
 test_local_hook_sourced
 

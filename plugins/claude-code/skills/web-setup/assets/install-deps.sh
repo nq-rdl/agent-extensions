@@ -508,7 +508,10 @@ ensure_plugins() {
   local installed_blob
   installed_blob="$(claude plugin list 2>/dev/null | awk '/^[[:space:]]*>[[:space:]]/ { print $2 }')"
 
-  local n_ok=0 n_fail=0 mkt
+  # $refreshed memoizes the marketplaces whose index we have already tried to
+  # `marketplace update` THIS run, as a space-delimited set " <mkt> <mkt> ". Plain
+  # string (not an associative array) so the hook stays bash 3.2-portable.
+  local n_ok=0 n_fail=0 mkt refreshed=" "
   for p in "${plugins[@]}"; do
     if printf '%s\n' "$installed_blob" | grep -qxF -- "$p"; then
       continue
@@ -524,23 +527,41 @@ ensure_plugins() {
     # but its index was never fetched/refreshed before this hook ran, so the install
     # reports "Plugin not found in marketplace … your local copy may be out of date —
     # try `claude plugin marketplace update`". `claude plugin install` does NOT do
-    # that refresh itself, so refresh the plugin's marketplace and retry once. The id
-    # is `<plugin>@<marketplace>`, so the marketplace is the suffix after the last '@'
-    # (refreshing marketplace M also freshens M's other plugins, so each stale
-    # marketplace ends up updated at most once per run).
+    # that refresh itself. The id is `<plugin>@<marketplace>`, so the marketplace is
+    # the suffix after the last '@'.
     mkt="${p##*@}"
-    log "  ${p}: first attempt failed; refreshing marketplace '${mkt}' and retrying…"
-    claude plugin marketplace update "$mkt" </dev/null >>"$LOG" 2>&1 || true
-    if claude plugin install "$p" </dev/null >>"$LOG" 2>&1; then
-      log "  ${p}: installed (after refreshing marketplace '${mkt}')."
-      n_ok=$((n_ok + 1))
-    else
-      # Still failing against a freshly-updated index => no longer a stale local
-      # copy. Now it usually means the marketplace source is unreachable (network)
-      # or the plugin id is wrong. Non-fatal — announce-capabilities.sh flags the gap.
-      log "  WARNING: could not install ${p} even after refreshing marketplace '${mkt}' — its source may be unreachable (network) or the id wrong (see ${LOG})."
-      n_fail=$((n_fail + 1))
-    fi
+    case "$refreshed" in
+      *" ${mkt} "*)
+        # This marketplace was already refreshed earlier this run, so this plugin's
+        # FIRST attempt above already ran against the updated index — a re-update +
+        # retry would be redundant. Refresh each marketplace AT MOST ONCE per run:
+        # multiple plugins can share one (e.g. three claude-plugins-official entries),
+        # and an unreachable marketplace must not be re-hit per plugin (network +
+        # SessionStart-delay). Fall straight through to the failure diagnostic.
+        log "  WARNING: could not install ${p}; marketplace '${mkt}' was already refreshed this run — the plugin id may be wrong or its source unreachable (see ${LOG})."
+        n_fail=$((n_fail + 1))
+        ;;
+      *)
+        refreshed="${refreshed}${mkt} "
+        log "  ${p}: first attempt failed; refreshing marketplace '${mkt}' and retrying…"
+        if claude plugin marketplace update "$mkt" </dev/null >>"$LOG" 2>&1; then
+          if claude plugin install "$p" </dev/null >>"$LOG" 2>&1; then
+            log "  ${p}: installed (after refreshing marketplace '${mkt}')."
+            n_ok=$((n_ok + 1))
+          else
+            # Index is now fresh yet the install still fails => the plugin id is
+            # likely wrong. Non-fatal — announce-capabilities.sh flags the gap.
+            log "  WARNING: could not install ${p} even after refreshing marketplace '${mkt}' — the plugin id may be wrong (see ${LOG})."
+            n_fail=$((n_fail + 1))
+          fi
+        else
+          # The refresh itself failed, so the index may still be stale; say so rather
+          # than claim we refreshed. Usually the marketplace source is unreachable.
+          log "  WARNING: could not install ${p}; marketplace '${mkt}' could not be refreshed — its source may be unreachable (network) (see ${LOG})."
+          n_fail=$((n_fail + 1))
+        fi
+        ;;
+    esac
   done
   log "Plugin install: ${n_ok} installed, ${n_fail} failed, $(( ${#plugins[@]} - n_ok - n_fail )) already present."
   # When the self-heal actually had to install >=1 plugin THIS session (i.e. the
