@@ -11,9 +11,7 @@
   },
   "runArgs": [
     "--cap-add=NET_ADMIN",
-    "--cap-add=NET_RAW",
-    "--userns=keep-id",
-    "--security-opt=label=disable"
+    "--cap-add=NET_RAW"
   ],
   "customizations": {
     "vscode": {

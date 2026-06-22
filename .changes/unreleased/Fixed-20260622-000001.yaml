@@ -1,0 +1,3 @@
+kind: Fixed
+body: '`.devcontainer`: drop podman-only `runArgs` (`--userns=keep-id`, `--security-opt=label=disable`) so `devcontainer up` starts under Docker as well as podman. Bind-mount access relies on uid alignment (host uid 1000 == container `node`), and `--cap-add=NET_ADMIN`/`NET_RAW` (needed by `init-firewall.sh`) are retained'
+time: 2026-06-22T00:00:01.000000000Z
