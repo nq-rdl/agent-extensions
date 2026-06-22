@@ -168,6 +168,25 @@ gopls_is_pinned() {
   gopls version 2>/dev/null | grep -Eq "(^|[^0-9.])${GOPLS_PIN//./\\.}([[:space:]]|\$)"
 }
 
+# Echo the directory `go install` drops binaries into: GOBIN when set, otherwise
+# the FIRST entry of GOPATH with /bin appended. GOPATH may be a colon-separated
+# list and go installs into the first entry's bin, so split on ':' BEFORE
+# appending /bin — a naive "$(go env GOPATH)/bin" would yield an invalid
+# `path1:path2/bin`. Returns non-zero (and echoes nothing) when the go toolchain
+# is absent or GOPATH is empty, so callers must guard `go env` behind this.
+go_bin_dir() {
+  command -v go >/dev/null 2>&1 || return 1
+  local gobin gopath
+  gobin="$(go env GOBIN 2>/dev/null)"
+  if [ -n "$gobin" ]; then
+    printf '%s\n' "$gobin"
+    return 0
+  fi
+  gopath="$(go env GOPATH 2>/dev/null)"
+  [ -n "$gopath" ] || return 1
+  printf '%s\n' "${gopath%%:*}/bin"
+}
+
 # Install gopls from source with `go install` into GOPATH/bin (or GOBIN), pinned
 # to GOPLS_PIN. Needs the Go toolchain (present on the base image) and module-
 # proxy network access; both the download and go.sum verification are handled by
@@ -177,9 +196,12 @@ gopls_is_pinned() {
 # logs a warning and the gopls-lsp plugin simply stays inert this session.
 ensure_gopls() {
   local gobin
-  gobin="$(go env GOBIN 2>/dev/null)"
-  [ -n "$gobin" ] || gobin="$(go env GOPATH 2>/dev/null)/bin"
-  export PATH="${gobin}:${PATH}"
+  # Only consult `go env` when the toolchain exists (go_bin_dir guards that),
+  # and prepend the resolved bin dir so an already-installed gopls resolves for
+  # the pin check below. A missing toolchain leaves PATH untouched.
+  if gobin="$(go_bin_dir)"; then
+    export PATH="${gobin}:${PATH}"
+  fi
   if gopls_is_pinned; then
     return 0
   fi
@@ -243,11 +265,10 @@ ensure_pyyaml
 if command -v persist_path >/dev/null 2>&1; then
   persist_path "${HOME}/.local/bin"
   # GOPATH/bin (gopls, and any other `go install`-ed tool) so the gopls-lsp
-  # plugin and Bash tool shells resolve gopls in later turns.
-  if command -v go >/dev/null 2>&1; then
-    _gobin="$(go env GOBIN 2>/dev/null)"
-    [ -n "$_gobin" ] || _gobin="$(go env GOPATH 2>/dev/null)/bin"
-    [ -n "$_gobin" ] && persist_path "$_gobin"
+  # plugin and Bash tool shells resolve gopls in later turns. go_bin_dir handles
+  # the missing-toolchain and multi-entry-GOPATH cases.
+  if _gobin="$(go_bin_dir)"; then
+    persist_path "$_gobin"
     unset _gobin
   fi
 fi
