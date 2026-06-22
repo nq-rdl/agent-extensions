@@ -482,11 +482,14 @@ main() {
   # shellcheck disable=SC2034  # consumed by the sourced project hook, not this file
   [ "$(id -u)" -eq 0 ] || SUDO='sudo -n'
 
-  # Verbose output sink (keeps the model's context clean — see header). Created
-  # 0600 via a subshell umask so the log (which may capture command output) is
-  # not world-readable from the outset.
-  LOG="${TMPDIR:-/tmp}/rdl-web-bootstrap.log"
-  ( umask 077; : > "$LOG" ) 2>/dev/null || LOG=/dev/null
+  # Verbose output sink (keeps the model's context clean — see header). Use
+  # mktemp for a UNIQUE, unpredictable name: a fixed /tmp/rdl-web-bootstrap.log
+  # could be pre-created as a symlink (truncating an arbitrary target via the
+  # old `: > "$LOG"` redirect) or raced by a concurrent session. mktemp creates
+  # the file safely (O_EXCL, no symlink follow); the subshell umask 077 keeps it
+  # 0600 from the outset. Fall back to /dev/null if mktemp is unavailable/fails.
+  LOG="$(umask 077; mktemp "${TMPDIR:-/tmp}/rdl-web-bootstrap.XXXXXX" 2>/dev/null)" || LOG=/dev/null
+  [ -n "$LOG" ] || LOG=/dev/null
 
   # Resolve the repo root. The hook exports CLAUDE_PROJECT_DIR; fall back to the
   # script's own location (this file lives at .claude/hooks/, so the repo root is
