@@ -24,7 +24,8 @@ do not restate it here.
 
 - Native pipe `|>` over magrittr `%>%` — base R, no import. Available since
   **R 4.1**, but the `_` named-argument placeholder (`x |> f(y = _)`) needs
-  **R 4.3+**. Without `_`, the piped value can only fill the first argument.
+  **R 4.2+** (R 4.3+ to use `_` with extraction, e.g. `_$col`). Without `_`,
+  the piped value can only fill the first argument.
 - Lambda shorthand `\(x)` — backslash function syntax, **R 4.1+**
   (e.g. `purrr::map_dbl(x, \(d) d^2)`).
 - `testthat` **3rd edition** semantics (`expect_snapshot()`, parallel tests,
