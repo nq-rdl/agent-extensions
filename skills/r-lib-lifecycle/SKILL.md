@@ -10,7 +10,7 @@ description: >-
   experimental, deprecated, superseded), or (7) Writing deprecation helpers for
   complex scenarios.
 metadata:
-  repo: https://github.com/nq-rdl/agent-skills
+  repo: https://github.com/nq-rdl/agent-extensions
 ---
 
 # R Package Lifecycle Management

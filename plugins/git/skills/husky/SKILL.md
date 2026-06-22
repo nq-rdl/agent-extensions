@@ -8,7 +8,7 @@ description: >-
 compatibility: >-
   Requires Node.js runtime and npm
 metadata:
-  repo: https://github.com/nq-rdl/agent-skills
+  repo: https://github.com/nq-rdl/agent-extensions
 ---
 
 # Husky Skill

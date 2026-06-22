@@ -12,7 +12,7 @@ description: >-
 compatibility: >-
   Requires lychee binary on PATH (Rust-based link checker)
 metadata:
-  repo: https://github.com/nq-rdl/agent-skills
+  repo: https://github.com/nq-rdl/agent-extensions
 ---
 
 # Lychee — Fast Link Checker

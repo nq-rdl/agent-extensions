@@ -10,7 +10,7 @@ description: >-
   don't explicitly say "security". Covers domain error types, trust boundary
   translation, log redaction with slog, and safe API responses.
 metadata:
-  repo: https://github.com/nq-rdl/agent-skills
+  repo: https://github.com/nq-rdl/agent-extensions
 ---
 
 # Secure Go Error Handling

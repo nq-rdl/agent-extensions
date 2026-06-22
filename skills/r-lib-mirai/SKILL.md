@@ -9,7 +9,7 @@ description: >-
   use parallel map operations, integrate async tasks with Shiny or promises,
   or configure cluster/HPC computing.
 metadata:
-  repo: https://github.com/nq-rdl/agent-skills
+  repo: https://github.com/nq-rdl/agent-extensions
 ---
 
 Expert guidance for the mirai R package for async, parallel, and distributed computing in R. Covers writing correct mirai code, fixing common mistakes, and converting from other parallel frameworks.

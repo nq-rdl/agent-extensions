@@ -10,7 +10,7 @@ description: >-
   (deprecation/versioning), and r-lib-cran-extrachecks (CRAN submission
   checklist).
 metadata:
-  repo: https://github.com/nq-rdl/agent-skills
+  repo: https://github.com/nq-rdl/agent-extensions
 ---
 
 # R Package Development -- Orchestration Guide

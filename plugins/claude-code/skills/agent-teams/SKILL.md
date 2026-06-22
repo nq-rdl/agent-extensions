@@ -13,7 +13,7 @@ compatibility: >-
   Requires Claude Code v2.1.32+. Split-pane mode requires tmux or iTerm2.
 user-invocable: true
 metadata:
-  repo: https://github.com/nq-rdl/agent-skills
+  repo: https://github.com/nq-rdl/agent-extensions
 ---
 
 ## User Input

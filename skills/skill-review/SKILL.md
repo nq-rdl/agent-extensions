@@ -8,7 +8,7 @@ description: >-
   session — after creating, editing, or debugging a skill — to get a second
   opinion and close the feedback loop.
 metadata:
-  repo: https://github.com/nq-rdl/agent-skills
+  repo: https://github.com/nq-rdl/agent-extensions
 ---
 
 # Skill Review

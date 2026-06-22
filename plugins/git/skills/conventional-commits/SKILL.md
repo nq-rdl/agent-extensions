@@ -7,7 +7,7 @@ description: >-
   conventional commits, semantic versioning based on commits, or needs to
   categorize a change (e.g., feat vs fix vs chore).
 metadata:
-  repo: https://github.com/nq-rdl/agent-skills
+  repo: https://github.com/nq-rdl/agent-extensions
   spec_url: https://www.conventionalcommits.org/en/v1.0.0/
 ---
 

@@ -10,7 +10,7 @@ description: >-
 compatibility: >-
   Requires R runtime
 metadata:
-  repo: https://github.com/nq-rdl/agent-skills
+  repo: https://github.com/nq-rdl/agent-extensions
 ---
 
 # R Expert — Idiomatic R Language Guide

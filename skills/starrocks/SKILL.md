@@ -13,7 +13,7 @@ description: >-
 compatibility: >-
   Requires StarRocks instance with MySQL-compatible client
 metadata:
-  repo: https://github.com/nq-rdl/agent-skills
+  repo: https://github.com/nq-rdl/agent-extensions
 ---
 
 # StarRocks — Analytical Data Warehouse Guide

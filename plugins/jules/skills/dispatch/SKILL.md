@@ -7,7 +7,7 @@ description: >-
 compatibility: >-
   Requires Go 1.25+, gh CLI
 metadata:
-  repo: https://github.com/nq-rdl/agent-skills
+  repo: https://github.com/nq-rdl/agent-extensions
 ---
 
 # Jules — Async AI Coding Sessions

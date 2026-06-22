@@ -7,7 +7,7 @@ description: >-
 compatibility: >-
   Requires pixi package manager
 metadata:
-  repo: https://github.com/nq-rdl/agent-skills
+  repo: https://github.com/nq-rdl/agent-extensions
 ---
 
 # Pre-commit

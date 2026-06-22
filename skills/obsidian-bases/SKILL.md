@@ -7,7 +7,7 @@ description: >-
   views of notes, or when the user mentions Bases, table views, card views,
   filters, or formulas in Obsidian.
 metadata:
-  repo: https://github.com/nq-rdl/agent-skills
+  repo: https://github.com/nq-rdl/agent-extensions
 ---
 
 # Obsidian Bases Skill

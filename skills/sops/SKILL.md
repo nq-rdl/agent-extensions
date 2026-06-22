@@ -15,7 +15,7 @@ compatibility: >-
   Requires sops CLI; and either age (for Age backend) or a HashiCorp Vault
   instance with the transit engine enabled (for Vault backend)
 metadata:
-  repo: https://github.com/nq-rdl/agent-skills
+  repo: https://github.com/nq-rdl/agent-extensions
 ---
 
 # SOPS Encryption Skill
