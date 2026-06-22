@@ -1,9 +1,9 @@
 #!/usr/bin/env bash
-# scripts/test-web-bootstrap.sh
-# Unit + integration tests for assets/web-bootstrap.sh (the portable SessionStart
+# scripts/test-install-deps.sh
+# Unit + integration tests for assets/install-deps.sh (the portable SessionStart
 # hook shipped by the cc-web-setup skill).
 #
-# web-bootstrap.sh is sourceable (its imperative body is guarded by
+# install-deps.sh is sourceable (its imperative body is guarded by
 # `[ "${BASH_SOURCE[0]}" = "${0}" ]`), so this harness sources it to get the REAL
 # ensure_gh / codex functions / persist_path and exercises them against a fake
 # PATH of stub executables — the only things stubbed are the external I/O boundary
@@ -11,17 +11,17 @@
 # the *.local.sh seam are covered by running the script as a subprocess.
 set -euo pipefail
 HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-SCRIPT="${HERE}/../assets/web-bootstrap.sh"
+SCRIPT="${HERE}/../assets/install-deps.sh"
 PASS=0; FAIL=0
 ok()   { PASS=$((PASS+1)); echo "  PASS  $*"; }
 fail() { FAIL=$((FAIL+1)); echo "  FAIL  $*"; }
 
 # Source the script under test. With the main-guard in place, sourcing only
 # defines the functions and never runs the hook body (side-effect free).
-# shellcheck source=../assets/web-bootstrap.sh
+# shellcheck source=../assets/install-deps.sh
 source "$SCRIPT"
 
-WORK="$(mktemp -d "${TMPDIR:-/tmp}/web-bootstrap-test.XXXXXX")"
+WORK="$(mktemp -d "${TMPDIR:-/tmp}/install-deps-test.XXXXXX")"
 trap 'rm -rf "$WORK"' EXIT
 
 # Coreutils the functions legitimately use (not the stubbed I/O boundary).
@@ -336,26 +336,26 @@ test_persist_path_readonly_warns() {
 # ---------------------------------------------------------------------------
 # main() gate + project hook seam (subprocess)
 # ---------------------------------------------------------------------------
-test_gate_local_noop() {
-  # No CLAUDE_CODE_REMOTE => must be an immediate no-op (exit 0), no install.
+test_gate_session_local_noop() {
+  # As the SessionStart hook (--session) on a LOCAL machine (no CLAUDE_CODE_REMOTE)
+  # => must be an immediate no-op (exit 0), no output.
   local out; out="$WORK/gate.out"
-  if CLAUDE_CODE_REMOTE='' bash "$SCRIPT" >"$out" 2>&1; then
-    ok "gate: no-op exit 0 when CLAUDE_CODE_REMOTE unset"
+  if CLAUDE_CODE_REMOTE='' bash "$SCRIPT" --session >"$out" 2>&1; then
+    ok "gate: --session no-op exit 0 when CLAUDE_CODE_REMOTE unset"
   else
-    fail "gate: non-zero exit when CLAUDE_CODE_REMOTE unset"
+    fail "gate: --session non-zero exit when CLAUDE_CODE_REMOTE unset"
   fi
-  [ -s "$out" ] && fail "gate: produced output when it should be silent" \
-    || ok "gate: produced no output (true no-op)"
+  [ -s "$out" ] && fail "gate: --session produced output when it should be silent" \
+    || ok "gate: --session produced no output (true no-op)"
 }
 
 test_local_hook_sourced() {
-  # CLAUDE_CODE_REMOTE=true with a project hook present => hook is sourced, exit 0.
+  # CLAUDE_CODE_REMOTE=true with a project seam present => the dev-toolchain seam
+  # (.claude/scripts/install-deps.local.sh) is sourced, exit 0.
   local proj d out; proj="$(mktemp -d "$WORK/proj.XXXXXX")"; d="$(new_stub_dir)"; out="$WORK/lh.out"
-  mkdir -p "$proj/scripts"
-  # A cc-web-setup.sh that no-ops (so the self-heal call is cheap) and a local hook
-  # that drops a sentinel.
-  printf '#!/usr/bin/env bash\nexit 0\n' > "$proj/scripts/cc-web-setup.sh"; chmod +x "$proj/scripts/cc-web-setup.sh"
-  printf 'touch "%s/lh-sentinel"\n' "$WORK" > "$proj/scripts/web-bootstrap.local.sh"
+  mkdir -p "$proj/.claude/scripts"
+  # A local seam that drops a sentinel when sourced.
+  printf 'touch "%s/lh-sentinel"\n' "$WORK" > "$proj/.claude/scripts/install-deps.local.sh"
   rm -f "$WORK/lh-sentinel"
   # Stub gh to the pinned version so ensure_gh short-circuits; no codex creds so codex is skipped.
   write_stub "$d" gh "echo 'gh version ${GH_PIN} (2026-01-01)'"
@@ -368,8 +368,33 @@ test_local_hook_sourced() {
     fail "local-hook: main() exited non-zero. Out: $(cat "$out" 2>/dev/null)"
   fi
   [ -e "$WORK/lh-sentinel" ] \
-    && ok "local-hook: web-bootstrap.local.sh was sourced" \
-    || fail "local-hook: project hook was NOT sourced. Out: $(cat "$out" 2>/dev/null)"
+    && ok "local-hook: install-deps.local.sh was sourced" \
+    || fail "local-hook: project seam was NOT sourced. Out: $(cat "$out" 2>/dev/null)"
+}
+
+test_make_local_dev_toolchain() {
+  # `make install-deps` path: invoked WITHOUT --session and WITHOUT remote =>
+  # provisions the dev toolchain (sources the local seam) and exits 0, but SKIPS
+  # the web runtime. The seam sentinel proves it ran; the "web runtime skipped"
+  # line proves the remote block was skipped.
+  local proj d out; proj="$(mktemp -d "$WORK/proj.XXXXXX")"; d="$(new_stub_dir)"; out="$WORK/make.out"
+  mkdir -p "$proj/.claude/scripts"
+  printf 'touch "%s/make-sentinel"\n' "$WORK" > "$proj/.claude/scripts/install-deps.local.sh"
+  rm -f "$WORK/make-sentinel"
+  write_stub "$d" id "echo 1000"   # non-root: SUDO='sudo -n'
+  # shellcheck disable=SC2030,SC2031
+  if ( export PATH="$d:/usr/bin:/bin" HOME="$WORK/make-home" CLAUDE_CODE_REMOTE='' \
+         CLAUDE_PROJECT_DIR="$proj" TMPDIR="$WORK"; bash "$SCRIPT" ) >"$out" 2>&1; then
+    ok "make-local: exits 0 (dev toolchain, no remote)"
+  else
+    fail "make-local: exited non-zero. Out: $(cat "$out" 2>/dev/null)"
+  fi
+  [ -e "$WORK/make-sentinel" ] \
+    && ok "make-local: dev toolchain (install-deps.local.sh) was sourced" \
+    || fail "make-local: dev toolchain was NOT sourced. Out: $(cat "$out" 2>/dev/null)"
+  grep -q 'web runtime skipped' "$out" \
+    && ok "make-local: web runtime was skipped" \
+    || fail "make-local: did not report skipping the web runtime. Out: $(cat "$out" 2>/dev/null)"
 }
 
 test_gh_pin_match
@@ -386,9 +411,10 @@ test_sandbox_creates
 test_sandbox_respects_existing
 test_persist_path
 test_persist_path_readonly_warns
-test_gate_local_noop
+test_gate_session_local_noop
 test_local_hook_sourced
+test_make_local_dev_toolchain
 
 echo ""
-echo "web-bootstrap: ${PASS} passed, ${FAIL} failed"
+echo "install-deps: ${PASS} passed, ${FAIL} failed"
 [ "$FAIL" -eq 0 ]

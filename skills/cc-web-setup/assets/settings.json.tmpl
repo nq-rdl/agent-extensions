@@ -12,11 +12,11 @@
         "hooks": [
           {
             "type": "command",
-            "command": "\"$CLAUDE_PROJECT_DIR\"/scripts/web-bootstrap.sh"
+            "command": "\"$CLAUDE_PROJECT_DIR\"/.claude/scripts/install-deps.sh --session"
           },
           {
             "type": "command",
-            "command": "\"$CLAUDE_PROJECT_DIR\"/scripts/announce-capabilities.sh"
+            "command": "\"$CLAUDE_PROJECT_DIR\"/.claude/scripts/announce-capabilities.sh"
           }
         ]
       }

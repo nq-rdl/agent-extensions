@@ -1,24 +1,30 @@
 #!/usr/bin/env bash
 #
-# web-bootstrap.sh — per-session bootstrap for a Claude Code on the web session.
+# install-deps.sh — provision this repo's dependencies, locally and on Claude
+# Code on the web. Exposed as `make install-deps`.
 #
-# Invoked from the repo's .claude/settings.json SessionStart hook. It is a no-op
-# unless running inside an Anthropic-managed cloud VM (CLAUDE_CODE_REMOTE=true),
-# so it never touches a local contributor's machine.
+# THREE INVOCATION MODES (one engine):
+#   1. `make install-deps` (human dev, local) — installs the dev toolchain
+#      (lefthook, changie, gopls, python/jq) so a contributor can run the git
+#      hooks and pipeline scripts. The web-only runtime steps are skipped.
+#   2. Pre-snapshot Setup-script field on Claude Code on the web, set to
+#      `CLAUDE_CODE_REMOTE=true make install-deps` — runs BEFORE Claude starts,
+#      so it pre-seeds the plugins (ensure_plugins) into the environment snapshot.
+#      This is the ONLY way plugin /<plugin>:<skill> commands appear on the FIRST
+#      session: Claude enumerates skills at startup, before any SessionStart hook.
+#   3. SessionStart hook (`install-deps.sh --session`) — runs every session. A
+#      no-op on a local machine (so it never disturbs a contributor); on the web
+#      it self-heals the dev toolchain + plugin install for resumed sessions.
 #
-# PLUGINS are NOT installed here. Claude Code on the web installs the plugins
-# declared in .claude/settings.json (enabledPlugins + extraKnownMarketplaces) at
-# session start from their marketplaces — see the web docs' "what carries over"
-# table — so their /<plugin>:<skill> commands surface without any hook or Setup
-# script. This per-session hook only provisions what that cannot:
-#   * the portable per-session tooling a base image may lack — the GitHub CLI
-#     (PR/CI automation) and the Codex CLI (a second opinion via `codex exec`),
-#     persisting both on PATH for later Bash commands;
-#   * an optional project hook (web-bootstrap.local.sh) for repo-specific glue
-#     (language toolchains, container runtimes, git-hook wiring, …).
+# WHY PLUGINS ARE INSTALLED HERE: Claude Code on the web registers the
+# extraKnownMarketplaces from .claude/settings.json at session start but does NOT
+# install the enabledPlugins from them (verified live, 2.1.185) — `enabledPlugins`
+# only *enables* an already-installed plugin. So this script installs the declared
+# set explicitly (ensure_plugins), reading it straight from settings.json.
 #
-# This script is PORTABLE: it carries no project-specific dependencies. Anything
-# specific to one repo belongs in .claude/hooks/web-bootstrap.local.sh (sourced below).
+# This engine is PORTABLE: it carries no project-specific dependencies. Anything
+# specific to one repo belongs in .claude/scripts/install-deps.local.sh (sourced
+# below) — the dev toolchain for THIS repo lives there.
 #
 # Output discipline: SessionStart stdout is injected into Claude's context, so
 # verbose tool output goes to $LOG and only concise status lines reach stdout.
@@ -38,7 +44,7 @@ fi
 # Only colorize on a TTY — cloud SessionStart stdout is non-TTY and injected into
 # the model context, where ANSI escapes are just noise.
 if [ -t 1 ]; then _BLU=$'\033[34m'; _RST=$'\033[0m'; else _BLU=''; _RST=''; fi
-log() { printf '%s[web-bootstrap]%s %s\n' "$_BLU" "$_RST" "$*"; }
+log() { printf '%s[install-deps]%s %s\n' "$_BLU" "$_RST" "$*"; }
 
 # Pinned GitHub CLI (gh) release. GitHub releases are on the cloud "Trusted"
 # network allowlist. Update the pin and BOTH per-arch checksums together — the
@@ -463,20 +469,92 @@ persist_path() {
   fi
 }
 
+# Install the plugins declared in .claude/settings.json (enabledPlugins == true).
+#
+# WHY THIS EXISTS: Claude Code on the web registers extraKnownMarketplaces at
+# session start but does NOT install enabledPlugins from them. Confirmed live on
+# 2.1.185 (issue #161 follow-up): a fresh cloud VM has all marketplaces registered
+# yet `claude plugin list` is empty and no /<plugin>:<skill> command surfaces —
+# `enabledPlugins` only *enables* an already-installed plugin, it does not
+# *install* it. The "declared plugins install at session start" model assumed in
+# #160 does not hold, so this repo installs the enabled set explicitly here.
+#
+# CAVEAT (timing): Claude enumerates skills at process startup, BEFORE SessionStart
+# hooks finish, so plugins installed here surface their commands from the NEXT
+# session, not the one that installs them. That is the accepted tradeoff for a dev
+# env — the install persists and self-heals; a guaranteed first-session path would
+# need a pre-snapshot Setup-script, which this repo deliberately does not use.
+#
+# Idempotent: skips any plugin already in `claude plugin list`, so a resume is a
+# quiet no-op. Non-fatal: a failed install logs a warning and the session
+# continues. Reads the enabled set straight from settings.json (single source of
+# truth) so it cannot drift from what announce-capabilities.sh verifies.
+ensure_plugins() {
+  command -v claude >/dev/null 2>&1 || { log "claude CLI not on PATH — skipping plugin install."; return 0; }
+  command -v jq >/dev/null 2>&1 || { log "jq not available — cannot read enabledPlugins; skipping plugin install."; return 0; }
+  local settings="${PROJECT_DIR}/.claude/settings.json"
+  [ -f "$settings" ] || return 0
+
+  local plugins=() p
+  while IFS= read -r p; do
+    [ -n "$p" ] && plugins+=("$p")
+  done < <(jq -r '(.enabledPlugins // {}) | to_entries[] | select(.value == true) | .key' "$settings" 2>/dev/null)
+  [ "${#plugins[@]}" -gt 0 ] || return 0
+
+  # Already-installed plugin ids (the `> <id>` lines from `claude plugin list`), so
+  # we skip re-installing on a resume. Empty on a cold VM — every plugin installs.
+  local installed_blob
+  installed_blob="$(claude plugin list 2>/dev/null | awk '/^[[:space:]]*>[[:space:]]/ { print $2 }')"
+
+  local n_ok=0 n_fail=0
+  for p in "${plugins[@]}"; do
+    if printf '%s\n' "$installed_blob" | grep -qxF -- "$p"; then
+      continue
+    fi
+    log "Installing plugin ${p}…"
+    if claude plugin install "$p" </dev/null >>"$LOG" 2>&1; then
+      log "  ${p}: installed."
+      n_ok=$((n_ok + 1))
+    else
+      # The marketplace is normally pre-registered by the platform from
+      # extraKnownMarketplaces; a failure here usually means it was unreachable or
+      # the id is wrong. Non-fatal — announce-capabilities.sh flags the gap.
+      log "  WARNING: could not install ${p} (see ${LOG})."
+      n_fail=$((n_fail + 1))
+    fi
+  done
+  log "Plugin install: ${n_ok} installed, ${n_fail} failed, $(( ${#plugins[@]} - n_ok - n_fail )) already present."
+  # When we installed >=1 plugin THIS session, leave a marker for
+  # announce-capabilities.sh (the next SessionStart hook) to surface the
+  # commit + next-session guidance once. Best-effort: never fail the hook on it.
+  if [ "$n_ok" -gt 0 ]; then
+    printf '%s\n' "$n_ok" > "${TMPDIR:-/tmp}/rdl-web-setup-installed" 2>/dev/null || true
+  fi
+  return 0
+}
+
 # Imperative body. Wrapped in main() so the script is *sourceable* for unit
 # tests: executing it (the SessionStart hook runs it by direct exec) runs main;
 # sourcing it (the test harness) only defines the functions/globals above so they
 # can be exercised against stubbed external tools. SUDO/LOG/PROJECT_DIR and the
 # CLAUDE_CODE_REMOTE gate live in here so sourcing never touches the environment.
 main() {
-  # Only run inside Claude Code on the web. Locally this is a fast no-op so the
-  # same committed hook is safe for every contributor.
-  if [ "${CLAUDE_CODE_REMOTE:-}" != "true" ]; then
+  # Mode: `--session` marks the passive SessionStart-hook invocation (runs every
+  # session); without it we were invoked deliberately, via `make install-deps`.
+  local session_mode=0
+  [ "${1:-}" = "--session" ] && session_mode=1
+  local remote=0
+  [ "${CLAUDE_CODE_REMOTE:-}" = "true" ] && remote=1
+
+  # As the SessionStart hook on a LOCAL machine, do nothing — the committed hook
+  # must never disturb a contributor mid-session. (`make install-deps` by hand is
+  # NOT --session, so it still provisions the local dev toolchain below.)
+  if [ "$session_mode" -eq 1 ] && [ "$remote" -ne 1 ]; then
     exit 0
   fi
 
   # SUDO is intentionally exposed as a global for the sourced project hook
-  # (web-bootstrap.local.sh) to use when starting daemons (e.g. dockerd).
+  # (install-deps.local.sh) to use when starting daemons (e.g. dockerd).
   SUDO=''
   # -n (non-interactive): a SessionStart hook has no TTY, so a sudo that needs a
   # password must fail fast rather than block the session waiting on input.
@@ -484,20 +562,51 @@ main() {
   [ "$(id -u)" -eq 0 ] || SUDO='sudo -n'
 
   # Verbose output sink (keeps the model's context clean — see header). Use
-  # mktemp for a UNIQUE, unpredictable name: a fixed /tmp/rdl-web-bootstrap.log
+  # mktemp for a UNIQUE, unpredictable name: a fixed /tmp/rdl-install-deps.log
   # could be pre-created as a symlink (truncating an arbitrary target via the
   # old `: > "$LOG"` redirect) or raced by a concurrent session. mktemp creates
   # the file safely (O_EXCL, no symlink follow); the subshell umask 077 keeps it
   # 0600 from the outset. Fall back to /dev/null if mktemp is unavailable/fails.
-  LOG="$(umask 077; mktemp "${TMPDIR:-/tmp}/rdl-web-bootstrap.XXXXXX" 2>/dev/null)" || LOG=/dev/null
+  LOG="$(umask 077; mktemp "${TMPDIR:-/tmp}/rdl-install-deps.XXXXXX" 2>/dev/null)" || LOG=/dev/null
   [ -n "$LOG" ] || LOG=/dev/null
 
   # Resolve the repo root. The hook exports CLAUDE_PROJECT_DIR; fall back to the
-  # script's own location (this file lives at .claude/hooks/, so the repo root is
-  # two levels up) so it also works when run by hand.
+  # script's own location (this file lives at .claude/scripts/, so the repo root
+  # is two levels up) so it also works when run by hand.
   PROJECT_DIR="${CLAUDE_PROJECT_DIR:-$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)}"
 
-  # --- 1. GitHub CLI + token (every session) ----------------------------------
+  # --- Dev toolchain (EVERY mode) — source the project seam --------------------
+  # The portable engine carries no project deps. THIS repo's dev toolchain
+  # (lefthook, changie, gopls, python/jq) + git-hook wiring lives in the project
+  # seam, sourced here so it provisions in ALL modes: `make install-deps` for a
+  # local contributor, and every web session. A subshell inherits main()'s helpers
+  # and globals (log, $LOG, $PROJECT_DIR, $SUDO, $CLAUDE_ENV_FILE, persist_path),
+  # so its file/system side effects persist.
+  #
+  # SECURITY/ISOLATION: install-deps.local.sh is trusted, repo-owned code — the
+  # same trust level as this committed script. Running it in a SUBSHELL keeps a
+  # stray `exit` from breaking the "always exit 0" discipline and stops its
+  # variable edits from leaking back; it does NOT sandbox the code (it legitimately
+  # needs the session's git/gh credentials). Non-zero exit is logged, never fatal.
+  local local_hook="${PROJECT_DIR}/.claude/scripts/install-deps.local.sh"
+  if [ -f "$local_hook" ]; then
+    log "Provisioning dev toolchain (install-deps.local.sh)…"
+    # shellcheck source=/dev/null
+    ( source "$local_hook" ) || log "WARNING: project bootstrap hook reported errors (see ${LOG})."
+  fi
+
+  # --- Web runtime (REMOTE only) ----------------------------------------------
+  # gh, codex and the plugin pre-seed provision a Claude Code on the web session
+  # — or `CLAUDE_CODE_REMOTE=true make install-deps`, the documented Setup-script
+  # field that pre-seeds plugins into the snapshot before Claude enumerates skills.
+  # A local contributor already has their own gh/codex, so `make install-deps`
+  # (mode 1) skips this whole block.
+  if [ "$remote" -ne 1 ]; then
+    log "install-deps complete (local dev toolchain; web runtime skipped — set CLAUDE_CODE_REMOTE=true for the web pre-seed)."
+    exit 0
+  fi
+
+  # --- GitHub CLI + token -----------------------------------------------------
   # Provision gh so PR/CI automation can run from the cloud session, and report
   # whether the environment injected a GitHub token. gh reads GH_TOKEN (or
   # GITHUB_TOKEN) straight from the env — no `gh auth login` — so we just verify it
@@ -518,7 +627,7 @@ main() {
     log "WARNING: gh CLI not available (install failed — see ${LOG})."
   fi
 
-  # --- 2. Codex CLI install + auth (every session; quiet no-op without creds) --
+  # --- Codex CLI install + auth (quiet no-op without creds) -------------------
   # Install the Codex CLI and authenticate it so `codex exec` works headlessly.
   # Two supported credential inputs, in priority order:
   #   * CODEX_AUTH_JSON   — the full contents of a ~/.codex/auth.json captured from
@@ -553,33 +662,18 @@ main() {
     fi
   fi
 
-  # --- 3. SOURCE PROJECT HOOK (optional, project-specific) --------------------
-  # The portable engine above carries no project dependencies. Repo-specific glue
-  # — language toolchains on PATH, container runtimes, git-hook wiring (.husky /
-  # .githooks / lefthook), fetching the default branch for merge-base checks, etc.
-  # — belongs in .claude/hooks/web-bootstrap.local.sh, sourced here if present. A subshell
-  # inherits main()'s helpers and globals (log, $LOG, $PROJECT_DIR, $SUDO,
-  # $CLAUDE_ENV_FILE, persist_path), so its file/system side effects persist.
-  #
-  # SECURITY/ISOLATION: web-bootstrap.local.sh is trusted, repo-owned code — the
-  # same trust level as this committed hook. Running it in a SUBSHELL keeps a stray
-  # `exit` (or `exit 1`) from breaking this hook's "always exit 0" discipline and
-  # stops its variable edits from leaking back; it does NOT sandbox the code (a
-  # project hook legitimately needs the session's git/gh credentials). Signal a
-  # soft failure with a non-zero exit/return — it is logged, never fatal.
-  local local_hook="${PROJECT_DIR}/.claude/hooks/web-bootstrap.local.sh"
-  if [ -f "$local_hook" ]; then
-    log "Running project bootstrap hook (web-bootstrap.local.sh)…"
-    # shellcheck source=/dev/null
-    ( source "$local_hook" ) || log "WARNING: project bootstrap hook reported errors (see ${LOG})."
-  fi
+  # --- Plugin install (cheap no-op once installed) ----------------------------
+  # Claude Code on the web does NOT install enabledPlugins for us (it only
+  # registers the marketplaces), so install the declared set explicitly. See the
+  # ensure_plugins header for the why + the session-timing caveat.
+  ensure_plugins
 
-  log "Session bootstrap complete."
+  log "install-deps complete."
   exit 0
 }
 
 # Run the imperative body only when executed, not when sourced. The hook is
-# invoked by direct exec ("$CLAUDE_PROJECT_DIR"/.claude/hooks/web-bootstrap.sh from the
+# invoked by direct exec ("$CLAUDE_PROJECT_DIR"/.claude/scripts/install-deps.sh from the
 # SessionStart hook), so BASH_SOURCE[0] == $0 holds for the real run and the test
 # harness (which sources this file) skips main and just exercises the functions.
 if [ "${BASH_SOURCE[0]}" = "${0}" ]; then

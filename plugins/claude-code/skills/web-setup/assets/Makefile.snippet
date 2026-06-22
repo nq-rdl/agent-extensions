@@ -1,9 +1,13 @@
-# --- Claude Code on the web provisioning (added by claude-code:web-setup) -----
-# Run this ONCE from the web environment's *setup script* (the bash that runs
-# before Claude starts, whose filesystem is captured in the environment
-# snapshot). Installing plugins here — before the snapshot — bakes their skills
-# into the image so they are available on the FIRST session. Exposed as a make
-# target for convenience; the web setup script should call `make cc-web-setup`.
-.PHONY: cc-web-setup
-cc-web-setup: ## Provision a Claude Code on the web VM (plugin pre-seed) — run by the cloud setup script
-	@bash scripts/cc-web-setup.sh
+# --- Claude Code on the web + local dev provisioning (added by claude-code:web-setup)
+# `make install-deps` is the single dependency-bootstrap entrypoint:
+#   * Human dev, locally: installs the project dev toolchain (from
+#     .claude/scripts/install-deps.local.sh if present); the web runtime is skipped.
+#   * Claude Code on the web: set the environment's *Setup script* field to
+#       CLAUDE_CODE_REMOTE=true make install-deps
+#     so the declared plugins are pre-seeded into the snapshot BEFORE Claude
+#     enumerates skills — the only way their /<plugin>:<skill> commands appear on
+#     the FIRST session. The committed SessionStart hook (install-deps.sh
+#     --session) then self-heals the install on later/resumed sessions.
+.PHONY: install-deps
+install-deps: ## Install dev deps; on Claude Code web (CLAUDE_CODE_REMOTE=true) also pre-seeds plugins
+	@bash .claude/scripts/install-deps.sh
