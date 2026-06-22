@@ -184,7 +184,7 @@ fi
 if [ "${#missing_plugins[@]}" -gt 0 ]; then
   uniq_missing="$(printf '%s\n' "${missing_plugins[@]}" | join_comma)"
   add "**⚠️ Declared but NOT installed:** $uniq_missing"
-  add "Enabled in .claude/settings.json but absent from \`claude plugin list\`, so their \`/plugin:skill\` commands will not appear. On Claude Code (web) this means the pre-snapshot pre-seed did not run — set the environment's Setup-script field to \`make cc-web-setup\` (see CONTRIBUTING.md § \"Claude Code on the web\")."
+  add "Enabled in .claude/settings.json but absent from \`claude plugin list\`, so their \`/plugin:skill\` commands will not appear. On Claude Code (web), declared plugins install at session start from their marketplace, so this usually means the marketplace was unreachable (check the environment's network access) or the install failed — see CONTRIBUTING.md § \"Claude Code on the web\"."
   add ""
 fi
 
@@ -193,16 +193,12 @@ context="$(printf '%s\n' "${lines[@]}")"
 # --- emit ------------------------------------------------------------------
 
 # On a cloud session, also request a same-session skill/command re-scan via
-# `reloadSkills: true`. Claude Code enumerates skills at startup, BEFORE
-# SessionStart hooks finish, so the plugins web-bootstrap.sh just pre-seeded
-# (cc-web-setup.sh) would otherwise only surface NEXT session. This hook runs
-# AFTER web-bootstrap.sh (settings.json order), so by the time we emit this the
-# install has completed; Claude re-scans the skill/command directories once all
-# SessionStart hooks return. Gate on CLAUDE_CODE_REMOTE so a local session (no
-# pre-seed) does not pay for a needless re-scan. NOTE: the docs only document the
-# re-scan for loose ~/.claude/skills/ — whether it also covers plugin-cache
-# skills is unconfirmed (see docs/notes/claude-code-web-issues.md); the env
-# Setup-script field remains the guaranteed first-session fallback.
+# `reloadSkills: true`, so any repo-local skills/commands committed under
+# .claude/ are picked up once all SessionStart hooks return. Gate on
+# CLAUDE_CODE_REMOTE so a local session does not pay for a needless re-scan.
+# NOTE: the docs only document this re-scan for loose ~/.claude/skills/, not the
+# plugin install cache — but declared plugins are installed by the platform at
+# session start (not by this hook), so plugin skills do not depend on it.
 if command -v jq >/dev/null 2>&1; then
   if [ "${CLAUDE_CODE_REMOTE:-}" = "true" ]; then
     jq -cn --arg ctx "$context" \

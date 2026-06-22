@@ -6,6 +6,22 @@ are candidates to file as issues — against the **`claude-code`** plugin in thi
 repo (the `cc-web-setup` / `web-setup` skill) where we own the fix, and against
 **upstream Claude Code** where the root cause is the harness.
 
+## Resolution (2026-06-22)
+
+The practical fix was **not** the `cc-web-setup` pre-seed. Claude Code on the web
+installs the plugins declared in `.claude/settings.json` (`enabledPlugins` +
+`extraKnownMarketplaces`) **at session start from their marketplaces** (web docs,
+"what carries over" table), so their `/<plugin>:<skill>` commands surface on the
+first session with no setup script and no `make`. This repo's earlier failure was
+self-inflicted: it declared 44 plugins headed by the **self-referential `rdl@rdl`
+meta-plugin** (which re-clones this repo and fans out to 35 deps), breaking the
+session-start install as a whole — so *nothing*, not even `superpowers`, surfaced.
+Scoping `.claude/settings.json` to a small set of **external** dev-helper plugins
+(the same path that gives `nq-rdl/dataops` its `/superpowers:*`) resolved it, and
+the `.claude/hooks/cc-web-setup.sh` + `make cc-web-setup` self-heal machinery was
+removed as unnecessary. The notes below are kept as the historical investigation
+and the upstream asks (which still stand).
+
 ## 1. Does `reloadSkills` re-scan plugin-cache skills? (upstream Claude Code)
 
 **Symptom.** On a fresh web environment, `/<plugin>:<skill>` commands declared via

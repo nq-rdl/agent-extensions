@@ -6,14 +6,11 @@
 # unless running inside an Anthropic-managed cloud VM (CLAUDE_CODE_REMOTE=true),
 # so it never touches a local contributor's machine.
 #
-# PLUGINS: the authoritative pre-seed runs from the web environment's *Setup
-# script* field (`make cc-web-setup` → .claude/hooks/cc-web-setup.sh), which runs
-# before Claude starts and is captured in the snapshot, so plugin skills are
-# present on the FIRST session. Claude enumerates skills at startup, BEFORE this
-# hook, so a plugin installed here only surfaces its skills NEXT session — hence
-# this hook calls cc-web-setup.sh purely as a SELF-HEAL for environments whose
-# Setup-script field is not wired (the skills then arrive the following session).
-# This per-session hook also provisions what the snapshot cannot:
+# PLUGINS are NOT installed here. Claude Code on the web installs the plugins
+# declared in .claude/settings.json (enabledPlugins + extraKnownMarketplaces) at
+# session start from their marketplaces — see the web docs' "what carries over"
+# table — so their /<plugin>:<skill> commands surface without any hook or Setup
+# script. This per-session hook only provisions what that cannot:
 #   * the portable per-session tooling a base image may lack — the GitHub CLI
 #     (PR/CI automation) and the Codex CLI (a second opinion via `codex exec`),
 #     persisting both on PATH for later Bash commands;
@@ -556,25 +553,7 @@ main() {
     fi
   fi
 
-  # --- 3. Plugin pre-seed (every cloud session) -------------------------------
-  # Install the declared marketplaces/plugins. This is the PRIMARY, committed,
-  # zero-manual-setup path: no environment Setup-script field required. Claude
-  # enumerates skills at startup BEFORE this hook, so the install lands after
-  # enumeration — but announce-capabilities.sh (which runs after this hook) emits
-  # `reloadSkills: true`, asking Claude to re-scan the skill/command directories
-  # once all SessionStart hooks return, so newly-pre-seeded skills can surface
-  # THIS session. (Whether that re-scan reaches plugin-cache skills is unconfirmed
-  # upstream — see docs/notes/claude-code-web-issues.md; the env Setup-script
-  # field, which bakes plugins in pre-enumeration, is the guaranteed fallback.)
-  # Non-fatal (|| true).
-  local cc_web_setup="${PROJECT_DIR}/.claude/hooks/cc-web-setup.sh"
-  if [ -f "$cc_web_setup" ]; then
-    log "Self-healing plugin pre-seed (cc-web-setup.sh)…"
-    CLAUDE_PROJECT_DIR="$PROJECT_DIR" bash "$cc_web_setup" >>"$LOG" 2>&1 \
-      || log "WARNING: plugin pre-seed reported errors (see ${LOG})."
-  fi
-
-  # --- 4. SOURCE PROJECT HOOK (optional, project-specific) --------------------
+  # --- 3. SOURCE PROJECT HOOK (optional, project-specific) --------------------
   # The portable engine above carries no project dependencies. Repo-specific glue
   # — language toolchains on PATH, container runtimes, git-hook wiring (.husky /
   # .githooks / lefthook), fetching the default branch for merge-base checks, etc.

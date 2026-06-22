@@ -5,10 +5,10 @@
 # run (inside the CLAUDE_CODE_REMOTE=true gate), AFTER the portable engine has
 # installed gh/codex and persisted PATH.
 #
-# PLUGINS are pre-seeded by .claude/hooks/cc-web-setup.sh (authoritatively from
-# the environment's Setup-script field, `make cc-web-setup`; and as a self-heal
-# from web-bootstrap.sh) — not from here. This per-session local hook provisions
-# the project-specific tooling the snapshot cannot:
+# PLUGINS are installed by Claude Code on the web itself, from the enabledPlugins
+# / extraKnownMarketplaces declared in .claude/settings.json — not from here and
+# not from any setup script. This per-session local hook provisions the
+# project-specific tooling the snapshot cannot:
 #   * lefthook + changie — installed from CHECKSUM-PINNED GitHub releases into
 #     ~/.local/bin (github.com is the reliably-allowlisted source on the cloud
 #     sandbox), mirroring web-bootstrap.sh's ensure_gh. They back the local git
