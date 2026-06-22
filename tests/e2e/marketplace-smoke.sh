@@ -30,13 +30,16 @@ jq -e '.plugins[]|select(.name=="go")' "$MP" >/dev/null 2>&1 && pass "C: go plug
 
 if [ "${1:-}" = "--live" ]; then
   echo "== live assertions (claude CLI) =="
+  ws="${WORKSPACE_DIR:-/workspace}"
   command -v claude >/dev/null || { bad "live: claude CLI not found"; exit $fail; }
-  claude plugin validate /workspace 2>&1 | tail -2 || bad "live: plugin validate failed"
-  claude plugin marketplace add /workspace 2>&1 | tail -2 || true
-  claude plugin install rdl@rdl 2>&1 | tail -2 || bad "live: install rdl@rdl failed"
+  # Capture claude's OWN exit status (a pipe would report the downstream tool's).
+  if claude plugin validate "$ws" >/tmp/smoke-validate.out 2>&1; then pass "live: plugin validate"; else bad "live: plugin validate failed"; tail -3 /tmp/smoke-validate.out; fi
+  claude plugin marketplace add "$ws" >/tmp/smoke-add.out 2>&1 || true   # idempotent; "already added" is fine
+  if claude plugin install rdl@rdl >/tmp/smoke-install.out 2>&1; then pass "live: install rdl@rdl"; else bad "live: install rdl@rdl failed"; tail -3 /tmp/smoke-install.out; fi
   list="$(claude plugin list 2>&1)"
-  echo "$list" | grep -qiw zod && bad "live: zod still installed" || pass "live: zod not installed"
-  echo "$list" | grep -qiw skill && pass "live: skill plugin installed" || bad "live: skill plugin missing"
+  printf '%s\n' "$list" | grep -qiw zod && bad "live: zod still installed" || pass "live: zod not installed"
+  # Word-bounded match for the 'skill' plugin name (not a substring of e.g. 'skills').
+  printf '%s\n' "$list" | grep -Eq '(^|[^[:alnum:]_])skill([^[:alnum:]_]|$)' && pass "live: skill plugin installed" || bad "live: skill plugin missing"
 fi
 
 echo
