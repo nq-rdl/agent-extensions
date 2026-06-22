@@ -1,2 +1,0 @@
-kind: Removed
-body: 'The cross-repo skills-vendoring sync (`.github/workflows/sync-skills.yml` and `scripts/sync_pr_body.py`) — the non-atomic `repository_dispatch` handoff behind the issue #121 / PR #122 failures. Skills are edited directly now; `scripts/sync-plugins.sh` still regenerates the plugin trees from `skills/` and `agents/`.'

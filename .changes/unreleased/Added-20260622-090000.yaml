@@ -1,2 +1,0 @@
-kind: Added
-body: '`claude-code:web-setup` — the `cc-web-setup` skill that bootstraps a repository for Claude Code on the web (provisions `.claude/`, the `web-bootstrap.sh` SessionStart hook, and pre-seeds the RDL marketplace). Recovered from the stranded v0.10.0 sync branch (issue #121, never merged because the sync PR failed to open) and mapped into the `claude-code` plugin.'

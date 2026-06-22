@@ -1,2 +1,0 @@
-kind: Changed
-body: 'Skills under `skills/` are now canonical content authored directly in this repo — the `nq-rdl/agent-skills` source-of-truth repo has been merged in. The previous "vendored from upstream, do not edit" model is retired; edit skills here.'
