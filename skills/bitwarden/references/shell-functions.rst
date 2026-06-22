@@ -4,7 +4,7 @@ Bitwarden Shell Functions Reference
 Complete annotated shell function library for ``.zshrc`` / ``.bashrc``.
 All functions assume ``jq`` and ``bw`` are installed and on ``PATH``.
 
-The full drop-in script is at ``examples/bw-env.sh``.
+The full drop-in script is at ``scripts/bw-env.sh``.
 
 --------------
 
@@ -55,7 +55,7 @@ Loads all variables from a Secure Note into the current shell.
    export KEY=value
    export ANOTHER_KEY="value with spaces"
 
-See ``examples/bw-env-format.env`` for the expected format.
+See ``assets/bw-env-format.env`` for the expected format.
 
 --------------
 

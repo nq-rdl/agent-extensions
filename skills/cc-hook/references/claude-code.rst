@@ -314,13 +314,13 @@ Worked example (multiple types)
 Curated configs in this repo
 ----------------------------
 
-Ready-to-adapt configs live in ``examples/``. Copy or merge into
+Ready-to-adapt configs live in ``assets/``. Copy or merge into
 ``.claude/settings.local.json``:
 
 .. code:: bash
 
-   cp examples/<config>.json .claude/settings.local.json
+   cp assets/<config>.json .claude/settings.local.json
 
    # Merge into existing settings
-   jq -s '.[0] * .[1]' .claude/settings.local.json examples/<config>.json > /tmp/merged.json \
+   jq -s '.[0] * .[1]' .claude/settings.local.json assets/<config>.json > /tmp/merged.json \
      && mv /tmp/merged.json .claude/settings.local.json

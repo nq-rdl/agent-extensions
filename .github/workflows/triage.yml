@@ -6,6 +6,10 @@ on:
   pull_request:
     types: [opened, ready_for_review]
 
+# The called reusable workflow uses a GitHub App token (not GITHUB_TOKEN) for
+# all writes, so the default token needs no permissions.
+permissions: {}
+
 jobs:
   triage:
     uses: nq-rdl/.github/.github/workflows/auto-triage.yml@main

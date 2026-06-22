@@ -36,6 +36,13 @@ jobs:
       - name: Check registry / marketplace / plugins consistency
         run: python3 scripts/check_consistency.py .
 
+      # Content-level drift gate: the plugins/ trees are real-file copies of the
+      # canonical skills/ and agents/. The checks above only compare dir sets and
+      # manifests, so editing a canonical skill without running sync-plugins.sh
+      # would ship stale plugin content undetected. --check compares the bytes.
+      - name: Check plugin trees match canonical skills/ and agents/
+        run: bash scripts/sync-plugins.sh --check
+
   validate-symlinks:
     name: Validate skill + agent symlinks
     runs-on: ubuntu-latest

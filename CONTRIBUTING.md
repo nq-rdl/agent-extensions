@@ -106,6 +106,42 @@ it is also registered as a dependency of the **`rdl` meta-plugin**, so `claude p
 rdl@rdl` keeps installing the full set. CI consistency checks fail if registry, generated
 manifests, and the meta-plugin dependency list disagree.
 
+## Skill directory structure
+
+A skill lives at `skills/<name>/` and follows a fixed v1 layout so the catalog stays predictable
+and installs stay clean. `asctl repo-check` enforces this contract — a violation fails CI (see the
+`validate-skills` job in [`.github/workflows/validate.yml`](.github/workflows/validate.yml), which
+builds `asctl` and runs `asctl repo-check` on every PR and push).
+
+The rules:
+
+1. **`SKILL.md` is required** at the skill root — it is the skill. The filename must be exactly
+   `SKILL.md` (uppercase); a lowercase `skill.md` is rejected.
+2. **Only three non-hidden subdirectories are allowed:** `scripts/`, `references/`, and `assets/`.
+   Any other non-hidden subdirectory is an error.
+3. **`references/` is `.rst`-only.** Every file under `references/` (at any depth) must be `.rst`;
+   anything else is an error.
+4. **No `agents/` inside a skill.** Agents are not skill content — they live in top-level
+   `agents/<name>/agent.md` and are bundled into the plugin through the registry (see
+   [§5](#5-agents-home--description-required-companion-skill-optional) and the agent add-and-sync
+   steps in [`AGENTS.md`](AGENTS.md)). A `skills/*/agents/` directory is an error.
+5. **Hidden entries are ignored.** Dot-prefixed files and directories (e.g. `.evals`) are not
+   linted; the structure check does not descend into or flag them.
+6. **Top-level files: `SKILL.md` plus a small config allowlist.** The only non-hidden top-level
+   file permitted besides `SKILL.md` is `lychee.toml` (used by `skills/lychee`). Any other
+   non-hidden top-level file is an error.
+
+### The 3-bucket rule
+
+When a skill ships more than its `SKILL.md`, sort each extra file into exactly one bucket:
+
+- **`scripts/`** — runnable files the skill invokes (`.sh`, compiled helpers, and the like).
+- **`references/`** — prose docs Claude reads on demand. `.rst` only.
+- **`assets/`** — everything else the skill ships: sample configs, templates, fixtures, and files
+  like `.json`, `.env`, `.yml.tmpl`, or icons. Not prose, not executed as a script.
+
+If a file is neither runnable nor `.rst` prose, it belongs in `assets/`.
+
 ## Packaging a new skill into a plugin
 
 A new skill authored under `skills/<name>/` is **not installable until you map it into a bundle**

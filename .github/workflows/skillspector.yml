@@ -1,0 +1,53 @@
+name: SkillSpector
+
+on:
+  pull_request:
+
+permissions:
+  contents: read
+  security-events: write
+
+jobs:
+  scan:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Run SkillSpector
+        id: scan
+        env:
+          SKILLSPECTOR_FORMAT: sarif
+          SKILLSPECTOR_OUTPUT: skillspector.sarif
+        run: |
+          set +e
+          tools/skillspector/scan.sh
+          echo "exit=$?" >> "$GITHUB_OUTPUT"
+          set -e
+
+      # continue-on-error keeps this step informational: on fork PRs the
+      # GITHUB_TOKEN is read-only, so security-events:write is denied and
+      # upload-sarif fails. Swallow that (and any transient code-scanning API
+      # error) so the supposedly non-gating check never fails the PR.
+      - name: Upload SARIF
+        if: always() && hashFiles('skillspector.sarif') != ''
+        continue-on-error: true
+        uses: github/codeql-action/upload-sarif@v3
+        with:
+          sarif_file: skillspector.sarif
+          category: skillspector
+
+      # Informational only: report findings to the run summary but never fail the
+      # check. Findings surface as code-scanning alerts (Security tab, category
+      # "skillspector") via the SARIF upload above.
+      - name: Report findings
+        if: always()
+        env:
+          SCAN_EXIT: ${{ steps.scan.outputs.exit }}
+        run: |
+          if [ "$SCAN_EXIT" = "0" ]; then
+            echo "SkillSpector: no high-risk findings." >> "$GITHUB_STEP_SUMMARY"
+          elif [ "$SCAN_EXIT" = "1" ]; then
+            echo "SkillSpector flagged potential findings (risk score > 50). Review them in the Security tab (code scanning, category \`skillspector\`). Informational — this check does not gate the PR." >> "$GITHUB_STEP_SUMMARY"
+          else
+            echo "SkillSpector failed to run (exit $SCAN_EXIT): tool/execution error. Informational — this check does not gate the PR." >> "$GITHUB_STEP_SUMMARY"
+          fi

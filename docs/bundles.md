@@ -174,6 +174,10 @@ Jules — dispatch AI coding sessions and scaffold GitHub Actions dispatch workf
 - `/jules:dispatch`
 - `/jules:dispatch-creator`
 
+**Agents**
+
+- `jules-orchestrator` (subagent)
+
 ---
 
 ## terraform

@@ -1,0 +1,123 @@
+# Local git hooks for contributors — a local mirror of the CI checks in
+# .github/workflows/ so failures surface before you push. Managed by lefthook
+# (https://lefthook.dev).
+#
+# Activate:  lefthook install
+# Prereqs:   lefthook, Go (asctl), python3 + pyyaml (registry scripts).
+# Optional:  lychee (link check), Docker (SkillSpector pre-push scan).
+# Bypass:    LEFTHOOK=0 git commit ...   |   git commit --no-verify
+min_version: 1.9.0
+
+pre-commit:
+  parallel: true
+  skip:
+    - merge
+    - rebase
+  jobs:
+    # --- Go: asctl (the only Go module in-repo) ---
+    - name: go-fmt-asctl
+      root: tools/asctl/
+      glob: "*.go"
+      run: test -z "$(gofmt -l {staged_files})"
+
+    - name: go-vet-asctl
+      root: tools/asctl/
+      glob: "*.go"
+      run: go vet ./...
+
+    - name: go-build-asctl
+      root: tools/asctl/
+      glob: "*.go"
+      run: CGO_ENABLED=0 go build ./...
+
+    # --- Skills: agentskills.io spec + directory-structure standard ---
+    # Build to a temp path and run from repo root (asctl resolves skills/
+    # relative to its working directory, which must stay the repo root).
+    - name: asctl-repo-check
+      glob: "skills/**"
+      run: |
+        bin="$(mktemp -d)/asctl"
+        CGO_ENABLED=0 go -C tools/asctl build -o "$bin" ./cmd/asctl
+        "$bin" repo-check
+
+    # --- Plugin manifests / hooks / agents are well-formed ---
+    - name: validate-plugins
+      glob: "{plugins/**,agents/**,registry/bundles/**}"
+      run: bash scripts/validate-plugins.sh
+
+    # --- Generated artifacts are in sync with the registry (catches a
+    #     forgotten sync-plugins.sh / regenerate before CI does) ---
+    - name: generated-in-sync
+      glob: "{registry/**,skills/**,agents/**,plugins/**,VERSION}"
+      run: |
+        python3 scripts/check_bundle_refs.py .
+        python3 scripts/check_grouping.py .
+        python3 scripts/check_consistency.py .
+        bash scripts/sync-plugins.sh --check
+        python3 scripts/generate_manifests.py . --check
+        python3 scripts/generate_bundles_doc.py . --check
+
+    # --- Docs link health. With lychee installed, a broken link in a staged
+    #     skill .md fails the commit (the old `|| true` wrongly swallowed real
+    #     failures). When lychee is absent we skip cleanly; CI (link-check.yml)
+    #     still enforces link health over the full skills/ tree. ---
+    - name: lychee-links
+      glob: "skills/**/*.md"
+      run: |
+        if command -v lychee >/dev/null 2>&1; then
+          skills/lychee/scripts/check-links.sh {staged_files}
+        else
+          echo "lychee not installed; skipping link check (CI still enforces it)."
+        fi
+
+commit-msg:
+  # Non-blocking changie reminder. Prints a hint when no fragment was staged on
+  # this branch; never fails. Hard enforcement lives in pre-push.
+  jobs:
+    - name: changie-hint
+      run: |
+        base=$(git merge-base HEAD origin/main 2>/dev/null || echo "")
+        if [ -n "$base" ] && ! git diff --name-only --diff-filter=A "$base"...HEAD -- '.changes/unreleased/*.yaml' 2>/dev/null | grep -q .; then
+          echo ""
+          echo "hint: no changie fragment added on this branch yet."
+          echo "hint: run 'changie new' before pushing, or add the 'skip-changelog' label to the PR."
+        fi
+        exit 0
+
+pre-push:
+  parallel: true
+  jobs:
+    - name: go-test-asctl
+      root: tools/asctl/
+      glob: "{*.go,go.mod,go.sum}"
+      run: go test -count=1 ./...
+
+    - name: python-unit-tests
+      glob: "{scripts/**,tests/**}"
+      run: python3 -m unittest discover -s tests -p 'test_*.py'
+
+    # Informational: report findings but never block the push (CI uploads the
+    # SARIF to the Security tab). scan.sh skips itself when Docker is absent;
+    # set SKILLSPECTOR_SKIP=1 to skip explicitly.
+    - name: skillspector
+      glob: "skills/**"
+      run: tools/skillspector/scan.sh || true
+
+    # Hard gate, mirrors .github/workflows/changelog-check.yml. Bypass locally
+    # with CHANGIE_SKIP=1 (use the 'skip-changelog' PR label for CI).
+    - name: changie-fragment
+      run: |
+        if [ "${CHANGIE_SKIP:-0}" = "1" ]; then
+          echo "CHANGIE_SKIP=1 set; skipping changie fragment check."
+          exit 0
+        fi
+        base=$(git merge-base HEAD origin/main 2>/dev/null)
+        if [ -z "$base" ]; then
+          echo "cannot resolve merge-base with origin/main; skipping changie check"
+          exit 0
+        fi
+        if ! git diff --name-only --diff-filter=A "$base"...HEAD -- '.changes/unreleased/*.yaml' | grep -q .; then
+          echo "error: no changie fragment added on this branch."
+          echo "  run: changie new   (or set CHANGIE_SKIP=1 to bypass locally)"
+          exit 1
+        fi
