@@ -16,68 +16,27 @@ metadata:
 
 The Conventional Commits specification is a lightweight convention on top of commit messages. It provides an easy set of rules for creating an explicit commit history; which makes it easier to write automated tools on top of. This convention dovetails with Semantic Versioning (SemVer), by describing the features, fixes, and breaking changes made in commit messages.
 
-## Message Structure
+## How commits map to this repo's release flow
 
-A commit message should be structured as follows:
+Commits here feed **changie** fragments, not the changelog directly. A commit's
+type should match the changie `kind` you create with `changie new`:
 
-```
-<type>[optional scope]: <description>
+| Commit type | changie kind | SemVer bump (`.changie.yaml` `auto:`) |
+|---|---|---|
+| `feat:` | `Added` | minor |
+| `fix:` | `Fixed` | patch |
+| `feat!:` / `BREAKING CHANGE` (remove/rename a plugin, skill, or public path) | `Removed` or `Changed` | **major** |
+| `refactor:`/`perf:`/behavior-preserving `Changed` | `Changed` | major |
+| `docs:`/`chore:`/`ci:`/`test:` | usually **no** fragment | — |
 
-[optional body]
+Release is tag-driven (`v*` on `main`): the tag triggers `changie batch` + `merge`,
+regenerates manifests, and publishes. So the commit type you pick decides the
+fragment kind, which decides the next version bump.
 
-[optional footer(s)]
-```
+### Calls models get wrong
+- A user-visible behavior change with no new feature is `fix:` only if it
+  corrects a defect; otherwise it's `refactor:`/`feat:`. Don't default to `chore:`.
+- Removing or renaming a published plugin/skill is **breaking** (`!` + `Removed`/`Changed` → major), even if "just cleanup."
+- A commit that is genuinely two changes → split it; one type per commit.
 
-## Common Types
-
-- **`feat`**: Introduces a new feature to the codebase (correlates with MINOR in SemVer).
-- **`fix`**: Patches a bug in your codebase (correlates with PATCH in SemVer).
-- **`chore`**: Maintenance tasks, dependency updates, or internal changes that don't affect production code.
-- **`docs`**: Documentation only changes.
-- **`style`**: Changes that do not affect the meaning of the code (white-space, formatting, missing semi-colons, etc).
-- **`refactor`**: A code change that neither fixes a bug nor adds a feature.
-- **`perf`**: A code change that improves performance.
-- **`test`**: Adding missing tests or correcting existing tests.
-- **`build`**: Changes that affect the build system or external dependencies (example scopes: gulp, broccoli, npm).
-- **`ci`**: Changes to our CI configuration files and scripts (example scopes: Travis, Circle, BrowserStack, SauceLabs).
-- **`revert`**: Reverts a previous commit.
-
-## Breaking Changes
-
-A commit that has a footer `BREAKING CHANGE:`, or appends a `!` after the type/scope, introduces a breaking API change (correlating with MAJOR in Semantic Versioning). A BREAKING CHANGE can be part of commits of any type.
-
-## Examples
-
-### With Scope
-```
-feat(parser): add ability to parse arrays
-```
-
-### Breaking Change
-```
-feat!: send an email to the customer when a product is shipped
-```
-or
-```
-feat: allow provided config object to extend other configs
-
-BREAKING CHANGE: `extends` key in config file is now used for extending other config files
-```
-
-### Multi-paragraph Body and Footers
-```
-fix: prevent racing of requests
-
-Introduce a request id and a reference to latest request. Dismiss
-incoming responses other than from latest request.
-
-Remove timeouts which were used to mitigate the racing issue but are
-obsolete now.
-
-Reviewed-by: Z
-Refs: #123
-```
-
-## Further Guidance
-
-For comprehensive details on the specification, including rules, FAQs, and edge cases, see the [Conventional Commits Guidance](references/guidance.rst).
+Spec reference: see `metadata.spec_url` — do not restate it here.
