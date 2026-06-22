@@ -481,6 +481,15 @@ test_plugins_shared_marketplace_refreshes_once() {
   [ "$(grep -cxF m4 "$state/update_attempts" 2>/dev/null)" = "1" ] \
     && ok "plugins shared-mkt: marketplace refreshed exactly once (memoized)" \
     || fail "plugins shared-mkt: update attempts = [$(cat "$state/update_attempts" 2>/dev/null)] (want m4 once)"
+  # The 2nd/3rd plugins hit the already-attempted branch. m4's earlier update FAILED
+  # (unreachable), so the diagnostic must say a refresh was "already attempted" — NOT
+  # claim m4 "was already refreshed" (which never happened) — to stay accurate.
+  grep -qF "a refresh was already attempted for marketplace 'm4'" "$log" \
+    && ok "plugins shared-mkt: memoized-skip warning is accurate ('already attempted')" \
+    || fail "plugins shared-mkt: memoized-skip warning missing/inaccurate. Log: $(cat "$log" 2>/dev/null)"
+  grep -qF "marketplace 'm4' was already refreshed this run" "$log" \
+    && fail "plugins shared-mkt: wrongly claims m4 'was already refreshed' when its update failed" \
+    || ok "plugins shared-mkt: does NOT claim a refresh that never succeeded"
 }
 
 # Refresh succeeds but the install still fails => wrong plugin id, and the warning

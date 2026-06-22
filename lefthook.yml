@@ -96,10 +96,14 @@ pre-push:
       glob: "{scripts/**,tests/**}"
       run: python3 -m unittest discover -s tests -p 'test_*.py'
 
-    # cc-web-setup SessionStart hook tests (mirrors the hook-tests CI job). The
-    # permission-dependent persist_path case self-skips when run as root.
+    # cc-web-setup SessionStart hook tests (mirrors the hook-tests CI job, which runs
+    # unconditionally). The permission-dependent persist_path case self-skips when run
+    # as root. Glob covers the canonical skill AND the two real-file copies (the live
+    # .claude/scripts/ hook and the synced plugins/ tree), so editing any one of the
+    # three byte-identical copies re-runs the harness, which re-validates the canonical
+    # copy it sources.
     - name: install-deps-hook-tests
-      glob: "skills/cc-web-setup/**"
+      glob: "{skills/cc-web-setup/**,.claude/scripts/**,plugins/claude-code/skills/web-setup/**}"
       run: bash skills/cc-web-setup/scripts/test-install-deps.sh
 
     # Informational: report findings but never block the push (CI uploads the

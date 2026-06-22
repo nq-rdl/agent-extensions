@@ -532,13 +532,16 @@ ensure_plugins() {
     mkt="${p##*@}"
     case "$refreshed" in
       *" ${mkt} "*)
-        # This marketplace was already refreshed earlier this run, so this plugin's
-        # FIRST attempt above already ran against the updated index — a re-update +
-        # retry would be redundant. Refresh each marketplace AT MOST ONCE per run:
-        # multiple plugins can share one (e.g. three claude-plugins-official entries),
-        # and an unreachable marketplace must not be re-hit per plugin (network +
-        # SessionStart-delay). Fall straight through to the failure diagnostic.
-        log "  WARNING: could not install ${p}; marketplace '${mkt}' was already refreshed this run — the plugin id may be wrong or its source unreachable (see ${LOG})."
+        # A refresh was already ATTEMPTED for this marketplace earlier this run. If it
+        # succeeded, this plugin's FIRST attempt above already ran against the updated
+        # index; if it failed (unreachable), re-running the update would just fail
+        # again. Either way a re-update + retry is pointless. Refresh each marketplace
+        # AT MOST ONCE per run: multiple plugins can share one (e.g. three
+        # claude-plugins-official entries), and an unreachable marketplace must not be
+        # re-hit per plugin (network + SessionStart-delay). Fall straight through to
+        # the failure diagnostic. Say "a refresh was already attempted" (not
+        # "refreshed") so the line stays accurate even when that earlier update failed.
+        log "  WARNING: could not install ${p}; a refresh was already attempted for marketplace '${mkt}' this run — the plugin id may be wrong or its source unreachable (see ${LOG})."
         n_fail=$((n_fail + 1))
         ;;
       *)
