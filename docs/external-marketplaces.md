@@ -17,8 +17,9 @@ who actually maintain the plugin. We stop being a middleman.
 
 ## The curated set
 
-Registered for the team in [`.claude/settings.json`](../.claude/settings.json).
-Each is a real Claude Code marketplace (has `.claude-plugin/marketplace.json`).
+Registered for the team in the project's `.claude/settings.json` (at the repo
+root). Each is a real Claude Code marketplace (has
+`.claude-plugin/marketplace.json`).
 
 | Marketplace (`name`) | Source repo | Plugin | What it's for |
 |---|---|---|---|
@@ -41,9 +42,9 @@ auto-available — so it needs no `extraKnownMarketplaces` entry, only an
   true` lets Claude Code refresh the catalog and update installed plugins at
   startup.
 - **`enabledPlugins`** turns specific plugins on after install, addressed as
-  `<plugin>@<marketplace>`. Every third-party marketplace above contains exactly
-  one plugin, so all of them are enabled; from the 200+-plugin
-  `claude-plugins-official` we enable **only** `pr-review-toolkit`.
+  `<plugin>@<marketplace>`. From each third-party marketplace above we enable a
+  single plugin (the one listed in the table); from the much larger
+  `claude-plugins-official` catalog we enable **only** `pr-review-toolkit`.
 
 ```jsonc
 // .claude/settings.json (excerpt)

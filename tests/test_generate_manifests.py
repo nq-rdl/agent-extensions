@@ -2,9 +2,9 @@
 
 plugin.json + marketplace.json are generated from registry/marketplace.yaml,
 registry/bundles/*.yaml, and VERSION. These tests pin the structure, ordering,
-key order (needed for byte-identical no-diff output), external passthrough,
-version stamping, the rdl meta-plugin dependency list, and the --check drift
-detector — all on a hermetic synthetic repo.
+key order (needed for byte-identical no-diff output), that legacy `external:`
+keys are ignored, version stamping, the rdl meta-plugin dependency list, and the
+--check drift detector — all on a hermetic synthetic repo.
 """
 
 import json
