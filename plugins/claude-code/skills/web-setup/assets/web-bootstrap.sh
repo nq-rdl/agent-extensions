@@ -445,8 +445,15 @@ persist_path() {
   # cannot false-match another entry and skip a needed export. printf avoids
   # echo's backslash/-flag surprises.
   if ! grep -qxF "$line" "$CLAUDE_ENV_FILE" 2>/dev/null; then
-    printf '%s\n' "$line" >> "$CLAUDE_ENV_FILE"
-    log "Persisted ${dir} on PATH via CLAUDE_ENV_FILE."
+    # Check the append: an unwritable CLAUDE_ENV_FILE would otherwise leave later
+    # Bash shells without ${dir} on PATH while we falsely log success. LOG may be
+    # unset here (persist_path runs outside main() in tests), so guard the stderr
+    # redirect with ${LOG:-/dev/null} to stay safe under `set -u`.
+    if printf '%s\n' "$line" >> "$CLAUDE_ENV_FILE" 2>>"${LOG:-/dev/null}"; then
+      log "Persisted ${dir} on PATH via CLAUDE_ENV_FILE."
+    else
+      log "WARNING: could not append PATH export for ${dir} to CLAUDE_ENV_FILE — later Bash shells will not see ${dir} on PATH."
+    fi
   fi
 }
 
@@ -531,7 +538,17 @@ main() {
       configure_codex_sandbox || true
       # Auth: prefer a pre-obtained auth.json blob (ChatGPT OAuth, personal plans);
       # fall back to the agent-identity token login (enterprise). Both idempotent.
-      seed_codex_auth_json || ensure_codex_auth || true
+      if seed_codex_auth_json; then
+        # auth.json is now the credential of record (freshly seeded OR already present
+        # on a resume). codex reads CODEX_ACCESS_TOKEN BEFORE ~/.codex/auth.json, so a
+        # leftover raw token would shadow the valid auth.json and break later
+        # `codex exec`. ensure_codex_auth (the only caller of drop_codex_access_token)
+        # never runs on this arm, so drop a stale token here ourselves.
+        [ -n "${CODEX_ACCESS_TOKEN:-}" ] \
+          && drop_codex_access_token "auth.json seeded; raw token would shadow it for later codex exec"
+      else
+        ensure_codex_auth || true
+      fi
     else
       log "WARNING: codex CLI install failed — 'codex exec' will be unavailable (see ${LOG})."
     fi

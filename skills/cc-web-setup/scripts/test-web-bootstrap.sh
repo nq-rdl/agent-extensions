@@ -220,6 +220,45 @@ test_codex_clean_token_kept() {
     || ok "codex clean-token: pristine token left in place"
 }
 
+# Fix A regression: when seed_codex_auth_json wins (auth.json is the credential of
+# record), a stale CODEX_ACCESS_TOKEN must be dropped — codex reads the raw token
+# BEFORE ~/.codex/auth.json, so a leftover would shadow the valid auth.json and break
+# later `codex exec`. This exercises main()'s auth arm as a subprocess: codex installs
+# at the pinned version, seed_codex_auth_json succeeds, and a non-JWT raw token is set.
+test_codex_authjson_drops_stale_token() {
+  local proj d out envf home; proj="$(mktemp -d "$WORK/aj-proj.XXXXXX")"; d="$(new_stub_dir)"
+  out="$WORK/aj.out"; envf="$WORK/aj-envfile"; : > "$envf"; home="$WORK/aj-home"; mkdir -p "$home"
+  mkdir -p "$proj/scripts"
+  printf '#!/usr/bin/env bash\nexit 0\n' > "$proj/scripts/cc-web-setup.sh"; chmod +x "$proj/scripts/cc-web-setup.sh"
+  # gh pinned so ensure_gh short-circuits with no download.
+  write_stub "$d" gh "echo 'gh version ${GH_PIN} (2026-01-01)'"
+  write_stub "$d" id "echo 0"
+  # codex stub: report the pinned version so ensure_codex_cli short-circuits (no
+  # download), and report "authenticated" for `login status` so seed_codex_auth_json's
+  # post-write probe succeeds.
+  # shellcheck disable=SC2016
+  write_stub "$d" codex \
+    'case "$1 $2" in
+       "--version "*|"--version") echo "codex-cli '"${CODEX_PIN}"'"; exit 0 ;;
+       "login status") exit 0 ;;
+     esac
+     exit 0'
+  # CODEX_AUTH_JSON present => seed_codex_auth_json wins. A stale, NON-JWT raw token is
+  # live; it must be dropped + persisted as `unset CODEX_ACCESS_TOKEN`.
+  # shellcheck disable=SC2030,SC2031
+  if ( export PATH="$d:/usr/bin:/bin" HOME="$home" CLAUDE_CODE_REMOTE=true \
+         CLAUDE_PROJECT_DIR="$proj" CLAUDE_ENV_FILE="$envf" TMPDIR="$WORK" \
+         CODEX_HOME="$home/.codex" CODEX_AUTH_JSON='{"tokens":{"access_token":"x"}}' \
+         CODEX_ACCESS_TOKEN='stale-not-a-jwt'; bash "$SCRIPT" ) >"$out" 2>&1; then
+    ok "codex authjson-drop: main() exits 0 in remote mode"
+  else
+    fail "codex authjson-drop: main() exited non-zero. Out: $(cat "$out" 2>/dev/null)"
+  fi
+  grep -qF 'unset CODEX_ACCESS_TOKEN' "$envf" 2>/dev/null \
+    && ok "codex authjson-drop: stale token unset persisted to CLAUDE_ENV_FILE" \
+    || fail "codex authjson-drop: stale token NOT dropped after auth.json seeded. File: [$(cat "$envf" 2>/dev/null)] Out: $(cat "$out" 2>/dev/null)"
+}
+
 run_configure_codex_sandbox() {
   local home="$1" out_file="$2"
   # shellcheck disable=SC2030,SC2031,SC2034  # LOG is read by configure_codex_sandbox (sourced)
@@ -257,6 +296,41 @@ test_persist_path() {
   [ "$(grep -cF '/opt/x/bin' "$envf")" -eq 1 ] \
     && ok "persist_path: idempotent (no duplicate on re-run)" \
     || fail "persist_path: duplicated the line on re-run"
+}
+
+# Fix B regression: a read-only CLAUDE_ENV_FILE makes the append fail. persist_path
+# must WARN (not falsely log "Persisted"), so later shells are not silently left
+# without the dir on PATH. Run it twice — with $LOG set and with $LOG UNSET — to lock
+# in the ${LOG:-/dev/null} discipline (a bare $LOG would crash under `set -u`).
+test_persist_path_readonly_warns() {
+  local envf out; envf="$WORK/p2-envfile"; : > "$envf"; chmod 0444 "$envf"
+
+  # (1) with $LOG set.
+  out="$WORK/p2-log-set.out"
+  ( export CLAUDE_ENV_FILE="$envf"; LOG="$WORK/p2-LOG"; persist_path "/opt/ro/bin" ) >"$out" 2>&1
+  grep -q 'WARNING: could not append PATH export for /opt/ro/bin' "$out" \
+    && ok "persist_path readonly (LOG set): warned on append failure" \
+    || fail "persist_path readonly (LOG set): no WARNING. Out: $(cat "$out" 2>/dev/null)"
+  grep -q 'Persisted /opt/ro/bin' "$out" \
+    && fail "persist_path readonly (LOG set): falsely claimed success" \
+    || ok "persist_path readonly (LOG set): did NOT falsely claim success"
+
+  # (2) with $LOG UNSET — must not crash under `set -u` (guarded ${LOG:-/dev/null}).
+  out="$WORK/p2-log-unset.out"
+  if ( export CLAUDE_ENV_FILE="$envf"; unset LOG; persist_path "/opt/ro/bin" ) >"$out" 2>&1; then
+    ok "persist_path readonly (LOG unset): ran without crashing under set -u"
+  else
+    fail "persist_path readonly (LOG unset): crashed (likely a bare \$LOG). Out: $(cat "$out" 2>/dev/null)"
+  fi
+  grep -q 'WARNING: could not append PATH export for /opt/ro/bin' "$out" \
+    && ok "persist_path readonly (LOG unset): warned on append failure" \
+    || fail "persist_path readonly (LOG unset): no WARNING. Out: $(cat "$out" 2>/dev/null)"
+
+  chmod 0644 "$envf" 2>/dev/null || true
+  # The unwritable file must remain empty — nothing was appended on either run.
+  [ ! -s "$envf" ] \
+    && ok "persist_path readonly: nothing written to the unwritable file" \
+    || fail "persist_path readonly: unexpectedly wrote to the file. File: [$(cat "$envf" 2>/dev/null)]"
 }
 
 # ---------------------------------------------------------------------------
@@ -307,9 +381,11 @@ test_codex_fresh_login
 test_codex_blank_token
 test_codex_trims_token
 test_codex_clean_token_kept
+test_codex_authjson_drops_stale_token
 test_sandbox_creates
 test_sandbox_respects_existing
 test_persist_path
+test_persist_path_readonly_warns
 test_gate_local_noop
 test_local_hook_sourced
 
