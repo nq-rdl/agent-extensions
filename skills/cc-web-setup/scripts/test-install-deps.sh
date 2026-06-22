@@ -12,9 +12,10 @@
 set -euo pipefail
 HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 SCRIPT="${HERE}/../assets/install-deps.sh"
-PASS=0; FAIL=0
+PASS=0; FAIL=0; SKIP=0
 ok()   { PASS=$((PASS+1)); echo "  PASS  $*"; }
 fail() { FAIL=$((FAIL+1)); echo "  FAIL  $*"; }
+skip() { SKIP=$((SKIP+1)); echo "  SKIP  $*"; }
 
 # Source the script under test. With the main-guard in place, sourcing only
 # defines the functions and never runs the hook body (side-effect free).
@@ -303,6 +304,14 @@ test_persist_path() {
 # without the dir on PATH. Run it twice — with $LOG set and with $LOG UNSET — to lock
 # in the ${LOG:-/dev/null} discipline (a bare $LOG would crash under `set -u`).
 test_persist_path_readonly_warns() {
+  # This test relies on a read-only file (chmod 0444) making the append FAIL. root
+  # bypasses DAC permission bits, so the premise cannot hold when running as root
+  # (e.g. a root devcontainer) — persist_path would succeed and the assertions
+  # would spuriously fail. Skip there; CI runs as non-root and exercises it fully.
+  if [ "$(id -u)" -eq 0 ]; then
+    skip "persist_path readonly: requires non-root (root bypasses 0444 perms)"
+    return 0
+  fi
   local envf out; envf="$WORK/p2-envfile"; : > "$envf"; chmod 0444 "$envf"
 
   # (1) with $LOG set.
@@ -511,5 +520,5 @@ test_gate_local_noop
 test_local_hook_sourced
 
 echo ""
-echo "install-deps: ${PASS} passed, ${FAIL} failed"
+echo "install-deps: ${PASS} passed, ${FAIL} failed, ${SKIP} skipped"
 [ "$FAIL" -eq 0 ]

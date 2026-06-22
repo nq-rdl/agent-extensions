@@ -96,6 +96,12 @@ pre-push:
       glob: "{scripts/**,tests/**}"
       run: python3 -m unittest discover -s tests -p 'test_*.py'
 
+    # cc-web-setup SessionStart hook tests (mirrors the hook-tests CI job). The
+    # permission-dependent persist_path case self-skips when run as root.
+    - name: install-deps-hook-tests
+      glob: "skills/cc-web-setup/**"
+      run: bash skills/cc-web-setup/scripts/test-install-deps.sh
+
     # Informational: report findings but never block the push (CI uploads the
     # SARIF to the Security tab). scan.sh skips itself when Docker is absent;
     # set SKILLSPECTOR_SKIP=1 to skip explicitly.
