@@ -184,11 +184,11 @@ fi
 if [ "${#missing_plugins[@]}" -gt 0 ]; then
   uniq_missing="$(printf '%s\n' "${missing_plugins[@]}" | join_comma)"
   add "**⚠️ Declared but NOT installed:** $uniq_missing"
-  add "Enabled in .claude/settings.json but absent from \`claude plugin list\`, so their \`/plugin:skill\` commands will not appear. On Claude Code (web) the platform registers the marketplaces but does NOT install the plugins; \`web-bootstrap.sh\` installs them. This line usually means that install failed — the marketplace was unreachable (check the environment's network access) or the id is wrong — see CONTRIBUTING.md § \"Claude Code on the web\"."
+  add "Enabled in .claude/settings.json but absent from \`claude plugin list\`, so their \`/plugin:skill\` commands will not appear. On Claude Code (web) the platform registers the marketplaces but does NOT install the plugins; \`install-deps.sh\` installs them. This line usually means that install failed — the marketplace was unreachable (check the environment's network access) or the id is wrong — see CONTRIBUTING.md § \"Claude Code on the web\"."
   add ""
 fi
 
-# Freshly-installed-this-session note. web-bootstrap.sh's ensure_plugins drops a
+# Freshly-installed-this-session note. install-deps.sh's ensure_plugins drops a
 # marker (the install count) when it installed >=1 plugin THIS session. Surface
 # the commit + next-session guidance once, then consume the marker. Honest about
 # the unknown: a hook-installed plugin can only surface from the NEXT session
@@ -212,7 +212,7 @@ context="$(printf '%s\n' "${lines[@]}")"
 # .claude/ are picked up once all SessionStart hooks return. Gate on
 # CLAUDE_CODE_REMOTE so a local session does not pay for a needless re-scan.
 # NOTE: this re-scan covers loose ~/.claude/skills/ only, NOT the plugin install
-# cache (confirmed in #160). Plugins are installed by web-bootstrap.sh's
+# cache (confirmed in #160). Plugins are installed by install-deps.sh's
 # ensure_plugins this session, but Claude already enumerated skills at startup, so
 # their /plugin:skill commands surface from the NEXT session, not via this re-scan.
 if command -v jq >/dev/null 2>&1; then

@@ -1,41 +1,42 @@
 #!/usr/bin/env bash
 #
-# web-bootstrap.local.sh — project-specific PER-SESSION provisioning for
-# agent-extensions. Sourced by .claude/hooks/web-bootstrap.sh near the end of its
-# run (inside the CLAUDE_CODE_REMOTE=true gate), AFTER the portable engine has
-# installed gh/codex and persisted PATH.
+# install-deps.local.sh — THIS repo's dev toolchain (project-specific). Sourced
+# by .claude/scripts/install-deps.sh in EVERY mode (it is the "dev toolchain"
+# step, before the remote-only web runtime), so it provisions both `make
+# install-deps` for a local contributor and every web session. It is the project
+# seam: the portable engine carries no project deps, they all live here.
 #
-# PLUGINS are installed by Claude Code on the web itself, from the enabledPlugins
-# / extraKnownMarketplaces declared in .claude/settings.json — not from here and
-# not from any setup script. This per-session local hook provisions the
-# project-specific tooling the snapshot cannot:
+# PLUGINS are NOT installed here — install-deps.sh's ensure_plugins does that
+# (Claude Code on the web registers the marketplaces but does not install the
+# enabledPlugins). This seam provisions the tooling needed to WORK ON this repo:
 #   * lefthook + changie — installed from CHECKSUM-PINNED GitHub releases into
 #     ~/.local/bin (github.com is the reliably-allowlisted source on the cloud
-#     sandbox), mirroring web-bootstrap.sh's ensure_gh. They back the local git
-#     hooks and the changelog gate, so commits made in a cloud session run the
-#     same checks as CI.
+#     sandbox), mirroring install-deps.sh's ensure_gh. They back the local git
+#     hooks and the changelog gate, so commits made anywhere run the same checks
+#     as CI.
 #   * python3 / jq / pyyaml — the registry pipeline scripts (generate_manifests.py
 #     etc., invoked by the lefthook hooks) need them; verify + best-effort install.
 #   * the Docker daemon — the web runner ships the docker CLI + dockerd binary but
 #     NO running daemon (no systemd), so a cloud session that needs containers
 #     (devcontainer smoke tests, testcontainers, image builds) must start dockerd
-#     itself; see ensure_docker below and the "Docker on Claude Code web" note in
-#     the cc-web-setup skill.
+#     itself. ensure_docker is idempotent: a no-op when `docker info` already
+#     answers (a local dev's Docker Desktop, or a resume), so it is safe in every
+#     mode. See the "Docker on Claude Code web" note in the cc-web-setup skill.
 #   * PATH persistence, `lefthook install`, and an origin/main fetch for changie's
 #     merge-base diffs.
 #
-# It shares web-bootstrap.sh's helpers + globals: log(), $LOG, $PROJECT_DIR,
+# It shares install-deps.sh's helpers + globals: log(), $LOG, $PROJECT_DIR,
 # $SUDO, $CLAUDE_ENV_FILE, persist_path(). Every step is non-fatal — the parent
-# hook must always exit 0.
+# must always exit 0.
 
 # Defensive fallbacks so the file is lint-clean / inspectable standalone; when
-# sourced by web-bootstrap.sh these are already provided and act as no-ops.
+# sourced by install-deps.sh these are already provided and act as no-ops.
 if ! command -v log >/dev/null 2>&1; then
-  log() { printf '[web-bootstrap.local] %s\n' "$*"; }
+  log() { printf '[install-deps.local] %s\n' "$*"; }
 fi
 : "${LOG:=/dev/null}"
 : "${PROJECT_DIR:=$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)}"
-# $SUDO is provided by web-bootstrap.sh (empty when root, `sudo -n` otherwise).
+# $SUDO is provided by install-deps.sh (empty when root, `sudo -n` otherwise).
 # Default it so a standalone run of this file is safe under `set -u`.
 : "${SUDO:=}"
 
@@ -61,7 +62,7 @@ GOPLS_PIN="0.22.0"
 # match a longer release (2.1.9 ⊂ 2.1.90), wrongly short-circuiting the install
 # onto an unpinned binary. Anchor the pin between line-start (or a non-version
 # char) and a trailing whitespace/EOL boundary, dots escaped to match literally —
-# mirrors web-bootstrap.sh's codex_is_pinned.
+# mirrors install-deps.sh's codex_is_pinned.
 lefthook_is_pinned() {
   command -v lefthook >/dev/null 2>&1 || return 1
   lefthook version 2>/dev/null | grep -Eq "(^|[^0-9.])${LEFTHOOK_PIN//./\\.}([[:space:]]|\$)"
@@ -264,7 +265,7 @@ ensure_pyyaml() {
 # up. So anything that needs containers in a cloud session (devcontainer smoke
 # tests, testcontainers, k8s-in-docker, building images) must start dockerd
 # itself. The PORTABLE engine deliberately does not (not every repo wants Docker);
-# it belongs in this per-session project seam — which is exactly why web-bootstrap.sh
+# it belongs in this per-session project seam — which is exactly why install-deps.sh
 # exposes $SUDO "for the sourced project hook to use when starting daemons (e.g.
 # dockerd)".
 #
@@ -310,7 +311,7 @@ ensure_pyyaml
 ensure_docker   || true
 
 # Persist ~/.local/bin (lefthook, changie, gh, codex) for subsequent Bash tool
-# commands. persist_path is provided by web-bootstrap.sh; guard for standalone runs.
+# commands. persist_path is provided by install-deps.sh; guard for standalone runs.
 if command -v persist_path >/dev/null 2>&1; then
   persist_path "${HOME}/.local/bin"
   # GOPATH/bin (gopls, and any other `go install`-ed tool) so the gopls-lsp
