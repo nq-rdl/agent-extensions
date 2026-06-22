@@ -14,3 +14,7 @@ __pycache__/
 
 # macOS
 .DS_Store
+
+# superpowers workflow scratch (SDD ledger) and process artifacts (specs/plans)
+.superpowers/
+docs/superpowers/
