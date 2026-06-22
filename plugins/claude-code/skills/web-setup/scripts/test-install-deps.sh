@@ -12,9 +12,10 @@
 set -euo pipefail
 HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 SCRIPT="${HERE}/../assets/install-deps.sh"
-PASS=0; FAIL=0
+PASS=0; FAIL=0; SKIP=0
 ok()   { PASS=$((PASS+1)); echo "  PASS  $*"; }
 fail() { FAIL=$((FAIL+1)); echo "  FAIL  $*"; }
+skip() { SKIP=$((SKIP+1)); echo "  SKIP  $*"; }
 
 # Source the script under test. With the main-guard in place, sourcing only
 # defines the functions and never runs the hook body (side-effect free).
@@ -303,6 +304,14 @@ test_persist_path() {
 # without the dir on PATH. Run it twice — with $LOG set and with $LOG UNSET — to lock
 # in the ${LOG:-/dev/null} discipline (a bare $LOG would crash under `set -u`).
 test_persist_path_readonly_warns() {
+  # This test relies on a read-only file (chmod 0444) making the append FAIL. root
+  # bypasses DAC permission bits, so the premise cannot hold when running as root
+  # (e.g. a root devcontainer) — persist_path would succeed and the assertions
+  # would spuriously fail. Skip there; CI runs as non-root and exercises it fully.
+  if [ "$(id -u)" -eq 0 ]; then
+    skip "persist_path readonly: requires non-root (root bypasses 0444 perms)"
+    return 0
+  fi
   local envf out; envf="$WORK/p2-envfile"; : > "$envf"; chmod 0444 "$envf"
 
   # (1) with $LOG set.
@@ -331,6 +340,174 @@ test_persist_path_readonly_warns() {
   [ ! -s "$envf" ] \
     && ok "persist_path readonly: nothing written to the unwritable file" \
     || fail "persist_path readonly: unexpectedly wrote to the file. File: [$(cat "$envf" 2>/dev/null)]"
+}
+
+# ---------------------------------------------------------------------------
+# ensure_plugins()
+# ---------------------------------------------------------------------------
+# A stateful `claude` stub driven by files under $STATE (exported into the
+# subshell), so one stub models every case the self-heal must handle:
+#   * installed        — `> <id>` lines returned by `plugin list` (seed = already present)
+#   * refreshed.<mkt>  — sentinel; `plugin install` succeeds IFF present (absent = stale index)
+#   * badids           — plugin ids whose `plugin install` fails even with a fresh index (wrong id)
+#   * unreachable      — marketplaces whose `marketplace update` fails (network down)
+#   * refreshes        — one line appended per SUCCESSFUL `marketplace update`
+#   * update_attempts  — one line appended per `marketplace update` INVOCATION (memoization counter)
+write_claude_stub() { # <stub_dir> ; reads $STATE at runtime
+  write_stub "$1" claude '
+case "$1 $2" in
+  "plugin list")
+    cat "$STATE/installed" 2>/dev/null; exit 0 ;;
+  "plugin install")
+    p="$3"; mkt="${p##*@}"
+    if grep -qxF "$p" "$STATE/badids" 2>/dev/null; then
+      echo "Plugin \"$p\" not found in marketplace \"$mkt\"." >&2; exit 1
+    fi
+    if [ -f "$STATE/refreshed.$mkt" ]; then
+      printf "> %s\n" "$p" >> "$STATE/installed"; echo "installed $p"; exit 0
+    fi
+    echo "Plugin \"$p\" not found in marketplace \"$mkt\"; your local copy may be out of date." >&2
+    exit 1 ;;
+  "plugin marketplace")
+    [ "$3" = "update" ] || exit 0
+    printf "%s\n" "$4" >> "$STATE/update_attempts"
+    if grep -qxF "$4" "$STATE/unreachable" 2>/dev/null; then
+      echo "marketplace update failed: $4" >&2; exit 1
+    fi
+    printf "%s\n" "$4" >> "$STATE/refreshes"; touch "$STATE/refreshed.$4"; echo "updated $4"; exit 0 ;;
+esac
+exit 0'
+}
+
+run_ensure_plugins() { # <stub_dir> <out_file> <project_dir> <state_dir>
+  local stub_dir="$1" out_file="$2" proj="$3" state="$4"
+  # shellcheck disable=SC2030,SC2031,SC2034  # PROJECT_DIR/LOG are read by ensure_plugins (sourced)
+  ( export PATH="$stub_dir" TMPDIR="$WORK" STATE="$state"
+    PROJECT_DIR="$proj"; LOG="$out_file"
+    ensure_plugins
+  ) >>"$out_file" 2>&1
+}
+
+# Stage a project dir with a (jq-stubbed) settings.json and a fresh state dir.
+setup_plugins_case() { # <tag> -> echoes "<stub_dir> <out_file> <project_dir> <state_dir>"
+  local tag="$1" d proj state
+  d="$(new_stub_dir)"
+  proj="$(mktemp -d "$WORK/${tag}-proj.XXXXXX")"; mkdir -p "$proj/.claude"; : > "$proj/.claude/settings.json"
+  state="$(mktemp -d "$WORK/${tag}-state.XXXXXX")"; : > "$state/installed"
+  # jq is stubbed to emit the declared set straight from $STATE/declared, so the
+  # tests do not depend on real jq or on parsing a real settings.json.
+  write_stub "$d" jq 'cat "$STATE/declared" 2>/dev/null'
+  write_claude_stub "$d"
+  printf '%s %s %s %s' "$d" "$WORK/${tag}.log" "$proj" "$state"
+}
+
+# A missing plugin against a FRESH index installs on the first try — and the
+# self-heal must NOT refresh when it does not need to (stays a quiet, minimal op).
+test_plugins_healthy_index_no_refresh() {
+  read -r d log proj state <<<"$(setup_plugins_case pp1)"
+  printf 'a@m1\n' > "$state/declared"
+  touch "$state/refreshed.m1"            # index already fresh
+  run_ensure_plugins "$d" "$log" "$proj" "$state"
+  grep -q 'Plugin install: 1 installed, 0 failed, 0 already present' "$log" \
+    && ok "plugins healthy-index: installed on first try" \
+    || fail "plugins healthy-index: wrong summary. Log: $(cat "$log" 2>/dev/null)"
+  [ ! -s "$state/refreshes" ] \
+    && ok "plugins healthy-index: no marketplace refresh when index is fresh" \
+    || fail "plugins healthy-index: refreshed unnecessarily ([$(cat "$state/refreshes" 2>/dev/null)])"
+}
+
+# THE FIX: a stale index makes the first install fail; the self-heal refreshes the
+# marketplace and retries. Three plugins across two marketplaces also lock in that
+# each marketplace is refreshed at most once (b@m1 rides a@m1's refresh).
+test_plugins_stale_index_recovers() {
+  read -r d log proj state <<<"$(setup_plugins_case pp2)"
+  printf 'a@m1\nb@m1\nc@m2\n' > "$state/declared"   # cold VM, no sentinels => stale
+  run_ensure_plugins "$d" "$log" "$proj" "$state"
+  grep -q 'Plugin install: 3 installed, 0 failed, 0 already present' "$log" \
+    && ok "plugins stale-index: all recovered after marketplace refresh" \
+    || fail "plugins stale-index: wrong summary. Log: $(cat "$log" 2>/dev/null)"
+  [ "$(wc -l < "$state/refreshes" 2>/dev/null | tr -d ' ')" = "2" ] \
+    && [ "$(sort -u "$state/refreshes" 2>/dev/null | wc -l | tr -d ' ')" = "2" ] \
+    && ok "plugins stale-index: each marketplace refreshed exactly once" \
+    || fail "plugins stale-index: refresh count wrong ([$(cat "$state/refreshes" 2>/dev/null)])"
+}
+
+# A resume where everything is already installed must be a quiet no-op: no install,
+# no marketplace refresh.
+test_plugins_already_present_noop() {
+  read -r d log proj state <<<"$(setup_plugins_case pp3)"
+  printf 'a@m1\n' > "$state/declared"
+  printf '> a@m1\n' > "$state/installed"            # already installed
+  run_ensure_plugins "$d" "$log" "$proj" "$state"
+  grep -q 'Plugin install: 0 installed, 0 failed, 1 already present' "$log" \
+    && ok "plugins already-present: quiet no-op summary" \
+    || fail "plugins already-present: wrong summary. Log: $(cat "$log" 2>/dev/null)"
+  grep -q 'Installing plugin' "$log" \
+    && fail "plugins already-present: attempted an install" \
+    || ok "plugins already-present: no install attempted"
+  [ ! -s "$state/refreshes" ] \
+    && ok "plugins already-present: no marketplace refresh" \
+    || fail "plugins already-present: refreshed unnecessarily"
+}
+
+# When the marketplace update itself fails (unreachable), the diagnostic must NOT
+# claim the index was refreshed — it says the marketplace could not be refreshed.
+test_plugins_unreachable_fails_after_refresh() {
+  read -r d log proj state <<<"$(setup_plugins_case pp4)"
+  printf 'bad@m3\n' > "$state/declared"
+  printf 'm3\n' > "$state/unreachable"              # `marketplace update` fails
+  run_ensure_plugins "$d" "$log" "$proj" "$state"
+  grep -q 'Plugin install: 0 installed, 1 failed, 0 already present' "$log" \
+    && ok "plugins unreachable: counted as failed" \
+    || fail "plugins unreachable: wrong summary. Log: $(cat "$log" 2>/dev/null)"
+  grep -qF "marketplace 'm3' could not be refreshed" "$log" \
+    && ok "plugins unreachable: warning says refresh failed (not 'even after refreshing')" \
+    || fail "plugins unreachable: warning text missing/inaccurate. Log: $(cat "$log" 2>/dev/null)"
+  grep -qF "even after refreshing marketplace 'm3'" "$log" \
+    && fail "plugins unreachable: wrongly claims it refreshed when the update failed" \
+    || ok "plugins unreachable: does NOT claim a refresh that did not happen"
+}
+
+# Memoization (the review fix): several plugins from ONE unreachable marketplace
+# must trigger `marketplace update` at most ONCE, not once per plugin.
+test_plugins_shared_marketplace_refreshes_once() {
+  read -r d log proj state <<<"$(setup_plugins_case pp5)"
+  printf 'a@m4\nb@m4\nc@m4\n' > "$state/declared"
+  printf 'm4\n' > "$state/unreachable"
+  run_ensure_plugins "$d" "$log" "$proj" "$state"
+  grep -q 'Plugin install: 0 installed, 3 failed, 0 already present' "$log" \
+    && ok "plugins shared-mkt: all three counted as failed" \
+    || fail "plugins shared-mkt: wrong summary. Log: $(cat "$log" 2>/dev/null)"
+  [ "$(grep -cxF m4 "$state/update_attempts" 2>/dev/null)" = "1" ] \
+    && ok "plugins shared-mkt: marketplace refreshed exactly once (memoized)" \
+    || fail "plugins shared-mkt: update attempts = [$(cat "$state/update_attempts" 2>/dev/null)] (want m4 once)"
+  # The 2nd/3rd plugins hit the already-attempted branch. m4's earlier update FAILED
+  # (unreachable), so the diagnostic must say a refresh was "already attempted" — NOT
+  # claim m4 "was already refreshed" (which never happened) — to stay accurate.
+  grep -qF "a refresh was already attempted for marketplace 'm4'" "$log" \
+    && ok "plugins shared-mkt: memoized-skip warning is accurate ('already attempted')" \
+    || fail "plugins shared-mkt: memoized-skip warning missing/inaccurate. Log: $(cat "$log" 2>/dev/null)"
+  grep -qF "marketplace 'm4' was already refreshed this run" "$log" \
+    && fail "plugins shared-mkt: wrongly claims m4 'was already refreshed' when its update failed" \
+    || ok "plugins shared-mkt: does NOT claim a refresh that never succeeded"
+}
+
+# Refresh succeeds but the install still fails => wrong plugin id, and the warning
+# must say so (distinct from the unreachable wording above).
+test_plugins_wrong_id_after_successful_refresh() {
+  read -r d log proj state <<<"$(setup_plugins_case pp6)"
+  printf 'bad@m5\n' > "$state/declared"
+  printf 'bad@m5\n' > "$state/badids"               # install fails even on a fresh index
+  run_ensure_plugins "$d" "$log" "$proj" "$state"
+  grep -q 'Plugin install: 0 installed, 1 failed, 0 already present' "$log" \
+    && ok "plugins wrong-id: counted as failed after refresh+retry" \
+    || fail "plugins wrong-id: wrong summary. Log: $(cat "$log" 2>/dev/null)"
+  [ "$(grep -cxF m5 "$state/update_attempts" 2>/dev/null)" = "1" ] \
+    && ok "plugins wrong-id: marketplace was refreshed once" \
+    || fail "plugins wrong-id: expected one m5 refresh, got [$(cat "$state/update_attempts" 2>/dev/null)]"
+  grep -qF "even after refreshing marketplace 'm5'" "$log" \
+    && ok "plugins wrong-id: warning attributes failure to the plugin id" \
+    || fail "plugins wrong-id: warning text missing. Log: $(cat "$log" 2>/dev/null)"
 }
 
 # ---------------------------------------------------------------------------
@@ -386,9 +563,15 @@ test_sandbox_creates
 test_sandbox_respects_existing
 test_persist_path
 test_persist_path_readonly_warns
+test_plugins_healthy_index_no_refresh
+test_plugins_stale_index_recovers
+test_plugins_already_present_noop
+test_plugins_unreachable_fails_after_refresh
+test_plugins_shared_marketplace_refreshes_once
+test_plugins_wrong_id_after_successful_refresh
 test_gate_local_noop
 test_local_hook_sourced
 
 echo ""
-echo "install-deps: ${PASS} passed, ${FAIL} failed"
+echo "install-deps: ${PASS} passed, ${FAIL} failed, ${SKIP} skipped"
 [ "$FAIL" -eq 0 ]
