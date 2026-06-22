@@ -2,11 +2,14 @@
 
 plugin.json + marketplace.json are generated from registry/marketplace.yaml,
 registry/bundles/*.yaml, and VERSION. These tests pin the structure, ordering,
-key order (needed for byte-identical no-diff output), that legacy `external:`
-keys are ignored, version stamping, the rdl meta-plugin dependency list, and the
---check drift detector — all on a hermetic synthetic repo.
+key order (needed for byte-identical no-diff output), that unknown top-level
+keys (e.g. the removed `external:` block) are ignored with a ::warning::,
+version stamping, the rdl meta-plugin dependency list, and the --check drift
+detector — all on a hermetic synthetic repo.
 """
 
+import contextlib
+import io
 import json
 import sys
 import tempfile
@@ -30,18 +33,22 @@ pluginDefaults:
   repository: https://github.com/nq-rdl/agent-extensions
   license: MIT
 order: [swe, infra]
-# Legacy key — the external passthrough mechanism was removed; the generator
-# must IGNORE this, not re-host it as a plugin.
-external:
-  - name: worktrunk
-    source: {source: github, repo: max-sixty/worktrunk}
-    description: External tool
-    keywords: [git]
 meta:
   name: rdl
   enabled: true
   description: Install everything
   keywords: [meta]
+"""
+
+# A legacy `external:` passthrough block — the mechanism it fed was removed. The
+# ignore/warn test appends this to the fixture so the rest of the suite isn't
+# coupled to it (and doesn't emit the migration ::warning:: on every run).
+EXTERNAL_BLOCK = """\
+external:
+  - name: worktrunk
+    source: {source: github, repo: max-sixty/worktrunk}
+    description: External tool
+    keywords: [git]
 """
 
 BUNDLE = "id: {p}\ndescription: {d}\nkeywords: {k}\ntargets:\n  claude:\n    enabled: true\n    pluginName: {p}\n"
@@ -90,12 +97,43 @@ class TestGenerate(unittest.TestCase):
 
     def test_external_key_ignored(self):
         # The external passthrough mechanism was removed: a legacy `external:`
-        # key in marketplace.yaml must be ignored, not re-hosted as a plugin.
+        # key in marketplace.yaml must be ignored (not re-hosted as a plugin),
+        # but it must NOT vanish silently — generate() emits a ::warning:: so a
+        # stale block is noticed instead of masked.
         with tempfile.TemporaryDirectory() as t:
-            m = generate_manifests.generate(make_repo(t))["marketplace"]
+            repo = make_repo(t)
+            mkt = repo / "registry" / "marketplace.yaml"
+            mkt.write_text(mkt.read_text() + EXTERNAL_BLOCK)
+            err = io.StringIO()
+            with contextlib.redirect_stderr(err):
+                m = generate_manifests.generate(repo)["marketplace"]
             names = [p["name"] for p in m["plugins"]]
             self.assertNotIn("worktrunk", names)
             self.assertEqual(names, ["swe", "infra", "rdl"])
+            self.assertIn("::warning::", err.getvalue())
+            self.assertIn("external", err.getvalue())
+
+    def test_unknown_top_level_key_warns(self):
+        # Any unrecognized top-level key (e.g. a typo like `oder:`) is ignored
+        # but warned about, so the mistake surfaces instead of silently no-op'ing.
+        with tempfile.TemporaryDirectory() as t:
+            repo = make_repo(t)
+            mkt = repo / "registry" / "marketplace.yaml"
+            mkt.write_text(mkt.read_text() + "oder: [swe]\n")
+            err = io.StringIO()
+            with contextlib.redirect_stderr(err):
+                generate_manifests.generate(repo)
+            self.assertIn("::warning::", err.getvalue())
+            self.assertIn("oder", err.getvalue())
+
+    def test_no_warning_for_known_keys(self):
+        # The clean fixture uses only recognized top-level keys → no warnings,
+        # so the guard never cries wolf on a well-formed registry.
+        with tempfile.TemporaryDirectory() as t:
+            err = io.StringIO()
+            with contextlib.redirect_stderr(err):
+                generate_manifests.generate(make_repo(t))
+            self.assertEqual(err.getvalue(), "")
 
     def test_meta_plugin_marketplace_entry(self):
         with tempfile.TemporaryDirectory() as t:
@@ -122,7 +160,6 @@ class TestGenerate(unittest.TestCase):
             mp = generate_manifests.generate(make_repo(t))["plugins"]["rdl"]
             self.assertEqual(mp["dependencies"], ["swe", "infra"])
             self.assertNotIn("rdl", mp["dependencies"])
-            self.assertNotIn("worktrunk", mp["dependencies"])
             # dependencies sits after description, before author
             self.assertEqual(
                 list(mp.keys()),
