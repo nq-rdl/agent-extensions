@@ -184,7 +184,22 @@ fi
 if [ "${#missing_plugins[@]}" -gt 0 ]; then
   uniq_missing="$(printf '%s\n' "${missing_plugins[@]}" | join_comma)"
   add "**⚠️ Declared but NOT installed:** $uniq_missing"
-  add "Enabled in .claude/settings.json but absent from \`claude plugin list\`, so their \`/plugin:skill\` commands will not appear. On Claude Code (web), declared plugins install at session start from their marketplace, so this usually means the marketplace was unreachable (check the environment's network access) or the install failed — see CONTRIBUTING.md § \"Claude Code on the web\"."
+  add "Enabled in .claude/settings.json but absent from \`claude plugin list\`, so their \`/plugin:skill\` commands will not appear. On Claude Code (web) the platform registers the marketplaces but does NOT install the plugins; \`web-bootstrap.sh\` installs them. This line usually means that install failed — the marketplace was unreachable (check the environment's network access) or the id is wrong — see CONTRIBUTING.md § \"Claude Code on the web\"."
+  add ""
+fi
+
+# Freshly-installed-this-session note. web-bootstrap.sh's ensure_plugins drops a
+# marker (the install count) when it installed >=1 plugin THIS session. Surface
+# the commit + next-session guidance once, then consume the marker. Honest about
+# the unknown: a hook-installed plugin can only surface from the NEXT session
+# (Claude scans skills at startup, before these hooks run), and only if the
+# environment carries the plugin cache forward — which is unconfirmed for web.
+fresh_marker="${TMPDIR:-/tmp}/rdl-web-setup-installed"
+if [ "${CLAUDE_CODE_REMOTE:-}" = "true" ] && [ -f "$fresh_marker" ]; then
+  n_fresh="$(cat "$fresh_marker" 2>/dev/null)"
+  rm -f "$fresh_marker" 2>/dev/null || true
+  add "## Claude Code web setup"
+  add "✅ Claude Code web setup active — ${n_fresh:-some} plugin(s) installed this session. Their \`/plugin:skill\` commands appear from your **next** session (Claude scans skills at startup, before these hooks run). **Commit your \`.claude/\` changes** so every future environment provisions them automatically. If a command is still missing next session, the \"Declared but NOT installed\" line will flag it — that means this environment does not carry the plugin cache across sessions and the pre-snapshot Setup-script is needed instead."
   add ""
 fi
 
@@ -196,9 +211,10 @@ context="$(printf '%s\n' "${lines[@]}")"
 # `reloadSkills: true`, so any repo-local skills/commands committed under
 # .claude/ are picked up once all SessionStart hooks return. Gate on
 # CLAUDE_CODE_REMOTE so a local session does not pay for a needless re-scan.
-# NOTE: the docs only document this re-scan for loose ~/.claude/skills/, not the
-# plugin install cache — but declared plugins are installed by the platform at
-# session start (not by this hook), so plugin skills do not depend on it.
+# NOTE: this re-scan covers loose ~/.claude/skills/ only, NOT the plugin install
+# cache (confirmed in #160). Plugins are installed by web-bootstrap.sh's
+# ensure_plugins this session, but Claude already enumerated skills at startup, so
+# their /plugin:skill commands surface from the NEXT session, not via this re-scan.
 if command -v jq >/dev/null 2>&1; then
   if [ "${CLAUDE_CODE_REMOTE:-}" = "true" ]; then
     jq -cn --arg ctx "$context" \

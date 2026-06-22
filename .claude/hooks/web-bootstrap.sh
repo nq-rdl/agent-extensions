@@ -463,6 +463,70 @@ persist_path() {
   fi
 }
 
+# Install the plugins declared in .claude/settings.json (enabledPlugins == true).
+#
+# WHY THIS EXISTS: Claude Code on the web registers extraKnownMarketplaces at
+# session start but does NOT install enabledPlugins from them. Confirmed live on
+# 2.1.185 (issue #161 follow-up): a fresh cloud VM has all marketplaces registered
+# yet `claude plugin list` is empty and no /<plugin>:<skill> command surfaces —
+# `enabledPlugins` only *enables* an already-installed plugin, it does not
+# *install* it. The "declared plugins install at session start" model assumed in
+# #160 does not hold, so this repo installs the enabled set explicitly here.
+#
+# CAVEAT (timing): Claude enumerates skills at process startup, BEFORE SessionStart
+# hooks finish, so plugins installed here surface their commands from the NEXT
+# session, not the one that installs them. That is the accepted tradeoff for a dev
+# env — the install persists and self-heals; a guaranteed first-session path would
+# need a pre-snapshot Setup-script, which this repo deliberately does not use.
+#
+# Idempotent: skips any plugin already in `claude plugin list`, so a resume is a
+# quiet no-op. Non-fatal: a failed install logs a warning and the session
+# continues. Reads the enabled set straight from settings.json (single source of
+# truth) so it cannot drift from what announce-capabilities.sh verifies.
+ensure_plugins() {
+  command -v claude >/dev/null 2>&1 || { log "claude CLI not on PATH — skipping plugin install."; return 0; }
+  command -v jq >/dev/null 2>&1 || { log "jq not available — cannot read enabledPlugins; skipping plugin install."; return 0; }
+  local settings="${PROJECT_DIR}/.claude/settings.json"
+  [ -f "$settings" ] || return 0
+
+  local plugins=() p
+  while IFS= read -r p; do
+    [ -n "$p" ] && plugins+=("$p")
+  done < <(jq -r '(.enabledPlugins // {}) | to_entries[] | select(.value == true) | .key' "$settings" 2>/dev/null)
+  [ "${#plugins[@]}" -gt 0 ] || return 0
+
+  # Already-installed plugin ids (the `> <id>` lines from `claude plugin list`), so
+  # we skip re-installing on a resume. Empty on a cold VM — every plugin installs.
+  local installed_blob
+  installed_blob="$(claude plugin list 2>/dev/null | awk '/^[[:space:]]*>[[:space:]]/ { print $2 }')"
+
+  local n_ok=0 n_fail=0
+  for p in "${plugins[@]}"; do
+    if printf '%s\n' "$installed_blob" | grep -qxF -- "$p"; then
+      continue
+    fi
+    log "Installing plugin ${p}…"
+    if claude plugin install "$p" </dev/null >>"$LOG" 2>&1; then
+      log "  ${p}: installed."
+      n_ok=$((n_ok + 1))
+    else
+      # The marketplace is normally pre-registered by the platform from
+      # extraKnownMarketplaces; a failure here usually means it was unreachable or
+      # the id is wrong. Non-fatal — announce-capabilities.sh flags the gap.
+      log "  WARNING: could not install ${p} (see ${LOG})."
+      n_fail=$((n_fail + 1))
+    fi
+  done
+  log "Plugin install: ${n_ok} installed, ${n_fail} failed, $(( ${#plugins[@]} - n_ok - n_fail )) already present."
+  # When we installed >=1 plugin THIS session, leave a marker for
+  # announce-capabilities.sh (the next SessionStart hook) to surface the
+  # commit + next-session guidance once. Best-effort: never fail the hook on it.
+  if [ "$n_ok" -gt 0 ]; then
+    printf '%s\n' "$n_ok" > "${TMPDIR:-/tmp}/rdl-web-setup-installed" 2>/dev/null || true
+  fi
+  return 0
+}
+
 # Imperative body. Wrapped in main() so the script is *sourceable* for unit
 # tests: executing it (the SessionStart hook runs it by direct exec) runs main;
 # sourcing it (the test harness) only defines the functions/globals above so they
@@ -553,7 +617,13 @@ main() {
     fi
   fi
 
-  # --- 3. SOURCE PROJECT HOOK (optional, project-specific) --------------------
+  # --- 3. Plugin install (every session; cheap no-op once installed) ----------
+  # Claude Code on the web does NOT install enabledPlugins for us (it only
+  # registers the marketplaces), so install the declared set explicitly. See the
+  # ensure_plugins header for the why + the session-timing caveat.
+  ensure_plugins
+
+  # --- 4. SOURCE PROJECT HOOK (optional, project-specific) --------------------
   # The portable engine above carries no project dependencies. Repo-specific glue
   # — language toolchains on PATH, container runtimes, git-hook wiring (.husky /
   # .githooks / lefthook), fetching the default branch for merge-base checks, etc.
