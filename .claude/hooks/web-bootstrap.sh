@@ -556,13 +556,17 @@ main() {
     fi
   fi
 
-  # --- 3. Plugin pre-seed self-heal -------------------------------------------
-  # The authoritative pre-seed is the environment's Setup-script field
-  # (`make cc-web-setup`), which runs pre-snapshot so skills are present on the
-  # first session. Call it again here as a SELF-HEAL for environments whose
-  # Setup-script field is not wired: the install lands after Claude has already
-  # enumerated skills this session, so the /<plugin>:<skill> commands surface on
-  # the NEXT session — but at least they then exist. Non-fatal (|| true).
+  # --- 3. Plugin pre-seed (every cloud session) -------------------------------
+  # Install the declared marketplaces/plugins. This is the PRIMARY, committed,
+  # zero-manual-setup path: no environment Setup-script field required. Claude
+  # enumerates skills at startup BEFORE this hook, so the install lands after
+  # enumeration — but announce-capabilities.sh (which runs after this hook) emits
+  # `reloadSkills: true`, asking Claude to re-scan the skill/command directories
+  # once all SessionStart hooks return, so newly-pre-seeded skills can surface
+  # THIS session. (Whether that re-scan reaches plugin-cache skills is unconfirmed
+  # upstream — see docs/notes/claude-code-web-issues.md; the env Setup-script
+  # field, which bakes plugins in pre-enumeration, is the guaranteed fallback.)
+  # Non-fatal (|| true).
   local cc_web_setup="${PROJECT_DIR}/.claude/hooks/cc-web-setup.sh"
   if [ -f "$cc_web_setup" ]; then
     log "Self-healing plugin pre-seed (cc-web-setup.sh)…"

@@ -6,25 +6,34 @@ are candidates to file as issues — against the **`claude-code`** plugin in thi
 repo (the `cc-web-setup` / `web-setup` skill) where we own the fix, and against
 **upstream Claude Code** where the root cause is the harness.
 
-## 1. First-session skill enumeration vs. SessionStart (upstream Claude Code)
+## 1. Does `reloadSkills` re-scan plugin-cache skills? (upstream Claude Code)
 
 **Symptom.** On a fresh web environment, `/<plugin>:<skill>` commands declared via
 `.claude/settings.json` (`extraKnownMarketplaces` + `enabledPlugins`) do **not**
 appear in the first session's slash menu. They show only from the *second* session.
 
 **Root cause.** Claude Code enumerates plugin skills at process startup, **before**
-any `SessionStart` hook runs. A plugin installed by a SessionStart hook therefore
-lands after enumeration → not in the menu until next session.
+`SessionStart` hooks finish (confirmed: hooks docs say *"Skill discovery normally
+runs before SessionStart hooks finish"*). A plugin installed by a SessionStart hook
+therefore lands after enumeration.
 
-**Our mitigation (this repo).** A pre-snapshot setup script (`make cc-web-setup`
-→ `.claude/hooks/cc-web-setup.sh`) installs the plugins *before* Claude starts, so
-they are baked into the environment snapshot. Requires the env's **Setup script**
-field to be set — a per-environment UI setting, not committable.
+**Our fix (this repo, committed, no manual step).** The `CLAUDE_CODE_REMOTE`-gated
+SessionStart hook installs the plugins (`.claude/hooks/cc-web-setup.sh`), and
+`announce-capabilities.sh` returns `reloadSkills: true`, which per the docs makes
+Claude *"re-scan the skill and command directories after the SessionStart hooks
+complete, so skills the hook installed are available in the same session."*
 
-**Ask upstream.** Either (a) install `enabledPlugins` from known marketplaces
-*before* skill enumeration on web, or (b) re-enumerate skills after `SessionStart`
-hooks complete, so a hook-driven install surfaces same-session. Today the
-declarative `enabledPlugins` path is effectively second-session-only on web.
+**The open question to raise.** The docs only document/exemplify the `reloadSkills`
+re-scan for **loose** skills under `~/.claude/skills/` (e.g. a `git clone` into that
+dir). They do **not** state whether the re-scan also covers **plugin-cache** skills
+installed via `claude plugin install` (which live under the plugin install cache,
+not `~/.claude/skills/`). If it does not, hook-installed *plugin* skills still only
+surface next session, and the pre-snapshot Setup-script (`make cc-web-setup`) is the
+only guaranteed first-session path.
+
+**Ask upstream.** (a) Confirm/document whether `reloadSkills` re-scans plugin-cache
+skills, not just loose `~/.claude/skills/`; and (b) ideally install `enabledPlugins`
+from known marketplaces *before* skill enumeration on web so no hook dance is needed.
 
 ## 2. `announce-capabilities.sh` reports enabled, not installed (this repo)
 

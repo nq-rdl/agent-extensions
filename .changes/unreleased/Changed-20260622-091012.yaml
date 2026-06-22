@@ -1,0 +1,3 @@
+kind: Changed
+body: 'Claude Code on the web — make plugin pre-seed fully hook-driven (no manual env Setup-script step required): the CLAUDE_CODE_REMOTE-gated SessionStart hook installs plugins and announce-capabilities.sh returns `reloadSkills: true` to re-scan skills the same session; documented in the cc-web-setup skill, with the env Setup-script kept as a guaranteed first-session fallback'
+time: 2026-06-22T09:10:12.511124163Z

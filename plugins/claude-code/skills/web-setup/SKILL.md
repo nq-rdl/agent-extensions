@@ -28,21 +28,34 @@ directory; you copy them into the target repo and merge the settings idempotentl
 
 ## Background you must understand before acting
 
-Claude Code on the web has **two** provisioning mechanisms, and this setup uses both:
+The hard fact this whole setup works around: **Claude Code enumerates plugin skills and
+slash-commands at process startup, BEFORE `SessionStart` hooks finish**
+([hooks docs](https://code.claude.com/docs/en/hooks)). So a plugin a hook installs would,
+by default, only surface its `/<plugin>:<skill>` commands on the *next* session. There are
+two committed levers to beat that, and **the SessionStart hook is the primary one** — it
+needs **no** manual, non-committable environment setting:
 
-1. **Setup script** — bash that runs **once, before Claude starts**, whose filesystem
-   is captured in the environment snapshot. Configured in the web environment's
-   settings UI (not the repo), but the *script it runs* lives in the repo at
-   `scripts/cc-web-setup.sh`. The user wires it by setting the environment's **Setup
-   script** field to `make cc-web-setup` (or `bash scripts/cc-web-setup.sh`). Plugins
-   installed here are available on the **first** session (Claude enumerates skills at
-   startup, before any hook runs).
-2. **SessionStart hook** — `scripts/web-bootstrap.sh`, runs **every session** (cloud
-   *and* local), gated on `CLAUDE_CODE_REMOTE=true` so it is a no-op on a contributor's
-   laptop. It self-heals the plugin pre-seed and provisions per-session tooling.
+1. **SessionStart hook (PRIMARY — committed, zero manual setup).** `scripts/web-bootstrap.sh`
+   runs **every session**, gated on `CLAUDE_CODE_REMOTE=true` (a no-op on a contributor's
+   laptop). On a cloud session it installs the declared marketplaces/plugins
+   (`scripts/cc-web-setup.sh`), and then `scripts/announce-capabilities.sh` (which runs
+   *after* it) returns `reloadSkills: true`, which asks Claude Code to **re-scan the skill
+   and command directories once all SessionStart hooks return** — so freshly-installed
+   skills can surface *this* session, not next. This is the idiomatic, all-in-repo answer:
+   "if `CLAUDE_CODE_REMOTE`, install + reload."
+2. **Setup script (OPTIONAL fallback — guaranteed first-session).** Bash that runs **once,
+   before Claude starts**, whose filesystem is captured in the environment snapshot.
+   Configured in the web environment's settings UI (not the repo); it runs
+   `scripts/cc-web-setup.sh` via the **Setup script** field set to `make cc-web-setup`.
+   Because it installs *before* enumeration, plugin skills are guaranteed present on the
+   first session.
 
-You cannot set the environment Setup-script field for the user (it is not in the repo).
-**Tell them** to set it to `make cc-web-setup` after you finish.
+> **Caveat to convey honestly.** The docs document the `reloadSkills` re-scan for loose
+> `~/.claude/skills/` skills; whether it also re-scans **plugin-cache** skills (installed
+> via `claude plugin install`) is **unconfirmed upstream**. If a team observes that plugin
+> skills still only appear from the *second* session, the Setup-script fallback (lever 2)
+> is the guaranteed fix. Track this as an upstream issue. Either way, lever 1 requires no
+> manual step, so it is what you wire by default.
 
 ## Phase 0 — Confirm context
 
@@ -164,9 +177,14 @@ Key points to convey:
 
 Tell the user, concisely:
 - What was created/merged (list the files + the settings keys touched).
-- **The one manual step:** set the web environment's **Setup script** field to
-  `make cc-web-setup` so plugin skills are baked into the snapshot and available on the
-  first session (otherwise they only appear from the second session onward).
+- **No manual step is required.** The committed SessionStart hook installs the plugins on
+  every cloud session (gated on `CLAUDE_CODE_REMOTE`) and requests a same-session re-scan
+  via `reloadSkills: true`, so skills surface without touching the web environment UI.
+- **Optional fallback:** *only if* plugin skills still appear from the second session
+  (i.e. the `reloadSkills` re-scan does not reach the plugin cache), set the web
+  environment's **Setup script** field to `make cc-web-setup` to bake the plugins into the
+  snapshot before enumeration — a guaranteed first-session fix. Frame this as a fallback,
+  not a required step.
 - That `web-bootstrap.sh` is safe locally (no-op unless `CLAUDE_CODE_REMOTE=true`).
 - How to add project-specific deps via `scripts/*.local.sh`.
 - That Codex CLI provisioning activates only when `CODEX_AUTH_JSON` or `CODEX_ACCESS_TOKEN`
