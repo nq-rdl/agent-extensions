@@ -7,8 +7,8 @@ For a Claude-targeted bundle to be coherent, three things must agree:
 
 This generalises the issue #100 failure mode beyond skills: it catches a retired
 bundle still listed in the marketplace, a published plugin with no bundle, or an
-orphaned plugins/<name>/ directory. Marketplace entries with a non-local source
-(e.g. an external github plugin like worktrunk) are ignored.
+orphaned plugins/<name>/ directory. Only entries with a local source
+(``./plugins/<name>``) are compared; any non-local source is skipped.
 
 CLI:
     python3 scripts/check_consistency.py [REPO_ROOT]

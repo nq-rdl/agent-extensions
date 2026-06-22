@@ -36,8 +36,8 @@ plugins/          ← Claude Code plugins, one per bundle (SELF-CONTAINED — re
     agents/<name>.md     ← real-file copy of agents/<name>/agent.md
 registry/
   bundles/*.yaml   ← single source of truth: skills/agents/keywords per bundle
-  marketplace.yaml ← marketplace metadata, plugin defaults, display order, external
-                     passthrough entries, and the rdl meta-plugin config
+  marketplace.yaml ← marketplace metadata, plugin defaults, display order, and the
+                     rdl meta-plugin config
 VERSION           ← single version source; stamped into every generated manifest
 mcp/
   <name>-go/      ← Go MCP servers, built to plugins/<bundle>/bin/mcp/

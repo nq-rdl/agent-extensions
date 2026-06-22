@@ -5,8 +5,8 @@ The registry is the single source of truth:
 
   * ``VERSION``                    — one version, stamped into every manifest.
   * ``registry/marketplace.yaml``  — marketplace metadata, plugin defaults,
-                                      display order, external passthrough
-                                      entries, and the rdl meta-plugin config.
+                                      display order, and the rdl meta-plugin
+                                      config.
   * ``registry/bundles/*.yaml``    — per-subject name/description/keywords.
 
 This is the structural fix for #100's metadata rot: hand-edited manifests can no
@@ -29,6 +29,36 @@ import yaml
 def _read_yaml(path: Path) -> dict:
     with path.open() as fh:
         return yaml.safe_load(fh) or {}
+
+
+# Top-level keys generate() actually consumes from registry/marketplace.yaml.
+# Anything else is ignored — but an ignored key is almost always a mistake (a
+# typo, or a stale block like the removed `external:` passthrough), so we warn
+# rather than drop it silently. Same never-silently-drop policy as _ordered_local.
+_KNOWN_MARKETPLACE_KEYS = frozenset(
+    {"name", "owner", "description", "pluginRoot", "pluginDefaults", "order", "meta"}
+)
+
+
+def _warn_unknown_marketplace_keys(mkt: dict) -> None:
+    """::warning:: for any top-level marketplace.yaml key generate() ignores, so a
+    stale `external:` block or a typo'd key surfaces instead of failing silently."""
+    unknown = set(mkt) - _KNOWN_MARKETPLACE_KEYS
+    if "external" in unknown:
+        unknown.discard("external")
+        print(
+            "::warning::registry/marketplace.yaml still defines 'external:' — "
+            "external plugins are now consumed from their upstream marketplaces "
+            "via extraKnownMarketplaces (see docs/external-marketplaces.md); this "
+            "key is ignored.",
+            file=sys.stderr,
+        )
+    for key in sorted(unknown):
+        print(
+            f"::warning::registry/marketplace.yaml: unrecognized top-level key "
+            f"'{key}' — ignored",
+            file=sys.stderr,
+        )
 
 
 def _enabled_bundles(repo: Path) -> dict[str, dict]:
@@ -66,6 +96,7 @@ def generate(repo) -> dict:
     repo = Path(repo)
     version = (repo / "VERSION").read_text().strip()
     mkt = _read_yaml(repo / "registry" / "marketplace.yaml")
+    _warn_unknown_marketplace_keys(mkt)
     defaults = mkt.get("pluginDefaults") or {}
     enabled = _enabled_bundles(repo)
     local_order = _ordered_local(list(mkt.get("order") or []), enabled)
@@ -81,16 +112,6 @@ def generate(repo) -> dict:
                 "description": enabled[p]["description"],
                 "version": version,
                 "keywords": enabled[p]["keywords"],
-            }
-        )
-    for ext in mkt.get("external") or []:
-        plugins.append(
-            {
-                "name": ext["name"],
-                "source": ext["source"],
-                "description": ext.get("description", ""),
-                "version": version,
-                "keywords": list(ext.get("keywords") or []),
             }
         )
     if meta.get("enabled"):

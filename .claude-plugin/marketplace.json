@@ -405,21 +405,6 @@
       ]
     },
     {
-      "name": "worktrunk",
-      "source": {
-        "source": "github",
-        "repo": "max-sixty/worktrunk"
-      },
-      "description": "Developer tools — Git worktree CLI for parallel AI agent workflows, config guidance, and automatic Claude session tracking",
-      "version": "0.12.0",
-      "keywords": [
-        "git",
-        "worktree",
-        "agents",
-        "workflow"
-      ]
-    },
-    {
       "name": "rdl",
       "source": "./plugins/rdl",
       "description": "Install the full RDL agent-extensions set — every subject plugin in one command",
