@@ -111,7 +111,10 @@ class TestGenerate(unittest.TestCase):
             self.assertNotIn("worktrunk", names)
             self.assertEqual(names, ["swe", "infra", "rdl"])
             self.assertIn("::warning::", err.getvalue())
-            self.assertIn("external", err.getvalue())
+            # Pin the dedicated migration message, not just the substring
+            # "external" (which the generic fallback warning also emits) — so
+            # this guards the tailored `if "external" in unknown` branch.
+            self.assertIn("extraKnownMarketplaces", err.getvalue())
 
     def test_unknown_top_level_key_warns(self):
         # Any unrecognized top-level key (e.g. a typo like `oder:`) is ignored

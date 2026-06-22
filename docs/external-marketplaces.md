@@ -44,7 +44,8 @@ auto-available — so it needs no `extraKnownMarketplaces` entry, only an
 - **`enabledPlugins`** turns specific plugins on after install, addressed as
   `<plugin>@<marketplace>`. From each third-party marketplace above we enable a
   single plugin (the one listed in the table); from the much larger
-  `claude-plugins-official` catalog we enable **only** `pr-review-toolkit`.
+  `claude-plugins-official` catalog we enable only the handful we want —
+  `pr-review-toolkit`, `superpowers`, and `gopls-lsp` — not the whole set.
 
 ```jsonc
 // .claude/settings.json (excerpt)
@@ -80,8 +81,10 @@ To get the same curated set everywhere you use Claude Code, copy the
 
 `autoUpdate: true` means Claude Code pulls the latest from each vendor's default
 branch at startup. Plugins run with your privileges, so only register
-marketplaces you trust. To pin a plugin to a reviewed commit instead, add a
-`sha` (and optionally `ref`) to that marketplace's `source` and set
-`autoUpdate: false`. See the Claude Code docs on
+marketplaces you trust. To stop tracking a vendor's default branch, pin that
+marketplace's `source` to a specific branch or tag with `ref` and set
+`autoUpdate: false` (exact-commit `sha` pins are documented for individual
+plugin sources inside a `marketplace.json`, not for marketplace sources). See
+the Claude Code docs on
 [discovering plugins](https://code.claude.com/docs/en/discover-plugins) and
 [plugin marketplaces](https://code.claude.com/docs/en/plugin-marketplaces).
