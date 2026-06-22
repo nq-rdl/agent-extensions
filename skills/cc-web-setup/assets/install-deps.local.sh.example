@@ -1,22 +1,21 @@
 #!/usr/bin/env bash
 #
-# web-bootstrap.local.sh — OPTIONAL per-project extension to web-bootstrap.sh.
+# install-deps.local.sh — OPTIONAL per-project dev toolchain for install-deps.sh.
 #
-# This file is the sanctioned seam for project-specific provisioning. If it
-# exists next to scripts/web-bootstrap.sh, the portable hook sources it near the
-# end of its run (inside the CLAUDE_CODE_REMOTE=true gate), AFTER the generic
-# engine (gh CLI, codex CLI, plugin pre-seed self-heal, PATH persistence, git
-# hooks) has run. Put anything specific to THIS repo here so the portable script
-# stays generic and re-syncable.
+# This is the sanctioned seam for project-specific provisioning. If it exists at
+# .claude/scripts/install-deps.local.sh, install-deps.sh sources it as its "dev
+# toolchain" step in EVERY mode — `make install-deps` for a local contributor and
+# every web session — BEFORE the remote-only web runtime (gh/codex/plugin
+# pre-seed). Put anything specific to THIS repo here (language toolchains, the
+# Docker daemon, git-hook wiring) so the portable engine stays generic.
 #
-# It is sourced (not executed), so it shares web-bootstrap.sh's helpers and
+# It is sourced (not executed), so it shares install-deps.sh's helpers and
 # globals: log(), $LOG (verbose sink), $PROJECT_DIR, $SUDO, $CLAUDE_ENV_FILE.
-# Keep every step non-fatal — the parent hook must always exit 0 — and route
-# verbose output to "$LOG" so it does not pollute the model context.
+# Keep every step non-fatal — the parent must always exit 0 — and route verbose
+# output to "$LOG" so it does not pollute the model context.
 #
-# Rename to `web-bootstrap.local.sh` (drop `.example`) and commit it to enable.
+# Rename to `install-deps.local.sh` (drop `.example`) and commit it to enable.
 #
-# Example: bring up the bits DataOps needs (pixi on PATH, docker, k3d, shellcheck).
 # Everything below is illustrative — delete what you do not need.
 
 # # Persist pixi on PATH for later Bash tool commands.
@@ -35,7 +34,9 @@
 # # a laptop where Docker Desktop / a systemd unit keeps dockerd up. So a cloud
 # # session that needs containers must start dockerd ITSELF, here in the per-session
 # # seam (the portable engine deliberately does not — not every repo wants Docker).
-# # web-bootstrap.sh exposes $SUDO precisely for starting daemons like this.
+# # install-deps.sh exposes $SUDO precisely for starting daemons like this. It is
+# # idempotent (a no-op when `docker info` already answers), so it is safe to run
+# # locally too, where Docker Desktop is already up.
 # ensure_docker() {
 #   command -v dockerd >/dev/null 2>&1 || return 0   # Docker not provisioned here.
 #   docker info >/dev/null 2>&1 && return 0           # Already up (resume / base image).

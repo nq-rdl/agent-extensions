@@ -2,16 +2,16 @@
 license: CC-BY-4.0
 description: >-
   Bootstrap a repository for Claude Code on the web — provision its `.claude/`
-  setup so cloud sessions are correctly configured. Use when the user wants to
-  "set up Claude Code on the web", "bootstrap web sessions", "add the web setup
-  scripts", "configure the SessionStart hook for cloud", "provision a cloud
-  environment", "install web-bootstrap", or "make this repo work with Claude
-  Code on the web". Installs a parameterized `.claude/settings.json` plus
-  portable `scripts/web-bootstrap.sh` (SessionStart hook), `scripts/cc-web-setup.sh`
-  (pre-snapshot setup script that pre-seeds the RDL marketplace), and
-  `scripts/announce-capabilities.sh`. Also covers the setup-script-vs-SessionStart
-  split, the `CLAUDE_CODE_REMOTE` gate, GH/Codex CLI provisioning, and the
-  `*.local.sh` extension seam for project-specific dependencies.
+  setup so cloud sessions start with the team's plugins and tooling. Use when the
+  user wants to "set up Claude Code on the web", "bootstrap web sessions", "add
+  the web setup scripts", "configure the SessionStart hook for cloud", "provision
+  a cloud environment", "install web-bootstrap / install-deps", or "make this repo
+  work with Claude Code on the web". Installs a parameterized `.claude/settings.json`
+  (declaring the marketplaces + plugins), a portable `.claude/scripts/install-deps.sh`
+  engine exposed as `make install-deps`, and `.claude/scripts/announce-capabilities.sh`.
+  Covers the pre-snapshot Setup-script field that makes plugins appear on the FIRST
+  session, the `--session` SessionStart self-heal, the `CLAUDE_CODE_REMOTE` gate,
+  GH/Codex CLI provisioning, and the `*.local.sh` seam for project dependencies.
 argument-hint: "Bootstrap this repo for Claude Code on the web? (run from the repo root; say if you have an existing .claude/settings.json to merge)"
 user-invocable: true
 metadata:
@@ -21,63 +21,74 @@ metadata:
 # Bootstrap a repo for Claude Code on the web
 
 Your job is to provision the current repository so **Claude Code on the web** (cloud)
-sessions start correctly configured: the RDL marketplace registered and pre-seeded,
-the GitHub and Codex CLIs available, and a SessionStart hook that self-heals and
-persists tooling. The portable pieces ship as files in this skill's `assets/`
-directory; you copy them into the target repo and merge the settings idempotently.
+sessions start correctly configured: the team's marketplace registered and its plugins
+installed, the GitHub (and optionally Codex) CLI available, and a SessionStart hook that
+self-heals and persists tooling. The portable pieces ship as files in this skill's
+`assets/` directory; you copy them into the target repo's `.claude/scripts/` and merge
+the settings idempotently.
 
 ## Background you must understand before acting
 
-The hard fact this whole setup works around: **Claude Code enumerates plugin skills and
-slash-commands at process startup, BEFORE `SessionStart` hooks finish**
-([hooks docs](https://code.claude.com/docs/en/hooks)). So a plugin a hook installs would,
-by default, only surface its `/<plugin>:<skill>` commands on the *next* session. There are
-two committed levers to beat that, and **the SessionStart hook is the primary one** — it
-needs **no** manual, non-committable environment setting:
+There are **two** facts about Claude Code on the web that this setup is built around.
+Get them right and the rest follows.
 
-1. **SessionStart hook (PRIMARY — committed, zero manual setup).** `scripts/web-bootstrap.sh`
-   runs **every session**, gated on `CLAUDE_CODE_REMOTE=true` (a no-op on a contributor's
-   laptop). On a cloud session it installs the declared marketplaces/plugins
-   (`scripts/cc-web-setup.sh`), and then `scripts/announce-capabilities.sh` (which runs
-   *after* it) returns `reloadSkills: true`, which asks Claude Code to **re-scan the skill
-   and command directories once all SessionStart hooks return** — so freshly-installed
-   skills can surface *this* session, not next. This is the idiomatic, all-in-repo answer:
-   "if `CLAUDE_CODE_REMOTE`, install + reload."
-2. **Setup script (OPTIONAL fallback — guaranteed first-session).** Bash that runs **once,
-   before Claude starts**, whose filesystem is captured in the environment snapshot.
-   Configured in the web environment's settings UI (not the repo); it runs
-   `scripts/cc-web-setup.sh` via the **Setup script** field set to `make cc-web-setup`.
-   Because it installs *before* enumeration, plugin skills are guaranteed present on the
-   first session.
+**1. The platform registers marketplaces, but does NOT install the plugins.**
+On a cloud session the platform reads `.claude/settings.json` and registers every
+`extraKnownMarketplaces` entry — but it does **not** install the `enabledPlugins` from
+them. `enabledPlugins` only *enables* an already-installed plugin; it does not *install*
+one. (Verified live on Claude Code 2.1.185: a fresh VM had all marketplaces registered
+yet `claude plugin list` empty and no `/<plugin>:<skill>` command in the menu.) So
+**something in the repo must run `claude plugin install`** — that is `install-deps.sh`'s
+`ensure_plugins`, which reads the declared set straight from `settings.json`.
 
-> **Caveat to convey honestly.** The docs document the `reloadSkills` re-scan for loose
-> `~/.claude/skills/` skills; whether it also re-scans **plugin-cache** skills (installed
-> via `claude plugin install`) is **unconfirmed upstream**. If a team observes that plugin
-> skills still only appear from the *second* session, the Setup-script fallback (lever 2)
-> is the guaranteed fix. Track this as an upstream issue. Either way, lever 1 requires no
-> manual step, so it is what you wire by default.
+**2. Claude enumerates skills at startup, BEFORE any SessionStart hook runs.**
+So a plugin a hook installs only surfaces its commands on the **next** session. The
+plugin cache **does** persist across sessions in an environment, so the hook is enough
+from session 2 onward — but to get plugins on the **first** session of a brand-new
+environment you must install them **before the snapshot**, via the environment's
+**Setup-script field**.
+
+`install-deps.sh` is one engine with **three invocation modes** that cover all of this:
+
+| Invocation | Runs | Purpose |
+|---|---|---|
+| `make install-deps` (local) | dev toolchain only | a human contributor's machine |
+| `CLAUDE_CODE_REMOTE=true make install-deps` | dev toolchain **+ plugin pre-seed + gh/codex** | the **Setup-script field** → **first-session** plugins |
+| `install-deps.sh --session` (SessionStart hook) | no-op locally; full on web | **self-heal** + resumes |
+
+`announce-capabilities.sh` (the second SessionStart hook) then cross-checks the declared
+set against `claude plugin list` and reports **"Enabled plugins (installed)"** vs a
+**"⚠️ Declared but NOT installed"** line — so a failed install is surfaced, never masked.
+Remember the chain: **declared ≠ installed ≠ surfaced.**
+
+> **The one manual, non-committable step.** The Setup-script field lives in the web
+> environment's settings UI, not the repo, so you cannot set it for the user. After you
+> finish, **tell them** to set the environment's **Setup script** field to
+> `CLAUDE_CODE_REMOTE=true make install-deps`. Without it, plugins appear only from the
+> *second* session (the hook self-heals but can't beat first-session enumeration).
 
 ## Phase 0 — Confirm context
 
 - Confirm you are at the **repo root** of the repo to bootstrap (a `.git` dir is present).
-- Check whether `.claude/settings.json`, `scripts/`, and `Makefile` already exist — this
-  decides create-fresh vs. merge for each.
+- Check whether `.claude/settings.json`, `.claude/scripts/`, and `Makefile` already exist —
+  this decides create-fresh vs. merge for each.
+- Confirm the **target is not `agent-extensions` itself.** This skill bootstraps *other*
+  team repos to consume the catalog; see the anti-pattern note in Phase 2.
 - Ask the user only if something is ambiguous (e.g. a pre-existing `settings.json` with a
   conflicting `model`/`hooks` block). Otherwise proceed with the defaults below.
 
 ## Phase 1 — Copy the portable scripts
 
-Copy these three files from this skill's `assets/` into the target repo's `scripts/`,
-creating `scripts/` if absent, and `chmod +x` each:
+Copy these two files from this skill's `assets/` into the target repo's `.claude/scripts/`,
+creating the directory if absent, and `chmod +x` each:
 
 | From (skill asset) | To (target repo) |
 |---|---|
-| `assets/web-bootstrap.sh` | `scripts/web-bootstrap.sh` |
-| `assets/cc-web-setup.sh` | `scripts/cc-web-setup.sh` |
-| `assets/announce-capabilities.sh` | `scripts/announce-capabilities.sh` |
+| `assets/install-deps.sh` | `.claude/scripts/install-deps.sh` |
+| `assets/announce-capabilities.sh` | `.claude/scripts/announce-capabilities.sh` |
 
 These are **portable and carry no project-specific dependencies** — do not edit them per
-project. Project specifics go in the optional `*.local.sh` seam (Phase 4).
+project. Project specifics go in the optional `install-deps.local.sh` seam (Phase 4).
 
 If a target file already exists and differs, show the diff and ask before overwriting.
 
@@ -85,8 +96,9 @@ If a target file already exists and differs, show the diff and ask before overwr
 
 The template is `assets/settings.json.tmpl`. It registers the **`rdl`** marketplace
 (`nq-rdl/agent-extensions`), enables **`rdl@rdl`** (the meta-plugin that installs every
-RDL subject plugin), wires the two SessionStart hooks, and sets opinionated defaults
-(`model: opus`, `alwaysThinkingEnabled`, `effortLevel: xhigh`,
+RDL subject plugin), wires the two SessionStart hooks
+(`.claude/scripts/install-deps.sh --session` and `.claude/scripts/announce-capabilities.sh`),
+and sets opinionated defaults (`model: opus`, `alwaysThinkingEnabled`, `effortLevel: xhigh`,
 `CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS`).
 
 - **If `.claude/settings.json` is absent:** create `.claude/` and write the template verbatim.
@@ -96,97 +108,80 @@ RDL subject plugin), wires the two SessionStart hooks, and sets opinionated defa
   - `hooks.SessionStart`: find (or create) the `startup|resume` matcher group; append the
     two hook commands **only if not already present** (dedupe by exact command string), so
     re-running is a no-op.
-  - `enabledPlugins`: add `"rdl@rdl": true`.
+  - `enabledPlugins`: add `"rdl@rdl": true` (or specific RDL subjects the repo wants).
   - `extraKnownMarketplaces`: add the `rdl` entry; leave any existing marketplaces intact.
   - `model` / `alwaysThinkingEnabled` / `effortLevel`: set **only if absent** — never
     override a deliberate user choice. Mention they are opinionated defaults the user can
     decline.
-  - If a stale `"superpowers@claude-plugins-official"` (or other migrated-away entry) is
-    present, point it out and offer to remove it.
+
+> **Anti-pattern — never enable a self-referential marketplace in its own dev env.**
+> `rdl@rdl` is fine for a *consumer* repo (it installs the catalog from a remote
+> marketplace). It is **not** fine inside `agent-extensions` itself: there it re-clones
+> the repo and fans out to dozens of dependency plugins, which can break the session-start
+> install as a whole so that **nothing** surfaces. If you are ever bootstrapping the
+> catalog repo itself, declare a small set of **external** dev-helper plugins instead.
 
 ## Phase 3 — Merge the Makefile target
 
-Append `assets/Makefile.snippet` to the repo's `Makefile` **only if** a `cc-web-setup:`
+Append `assets/Makefile.snippet` to the repo's `Makefile` **only if** an `install-deps:`
 target is not already present. If there is no `Makefile`, create one containing just the
-snippet. This gives the user the `make cc-web-setup` entrypoint to set as the environment
-Setup script.
+snippet. This gives both the human-dev command (`make install-deps`) and the web
+Setup-script entrypoint (`CLAUDE_CODE_REMOTE=true make install-deps`).
 
 ## Phase 4 — Offer the project extension seam
 
-The portable scripts source two optional, project-owned hooks if present:
-`scripts/cc-web-setup.local.sh` (heavy pre-snapshot deps) and `scripts/web-bootstrap.local.sh`
-(per-session glue: language toolchains on PATH, container runtimes, git-hook wiring like
-`.husky`/`.githooks`/lefthook, fetching the default branch). This is the **only** sanctioned
-place for project-specific provisioning — keep it out of the portable scripts so they stay
-re-syncable.
+`install-deps.sh` sources an optional, project-owned `.claude/scripts/install-deps.local.sh`
+as its **dev-toolchain** step (run in every mode, before the remote-only web runtime). This
+is the **only** sanctioned place for project-specific provisioning — language toolchains on
+PATH, container runtimes, git-hook wiring (`.husky`/`.githooks`/lefthook), fetching the
+default branch. Keep it out of the portable engine so it stays re-syncable.
 
-Offer to scaffold a commented `scripts/web-bootstrap.local.sh` from
-`assets/web-bootstrap.local.sh.example`. Do **not** create it unless the repo actually needs
+Offer to scaffold a commented `.claude/scripts/install-deps.local.sh` from
+`assets/install-deps.local.sh.example`. Do **not** create it unless the repo actually needs
 project-specific steps.
 
 ### Docker on Claude Code on the web
 
-A web runner is **not** a laptop: it ships the `docker` CLI and the `dockerd`
-binary but **no running daemon**, and there is **no systemd / service manager**
-to start one. On a developer machine Docker Desktop (or a systemd unit) keeps
-`dockerd` up; in a cloud session nothing does. So any repo that needs containers
-in a web session — devcontainer smoke tests, `testcontainers`, k3d/k8s-in-docker,
-building images — **must start `dockerd` itself**.
+A web runner is **not** a laptop: it ships the `docker` CLI and the `dockerd` binary but
+**no running daemon**, and there is **no systemd / service manager** to start one. So any
+repo that needs containers in a web session — devcontainer smoke tests, `testcontainers`,
+k3d/k8s-in-docker, building images — **must start `dockerd` itself**, in the
+`install-deps.local.sh` seam (the portable engine deliberately does not — not every repo
+wants Docker). The pattern is shipped commented in `assets/install-deps.local.sh.example`;
+it is idempotent (a no-op when `docker info` already answers), so it is safe locally too.
 
-This is per-session, project-specific work, so it belongs in the `web-bootstrap.local.sh`
-seam, **not** in the portable engine (not every repo wants Docker) and **not** in the
-pre-snapshot setup script (a daemon is runtime state, not snapshot filesystem state — it
-does not survive into a new session). The portable `web-bootstrap.sh` exposes the `$SUDO`
-global specifically so the local hook can start daemons like this. The pattern (proven in
-DataOps and shipped commented in `assets/web-bootstrap.local.sh.example`):
-
-```bash
-ensure_docker() {
-  command -v dockerd >/dev/null 2>&1 || return 0   # Docker not provisioned here.
-  docker info >/dev/null 2>&1 && return 0           # Already up.
-  # shellcheck disable=SC2086  # $SUDO word-splits into argv ('' as root, 'sudo -n' otherwise)
-  nohup $SUDO dockerd >>"$LOG" 2>&1 &               # nohup+bg: outlive the sourced subshell
-  local i; for i in $(seq 1 30); do docker info >/dev/null 2>&1 && return 0; sleep 1; done
-  log "WARNING: dockerd did not become ready within 30s (see ${LOG})."; return 1
-}
-ensure_docker || true
-```
-
-Key points to convey:
-
-- **Idempotent + non-fatal.** No-op when `docker info` already answers (a resume, or a base
-  image that started it); a runner lacking the privileges/cgroups to run `dockerd` logs a
-  warning and the session continues without containers — never fail the parent hook.
-- **`nohup … &`** so the daemon outlives the subshell the parent hook sources the local hook
-  in (a reparented-to-init `dockerd` keeps serving later Bash tool turns).
-- **`$SUDO`** is empty when the session already runs as root and `sudo -n` under an
-  unprivileged `remoteUser` (e.g. the devcontainer `node` user) — leave it unquoted so
-  `sudo -n` splits into argv.
-- **Poll the socket.** `dockerd` needs a second or two to create `/var/run/docker.sock`;
-  return only once `docker info` succeeds so the next step does not race a half-up daemon.
+This is exactly the kind of **non-plugin, snapshot-relevant** provisioning the Setup-script
+path is for. Plugins install declaratively-plus-`ensure_plugins`; heavy deps and daemons
+belong here in the project seam.
 
 ## Phase 5 — Verify
 
-- Run `CLAUDE_CODE_REMOTE=true bash scripts/web-bootstrap.sh` and confirm it exits 0. (Cloud
-  tooling installs may warn if offline — that is fine; the hook must still exit 0.)
-- Run `bash scripts/web-bootstrap.sh` (no env var) and confirm it is an immediate no-op.
-- Confirm `bash scripts/cc-web-setup.sh` is sentinel-/idempotent — a second run changes nothing.
+- `make install-deps` (no env var) → provisions the dev toolchain and prints
+  "web runtime skipped". Safe on a contributor's laptop.
+- `CLAUDE_CODE_REMOTE=true bash .claude/scripts/install-deps.sh` → runs the full path
+  (dev toolchain + gh/codex + `ensure_plugins`) and exits 0. (Cloud tooling installs may
+  warn if offline — that is fine; it must still exit 0.)
+- `bash .claude/scripts/install-deps.sh --session` (no env var) → an immediate no-op
+  (exit 0, no output): the committed hook never disturbs a local session.
 - Validate `.claude/settings.json` parses (`jq . .claude/settings.json`).
 
 ## Phase 6 — Summarize for the user
 
 Tell the user, concisely:
 - What was created/merged (list the files + the settings keys touched).
-- **No manual step is required.** The committed SessionStart hook installs the plugins on
-  every cloud session (gated on `CLAUDE_CODE_REMOTE`) and requests a same-session re-scan
-  via `reloadSkills: true`, so skills surface without touching the web environment UI.
-- **Optional fallback:** *only if* plugin skills still appear from the second session
-  (i.e. the `reloadSkills` re-scan does not reach the plugin cache), set the web
-  environment's **Setup script** field to `make cc-web-setup` to bake the plugins into the
-  snapshot before enumeration — a guaranteed first-session fix. Frame this as a fallback,
-  not a required step.
-- That `web-bootstrap.sh` is safe locally (no-op unless `CLAUDE_CODE_REMOTE=true`).
-- How to add project-specific deps via `scripts/*.local.sh`.
+- **The one manual step:** set the web environment's **Setup script** field to
+  `CLAUDE_CODE_REMOTE=true make install-deps`, so the declared plugins are pre-seeded into
+  the snapshot *before* Claude enumerates skills — the only way their `/<plugin>:<skill>`
+  commands appear on the **first** session of a new environment. Without it they appear
+  only from the second session (the SessionStart hook self-heals but can't beat
+  first-session enumeration).
+- That `make install-deps` is the local-dev command (dev toolchain only; the web runtime
+  is gated on `CLAUDE_CODE_REMOTE`).
+- That `announce-capabilities.sh` reports **installed** plugins and flags any
+  **"Declared but NOT installed"** — the canary if a marketplace was unreachable or an
+  install failed.
+- That `install-deps.sh --session` is safe locally (no-op unless `CLAUDE_CODE_REMOTE=true`).
+- How to add project-specific deps via `.claude/scripts/install-deps.local.sh`.
 - That Codex CLI provisioning activates only when `CODEX_AUTH_JSON` or `CODEX_ACCESS_TOKEN`
   is set in the environment.
 - To commit the new files so cloud sessions (which clone the repo) pick them up.

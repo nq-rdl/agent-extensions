@@ -6,7 +6,39 @@ are candidates to file as issues — against the **`claude-code`** plugin in thi
 repo (the `cc-web-setup` / `web-setup` skill) where we own the fix, and against
 **upstream Claude Code** where the root cause is the harness.
 
-## Resolution (2026-06-22)
+## Resolution — CORRECTED (2026-06-22, issue #161)
+
+> **Earlier "resolution" (below this block) was WRONG and is kept only for the
+> record.** It claimed the platform installs `enabledPlugins` at session start, so
+> no setup script / `make` was needed. **It does not.** Verified live on Claude
+> Code 2.1.185: a fresh web VM had every `extraKnownMarketplaces` entry registered
+> yet `claude plugin list` **empty** and no `/<plugin>:<skill>` in the menu;
+> `claude plugin install` then worked instantly (network fine). So
+> `extraKnownMarketplaces` makes plugins *known* and `enabledPlugins` only
+> *enables* an already-installed plugin — **neither installs one.** When the
+> "declarative is enough" belief led us to delete the install machinery, nothing
+> installed the plugins at all.
+
+**The actual mechanism (now shipped):**
+
+- A repo script must run `claude plugin install` for the declared set.
+  `.claude/scripts/install-deps.sh` (`ensure_plugins`, reading `enabledPlugins`
+  from `settings.json`) does this, exposed as `make install-deps`.
+- Claude enumerates skills at **startup, before** any SessionStart hook, so a
+  hook-installed plugin surfaces only from the **next** session. The plugin cache
+  **does** persist across sessions in an environment (confirmed: a resume reported
+  "already present" and the skills loaded), so the hook is enough from session 2 —
+  but the **first** session of a new environment needs a **pre-snapshot** install.
+- That pre-snapshot install is the environment's **Setup-script field** set to
+  `CLAUDE_CODE_REMOTE=true make install-deps`. The `install-deps.sh --session`
+  SessionStart hook self-heals resumes; `announce-capabilities.sh` cross-checks
+  `claude plugin list` and flags "Declared but NOT installed".
+
+The self-referential `rdl@rdl` point still stands: do not enable a repo's own meta
+marketplace inside that repo's dev env (it re-clones + fans out and breaks the
+batch). The `make cc-web-setup` name is retired in favour of `make install-deps`.
+
+### Superseded resolution (kept for the record)
 
 The practical fix was **not** the `cc-web-setup` pre-seed. Claude Code on the web
 installs the plugins declared in `.claude/settings.json` (`enabledPlugins` +
