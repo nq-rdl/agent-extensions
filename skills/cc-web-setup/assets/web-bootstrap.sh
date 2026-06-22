@@ -397,7 +397,7 @@ configure_codex_sandbox() {
     # after `[` is literal in POSIX ERE — so this matches a `[permissions]` table
     # header or any `[permissions.<sub>]` subtable, and nothing else.
     if printf '%s\n' "$toplevel" | grep -Eq '^[[:space:]]*default_permissions[[:space:]]*=' \
-        || grep -Eq '^[[:space:]]*\[permissions[].]' "$config"; then
+        || grep -Eq '^[[:space:]]*\[permissions([.][^]]+)?\][[:space:]]*$' "$config"; then
       log "Codex permission profile already configured — leaving config.toml untouched."
       return 0
     fi
