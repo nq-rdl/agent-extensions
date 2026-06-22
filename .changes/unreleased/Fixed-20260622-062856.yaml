@@ -1,0 +1,3 @@
+kind: Fixed
+body: '`cc-web-setup` skill: create the `web-bootstrap.sh` SessionStart log via `mktemp` under `umask 077` instead of a fixed `/tmp/rdl-web-bootstrap.log`, closing a symlink-truncation and concurrent-session race window on shared hosts'
+time: 2026-06-22T06:28:56.410298103Z
