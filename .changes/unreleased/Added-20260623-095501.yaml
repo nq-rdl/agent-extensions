@@ -1,0 +1,3 @@
+kind: Added
+body: 'Add `/claude-code:create-workflow` skill — guides creating, saving, and reusing Claude Code dynamic workflows: a decision gate for workflow vs subagent/skill/agent-team, the `ultracode` author-and-save loop, `.claude/workflows/` distribution rules (including the no-plugin-bundling reality), `args` parameterization, and runtime/permission/cost constraints'
+time: 2026-06-23T09:55:01.161371811Z

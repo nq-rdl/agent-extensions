@@ -9,6 +9,7 @@ channels:
   - stable
 skills:
   - {source: cc-agent-teams, leaf: agent-teams}
+  - {source: cc-create-workflow, leaf: create-workflow}
   - {source: cc-hook, leaf: hook}
   - {source: cc-web-setup, leaf: web-setup}
 agents: []
