@@ -1,0 +1,3 @@
+kind: Fixed
+body: Fixed a Claude Code on the web cold-start race where the SessionStart plugin self-heal (`ensure_plugins`) ran before `extraKnownMarketplaces` were registered, so installs failed against an empty marketplace registry and the failure was misreported as a network issue; the hook now registers every declared marketplace with `claude plugin marketplace add` before installing (#181)
+time: 2026-06-23T08:19:08.067613243Z

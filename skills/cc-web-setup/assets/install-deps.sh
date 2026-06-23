@@ -16,9 +16,11 @@
 #   * the project dev toolchain + services (lefthook, changie, gopls, python/jq,
 #     the Docker daemon) via the optional project seam (install-deps.local.sh);
 #   * a cheap idempotent PLUGIN SELF-HEAL (ensure_plugins) that retries the
-#     declarative install if it did not complete at session start — refreshing the
-#     marketplace index first (`claude plugin marketplace update`) so a stale local
-#     copy, not just an unreachable source, is recovered.
+#     declarative install if it did not complete at session start — first
+#     REGISTERING the declared marketplaces (`claude plugin marketplace add`, for
+#     the cold-start case where this hook outran Claude Code's own registration of
+#     extraKnownMarketplaces and the registry is still empty), then refreshing a
+#     stale index (`claude plugin marketplace update`) on a failed install.
 #
 # This engine is PORTABLE: it carries no project-specific dependencies. Anything
 # specific to one repo belongs in .claude/scripts/install-deps.local.sh (sourced
@@ -473,14 +475,20 @@ persist_path() {
 # .claude/settings.json (enabledPlugins + extraKnownMarketplaces) at session start
 # from their marketplaces — see the web docs' "what carries over" table — so this
 # is NOT the primary install path. It is a belt-and-suspenders RETRY for when that
-# did not complete. Two failure modes are covered: (1) a STALE local marketplace
-# index — the marketplace is registered but its index was never fetched/refreshed
-# before this hook ran, so `claude plugin install` fails with "Plugin not found in
-# marketplace … your local copy may be out of date"; and (2) the docs' "requires
-# network access to reach the marketplace source." `claude plugin install` does NOT
-# refresh the index itself, so on a failed install this runs `claude plugin
-# marketplace update <marketplace>` and retries once (which fixes case 1). Normally
-# every plugin is already present and this is a quiet no-op.
+# did not complete. Three failure modes are covered: (1) an EMPTY marketplace
+# registry — on a cold cloud VM this SessionStart hook can outrun Claude Code's own
+# registration of extraKnownMarketplaces, so `claude plugin install` (and even
+# `marketplace update`) fail with "Marketplace not found. Available marketplaces:"
+# (an empty list) — NOT a network error; (2) a STALE local marketplace index — the
+# marketplace is registered but its index was never refreshed, so the install fails
+# with "Plugin not found in marketplace … your local copy may be out of date"; and
+# (3) the docs' "requires network access to reach the marketplace source." To cover
+# (1) we first `claude plugin marketplace add` every declared marketplace
+# (idempotent — a no-op once on disk) so the hook owns the whole add → update →
+# install chain; `claude plugin install` does not refresh the index itself, so a
+# failed install then runs `claude plugin marketplace update <marketplace>` and
+# retries once (which fixes (2)). Normally every plugin is already present and this
+# is a quiet no-op.
 #
 # CAVEAT (timing): Claude enumerates skills at process startup, BEFORE SessionStart
 # hooks finish, so anything this retry installs surfaces from the NEXT session, not
@@ -508,6 +516,64 @@ ensure_plugins() {
   local installed_blob
   installed_blob="$(claude plugin list 2>/dev/null | awk '/^[[:space:]]*>[[:space:]]/ { print $2 }')"
 
+  # Count plugins still needing install (those NOT already in `claude plugin list`).
+  # On a cold VM this is the full set; on a warm resume it is 0 and the marketplace
+  # registration + install below are skipped, keeping the resume a quiet no-op.
+  local pending=0
+  for p in "${plugins[@]}"; do
+    printf '%s\n' "$installed_blob" | grep -qxF -- "$p" || pending=$((pending + 1))
+  done
+
+  # COLD-START RACE FIX: register the declared marketplaces BEFORE installing. On a
+  # fresh cloud VM this hook can run before Claude Code has registered
+  # extraKnownMarketplaces, leaving the registry empty — then `claude plugin install`
+  # and `claude plugin marketplace update` both fail with "Marketplace not found.
+  # Available marketplaces:" (an empty list), which is NOT a network failure.
+  # `claude plugin marketplace add` is idempotent (a no-op once the marketplace is on
+  # disk), so registering here lets the hook own the whole add → update → install
+  # chain instead of depending on a registration that may not have happened yet.
+  #
+  # Source encoding (the `marketplace add <source>` grammar): a GitHub source pins a
+  # ref as `owner/repo@ref`, a git URL as `<git-url>#ref`. A `path` on a GitHub
+  # source (a non-default marketplace.json location) has NO `marketplace add`
+  # equivalent — only the declarative extraKnownMarketplaces entry expresses it — so
+  # such a marketplace is SKIPPED here rather than registered as the wrong catalog,
+  # and Claude Code's own declarative registration handles it. jq emits one
+  # `name<TAB>add|skip<TAB>source-or-reason` row per declared marketplace.
+  if [ "$pending" -gt 0 ]; then
+    local mkt_name mkt_kind mkt_src mkt_out
+    while IFS=$'\t' read -r mkt_name mkt_kind mkt_src; do
+      [ -n "$mkt_name" ] || continue
+      if [ "$mkt_kind" = "skip" ]; then
+        printf 'marketplace %s: not self-healed (%s)\n' "$mkt_name" "$mkt_src" >>"$LOG"
+        continue
+      fi
+      [ -n "$mkt_src" ] || continue
+      # `marketplace add` is idempotent but can still exit non-zero when the
+      # marketplace is already registered (see tests/e2e/marketplace-smoke.sh) — that
+      # case is benign, so an "already" message counts as success. Capture output to
+      # $LOG either way; only a genuine failure earns a WARNING.
+      if mkt_out="$(claude plugin marketplace add "$mkt_src" </dev/null 2>&1)"; then
+        printf 'marketplace %s registered via %s\n%s\n' "$mkt_name" "$mkt_src" "$mkt_out" >>"$LOG"
+      elif printf '%s' "$mkt_out" | grep -qi 'already'; then
+        printf 'marketplace %s already registered (%s)\n%s\n' "$mkt_name" "$mkt_src" "$mkt_out" >>"$LOG"
+      else
+        printf '%s\n' "$mkt_out" >>"$LOG"
+        log "  WARNING: could not register marketplace '${mkt_name}' (${mkt_src}) — see ${LOG}."
+      fi
+    done < <(jq -r '
+      (.extraKnownMarketplaces // {}) | to_entries[]
+      | .key as $name | .value.source as $s
+      | if ($s.source == "github") and ($s.repo) then
+          if (($s.path // "") != "") then [$name, "skip", "custom marketplace.json path not expressible via marketplace add"]
+          else [$name, "add", ($s.repo + (if (($s.ref // "") != "") then "@" + $s.ref else "" end))] end
+        elif (($s.url // "") != "") then [$name, "add", ($s.url + (if (($s.ref // "") != "") then "#" + $s.ref else "" end))]
+        elif (($s.path // "") != "") then [$name, "add", $s.path]
+        else [$name, "skip", "unrecognized source shape"] end
+      | @tsv
+    ' "$settings" 2>/dev/null)
+  fi
+
   # $refreshed memoizes the marketplaces whose index we have already tried to
   # `marketplace update` THIS run, as a space-delimited set " <mkt> <mkt> ". Plain
   # string (not an associative array) so the hook stays bash 3.2-portable.
@@ -522,11 +588,10 @@ ensure_plugins() {
       n_ok=$((n_ok + 1))
       continue
     fi
-    # First attempt failed. The usual cause on a fresh cloud VM is a STALE local
-    # marketplace index: the marketplace is registered (from extraKnownMarketplaces)
-    # but its index was never fetched/refreshed before this hook ran, so the install
-    # reports "Plugin not found in marketplace … your local copy may be out of date —
-    # try `claude plugin marketplace update`". `claude plugin install` does NOT do
+    # First attempt failed. With the marketplace now registered (we ensured it just
+    # above), the usual remaining cause is a STALE local index: the install reports
+    # "Plugin not found in marketplace … your local copy may be out of date — try
+    # `claude plugin marketplace update`", and `claude plugin install` does NOT do
     # that refresh itself. The id is `<plugin>@<marketplace>`, so the marketplace is
     # the suffix after the last '@'.
     mkt="${p##*@}"

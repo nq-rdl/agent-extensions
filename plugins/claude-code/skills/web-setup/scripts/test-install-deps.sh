@@ -355,6 +355,7 @@ test_persist_path_readonly_warns() {
 #   * update_attempts  — one line appended per `marketplace update` INVOCATION (memoization counter)
 write_claude_stub() { # <stub_dir> ; reads $STATE at runtime
   write_stub "$1" claude '
+printf "%s\n" "$*" >> "$STATE/trace"
 case "$1 $2" in
   "plugin list")
     cat "$STATE/installed" 2>/dev/null; exit 0 ;;
@@ -369,6 +370,14 @@ case "$1 $2" in
     echo "Plugin \"$p\" not found in marketplace \"$mkt\"; your local copy may be out of date." >&2
     exit 1 ;;
   "plugin marketplace")
+    if [ "$3" = "add" ]; then
+      printf "%s\n" "$4" >> "$STATE/added"
+      # Model the idempotent-but-non-zero "already added" exit (see
+      # tests/e2e/marketplace-smoke.sh): if $4 is listed in $STATE/already, exit 1 with
+      # an "already" message so the hook can prove it treats that as benign.
+      if grep -qxF "$4" "$STATE/already" 2>/dev/null; then echo "Marketplace already added: $4"; exit 1; fi
+      exit 0
+    fi
     [ "$3" = "update" ] || exit 0
     printf "%s\n" "$4" >> "$STATE/update_attempts"
     if grep -qxF "$4" "$STATE/unreachable" 2>/dev/null; then
@@ -393,10 +402,17 @@ setup_plugins_case() { # <tag> -> echoes "<stub_dir> <out_file> <project_dir> <s
   local tag="$1" d proj state
   d="$(new_stub_dir)"
   proj="$(mktemp -d "$WORK/${tag}-proj.XXXXXX")"; mkdir -p "$proj/.claude"; : > "$proj/.claude/settings.json"
-  state="$(mktemp -d "$WORK/${tag}-state.XXXXXX")"; : > "$state/installed"
-  # jq is stubbed to emit the declared set straight from $STATE/declared, so the
-  # tests do not depend on real jq or on parsing a real settings.json.
-  write_stub "$d" jq 'cat "$STATE/declared" 2>/dev/null'
+  state="$(mktemp -d "$WORK/${tag}-state.XXXXXX")"; : > "$state/installed"; : > "$state/declared_marketplaces"
+  # jq is stubbed to emit a declared set straight from $STATE (no real jq / no real
+  # settings.json parsing). ensure_plugins calls jq with two different programs: the
+  # enabledPlugins query (=> plugin ids from $STATE/declared) and the
+  # extraKnownMarketplaces query (=> "name<TAB>source" lines from
+  # $STATE/declared_marketplaces). Branch on the program text so one stub serves both.
+  write_stub "$d" jq '
+for a in "$@"; do
+  case "$a" in *extraKnownMarketplaces*) cat "$STATE/declared_marketplaces" 2>/dev/null; exit 0 ;; esac
+done
+cat "$STATE/declared" 2>/dev/null'
   write_claude_stub "$d"
   printf '%s %s %s %s' "$d" "$WORK/${tag}.log" "$proj" "$state"
 }
@@ -510,6 +526,102 @@ test_plugins_wrong_id_after_successful_refresh() {
     || fail "plugins wrong-id: warning text missing. Log: $(cat "$log" 2>/dev/null)"
 }
 
+# THE COLD-START RACE FIX: when the marketplace registry is empty, ensure_plugins
+# must `claude plugin marketplace add` every declared marketplace BEFORE attempting
+# installs, so the install never runs against an unregistered marketplace. Sentinels
+# are pre-seeded so the post-registration install succeeds on the first try —
+# isolating the new registration step from the stale-index retry path.
+test_plugins_registers_marketplaces_before_install() {
+  read -r d log proj state <<<"$(setup_plugins_case pp7)"
+  printf 'a@m1\nb@m2\n' > "$state/declared"
+  printf 'm1\tadd\tacme/mkt-one\nm2\tadd\tacme/mkt-two\n' > "$state/declared_marketplaces"
+  touch "$state/refreshed.m1" "$state/refreshed.m2"   # registered => index already fresh
+  run_ensure_plugins "$d" "$log" "$proj" "$state"
+  grep -q 'Plugin install: 2 installed, 0 failed, 0 already present' "$log" \
+    && ok "plugins register: both installed after registration" \
+    || fail "plugins register: wrong summary. Log: $(cat "$log" 2>/dev/null)"
+  { grep -qxF 'acme/mkt-one' "$state/added" 2>/dev/null && grep -qxF 'acme/mkt-two' "$state/added" 2>/dev/null; } \
+    && ok "plugins register: both declared marketplaces were 'marketplace add'-ed" \
+    || fail "plugins register: missing marketplace add ([$(cat "$state/added" 2>/dev/null)])"
+  # Ordering: the LAST 'marketplace add' must precede the FIRST 'plugin install'.
+  local last_add first_install
+  last_add="$(grep -n 'marketplace add' "$state/trace" 2>/dev/null | tail -1 | cut -d: -f1 || true)"
+  first_install="$(grep -n 'plugin install' "$state/trace" 2>/dev/null | head -1 | cut -d: -f1 || true)"
+  { [ -n "$last_add" ] && [ -n "$first_install" ] && [ "$last_add" -lt "$first_install" ]; } \
+    && ok "plugins register: all marketplace adds precede the first install" \
+    || fail "plugins register: add/install order wrong (add@${last_add:-?} install@${first_install:-?})."
+}
+
+# The registration step is gated on $pending: a warm resume where every declared
+# plugin is already installed must NOT register marketplaces, even though they are
+# declared — the whole self-heal stays a quiet no-op.
+test_plugins_warm_resume_skips_registration() {
+  read -r d log proj state <<<"$(setup_plugins_case pp8)"
+  printf 'a@m1\n' > "$state/declared"
+  printf 'm1\tadd\tacme/mkt-one\n' > "$state/declared_marketplaces"
+  printf '> a@m1\n' > "$state/installed"              # already installed => pending=0
+  run_ensure_plugins "$d" "$log" "$proj" "$state"
+  grep -q 'Plugin install: 0 installed, 0 failed, 1 already present' "$log" \
+    && ok "plugins warm-resume: quiet no-op summary" \
+    || fail "plugins warm-resume: wrong summary. Log: $(cat "$log" 2>/dev/null)"
+  [ ! -s "$state/added" ] \
+    && ok "plugins warm-resume: no marketplace registered when nothing to install" \
+    || fail "plugins warm-resume: registered despite pending=0 ([$(cat "$state/added" 2>/dev/null)])"
+}
+
+# Comment #1 (encode ref, skip path): drive ensure_plugins with REAL jq + a real
+# settings.json so the actual source-encoding logic runs end to end (only `claude`
+# is stubbed). Asserts ref pinning (owner/repo@ref, git-url#ref) and that a GitHub
+# source carrying a custom marketplace.json `path` is SKIPPED, not mis-registered.
+test_marketplace_source_encoding() {
+  command -v jq >/dev/null 2>&1 || { skip "marketplace encoding: jq not available"; return; }
+  local d proj state log
+  d="$(new_stub_dir)"
+  ln -sf "$(command -v jq)" "$d/jq"            # real jq, replacing the cat-stub default
+  write_claude_stub "$d"
+  proj="$(mktemp -d "$WORK/enc-proj.XXXXXX")"; mkdir -p "$proj/.claude"
+  state="$(mktemp -d "$WORK/enc-state.XXXXXX")"; : > "$state/installed"
+  cat > "$proj/.claude/settings.json" <<'JSON'
+{
+  "enabledPlugins": {"a@plain": true, "b@pinned": true, "c@subdir": true, "d@viaurl": true},
+  "extraKnownMarketplaces": {
+    "plain":  {"source": {"source": "github", "repo": "acme/plain"}, "autoUpdate": true},
+    "pinned": {"source": {"source": "github", "repo": "acme/pinned", "ref": "v1.0.0"}, "autoUpdate": true},
+    "subdir": {"source": {"source": "github", "repo": "acme/subdir", "path": "catalog"}, "autoUpdate": true},
+    "viaurl": {"source": {"source": "git", "url": "https://example.com/x.git", "ref": "main"}, "autoUpdate": true}
+  }
+}
+JSON
+  log="$WORK/enc.log"
+  run_ensure_plugins "$d" "$log" "$proj" "$state"
+  grep -qxF 'acme/plain'                     "$state/added" 2>/dev/null \
+    && ok "encode: plain github -> owner/repo" || fail "encode: plain missing ([$(cat "$state/added" 2>/dev/null)])"
+  grep -qxF 'acme/pinned@v1.0.0'             "$state/added" 2>/dev/null \
+    && ok "encode: github ref -> owner/repo@ref" || fail "encode: ref not encoded ([$(cat "$state/added" 2>/dev/null)])"
+  grep -qxF 'https://example.com/x.git#main' "$state/added" 2>/dev/null \
+    && ok "encode: git url ref -> url#ref" || fail "encode: url ref not encoded ([$(cat "$state/added" 2>/dev/null)])"
+  grep -q 'acme/subdir' "$state/added" 2>/dev/null \
+    && fail "encode: custom-path source must be SKIPPED, not added ([$(cat "$state/added" 2>/dev/null)])" \
+    || ok "encode: custom marketplace.json path source skipped"
+}
+
+# Comment #2: `marketplace add` can exit non-zero with an "already" message; that is
+# benign and must be treated as success (logged to $LOG, never surfaced as a WARNING).
+test_plugins_already_present_add_is_benign() {
+  read -r d log proj state <<<"$(setup_plugins_case pp9)"
+  printf 'a@m1\n' > "$state/declared"
+  printf 'm1\tadd\tacme/mkt-one\n' > "$state/declared_marketplaces"
+  printf 'acme/mkt-one\n' > "$state/already"   # add exits non-zero with an "already" message
+  touch "$state/refreshed.m1"
+  run_ensure_plugins "$d" "$log" "$proj" "$state"
+  grep -qF 'acme/mkt-one' "$state/added" \
+    && ok "already-add: registration was attempted" \
+    || fail "already-add: add not attempted ([$(cat "$state/added" 2>/dev/null)])"
+  grep -qi "could not register marketplace 'm1'" "$log" \
+    && fail "already-add: spurious WARNING on benign 'already' exit. Log: $(cat "$log" 2>/dev/null)" \
+    || ok "already-add: benign 'already' treated as success (no WARNING)"
+}
+
 # ---------------------------------------------------------------------------
 # main() gate + project hook seam (subprocess)
 # ---------------------------------------------------------------------------
@@ -569,6 +681,10 @@ test_plugins_already_present_noop
 test_plugins_unreachable_fails_after_refresh
 test_plugins_shared_marketplace_refreshes_once
 test_plugins_wrong_id_after_successful_refresh
+test_plugins_registers_marketplaces_before_install
+test_plugins_warm_resume_skips_registration
+test_marketplace_source_encoding
+test_plugins_already_present_add_is_benign
 test_gate_local_noop
 test_local_hook_sourced
 
