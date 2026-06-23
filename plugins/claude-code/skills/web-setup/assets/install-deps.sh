@@ -532,21 +532,45 @@ ensure_plugins() {
   # `claude plugin marketplace add` is idempotent (a no-op once the marketplace is on
   # disk), so registering here lets the hook own the whole add → update → install
   # chain instead of depending on a registration that may not have happened yet.
-  # Source can be a GitHub repo, URL, or path (see `marketplace add`); the nested
-  # extraKnownMarketplaces schema carries it under .source.{repo,url,path}.
+  #
+  # Source encoding (the `marketplace add <source>` grammar): a GitHub source pins a
+  # ref as `owner/repo@ref`, a git URL as `<git-url>#ref`. A `path` on a GitHub
+  # source (a non-default marketplace.json location) has NO `marketplace add`
+  # equivalent — only the declarative extraKnownMarketplaces entry expresses it — so
+  # such a marketplace is SKIPPED here rather than registered as the wrong catalog,
+  # and Claude Code's own declarative registration handles it. jq emits one
+  # `name<TAB>add|skip<TAB>source-or-reason` row per declared marketplace.
   if [ "$pending" -gt 0 ]; then
-    local mkt_name mkt_src
-    while IFS=$'\t' read -r mkt_name mkt_src; do
+    local mkt_name mkt_kind mkt_src mkt_out
+    while IFS=$'\t' read -r mkt_name mkt_kind mkt_src; do
+      [ -n "$mkt_name" ] || continue
+      if [ "$mkt_kind" = "skip" ]; then
+        printf 'marketplace %s: not self-healed (%s)\n' "$mkt_name" "$mkt_src" >>"$LOG"
+        continue
+      fi
       [ -n "$mkt_src" ] || continue
-      if claude plugin marketplace add "$mkt_src" </dev/null >>"$LOG" 2>&1; then
-        printf 'marketplace %s registered (or already present)\n' "$mkt_name" >>"$LOG"
+      # `marketplace add` is idempotent but can still exit non-zero when the
+      # marketplace is already registered (see tests/e2e/marketplace-smoke.sh) — that
+      # case is benign, so an "already" message counts as success. Capture output to
+      # $LOG either way; only a genuine failure earns a WARNING.
+      if mkt_out="$(claude plugin marketplace add "$mkt_src" </dev/null 2>&1)"; then
+        printf 'marketplace %s registered via %s\n%s\n' "$mkt_name" "$mkt_src" "$mkt_out" >>"$LOG"
+      elif printf '%s' "$mkt_out" | grep -qi 'already'; then
+        printf 'marketplace %s already registered (%s)\n%s\n' "$mkt_name" "$mkt_src" "$mkt_out" >>"$LOG"
       else
+        printf '%s\n' "$mkt_out" >>"$LOG"
         log "  WARNING: could not register marketplace '${mkt_name}' (${mkt_src}) — see ${LOG}."
       fi
     done < <(jq -r '
       (.extraKnownMarketplaces // {}) | to_entries[]
-      | (.value.source.repo // .value.source.url // .value.source.path // "") as $src
-      | select($src != "") | "\(.key)\t\($src)"
+      | .key as $name | .value.source as $s
+      | if ($s.source == "github") and ($s.repo) then
+          if (($s.path // "") != "") then [$name, "skip", "custom marketplace.json path not expressible via marketplace add"]
+          else [$name, "add", ($s.repo + (if (($s.ref // "") != "") then "@" + $s.ref else "" end))] end
+        elif (($s.url // "") != "") then [$name, "add", ($s.url + (if (($s.ref // "") != "") then "#" + $s.ref else "" end))]
+        elif (($s.path // "") != "") then [$name, "add", $s.path]
+        else [$name, "skip", "unrecognized source shape"] end
+      | @tsv
     ' "$settings" 2>/dev/null)
   fi
 
