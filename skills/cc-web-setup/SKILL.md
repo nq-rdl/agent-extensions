@@ -67,13 +67,23 @@ surfaced, never masked. Keep the chain in mind: **declared ≠ installed ≠ sur
 > the Setup-script field is for caching heavy *packages*, not plugins, and this skill does
 > not use it.
 
+> Authoritative platform facts (the web docs' "what carries over" table), the three-layer
+> architecture (declarative settings ↔ `install-deps.sh` engine ↔ `install-deps.local.sh`
+> project seam), and the hard-won anti-patterns live in
+> [`references/web-setup.rst`](references/web-setup.rst). Read it before bootstrapping an
+> unfamiliar repo, and to debug a "declared but not installed" plugin.
+
 ## Phase 0 — Confirm context
 
 - Confirm you are at the **repo root** of the repo to bootstrap (a `.git` dir is present).
 - Check whether `.claude/settings.json` and `.claude/scripts/` already exist — this decides
   create-fresh vs. merge for each.
-- Confirm the **target is not `agent-extensions` itself** (see the anti-pattern note in
-  Phase 2).
+- **Self-marketplace check.** If the target repo has a `.claude-plugin/marketplace.json`, it
+  **is itself a Claude Code marketplace** — enabling a plugin it publishes (e.g. `rdl@rdl`
+  inside `nq-rdl/agent-extensions`) installs `main`'s *published* copy into the plugin cache,
+  silently **shadowing the working-tree edits** under development. Pick the **externals** base
+  (not rdl) in Phase 2; the bundled `web-settings.sh strip-self` enforces this
+  deterministically for any marketplace repo, not just this one.
 - Ask the user only if something is ambiguous (e.g. a pre-existing `settings.json` with a
   conflicting `model`/`hooks` block). Otherwise proceed with the defaults below.
 
@@ -92,33 +102,65 @@ project. Project specifics go in the optional `install-deps.local.sh` seam (Phas
 
 If a target file already exists and differs, show the diff and ask before overwriting.
 
-## Phase 2 — Merge `.claude/settings.json`
+## Phase 2 — Choose a base template and merge `.claude/settings.json`
 
-The template is `assets/settings.json.tmpl`. It registers the **`rdl`** marketplace
-(`nq-rdl/agent-extensions`), enables **`rdl@rdl`** (the meta-plugin that installs every RDL
-subject plugin), wires the two SessionStart hooks
-(`.claude/scripts/install-deps.sh` and `.claude/scripts/announce-capabilities.sh`), and sets
-opinionated defaults (`model: opus`, `alwaysThinkingEnabled`, `effortLevel: xhigh`,
-`CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS`).
+Two complete templates ship in `assets/`. The skill **composes** the right `enabledPlugins`
+on a chosen base and lets the bundled helper `scripts/web-settings.sh` make the marketplace
+wiring deterministic — it never concatenates two templates. `web-settings.sh` is a
+**setup-time** tool; it is **not** copied into the target repo. It lives in **this skill's
+own `scripts/` directory** (the directory this `SKILL.md` is in) — not in the target repo and
+not on `PATH` — so the model's cwd (the target repo root) cannot find it by name. Resolve its
+absolute path once and reuse it:
 
-- **If `.claude/settings.json` is absent:** create `.claude/` and write the template verbatim.
-- **If it exists:** perform an **idempotent JSON-aware deep-merge** (use `jq` or a careful
-  read-modify-write), and **show the diff before writing**:
-  - `env`: add `CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS` without clobbering other keys.
-  - `hooks.SessionStart`: find (or create) the `startup|resume` matcher group; append the
-    two hook commands **only if not already present** (dedupe by exact command string).
-  - `enabledPlugins`: add `"rdl@rdl": true` (or specific RDL subjects the repo wants).
-  - `extraKnownMarketplaces`: add the `rdl` entry; leave any existing marketplaces intact.
-  - `model` / `alwaysThinkingEnabled` / `effortLevel`: set **only if absent** — never
-    override a deliberate user choice. Mention they are opinionated defaults.
+```bash
+WS="<absolute path to this skill>/scripts/web-settings.sh"   # the scripts/ next to this SKILL.md
+```
 
-> **Anti-pattern — never enable a self-referential marketplace in its own dev env.**
-> `rdl@rdl` is fine for a *consumer* repo (the platform installs the catalog from a remote
-> marketplace). It is **not** fine inside `agent-extensions` itself: there it re-clones the
-> repo and fans out to dozens of dependency plugins — and since the docs require the install
-> to *reach its marketplace source*, that self-cloning batch breaks the session-start
-> install so **nothing** surfaces. If you ever bootstrap the catalog repo itself, declare a
-> small set of **external** dev-helper plugins instead.
+| Base | File | Use for |
+|---|---|---|
+| **rdl** | `assets/settings.json.tmpl` | a *consumer* repo that wants the RDL catalog (`rdl@rdl`) |
+| **externals** | `assets/settings.externals.json.tmpl` | the team's external dev-helper plugins, **no rdl** — and the **only** correct base when Phase 0 found a `.claude-plugin/marketplace.json` |
+
+Both wire the two SessionStart hooks and the opinionated defaults (`model: opus`,
+`alwaysThinkingEnabled`, `effortLevel: xhigh`, `CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS`).
+
+1. **Pick the base** per the table. For *rdl + externals* (a consumer wanting both), start
+   from the externals base and add `"rdl@rdl": true` to `enabledPlugins`.
+2. **Tailor the external set** from `assets/marketplaces.json` (`teamExternals`) by the
+   repo's language: always offer the `agnostic`-tagged (superpowers, pr-review-toolkit,
+   codex); add `go`-tagged for a Go repo, `python`-tagged (astral) for Python, `workflow`
+   (worktrunk) as desired. Present the menu and let the user confirm — do not silently decide.
+3. **Strip self-references (Phase 0 enforcement):**
+   ```bash
+   bash "$WS" strip-self "$PWD" .claude/settings.json
+   ```
+   Removes any `enabledPlugins`/marketplace that resolves to *this* repo's own
+   `.claude-plugin/marketplace.json`; a no-op passthrough when there is none.
+4. **Guarantee marketplace coverage (#157):**
+   ```bash
+   bash "$WS" ensure .claude/settings.json
+   ```
+   Auto-adds every missing-but-known marketplace from `marketplaces.json`. If it exits
+   non-zero it printed an **unknown** marketplace to stderr and wrote **nothing** — **stop and
+   ask** the user for that marketplace's source, declare it, and re-run. Always keep
+   `claude-plugins-official` declared explicitly (auto-known on the local CLI, unreliable on
+   the web).
+
+**Merging into an existing `.claude/settings.json`** (idempotent; **show the diff before
+writing**):
+- `env`: add `CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS` without clobbering other keys.
+- `hooks.SessionStart`: find (or create) the `startup|resume` matcher group; append the two
+  hook commands **only if not already present** (dedupe by exact command string).
+- `enabledPlugins` / `extraKnownMarketplaces`: union the chosen set in, leave existing entries
+  intact, then run `strip-self` + `ensure` (steps 3–4) over the merged result.
+- `model` / `alwaysThinkingEnabled` / `effortLevel`: set **only if absent** — never override a
+  deliberate user choice.
+
+> **Why externals-not-rdl for a marketplace repo.** Enabling `rdl@rdl` inside
+> `nq-rdl/agent-extensions` installs `main`'s published catalog into the plugin cache,
+> shadowing your working-tree edits, and the self-cloning batch can break the whole
+> session-start install so **nothing** surfaces. `strip-self` removes it deterministically;
+> the externals base avoids it by construction.
 
 ## Phase 3 — Offer the project extension seam
 
@@ -152,6 +194,10 @@ are handled declaratively by the platform.
 - `bash .claude/scripts/install-deps.sh` (no env var) → an immediate no-op (exit 0, no
   output): the committed hook never disturbs a local session.
 - Validate `.claude/settings.json` parses (`jq . .claude/settings.json`).
+- **Marketplace coverage (#157):** `bash "$WS" cover .claude/settings.json` (this skill's
+  bundled helper — `$WS` from Phase 2, an absolute path) exits 0. Any line it prints is an
+  enabled plugin whose marketplace is undeclared — it would install **nothing, silently** —
+  so fix Phase 2. This checks *configuration* only; it cannot prove a cloud install succeeded.
 
 ## Phase 5 — Summarize for the user
 
