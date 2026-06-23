@@ -90,6 +90,10 @@ Merge this block into the chosen `settings.json` (`command` path matches Phase 1
 install location). **Show the diff before writing**, and merge idempotently — never
 clobber existing keys, and dedupe by exact `command` string so re-running is a no-op.
 
+Shell-form hook commands run via `sh -c`, so keep the variable **double-quoted inside
+the JSON string** (`"$CLAUDE_PROJECT_DIR"` / `"$HOME"`) — an unquoted path that contains
+spaces would word-split and the hook would fail to launch.
+
 Project scope (`.claude/settings.json`) — use `$CLAUDE_PROJECT_DIR` so the path is
 portable:
 
@@ -101,7 +105,7 @@ portable:
         "hooks": [
           {
             "type": "command",
-            "command": "$CLAUDE_PROJECT_DIR/.claude/hooks/forced-eval-hook.sh",
+            "command": "\"$CLAUDE_PROJECT_DIR\"/.claude/hooks/forced-eval-hook.sh",
             "timeout": 10
           }
         ]
@@ -121,7 +125,7 @@ Global scope (`~/.claude/settings.json`) — use `$HOME`:
         "hooks": [
           {
             "type": "command",
-            "command": "$HOME/.claude/hooks/forced-eval-hook.sh",
+            "command": "\"$HOME\"/.claude/hooks/forced-eval-hook.sh",
             "timeout": 10
           }
         ]

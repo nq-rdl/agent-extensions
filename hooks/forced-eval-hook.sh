@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 # UserPromptSubmit hook that surfaces available skills as advisory context.
 #
 # Dynamically discovers available skills from:
@@ -9,15 +9,15 @@
 # Plugin install paths come from ~/.claude/plugins/installed_plugins.json.
 #
 # Cache: ${XDG_CACHE_HOME:-$HOME/.cache}/claude-hooks/skill-catalog.cache
-# Invalidated when: skills dir, installed_plugins.json, or this script changes.
+# Invalidated when: any SKILL.md, the skills dir, installed_plugins.json, or this script changes.
 # Requires jq for plugin scanning; degrades gracefully if missing.
 #
 # Installation:
-#   1. Copy forced-eval-hook.json into your project's .claude/settings.local.json
-#      (or merge the hooks block into your existing settings).
-#   2. Ensure this script is accessible at the path referenced in the JSON
-#      (default: hooks/forced-eval-hook.sh relative to your project root).
-#      Update the "command" path in the JSON if you place it elsewhere.
+#   1. Merge a hooks.UserPromptSubmit block into settings.json that runs this
+#      script (project: .claude/settings.json with "$CLAUDE_PROJECT_DIR";
+#      global: ~/.claude/settings.json with "$HOME"). /rdl-team:cc-setup and the
+#      `hooks` plugin both wire this for you.
+#   2. Point the "command" path at this script's install location.
 #   3. Ensure this script is executable: chmod +x forced-eval-hook.sh
 #
 # How it works:
@@ -98,7 +98,7 @@ parse_frontmatter() {
   /^description:/ {
     state="";
     val=$0; sub(/^description:[[:space:]]*/, "", val);
-    if (val == ">" || val == "|") {
+    if (val ~ /^[>|][0-9+-]*[[:space:]]*$/) {
       state="folded_wait";
     } else {
       gsub(/^"/, "", val); gsub(/"$/, "", val);
@@ -138,13 +138,18 @@ format_list() {
 # ---------------------------------------------------------------------------
 check_cache() {
   [[ -f "$CACHE_FILE" ]] || return 1
-  local cache_mtime
-  cache_mtime=$(stat -c %Y "$CACHE_FILE" 2>/dev/null) || return 1
-  local src src_mtime
-  for src in "$0" "$SKILLS_DIR" "$PLUGINS_JSON"; do
-    [[ -e "$src" ]] || continue
-    src_mtime=$(stat -c %Y "$src" 2>/dev/null) || continue
-    [[ "$src_mtime" -le "$cache_mtime" ]] || return 1
+  # Portable freshness via bash's -nt (no stat(1) — GNU uses `-c %Y`, BSD/macOS
+  # `-f %m`). Stale if the script, installed_plugins.json, the skills dir, or any
+  # standalone SKILL.md is newer than the cache. Globbing the SKILL.md files (not
+  # just the dir) catches an edit to an existing skill — a dir mtime only moves
+  # on add/remove/rename.
+  local src
+  for src in "$0" "$PLUGINS_JSON" "$SKILLS_DIR"; do
+    if [[ -e "$src" && "$src" -nt "$CACHE_FILE" ]]; then return 1; fi
+  done
+  local skill_md
+  for skill_md in "$SKILLS_DIR"/*/SKILL.md "$SKILLS_DIR"/*/*/SKILL.md; do
+    if [[ -f "$skill_md" && "$skill_md" -nt "$CACHE_FILE" ]]; then return 1; fi
   done
   return 0
 }
@@ -334,14 +339,21 @@ main() {
       "$PLUGINS_JSON" >&2
   fi
 
-  # Format skill list
+  # Format skill list. `|| true` keeps an empty skill_data from tripping
+  # `set -o pipefail` — grep -v exits 1 when it filters every line away.
   local skills_block
-  skills_block=$(printf '%s\n' "$skill_data" | grep -v '^$' | format_list)
+  skills_block=$(printf '%s\n' "$skill_data" | grep -v '^$' | format_list || true)
 
   # Format command list (optional)
   local commands_block=""
   if [[ -n "$cmd_data" ]]; then
-    commands_block=$(printf '%s\n' "$cmd_data" | grep -v '^$' | format_list)
+    commands_block=$(printf '%s\n' "$cmd_data" | grep -v '^$' | format_list || true)
+  fi
+
+  # Nothing discovered → quiet no-op (exit 0), matching the documented behaviour
+  # for a configuration with no skills or commands installed.
+  if [[ -z "$skills_block" && -z "$commands_block" ]]; then
+    return 0
   fi
 
   # Build, cache, and emit the prompt
