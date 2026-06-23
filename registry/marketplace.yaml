@@ -18,9 +18,8 @@ pluginDefaults:
   repository: https://github.com/nq-rdl/agent-extensions
   license: MIT
 
-# Marketplace display order for LOCAL plugins. Any enabled bundle missing from
-# this list is appended alphabetically (with a ::warning::). External entries
-# (below) follow, in list order.
+# Marketplace display order. Any enabled bundle missing from this list is
+# appended alphabetically (with a ::warning::).
 order:
   - go
   - rust
@@ -29,7 +28,6 @@ order:
   - quarto
   - obsidian
   - writerside
-  - zod
   - defuddle
   - git
   - github-actions
@@ -58,19 +56,9 @@ order:
   - lucid
   - hooks
 
-# Marketplace entries with a non-local source (external plugins). Preserved
-# verbatim; the generator only injects the shared version.
-external:
-  - name: worktrunk
-    source:
-      source: github
-      repo: max-sixty/worktrunk
-    description: Developer tools — Git worktree CLI for parallel AI agent workflows, config guidance, and automatic Claude session tracking
-    keywords:
-      - git
-      - worktree
-      - agents
-      - workflow
+# External plugins are NOT re-hosted in this marketplace. They are consumed from
+# their own upstream marketplaces, registered for the team in .claude/settings.json
+# via `extraKnownMarketplaces`. See docs/external-marketplaces.md.
 
 # D-1 meta-plugin: a content-less plugin that declares every local subject plugin
 # as a dependency, so `claude plugin install rdl@rdl` installs the whole set and

@@ -48,7 +48,7 @@ pre-commit:
     # --- Generated artifacts are in sync with the registry (catches a
     #     forgotten sync-plugins.sh / regenerate before CI does) ---
     - name: generated-in-sync
-      glob: "{registry/**,skills/**,agents/**,plugins/**,VERSION}"
+      glob: "{registry/**,skills/**,agents/**,plugins/**,.claude/scripts/**,VERSION}"
       run: |
         python3 scripts/check_bundle_refs.py .
         python3 scripts/check_grouping.py .
@@ -95,6 +95,16 @@ pre-push:
     - name: python-unit-tests
       glob: "{scripts/**,tests/**}"
       run: python3 -m unittest discover -s tests -p 'test_*.py'
+
+    # cc-web-setup SessionStart hook tests (mirrors the hook-tests CI job, which runs
+    # unconditionally). The permission-dependent persist_path case self-skips when run
+    # as root. Glob covers the canonical skill AND the two real-file copies (the live
+    # .claude/scripts/ hook and the synced plugins/ tree), so editing any one of the
+    # three byte-identical copies re-runs the harness, which re-validates the canonical
+    # copy it sources.
+    - name: install-deps-hook-tests
+      glob: "{skills/cc-web-setup/**,.claude/scripts/**,plugins/claude-code/skills/web-setup/**}"
+      run: bash skills/cc-web-setup/scripts/test-install-deps.sh
 
     # Informational: report findings but never block the push (CI uploads the
     # SARIF to the Security tab). scan.sh skips itself when Docker is absent;

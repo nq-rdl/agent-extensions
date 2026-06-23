@@ -9,11 +9,15 @@
       "ZSH_IN_DOCKER_VERSION": "1.2.0"
     }
   },
+  // Engine-portable runArgs only. NET_ADMIN/NET_RAW are required by
+  // init-firewall.sh and are valid on both Docker and podman.
+  // Note: rootless podman maps the host user to container uid 0, so the
+  // bind-mounted workspace ends up root-owned while we run as `node`. If you
+  // use rootless podman, add "--userns=keep-id" here to realign uids (Docker
+  // rejects that flag, which is why it is not set by default).
   "runArgs": [
     "--cap-add=NET_ADMIN",
-    "--cap-add=NET_RAW",
-    "--userns=keep-id",
-    "--security-opt=label=disable"
+    "--cap-add=NET_RAW"
   ],
   "customizations": {
     "vscode": {
@@ -43,6 +47,9 @@
     }
   },
   "remoteUser": "node",
+  // Sync the container `node` user to the host uid/gid on start so bind-mount
+  // writes work under Docker regardless of the host uid (not just uid 1000).
+  "updateRemoteUserUID": true,
   "mounts": [
     "source=claude-code-bashhistory-${devcontainerId},target=/commandhistory,type=volume",
     "source=claude-code-config-${devcontainerId},target=/home/node/.claude,type=volume"

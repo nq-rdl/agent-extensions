@@ -1,6 +1,6 @@
 {
   "name": "rdl",
-  "version": "0.11.0",
+  "version": "0.13.0",
   "description": "Install the full RDL agent-extensions set — every subject plugin in one command",
   "dependencies": [
     "go",
@@ -10,7 +10,6 @@
     "quarto",
     "obsidian",
     "writerside",
-    "zod",
     "defuddle",
     "git",
     "github-actions",

@@ -1,3 +1,0 @@
-kind: Added
-body: 'Restored CI workflows: SkillSpector security scan, changelog-fragment gate, and lychee link check; migrated tools/skillspector/scan.sh'
-time: 2026-06-22T10:46:42.868991273+10:00

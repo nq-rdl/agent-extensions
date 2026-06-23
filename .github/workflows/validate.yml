@@ -95,6 +95,18 @@ jobs:
       - name: Run pipeline-script unit tests
         run: python3 -m unittest discover -s tests -p 'test_*.py' -v
 
+  hook-tests:
+    name: Test cc-web-setup SessionStart hook (install-deps.sh)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      # Pure-bash harness for the SessionStart hook (ensure_gh / codex auth /
+      # persist_path / ensure_plugins). Runs as a non-root user here, so the
+      # permission-dependent persist_path case is exercised (it self-skips as root).
+      - name: Run install-deps hook unit tests
+        run: bash skills/cc-web-setup/scripts/test-install-deps.sh
+
   validate-skills:
     name: Validate skills against the agentskills.io spec (asctl)
     runs-on: ubuntu-latest

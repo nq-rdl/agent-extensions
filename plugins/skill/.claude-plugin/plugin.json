@@ -1,7 +1,7 @@
 {
   "name": "skill",
-  "version": "0.11.0",
-  "description": "Skill authoring — review skill quality and report skill issues upstream",
+  "version": "0.13.0",
+  "description": "Skill quality — audit skills for non-inferable value, review changes, and report issues upstream",
   "author": {
     "name": "nq-rdl"
   },

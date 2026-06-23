@@ -142,6 +142,32 @@ When a skill ships more than its `SKILL.md`, sort each extra file into exactly o
 
 If a file is neither runnable nor `.rst` prose, it belongs in `assets/`.
 
+## Skill content conventions
+
+A skill must encode a **gap the fresh model cannot see** — not restate public
+knowledge. Before writing or accepting skill content, apply these:
+
+### Prefer the non-inferable delta
+Ask Biggs's test: *"could a fresh model write this verbatim, with no prior
+struggle?"* If yes, cut it. Don't restate public specs or style guides; encode
+the gaps, gotchas, and project-specific decisions instead. Empirically
+(SkillsBench), wins concentrate in **concise** skills carrying verifier-facing,
+non-inferable detail — "comprehensive" prose scores worst and can displace the
+model's own stronger default.
+
+### Pin versions
+When a skill encodes a library or tool API surface, pin the version in
+`compatibility:` so drift is visible and reviewable. An unpinned API recital is
+how stale guidance (e.g. a deprecated method form) silently overrides the
+model's newer, correct default.
+
+### Add a verify-canonical guard
+For fast-moving or correctness-critical subjects, include a one-line "verify
+against the canonical source when being wrong would mislead," and point to the
+authoritative docs. See `skills/rust-explain/SKILL.md` for the model pattern.
+
+References: Biggs, *You're Probably Using Agent Skills Wrong*; SkillsBench (arXiv 2602.12670).
+
 ## Packaging a new skill into a plugin
 
 A new skill authored under `skills/<name>/` is **not installable until you map it into a bundle**
@@ -183,3 +209,17 @@ that should become `sql-review:analyse`:
 Adding an **agent** follows the same loop: author `agents/<name>/agent.md` (with frontmatter
 `name` + `description`), list it under a bundle's `agents:`, then run steps 5–6. An agent-only
 subject (no skill) is fine — give it its own bundle with an empty `skills: []`.
+
+## Claude Code on the web
+
+Cloud sessions ([Claude Code on the web](https://code.claude.com/docs/en/claude-code-on-the-web)) run on a fresh VM with only a clone of this repo. The dev-helper plugins enabled here are **external** — they help you *work on* this catalog (Go/LSP, PR review, Python tooling, git worktrees, general workflows); they are deliberately **not** this catalog's own `rdl` plugins. A session for developing the catalog should not install the catalog.
+
+`.claude/settings.json` declares them under `enabledPlugins` with their sources under `extraKnownMarketplaces`. Per the [web docs' "what carries over" table](https://code.claude.com/docs/en/claude-code-on-the-web), **plugins declared in `.claude/settings.json` are installed at session start from the marketplace you declared** — it just has to be reachable (`github.com` is on the default *Trusted* allowlist). So their `/<plugin>:<skill>` commands surface with **no setup script and no `make`**; the declaration is the whole mechanism.
+
+The repo ships a `.claude/scripts/install-deps.sh` **SessionStart hook** (gated on `CLAUDE_CODE_REMOTE`) but it does **not** drive that plugin install — it provisions only what the declarative path does not: per-session tooling the base image lacks (gh/codex CLIs), the project dev toolchain + Docker daemon (via `install-deps.local.sh`), and a cheap idempotent **plugin self-heal** that retries the declarative install *only if* a transient marketplace fetch failed at session start. `announce-capabilities.sh` cross-checks the declared set against `claude plugin list` and flags any **"Declared but NOT installed"** plugin, so a marketplace-reachability failure is never silently masked.
+
+These two engine scripts have one **canonical source**, `skills/cc-web-setup/assets/{install-deps,announce-capabilities}.sh`; both the live `.claude/scripts/` copies and the synced `plugins/claude-code/skills/web-setup/` copies are written by `bash scripts/sync-plugins.sh` and guarded by its `--check` drift gate (bytes **and** the executable bit — the live copies are forced `0o755` and a non-executable canonical asset is flagged). Edit only the canonical copy under `skills/cc-web-setup/assets/`, then re-run sync. `.claude/scripts/install-deps.local.sh` is the repo-local project seam — it has no canonical source and is intentionally left untouched.
+
+There is **no Setup-script field to set and no manual per-environment step** — declaring the plugins is sufficient.
+
+To add a dev-helper plugin: set it `true` in `enabledPlugins` and register its marketplace under `extraKnownMarketplaces`. Keep the set small and **external** — do not enable the `rdl` marketplace or the `rdl@rdl` meta-plugin here (it is self-referential in this repo's own dev env: per the docs it must reach its marketplace source, and a self-cloning meta batch breaks that install).

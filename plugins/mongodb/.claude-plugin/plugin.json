@@ -1,6 +1,6 @@
 {
   "name": "mongodb",
-  "version": "0.11.0",
+  "version": "0.13.0",
   "description": "MongoDB — query and index performance analysis against a live cluster",
   "author": {
     "name": "nq-rdl"

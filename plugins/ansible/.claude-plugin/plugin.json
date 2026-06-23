@@ -1,6 +1,6 @@
 {
   "name": "ansible",
-  "version": "0.11.0",
+  "version": "0.13.0",
   "description": "Ansible — author, debug, and optimise playbooks, roles, and inventories",
   "author": {
     "name": "nq-rdl"
