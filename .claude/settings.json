@@ -30,7 +30,7 @@
     "astral@astral-sh": true,
     "worktrunk@worktrunk": true,
     "skill-creator@claude-plugins-official": true,
-    "plugin-dev@claude-plugins-offical": true
+    "plugin-dev@claude-plugins-official": true
   },
   "extraKnownMarketplaces": {
     "claude-plugins-official": {
