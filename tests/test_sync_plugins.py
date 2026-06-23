@@ -393,6 +393,26 @@ class TestSyncLiveHooks(unittest.TestCase):
         self.assertTrue(_is_exec(p))
         self.assertEqual(self._run("--check").returncode, 0)
 
+    def _canon(self, name):
+        return self.repo / "skills" / "cc-web-setup" / "assets" / name
+
+    def test_check_flags_non_executable_canonical(self):
+        # A canonical asset that lost its exec bit must be flagged even though
+        # src == dst could otherwise agree — the live hook is run directly, so a
+        # non-executable mode would fail SessionStart with permission denied.
+        self._canon("install-deps.sh").chmod(0o644)
+        self.assertEqual(self._run("--check").returncode, 1)
+
+    def test_write_forces_live_hook_executable_despite_non_exec_canonical(self):
+        # Even if canonical lost its exec bit, the written live hook is forced
+        # 0o755 (the bad mode never propagates); --check still flags the broken
+        # canonical so the root cause surfaces.
+        canon = self._canon("install-deps.sh")
+        canon.chmod(0o644)
+        self.assertEqual(self._run().returncode, 0)
+        self.assertTrue(_is_exec(self.live / "install-deps.sh"))
+        self.assertEqual(self._run("--check").returncode, 1)
+
 
 if __name__ == "__main__":
     unittest.main()

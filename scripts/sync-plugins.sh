@@ -253,6 +253,17 @@ def sync_agent(plugin: str, agent: str, bundle_file: Path) -> None:
     print(f"  ✓ agent {agent}")
 
 
+# The live .claude/scripts/ hooks are invoked DIRECTLY from .claude/settings.json,
+# so they MUST be executable. We pin both the canonical asset and the live copy to
+# 0o755 (every cc-web-setup hook copy is 0o755 today) rather than merely requiring
+# src == dst: if src and dst agreed on a NON-executable mode, an `src == dst` check
+# would pass while SessionStart fails with permission denied. Write force-sets 0o755
+# on the live copy (so a cleared canonical exec bit can never propagate a broken
+# mode), and --check flags any live copy that is not 0o755 AND a canonical asset
+# that has itself lost its exec bit, so the root cause surfaces too.
+HOOK_MODE = 0o755
+
+
 def sync_hooks() -> None:
     """Own this repo's LIVE cc-web-setup SessionStart hook copies (issue #166).
 
@@ -262,8 +273,9 @@ def sync_hooks() -> None:
     ("$CLAUDE_PROJECT_DIR"/.claude/scripts/install-deps.sh) — so the executable
     bit is load-bearing. Before this, no generator owned them: you hand-copied
     after editing canonical, and nothing caught silent drift. This makes sync
-    write them from canonical (carrying the exec bit) and the --check gate flag
-    any divergence in bytes OR permission mode.
+    write them from canonical and force them executable (0o755), and the --check
+    gate flag any divergence in bytes, a live copy that is not executable, or a
+    canonical asset that has itself lost its exec bit.
 
     .claude/scripts/install-deps.local.sh is the repo-local project seam — it
     has NO canonical source and is intentionally excluded (we only iterate the
@@ -282,25 +294,35 @@ def sync_hooks() -> None:
             )
             continue
         if check:
+            # The canonical asset must itself be executable — a sync would otherwise
+            # have nothing sound to copy from, and the plugin-tree copy (mode via
+            # copytree) would silently go non-executable too.
+            srcmode = src.stat().st_mode & 0o777
+            if srcmode != HOOK_MODE:
+                drift.append(
+                    f"skills/cc-web-setup/assets/{name}: canonical mode "
+                    f"{oct(srcmode)} is not {oct(HOOK_MODE)} — the live hook is run "
+                    f"directly and must be executable; restore it (e.g. chmod 755)"
+                )
             if not dst.is_file():
                 drift.append(f".claude/scripts/{name}: missing — run sync-plugins.sh")
-            elif dst.read_bytes() != src.read_bytes():
+                continue
+            if dst.read_bytes() != src.read_bytes():
                 drift.append(
                     f".claude/scripts/{name}: content differs from "
                     f"skills/cc-web-setup/assets/{name}"
                 )
-            else:
-                srcmode = src.stat().st_mode & 0o777
-                dstmode = dst.stat().st_mode & 0o777
-                if srcmode != dstmode:
-                    drift.append(
-                        f".claude/scripts/{name}: mode {oct(dstmode)} differs from "
-                        f"canonical {oct(srcmode)} — run sync-plugins.sh"
-                    )
+            dstmode = dst.stat().st_mode & 0o777
+            if dstmode != HOOK_MODE:
+                drift.append(
+                    f".claude/scripts/{name}: mode {oct(dstmode)} is not the required "
+                    f"{oct(HOOK_MODE)} — invoked directly from .claude/settings.json, "
+                    f"so it must be executable; run sync-plugins.sh"
+                )
             continue
         dst.parent.mkdir(parents=True, exist_ok=True)
         shutil.copyfile(src, dst)  # bytes
-        shutil.copymode(src, dst)  # carry the exec bit — the live hook is exec'd directly
+        dst.chmod(HOOK_MODE)  # force-executable — never inherit a cleared exec bit
         print(f"  ✓ hook {name} -> .claude/scripts/{name}")
 
 
