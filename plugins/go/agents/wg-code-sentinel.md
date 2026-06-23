@@ -16,8 +16,7 @@ tools:
 model: opus
 effort: xhigh
 skills:
-  - go-secure
-  - sops
+  - secure
 color: orange
 metadata:
   upstream: https://github.com/github/awesome-copilot/blob/main/agents/wg-code-sentinel.agent.md

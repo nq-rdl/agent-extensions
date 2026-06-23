@@ -72,7 +72,7 @@ stack (language, package manager, existing CI) before recommending anything.
 | **Git hooks** | A hooks manager is installed and wired (pre-commit/commit-msg/pre-push). | `lefthook` (Go/polyglot, no JS runtime) · `husky` (JS/Bun projects) · `pre-commit` (Python/pixi). Pick one per repo — never stack managers. |
 | **Changelog** | A changelog process exists and fragments are required in CI. | `changie` |
 | **Commit messages** | Commits follow a convention; commit-msg hook or CI enforces it. | `conventional-commits` |
-| **CI/CD** | Workflows build/test/lint/release; actions are SHA-pinned, least-privilege, OIDC where applicable. | `go-gh` (Go GitHub Actions). For broader Actions security hardening, recommend the **github-actions-expert** agent. |
+| **CI/CD** | Workflows build/test/lint/release; actions are SHA-pinned, least-privilege, OIDC where applicable. | `/gh:go` (Go GitHub Actions). For broader Actions security hardening, recommend the **github-actions-expert** agent. |
 | **PR flow** | A repeatable commit→push→PR path exists. | `send-pr` |
 | **Release/docs** | README, ARCHITECTURE, CONTRIBUTING, CHANGELOG, VERSION stay accurate post-ship. | `document-release` |
 | **Repo settings** | Default branch, branch protection + required checks, CODEOWNERS, LICENSE, `.gitignore`, Dependabot, secret scanning. | Use the `gh` CLI / GitHub MCP tools to read and (in Update mode) set these. |

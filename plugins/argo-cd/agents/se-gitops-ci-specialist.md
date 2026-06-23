@@ -15,7 +15,7 @@ tools:
   - WebFetch
 model: sonnet
 skills:
-  - argo-cd
+  - manage
 color: purple
 metadata:
   upstream: https://github.com/github/awesome-copilot/blob/main/agents/se-gitops-ci-specialist.agent.md
