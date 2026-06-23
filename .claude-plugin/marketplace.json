@@ -13,13 +13,12 @@
     {
       "name": "go",
       "source": "./plugins/go",
-      "description": "Go — idiomatic naming, secure error handling, and GitHub Actions CI/CD",
+      "description": "Go — idiomatic naming and secure error handling",
       "version": "0.14.0",
       "keywords": [
         "go",
         "naming",
-        "security",
-        "ci-cd"
+        "security"
       ]
     },
     {
@@ -105,15 +104,17 @@
       ]
     },
     {
-      "name": "git",
-      "source": "./plugins/git",
-      "description": "Git workflow — hooks, changelogs, conventional commits, pull requests, and releases",
+      "name": "gh",
+      "source": "./plugins/gh",
+      "description": "GitHub workflow — git hooks, changelogs, conventional commits, pull requests, releases, and Go CI/CD",
       "version": "0.14.0",
       "keywords": [
+        "github",
         "git",
         "hooks",
         "changelog",
-        "pull-request"
+        "pull-request",
+        "ci-cd"
       ]
     },
     {
@@ -298,6 +299,19 @@
         "agents",
         "hooks",
         "web",
+        "setup"
+      ]
+    },
+    {
+      "name": "rdl-team",
+      "source": "./plugins/rdl-team",
+      "description": "RDL team workflows — Claude Code onboarding, setup, and config management",
+      "version": "0.14.0",
+      "keywords": [
+        "rdl",
+        "team",
+        "onboarding",
+        "claude-code",
         "setup"
       ]
     },

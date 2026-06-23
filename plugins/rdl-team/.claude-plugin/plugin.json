@@ -1,7 +1,7 @@
 {
-  "name": "git",
+  "name": "rdl-team",
   "version": "0.14.0",
-  "description": "Git workflow — hooks, changelogs, conventional commits, pull requests, and releases",
+  "description": "RDL team workflows — Claude Code onboarding, setup, and config management",
   "author": {
     "name": "nq-rdl"
   },

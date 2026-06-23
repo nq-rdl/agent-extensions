@@ -1,6 +1,6 @@
 # Agent Extensions
 
-Curated reusable agent skills and agents packaged as Claude Code plugins. Each **subject** (a tool, library, language, or workflow) is one plugin: skills are invoked as `/<subject>:<facet>` (e.g. `/go:secure`, `/git:send-pr`) and agents are delegated as subagents. Canonical skills live under `skills/` and agents under `agents/`; each subject is published as a self-contained plugin under `plugins/`, listed in the repo-root marketplace manifest (`.claude-plugin/marketplace.json`).
+Curated reusable agent skills and agents packaged as Claude Code plugins. Each **subject** (a tool, library, language, or workflow) is one plugin: skills are invoked as `/<subject>:<facet>` (e.g. `/go:secure`, `/gh:send-pr`) and agents are delegated as subagents. Canonical skills live under `skills/` and agents under `agents/`; each subject is published as a self-contained plugin under `plugins/`, listed in the repo-root marketplace manifest (`.claude-plugin/marketplace.json`).
 
 Claude Code is the only publication target.
 

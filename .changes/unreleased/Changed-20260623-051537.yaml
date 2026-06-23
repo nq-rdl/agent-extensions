@@ -1,0 +1,3 @@
+kind: Changed
+body: Moved `go-gh` from `/go:gh` to `/gh:go` (#115)
+time: 2026-06-23T05:15:37.045155014Z
