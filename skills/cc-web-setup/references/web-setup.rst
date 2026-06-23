@@ -76,7 +76,7 @@ Declarative install is primary; the self-heal is the backstop kept **deliberatel
 installs the rest idempotently. When any plugin is still pending it **first registers
 every declared marketplace** with ``claude plugin marketplace add`` (idempotent — a
 no-op once on disk), so it never depends on the platform having registered
-``extraKnownMarketplaces`` first (the cold-start race, issue #181). A github source
+``extraKnownMarketplaces`` first (the cold-start race, issue #181). A GitHub source
 pins its ref as ``owner/repo@ref`` (a git URL as ``<git-url>#ref``); a source carrying
 a custom ``path`` (a non-default ``marketplace.json``) has no ``marketplace add``
 equivalent and is **skipped**, left to declarative registration. On a failed install
