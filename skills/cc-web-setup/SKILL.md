@@ -52,9 +52,13 @@ and provisions only what the declarative path does not:
 - **The project dev toolchain + services** (language toolchains, the Docker daemon,
   git-hook wiring) via the optional `install-deps.local.sh` seam.
 - **A plugin self-heal** (`ensure_plugins`): a cheap, idempotent retry that reinstalls the
-  declared set **only if** the platform's session-start install didn't complete (the docs'
-  *"requires network access to reach the marketplace source"* failure mode). Normally a
-  no-op.
+  declared set **only if** the platform's session-start install didn't complete. It first
+  **registers** the declared marketplaces (`claude plugin marketplace add`) — on a cold VM
+  this hook can outrun Claude Code's own registration of `extraKnownMarketplaces`, leaving
+  the registry empty, which is a **race**, not the docs' *"requires network access to reach
+  the marketplace source"* failure — then refreshes a stale index on a failed install,
+  owning the whole add → update → install chain. Gated on a pending count, so a warm resume
+  stays a no-op.
 
 `announce-capabilities.sh` (the second SessionStart hook) cross-checks the declared set
 against `claude plugin list` and reports **"Enabled plugins (installed)"** vs a
