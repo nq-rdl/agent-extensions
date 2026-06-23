@@ -70,7 +70,7 @@
     }
   ],
   "baseline": {
-    "description": "Always-useful plugins to suggest on every setup (cc-setup / cc-web-setup), regardless of the repo's stack. The `always` set is language-agnostic; the `lsp` set is language-applicable — offer the entry whose `language` matches a detected language. Every id's @marketplace must be declared in `marketplaces` above (the gh@rdl suggestion is stripped automatically inside this repo by web-settings.sh strip-self).",
+    "description": "Always-useful plugins to suggest on every setup (cc-setup / cc-web-setup), regardless of the repo's stack. The `always` set is language-agnostic; the `lsp` set is language-applicable — offer the entry whose `language` matches a detected language. Every id's @marketplace must be declared in `marketplaces` above. Caveat for marketplace repos: when the repo being set up is itself the `rdl` marketplace (a .claude-plugin/marketplace.json named `rdl`, e.g. agent-extensions), the gh@rdl suggestion is removed — automatically by web-settings.sh strip-self on the web path, and manually by the cc-setup self-marketplace guard on the local path.",
     "always": [
       {
         "id": "pr-review-toolkit@claude-plugins-official",

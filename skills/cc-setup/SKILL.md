@@ -187,9 +187,12 @@ claude plugin marketplace add <owner>/<repo>      # e.g. nq-rdl/agent-extensions
 claude plugin install <plugin>@<marketplace>      # only the ones the user confirmed
 ```
 
-Never install without confirmation, and never enable the self-referential `rdl@rdl`
-meta-plugin from inside this repo's own checkout (it shadows working-tree edits) — suggest
-the individual subject plugins instead.
+Never install without confirmation. **Self-marketplace guard:** if the target repo is
+itself the `rdl` marketplace (a `.claude-plugin/marketplace.json` with `name: rdl` — e.g.
+`agent-extensions` itself), skip **every** `@rdl` plugin, not just `rdl@rdl`. Installing the
+published copy of *any* `@rdl` id (including the baseline's `gh@rdl`) shadows the working
+tree's own copy. Unlike the web path, this local install has no automatic `strip-self`, so
+you must exclude `@rdl` ids yourself there — the working tree already provides those skills.
 
 ## Phase 5 — Summarize
 

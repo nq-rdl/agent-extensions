@@ -7,8 +7,8 @@ description: >-
   decide which ones THIS repo should enable. It locates the team's tracked
   marketplace list, enumerates each marketplace's plugin catalog (live), inspects
   the repo's languages and tooling, and returns a ranked suggestion set: the
-  always-useful baseline (pr-review, gh@rdl, worktrunk, the applicable LSP) plus
-  language/stack-matched picks, each with id, marketplace, and a one-line reason.
+  always-useful baseline (pr-review-toolkit, gh@rdl, worktrunk, the applicable LSP)
+  plus language/stack-matched picks, each with id, marketplace, and a one-line reason.
   It only researches and recommends — it does not install or edit settings.
 license: MIT
 tools:
@@ -39,9 +39,10 @@ The team tracks its marketplaces, externals, and the always-useful **baseline** 
 single `marketplaces.json`. Find it, in this order, and read it:
 
 ```bash
-# Both setup skills ship marketplaces.json in their assets/ (cc-web-setup AND cc-setup),
-# so search the plugin cache broadly and take the first hit:
-find "$HOME/.claude/plugins" -path '*/assets/marketplaces.json' 2>/dev/null | head -1
+# Both setup skills ship marketplaces.json under a *-setup leaf (web-setup AND cc-setup),
+# so search those plugin trees and take the first hit (the glob is scoped to setup leaves
+# so an unrelated plugin's assets/marketplaces.json can't be picked up by mistake):
+find "$HOME/.claude/plugins" -path '*-setup/assets/marketplaces.json' 2>/dev/null | head -1
 # Fallbacks, in order:
 #   - this repo's canonical copies when running inside agent-extensions itself:
 #       skills/cc-web-setup/assets/marketplaces.json  (canonical)
@@ -74,19 +75,19 @@ Baseline (always suggest): `pr-review-toolkit@claude-plugins-official`, `gh@rdl`
 
 For every marketplace in the list, fetch its catalog so you suggest from the **current**
 set, not a stale memory. Each Claude Code marketplace publishes a
-`.claude-plugin/marketplace.json` at its repo root. Prefer the live CLI when marketplaces
-are already registered; otherwise fetch the raw manifest.
-
-```bash
-# If the marketplaces are already registered locally, list their plugins directly:
-claude plugin marketplace list 2>/dev/null || true
-```
-
-Otherwise fetch each repo's manifest with WebFetch (most reliable in a fresh/web session):
+`.claude-plugin/marketplace.json` at its repo root — that manifest is the **authoritative
+plugin list**, so fetch and parse it for each marketplace with WebFetch (most reliable in a
+fresh/web session):
 
 ```
 https://raw.githubusercontent.com/<owner>/<repo>/HEAD/.claude-plugin/marketplace.json
 ```
+
+Read each manifest's `plugins[]` array for the catalog. Do **not** rely on
+`claude plugin marketplace list` to enumerate plugins — it lists the *configured
+marketplaces*, not their plugin catalogs. The only CLI list that helps is
+`claude plugin list` (the plugins **already installed**), which you use in Step 4 to
+drop suggestions the repo already has — not to discover what's available.
 
 For each marketplace, record every plugin's `name`, `description`, and `keywords`. The
 **RDL** catalog (`nq-rdl/agent-extensions`) is the largest — capture all of its subject
@@ -105,9 +106,13 @@ Survey the target repo to know what to match against. Look for:
   `DESCRIPTION`/`*.R` (R), `package.json` (TS/JS), `*.tf` (Terraform), `Chart.yaml`/`k8s` manifests, `*.qmd` (Quarto), etc.
 - **Tooling / workflow signals:** `.github/workflows/` (CI), `.pre-commit-config.yaml`/`lefthook.yml`/`.husky` (hooks),
   `CHANGELOG.md`/`.changes/` (changie), `Dockerfile`/`docker-compose` (containers), `.sops.yaml` (secrets), docs sites.
-- **Repo shape:** is it itself a Claude Code marketplace (`.claude-plugin/marketplace.json` present)? If so, flag
-  that any `@rdl` self-suggestion (e.g. `gh@rdl` inside `nq-rdl/agent-extensions`) will be stripped by web-setup —
-  note it rather than recommending it for install.
+- **Repo shape:** is the target repo **itself the `rdl` marketplace** — i.e. does
+  `.claude-plugin/marketplace.json` exist with `name: rdl`? If so, **every** `@rdl` plugin
+  (not just `rdl@rdl` — also `gh@rdl`, `go@rdl`, …) is already provided by the working tree,
+  and installing the published copy would shadow local edits. Drop **all** `@rdl` ids from the
+  install recommendation for that repo (the web path's `strip-self` enforces this; the local
+  path has no such guard, so the recommendation itself must exclude them) and say why in the
+  report's Notes.
 
 Use `Glob`/`Grep` for fast detection; don't read whole files.
 
