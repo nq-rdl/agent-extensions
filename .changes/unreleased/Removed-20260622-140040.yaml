@@ -1,3 +1,0 @@
-kind: Removed
-body: Removed the `external:` marketplace passthrough mechanism (and the worktrunk passthrough entry). External plugins are no longer re-hosted in the `rdl` marketplace; they are consumed from their upstream marketplaces, registered for the team in `.claude/settings.json` via `extraKnownMarketplaces`. See docs/external-marketplaces.md.
-time: 2026-06-22T14:00:40.684487733+10:00

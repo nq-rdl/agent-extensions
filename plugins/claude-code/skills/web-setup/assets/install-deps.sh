@@ -1,38 +1,48 @@
 #!/usr/bin/env bash
 #
-# web-bootstrap.sh — per-session bootstrap for a Claude Code on the web session.
+# install-deps.sh — SessionStart hook for Claude Code on the web.
 #
-# Invoked from the repo's .claude/settings.json SessionStart hook. It is a no-op
-# unless running inside an Anthropic-managed cloud VM (CLAUDE_CODE_REMOTE=true),
-# so it never touches a local contributor's machine.
+# Invoked from .claude/settings.json (SessionStart). A no-op unless running inside
+# an Anthropic-managed cloud VM (CLAUDE_CODE_REMOTE=true), so the same committed
+# hook is safe for every local contributor.
 #
-# The heavy provisioning (Claude plugin pre-seed) lives in
-# scripts/cc-web-setup.sh, which the web environment's *setup script* should run
-# ONCE before the snapshot (`make cc-web-setup`) so plugin skills are available
-# on the FIRST session — Claude enumerates skills at startup, so a plugin
-# installed by this hook only surfaces next session. This per-session hook then:
-#   * self-heals by running cc-web-setup.sh when the environment was not
-#     pre-provisioned (on that path, plugin skills only arrive next session);
-#   * provisions the portable per-session tooling a snapshot cannot carry: the
-#     GitHub CLI (PR/CI automation) and the Codex CLI (a second opinion via
-#     `codex exec`), persisting both on PATH for later Bash commands;
-#   * sources an optional project hook (web-bootstrap.local.sh) for repo-specific
-#     glue (language toolchains, container runtimes, git-hook wiring, …).
+# PLUGINS ARE NOT INSTALLED HERE (primarily). Claude Code on the web installs the
+# plugins declared in .claude/settings.json (enabledPlugins + extraKnownMarketplaces)
+# at session start from their marketplaces — see the web docs' "what carries over"
+# table — so their /<plugin>:<skill> commands surface without any Setup script or
+# `make`. This hook only provisions what that declarative path does NOT cover:
+#   * the per-session tooling a base image may lack — the GitHub CLI (PR/CI
+#     automation) and the Codex CLI (a second opinion via `codex exec`);
+#   * the project dev toolchain + services (lefthook, changie, gopls, python/jq,
+#     the Docker daemon) via the optional project seam (install-deps.local.sh);
+#   * a cheap idempotent PLUGIN SELF-HEAL (ensure_plugins) that retries the
+#     declarative install if it did not complete at session start — refreshing the
+#     marketplace index first (`claude plugin marketplace update`) so a stale local
+#     copy, not just an unreachable source, is recovered.
 #
-# This script is PORTABLE: it carries no project-specific dependencies. Anything
-# specific to one repo belongs in scripts/web-bootstrap.local.sh (sourced below).
+# This engine is PORTABLE: it carries no project-specific dependencies. Anything
+# specific to one repo belongs in .claude/scripts/install-deps.local.sh (sourced
+# below) — the dev toolchain for THIS repo lives there.
 #
 # Output discipline: SessionStart stdout is injected into Claude's context, so
 # verbose tool output goes to $LOG and only concise status lines reach stdout.
 #
 # Every step is non-fatal: a SessionStart hook that exits non-zero can disrupt
 # session start, so problems are logged and the script always exits 0.
-set -uo pipefail
+#
+# Apply strict mode ONLY when executed as the hook, not when the test harness
+# sources this file: `set` mutates global shell options, so an unguarded `set`
+# here would leak -u/pipefail into the caller's shell and break the
+# sourceable-for-tests guarantee noted at the bottom. Same BASH_SOURCE[0] == $0
+# test as the main() guard.
+if [ "${BASH_SOURCE[0]}" = "${0}" ]; then
+  set -uo pipefail
+fi
 
 # Only colorize on a TTY — cloud SessionStart stdout is non-TTY and injected into
 # the model context, where ANSI escapes are just noise.
 if [ -t 1 ]; then _BLU=$'\033[34m'; _RST=$'\033[0m'; else _BLU=''; _RST=''; fi
-log() { printf '%s[web-bootstrap]%s %s\n' "$_BLU" "$_RST" "$*"; }
+log() { printf '%s[install-deps]%s %s\n' "$_BLU" "$_RST" "$*"; }
 
 # Pinned GitHub CLI (gh) release. GitHub releases are on the cloud "Trusted"
 # network allowlist. Update the pin and BOTH per-arch checksums together — the
@@ -457,20 +467,128 @@ persist_path() {
   fi
 }
 
+# Self-heal the plugins declared in .claude/settings.json (enabledPlugins == true).
+#
+# WHY THIS EXISTS: Claude Code on the web installs the plugins declared in
+# .claude/settings.json (enabledPlugins + extraKnownMarketplaces) at session start
+# from their marketplaces — see the web docs' "what carries over" table — so this
+# is NOT the primary install path. It is a belt-and-suspenders RETRY for when that
+# did not complete. Two failure modes are covered: (1) a STALE local marketplace
+# index — the marketplace is registered but its index was never fetched/refreshed
+# before this hook ran, so `claude plugin install` fails with "Plugin not found in
+# marketplace … your local copy may be out of date"; and (2) the docs' "requires
+# network access to reach the marketplace source." `claude plugin install` does NOT
+# refresh the index itself, so on a failed install this runs `claude plugin
+# marketplace update <marketplace>` and retries once (which fixes case 1). Normally
+# every plugin is already present and this is a quiet no-op.
+#
+# CAVEAT (timing): Claude enumerates skills at process startup, BEFORE SessionStart
+# hooks finish, so anything this retry installs surfaces from the NEXT session, not
+# the one that installs it — acceptable for a self-heal, since the platform's own
+# session-start install is the first-session path.
+#
+# Idempotent: skips any plugin already in `claude plugin list`. Non-fatal: a failed
+# install logs a warning and the session continues. Reads the enabled set straight
+# from settings.json (single source of truth) so it cannot drift from what
+# announce-capabilities.sh verifies.
+ensure_plugins() {
+  command -v claude >/dev/null 2>&1 || { log "claude CLI not on PATH — skipping plugin install."; return 0; }
+  command -v jq >/dev/null 2>&1 || { log "jq not available — cannot read enabledPlugins; skipping plugin install."; return 0; }
+  local settings="${PROJECT_DIR}/.claude/settings.json"
+  [ -f "$settings" ] || return 0
+
+  local plugins=() p
+  while IFS= read -r p; do
+    [ -n "$p" ] && plugins+=("$p")
+  done < <(jq -r '(.enabledPlugins // {}) | to_entries[] | select(.value == true) | .key' "$settings" 2>/dev/null)
+  [ "${#plugins[@]}" -gt 0 ] || return 0
+
+  # Already-installed plugin ids (the `> <id>` lines from `claude plugin list`), so
+  # we skip re-installing on a resume. Empty on a cold VM — every plugin installs.
+  local installed_blob
+  installed_blob="$(claude plugin list 2>/dev/null | awk '/^[[:space:]]*>[[:space:]]/ { print $2 }')"
+
+  # $refreshed memoizes the marketplaces whose index we have already tried to
+  # `marketplace update` THIS run, as a space-delimited set " <mkt> <mkt> ". Plain
+  # string (not an associative array) so the hook stays bash 3.2-portable.
+  local n_ok=0 n_fail=0 mkt refreshed=" "
+  for p in "${plugins[@]}"; do
+    if printf '%s\n' "$installed_blob" | grep -qxF -- "$p"; then
+      continue
+    fi
+    log "Installing plugin ${p}…"
+    if claude plugin install "$p" </dev/null >>"$LOG" 2>&1; then
+      log "  ${p}: installed."
+      n_ok=$((n_ok + 1))
+      continue
+    fi
+    # First attempt failed. The usual cause on a fresh cloud VM is a STALE local
+    # marketplace index: the marketplace is registered (from extraKnownMarketplaces)
+    # but its index was never fetched/refreshed before this hook ran, so the install
+    # reports "Plugin not found in marketplace … your local copy may be out of date —
+    # try `claude plugin marketplace update`". `claude plugin install` does NOT do
+    # that refresh itself. The id is `<plugin>@<marketplace>`, so the marketplace is
+    # the suffix after the last '@'.
+    mkt="${p##*@}"
+    case "$refreshed" in
+      *" ${mkt} "*)
+        # A refresh was already ATTEMPTED for this marketplace earlier this run. If it
+        # succeeded, this plugin's FIRST attempt above already ran against the updated
+        # index; if it failed (unreachable), re-running the update would just fail
+        # again. Either way a re-update + retry is pointless. Refresh each marketplace
+        # AT MOST ONCE per run: multiple plugins can share one (e.g. three
+        # claude-plugins-official entries), and an unreachable marketplace must not be
+        # re-hit per plugin (network + SessionStart-delay). Fall straight through to
+        # the failure diagnostic. Say "a refresh was already attempted" (not
+        # "refreshed") so the line stays accurate even when that earlier update failed.
+        log "  WARNING: could not install ${p}; a refresh was already attempted for marketplace '${mkt}' this run — the plugin id may be wrong or its source unreachable (see ${LOG})."
+        n_fail=$((n_fail + 1))
+        ;;
+      *)
+        refreshed="${refreshed}${mkt} "
+        log "  ${p}: first attempt failed; refreshing marketplace '${mkt}' and retrying…"
+        if claude plugin marketplace update "$mkt" </dev/null >>"$LOG" 2>&1; then
+          if claude plugin install "$p" </dev/null >>"$LOG" 2>&1; then
+            log "  ${p}: installed (after refreshing marketplace '${mkt}')."
+            n_ok=$((n_ok + 1))
+          else
+            # Index is now fresh yet the install still fails => the plugin id is
+            # likely wrong. Non-fatal — announce-capabilities.sh flags the gap.
+            log "  WARNING: could not install ${p} even after refreshing marketplace '${mkt}' — the plugin id may be wrong (see ${LOG})."
+            n_fail=$((n_fail + 1))
+          fi
+        else
+          # The refresh itself failed, so the index may still be stale; say so rather
+          # than claim we refreshed. Usually the marketplace source is unreachable.
+          log "  WARNING: could not install ${p}; marketplace '${mkt}' could not be refreshed — its source may be unreachable (network) (see ${LOG})."
+          n_fail=$((n_fail + 1))
+        fi
+        ;;
+    esac
+  done
+  log "Plugin install: ${n_ok} installed, ${n_fail} failed, $(( ${#plugins[@]} - n_ok - n_fail )) already present."
+  # When the self-heal actually had to install >=1 plugin THIS session (i.e. the
+  # platform's own session-start install did not complete), leave a marker for
+  # announce-capabilities.sh to surface the gap once. Best-effort: never fail on it.
+  if [ "$n_ok" -gt 0 ]; then
+    printf '%s\n' "$n_ok" > "${TMPDIR:-/tmp}/rdl-web-setup-installed" 2>/dev/null || true
+  fi
+  return 0
+}
+
 # Imperative body. Wrapped in main() so the script is *sourceable* for unit
 # tests: executing it (the SessionStart hook runs it by direct exec) runs main;
 # sourcing it (the test harness) only defines the functions/globals above so they
 # can be exercised against stubbed external tools. SUDO/LOG/PROJECT_DIR and the
 # CLAUDE_CODE_REMOTE gate live in here so sourcing never touches the environment.
 main() {
-  # Only run inside Claude Code on the web. Locally this is a fast no-op so the
-  # same committed hook is safe for every contributor.
-  if [ "${CLAUDE_CODE_REMOTE:-}" != "true" ]; then
-    exit 0
-  fi
+  # SessionStart hook for Claude Code on the web. A no-op on a local machine so the
+  # same committed hook never disturbs a contributor; everything below runs only in
+  # a cloud session.
+  [ "${CLAUDE_CODE_REMOTE:-}" = "true" ] || exit 0
 
   # SUDO is intentionally exposed as a global for the sourced project hook
-  # (web-bootstrap.local.sh) to use when starting daemons (e.g. dockerd).
+  # (install-deps.local.sh) to use when starting daemons (e.g. dockerd).
   SUDO=''
   # -n (non-interactive): a SessionStart hook has no TTY, so a sudo that needs a
   # password must fail fast rather than block the session waiting on input.
@@ -478,30 +596,39 @@ main() {
   [ "$(id -u)" -eq 0 ] || SUDO='sudo -n'
 
   # Verbose output sink (keeps the model's context clean — see header). Use
-  # mktemp for a UNIQUE, unpredictable name: a fixed /tmp/rdl-web-bootstrap.log
+  # mktemp for a UNIQUE, unpredictable name: a fixed /tmp/rdl-install-deps.log
   # could be pre-created as a symlink (truncating an arbitrary target via the
   # old `: > "$LOG"` redirect) or raced by a concurrent session. mktemp creates
   # the file safely (O_EXCL, no symlink follow); the subshell umask 077 keeps it
   # 0600 from the outset. Fall back to /dev/null if mktemp is unavailable/fails.
-  LOG="$(umask 077; mktemp "${TMPDIR:-/tmp}/rdl-web-bootstrap.XXXXXX" 2>/dev/null)" || LOG=/dev/null
+  LOG="$(umask 077; mktemp "${TMPDIR:-/tmp}/rdl-install-deps.XXXXXX" 2>/dev/null)" || LOG=/dev/null
   [ -n "$LOG" ] || LOG=/dev/null
 
   # Resolve the repo root. The hook exports CLAUDE_PROJECT_DIR; fall back to the
-  # script's own location so it also works when run by hand.
-  PROJECT_DIR="${CLAUDE_PROJECT_DIR:-$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)}"
+  # script's own location (this file lives at .claude/scripts/, so the repo root
+  # is two levels up) so it also works when run by hand.
+  PROJECT_DIR="${CLAUDE_PROJECT_DIR:-$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)}"
 
-  # --- 1. provisioning self-heal (plugin pre-seed) ----------------------------
-  # Normally already done ONCE by the environment setup script (`make
-  # cc-web-setup`) before the snapshot, which is what makes plugin skills available
-  # this session. Re-running is idempotent, so this self-heals environments whose
-  # setup script does not run it — though on that path plugin skills only surface
-  # next session.
-  if [ -f "${PROJECT_DIR}/scripts/cc-web-setup.sh" ]; then
-    bash "${PROJECT_DIR}/scripts/cc-web-setup.sh" \
-      || log "WARNING: cc-web-setup reported errors (see ${TMPDIR:-/tmp}/rdl-cc-web-setup.log)."
+  # --- Project dev toolchain — source the project seam ------------------------
+  # The portable engine carries no project deps. THIS repo's dev toolchain
+  # (lefthook, changie, gopls, python/jq, the Docker daemon) + git-hook wiring
+  # lives in the project seam, sourced here. A subshell inherits main()'s helpers
+  # and globals (log, $LOG, $PROJECT_DIR, $SUDO, $CLAUDE_ENV_FILE, persist_path),
+  # so its file/system side effects persist.
+  #
+  # SECURITY/ISOLATION: install-deps.local.sh is trusted, repo-owned code — the
+  # same trust level as this committed script. Running it in a SUBSHELL keeps a
+  # stray `exit` from breaking the "always exit 0" discipline and stops its
+  # variable edits from leaking back; it does NOT sandbox the code (it legitimately
+  # needs the session's git/gh credentials). Non-zero exit is logged, never fatal.
+  local local_hook="${PROJECT_DIR}/.claude/scripts/install-deps.local.sh"
+  if [ -f "$local_hook" ]; then
+    log "Provisioning dev toolchain (install-deps.local.sh)…"
+    # shellcheck source=/dev/null
+    ( source "$local_hook" ) || log "WARNING: project bootstrap hook reported errors (see ${LOG})."
   fi
 
-  # --- 2. GitHub CLI + token (every session) ----------------------------------
+  # --- GitHub CLI + token -----------------------------------------------------
   # Provision gh so PR/CI automation can run from the cloud session, and report
   # whether the environment injected a GitHub token. gh reads GH_TOKEN (or
   # GITHUB_TOKEN) straight from the env — no `gh auth login` — so we just verify it
@@ -522,7 +649,7 @@ main() {
     log "WARNING: gh CLI not available (install failed — see ${LOG})."
   fi
 
-  # --- 3. Codex CLI install + auth (every session; quiet no-op without creds) --
+  # --- Codex CLI install + auth (quiet no-op without creds) -------------------
   # Install the Codex CLI and authenticate it so `codex exec` works headlessly.
   # Two supported credential inputs, in priority order:
   #   * CODEX_AUTH_JSON   — the full contents of a ~/.codex/auth.json captured from
@@ -557,33 +684,19 @@ main() {
     fi
   fi
 
-  # --- 4. SOURCE PROJECT HOOK (optional, project-specific) --------------------
-  # The portable engine above carries no project dependencies. Repo-specific glue
-  # — language toolchains on PATH, container runtimes, git-hook wiring (.husky /
-  # .githooks / lefthook), fetching the default branch for merge-base checks, etc.
-  # — belongs in scripts/web-bootstrap.local.sh, sourced here if present. A subshell
-  # inherits main()'s helpers and globals (log, $LOG, $PROJECT_DIR, $SUDO,
-  # $CLAUDE_ENV_FILE, persist_path), so its file/system side effects persist.
-  #
-  # SECURITY/ISOLATION: web-bootstrap.local.sh is trusted, repo-owned code — the
-  # same trust level as this committed hook. Running it in a SUBSHELL keeps a stray
-  # `exit` (or `exit 1`) from breaking this hook's "always exit 0" discipline and
-  # stops its variable edits from leaking back; it does NOT sandbox the code (a
-  # project hook legitimately needs the session's git/gh credentials). Signal a
-  # soft failure with a non-zero exit/return — it is logged, never fatal.
-  local local_hook="${PROJECT_DIR}/scripts/web-bootstrap.local.sh"
-  if [ -f "$local_hook" ]; then
-    log "Running project bootstrap hook (web-bootstrap.local.sh)…"
-    # shellcheck source=/dev/null
-    ( source "$local_hook" ) || log "WARNING: project bootstrap hook reported errors (see ${LOG})."
-  fi
+  # --- Plugin self-heal (cheap no-op once installed) --------------------------
+  # Claude Code on the web installs the plugins declared in .claude/settings.json
+  # at session start (docs: "what carries over"). This is only a belt-and-suspenders
+  # retry for the case where that did not complete (e.g. a transient marketplace
+  # network failure) — idempotent, so normally a no-op. See the ensure_plugins header.
+  ensure_plugins
 
-  log "Session bootstrap complete."
+  log "install-deps complete."
   exit 0
 }
 
 # Run the imperative body only when executed, not when sourced. The hook is
-# invoked by direct exec ("$CLAUDE_PROJECT_DIR"/scripts/web-bootstrap.sh from the
+# invoked by direct exec ("$CLAUDE_PROJECT_DIR"/.claude/scripts/install-deps.sh from the
 # SessionStart hook), so BASH_SOURCE[0] == $0 holds for the real run and the test
 # harness (which sources this file) skips main and just exercises the functions.
 if [ "${BASH_SOURCE[0]}" = "${0}" ]; then

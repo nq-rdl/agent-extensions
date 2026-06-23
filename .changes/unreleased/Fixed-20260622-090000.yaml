@@ -1,3 +1,0 @@
-kind: Fixed
-body: '`.claude/settings.json`: register the `claude-plugins-official` marketplace in `extraKnownMarketplaces` so the enabled `superpowers`, `gopls-lsp`, and `pr-review-toolkit` plugins resolve and install on Claude Code (web) — previously only `openai-codex` was declared, so those plugins'' slash-commands/skills (e.g. `/test-driven-development`) never appeared'
-time: 2026-06-22T09:00:00.000000000Z
