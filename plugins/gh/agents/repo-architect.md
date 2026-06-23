@@ -14,7 +14,8 @@ tools:
   - Grep
   - Glob
   - Bash
-model: inherit
+model: opus
+effort: xhigh
 skills:
   - changie
   - conventional-commits

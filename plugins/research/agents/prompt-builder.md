@@ -9,7 +9,8 @@ tools:
   - Edit
   - Grep
   - Glob
-model: inherit
+model: opus
+effort: xhigh
 skills: []
 color: purple
 metadata:

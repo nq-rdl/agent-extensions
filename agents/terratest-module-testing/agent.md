@@ -12,7 +12,7 @@ tools:
   - Grep
   - Glob
   - Bash
-model: inherit
+model: sonnet
 skills: []
 color: green
 metadata:

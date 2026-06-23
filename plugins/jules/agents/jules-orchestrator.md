@@ -13,7 +13,8 @@ tools:
   - Grep
   - Glob
   - Bash
-model: inherit
+model: opus
+effort: xhigh
 skills: []
 color: blue
 metadata:

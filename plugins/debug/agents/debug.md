@@ -12,7 +12,7 @@ tools:
   - Glob
   - Bash
   - WebFetch
-model: inherit
+model: sonnet
 skills: []
 color: red
 metadata:

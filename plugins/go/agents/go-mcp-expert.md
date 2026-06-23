@@ -12,9 +12,9 @@ tools:
   - Grep
   - Glob
   - Bash
-model: inherit
+model: sonnet
 skills: []
-color: teal
+color: cyan
 metadata:
   upstream: https://github.com/github/awesome-copilot/blob/main/agents/go-mcp-expert.agent.md
   repo: https://github.com/nq-rdl/agent-extensions
