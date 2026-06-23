@@ -1,0 +1,3 @@
+kind: Added
+body: Add a `/claude-code:web-setup` and `/rdl-team:cc-setup` plugin-discovery pass plus a new `marketplace-scout` agent that enumerates the RDL marketplace and the team's extra marketplaces, inspects the repo's stack, and suggests an always-useful baseline (pr-review-toolkit, gh@rdl, worktrunk, the applicable LSP) and language-matched plugins; the baseline + marketplace list are tracked in `marketplaces.json` (now shipped with both setup skills)
+time: 2026-06-23T20:35:44.905957123Z

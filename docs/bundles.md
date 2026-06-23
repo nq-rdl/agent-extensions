@@ -321,6 +321,10 @@ Claude Code — agent-team coordination, hook authoring, and web-session setup.
 - `/claude-code:pipeline`
 - `/claude-code:web-setup`
 
+**Agents**
+
+- `marketplace-scout` (subagent)
+
 ---
 
 ## rdl-team
@@ -330,6 +334,10 @@ RDL team workflows — Claude Code onboarding, setup, and config management.
 **Skills**
 
 - `/rdl-team:cc-setup`
+
+**Agents**
+
+- `marketplace-scout` (subagent)
 
 ---
 

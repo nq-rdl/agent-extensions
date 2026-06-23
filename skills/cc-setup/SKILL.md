@@ -24,10 +24,12 @@ wire it as a `UserPromptSubmit` hook in the scope the user chooses. The hook scr
 ships in this skill's `assets/` directory; you copy it into the target `.claude/` and
 merge the settings idempotently.
 
-> **Scope.** This is deliberately minimal — the hook is the floor, not the ceiling.
-> Do not configure model, permissions, MCP servers, or other settings here unless the
-> user explicitly asks. A future pass will turn this into a fuller guided tour of the
-> Claude Code settings surface.
+> **Scope.** The forced-eval hook is the floor, not the ceiling. Do not configure model,
+> permissions, MCP servers, or other settings here unless the user explicitly asks. The one
+> addition beyond the hook is an **optional** plugin-discovery pass (Phase 4) that reviews
+> the RDL marketplace and the team's extra marketplaces and *suggests* a plugin set — it
+> only recommends and installs on confirmation. A future pass will turn this into a fuller
+> guided tour of the Claude Code settings surface.
 
 ## What the hook does
 
@@ -153,7 +155,46 @@ Merge rules when the file already exists:
   expect it to emit the skill catalogue (or exit 0 quietly if no skills are installed);
   `printf '{"prompt":"hello"}' | <script>` should exit 0 with no output.
 
-## Phase 4 — Summarize
+## Phase 4 — Review and suggest team plugins (optional)
+
+Offer — don't force — to review what plugins are available across the RDL marketplace and
+the team's extra marketplaces and suggest a set for this repo. Run this on first setup **and
+whenever the user re-runs setup** (it is idempotent: it drops anything already enabled). If
+the user declines, skip straight to Phase 5.
+
+**Delegate the discovery to the `marketplace-scout` agent** (Task tool). It locates the
+team's tracked-marketplace list (`marketplaces.json` — shipped in this skill's own `assets/`,
+also in the `cc-web-setup` plugin), enumerates the *live* plugin catalog of every tracked
+marketplace, inspects this repo's languages/tooling, and returns a ranked suggestion list:
+
+- **Baseline (always-useful)** — `pr-review-toolkit@claude-plugins-official`, `gh@rdl`,
+  `worktrunk@worktrunk`, plus the applicable LSP (`gopls-lsp@claude-plugins-official` for Go;
+  the official marketplace ships more `*-lsp` plugins the scout matches by language).
+- **Language/stack-matched** — RDL subject plugins and team externals whose subject matches a
+  detected language/tool (`go@rdl`, `terraform@rdl`, `astral@astral-sh`, …).
+
+The marketplace list lives in `assets/marketplaces.json` beside this skill (resolve it the
+same way as the hook script in Phase 1: prefer the installed plugin-cache copy, fall back to
+the path beside this `SKILL.md`). The agent reads it; you don't have to.
+
+Present the scout's menu and let the user pick. For each marketplace a chosen plugin needs,
+register it and install **only the confirmed plugins** — locally this skill *can* install
+(unlike the web path, which is declarative):
+
+```bash
+# Register each marketplace the chosen plugins need (idempotent), then install.
+claude plugin marketplace add <owner>/<repo>      # e.g. nq-rdl/agent-extensions for @rdl
+claude plugin install <plugin>@<marketplace>      # only the ones the user confirmed
+```
+
+Never install without confirmation. **Self-marketplace guard:** if the target repo is
+itself the `rdl` marketplace (a `.claude-plugin/marketplace.json` with `name: rdl` — e.g.
+`agent-extensions` itself), skip **every** `@rdl` plugin, not just `rdl@rdl`. Installing the
+published copy of *any* `@rdl` id (including the baseline's `gh@rdl`) shadows the working
+tree's own copy. Unlike the web path, this local install has no automatic `strip-self`, so
+you must exclude `@rdl` ids yourself there — the working tree already provides those skills.
+
+## Phase 5 — Summarize
 
 Tell the user, concisely:
 - The scope chosen, the script path installed, and the settings file touched.
@@ -162,4 +203,5 @@ Tell the user, concisely:
 - For **project** scope: commit `.claude/hooks/forced-eval-hook.sh` and the settings
   change so the team picks them up (or note it is personal if they chose
   `settings.local.json`).
+- Any plugins suggested/installed in Phase 4 (or that the step was skipped).
 - That this is the first onboarding step; more RDL Claude Code configuration can follow.
