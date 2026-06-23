@@ -1,3 +1,0 @@
-kind: Fixed
-body: 'cc-web-setup: documented the cold-start marketplace-registration race and the self-heal''s add → update → install chain in SKILL.md and the reference doc, corrected the stale single-failure-mode guidance, and added a matching anti-pattern (follow-up to #181)'
-time: 2026-06-23T10:08:38.004400113Z

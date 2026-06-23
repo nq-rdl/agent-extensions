@@ -1,3 +1,0 @@
-kind: Fixed
-body: Agent skill-preload references now resolve in every plugin. `sync-plugins.sh` rewrites each agent copy's `skills:` frontmatter to the target plugin's leaves and drops skills the plugin doesn't ship, so cross-listed agents no longer preload canonical names that don't exist in that plugin — `repo-architect` → `go` (gh), `wg-code-sentinel` → `secure` (go) / none (review), `se-gitops-ci-specialist` → `manage` (argo-cd) (#186)
-time: 2026-06-23T11:24:22.000000000Z

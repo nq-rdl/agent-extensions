@@ -1,3 +1,0 @@
-kind: Added
-body: Cross-listed existing agents into more relevant plugins — `wg-code-sentinel` and `github-actions-expert` into `go`, `terraform-iac-reviewer` into `review`, and `se-gitops-ci-specialist` into `argo-cd` (#137)
-time: 2026-06-23T10:16:23.000000000Z

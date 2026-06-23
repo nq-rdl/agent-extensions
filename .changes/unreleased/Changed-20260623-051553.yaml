@@ -1,3 +1,0 @@
-kind: Changed
-body: Renamed the `git` plugin to `gh` so its skills invoke as `/gh:*` (#115)
-time: 2026-06-23T05:15:53.775741284Z

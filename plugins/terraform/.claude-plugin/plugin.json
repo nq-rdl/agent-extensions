@@ -1,6 +1,6 @@
 {
   "name": "terraform",
-  "version": "0.14.0",
+  "version": "0.15.0",
   "description": "Terraform — generate compliant HCL, review IaC for state safety, and author Terratest suites",
   "author": {
     "name": "nq-rdl"

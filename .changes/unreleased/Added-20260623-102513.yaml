@@ -1,3 +1,0 @@
-kind: Added
-body: 'Add `/claude-code:pipeline` skill — a decision framework for reproducible multi-step flows: single ordered skill vs multiple step commands, the marker-file + hook gating pattern for enforced ordering, and when to escalate a step to subagents, an agent team, or a dynamic workflow'
-time: 2026-06-23T10:25:13.988258057Z

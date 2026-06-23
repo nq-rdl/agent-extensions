@@ -1,3 +1,0 @@
-kind: Changed
-body: "Optimized all 30 agents for Claude Code — set `model` per agent (opus for the reasoning/review/architecture tier, sonnet for the execution/ops/docs tier), added `effort: xhigh` to the reasoning tier, fixed an out-of-spec `color` value, and de-branded the JARVIS persona in the `wg-code-*` agents (#186)"
-time: 2026-06-23T10:41:12.000000000Z
