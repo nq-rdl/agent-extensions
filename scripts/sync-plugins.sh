@@ -12,6 +12,13 @@
 # canonical skills/ or agents/ trees change. Run it whenever you add or edit
 # a skill or agent.
 #
+# It also owns the two LIVE cc-web-setup SessionStart hook copies under this
+# repo's own .claude/scripts/ (install-deps.sh, announce-capabilities.sh): it
+# rewrites them from canonical skills/cc-web-setup/assets/ on a normal run and
+# drift-checks them (bytes + exec mode) under --check. See issue #166 — the
+# live copies are invoked directly from .claude/settings.json, so the exec bit
+# matters and they must not silently diverge from canonical.
+#
 # Resilience: a bundle that references a skill/agent with no source (e.g. a
 # rename or removal that landed before the registry was updated) is reported
 # as a ::warning:: and skipped — this script never aborts. The authoritative
@@ -23,9 +30,11 @@
 # Usage:
 #   scripts/sync-plugins.sh           # sync every bundle in registry/
 #   scripts/sync-plugins.sh swe       # sync only the named bundle(s)
-#   scripts/sync-plugins.sh --check   # report (don't fix) any plugin copy that
-#                                     # has drifted from its canonical source;
-#                                     # exits non-zero on drift (CI / hook gate)
+#   scripts/sync-plugins.sh --check   # report (don't fix) any plugin copy or
+#                                     # live .claude/scripts/ cc-web-setup hook
+#                                     # that has drifted from its canonical
+#                                     # source; exits non-zero on drift (CI /
+#                                     # hook gate)
 
 set -euo pipefail
 
@@ -244,6 +253,64 @@ def sync_agent(plugin: str, agent: str, bundle_file: Path) -> None:
     print(f"  ✓ agent {agent}")
 
 
+def sync_hooks() -> None:
+    """Own this repo's LIVE cc-web-setup SessionStart hook copies (issue #166).
+
+    .claude/scripts/{install-deps,announce-capabilities}.sh are byte-identical
+    copies of the canonical skills/cc-web-setup/assets/ engine, but unlike the
+    plugin trees they are invoked DIRECTLY from .claude/settings.json
+    ("$CLAUDE_PROJECT_DIR"/.claude/scripts/install-deps.sh) — so the executable
+    bit is load-bearing. Before this, no generator owned them: you hand-copied
+    after editing canonical, and nothing caught silent drift. This makes sync
+    write them from canonical (carrying the exec bit) and the --check gate flag
+    any divergence in bytes OR permission mode.
+
+    .claude/scripts/install-deps.local.sh is the repo-local project seam — it
+    has NO canonical source and is intentionally excluded (we only iterate the
+    two named engine files below).
+    """
+    src_dir = repo / "skills" / "cc-web-setup" / "assets"
+    dst_dir = repo / ".claude" / "scripts"
+    for name in ("install-deps.sh", "announce-capabilities.sh"):
+        src = src_dir / name
+        dst = dst_dir / name
+        if not src.is_file():
+            warn(
+                src_dir / name if src_dir.exists() else repo,
+                f"cc-web-setup hook '{name}' has no canonical source "
+                f"skills/cc-web-setup/assets/{name} — skipped.",
+            )
+            continue
+        if check:
+            if not dst.is_file():
+                drift.append(f".claude/scripts/{name}: missing — run sync-plugins.sh")
+            elif dst.read_bytes() != src.read_bytes():
+                drift.append(
+                    f".claude/scripts/{name}: content differs from "
+                    f"skills/cc-web-setup/assets/{name}"
+                )
+            else:
+                srcmode = src.stat().st_mode & 0o777
+                dstmode = dst.stat().st_mode & 0o777
+                if srcmode != dstmode:
+                    drift.append(
+                        f".claude/scripts/{name}: mode {oct(dstmode)} differs from "
+                        f"canonical {oct(srcmode)} — run sync-plugins.sh"
+                    )
+            continue
+        dst.parent.mkdir(parents=True, exist_ok=True)
+        shutil.copyfile(src, dst)  # bytes
+        shutil.copymode(src, dst)  # carry the exec bit — the live hook is exec'd directly
+        print(f"  ✓ hook {name} -> .claude/scripts/{name}")
+
+
+# Only sync the live .claude/scripts/ hooks when their owning bundle is in scope.
+# The cc-web-setup skill lives in registry/bundles/claude-code.yaml, whose
+# pluginName is "claude-code". An unscoped run (no bundle args) covers them, and
+# CI/pre-commit run `--check` unscoped, so the hooks are always gated there.
+hooks_in_scope = (not selected) or ("claude-code" in selected)
+
+
 for bundle_file in bundle_files:
     with bundle_file.open() as f:
         data = yaml.safe_load(f) or {}
@@ -297,10 +364,16 @@ for bundle_file in bundle_files:
     for agent in agents:
         sync_agent(plugin, agent, bundle_file)
 
+# After the bundle loop so live-hook drift folds into `drift` and is reported by
+# the existing exit logic below. Scoped runs that exclude claude-code skip it.
+if hooks_in_scope:
+    sync_hooks()
+
 if check:
     if drift:
         print(
-            "::error::plugin trees are out of sync with canonical skills/ and agents/.",
+            "::error::plugin trees and .claude/scripts hooks are out of sync with "
+            "canonical skills/ and agents/.",
             file=sys.stderr,
         )
         print(
@@ -314,7 +387,10 @@ if check:
         for d in drift:
             print(f"  - {d}", file=sys.stderr)
         sys.exit(1)
-    print("plugin trees are in sync with canonical skills/ and agents/.")
+    print(
+        "plugin trees and .claude/scripts hooks are in sync with canonical "
+        "skills/ and agents/."
+    )
     sys.exit(0)
 
 if warnings:

@@ -48,7 +48,7 @@ pre-commit:
     # --- Generated artifacts are in sync with the registry (catches a
     #     forgotten sync-plugins.sh / regenerate before CI does) ---
     - name: generated-in-sync
-      glob: "{registry/**,skills/**,agents/**,plugins/**,VERSION}"
+      glob: "{registry/**,skills/**,agents/**,plugins/**,.claude/scripts/**,VERSION}"
       run: |
         python3 scripts/check_bundle_refs.py .
         python3 scripts/check_grouping.py .
