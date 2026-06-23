@@ -31,8 +31,10 @@ Consequences that drive every design choice here:
   Setup-script field, no** ``make``\ **, no** ``.claude/skills/`` **bake** needed for
   plugins. ``github.com`` is on the default *Trusted* allowlist, so a github-sourced
   marketplace is reachable by default.
-- The only failure mode is the marketplace source being unreachable, or its local
-  index being stale on a cold VM. Both are handled by the self-heal (below).
+- The failure modes are: the marketplace registry still **empty** because this hook
+  outran the platform's registration of ``extraKnownMarketplaces`` on a cold VM (a
+  **race**, not a network error — issue #181); the local index being **stale**; or the
+  source genuinely **unreachable**. All three are handled by the self-heal (below).
 - A cloud session is a **fresh VM with only a clone of the repo** — anything not in
   git (or not installed by the SessionStart hook) is absent.
 
@@ -71,10 +73,18 @@ The self-heal (``ensure_plugins``)
 Declarative install is primary; the self-heal is the backstop kept **deliberately**
 (it has empirically rescued installs). It reads ``enabledPlugins`` from
 ``settings.json`` via ``jq``, skips ids already in ``claude plugin list``, and
-installs the rest idempotently. On a failed install it derives the marketplace from
-the ``@`` suffix, runs ``claude plugin marketplace update <mkt>`` (the refresh
-``claude plugin install`` does **not** do itself — the stale-index failure mode),
-and retries once, refreshing each marketplace at most once per run.
+installs the rest idempotently. When any plugin is still pending it **first registers
+every declared marketplace** with ``claude plugin marketplace add`` (idempotent — a
+no-op once on disk), so it never depends on the platform having registered
+``extraKnownMarketplaces`` first (the cold-start race, issue #181). A GitHub source
+pins its ref as ``owner/repo@ref`` (a git URL as ``<git-url>#ref``); a source carrying
+a custom ``path`` (a non-default ``marketplace.json``) has no ``marketplace add``
+equivalent and is **skipped**, left to declarative registration. On a failed install
+it then derives the marketplace from the ``@`` suffix, runs ``claude plugin marketplace
+update <mkt>`` (the refresh ``claude plugin install`` does **not** do itself — the
+stale-index failure mode), and retries once, refreshing each marketplace at most once
+per run. The hook owns the whole **add → update → install** chain so it assumes no
+platform-side state; gated on a pending count, a warm resume is a silent no-op.
 
 A plugin the self-heal installs **surfaces from the *next* session**: Claude
 enumerates skills at startup, *before* SessionStart hooks run, and ``reloadSkills``
@@ -114,13 +124,22 @@ These each cost a PR (or several) to learn:
   Setup-script field hard-failed *environment startup* on a CWD hiccup. The
   Setup-script field is only worth it for heavy **non-plugin** caching.
 - **Believing "the platform registers marketplaces but does not install
-  enabledPlugins."** It does install them. An empty ``claude plugin list`` is the
-  stale-index / unreachable-source failure, not a missing platform feature.
+  enabledPlugins."** It does install them. An empty ``claude plugin list`` is a
+  stale-index / unreachable-source failure **or the cold-start race below** — not a
+  missing platform feature.
 - **Reporting *declared* plugins as installed.** Build the banner from ``claude plugin
   list``, not from ``settings.json``, or a missing marketplace looks healthy while the
   slash menu is empty.
 - **A naive ``claude plugin install`` retry without ``marketplace update``.** On a
-  cold VM the index is empty; the retry re-hits the same stale index forever.
+  cold VM the index can be stale; the retry re-hits the same stale index forever unless
+  it refreshes.
+- **Assuming ``extraKnownMarketplaces`` is already registered when the SessionStart
+  hook runs (issue #181).** On a cold VM this hook can outrun that registration, so the
+  registry is **empty** and ``claude plugin install`` *and* ``claude plugin marketplace
+  update`` both fail with ``Marketplace not found. Available marketplaces:`` (an empty
+  list) — **not** a network failure, and it must not be reported as one. The self-heal
+  must ``claude plugin marketplace add`` every declared marketplace itself and own the
+  whole add → update → install chain, assuming no platform-side state.
 - **Leaving ``CODEX_ACCESS_TOKEN`` set.** Codex parses it as a JWT at runtime; a
   blob/blank value breaks every later ``codex exec`` even with a valid ``auth.json``.
   Unset it in-process and via ``CLAUDE_ENV_FILE``.
