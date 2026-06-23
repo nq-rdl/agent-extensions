@@ -1,3 +1,0 @@
-kind: Added
-body: '`generate_manifests.py` now emits a `::warning::` for any unrecognized top-level key in `registry/marketplace.yaml` (a stale `external:` block, or a typo such as `oder:`), so a misconfigured registry surfaces in CI instead of being silently ignored. Mirrors the existing never-silently-drop policy in `_ordered_local`.'
-time: 2026-06-22T15:05:19.965624283+10:00

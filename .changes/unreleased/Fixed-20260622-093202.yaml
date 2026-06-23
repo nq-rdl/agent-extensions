@@ -1,3 +1,0 @@
-kind: Fixed
-body: '`Claude Code on the web`: scope `.claude/settings.json` to **external dev-helper plugins** (`superpowers`, `gopls-lsp`, `pr-review-toolkit`, `codex`, `modern-go-guidelines`, `astral`, `worktrunk`) and their marketplaces, and remove the self-referential `rdl` marketplace + `rdl@rdl` meta-plugin from the web set — a session for developing this catalog should not install the catalog. Declared plugins install at session start from their (reachable) marketplace, so their `/<plugin>:<skill>` commands surface on the first session, the same path that gives dataops its `/superpowers:*` (no setup script / `make` required)'
-time: 2026-06-22T09:32:02.647571835Z

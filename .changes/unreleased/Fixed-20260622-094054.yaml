@@ -1,3 +1,0 @@
-kind: Fixed
-body: '`announce-capabilities.sh`: report **installed** plugins (cross-checked against `claude plugin list`), not merely the declared `enabledPlugins` from `settings.json` — verified-installed plugins show under "Enabled plugins (installed)", while any declared-but-not-installed plugin is now flagged with the `make cc-web-setup` remedy instead of being silently announced as present (falls back to the declared set when the `claude` CLI is unavailable)'
-time: 2026-06-22T09:40:54.757157942Z

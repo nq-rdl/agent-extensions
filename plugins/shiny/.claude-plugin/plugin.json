@@ -1,6 +1,6 @@
 {
   "name": "shiny",
-  "version": "0.12.0",
+  "version": "0.13.0",
   "description": "Shiny — modern dashboards with bslib and Bootstrap 5 theming",
   "author": {
     "name": "nq-rdl"

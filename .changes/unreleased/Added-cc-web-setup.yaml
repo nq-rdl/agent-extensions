@@ -1,3 +1,0 @@
-kind: Added
-body: '`Claude Code on the web` support — `.claude/settings.json` declares the `codex` + `superpowers` plugins, and a SessionStart hook provisions `gh`, `codex`, `lefthook`, and `changie` for cloud sessions'
-time: 2026-06-22T14:38:19.732899801+10:00

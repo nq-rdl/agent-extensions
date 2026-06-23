@@ -1,3 +1,0 @@
-kind: Added
-body: Docker daemon management for Claude Code on the web — `web-bootstrap.local.sh` starts `dockerd` under the remote gate (the web runner ships docker but no running daemon), with the pattern and rationale documented in the `cc-web-setup` skill
-time: 2026-06-22T08:55:38.10027259Z

@@ -1,6 +1,6 @@
 {
   "name": "go",
-  "version": "0.12.0",
+  "version": "0.13.0",
   "description": "Go — idiomatic naming, secure error handling, and GitHub Actions CI/CD",
   "author": {
     "name": "nq-rdl"

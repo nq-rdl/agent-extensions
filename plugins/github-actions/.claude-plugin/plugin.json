@@ -1,6 +1,6 @@
 {
   "name": "github-actions",
-  "version": "0.12.0",
+  "version": "0.13.0",
   "description": "GitHub Actions — secure CI/CD workflows, SHA pinning, OIDC, and GitOps delivery",
   "author": {
     "name": "nq-rdl"
