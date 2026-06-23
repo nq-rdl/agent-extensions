@@ -1,0 +1,20 @@
+schemaVersion: v1
+id: rdl-team
+displayName: RDL Team
+description: RDL team workflows — Claude Code onboarding, setup, and config management
+keywords: [rdl, team, onboarding, claude-code, setup]
+owners:
+  - rdl
+channels:
+  - stable
+skills:
+  - {source: cc-setup, leaf: cc-setup}
+agents: []
+hooks: []
+prompts: []
+mcp: []
+targets:
+  claude:
+    enabled: true
+    pluginName: rdl-team
+    marketplaceName: rdl

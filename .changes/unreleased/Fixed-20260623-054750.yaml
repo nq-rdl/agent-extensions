@@ -1,0 +1,3 @@
+kind: Fixed
+body: forced-eval-hook now parses `>-` folded descriptions, no-ops on an empty catalogue, and uses portable cache-freshness checks (#115)
+time: 2026-06-23T05:47:50.147382483Z

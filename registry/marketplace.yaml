@@ -29,7 +29,7 @@ order:
   - obsidian
   - writerside
   - defuddle
-  - git
+  - gh
   - github-actions
   - jules
   - terraform
@@ -46,6 +46,7 @@ order:
   - lychee
   - charm-tui
   - claude-code
+  - rdl-team
   - playwright
   - skill
   - review

@@ -1,14 +1,13 @@
 schemaVersion: v1
 id: go
 displayName: Go
-description: Go — idiomatic naming, secure error handling, and GitHub Actions CI/CD
-keywords: [go, naming, security, ci-cd]
+description: Go — idiomatic naming and secure error handling
+keywords: [go, naming, security]
 owners:
   - rdl
 channels:
   - stable
 skills:
-  - {source: go-gh, leaf: gh}
   - {source: go-naming, leaf: naming}
   - {source: go-secure, leaf: secure}
 agents:

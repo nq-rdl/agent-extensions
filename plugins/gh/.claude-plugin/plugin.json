@@ -1,7 +1,7 @@
 {
-  "name": "go",
+  "name": "gh",
   "version": "0.14.0",
-  "description": "Go — idiomatic naming and secure error handling",
+  "description": "GitHub workflow — git hooks, changelogs, conventional commits, pull requests, releases, and Go CI/CD",
   "author": {
     "name": "nq-rdl"
   },

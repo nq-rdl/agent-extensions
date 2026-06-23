@@ -36,7 +36,7 @@ claude plugin install rdl@rdl
 claude plugin install go@rdl
 ```
 
-Then launch `claude` and type `/` — confirm the expected skills appear (e.g. `/go:secure`, `/git:changie`, `/claude-code:hook`).
+Then launch `claude` and type `/` — confirm the expected skills appear (e.g. `/go:secure`, `/gh:changie`, `/claude-code:hook`).
 
 You can also verify from the CLI without entering the REPL:
 

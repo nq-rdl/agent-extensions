@@ -7,7 +7,7 @@ release), see [`AGENTS.md`](AGENTS.md) and [`docs/ARCHITECTURE.md`](docs/ARCHITE
 ## Plugin grouping: one plugin per subject
 
 > **Status:** live. The legacy domain bundles (`swe`, `infra`, `informatics`, `dev-tools`, `meta`)
-> have been **retired** and every skill and agent is now grouped by subject (`go`, `git`, `r`,
+> have been **retired** and every skill and agent is now grouped by subject (`go`, `gh`, `r`,
 > `terraform`, `review`, …). The *strategy* is
 > [#101](https://github.com/nq-rdl/agent-extensions/issues/101); the *mechanism* (the
 > registry-owned `{source, leaf}` mapping + sync/packaging) is
@@ -31,13 +31,22 @@ its own plugin — small plugins are fine.
 Put each skill/agent under the one thing it is **primarily about**. Secondary tools it merely
 *uses* do not count.
 
-- `go-gh` is "GitHub Actions CI/CD **for Go**" → subject is **Go** → `go:gh`. (Not a GitHub
-  Actions plugin.)
 - `jules-dispatch-creator` sets up **Jules** GitHub Actions workflows → subject is **Jules** →
-  `jules:dispatch-creator`.
+  `jules:dispatch-creator`. (Not a GitHub Actions plugin.)
+- `shiny-bslib` themes a **Shiny** app with bslib → subject is **Shiny** → `shiny:bslib`. (Not
+  a bslib plugin.)
 
 If you're tempted to file something under two subjects, you've applied the wrong test. Ask
 "what is this *about*?" — that question returns exactly one answer.
+
+> **The `gh` bundle and its one exception.** `gh` is the team's GitHub *workflow* subject (rule
+> 4 below): `changie`, `conventional-commits`, `husky`, `lefthook`, `pre-commit`, `send-pr`, and
+> `document-release` all invoke as `/gh:*`. `go-gh` ("GitHub Actions CI/CD **for Go**") is grouped
+> there too, as `/gh:go` — even though its primary subject is **Go** — a deliberate choice to keep
+> all GitHub-centric work under one namespace
+> ([#115](https://github.com/nq-rdl/agent-extensions/issues/115)). Treat it as the **one
+> sanctioned exception** to "file by primary subject," not a precedent: file everything else by
+> what it is *about*.
 
 ### 3. The facet is always an action or stage
 
@@ -80,13 +89,13 @@ group folders. **Grouping is a packaging decision** expressed in the bundle regi
 - A bundle sets `pluginName: <subject>` and lists each skill member as either:
   - a **flat string** `<name>` — packaged as-is (`leaf == <name>`); or
   - an explicit **`{source, leaf}` mapping** — packages the flat `skills/<source>/` under a
-    different `leaf` (e.g. `{source: go-gh, leaf: gh}` → `go:gh`).
+    different `leaf` (e.g. `{source: go-gh, leaf: go}` → `gh:go`).
 - `scripts/sync-plugins.sh` copies `skills/<source>/` → `plugins/<subject>/skills/<leaf>/`, renaming
   to the leaf — so the plugin tree is one level deep and Claude Code invokes `<subject>:<leaf>`.
   **The leaf folder name drives invocation.** Claude Code labels the skill in `/`-autocomplete as
   `frontmatter.name || <subject>:<leaf>` — so a present `name:` (the canonical `go-gh` **or** the
-  leaf `gh`) *overrides* the namespaced id with a bare, un-prefixed label, and `/go` lists
-  `go-gh`/`gh` instead of `go:gh`. So `sync-plugins.sh` **strips the copy's `name:` entirely**, letting the
+  leaf `go`) *overrides* the namespaced id with a bare, un-prefixed label, and `/gh` lists
+  `go-gh`/`go` instead of `gh:go`. So `sync-plugins.sh` **strips the copy's `name:` entirely**, letting the
   label fall back to `<subject>:<leaf>`. The canonical `skills/` source is never touched; only the
   derivative plugin copy is stripped.
 - Validators enforce: every member has a valid shape · no duplicate leaf within a bundle ·

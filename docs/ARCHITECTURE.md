@@ -95,15 +95,14 @@ The registry describes installable subject plugins, not raw files. One bundle = 
 schemaVersion: v1
 id: go
 displayName: Go
-description: Go — idiomatic naming, secure error handling, and GitHub Actions CI/CD
-keywords: [go, naming, security, ci-cd]   # marketplace keywords (generated into the manifests)
+description: Go — idiomatic naming and secure error handling
+keywords: [go, naming, security]   # marketplace keywords (generated into the manifests)
 owners:
   - rdl
 channels:
   - stable
-skills:                        # flat <name> (resolved from skills/<name>/), or a
-  - {source: go-gh, leaf: gh}  #   {source, leaf} map → invokes as /go:gh
-  - {source: go-naming, leaf: naming}
+skills:                                # flat <name> (resolved from skills/<name>/), or a
+  - {source: go-naming, leaf: naming}  #   {source, leaf} map → invokes as /go:naming
   - {source: go-secure, leaf: secure}
 agents:                        # resolved from agents/<name>/agent.md
   - go-mcp-expert

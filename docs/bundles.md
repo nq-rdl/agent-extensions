@@ -29,11 +29,10 @@ Or install a single subject:
 
 ## go
 
-Go — idiomatic naming, secure error handling, and GitHub Actions CI/CD.
+Go — idiomatic naming and secure error handling.
 
 **Skills**
 
-- `/go:gh`
 - `/go:naming`
 - `/go:secure`
 
@@ -124,19 +123,20 @@ Defuddle — extract clean Markdown from cluttered web pages.
 
 ---
 
-## git
+## gh
 
-Git workflow — hooks, changelogs, conventional commits, pull requests, and releases.
+GitHub workflow — git hooks, changelogs, conventional commits, pull requests, releases, and Go CI/CD.
 
 **Skills**
 
-- `/git:changie`
-- `/git:conventional-commits`
-- `/git:document-release`
-- `/git:husky`
-- `/git:lefthook`
-- `/git:pre-commit`
-- `/git:send-pr`
+- `/gh:changie`
+- `/gh:conventional-commits`
+- `/gh:document-release`
+- `/gh:go`
+- `/gh:husky`
+- `/gh:lefthook`
+- `/gh:pre-commit`
+- `/gh:send-pr`
 
 **Agents**
 
@@ -311,6 +311,16 @@ Claude Code — agent-team coordination, hook authoring, and web-session setup.
 - `/claude-code:agent-teams`
 - `/claude-code:hook`
 - `/claude-code:web-setup`
+
+---
+
+## rdl-team
+
+RDL team workflows — Claude Code onboarding, setup, and config management.
+
+**Skills**
+
+- `/rdl-team:cc-setup`
 
 ---
 

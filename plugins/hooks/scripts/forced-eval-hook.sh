@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 # UserPromptSubmit hook that surfaces available skills as advisory context.
 #
 # Triggers only when the prompt expresses intent to use a skill — an action
@@ -82,7 +82,7 @@ parse_frontmatter() {
   /^description:/ {
     state="";
     val=$0; sub(/^description:[[:space:]]*/, "", val);
-    if (val == ">" || val == "|") {
+    if (val ~ /^[>|][0-9+-]*[[:space:]]*$/) {
       state="folded_wait";
     } else {
       gsub(/^"/, "", val); gsub(/"$/, "", val);
@@ -121,13 +121,18 @@ format_list() {
 # ---------------------------------------------------------------------------
 check_cache() {
   [[ -f "$CACHE_FILE" ]] || return 1
-  local cache_mtime
-  cache_mtime=$(stat -c %Y "$CACHE_FILE" 2>/dev/null) || return 1
-  local src src_mtime
-  for src in "$0" "$SKILLS_DIR" "$PLUGINS_JSON"; do
-    [[ -e "$src" ]] || continue
-    src_mtime=$(stat -c %Y "$src" 2>/dev/null) || continue
-    [[ "$src_mtime" -le "$cache_mtime" ]] || return 1
+  # Portable freshness via bash's -nt (no stat(1) — GNU uses `-c %Y`, BSD/macOS
+  # `-f %m`). Stale if the script, installed_plugins.json, the skills dir, or any
+  # standalone SKILL.md is newer than the cache. Globbing the SKILL.md files (not
+  # just the dir) catches an edit to an existing skill — a dir mtime only moves
+  # on add/remove/rename.
+  local src
+  for src in "$0" "$PLUGINS_JSON" "$SKILLS_DIR"; do
+    if [[ -e "$src" && "$src" -nt "$CACHE_FILE" ]]; then return 1; fi
+  done
+  local skill_md
+  for skill_md in "$SKILLS_DIR"/*/SKILL.md "$SKILLS_DIR"/*/*/SKILL.md; do
+    if [[ -f "$skill_md" && "$skill_md" -nt "$CACHE_FILE" ]]; then return 1; fi
   done
   return 0
 }
@@ -304,12 +309,19 @@ main() {
       "$PLUGINS_JSON" >&2
   fi
 
+  # `|| true` keeps an empty skill_data from tripping `set -o pipefail` — grep -v
+  # exits 1 when it filters every line away.
   local skills_block
-  skills_block=$(printf '%s\n' "$skill_data" | grep -v '^$' | format_list)
+  skills_block=$(printf '%s\n' "$skill_data" | grep -v '^$' | format_list || true)
 
   local commands_block=""
   if [[ -n "$cmd_data" ]]; then
-    commands_block=$(printf '%s\n' "$cmd_data" | grep -v '^$' | format_list)
+    commands_block=$(printf '%s\n' "$cmd_data" | grep -v '^$' | format_list || true)
+  fi
+
+  # Nothing discovered → quiet no-op (exit 0).
+  if [[ -z "$skills_block" && -z "$commands_block" ]]; then
+    return 0
   fi
 
   local output
