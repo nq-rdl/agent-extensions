@@ -39,6 +39,8 @@ Go — idiomatic naming and secure error handling.
 **Agents**
 
 - `go-mcp-expert` (subagent)
+- `wg-code-sentinel` (subagent)
+- `github-actions-expert` (subagent)
 
 ---
 
@@ -141,6 +143,7 @@ GitHub workflow — git hooks, changelogs, conventional commits, pull requests, 
 **Agents**
 
 - `address-comments` (subagent)
+- `repo-architect` (subagent)
 
 ---
 
@@ -199,6 +202,10 @@ Argo CD — GitOps application management and sync for Kubernetes.
 **Skills**
 
 - `/argo-cd:manage`
+
+**Agents**
+
+- `se-gitops-ci-specialist` (subagent)
 
 ---
 
@@ -360,13 +367,13 @@ Code review — security, clean code, governance, responsible AI, and fact-check
 
 **Agents**
 
-- `gem-reviewer` (subagent)
 - `wg-code-sentinel` (subagent)
 - `wg-code-alchemist` (subagent)
 - `critical-thinking` (subagent)
 - `doublecheck` (subagent)
 - `agent-governance-reviewer` (subagent)
 - `se-responsible-ai-code` (subagent)
+- `terraform-iac-reviewer` (subagent)
 
 ---
 
@@ -378,8 +385,6 @@ Planning — implementation strategy, file-level sequencing, API/repo architectu
 
 - `plan` (subagent)
 - `context-architect` (subagent)
-- `repo-architect` (subagent)
-- `api-architect` (subagent)
 - `hlbpa` (subagent)
 - `adr-generator` (subagent)
 

@@ -18,6 +18,7 @@ skills:
   - send-pr
 agents:
   - address-comments
+  - repo-architect
 hooks: []
 prompts: []
 mcp: []

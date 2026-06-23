@@ -9,13 +9,13 @@ channels:
   - stable
 skills: []
 agents:
-  - gem-reviewer
   - wg-code-sentinel
   - wg-code-alchemist
   - critical-thinking
   - doublecheck
   - agent-governance-reviewer
   - se-responsible-ai-code
+  - terraform-iac-reviewer
 hooks: []
 prompts: []
 mcp: []
