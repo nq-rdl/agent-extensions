@@ -39,24 +39,43 @@ grep -q 'leaf: audit' registry/bundles/skill.yaml 2>/dev/null && pass "B: skill 
 # (C) known plugin still loads
 jq -e '.plugins[]|select(.name=="go")' "$MP" >/dev/null 2>&1 && pass "C: go plugin present" || bad "C: go plugin missing"
 
+# Live mode runs only with --live (devcontainer + claude CLI); never in CI. A
+# missing CLI marks the run bad but falls through to the unified RED/GREEN
+# banner below instead of exiting early (which would skip the summary line).
 if [ "${1:-}" = "--live" ]; then
   echo "== live assertions (claude CLI) =="
   ws="${WORKSPACE_DIR:-/workspace}"
-  command -v claude >/dev/null || { bad "live: claude CLI not found"; exit $fail; }
-  # Capture claude's OWN exit status (a pipe would report the downstream tool's).
-  if claude plugin validate "$ws" >/tmp/smoke-validate.out 2>&1; then pass "live: plugin validate"; else bad "live: plugin validate failed"; tail -3 /tmp/smoke-validate.out; fi
-  claude plugin marketplace add "$ws" >/tmp/smoke-add.out 2>&1 || true   # idempotent; "already added" is fine
-  if claude plugin install rdl@rdl >/tmp/smoke-install.out 2>&1; then pass "live: install rdl@rdl"; else bad "live: install rdl@rdl failed"; tail -3 /tmp/smoke-install.out; fi
-  # Verify `plugin list` itself succeeded before drawing conclusions from its
-  # output — otherwise an errored listing has no "zod" line and false-PASSes the
-  # removal assertion below.
-  if list="$(claude plugin list 2>&1)"; then
-    printf '%s\n' "$list" | grep -qiw zod && bad "live: zod still installed" || pass "live: zod not installed"
-    # Case-insensitive (matches line 'zod' check) word-bounded match for the
-    # 'skill' plugin name (not a substring of e.g. 'skills').
-    printf '%s\n' "$list" | grep -Eiq '(^|[^[:alnum:]_])skill([^[:alnum:]_]|$)' && pass "live: skill plugin installed" || bad "live: skill plugin missing"
+  if ! command -v claude >/dev/null; then
+    bad "live: claude CLI not found"
   else
-    bad "live: plugin list failed"; printf '%s\n' "$list" | tail -3
+    # Per-run temp dir, not fixed /tmp/smoke-*.out paths: those are vulnerable to
+    # collision and symlink clobbering across overlapping runs. Cleaned on exit.
+    tmp="$(mktemp -d)" || { echo "FATAL: mktemp failed" >&2; exit 2; }
+    trap 'rm -rf "$tmp"' EXIT
+    # Capture claude's OWN exit status (a pipe would report the downstream tool's).
+    if claude plugin validate "$ws" >"$tmp/validate.out" 2>&1; then pass "live: plugin validate"; else bad "live: plugin validate failed"; tail -3 "$tmp/validate.out"; fi
+    # marketplace add is idempotent: a non-zero exit is benign ONLY when the CLI
+    # reports the marketplace is already added. Any other failure (bad workspace,
+    # CLI error) is real and must not slip through as GREEN via `|| true`.
+    if claude plugin marketplace add "$ws" >"$tmp/add.out" 2>&1; then
+      pass "live: marketplace add"
+    elif grep -qi 'already' "$tmp/add.out"; then
+      pass "live: marketplace already added"
+    else
+      bad "live: marketplace add failed"; tail -3 "$tmp/add.out"
+    fi
+    if claude plugin install rdl@rdl >"$tmp/install.out" 2>&1; then pass "live: install rdl@rdl"; else bad "live: install rdl@rdl failed"; tail -3 "$tmp/install.out"; fi
+    # Verify `plugin list` itself succeeded before drawing conclusions from its
+    # output — otherwise an errored listing has no "zod" line and false-PASSes the
+    # removal assertion below.
+    if list="$(claude plugin list 2>&1)"; then
+      printf '%s\n' "$list" | grep -qiw zod && bad "live: zod still installed" || pass "live: zod not installed"
+      # Case-insensitive (matches line 'zod' check) word-bounded match for the
+      # 'skill' plugin name (not a substring of e.g. 'skills').
+      printf '%s\n' "$list" | grep -Eiq '(^|[^[:alnum:]_])skill([^[:alnum:]_]|$)' && pass "live: skill plugin installed" || bad "live: skill plugin missing"
+    else
+      bad "live: plugin list failed"; printf '%s\n' "$list" | tail -3
+    fi
   fi
 fi
 
