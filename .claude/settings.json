@@ -29,7 +29,7 @@
     "modern-go-guidelines@goland-claude-marketplace": true,
     "astral@astral-sh": true,
     "worktrunk@worktrunk": true,
-    "skill-creator@claude-plugins-official": true,
+    "skill-creator@claude-plugins-official": true
   },
   "extraKnownMarketplaces": {
     "claude-plugins-official": {
