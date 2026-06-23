@@ -422,6 +422,33 @@ class TestWebSettingsHelper(unittest.TestCase):
         self.assertNotIn("rdl@rdl", final["enabledPlugins"])
         self.assertNotIn("rdl", final["extraKnownMarketplaces"])
 
+    def test_ensure_is_idempotent(self):
+        # ensure∘ensure is a fixed point: a second pass over ensure's own output is a no-op.
+        path = self._write(self._externals_plus_rdl())
+        first = run_helper(HELPER, "ensure", path)
+        self.assertEqual(first.returncode, 0, first.stderr)
+        second = run_helper(HELPER, "ensure", self._write(json.loads(first.stdout)))
+        self.assertEqual(second.returncode, 0, second.stderr)
+        self.assertEqual(json.loads(second.stdout), json.loads(first.stdout))
+
+    def test_strip_self_is_idempotent_and_preserves_top_level_keys(self):
+        # strip-self∘strip-self is a fixed point, and unrelated top-level keys
+        # (model/env/effortLevel) survive the transform — not only enabledPlugins.
+        both = self._externals_plus_rdl()
+        both["extraKnownMarketplaces"] = dict(
+            both["extraKnownMarketplaces"],
+            rdl={"source": {"source": "github", "repo": "nq-rdl/agent-extensions"}, "autoUpdate": True},
+        )
+        root = self._marketplace_repo("rdl")
+        first = run_helper(HELPER, "strip-self", root, self._write(both))
+        self.assertEqual(first.returncode, 0, first.stderr)
+        out = json.loads(first.stdout)
+        for key in ("model", "env", "effortLevel"):
+            self.assertEqual(out.get(key), both.get(key), f"strip-self dropped top-level {key}")
+        second = run_helper(HELPER, "strip-self", root, self._write(out))
+        self.assertEqual(second.returncode, 0, second.stderr)
+        self.assertEqual(json.loads(second.stdout), out)
+
     # --- dispatch contract ---
     def test_dispatch_errors_exit_2(self):
         for args in ([], ["bogus-subcommand"], ["cover"], ["cover", "a", "b"], ["strip-self", "only-one"]):
