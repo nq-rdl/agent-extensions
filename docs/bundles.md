@@ -311,6 +311,7 @@ Claude Code — agent-team coordination, hook authoring, and web-session setup.
 - `/claude-code:agent-teams`
 - `/claude-code:create-workflow`
 - `/claude-code:hook`
+- `/claude-code:pipeline`
 - `/claude-code:web-setup`
 
 ---
