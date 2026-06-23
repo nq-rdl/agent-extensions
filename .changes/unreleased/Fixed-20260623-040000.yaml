@@ -1,0 +1,3 @@
+kind: Fixed
+body: '`sync-plugins.sh` now writes and drift-checks (bytes + exec mode) the live `.claude/scripts/` cc-web-setup hook copies from canonical, closing the silent-drift gap (#166).'
+time: 2026-06-23T04:00:00.000000000Z

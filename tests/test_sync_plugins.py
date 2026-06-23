@@ -10,6 +10,7 @@ real script into a throwaway fixture and runs it there.
 
 from __future__ import annotations
 
+import os
 import shutil
 import subprocess
 import tempfile
@@ -274,6 +275,143 @@ class TestNameStrip(unittest.TestCase):
                 _skill_name(repo / "plugins" / "git" / "skills" / "changie" / "SKILL.md"),
                 "flat member's copy name must be stripped so the label is git:changie",
             )
+
+
+# --- issue #166: ownership of the live .claude/scripts cc-web-setup hooks ---
+
+HOOKS = ("install-deps.sh", "announce-capabilities.sh")
+LOCAL_SENTINEL = "install-deps.local.sh"
+LOCAL_BODY = (
+    "#!/bin/bash\n# repo-local seam — NO canonical source — must survive sync\n"
+)
+
+
+def _is_exec(path: Path) -> bool:
+    return os.access(path, os.X_OK) and bool(path.stat().st_mode & 0o111)
+
+
+class TestSyncLiveHooks(unittest.TestCase):
+    """sync-plugins.sh writes and drift-checks the two live .claude/scripts hooks
+    from canonical skills/cc-web-setup/assets/, preserving the exec bit (the live
+    copies are invoked DIRECTLY from .claude/settings.json). The repo-local
+    install-deps.local.sh seam has no canonical source and must be left untouched.
+
+    The script resolves its repo root as dirname($0)/.., so running the copied
+    script under the temp fixture targets the fixture. An empty bundles dir makes
+    the bundle loop a no-op so only sync_hooks runs.
+    """
+
+    def _fixture(self) -> Path:
+        repo = Path(self.tmp)
+        # The real script, exec bit preserved.
+        (repo / "scripts").mkdir(parents=True)
+        dst_script = repo / "scripts" / "sync-plugins.sh"
+        shutil.copyfile(SCRIPT, dst_script)
+        shutil.copymode(SCRIPT, dst_script)
+        # Canonical engine assets (small distinct stubs, 0755).
+        assets = repo / "skills" / "cc-web-setup" / "assets"
+        assets.mkdir(parents=True)
+        self.canon = {}
+        for name in HOOKS:
+            body = f"#!/bin/bash\n# canonical {name}\necho {name}\n"
+            p = assets / name
+            p.write_text(body)
+            p.chmod(0o755)
+            self.canon[name] = body
+        # Live byte-identical copies (0755) + the repo-local seam (0755).
+        live = repo / ".claude" / "scripts"
+        live.mkdir(parents=True)
+        for name in HOOKS:
+            p = live / name
+            p.write_text(self.canon[name])
+            p.chmod(0o755)
+        local = live / LOCAL_SENTINEL
+        local.write_text(LOCAL_BODY)
+        local.chmod(0o755)
+        # Empty bundles dir → bundle loop is a no-op.
+        (repo / "registry" / "bundles").mkdir(parents=True)
+        return repo
+
+    def setUp(self):
+        self._tmpobj = tempfile.TemporaryDirectory()
+        self.addCleanup(self._tmpobj.cleanup)
+        self.tmp = self._tmpobj.name
+        self.repo = self._fixture()
+        self.live = self.repo / ".claude" / "scripts"
+
+    def _run(self, *args):
+        return subprocess.run(
+            ["bash", str(self.repo / "scripts" / "sync-plugins.sh"), *args],
+            cwd=self.repo,
+            capture_output=True,
+            text=True,
+        )
+
+    def test_write_produces_executable_byte_equal_hooks(self):
+        res = self._run()
+        self.assertEqual(res.returncode, 0, res.stderr)
+        for name in HOOKS:
+            dst = self.live / name
+            self.assertEqual(dst.read_text(), self.canon[name], f"{name} bytes differ")
+            self.assertTrue(_is_exec(dst), f"{name} lost its exec bit")
+        # The repo-local seam is untouched.
+        self.assertEqual((self.live / LOCAL_SENTINEL).read_text(), LOCAL_BODY)
+
+    def test_write_is_idempotent(self):
+        first = self._run()
+        self.assertEqual(first.returncode, 0, first.stderr)
+        second = self._run()
+        self.assertEqual(second.returncode, 0, second.stderr)
+        for name in HOOKS:
+            self.assertEqual((self.live / name).read_text(), self.canon[name])
+            self.assertTrue(_is_exec(self.live / name))
+        self.assertEqual((self.live / LOCAL_SENTINEL).read_text(), LOCAL_BODY)
+
+    def test_check_passes_on_clean_fixture(self):
+        self.assertEqual(self._run("--check").returncode, 0)
+
+    def test_check_flags_byte_drift(self):
+        p = self.live / "install-deps.sh"
+        p.write_text(p.read_text() + "# drift\n")
+        self.assertEqual(self._run("--check").returncode, 1)
+
+    def test_check_flags_mode_drift(self):
+        # Clear the exec bit but keep bytes identical → MODE drift case.
+        p = self.live / "announce-capabilities.sh"
+        p.chmod(0o644)
+        self.assertFalse(_is_exec(p))
+        self.assertEqual(self._run("--check").returncode, 1)
+
+    def test_check_flags_missing_hook(self):
+        (self.live / "install-deps.sh").unlink()
+        self.assertEqual(self._run("--check").returncode, 1)
+
+    def test_write_heals_mode_drift(self):
+        p = self.live / "announce-capabilities.sh"
+        p.chmod(0o644)
+        self.assertEqual(self._run().returncode, 0)
+        self.assertTrue(_is_exec(p))
+        self.assertEqual(self._run("--check").returncode, 0)
+
+    def _canon(self, name):
+        return self.repo / "skills" / "cc-web-setup" / "assets" / name
+
+    def test_check_flags_non_executable_canonical(self):
+        # A canonical asset that lost its exec bit must be flagged even though
+        # src == dst could otherwise agree — the live hook is run directly, so a
+        # non-executable mode would fail SessionStart with permission denied.
+        self._canon("install-deps.sh").chmod(0o644)
+        self.assertEqual(self._run("--check").returncode, 1)
+
+    def test_write_forces_live_hook_executable_despite_non_exec_canonical(self):
+        # Even if canonical lost its exec bit, the written live hook is forced
+        # 0o755 (the bad mode never propagates); --check still flags the broken
+        # canonical so the root cause surfaces.
+        canon = self._canon("install-deps.sh")
+        canon.chmod(0o644)
+        self.assertEqual(self._run().returncode, 0)
+        self.assertTrue(_is_exec(self.live / "install-deps.sh"))
+        self.assertEqual(self._run("--check").returncode, 1)
 
 
 if __name__ == "__main__":
