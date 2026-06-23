@@ -44,10 +44,21 @@ die() { printf '%s\n' "$1" >&2; exit "${2:-1}"; }
 
 command -v jq >/dev/null 2>&1 || die "web-settings.sh: jq is required but not on PATH" 3
 
-# Fail fast (exit 2, no stdout) if a settings file is not valid JSON, so every
-# subcommand has a known-good document and set -e cannot mask a parse failure as
-# an empty (and thus falsely "covered" / "no unknowns") result.
-require_json() { jq empty "$1" >/dev/null 2>&1 || die "$2: not valid JSON: $1" 2; }
+# Fail fast (exit 2, no stdout) unless the file is a JSON OBJECT with object-typed
+# enabledPlugins/extraKnownMarketplaces when present. `jq empty` alone accepts ANY
+# well-formed JSON (null, [], scalars), which would let a non-object slip the guard:
+# a `null` settings file reads as "fully covered", and ensure's documented
+# `> tmp && mv` could overwrite the user's file with a stub; a wrong-typed field
+# would leak a bare jq exit 5. Asserting shape collapses every malformed input into
+# the advertised exit 2.
+require_json() {
+  jq -e '
+    type == "object"
+    and ((.enabledPlugins // {})        | type == "object")
+    and ((.extraKnownMarketplaces // {}) | type == "object")
+  ' "$1" >/dev/null 2>&1 \
+    || die "$2: must be a JSON object with object-typed enabledPlugins/extraKnownMarketplaces: $1" 2
+}
 
 usage() {
   cat >&2 <<'EOF'
@@ -86,7 +97,10 @@ cmd_ensure() {
   [ -f "$settings" ] || die "ensure: no such file: $settings" 2
   [ -f "$MARKETPLACES" ] || die "ensure: marketplaces lookup not found: $MARKETPLACES" 2
   require_json "$settings" ensure
-  require_json "$MARKETPLACES" ensure
+  # The lookup must itself be an object with an object .marketplaces, or the reduce
+  # below would leak a bare jq exit 5 instead of the advertised exit 2.
+  jq -e 'type == "object" and (.marketplaces | type == "object")' "$MARKETPLACES" >/dev/null 2>&1 \
+    || die "ensure: marketplaces lookup must be an object with an object .marketplaces: $MARKETPLACES" 2
 
   lookup="$(jq -c '.marketplaces' "$MARKETPLACES")"
 

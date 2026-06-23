@@ -113,7 +113,11 @@ not on `PATH` — so the model's cwd (the target repo root) cannot find it by na
 absolute path once and reuse it:
 
 ```bash
-WS="<absolute path to this skill>/scripts/web-settings.sh"   # the scripts/ next to this SKILL.md
+# Resolve this skill's own scripts/ dir. On an installed plugin the skill lives in
+# the plugin cache — locate the helper rather than guessing the path:
+WS="$(find "$HOME/.claude/plugins" -path '*/web-setup/scripts/web-settings.sh' 2>/dev/null | head -1)"
+# Fallback: the absolute path of the scripts/ directory beside this SKILL.md.
+WS="${WS:-<absolute path to this skill>/scripts/web-settings.sh}"
 ```
 
 `strip-self` and `ensure` are **stdout filters** — they print the corrected document and

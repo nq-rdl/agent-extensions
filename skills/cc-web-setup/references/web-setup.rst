@@ -78,7 +78,8 @@ and retries once, refreshing each marketplace at most once per run.
 
 A plugin the self-heal installs **surfaces from the *next* session**: Claude
 enumerates skills at startup, *before* SessionStart hooks run, and ``reloadSkills``
-re-scans only loose ``~/.claude/skills/``, **not** the plugin install cache.
+empirically *appears* to re-scan only loose ``~/.claude/skills/``, not the plugin
+install cache (unconfirmed upstream — see ``docs/notes/claude-code-web-issues.md``).
 
 
 The two guards this skill enforces

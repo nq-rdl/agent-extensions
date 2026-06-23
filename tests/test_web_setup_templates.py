@@ -205,6 +205,12 @@ class TestWebSettingsHelper(unittest.TestCase):
         self.addCleanup(shutil.rmtree, self.tmp)
         self.externals = load(EXT_TMPL)
 
+    def _externals_plus_rdl(self):
+        """The 'rdl + externals' composition: the 7 externals + rdl@rdl enabled."""
+        both = dict(self.externals)
+        both["enabledPlugins"] = dict(both["enabledPlugins"], **{"rdl@rdl": True})
+        return both
+
     # --- cover ---
     def test_cover_passes_on_covered_template(self):
         res = run_helper(HELPER, "cover", str(EXT_TMPL))
@@ -219,19 +225,26 @@ class TestWebSettingsHelper(unittest.TestCase):
 
     # --- ensure ---
     def test_ensure_adds_known_marketplace(self):
-        both = dict(self.externals)
-        both["enabledPlugins"] = dict(both["enabledPlugins"], **{"rdl@rdl": True})
-        path = self._write(both)
+        path = self._write(self._externals_plus_rdl())
         res = run_helper(HELPER, "ensure", path)
         self.assertEqual(res.returncode, 0, res.stderr)
         out = json.loads(res.stdout)
-        self.assertEqual(len(out["extraKnownMarketplaces"]), 6)
-        self.assertIn("rdl", out["extraKnownMarketplaces"])
+        # Assert the exact key set, so "right count, wrong marketplace" can't pass.
+        self.assertEqual(
+            set(out["extraKnownMarketplaces"]),
+            {
+                "claude-plugins-official", "openai-codex", "goland-claude-marketplace",
+                "astral-sh", "worktrunk", "rdl",
+            },
+        )
 
     def test_ensure_is_noop_when_complete(self):
         res = run_helper(HELPER, "ensure", str(EXT_TMPL))
         self.assertEqual(res.returncode, 0, res.stderr)
-        self.assertEqual(len(json.loads(res.stdout)["extraKnownMarketplaces"]), 5)
+        self.assertEqual(
+            set(json.loads(res.stdout)["extraKnownMarketplaces"]),
+            set(self.externals["extraKnownMarketplaces"]),
+        )
 
     def test_ensure_unknown_emits_no_stdout_and_exits_4(self):
         path = self._write({"enabledPlugins": {"x@mystery": True}, "extraKnownMarketplaces": {}})
@@ -260,17 +273,20 @@ class TestWebSettingsHelper(unittest.TestCase):
     def test_composed_rdl_plus_externals(self):
         # The 'rdl + externals' outcome: externals template + the single rdl line,
         # reconciled by ensure. No duplicate hooks, exactly one rdl@rdl, all 8
-        # plugins, 6 marketplaces.
-        both = dict(self.externals)
-        both["enabledPlugins"] = dict(both["enabledPlugins"], **{"rdl@rdl": True})
+        # plugins, 6 marketplaces, and top-level keys preserved.
+        both = self._externals_plus_rdl()
         path = self._write(both)
         res = run_helper(HELPER, "ensure", path)
         self.assertEqual(res.returncode, 0, res.stderr)
         out = json.loads(res.stdout)
         self.assertEqual(session_start_commands(out), HOOK_CMDS)
-        self.assertEqual(len(out["enabledPlugins"]), 8)
+        self.assertEqual(set(out["enabledPlugins"]), set(both["enabledPlugins"]))
         self.assertIs(out["enabledPlugins"]["rdl@rdl"], True)
+        self.assertIn("rdl", out["extraKnownMarketplaces"])
         self.assertEqual(len(out["extraKnownMarketplaces"]), 6)
+        # ensure must only touch extraKnownMarketplaces — model/env/effortLevel survive.
+        for key in ("model", "env", "effortLevel"):
+            self.assertEqual(out.get(key), both.get(key))
 
     # --- strip-self ---
     def _marketplace_repo(self, name="rdl"):
@@ -283,8 +299,7 @@ class TestWebSettingsHelper(unittest.TestCase):
         return root
 
     def test_strip_self_removes_self_reference(self):
-        both = dict(self.externals)
-        both["enabledPlugins"] = dict(both["enabledPlugins"], **{"rdl@rdl": True})
+        both = self._externals_plus_rdl()
         both["extraKnownMarketplaces"] = dict(
             both["extraKnownMarketplaces"],
             rdl={"source": {"source": "github", "repo": "nq-rdl/agent-extensions"}, "autoUpdate": True},
@@ -296,7 +311,24 @@ class TestWebSettingsHelper(unittest.TestCase):
         out = json.loads(res.stdout)
         self.assertNotIn("rdl@rdl", out["enabledPlugins"])
         self.assertNotIn("rdl", out["extraKnownMarketplaces"])
-        self.assertEqual(len(out["enabledPlugins"]), 7)
+        self.assertEqual(set(out["enabledPlugins"]), set(self.externals["enabledPlugins"]))
+
+    def test_strip_self_keeps_a_differently_named_marketplace(self):
+        # strip-self must remove ONLY its own marketplace name, never a foreign one.
+        settings = {
+            "enabledPlugins": {"rdl@rdl": True, "foo@other": True},
+            "extraKnownMarketplaces": {
+                "rdl": {"source": {"source": "github", "repo": "nq-rdl/agent-extensions"}, "autoUpdate": True},
+                "other": {"source": {"source": "github", "repo": "acme/other"}, "autoUpdate": True},
+            },
+        }
+        path = self._write(settings)
+        root = self._marketplace_repo("someothermarket")  # self-name matches neither
+        res = run_helper(HELPER, "strip-self", root, path)
+        self.assertEqual(res.returncode, 0, res.stderr)
+        out = json.loads(res.stdout)
+        self.assertEqual(set(out["enabledPlugins"]), {"rdl@rdl", "foo@other"})
+        self.assertEqual(set(out["extraKnownMarketplaces"]), {"rdl", "other"})
 
     def test_strip_self_passthrough_when_not_a_marketplace(self):
         path = self._write(self.externals)
@@ -333,12 +365,74 @@ class TestWebSettingsHelper(unittest.TestCase):
         self.assertEqual(res.returncode, 2)
         self.assertEqual(res.stdout, "")
 
+    def test_ensure_rejects_lookup_without_marketplaces_object(self):
+        # A well-formed lookup that lacks an object .marketplaces must be exit 2, not a bare jq 5.
+        bad = os.path.join(self.tmp, "no-marketplaces.json")
+        with open(bad, "w") as fh:
+            fh.write('{"teamExternals": []}')
+        path = self._write({"enabledPlugins": {"x@y": True}, "extraKnownMarketplaces": {}})
+        res = run_helper(HELPER, "ensure", path, env={"WEB_SETTINGS_MARKETPLACES": bad})
+        self.assertEqual(res.returncode, 2)
+        self.assertEqual(res.stdout, "")
+
+    # --- shape gate: valid-JSON-but-wrong-shape must collapse to exit 2, no stdout ---
+    def test_shape_gate_rejects_non_object_inputs(self):
+        for sub in ("cover", "ensure", "strip-self"):
+            for blob in ("null", "[]", '{"enabledPlugins": []}', '{"enabledPlugins": true}'):
+                with self.subTest(sub=sub, blob=blob):
+                    path = os.path.join(self.tmp, "shape.json")
+                    with open(path, "w") as fh:
+                        fh.write(blob)
+                    args = [sub, self.tmp, path] if sub == "strip-self" else [sub, path]
+                    res = run_helper(HELPER, *args)
+                    self.assertEqual(res.returncode, 2, f"{sub} {blob}: {res.stderr}")
+                    self.assertEqual(res.stdout, "", f"{sub} {blob} leaked stdout")
+
+    # --- composition: the headline #157 / Phase 0→2→5 invariants under round-trip ---
+    def test_cover_passes_on_ensure_output(self):
+        # The literal #157 invariant: ensure's result is fully covered.
+        path = self._write(self._externals_plus_rdl())
+        ensured = run_helper(HELPER, "ensure", path)
+        self.assertEqual(ensured.returncode, 0, ensured.stderr)
+        out_path = self._write(json.loads(ensured.stdout))
+        covered = run_helper(HELPER, "cover", out_path)
+        self.assertEqual(covered.returncode, 0, covered.stderr)
+        self.assertEqual(covered.stdout.strip(), "")
+
+    def test_strip_self_then_ensure_then_cover_pipeline(self):
+        # Full Phase 0→2→5 on a marketplace repo: strip the self ref, reconcile, assert covered.
+        both = self._externals_plus_rdl()
+        both["extraKnownMarketplaces"] = dict(
+            both["extraKnownMarketplaces"],
+            rdl={"source": {"source": "github", "repo": "nq-rdl/agent-extensions"}, "autoUpdate": True},
+        )
+        path = self._write(both)
+        root = self._marketplace_repo("rdl")
+        stripped = run_helper(HELPER, "strip-self", root, path)
+        self.assertEqual(stripped.returncode, 0, stripped.stderr)
+        p2 = self._write(json.loads(stripped.stdout))
+        ensured = run_helper(HELPER, "ensure", p2)
+        self.assertEqual(ensured.returncode, 0, ensured.stderr)
+        p3 = self._write(json.loads(ensured.stdout))
+        covered = run_helper(HELPER, "cover", p3)
+        self.assertEqual(covered.returncode, 0, covered.stderr)
+        self.assertEqual(covered.stdout.strip(), "")
+        # No rdl left anywhere after the pipeline.
+        final = json.loads(ensured.stdout)
+        self.assertNotIn("rdl@rdl", final["enabledPlugins"])
+        self.assertNotIn("rdl", final["extraKnownMarketplaces"])
+
+    # --- dispatch contract ---
+    def test_dispatch_errors_exit_2(self):
+        for args in ([], ["bogus-subcommand"], ["cover"], ["cover", "a", "b"], ["strip-self", "only-one"]):
+            with self.subTest(args=args):
+                res = run_helper(HELPER, *args)
+                self.assertEqual(res.returncode, 2, f"{args}: rc={res.returncode}")
+
     # --- dual-path asset resolution ---
     @unittest.skipUnless(SYNCED_HELPER.is_file(), "synced plugin copy not present (run sync-plugins)")
     def test_synced_copy_resolves_marketplaces(self):
-        both = dict(self.externals)
-        both["enabledPlugins"] = dict(both["enabledPlugins"], **{"rdl@rdl": True})
-        path = self._write(both)
+        path = self._write(self._externals_plus_rdl())
         res = run_helper(SYNCED_HELPER, "ensure", path)
         self.assertEqual(res.returncode, 0, res.stderr)
         self.assertEqual(len(json.loads(res.stdout)["extraKnownMarketplaces"]), 6)
