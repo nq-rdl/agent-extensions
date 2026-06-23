@@ -4,7 +4,13 @@
 # Live mode (--live): also installs the marketplace via the claude CLI and
 # asserts plugin visibility. Run --live inside `devcontainer exec`.
 set -uo pipefail
-cd "$(git rev-parse --show-toplevel)" || exit 2
+# Resolve and validate the repo root before cd. `cd "$(git rev-parse ...)"`
+# alone is unsafe: outside a repo the substitution is empty and `cd ""` returns
+# 0, so the guard never fires and assertions silently run against the caller's
+# cwd (e.g. a sibling repo's marketplace.json) — a false GREEN/RED.
+root="$(git rev-parse --show-toplevel 2>/dev/null)" || { echo "FATAL: not inside a git repo" >&2; exit 2; }
+[ -n "$root" ] || { echo "FATAL: could not resolve repo root" >&2; exit 2; }
+cd "$root" || { echo "FATAL: cannot cd to repo root $root" >&2; exit 2; }
 MP=".claude-plugin/marketplace.json"
 # Preflight: the static assertions below shell out to jq against $MP. Without
 # this gate a missing jq binary or missing/invalid marketplace file would make
