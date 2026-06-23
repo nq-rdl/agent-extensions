@@ -377,11 +377,13 @@ if check:
             file=sys.stderr,
         )
         print(
-            "The plugins/ copies are derived from skills/ and agents/; refresh them with:",
+            "The plugins/ copies and the live .claude/scripts/ hooks are derived "
+            "from skills/ and agents/; refresh them with:",
             file=sys.stderr,
         )
         print(
-            "  bash scripts/sync-plugins.sh   (then commit the updated plugins/ tree)",
+            "  bash scripts/sync-plugins.sh   (then commit the updated plugins/ tree "
+            "and any .claude/scripts/ hook changes)",
             file=sys.stderr,
         )
         for d in drift:
