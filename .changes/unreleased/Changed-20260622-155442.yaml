@@ -1,3 +1,0 @@
-kind: Changed
-body: 'Compress `conventional-commits` to the non-inferable delta: drop the spec recital (and references/guidance.rst), add the commit-type to changie-kind/release-flow mapping and the feat/fix/chore edge calls; link the spec instead of restating it.'
-time: 2026-06-22T15:54:42.02113741+10:00

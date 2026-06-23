@@ -1,3 +1,0 @@
-kind: Added
-body: 'cc-web-setup: portable plugin provisioning for other repos — a curated team-externals settings template (`settings.externals.json.tmpl`) alongside the rdl baseline, an `assets/marketplaces.json` source of truth, and a `web-settings.sh` guard helper that enforces marketplace-consistency (every enabled plugin''s marketplace declared, #157) and strips self-referential marketplaces (#149); plus a `references/web-setup.rst` platform/architecture/anti-patterns reference'
-time: 2026-06-23T01:36:35.421536019Z

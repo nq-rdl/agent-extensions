@@ -1,3 +1,0 @@
-kind: Changed
-body: 'Compress `r-expert` to the non-inferable delta: drop the tidyverse style-guide recital (and references/style-quick-ref.rst); keep the R-version-pinned high-drift items, the cli/styler/arrow toolchain preferences, and the r-lib-*/shiny-* delegation pointers.'
-time: 2026-06-22T15:58:16.349626755+10:00

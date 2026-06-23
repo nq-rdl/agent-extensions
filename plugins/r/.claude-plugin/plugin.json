@@ -1,6 +1,6 @@
 {
   "name": "r",
-  "version": "0.13.0",
+  "version": "0.14.0",
   "description": "R — language expertise, package development, CLI apps, CRAN, lifecycle, async, and testing",
   "author": {
     "name": "nq-rdl"

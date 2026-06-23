@@ -1,3 +1,0 @@
-kind: Added
-body: Add `/skill:audit` — a non-inferable-value review skill, the read-only `skill-auditor` subagent, and an advisory PostToolUse hook nudging the audit when a skills/**/SKILL.md changes; folded into the existing `skill` bundle alongside review and report-issue.
-time: 2026-06-22T16:14:50.725904492+10:00
