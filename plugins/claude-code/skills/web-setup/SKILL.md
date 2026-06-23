@@ -139,10 +139,25 @@ Both wire the two SessionStart hooks and the opinionated defaults (`model: opus`
 
 1. **Pick the base** per the table. For *rdl + externals* (a consumer wanting both), start
    from the externals base and add `"rdl@rdl": true` to `enabledPlugins`.
-2. **Tailor the external set** from `assets/marketplaces.json` (`teamExternals`) by the
-   repo's language: always offer the `agnostic`-tagged (superpowers, pr-review-toolkit,
-   codex); add `go`-tagged for a Go repo, `python`-tagged (astral) for Python, `workflow`
-   (worktrunk) as desired. Present the menu and let the user confirm — do not silently decide.
+2. **Discover and tailor the plugin set.** Delegate the "what does this repo need?" work to
+   the **`marketplace-scout`** agent (Task tool): it locates `assets/marketplaces.json`,
+   enumerates the *live* catalog of every tracked marketplace (the RDL marketplace **and**
+   the team's extra marketplaces — official, worktrunk, codex, goland, astral), inspects the
+   repo's languages/tooling, and returns a ranked suggestion list with provenance. It only
+   recommends — **you** present its menu and let the user confirm; never silently decide.
+   The scout's report is organized as:
+   - **Baseline (always-useful)** — from `marketplaces.json` → `baseline`: `pr-review-toolkit@claude-plugins-official`,
+     `gh@rdl`, `worktrunk@worktrunk`, plus the applicable LSP (`gopls-lsp@claude-plugins-official`
+     for Go; the official marketplace ships more `*-lsp` plugins the scout enumerates per language).
+   - **Language/LSP + stack-matched** — RDL subject plugins and `teamExternals` whose subject
+     matches a detected language/tool (e.g. `go@rdl` + `modern-go-guidelines` + `gopls-lsp` for Go,
+     `terraform@rdl` for `*.tf`, `astral@astral-sh` for Python).
+
+   If you cannot or do not delegate, tailor by hand from `assets/marketplaces.json`: always
+   offer the `baseline.always` set and the `agnostic`-tagged `teamExternals`; add the
+   `go`/`python`/`workflow`-tagged entries and the matching `baseline.lsp` entry by language.
+   Remember `gh@rdl` (and any other `@rdl` baseline pick) is stripped automatically inside this
+   repo by `strip-self` (Phase 0) — it is a suggestion for *consumer* repos.
 3. **Strip self-references (Phase 0 enforcement):**
    ```bash
    tmp="$(mktemp)"

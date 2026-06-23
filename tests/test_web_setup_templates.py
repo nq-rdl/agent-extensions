@@ -102,6 +102,54 @@ class TestMarketplacesJson(unittest.TestCase):
                 self.assertNotEqual(ext["marketplace"], "rdl")
                 self.assertNotEqual(ext["id"], "rdl@rdl")
 
+    def test_baseline_ids_reference_known_marketplaces(self):
+        # The always-useful set the setup skills + marketplace-scout suggest. Every id must
+        # be name@marketplace and resolve to a declared marketplace (or `ensure` would add
+        # nothing and the suggestion would install silently).
+        baseline = self.data["baseline"]
+        entries = baseline["always"] + baseline["lsp"]
+        self.assertTrue(entries, "baseline must list at least one plugin")
+        for entry in entries:
+            with self.subTest(plugin=entry["id"]):
+                name, _, mkt = entry["id"].partition("@")
+                self.assertTrue(name and mkt, f"id must be name@marketplace: {entry['id']}")
+                self.assertEqual(mkt, entry["marketplace"], "id suffix must match marketplace field")
+                self.assertIn(entry["marketplace"], self.marketplaces)
+                self.assertTrue(entry["purpose"], "every baseline entry needs a purpose")
+
+    def test_baseline_always_set_is_the_team_floor(self):
+        # The user-specified always-useful floor — guard against an accidental drop.
+        always = {e["id"] for e in self.data["baseline"]["always"]}
+        self.assertEqual(
+            always,
+            {
+                "pr-review-toolkit@claude-plugins-official",
+                "gh@rdl",
+                "worktrunk@worktrunk",
+            },
+        )
+
+    def test_baseline_lsp_entries_are_language_tagged(self):
+        for entry in self.data["baseline"]["lsp"]:
+            with self.subTest(plugin=entry["id"]):
+                self.assertTrue(entry["language"], "an lsp entry must name its language")
+
+
+class TestCcSetupMarketplacesCopy(unittest.TestCase):
+    """cc-setup ships its own marketplaces.json so the local onboarding skill can do
+    plugin discovery standalone (when only the rdl-team plugin is installed). It must
+    stay byte-identical to the canonical cc-web-setup copy — guard against drift."""
+
+    def test_cc_setup_copy_matches_canonical(self):
+        canonical = MARKETPLACES.read_bytes()
+        cc_setup = (REPO / "skills" / "cc-setup" / "assets" / "marketplaces.json").read_bytes()
+        self.assertEqual(
+            cc_setup,
+            canonical,
+            "skills/cc-setup/assets/marketplaces.json drifted from the canonical "
+            "skills/cc-web-setup/assets/marketplaces.json — re-copy it.",
+        )
+
 
 class TestTemplates(unittest.TestCase):
     """The contract every shipped settings template must satisfy (both checked)."""
