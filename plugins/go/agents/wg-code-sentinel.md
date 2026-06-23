@@ -15,7 +15,8 @@ tools:
   - WebFetch
 model: opus
 effort: xhigh
-skills: []
+skills:
+  - secure
 color: orange
 metadata:
   upstream: https://github.com/github/awesome-copilot/blob/main/agents/wg-code-sentinel.agent.md

@@ -7,7 +7,8 @@ tools:
   - Read
   - Grep
   - Glob
-model: inherit
+model: opus
+effort: xhigh
 skills: []
 color: red
 metadata:

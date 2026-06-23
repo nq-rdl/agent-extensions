@@ -14,7 +14,8 @@ tools:
   - Glob
   - Bash
   - WebFetch
-model: inherit
+model: opus
+effort: xhigh
 skills: []
 color: red
 metadata:

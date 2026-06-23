@@ -11,7 +11,7 @@ tools:
   - Edit
   - Grep
   - Glob
-model: inherit
+model: sonnet
 skills: []
 color: purple
 metadata:

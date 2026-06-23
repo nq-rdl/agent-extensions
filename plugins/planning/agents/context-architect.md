@@ -10,7 +10,8 @@ tools:
   - Edit
   - Write
   - Bash
-model: inherit
+model: opus
+effort: xhigh
 skills: []
 color: purple
 metadata:

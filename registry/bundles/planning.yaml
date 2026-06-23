@@ -11,8 +11,6 @@ skills: []
 agents:
   - plan
   - context-architect
-  - repo-architect
-  - api-architect
   - hlbpa
   - adr-generator
 hooks: []

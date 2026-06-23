@@ -20,7 +20,7 @@ skills:
   - changie
   - conventional-commits
   - document-release
-  - go-gh
+  - go
   - husky
   - lefthook
   - pre-commit

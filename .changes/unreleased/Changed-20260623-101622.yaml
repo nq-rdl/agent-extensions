@@ -1,0 +1,3 @@
+kind: Changed
+body: Reworked the `repo-architect` agent from a Copilot/VS Code scaffolder into a GitHub repo bootstrap/audit agent and moved it from the `planning` plugin to `gh`, where it delegates to the gh skills (#137)
+time: 2026-06-23T10:16:22.000000000Z

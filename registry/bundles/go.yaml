@@ -12,6 +12,8 @@ skills:
   - {source: go-secure, leaf: secure}
 agents:
   - go-mcp-expert
+  - wg-code-sentinel
+  - github-actions-expert
 hooks: []
 prompts: []
 mcp: []

@@ -198,6 +198,69 @@ def strip_skill_name(dst: Path) -> None:
         skill_md.write_text("---\n".join(parts))
 
 
+def rewrite_agent_skills(text: str, skill_leaf_map: dict) -> str:
+    """Rewrite a copied agent's frontmatter ``skills:`` preload for one plugin.
+
+    A canonical agent lists the skills it preloads by their flat
+    ``skills/<source>/`` name (the single source of truth). Inside a plugin,
+    though, a grouped skill is packaged under its LEAF (``{source, leaf}``) and
+    invoked as ``<plugin>:<leaf>`` — and a skill the plugin does not ship cannot
+    be preloaded at all. So every plugin copy must translate each preload entry
+    to that plugin's leaf and drop the entries the plugin does not carry, or the
+    preload silently no-ops (Claude Code skips skills it can't resolve). A
+    cross-listed agent therefore needs a *different* list per plugin, which only
+    the derivative copy can hold — the canonical agents/ tree is never touched.
+
+    ``skill_leaf_map`` is {source -> leaf} for the skills actually shipped in the
+    target bundle. Order is preserved; an entry whose source is absent from the
+    map is dropped; an emptied list renders as ``skills: []``. Everything else in
+    the frontmatter and the whole body are preserved byte-for-byte. A no-op when
+    the agent has no ``skills:`` key, and idempotent when every preload is already
+    a shipped leaf (the common ``skills: []`` case). Mirrors the leaf grouping in
+    sync_skill / scripts/_registry.py::normalize_member.
+    """
+    parts = text.split("---\n", 2)
+    if len(parts) < 3 or parts[0].strip():
+        return text  # no leading YAML frontmatter block — nothing to rewrite
+    lines = parts[1].splitlines(keepends=True)
+    out, i, changed = [], 0, False
+    while i < len(lines):
+        if re.match(r"^skills:", lines[i]):
+            inline = lines[i].split(":", 1)[1].strip()
+            entries, consumed_end = [], i + 1
+            if inline:
+                # Flow form: `skills: []` or `skills: [a, b]`.
+                inner = inline[1:-1] if inline.startswith("[") and inline.endswith("]") else inline
+                entries = [e.strip() for e in inner.split(",") if e.strip()]
+            else:
+                # Block form: consume the following `  - <name>` list items.
+                j = i + 1
+                while j < len(lines):
+                    m = re.match(r"^[ \t]+-\s*([^\s#]+)", lines[j])
+                    if not m:
+                        break
+                    entries.append(m.group(1))
+                    j += 1
+                consumed_end = j
+            mapped = [skill_leaf_map[e] for e in entries if e in skill_leaf_map]
+            block = (
+                "skills:\n" + "".join(f"  - {leaf}\n" for leaf in mapped)
+                if mapped
+                else "skills: []\n"
+            )
+            if block != "".join(lines[i:consumed_end]):
+                changed = True
+            out.append(block)
+            i = consumed_end
+            continue
+        out.append(lines[i])
+        i += 1
+    if not changed:
+        return text
+    parts[1] = "".join(out)
+    return "---\n".join(parts)
+
+
 def sync_skill(plugin: str, source: str, leaf: str, bundle_file: Path) -> None:
     src = repo / "skills" / source
     dst = repo / "plugins" / plugin / "skills" / leaf
@@ -228,7 +291,7 @@ def sync_skill(plugin: str, source: str, leaf: str, bundle_file: Path) -> None:
     print(f"  ✓ skill {source} -> {leaf}" if source != leaf else f"  ✓ skill {source}")
 
 
-def sync_agent(plugin: str, agent: str, bundle_file: Path) -> None:
+def sync_agent(plugin: str, agent: str, bundle_file: Path, skill_leaf_map: dict) -> None:
     src = repo / "agents" / agent / "agent.md"
     dst = repo / "plugins" / plugin / "agents" / f"{agent}.md"
     if not src.is_file():
@@ -237,19 +300,24 @@ def sync_agent(plugin: str, agent: str, bundle_file: Path) -> None:
             f"Agent '{agent}' has no source agents/{agent}/agent.md — skipped.",
         )
         return
+    # The copy is canonical byte-for-byte except its frontmatter skills: preload,
+    # which is rewritten to this plugin's leaves (dropping skills it does not
+    # ship) so a cross-listed agent references what each plugin actually carries.
+    expected = rewrite_agent_skills(src.read_text(), skill_leaf_map)
     if check:
         if not dst.is_file():
             drift.append(f"plugins/{plugin}/agents/{agent}.md: missing — run sync-plugins.sh")
-        elif dst.read_bytes() != src.read_bytes():
+        elif dst.read_text() != expected:
             drift.append(
-                f"plugins/{plugin}/agents/{agent}.md: content differs from "
-                f"agents/{agent}/agent.md"
+                f"plugins/{plugin}/agents/{agent}.md: out of sync with "
+                f"agents/{agent}/agent.md (skills: preload not rewritten to this "
+                "plugin's leaves) — run sync-plugins.sh"
             )
         return
     dst.parent.mkdir(parents=True, exist_ok=True)
     if dst.is_symlink() or dst.exists():
         dst.unlink()
-    shutil.copyfile(src, dst)
+    dst.write_text(expected)
     print(f"  ✓ agent {agent}")
 
 
@@ -372,6 +440,14 @@ for bundle_file in bundle_files:
     present_skill_leaves = {
         leaf for (source, leaf) in norm_skills if (repo / "skills" / source).is_dir()
     }
+    # source -> leaf for skills this plugin actually ships; an agent copy's
+    # skills: preload is rewritten through this map and entries absent from it are
+    # dropped, so each plugin references only the skills it carries (by leaf).
+    skill_leaf_map = {
+        source: leaf
+        for (source, leaf) in norm_skills
+        if (repo / "skills" / source).is_dir()
+    }
     present_agents = [
         a for a in agents if (repo / "agents" / a / "agent.md").is_file()
     ]
@@ -384,7 +460,7 @@ for bundle_file in bundle_files:
     for source, leaf in norm_skills:
         sync_skill(plugin, source, leaf, bundle_file)
     for agent in agents:
-        sync_agent(plugin, agent, bundle_file)
+        sync_agent(plugin, agent, bundle_file, skill_leaf_map)
 
 # After the bundle loop so live-hook drift folds into `drift` and is reported by
 # the existing exit logic below. Scoped runs that exclude claude-code skip it.
