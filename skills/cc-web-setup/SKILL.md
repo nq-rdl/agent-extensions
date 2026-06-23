@@ -116,6 +116,12 @@ absolute path once and reuse it:
 WS="<absolute path to this skill>/scripts/web-settings.sh"   # the scripts/ next to this SKILL.md
 ```
 
+`strip-self` and `ensure` are **stdout filters** — they print the corrected document and
+do **not** edit `.claude/settings.json` in place (so you can review the diff first). Capture
+the output to a temp file and move it into place; the `&&` leaves the original untouched if
+the guard exits non-zero (e.g. `ensure`'s stop-and-ask on an unknown marketplace), which is
+exactly what you want. `cover` is a read-only assertion (no redirect needed).
+
 | Base | File | Use for |
 |---|---|---|
 | **rdl** | `assets/settings.json.tmpl` | a *consumer* repo that wants the RDL catalog (`rdl@rdl`) |
@@ -132,13 +138,15 @@ Both wire the two SessionStart hooks and the opinionated defaults (`model: opus`
    (worktrunk) as desired. Present the menu and let the user confirm — do not silently decide.
 3. **Strip self-references (Phase 0 enforcement):**
    ```bash
-   bash "$WS" strip-self "$PWD" .claude/settings.json
+   tmp="$(mktemp)"
+   bash "$WS" strip-self "$PWD" .claude/settings.json > "$tmp" && mv "$tmp" .claude/settings.json
    ```
    Removes any `enabledPlugins`/marketplace that resolves to *this* repo's own
    `.claude-plugin/marketplace.json`; a no-op passthrough when there is none.
 4. **Guarantee marketplace coverage (#157):**
    ```bash
-   bash "$WS" ensure .claude/settings.json
+   tmp="$(mktemp)"
+   bash "$WS" ensure .claude/settings.json > "$tmp" && mv "$tmp" .claude/settings.json
    ```
    Auto-adds every missing-but-known marketplace from `marketplaces.json`. If it exits
    non-zero it printed an **unknown** marketplace to stderr and wrote **nothing** — **stop and

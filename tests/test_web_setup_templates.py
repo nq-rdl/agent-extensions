@@ -305,6 +305,34 @@ class TestWebSettingsHelper(unittest.TestCase):
         # Whole document unchanged (not just enabledPlugins) for the passthrough path.
         self.assertEqual(json.loads(res.stdout), self.externals)
 
+    def test_strip_self_rejects_nonexistent_repo_root(self):
+        # A bad repo-root must fail fast, not silently skip the Phase 0 guard.
+        path = self._write(self.externals)
+        res = run_helper(HELPER, "strip-self", os.path.join(self.tmp, "nope"), path)
+        self.assertEqual(res.returncode, 2)
+        self.assertEqual(res.stdout, "")
+
+    def test_strip_self_rejects_malformed_marketplace_json(self):
+        root = tempfile.mkdtemp(dir=self.tmp)
+        plugin_dir = Path(root) / ".claude-plugin"
+        plugin_dir.mkdir()
+        (plugin_dir / "marketplace.json").write_text("{not valid json,,}")
+        path = self._write(self.externals)
+        res = run_helper(HELPER, "strip-self", root, path)
+        self.assertEqual(res.returncode, 2)
+        self.assertEqual(res.stdout, "")
+
+    def test_ensure_rejects_malformed_marketplaces_lookup(self):
+        bad = os.path.join(self.tmp, "bad-marketplaces.json")
+        with open(bad, "w") as fh:
+            fh.write("{not valid json")
+        path = self._write(
+            {"enabledPlugins": {"superpowers@claude-plugins-official": True}, "extraKnownMarketplaces": {}}
+        )
+        res = run_helper(HELPER, "ensure", path, env={"WEB_SETTINGS_MARKETPLACES": bad})
+        self.assertEqual(res.returncode, 2)
+        self.assertEqual(res.stdout, "")
+
     # --- dual-path asset resolution ---
     @unittest.skipUnless(SYNCED_HELPER.is_file(), "synced plugin copy not present (run sync-plugins)")
     def test_synced_copy_resolves_marketplaces(self):

@@ -86,6 +86,7 @@ cmd_ensure() {
   [ -f "$settings" ] || die "ensure: no such file: $settings" 2
   [ -f "$MARKETPLACES" ] || die "ensure: marketplaces lookup not found: $MARKETPLACES" 2
   require_json "$settings" ensure
+  require_json "$MARKETPLACES" ensure
 
   lookup="$(jq -c '.marketplaces' "$MARKETPLACES")"
 
@@ -129,6 +130,8 @@ cmd_strip_self() {
   [ "$#" -eq 2 ] || die "strip-self: expected <repo-root> <settings.json>" 2
   repo_root="$1"
   settings="$2"
+  # Fail fast on a bad repo-root rather than silently skipping the Phase 0 guard.
+  [ -d "$repo_root" ] || die "strip-self: not a directory: $repo_root" 2
   [ -f "$settings" ] || die "strip-self: no such file: $settings" 2
   require_json "$settings" strip-self
 
@@ -137,9 +140,11 @@ cmd_strip_self() {
     jq '.' "$settings"   # not a marketplace repo — passthrough (still validated)
     return 0
   fi
+  # A present marketplace file must be valid JSON, or we cannot trust the guard.
+  require_json "$mkfile" strip-self
   self="$(jq -r '.name // empty' "$mkfile")"
   if [ -z "$self" ]; then
-    jq '.' "$settings"   # marketplace file without a name — nothing to strip (validated)
+    jq '.' "$settings"   # valid marketplace file but no name — nothing to strip
     return 0
   fi
 
