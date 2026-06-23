@@ -94,18 +94,6 @@
       ]
     },
     {
-      "name": "zod",
-      "source": "./plugins/zod",
-      "description": "Zod — TypeScript-first schema declaration and validation",
-      "version": "0.13.0",
-      "keywords": [
-        "zod",
-        "schema",
-        "validation",
-        "typescript"
-      ]
-    },
-    {
       "name": "defuddle",
       "source": "./plugins/defuddle",
       "description": "Defuddle — extract clean Markdown from cluttered web pages",
@@ -328,12 +316,13 @@
     {
       "name": "skill",
       "source": "./plugins/skill",
-      "description": "Skill authoring — review skill quality and report skill issues upstream",
+      "description": "Skill quality — audit skills for non-inferable value, review changes, and report issues upstream",
       "version": "0.13.0",
       "keywords": [
         "skills",
         "review",
-        "quality"
+        "quality",
+        "audit"
       ]
     },
     {

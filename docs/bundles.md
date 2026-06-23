@@ -114,16 +114,6 @@ Writerside — author and build JetBrains Writerside documentation.
 
 ---
 
-## zod
-
-Zod — TypeScript-first schema declaration and validation.
-
-**Skills**
-
-- `/zod:schema`
-
----
-
 ## defuddle
 
 Defuddle — extract clean Markdown from cluttered web pages.
@@ -338,12 +328,19 @@ Playwright — generate and debug end-to-end browser tests.
 
 ## skill
 
-Skill authoring — review skill quality and report skill issues upstream.
+Skill quality — audit skills for non-inferable value, review changes, and report issues upstream.
 
 **Skills**
 
 - `/skill:review`
 - `/skill:report-issue`
+- `/skill:audit`
+
+**Agents**
+
+- `skill-auditor` (subagent)
+
+**Hooks:** `skill-audit-nudge`
 
 ---
 

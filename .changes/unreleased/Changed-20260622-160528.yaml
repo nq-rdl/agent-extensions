@@ -1,0 +1,3 @@
+kind: Changed
+body: 'Trim `go-naming` ~50% to the high-drift items: the initialisms casing table, getter/stutter/receiver rules, and the Summary Checklist; link Effective Go for the rest instead of restating it.'
+time: 2026-06-22T16:05:28.439415644+10:00

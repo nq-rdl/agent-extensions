@@ -62,6 +62,8 @@ To make installs self-contained, `plugins/<bundle>/skills/<name>/` and `plugins/
 
 Skills and agents are authored directly under `skills/` and `agents/`. After editing one, run `bash scripts/sync-plugins.sh` to refresh the plugin trees; CI's `validate-skills` job runs `asctl repo-check` to validate `skills/` against the agentskills.io spec.
 
+When authoring or compressing a skill, follow **CONTRIBUTING.md → "Skill content conventions"** (non-inferable delta, version pins, verify-canonical guard). The `/skill:audit` skill checks these.
+
 ### Python skills (csv, pdf, xlsx, docx)
 
 These skills call Python directly (no CLI wrapper). Each has a `requirements.txt` and an `ensure-deps.sh` bootstrap script. Install `uv` (recommended) or `pixi` (linux-64 only) for the docs environment; neither is required for skill execution.
