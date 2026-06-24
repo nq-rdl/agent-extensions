@@ -1,6 +1,6 @@
 {
   "name": "arch-linux",
-  "version": "0.15.0",
+  "version": "0.16.0",
   "description": "Arch Linux — pacman, rolling-release maintenance, and system administration",
   "author": {
     "name": "nq-rdl"
