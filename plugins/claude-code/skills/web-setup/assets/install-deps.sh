@@ -469,26 +469,145 @@ persist_path() {
   fi
 }
 
+# Register a declared GitHub marketplace WITHOUT git, by fetching it as a tarball
+# over HTTPS and adding it from a local path.
+#
+# WHY THIS EXISTS: in a cloud session the in-sandbox GitHub proxy authorizes git
+# operations ONLY against the session's own working repo. Verified empirically —
+# `git ls-remote` of the session repo returns 200, but EVERY other repo (a
+# different repo in the SAME org, and unrelated public repos alike) returns 403,
+# and that proxy is independent of the environment's network-access level (so
+# "Full" access does not change it). `claude plugin marketplace add owner/repo`
+# is a `git clone`, so it 403s for every marketplace whose source repo is not the
+# session repo — which is essentially all of them. This is a distinct failure
+# mode from an empty registry, a stale index, or an unreachable host: the host is
+# reachable and the policy allows it; only the git protocol to a non-session repo
+# is denied.
+#
+# The non-git GitHub hosts (api.github.com, codeload.github.com) ARE on the
+# default Trusted allowlist, so we fetch the marketplace as a tarball over HTTPS
+# and register it from the extracted LOCAL PATH — which never invokes git.
+# Verified end to end: `claude plugin marketplace add <local-dir>` + `claude
+# plugin install <plugin>@<name>` both succeed this way.
+#
+# $1 declared marketplace name, $2 owner/repo, $3 ref (empty => default branch).
+# Returns 0 iff the local-path registration succeeded. Non-fatal: every failure
+# logs a specific reason and returns non-zero so the caller does not double-warn.
+register_marketplace_via_tarball() {
+  local name="$1" repo="$2" ref="$3"
+  # A marketplace name is a settings.json key; reject path-unsafe values up front so
+  # they cannot break the temp-file template or let $dest escape the cache dir.
+  case "$name" in
+    ''|.|..|*/*) log "  WARNING: marketplace name '${name}' is not a path-safe identifier — skipping tarball registration."; return 1 ;;
+  esac
+  # The official marketplace's NAME is reserved by the CLI to GitHub sources from
+  # the 'anthropics' org ("The name 'claude-plugins-official' is reserved … and can
+  # only be used with GitHub sources from the 'anthropics' organization"), so a
+  # local-path registration is rejected outright — confirmed. Don't waste a
+  # multi-MB download on it: its plugins must be VENDORED into the repo's
+  # .claude/skills/ instead (the only path the proxy can't block — see the skill's
+  # references/web-setup.rst). Match the reserved NAME or the SPECIFIC official repo
+  # only — NOT the whole anthropics org: a hypothetical other anthropics-hosted
+  # marketplace is not name-reserved and CAN be tarball-registered. Any reserved name
+  # we don't foresee here still trips the `grep -qi 'reserved'` safety net below.
+  if [ "$name" = "claude-plugins-official" ] || [ "$repo" = "anthropics/claude-plugins-official" ]; then
+    log "  WARNING: marketplace '${name}' (${repo}) is an official/reserved marketplace — it cannot be registered from a tarball; vendor its plugins' skills into .claude/skills/ instead (see the cc-web-setup skill's web-setup.rst)."
+    return 1
+  fi
+  local tool
+  for tool in curl tar; do
+    command -v "$tool" >/dev/null 2>&1 || { log "  WARNING: $tool not found — cannot tarball-register marketplace '${name}'."; return 1; }
+  done
+  local base dest tmp url
+  base="${XDG_CACHE_HOME:-${HOME}/.cache}/rdl-web-setup/marketplaces"
+  dest="${base}/${name}"
+  if ! mkdir -p "$base" 2>>"$LOG"; then
+    log "  WARNING: could not create the marketplace cache dir ${base} (see ${LOG})."; return 1
+  fi
+  # Generic temp name — NOT mkt-${name}: a name with a '/' would make this a
+  # nonexistent-subdir template and mktemp would fail for an otherwise-valid repo.
+  if ! tmp="$(mktemp "${TMPDIR:-/tmp}/rdl-mkt.XXXXXX")" || [ -z "$tmp" ]; then
+    log "  WARNING: could not stage a temp tarball for marketplace '${name}'."; return 1
+  fi
+  # api.github.com/repos/<owner>/<repo>/tarball[/<ref>] 302-redirects to a signed
+  # codeload URL; -L follows it. Both hosts are Trusted-allowlisted. Omit the ref
+  # segment to get the default branch (no need to discover it). Try ANONYMOUS first
+  # — public repos need no token, and a stale/placeholder token would 401 a request
+  # that would otherwise succeed — then retry WITH the env GitHub token for a
+  # PRIVATE marketplace. This HTTPS fetch is the one place GH_TOKEN actually helps
+  # the marketplace path; the git proxy ignores it entirely.
+  url="https://api.github.com/repos/${repo}/tarball${ref:+/${ref}}"
+  if ! curl -fsSL "$url" -o "$tmp" 2>>"$LOG"; then
+    local tok="${GH_TOKEN:-${GITHUB_TOKEN:-}}"
+    if [ -z "$tok" ] || ! curl -fsSL -H "Authorization: Bearer ${tok}" "$url" -o "$tmp" 2>>"$LOG"; then
+      log "  WARNING: could not download marketplace '${name}' tarball from ${url} (see ${LOG})."; rm -f "$tmp"; return 1
+    fi
+  fi
+  # Re-extract cleanly: remove the WHOLE dir (a `${dest}/*` glob leaves dotfiles —
+  # notably a prior run's .claude-plugin/ — behind, defeating the clean extract and
+  # risking a register off stale content), then recreate it. The scoped `[ -n ]`
+  # keeps any failure inside this function (a bare `${dest:?}` would abort the whole
+  # hook shell, which the caller's `|| true` can't rescue). GitHub nests the tree
+  # under a top-level <repo>-<sha>/ dir, so strip one component.
+  [ -n "$dest" ] || { log "  WARNING: empty cache path for marketplace '${name}' — skipping."; rm -f "$tmp"; return 1; }
+  rm -rf "$dest" 2>>"$LOG" || true
+  if ! mkdir -p "$dest" 2>>"$LOG"; then
+    log "  WARNING: could not recreate ${dest} for marketplace '${name}' (see ${LOG})."; rm -f "$tmp"; return 1
+  fi
+  if ! tar -xzf "$tmp" -C "$dest" --strip-components=1 2>>"$LOG"; then
+    log "  WARNING: could not extract marketplace '${name}' tarball (see ${LOG})."; rm -f "$tmp"; return 1
+  fi
+  rm -f "$tmp"
+  # Honest signal: a marketplace dir must carry .claude-plugin/marketplace.json, or
+  # `marketplace add` would reject it — fail with a clear reason rather than letting
+  # a malformed extract fall through.
+  if [ ! -f "${dest}/.claude-plugin/marketplace.json" ]; then
+    log "  WARNING: marketplace '${name}' tarball had no .claude-plugin/marketplace.json — refusing to register."; return 1
+  fi
+  # Register from the LOCAL PATH (no git → no 403). A reserved-name rejection can
+  # still surface here for an official marketplace not caught by the guard above;
+  # translate it into the vendoring pointer rather than a generic failure.
+  local out
+  if out="$(claude plugin marketplace add "$dest" </dev/null 2>&1)"; then
+    printf 'marketplace %s registered from local tarball %s (%s)\n%s\n' "$name" "$dest" "$repo" "$out" >>"$LOG"
+    log "  marketplace '${name}': registered from a downloaded tarball (git clone is blocked for non-session repos)."
+    return 0
+  fi
+  printf '%s\n' "$out" >>"$LOG"
+  if printf '%s' "$out" | grep -qi 'reserved'; then
+    log "  WARNING: marketplace '${name}' uses a reserved name and cannot be registered from a tarball — vendor its plugins' skills into .claude/skills/ instead (see the cc-web-setup skill's web-setup.rst)."
+  else
+    log "  WARNING: could not register marketplace '${name}' from its tarball (see ${LOG})."
+  fi
+  return 1
+}
+
 # Self-heal the plugins declared in .claude/settings.json (enabledPlugins == true).
 #
 # WHY THIS EXISTS: Claude Code on the web installs the plugins declared in
 # .claude/settings.json (enabledPlugins + extraKnownMarketplaces) at session start
 # from their marketplaces — see the web docs' "what carries over" table — so this
 # is NOT the primary install path. It is a belt-and-suspenders RETRY for when that
-# did not complete. Three failure modes are covered: (1) an EMPTY marketplace
+# did not complete. Four failure modes are covered: (1) an EMPTY marketplace
 # registry — on a cold cloud VM this SessionStart hook can outrun Claude Code's own
 # registration of extraKnownMarketplaces, so `claude plugin install` (and even
 # `marketplace update`) fail with "Marketplace not found. Available marketplaces:"
 # (an empty list) — NOT a network error; (2) a STALE local marketplace index — the
 # marketplace is registered but its index was never refreshed, so the install fails
-# with "Plugin not found in marketplace … your local copy may be out of date"; and
-# (3) the docs' "requires network access to reach the marketplace source." To cover
-# (1) we first `claude plugin marketplace add` every declared marketplace
-# (idempotent — a no-op once on disk) so the hook owns the whole add → update →
-# install chain; `claude plugin install` does not refresh the index itself, so a
-# failed install then runs `claude plugin marketplace update <marketplace>` and
-# retries once (which fixes (2)). Normally every plugin is already present and this
-# is a quiet no-op.
+# with "Plugin not found in marketplace … your local copy may be out of date";
+# (3) the docs' "requires network access to reach the marketplace source"; and
+# (4) GITHUB-PROXY REPO-SCOPING — the in-sandbox GitHub proxy authorizes git only
+# against the session's OWN repo, so `claude plugin marketplace add owner/repo` (a
+# git clone) 403s for every other marketplace repo, independent of the network
+# level. To cover (1) we first `claude plugin marketplace add` every declared
+# marketplace (idempotent — a no-op once on disk) so the hook owns the whole add →
+# update → install chain; `claude plugin install` does not refresh the index
+# itself, so a failed install then runs `claude plugin marketplace update
+# <marketplace>` and retries once (which fixes (2)). To cover (4), a failed git
+# `marketplace add` of a GitHub source falls back to register_marketplace_via_tarball
+# — an HTTPS tarball fetch + local-path add that never touches git (the official
+# anthropics marketplace is name-reserved and the one exception, which must be
+# vendored). Normally every plugin is already present and this is a quiet no-op.
 #
 # CAVEAT (timing): Claude enumerates skills at process startup, BEFORE SessionStart
 # hooks finish, so anything this retry installs surfaces from the NEXT session, not
@@ -539,10 +658,15 @@ ensure_plugins() {
   # equivalent — only the declarative extraKnownMarketplaces entry expresses it — so
   # such a marketplace is SKIPPED here rather than registered as the wrong catalog,
   # and Claude Code's own declarative registration handles it. jq emits one
-  # `name<TAB>add|skip<TAB>source-or-reason` row per declared marketplace.
+  # `name<TAB>add|skip<TAB>source-or-reason<TAB>owner/repo<TAB>ref` row per declared
+  # marketplace; the trailing owner/repo + ref (empty for non-github sources) feed
+  # the git-403 tarball fallback below.
   if [ "$pending" -gt 0 ]; then
-    local mkt_name mkt_kind mkt_src mkt_out
-    while IFS=$'\t' read -r mkt_name mkt_kind mkt_src; do
+    # jq emits two extra fields beyond name/kind/src: the bare GitHub `owner/repo`
+    # and `ref` (both empty for non-github sources), so a git-add failure can fall
+    # back to a non-git tarball registration without re-parsing `owner/repo@ref`.
+    local mkt_name mkt_kind mkt_src mkt_repo mkt_ref mkt_out
+    while IFS=$'\t' read -r mkt_name mkt_kind mkt_src mkt_repo mkt_ref; do
       [ -n "$mkt_name" ] || continue
       if [ "$mkt_kind" = "skip" ]; then
         printf 'marketplace %s: not self-healed (%s)\n' "$mkt_name" "$mkt_src" >>"$LOG"
@@ -555,21 +679,49 @@ ensure_plugins() {
       # $LOG either way; only a genuine failure earns a WARNING.
       if mkt_out="$(claude plugin marketplace add "$mkt_src" </dev/null 2>&1)"; then
         printf 'marketplace %s registered via %s\n%s\n' "$mkt_name" "$mkt_src" "$mkt_out" >>"$LOG"
+        # "Already on disk" for a GITHUB source means the registration predates this
+        # hook (e.g. Claude Code's declarative startup) and its git-backed index may be
+        # EMPTY — a later `marketplace update` would re-hit the blocked git source and
+        # 403, so the pending plugin never installs and the genuine-failure branch
+        # below (which would have tarball-fetched it) is never reached. Re-register
+        # from a fresh tarball to give it a populated local-path index; `marketplace
+        # add <local-dir>` overrides an existing same-name registration (verified). A
+        # genuine first add prints "Successfully added" (no "already"), so the session's
+        # own repo — where git works — is left untouched. (#189, Codex review.)
+        if [ -n "$mkt_repo" ] && printf '%s' "$mkt_out" | grep -qi 'already'; then
+          register_marketplace_via_tarball "$mkt_name" "$mkt_repo" "$mkt_ref" || true
+        fi
       elif printf '%s' "$mkt_out" | grep -qi 'already'; then
         printf 'marketplace %s already registered (%s)\n%s\n' "$mkt_name" "$mkt_src" "$mkt_out" >>"$LOG"
+        # Same empty/stale-index concern on the rc!=0 "already" variant — re-register a
+        # GitHub source from the tarball so a pending plugin isn't stranded on a
+        # git-backed index that `marketplace update` can't refresh.
+        if [ -n "$mkt_repo" ]; then
+          register_marketplace_via_tarball "$mkt_name" "$mkt_repo" "$mkt_ref" || true
+        fi
       else
+        # The git `marketplace add` failed. In the cloud the dominant cause is the
+        # GitHub proxy 403'ing git for any non-session repo (see
+        # register_marketplace_via_tarball). For a GitHub source, fall back to a
+        # non-git tarball registration; the helper logs its own outcome (success or a
+        # specific reason), so don't double-warn here. A non-github source (a git URL
+        # or local path) has no tarball path, so it keeps the original WARNING.
         printf '%s\n' "$mkt_out" >>"$LOG"
-        log "  WARNING: could not register marketplace '${mkt_name}' (${mkt_src}) — see ${LOG}."
+        if [ -n "$mkt_repo" ]; then
+          register_marketplace_via_tarball "$mkt_name" "$mkt_repo" "$mkt_ref" || true
+        else
+          log "  WARNING: could not register marketplace '${mkt_name}' (${mkt_src}) — see ${LOG}."
+        fi
       fi
     done < <(jq -r '
       (.extraKnownMarketplaces // {}) | to_entries[]
       | .key as $name | .value.source as $s
       | if ($s.source == "github") and ($s.repo) then
-          if (($s.path // "") != "") then [$name, "skip", "custom marketplace.json path not expressible via marketplace add"]
-          else [$name, "add", ($s.repo + (if (($s.ref // "") != "") then "@" + $s.ref else "" end))] end
-        elif (($s.url // "") != "") then [$name, "add", ($s.url + (if (($s.ref // "") != "") then "#" + $s.ref else "" end))]
-        elif (($s.path // "") != "") then [$name, "add", $s.path]
-        else [$name, "skip", "unrecognized source shape"] end
+          if (($s.path // "") != "") then [$name, "skip", "custom marketplace.json path not expressible via marketplace add", "", ""]
+          else [$name, "add", ($s.repo + (if (($s.ref // "") != "") then "@" + $s.ref else "" end)), $s.repo, ($s.ref // "")] end
+        elif (($s.url // "") != "") then [$name, "add", ($s.url + (if (($s.ref // "") != "") then "#" + $s.ref else "" end)), "", ""]
+        elif (($s.path // "") != "") then [$name, "add", $s.path, "", ""]
+        else [$name, "skip", "unrecognized source shape", "", ""] end
       | @tsv
     ' "$settings" 2>/dev/null)
   fi

@@ -37,10 +37,32 @@ Per the [web docs' "what carries over" table](https://code.claude.com/docs/en/cl
 > marketplace source."*
 
 So declaring the marketplace under `extraKnownMarketplaces` and the plugin under
-`enabledPlugins` is the **whole mechanism** — the platform installs them at session start
-and their `/<plugin>:<skill>` commands surface on the first session. The only requirement
-is that the marketplace source is reachable (`github.com` is on the default *Trusted*
-allowlist).
+`enabledPlugins` is the **whole mechanism** for the platform's session-start install. But
+the docs' one-line *"requires network access to reach the marketplace source"* undersells a
+hard constraint:
+
+> **The in-sandbox GitHub proxy authorizes git only against the session's own repo.**
+> `claude plugin marketplace add owner/repo` is a `git clone`; verified empirically, it
+> returns **403** for *every* repo that is not the session's working repo — a different
+> repo in the **same org** and unrelated **public** repos alike. That proxy is
+> **independent of the environment's network-access level**, so "Full network access" does
+> **not** change it (per the web docs, *"GitHub operations use a separate proxy that is
+> independent of this setting"*). `github.com` on the *Trusted* allowlist only governs
+> ordinary HTTPS — the API, `raw.githubusercontent.com`, and `codeload` tarballs all
+> work — **not** the git protocol.
+
+Practical consequence: a marketplace whose source repo **is** the session repo (e.g.
+`rdl@rdl` inside `nq-rdl/agent-extensions`) git-clones fine; **every external marketplace**
+(`claude-plugins-official`, `worktrunk`, `astral-sh`, …) 403s over git. Two routes survive
+this (see [`references/web-setup.rst`](references/web-setup.rst) → "Failure mode #4 — git-proxy
+repo-scoping" and Phase 3 below):
+
+- **Vendor the skills into the repo's `.claude/skills/`** — they carry over as part of the
+  clone (zero proxy, zero git, available the **first** session). The robust path, and what
+  this repo does for its own plugins.
+- **Fetch the marketplace as an HTTPS tarball and register it from a local path** — the
+  self-heal does this automatically. Works for every marketplace **except the name-reserved
+  `claude-plugins-official`**, which must be vendored.
 
 The `install-deps.sh` **SessionStart hook** this skill installs does **not** drive that
 plugin install. It is gated on `CLAUDE_CODE_REMOTE` (a no-op on a contributor's laptop)
@@ -56,19 +78,27 @@ and provisions only what the declarative path does not:
   this hook can outrun Claude Code's own registration of `extraKnownMarketplaces`, leaving
   the registry empty, which is a **race**, not the docs' *"requires network access to reach
   the marketplace source"* failure — then refreshes a stale index on a failed install,
-  owning the whole add → update → install chain. Gated on a pending count, so a warm resume
-  stays a no-op.
+  owning the whole add → update → install chain. When a GitHub `marketplace add` 403s
+  (failure mode #4), it falls back to an **HTTPS tarball fetch + local-path registration**
+  (`register_marketplace_via_tarball`) that never touches git. Gated on a pending count, so
+  a warm resume stays a no-op. **Caveat:** anything the self-heal installs surfaces from the
+  **next** session (skills enumerate before SessionStart hooks finish) — for *first-session*
+  availability, vendor into `.claude/skills/`.
 
 `announce-capabilities.sh` (the second SessionStart hook) cross-checks the declared set
 against `claude plugin list` and reports **"Enabled plugins (installed)"** vs a
 **"⚠️ Declared but NOT installed"** line — so a marketplace-reachability failure is
 surfaced, never masked. Keep the chain in mind: **declared ≠ installed ≠ surfaced.**
 
-> **Do NOT add a Setup-script field for plugins.** Earlier revisions of this repo told
-> users to set the environment's Setup-script field to `make install-deps`; that was wrong
-> (and it hard-blocked session startup on any CWD/branch hiccup). Plugins are declarative —
-> the Setup-script field is for caching heavy *packages*, not plugins, and this skill does
-> not use it.
+> **Do NOT drive the plugin install from a Setup-script field via `make`/git.** Earlier
+> revisions set the environment's Setup-script field to `make install-deps`; that was wrong
+> twice over — it drove the install through **git** (which 403s, failure mode #4) and it
+> hard-blocked session startup on any CWD/branch hiccup. Plugins install declaratively; when
+> the git path is blocked, the fix is **vendoring** (or the self-heal's HTTPS-tarball
+> fallback) — never `git`/`make`. A Setup-script field earns its keep only for caching heavy
+> *packages*, or to pre-bake vendored/tarball-fetched content into the snapshot for
+> first-session availability (it must fetch over HTTPS, never git, and be `|| true`-guarded
+> so a hiccup never fails startup). This skill ships the portable hook, not a Setup-script.
 
 > Authoritative platform facts (the web docs' "what carries over" table), the three-layer
 > architecture (declarative settings ↔ `install-deps.sh` engine ↔ `install-deps.local.sh`
@@ -203,6 +233,38 @@ portable engine so it stays re-syncable.
 Offer to scaffold a commented `.claude/scripts/install-deps.local.sh` from
 `assets/install-deps.local.sh.example`. Do **not** create it unless the repo actually needs
 project-specific steps.
+
+### Vendoring third-party plugin content (the git-403 escape hatch)
+
+When a repo *must* have a third-party plugin's skills available on the **first** session, do
+not rely on the declarative install or the self-heal — the GitHub proxy 403s the git clone
+of any non-session marketplace (failure mode #4), and a self-heal install only surfaces
+next-session. **Vendor the skills into the repo's own `.claude/skills/`**: per the web docs'
+"what carries over" table, `.claude/skills/`, `.claude/agents/`, and `.claude/commands/`
+carry over because they are *part of the clone* — no proxy, no git, no marketplace. This is
+exactly the self-contained real-file-copy model this repo uses for its own plugins.
+
+Fetch the content over **HTTPS** (allowlisted; the git path is what's blocked), copy in only
+the skills you actually want, and commit them:
+
+```bash
+# api.github.com/repos/<owner>/<repo>/tarball[/<ref>] → codeload (both Trusted-allowlisted).
+# No git. Add `-H "Authorization: Bearer $GH_TOKEN"` only for a PRIVATE marketplace.
+ext="$(mktemp -d)"; tgz="$(mktemp)"
+# Download to a file first rather than piping curl into tar — lets you inspect the
+# artifact before extracting, and a partial download can't be half-extracted.
+curl -fsSL "https://api.github.com/repos/OWNER/REPO/tarball" -o "$tgz"
+tar -xzf "$tgz" -C "$ext" --strip-components=1
+mkdir -p .claude/skills
+cp -R "$ext/plugins/<plugin>/skills/<skill>" .claude/skills/<skill>   # vendor just what you need
+git add .claude/skills/<skill>
+```
+
+This is the **only** route for the name-reserved `claude-plugins-official` plugins
+(`superpowers`, `pr-review-toolkit`, `gopls-lsp`, `skill-creator`, `plugin-dev`): the CLI
+rejects registering that marketplace from a local path, so its content cannot be installed
+as a plugin in a scoped cloud session — vendor the skills instead. Mind the upstream
+licenses and note that vendored copies drift from upstream (refresh deliberately).
 
 ### Docker on Claude Code on the web
 

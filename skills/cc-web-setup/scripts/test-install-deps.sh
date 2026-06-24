@@ -372,10 +372,24 @@ case "$1 $2" in
   "plugin marketplace")
     if [ "$3" = "add" ]; then
       printf "%s\n" "$4" >> "$STATE/added"
+      # A LOCAL-PATH add ($4 begins with /) models the non-git tarball fallback'\''s
+      # `marketplace add <extracted-dir>` — it never touches git, so it always
+      # succeeds here regardless of the git-failure sentinels below.
+      case "$4" in /*) echo "added local $4"; exit 0 ;; esac
       # Model the idempotent-but-non-zero "already added" exit (see
       # tests/e2e/marketplace-smoke.sh): if $4 is listed in $STATE/already, exit 1 with
       # an "already" message so the hook can prove it treats that as benign.
       if grep -qxF "$4" "$STATE/already" 2>/dev/null; then echo "Marketplace already added: $4"; exit 1; fi
+      # Model the CURRENT CLI rc=0 "already on disk" exit (a re-add of an already
+      # registered name): $4 in $STATE/already_ok exits 0 with an "already" message,
+      # so the hook can prove it still re-registers the index of a github source.
+      if grep -qxF "$4" "$STATE/already_ok" 2>/dev/null; then echo "Marketplace $4 already on disk"; exit 0; fi
+      # Model the GitHub-proxy 403 on `git clone` of a non-session repo: a git
+      # `owner/repo` source listed in $STATE/git_add_fails fails, which must trigger
+      # the non-git tarball fallback (register_marketplace_via_tarball).
+      if grep -qxF "$4" "$STATE/git_add_fails" 2>/dev/null; then
+        echo "Failed to clone marketplace repository: fatal: ... error: 403" >&2; exit 1
+      fi
       exit 0
     fi
     [ "$3" = "update" ] || exit 0
@@ -622,6 +636,104 @@ test_plugins_already_present_add_is_benign() {
     || ok "already-add: benign 'already' treated as success (no WARNING)"
 }
 
+# Failure mode #4 (GitHub-proxy repo-scoping): a git `marketplace add owner/repo`
+# 403s for a non-session repo. ensure_plugins must fall back to a NON-GIT tarball
+# fetch (api.github.com -> curl -> tar) and register the marketplace from the
+# extracted LOCAL PATH, after which the plugin installs. curl/tar are stubbed (the
+# real I/O boundary); only the fallback's control flow is under test. XDG_CACHE_HOME
+# is pointed at $WORK so the fallback never writes to the real $HOME.
+test_marketplace_tarball_fallback_on_git_403() {
+  read -r d log proj state <<<"$(setup_plugins_case pp10)"
+  printf 'p@extm\n' > "$state/declared"
+  # 5-field row: name, kind, git-src, owner/repo, ref (empty => trailing tab).
+  printf 'extm\tadd\tacme/extm\tacme/extm\t\n' > "$state/declared_marketplaces"
+  printf 'acme/extm\n' > "$state/git_add_fails"     # git `marketplace add` 403s
+  touch "$state/refreshed.extm"                      # fresh local index after the tarball add
+  # curl stub: record the call and write a dummy tarball to the -o target.
+  write_stub "$d" curl '
+    printf "%s\n" "$*" >> "$STATE/curl_calls"
+    out=""; while [ $# -gt 0 ]; do [ "$1" = "-o" ] && out="$2"; shift; done
+    [ -n "$out" ] && printf dummytar > "$out"; exit 0'
+  # tar stub: lay down a minimal valid marketplace under the -C dest dir.
+  write_stub "$d" tar '
+    dir=""; while [ $# -gt 0 ]; do [ "$1" = "-C" ] && dir="$2"; shift; done
+    if [ -n "$dir" ]; then mkdir -p "$dir/.claude-plugin"; printf "{\"name\":\"extm\"}" > "$dir/.claude-plugin/marketplace.json"; fi
+    exit 0'
+  # Scope XDG_CACHE_HOME to a subshell (inherited by run_ensure_plugins's own
+  # subshell) so it never leaks to later tests, even if a future change lets
+  # ensure_plugins return non-zero under the harness's `set -e`.
+  ( export XDG_CACHE_HOME="$WORK/xdg-pp10"; run_ensure_plugins "$d" "$log" "$proj" "$state" )
+  [ -s "$state/curl_calls" ] \
+    && ok "tarball-fallback: fetched the marketplace tarball over HTTPS" \
+    || fail "tarball-fallback: did not attempt a tarball download. Log: $(cat "$log" 2>/dev/null)"
+  grep -q '/rdl-web-setup/marketplaces/extm$' "$state/added" 2>/dev/null \
+    && ok "tarball-fallback: registered the marketplace from the extracted local path" \
+    || fail "tarball-fallback: no local-path marketplace add ([$(cat "$state/added" 2>/dev/null)])"
+  # Load-bearing: the helper logs this ONLY after the local-path `marketplace add`
+  # succeeds (a seeded `refreshed.extm` would make the *install* pass on its own, so
+  # asserting "1 installed" here would be false-green — it would not prove the fallback ran).
+  grep -qF 'registered from a downloaded tarball' "$log" 2>/dev/null \
+    && ok "tarball-fallback: helper registered the marketplace from the downloaded tarball" \
+    || fail "tarball-fallback: helper did not report a tarball registration. Log: $(cat "$log" 2>/dev/null)"
+}
+
+# The official anthropics marketplace is NAME-RESERVED, so the tarball/local-path
+# trick is rejected by the CLI. The fallback must SHORT-CIRCUIT (no download) and
+# point the user at vendoring. The marketplace is modelled as unreachable so the
+# downstream install genuinely fails (the claude stub can't model "never registered").
+test_marketplace_reserved_official_skipped() {
+  read -r d log proj state <<<"$(setup_plugins_case pp11)"
+  printf 'superpowers@claude-plugins-official\n' > "$state/declared"
+  printf 'claude-plugins-official\tadd\tanthropics/claude-plugins-official\tanthropics/claude-plugins-official\t\n' > "$state/declared_marketplaces"
+  printf 'anthropics/claude-plugins-official\n' > "$state/git_add_fails"   # git add 403s
+  printf 'claude-plugins-official\n' > "$state/unreachable"                # update can't fix it
+  # A curl stub that records any call — the reserved guard must NOT download.
+  write_stub "$d" curl 'printf "%s\n" "$*" >> "$STATE/curl_calls"; exit 1'
+  # Stub tar too so the "no download" assertion is LOAD-BEARING: with both tools
+  # present, only the reserved-name guard can stop the curl. Without this, the
+  # helper's `for tool in curl tar` preflight would fail on the missing tar and
+  # mask the guard (the assertion would pass even if the guard were broken).
+  write_stub "$d" tar 'exit 0'
+  ( export XDG_CACHE_HOME="$WORK/xdg-pp11"; run_ensure_plugins "$d" "$log" "$proj" "$state" )
+  [ ! -e "$state/curl_calls" ] \
+    && ok "reserved-official: short-circuited without downloading a tarball" \
+    || fail "reserved-official: wrongly attempted a download ([$(cat "$state/curl_calls" 2>/dev/null)])"
+  grep -qi 'vendor' "$log" 2>/dev/null \
+    && ok "reserved-official: warned to vendor the plugins' skills" \
+    || fail "reserved-official: no vendoring guidance. Log: $(cat "$log" 2>/dev/null)"
+  grep -q 'Plugin install: 0 installed, 1 failed' "$log" \
+    && ok "reserved-official: the declared plugin is reported as not installed" \
+    || fail "reserved-official: wrong summary. Log: $(cat "$log" 2>/dev/null)"
+}
+
+# Codex review (#189): when the platform pre-registers an external GitHub marketplace
+# before this hook runs, `marketplace add owner/repo` returns rc=0 "already on disk"
+# and the old code skipped the fallback — but that registration's git-backed index can
+# be empty (a later `marketplace update` 403s), stranding the pending plugin. The hook
+# must re-register such a marketplace from a fresh tarball (local path) to populate it.
+test_marketplace_already_registered_github_reregisters() {
+  read -r d log proj state <<<"$(setup_plugins_case pp12)"
+  printf 'p@ghal\n' > "$state/declared"
+  printf 'ghal\tadd\tacme/ghal\tacme/ghal\t\n' > "$state/declared_marketplaces"
+  printf 'acme/ghal\n' > "$state/already_ok"   # git add returns rc=0 "already on disk"
+  touch "$state/refreshed.ghal"                 # fresh local index after the tarball re-register
+  write_stub "$d" curl '
+    printf "%s\n" "$*" >> "$STATE/curl_calls"
+    out=""; while [ $# -gt 0 ]; do [ "$1" = "-o" ] && out="$2"; shift; done
+    [ -n "$out" ] && printf dummytar > "$out"; exit 0'
+  write_stub "$d" tar '
+    dir=""; while [ $# -gt 0 ]; do [ "$1" = "-C" ] && dir="$2"; shift; done
+    if [ -n "$dir" ]; then mkdir -p "$dir/.claude-plugin"; printf "{\"name\":\"ghal\"}" > "$dir/.claude-plugin/marketplace.json"; fi
+    exit 0'
+  ( export XDG_CACHE_HOME="$WORK/xdg-pp12"; run_ensure_plugins "$d" "$log" "$proj" "$state" )
+  [ -s "$state/curl_calls" ] \
+    && ok "already-github: re-registered via tarball despite 'already on disk'" \
+    || fail "already-github: did not re-register the already-on-disk github marketplace. Log: $(cat "$log" 2>/dev/null)"
+  grep -q '/rdl-web-setup/marketplaces/ghal$' "$state/added" 2>/dev/null \
+    && ok "already-github: registered from the extracted local path" \
+    || fail "already-github: no local-path re-registration ([$(cat "$state/added" 2>/dev/null)])"
+}
+
 # ---------------------------------------------------------------------------
 # main() gate + project hook seam (subprocess)
 # ---------------------------------------------------------------------------
@@ -685,6 +797,9 @@ test_plugins_registers_marketplaces_before_install
 test_plugins_warm_resume_skips_registration
 test_marketplace_source_encoding
 test_plugins_already_present_add_is_benign
+test_marketplace_tarball_fallback_on_git_403
+test_marketplace_reserved_official_skipped
+test_marketplace_already_registered_github_reregisters
 test_gate_local_noop
 test_local_hook_sourced
 
