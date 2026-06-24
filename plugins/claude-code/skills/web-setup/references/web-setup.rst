@@ -159,8 +159,11 @@ session. Fetch upstream over HTTPS (not git), copy in only the skills you want, 
 
    # api.github.com/repos/<owner>/<repo>/tarball[/<ref>] → codeload (both allowlisted).
    # Add `-H "Authorization: Bearer $GH_TOKEN"` only for a PRIVATE marketplace.
-   ext="$(mktemp -d)"
-   curl -fsSL "https://api.github.com/repos/OWNER/REPO/tarball" | tar -xz -C "$ext" --strip-components=1
+   ext="$(mktemp -d)"; tgz="$(mktemp)"
+   # Download to a file first rather than piping curl into tar (inspectable; no
+   # half-extracted partial download).
+   curl -fsSL "https://api.github.com/repos/OWNER/REPO/tarball" -o "$tgz"
+   tar -xzf "$tgz" -C "$ext" --strip-components=1
    cp -R "$ext/plugins/<plugin>/skills/<skill>" .claude/skills/<skill>
    git add .claude/skills/<skill>
 

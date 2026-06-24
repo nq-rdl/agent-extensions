@@ -250,8 +250,11 @@ the skills you actually want, and commit them:
 ```bash
 # api.github.com/repos/<owner>/<repo>/tarball[/<ref>] → codeload (both Trusted-allowlisted).
 # No git. Add `-H "Authorization: Bearer $GH_TOKEN"` only for a PRIVATE marketplace.
-ext="$(mktemp -d)"
-curl -fsSL "https://api.github.com/repos/OWNER/REPO/tarball" | tar -xz -C "$ext" --strip-components=1
+ext="$(mktemp -d)"; tgz="$(mktemp)"
+# Download to a file first rather than piping curl into tar — lets you inspect the
+# artifact before extracting, and a partial download can't be half-extracted.
+curl -fsSL "https://api.github.com/repos/OWNER/REPO/tarball" -o "$tgz"
+tar -xzf "$tgz" -C "$ext" --strip-components=1
 mkdir -p .claude/skills
 cp -R "$ext/plugins/<plugin>/skills/<skill>" .claude/skills/<skill>   # vendor just what you need
 git add .claude/skills/<skill>
