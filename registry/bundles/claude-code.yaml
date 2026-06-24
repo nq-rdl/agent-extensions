@@ -14,7 +14,7 @@ skills:
   - {source: cc-pipeline, leaf: pipeline}
   - {source: cc-web-setup, leaf: web-setup}
 agents: [marketplace-scout]
-hooks: []
+hooks: [web-setup-plugin-check]
 prompts: []
 mcp: []
 targets:

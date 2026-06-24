@@ -14,6 +14,25 @@
 #       key in extraKnownMarketplaces (it would install nothing, silently). Exit 1
 #       if any orphan, 0 if fully covered. Read-only.
 #
+#   verify <settings.json>
+#       Phase 2/5 assertion. cover/ensure only check the @marketplace SUFFIX is
+#       declared/known — they never check the plugin NAME exists in that
+#       marketplace's catalog, so a hallucinated id (real marketplace, non-existent
+#       plugin, e.g. `pyright-lsp@claude-plugins-official`) sails through and lands
+#       as "Declared but NOT installed" forever. verify closes that hole: for every
+#       enabled id it resolves the marketplace's catalog (the curated
+#       marketplaces.json set, a pre-fetched WEB_SETTINGS_CATALOG_DIR/<mkt>.json, or a
+#       best-effort HTTPS fetch of the marketplace's .claude-plugin/marketplace.json)
+#       and classifies the id three ways:
+#         - verified     — id is curated or present in an obtained catalog (silent).
+#         - non-existent — the marketplace catalog WAS obtained and the id is absent
+#                          → printed to STDOUT, exit 1 (the dataops #169 failure).
+#         - unverifiable — the catalog could not be obtained (offline / git-proxy 403)
+#                          → noted on STDERR, never fails (can't prove non-existence).
+#       Read-only. Honours WEB_SETTINGS_CATALOG_DIR (pre-fetched catalogs, keyed by
+#       marketplace name) and WEB_SETTINGS_NO_FETCH=1 (skip the network entirely —
+#       used by the unit tests for determinism).
+#
 #   ensure <settings.json>
 #       Phase 2 guard. Emit <settings.json> with every missing-but-KNOWN marketplace
 #       added from assets/marketplaces.json. If any referenced marketplace is UNKNOWN
@@ -65,6 +84,7 @@ usage() {
 usage:
   web-settings.sh cover <settings.json>
   web-settings.sh ensure <settings.json>
+  web-settings.sh verify <settings.json>
   web-settings.sh strip-self <repo-root> <settings.json>
 EOF
 }
@@ -139,6 +159,110 @@ cmd_ensure() {
   ' "$settings"
 }
 
+# Assert every enabled plugin id actually EXISTS in its marketplace catalog.
+cmd_verify() {
+  [ "$#" -eq 1 ] || die "verify: expected <settings.json>" 2
+  settings="$1"
+  [ -f "$settings" ] || die "verify: no such file: $settings" 2
+  require_json "$settings" verify
+
+  # Curated known-good ids (teamExternals + baseline) — always trusted, no network.
+  # A missing/odd lookup just yields an empty curated set; verify still works off catalogs.
+  curated=""
+  if [ -f "$MARKETPLACES" ] && jq -e 'type == "object"' "$MARKETPLACES" >/dev/null 2>&1; then
+    curated="$(jq -r '
+      ((.teamExternals // []) + (.baseline.always // []) + (.baseline.lsp // []))
+      | map(.id // empty) | .[]
+    ' "$MARKETPLACES" 2>/dev/null || true)"
+  fi
+
+  enabled_ids="$(jq -r '(.enabledPlugins // {}) | to_entries[] | select(.value == true) | .key' "$settings")"
+  # Nothing enabled, or nothing with a marketplace — nothing to verify.
+  [ -n "$enabled_ids" ] || return 0
+
+  work="$(mktemp -d)"
+  trap 'rm -rf "$work"' EXIT
+
+  # Resolve each referenced marketplace's catalog once. A catalog is "obtained" only
+  # when we can actually read its plugin names; otherwise the marketplace is unreachable
+  # and its ids are unverifiable, NOT non-existent.
+  mkts="$(printf '%s\n' "$enabled_ids" | sed -n 's/^[^@]*@\(..*\)$/\1/p' | sort -u)"
+  for mkt in $mkts; do
+    # A marketplace name comes from .claude/settings.json (attacker-influenced), so
+    # never interpolate it raw into a filesystem path — a `/` or `..` would escape
+    # $work or the catalog dir (path traversal). Derive a safe key and use it for
+    # every on-disk reference; pass 2 below recomputes the SAME key from $mkt.
+    key="$(printf '%s' "$mkt" | tr -c 'A-Za-z0-9._-' '_')"
+    case "$key" in ''|.|..) key="_" ;; esac
+    catfile="$work/cat.$key"; okflag="$work/ok.$key"
+    # 1) Pre-fetched catalog dir (deterministic; used by tests and by callers that
+    #    fetched once up front). Keyed by the same safe key.
+    if [ -n "${WEB_SETTINGS_CATALOG_DIR:-}" ] && [ -f "$WEB_SETTINGS_CATALOG_DIR/$key.json" ]; then
+      if jq -r '.plugins[]?.name // empty' "$WEB_SETTINGS_CATALOG_DIR/$key.json" > "$catfile" 2>/dev/null; then
+        : > "$okflag"
+      fi
+      continue
+    fi
+    # 2) Best-effort HTTPS fetch of the marketplace's authoritative manifest. raw.* is
+    #    allowlisted on the web (it is ordinary HTTPS, not the git protocol the proxy 403s).
+    [ "${WEB_SETTINGS_NO_FETCH:-0}" = "1" ] && continue
+    command -v curl >/dev/null 2>&1 || continue
+    # Resolve the marketplace source object (settings first, then the curated lookup).
+    # Only a `github` marketplace source exposes a fetchable raw catalog; honour a
+    # pinned `ref` (branch/tag) so we fetch the SAME catalog Claude Code installs from,
+    # not always the default branch (per the web docs, a marketplace github source
+    # supports `ref` but not `sha`, and the catalog always lives at
+    # .claude-plugin/marketplace.json). `url`/`git-subdir`/local sources are not
+    # raw-fetchable here, so they stay unverifiable — never mis-flagged as missing.
+    src="$(jq -c --arg m "$mkt" '.extraKnownMarketplaces[$m].source // empty' "$settings" 2>/dev/null || true)"
+    if { [ -z "$src" ] || [ "$src" = "null" ]; } && [ -f "$MARKETPLACES" ]; then
+      src="$(jq -c --arg m "$mkt" '.marketplaces[$m].source // empty' "$MARKETPLACES" 2>/dev/null || true)"
+    fi
+    [ -n "$src" ] && [ "$src" != "null" ] || continue
+    repo="$(printf '%s' "$src" | jq -r 'select(.source == "github") | .repo // empty' 2>/dev/null || true)"
+    [ -n "$repo" ] || continue
+    ref="$(printf '%s' "$src" | jq -r '.ref // empty' 2>/dev/null || true)"
+    [ -n "$ref" ] || ref="HEAD"
+    raw="https://raw.githubusercontent.com/$repo/$ref/.claude-plugin/marketplace.json"
+    if curl -fsSL --max-time 8 "$raw" -o "$work/raw.$key" 2>/dev/null \
+       && jq -r '.plugins[]?.name // empty' "$work/raw.$key" > "$catfile" 2>/dev/null; then
+      : > "$okflag"
+    fi
+  done
+
+  missing=""; unverifiable=""
+  for id in $enabled_ids; do
+    case "$id" in *@*) ;; *) continue ;; esac   # bare ids are cover/ensure's job
+    name="${id%@*}"; mkt="${id##*@}"
+    # Curated ids are trusted without a fetch.
+    if printf '%s\n' "$curated" | grep -Fxq "$id"; then continue; fi
+    key="$(printf '%s' "$mkt" | tr -c 'A-Za-z0-9._-' '_')"
+    case "$key" in ''|.|..) key="_" ;; esac
+    if [ -f "$work/ok.$key" ]; then
+      if grep -Fxq "$name" "$work/cat.$key"; then
+        continue                                   # verified: present in catalog
+      fi
+      missing="${missing}${id}"$'\n'
+    else
+      unverifiable="${unverifiable}${id}"$'\n'
+    fi
+  done
+
+  if [ -n "$unverifiable" ]; then
+    {
+      printf 'web-settings.sh verify: could NOT reach the marketplace catalog for these enabled\n'
+      printf 'plugins, so their existence is UNVERIFIED (marketplace unreachable — e.g. offline or\n'
+      printf 'the git-proxy 403). Re-run with network, or confirm each id against its\n'
+      printf 'marketplace.json before committing:\n'
+      printf '%s' "$unverifiable"
+    } >&2
+  fi
+  if [ -n "$missing" ]; then
+    printf '%s' "$missing"   # non-existent ids -> stdout (mirrors cover)
+    exit 1
+  fi
+}
+
 # Drop self-referential plugins/marketplace when the target repo is itself a marketplace.
 cmd_strip_self() {
   [ "$#" -eq 2 ] || die "strip-self: expected <repo-root> <settings.json>" 2
@@ -176,6 +300,7 @@ sub="$1"; shift
 case "$sub" in
   cover)      cmd_cover "$@" ;;
   ensure)     cmd_ensure "$@" ;;
+  verify)     cmd_verify "$@" ;;
   strip-self) cmd_strip_self "$@" ;;
   -h|--help|help) usage ;;
   *) usage; exit 2 ;;

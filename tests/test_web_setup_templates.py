@@ -336,6 +336,122 @@ class TestWebSettingsHelper(unittest.TestCase):
         for key in ("model", "env", "effortLevel"):
             self.assertEqual(out.get(key), both.get(key))
 
+    # --- verify (#169: enabled ids must EXIST in their marketplace catalog) ---
+    def _catalog_dir(self, catalogs):
+        """Write {marketplace: [plugin names]} to a WEB_SETTINGS_CATALOG_DIR layout."""
+        d = tempfile.mkdtemp(dir=self.tmp)
+        for mkt, names in catalogs.items():
+            with open(os.path.join(d, f"{mkt}.json"), "w") as fh:
+                json.dump({"plugins": [{"name": n} for n in names]}, fh)
+        return d
+
+    def _verify_env(self, catalog_dir=None):
+        # Always disable network so the tests are deterministic and offline-safe.
+        env = {"WEB_SETTINGS_NO_FETCH": "1"}
+        if catalog_dir:
+            env["WEB_SETTINGS_CATALOG_DIR"] = catalog_dir
+        return env
+
+    def test_verify_flags_nonexistent_id_in_reachable_marketplace(self):
+        cat = self._catalog_dir({"acme": ["foo", "bar"]})
+        path = self._write({
+            "enabledPlugins": {"foo@acme": True, "ghost@acme": True},
+            "extraKnownMarketplaces": {"acme": {"source": {"source": "github", "repo": "x/y"}}},
+        })
+        res = run_helper(HELPER, "verify", path, env=self._verify_env(cat))
+        self.assertEqual(res.returncode, 1, res.stderr)
+        self.assertIn("ghost@acme", res.stdout)
+        self.assertNotIn("foo@acme", res.stdout)  # present in catalog -> not flagged
+
+    def test_verify_passes_when_all_ids_present(self):
+        cat = self._catalog_dir({"acme": ["foo", "bar"]})
+        path = self._write({
+            "enabledPlugins": {"foo@acme": True, "bar@acme": True},
+            "extraKnownMarketplaces": {},
+        })
+        res = run_helper(HELPER, "verify", path, env=self._verify_env(cat))
+        self.assertEqual(res.returncode, 0, res.stderr)
+        self.assertEqual(res.stdout.strip(), "")
+
+    def test_verify_trusts_curated_ids_without_a_catalog(self):
+        # A curated marketplaces.json id (worktrunk@worktrunk) is verified even with no
+        # catalog reachable — it is vetted in the source of truth.
+        path = self._write({
+            "enabledPlugins": {"worktrunk@worktrunk": True},
+            "extraKnownMarketplaces": {},
+        })
+        res = run_helper(HELPER, "verify", path, env=self._verify_env())
+        self.assertEqual(res.returncode, 0, res.stderr)
+        self.assertEqual(res.stdout.strip(), "")
+
+    def test_verify_does_not_fail_on_unverifiable_unreachable_marketplace(self):
+        # No catalog + no network = cannot prove non-existence (the #4 git-403 case).
+        # verify must NOT fail; it notes the id on stderr and exits 0.
+        path = self._write({
+            "enabledPlugins": {"whatever@mystery": True},
+            "extraKnownMarketplaces": {},
+        })
+        res = run_helper(HELPER, "verify", path, env=self._verify_env())
+        self.assertEqual(res.returncode, 0, res.stderr)
+        self.assertEqual(res.stdout.strip(), "")
+        self.assertIn("whatever@mystery", res.stderr)
+
+    def test_verify_skips_bare_unqualified_ids(self):
+        # A bare id (no @marketplace) is cover/ensure's job; verify leaves it alone.
+        path = self._write({
+            "enabledPlugins": {"superpowers": True},
+            "extraKnownMarketplaces": {},
+        })
+        res = run_helper(HELPER, "verify", path, env=self._verify_env())
+        self.assertEqual(res.returncode, 0, res.stderr)
+        self.assertEqual(res.stdout.strip(), "")
+
+    def test_verify_ignores_disabled_plugins(self):
+        cat = self._catalog_dir({"acme": ["foo"]})
+        path = self._write({
+            "enabledPlugins": {"ghost@acme": False},  # not enabled -> not verified
+            "extraKnownMarketplaces": {},
+        })
+        res = run_helper(HELPER, "verify", path, env=self._verify_env(cat))
+        self.assertEqual(res.returncode, 0, res.stderr)
+        self.assertEqual(res.stdout.strip(), "")
+
+    def test_verify_marketplace_name_cannot_traverse_out_of_catalog_dir(self):
+        # Security: a marketplace name comes from settings.json, so a crafted `../`
+        # value must NOT be used raw as a filename to read a catalog outside the
+        # catalog dir. Plant a valid catalog one level UP that would "verify" the id
+        # if traversal worked; assert the id is instead treated as unverifiable.
+        cat = self._catalog_dir({"acme": ["foo"]})  # cat == <tmp>/<dir>
+        parent = os.path.dirname(cat)
+        with open(os.path.join(parent, "secret.json"), "w") as fh:
+            json.dump({"plugins": [{"name": "x"}]}, fh)
+        path = self._write({
+            "enabledPlugins": {"x@../secret": True},
+            "extraKnownMarketplaces": {},
+        })
+        res = run_helper(HELPER, "verify", path, env=self._verify_env(cat))
+        # No stdout (not flagged missing), exit 0, and reported unverifiable on stderr
+        # — proving the traversal did NOT silently "verify" it from ../secret.json.
+        self.assertEqual(res.returncode, 0, res.stderr)
+        self.assertEqual(res.stdout.strip(), "")
+        self.assertIn("x@../secret", res.stderr)
+
+    def test_verify_output_has_no_blank_lines(self):
+        cat = self._catalog_dir({"acme": ["foo"]})
+        path = self._write({
+            "enabledPlugins": {"ghost1@acme": True, "ghost2@acme": True},
+            "extraKnownMarketplaces": {},
+        })
+        res = run_helper(HELPER, "verify", path, env=self._verify_env(cat))
+        self.assertEqual(res.returncode, 1, res.stderr)
+        lines = res.stdout.split("\n")
+        # Trailing newline yields one empty trailing element; no OTHER blank/space-only line.
+        self.assertEqual(lines[-1], "")
+        for ln in lines[:-1]:
+            self.assertTrue(ln.strip() != "" and ln == ln.strip(),
+                            f"blank/padded line in stdout: {ln!r}")
+        self.assertEqual(set(l for l in lines if l), {"ghost1@acme", "ghost2@acme"})
+
     # --- strip-self ---
     def _marketplace_repo(self, name="rdl"):
         root = tempfile.mkdtemp(dir=self.tmp)
@@ -425,7 +541,7 @@ class TestWebSettingsHelper(unittest.TestCase):
 
     # --- shape gate: valid-JSON-but-wrong-shape must collapse to exit 2, no stdout ---
     def test_shape_gate_rejects_non_object_inputs(self):
-        for sub in ("cover", "ensure", "strip-self"):
+        for sub in ("cover", "ensure", "verify", "strip-self"):
             for blob in ("null", "[]", '{"enabledPlugins": []}', '{"enabledPlugins": true}'):
                 with self.subTest(sub=sub, blob=blob):
                     path = os.path.join(self.tmp, "shape.json")
