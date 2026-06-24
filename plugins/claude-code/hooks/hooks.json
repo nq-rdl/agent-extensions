@@ -1,0 +1,17 @@
+{
+  "description": "Verify enabled-plugin ids exist in their marketplace when .claude/settings.json is written during web-setup",
+  "hooks": {
+    "PostToolUse": [
+      {
+        "matcher": "Edit|Write",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "${CLAUDE_PLUGIN_ROOT}/scripts/web-setup-plugin-check.sh",
+            "timeout": 30
+          }
+        ]
+      }
+    ]
+  }
+}

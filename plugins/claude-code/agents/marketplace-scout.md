@@ -98,6 +98,17 @@ tooling (pr-review-toolkit, skill-creator, plugin-dev, superpowers).
 If a fetch fails (network), say so for that marketplace and continue — partial results
 beat none.
 
+> **Never recommend a plugin id you did not read from a fetched `marketplace.json` or the
+> curated `marketplaces.json`.** This is the cause of the dataops#169 failure: a plugin
+> id whose `@marketplace` is real but whose plugin **name** does not exist (a guessed
+> `pyright-lsp@claude-plugins-official`, `ty-lsp@astral-sh`, `<lang>-lsp`, or subject id).
+> Such an id passes the cover/ensure marketplace-suffix guards and then sits as "Declared
+> but NOT installed" forever. So: if you **could not** fetch a marketplace's catalog,
+> recommend **only** its ids that appear in the curated `marketplaces.json`
+> (`teamExternals`/`baseline`), and for everything else say *"could not verify <marketplace>'s
+> catalog — did not enumerate further ids"*. Do **not** reconstruct `*-lsp` or subject ids
+> from memory. Every id you list must be traceable to a catalog you actually read.
+
 ## Step 3 — Detect the repo's stack and needs
 
 Survey the target repo to know what to match against. Look for:
@@ -132,7 +143,9 @@ Build the recommendation in three tiers:
    keep it tight — only plugins with a real signal in the repo.
 
 Drop anything already enabled in the repo's `.claude/settings.json` (read `enabledPlugins`),
-and de-duplicate ids.
+and de-duplicate ids. **Every id in the final set must be one you read from a fetched
+catalog or the curated `marketplaces.json`** — drop any you could not verify exists (see the
+no-guessing rule in Step 2). A short, fully-verified list beats a longer one with a guessed id.
 
 ## Step 5 — Return a structured report
 
