@@ -27,14 +27,18 @@ access to reach the marketplace source."*
 
 Consequences that drive every design choice here:
 
-- Declaring the marketplace + plugin **is the whole mechanism**. There is **no
-  Setup-script field, no** ``make``\ **, no** ``.claude/skills/`` **bake** needed for
-  plugins. ``github.com`` is on the default *Trusted* allowlist, so a github-sourced
-  marketplace is reachable by default.
+- Declaring the marketplace + plugin is the **whole mechanism** for the platform's
+  session-start install. But ``github.com`` being on the *Trusted* allowlist does **not**
+  make a github-sourced marketplace reachable by **git**: the in-sandbox GitHub proxy
+  authorizes git only against the session's **own repo** (see "Failure mode #4" below), so
+  ``claude plugin marketplace add owner/repo`` 403s for every external marketplace. The
+  allowlist governs ordinary HTTPS (API, ``raw``, ``codeload``), not the git protocol.
 - The failure modes are: the marketplace registry still **empty** because this hook
   outran the platform's registration of ``extraKnownMarketplaces`` on a cold VM (a
-  **race**, not a network error — issue #181); the local index being **stale**; or the
-  source genuinely **unreachable**. All three are handled by the self-heal (below).
+  **race**, not a network error — issue #181); the local index being **stale**; the
+  source genuinely **unreachable**; or the git clone **403'd by the GitHub proxy** because
+  the marketplace repo is not the session repo (failure mode #4). All four are handled by
+  the self-heal (below).
 - A cloud session is a **fresh VM with only a clone of the repo** — anything not in
   git (or not installed by the SessionStart hook) is absent.
 
@@ -79,8 +83,15 @@ no-op once on disk), so it never depends on the platform having registered
 ``extraKnownMarketplaces`` first (the cold-start race, issue #181). A GitHub source
 pins its ref as ``owner/repo@ref`` (a git URL as ``<git-url>#ref``); a source carrying
 a custom ``path`` (a non-default ``marketplace.json``) has no ``marketplace add``
-equivalent and is **skipped**, left to declarative registration. On a failed install
-it then derives the marketplace from the ``@`` suffix, runs ``claude plugin marketplace
+equivalent and is **skipped**, left to declarative registration. When a GitHub
+``marketplace add`` **fails** — overwhelmingly the proxy 403 of failure mode #4 — it
+falls back to ``register_marketplace_via_tarball``: fetch the marketplace over HTTPS
+(``api.github.com/repos/<owner>/<repo>/tarball`` → ``codeload``, both allowlisted),
+extract to a stable cache dir, and ``claude plugin marketplace add <local-dir>`` — a
+**local-path** registration that never invokes git. The name-reserved
+``claude-plugins-official`` is the one exception (the CLI rejects a local-path source
+for it); it short-circuits with a vendoring pointer. On a failed install it then
+derives the marketplace from the ``@`` suffix, runs ``claude plugin marketplace
 update <mkt>`` (the refresh ``claude plugin install`` does **not** do itself — the
 stale-index failure mode), and retries once, refreshing each marketplace at most once
 per run. The hook owns the whole **add → update → install** chain so it assumes no
@@ -90,6 +101,72 @@ A plugin the self-heal installs **surfaces from the *next* session**: Claude
 enumerates skills at startup, *before* SessionStart hooks run, and ``reloadSkills``
 empirically *appears* to re-scan only loose ``~/.claude/skills/``, not the plugin
 install cache (unconfirmed upstream — see ``docs/notes/claude-code-web-issues.md``).
+
+
+Failure mode #4 — git-proxy repo-scoping (the 403)
+==================================================
+
+The one most likely to be misread as a network-policy problem. In a cloud session
+**all GitHub git traffic is rewritten through an in-sandbox proxy** that injects a
+scoped credential (``url.http://local_proxy@127.0.0.1:<port>/git/.insteadof =
+https://github.com/``). That proxy authorizes git operations **only against the
+session's own working repo**. Reproduced directly with ``git ls-remote``:
+
+==========================================  ======
+target                                      result
+==========================================  ======
+the session's own repo                      200
+a **different repo in the same org**        **403**
+an unrelated **public** repo                **403**
+``anthropics/claude-plugins-official``      **403**
+==========================================  ======
+
+…while ordinary HTTPS to those *same* repos succeeds — ``raw.githubusercontent.com``,
+``codeload.github.com`` (tarball), and ``api.github.com`` all return **200** (all on
+the default Trusted allowlist). So the block is specific to the **git smart-HTTP
+protocol on a non-session repo**, not the host.
+
+Two facts make this its own failure mode, distinct from "unreachable source":
+
+- **It is independent of the network-access level.** The web docs state *"GitHub
+  operations use a separate proxy that is independent of this setting."* Switching the
+  environment to **Full** network access does **not** change it — confirmed.
+- **A GitHub token does not fix it.** ``claude plugin marketplace add owner/repo`` is a
+  ``git clone``; the in-sandbox git client authenticates via the proxy's scoped
+  credential, not ``GH_TOKEN`` (*"your token never enters the container"*). Embedding a
+  token in a relay-bypassing git URL still 403s. ``GH_TOKEN`` only helps the **non-git**
+  HTTPS paths (the tarball fetch, ``gh api``) — useful for the workaround, not the clone.
+
+The consequence: ``claude plugin marketplace add owner/repo`` works **only** when the
+source repo *is* the session repo. Every external marketplace 403s. Two escape routes:
+
+1. **Vendor into ``.claude/skills/``** (below) — the robust, first-session path.
+2. **The self-heal's HTTPS-tarball fallback** (above) — works for every marketplace
+   except the name-reserved ``claude-plugins-official``.
+
+
+Vendoring third-party plugin content
+====================================
+
+The only route the proxy cannot block, and the **only** route for the name-reserved
+``claude-plugins-official`` plugins (``superpowers``, ``pr-review-toolkit``,
+``gopls-lsp``, ``skill-creator``, ``plugin-dev``). Per the "what carries over" table,
+``.claude/skills/`` / ``.claude/agents/`` / ``.claude/commands/`` carry over because they
+are *part of the clone* — no proxy, no git, no marketplace, available the **first**
+session. Fetch upstream over HTTPS (not git), copy in only the skills you want, commit:
+
+.. code-block:: bash
+
+   # api.github.com/repos/<owner>/<repo>/tarball[/<ref>] → codeload (both allowlisted).
+   # Add `-H "Authorization: Bearer $GH_TOKEN"` only for a PRIVATE marketplace.
+   ext="$(mktemp -d)"
+   curl -fsSL "https://api.github.com/repos/OWNER/REPO/tarball" | tar -xz -C "$ext" --strip-components=1
+   cp -R "$ext/plugins/<plugin>/skills/<skill>" .claude/skills/<skill>
+   git add .claude/skills/<skill>
+
+Trade-off: vendored copies carry the upstream license and **drift** from upstream —
+refresh them deliberately. This is the model this repo already uses for its own plugins
+(self-contained real-file copies under ``plugins/``).
 
 
 The two guards this skill enforces
@@ -122,7 +199,15 @@ These each cost a PR (or several) to learn:
 - **A pre-snapshot Setup-script field for plugins** (``make install-deps`` / ``make
   cc-web-setup``). Plugins already auto-install declaratively; worse, a ``make``
   Setup-script field hard-failed *environment startup* on a CWD hiccup. The
-  Setup-script field is only worth it for heavy **non-plugin** caching.
+  Setup-script field is only worth it for heavy **non-plugin** caching — and if it ever
+  fetches plugin content it must use **HTTPS, not git** (failure mode #4), guarded with
+  ``|| true``.
+- **Reading the marketplace 403 as a network-policy / token problem (failure mode #4).**
+  ``claude plugin marketplace add owner/repo`` 403'ing is **not** fixed by switching to
+  **Full** network access (the GitHub proxy is independent of that level) nor by adding
+  ``GH_TOKEN`` + ``gh auth`` (the git clone uses the proxy's scoped credential, not your
+  token). It is the GitHub proxy scoping git to the session repo. Fix by **vendoring** or
+  the HTTPS-tarball fallback — never by retrying the clone or widening the network level.
 - **Believing "the platform registers marketplaces but does not install
   enabledPlugins."** It does install them. An empty ``claude plugin list`` is a
   stale-index / unreachable-source failure **or the cold-start race below** — not a
