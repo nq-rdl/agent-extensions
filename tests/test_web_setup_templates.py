@@ -416,6 +416,42 @@ class TestWebSettingsHelper(unittest.TestCase):
         self.assertEqual(res.returncode, 0, res.stderr)
         self.assertEqual(res.stdout.strip(), "")
 
+    def test_verify_marketplace_name_cannot_traverse_out_of_catalog_dir(self):
+        # Security: a marketplace name comes from settings.json, so a crafted `../`
+        # value must NOT be used raw as a filename to read a catalog outside the
+        # catalog dir. Plant a valid catalog one level UP that would "verify" the id
+        # if traversal worked; assert the id is instead treated as unverifiable.
+        cat = self._catalog_dir({"acme": ["foo"]})  # cat == <tmp>/<dir>
+        parent = os.path.dirname(cat)
+        with open(os.path.join(parent, "secret.json"), "w") as fh:
+            json.dump({"plugins": [{"name": "x"}]}, fh)
+        path = self._write({
+            "enabledPlugins": {"x@../secret": True},
+            "extraKnownMarketplaces": {},
+        })
+        res = run_helper(HELPER, "verify", path, env=self._verify_env(cat))
+        # No stdout (not flagged missing), exit 0, and reported unverifiable on stderr
+        # — proving the traversal did NOT silently "verify" it from ../secret.json.
+        self.assertEqual(res.returncode, 0, res.stderr)
+        self.assertEqual(res.stdout.strip(), "")
+        self.assertIn("x@../secret", res.stderr)
+
+    def test_verify_output_has_no_blank_lines(self):
+        cat = self._catalog_dir({"acme": ["foo"]})
+        path = self._write({
+            "enabledPlugins": {"ghost1@acme": True, "ghost2@acme": True},
+            "extraKnownMarketplaces": {},
+        })
+        res = run_helper(HELPER, "verify", path, env=self._verify_env(cat))
+        self.assertEqual(res.returncode, 1, res.stderr)
+        lines = res.stdout.split("\n")
+        # Trailing newline yields one empty trailing element; no OTHER blank/space-only line.
+        self.assertEqual(lines[-1], "")
+        for ln in lines[:-1]:
+            self.assertTrue(ln.strip() != "" and ln == ln.strip(),
+                            f"blank/padded line in stdout: {ln!r}")
+        self.assertEqual(set(l for l in lines if l), {"ghost1@acme", "ghost2@acme"})
+
     # --- strip-self ---
     def _marketplace_repo(self, name="rdl"):
         root = tempfile.mkdtemp(dir=self.tmp)

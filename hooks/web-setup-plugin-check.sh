@@ -34,7 +34,11 @@ helper="${CLAUDE_PLUGIN_ROOT:-}/skills/web-setup/scripts/web-settings.sh"
 missing="$(bash "$helper" verify "$path" 2>/dev/null || true)"
 [ -n "$missing" ] || exit 0
 
-ids="$(printf '%s' "$missing" | paste -sd ', ' - 2>/dev/null || printf '%s' "$missing")"
+# Join the newline-separated ids into "a, b, c". `paste -sd,` collapses with a single
+# delimiter (a delimiter LIST like ', ' would cycle comma/space, mis-joining 3+ ids);
+# the sed then pads each comma to ", ".
+ids="$(printf '%s' "$missing" | paste -sd, - 2>/dev/null | sed 's/,/, /g')"
+[ -n "$ids" ] || ids="$(printf '%s' "$missing" | tr '\n' ' ')"
 jq -nc --arg ids "$ids" --arg p "$path" '{
   hookSpecificOutput: {
     hookEventName: "PostToolUse",

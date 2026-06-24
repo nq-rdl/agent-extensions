@@ -188,11 +188,17 @@ cmd_verify() {
   # and its ids are unverifiable, NOT non-existent.
   mkts="$(printf '%s\n' "$enabled_ids" | sed -n 's/^[^@]*@\(..*\)$/\1/p' | sort -u)"
   for mkt in $mkts; do
-    catfile="$work/cat.$mkt"; okflag="$work/ok.$mkt"
+    # A marketplace name comes from .claude/settings.json (attacker-influenced), so
+    # never interpolate it raw into a filesystem path — a `/` or `..` would escape
+    # $work or the catalog dir (path traversal). Derive a safe key and use it for
+    # every on-disk reference; pass 2 below recomputes the SAME key from $mkt.
+    key="$(printf '%s' "$mkt" | tr -c 'A-Za-z0-9._-' '_')"
+    case "$key" in ''|.|..) key="_" ;; esac
+    catfile="$work/cat.$key"; okflag="$work/ok.$key"
     # 1) Pre-fetched catalog dir (deterministic; used by tests and by callers that
-    #    fetched once up front).
-    if [ -n "${WEB_SETTINGS_CATALOG_DIR:-}" ] && [ -f "$WEB_SETTINGS_CATALOG_DIR/$mkt.json" ]; then
-      if jq -r '.plugins[]?.name // empty' "$WEB_SETTINGS_CATALOG_DIR/$mkt.json" > "$catfile" 2>/dev/null; then
+    #    fetched once up front). Keyed by the same safe key.
+    if [ -n "${WEB_SETTINGS_CATALOG_DIR:-}" ] && [ -f "$WEB_SETTINGS_CATALOG_DIR/$key.json" ]; then
+      if jq -r '.plugins[]?.name // empty' "$WEB_SETTINGS_CATALOG_DIR/$key.json" > "$catfile" 2>/dev/null; then
         : > "$okflag"
       fi
       continue
@@ -201,14 +207,25 @@ cmd_verify() {
     #    allowlisted on the web (it is ordinary HTTPS, not the git protocol the proxy 403s).
     [ "${WEB_SETTINGS_NO_FETCH:-0}" = "1" ] && continue
     command -v curl >/dev/null 2>&1 || continue
-    repo="$(jq -r --arg m "$mkt" '.extraKnownMarketplaces[$m].source.repo // empty' "$settings" 2>/dev/null || true)"
-    if [ -z "$repo" ] && [ -f "$MARKETPLACES" ]; then
-      repo="$(jq -r --arg m "$mkt" '.marketplaces[$m].source.repo // empty' "$MARKETPLACES" 2>/dev/null || true)"
+    # Resolve the marketplace source object (settings first, then the curated lookup).
+    # Only a `github` marketplace source exposes a fetchable raw catalog; honour a
+    # pinned `ref` (branch/tag) so we fetch the SAME catalog Claude Code installs from,
+    # not always the default branch (per the web docs, a marketplace github source
+    # supports `ref` but not `sha`, and the catalog always lives at
+    # .claude-plugin/marketplace.json). `url`/`git-subdir`/local sources are not
+    # raw-fetchable here, so they stay unverifiable — never mis-flagged as missing.
+    src="$(jq -c --arg m "$mkt" '.extraKnownMarketplaces[$m].source // empty' "$settings" 2>/dev/null || true)"
+    if { [ -z "$src" ] || [ "$src" = "null" ]; } && [ -f "$MARKETPLACES" ]; then
+      src="$(jq -c --arg m "$mkt" '.marketplaces[$m].source // empty' "$MARKETPLACES" 2>/dev/null || true)"
     fi
+    [ -n "$src" ] && [ "$src" != "null" ] || continue
+    repo="$(printf '%s' "$src" | jq -r 'select(.source == "github") | .repo // empty' 2>/dev/null || true)"
     [ -n "$repo" ] || continue
-    raw="https://raw.githubusercontent.com/$repo/HEAD/.claude-plugin/marketplace.json"
-    if curl -fsSL --max-time 8 "$raw" -o "$work/raw.$mkt" 2>/dev/null \
-       && jq -r '.plugins[]?.name // empty' "$work/raw.$mkt" > "$catfile" 2>/dev/null; then
+    ref="$(printf '%s' "$src" | jq -r '.ref // empty' 2>/dev/null || true)"
+    [ -n "$ref" ] || ref="HEAD"
+    raw="https://raw.githubusercontent.com/$repo/$ref/.claude-plugin/marketplace.json"
+    if curl -fsSL --max-time 8 "$raw" -o "$work/raw.$key" 2>/dev/null \
+       && jq -r '.plugins[]?.name // empty' "$work/raw.$key" > "$catfile" 2>/dev/null; then
       : > "$okflag"
     fi
   done
@@ -219,15 +236,15 @@ cmd_verify() {
     name="${id%@*}"; mkt="${id##*@}"
     # Curated ids are trusted without a fetch.
     if printf '%s\n' "$curated" | grep -Fxq "$id"; then continue; fi
-    if [ -f "$work/ok.$mkt" ]; then
-      if grep -Fxq "$name" "$work/cat.$mkt"; then
+    key="$(printf '%s' "$mkt" | tr -c 'A-Za-z0-9._-' '_')"
+    case "$key" in ''|.|..) key="_" ;; esac
+    if [ -f "$work/ok.$key" ]; then
+      if grep -Fxq "$name" "$work/cat.$key"; then
         continue                                   # verified: present in catalog
       fi
-      missing="${missing}${id}
-"
+      missing="${missing}${id}"$'\n'
     else
-      unverifiable="${unverifiable}${id}
-"
+      unverifiable="${unverifiable}${id}"$'\n'
     fi
   done
 
