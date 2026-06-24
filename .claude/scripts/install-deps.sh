@@ -506,8 +506,11 @@ register_marketplace_via_tarball() {
   # local-path registration is rejected outright — confirmed. Don't waste a
   # multi-MB download on it: its plugins must be VENDORED into the repo's
   # .claude/skills/ instead (the only path the proxy can't block — see the skill's
-  # references/web-setup.rst). Catch it by the declared name or the anthropics owner.
-  if [ "$name" = "claude-plugins-official" ] || [ "${repo%%/*}" = "anthropics" ]; then
+  # references/web-setup.rst). Match the reserved NAME or the SPECIFIC official repo
+  # only — NOT the whole anthropics org: a hypothetical other anthropics-hosted
+  # marketplace is not name-reserved and CAN be tarball-registered. Any reserved name
+  # we don't foresee here still trips the `grep -qi 'reserved'` safety net below.
+  if [ "$name" = "claude-plugins-official" ] || [ "$repo" = "anthropics/claude-plugins-official" ]; then
     log "  WARNING: marketplace '${name}' (${repo}) is an official/reserved marketplace — it cannot be registered from a tarball; vendor its plugins' skills into .claude/skills/ instead (see the cc-web-setup skill's web-setup.rst)."
     return 1
   fi
@@ -676,8 +679,26 @@ ensure_plugins() {
       # $LOG either way; only a genuine failure earns a WARNING.
       if mkt_out="$(claude plugin marketplace add "$mkt_src" </dev/null 2>&1)"; then
         printf 'marketplace %s registered via %s\n%s\n' "$mkt_name" "$mkt_src" "$mkt_out" >>"$LOG"
+        # "Already on disk" for a GITHUB source means the registration predates this
+        # hook (e.g. Claude Code's declarative startup) and its git-backed index may be
+        # EMPTY — a later `marketplace update` would re-hit the blocked git source and
+        # 403, so the pending plugin never installs and the genuine-failure branch
+        # below (which would have tarball-fetched it) is never reached. Re-register
+        # from a fresh tarball to give it a populated local-path index; `marketplace
+        # add <local-dir>` overrides an existing same-name registration (verified). A
+        # genuine first add prints "Successfully added" (no "already"), so the session's
+        # own repo — where git works — is left untouched. (#189, Codex review.)
+        if [ -n "$mkt_repo" ] && printf '%s' "$mkt_out" | grep -qi 'already'; then
+          register_marketplace_via_tarball "$mkt_name" "$mkt_repo" "$mkt_ref" || true
+        fi
       elif printf '%s' "$mkt_out" | grep -qi 'already'; then
         printf 'marketplace %s already registered (%s)\n%s\n' "$mkt_name" "$mkt_src" "$mkt_out" >>"$LOG"
+        # Same empty/stale-index concern on the rc!=0 "already" variant — re-register a
+        # GitHub source from the tarball so a pending plugin isn't stranded on a
+        # git-backed index that `marketplace update` can't refresh.
+        if [ -n "$mkt_repo" ]; then
+          register_marketplace_via_tarball "$mkt_name" "$mkt_repo" "$mkt_ref" || true
+        fi
       else
         # The git `marketplace add` failed. In the cloud the dominant cause is the
         # GitHub proxy 403'ing git for any non-session repo (see

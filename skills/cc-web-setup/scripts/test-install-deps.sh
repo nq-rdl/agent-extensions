@@ -380,6 +380,10 @@ case "$1 $2" in
       # tests/e2e/marketplace-smoke.sh): if $4 is listed in $STATE/already, exit 1 with
       # an "already" message so the hook can prove it treats that as benign.
       if grep -qxF "$4" "$STATE/already" 2>/dev/null; then echo "Marketplace already added: $4"; exit 1; fi
+      # Model the CURRENT CLI rc=0 "already on disk" exit (a re-add of an already
+      # registered name): $4 in $STATE/already_ok exits 0 with an "already" message,
+      # so the hook can prove it still re-registers the index of a github source.
+      if grep -qxF "$4" "$STATE/already_ok" 2>/dev/null; then echo "Marketplace $4 already on disk"; exit 0; fi
       # Model the GitHub-proxy 403 on `git clone` of a non-session repo: a git
       # `owner/repo` source listed in $STATE/git_add_fails fails, which must trigger
       # the non-git tarball fallback (register_marketplace_via_tarball).
@@ -702,6 +706,34 @@ test_marketplace_reserved_official_skipped() {
     || fail "reserved-official: wrong summary. Log: $(cat "$log" 2>/dev/null)"
 }
 
+# Codex review (#189): when the platform pre-registers an external GitHub marketplace
+# before this hook runs, `marketplace add owner/repo` returns rc=0 "already on disk"
+# and the old code skipped the fallback — but that registration's git-backed index can
+# be empty (a later `marketplace update` 403s), stranding the pending plugin. The hook
+# must re-register such a marketplace from a fresh tarball (local path) to populate it.
+test_marketplace_already_registered_github_reregisters() {
+  read -r d log proj state <<<"$(setup_plugins_case pp12)"
+  printf 'p@ghal\n' > "$state/declared"
+  printf 'ghal\tadd\tacme/ghal\tacme/ghal\t\n' > "$state/declared_marketplaces"
+  printf 'acme/ghal\n' > "$state/already_ok"   # git add returns rc=0 "already on disk"
+  touch "$state/refreshed.ghal"                 # fresh local index after the tarball re-register
+  write_stub "$d" curl '
+    printf "%s\n" "$*" >> "$STATE/curl_calls"
+    out=""; while [ $# -gt 0 ]; do [ "$1" = "-o" ] && out="$2"; shift; done
+    [ -n "$out" ] && printf dummytar > "$out"; exit 0'
+  write_stub "$d" tar '
+    dir=""; while [ $# -gt 0 ]; do [ "$1" = "-C" ] && dir="$2"; shift; done
+    if [ -n "$dir" ]; then mkdir -p "$dir/.claude-plugin"; printf "{\"name\":\"ghal\"}" > "$dir/.claude-plugin/marketplace.json"; fi
+    exit 0'
+  ( export XDG_CACHE_HOME="$WORK/xdg-pp12"; run_ensure_plugins "$d" "$log" "$proj" "$state" )
+  [ -s "$state/curl_calls" ] \
+    && ok "already-github: re-registered via tarball despite 'already on disk'" \
+    || fail "already-github: did not re-register the already-on-disk github marketplace. Log: $(cat "$log" 2>/dev/null)"
+  grep -q '/rdl-web-setup/marketplaces/ghal$' "$state/added" 2>/dev/null \
+    && ok "already-github: registered from the extracted local path" \
+    || fail "already-github: no local-path re-registration ([$(cat "$state/added" 2>/dev/null)])"
+}
+
 # ---------------------------------------------------------------------------
 # main() gate + project hook seam (subprocess)
 # ---------------------------------------------------------------------------
@@ -767,6 +799,7 @@ test_marketplace_source_encoding
 test_plugins_already_present_add_is_benign
 test_marketplace_tarball_fallback_on_git_403
 test_marketplace_reserved_official_skipped
+test_marketplace_already_registered_github_reregisters
 test_gate_local_noop
 test_local_hook_sourced
 
