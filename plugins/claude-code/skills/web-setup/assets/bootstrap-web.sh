@@ -168,18 +168,19 @@ install_skill() {
   # path "link/skill" where `link` is a symlink): cp -R would then follow it and pull
   # content from OUTSIDE the extracted repo (a symlink escape the post-copy
   # `find -type l` guard can't see, because the copied files are real). Walk each
-  # segment under src_root and refuse if any is a symlink.
-  local walk="$src_root" seg saved_ifs="$IFS"
-  IFS='/'
-  for seg in $path; do
-    [ -n "$seg" ] || continue
+  # segment under src_root and refuse if any is a symlink. Split with parameter
+  # expansion (not `for x in $path`) so a path component is never word-split or
+  # glob-expanded — an unquoted split would let a `*`/`?`/`[` in `path` evade the check.
+  local walk="$src_root" seg rest="$path"
+  while [ -n "$rest" ]; do
+    seg="${rest%%/*}"                                  # first remaining component
+    case "$rest" in */*) rest="${rest#*/}" ;; *) rest="" ;; esac
+    [ -n "$seg" ] || continue                          # tolerate // and leading /
     walk="${walk}/${seg}"
     if [ -L "$walk" ]; then
-      IFS="$saved_ifs"
       log "  WARNING: skill '${leaf}': path component '${seg}' under '${path}' is a symlink — refusing (not self-contained)."; return 1
     fi
   done
-  IFS="$saved_ifs"
   if [ ! -f "${src}/SKILL.md" ]; then
     log "  WARNING: skill '${leaf}': no SKILL.md at path '${path}' in the tarball — skipping."
     return 1
