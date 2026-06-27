@@ -26,8 +26,10 @@
     "  ref   git ref to fetch — PIN AN IMMUTABLE COMMIT SHA for reproducibility. An",
     "        empty string tracks the moving default branch (logged as a warning).",
     "  path  path to the skill dir INSIDE that repo (the dir holding SKILL.md)",
-    "  leaf  directory name to install under ~/.claude/skills/; rewritten into the",
-    "        copied SKILL.md's frontmatter name so it drives the /<leaf> command id"
+    "  leaf  directory name to install under ~/.claude/skills/; MUST equal the",
+    "        upstream skill's own SKILL.md frontmatter name (bootstrap-web.sh fails",
+    "        closed on a mismatch — it never rewrites frontmatter), and that name",
+    "        drives the /<leaf> command id"
   ],
   "skills": [
     {

@@ -105,7 +105,7 @@ fetch_repo_tarball() {
     log "  WARNING: could not create cache dir ${dir} for ${repo} (see ${LOG})."; rm -f "$tmp"; return 1
   fi
   if ! tar -xzf "$tmp" -C "$dir" --strip-components=1 2>>"$LOG"; then
-    log "  WARNING: could not extract ${repo} tarball (see ${LOG})."; rm -f "$tmp" "$dir"; return 1
+    log "  WARNING: could not extract ${repo} tarball (see ${LOG})."; rm -f "$tmp"; rm -rf "$dir"; return 1
   fi
   rm -f "$tmp"
   : > "${dir}/.cc-web-fetched" 2>/dev/null || true
@@ -163,11 +163,23 @@ install_skill() {
     return 0
   fi
   src="${src_root}/${path}"
-  # Reject a SYMLINKED source dir: cp -R would preserve/deref it and a later read or
-  # write could reach files OUTSIDE the extracted repo (a symlink escape).
-  if [ -L "$src" ]; then
-    log "  WARNING: skill '${leaf}': source path '${path}' is a symlink — refusing (not self-contained)."; return 1
-  fi
+  # Reject a SYMLINKED source path — the final component AND every intermediate
+  # directory in `path`. Checking only "$src" misses an intermediate symlink (e.g.
+  # path "link/skill" where `link` is a symlink): cp -R would then follow it and pull
+  # content from OUTSIDE the extracted repo (a symlink escape the post-copy
+  # `find -type l` guard can't see, because the copied files are real). Walk each
+  # segment under src_root and refuse if any is a symlink.
+  local walk="$src_root" seg saved_ifs="$IFS"
+  IFS='/'
+  for seg in $path; do
+    [ -n "$seg" ] || continue
+    walk="${walk}/${seg}"
+    if [ -L "$walk" ]; then
+      IFS="$saved_ifs"
+      log "  WARNING: skill '${leaf}': path component '${seg}' under '${path}' is a symlink — refusing (not self-contained)."; return 1
+    fi
+  done
+  IFS="$saved_ifs"
   if [ ! -f "${src}/SKILL.md" ]; then
     log "  WARNING: skill '${leaf}': no SKILL.md at path '${path}' in the tarball — skipping."
     return 1

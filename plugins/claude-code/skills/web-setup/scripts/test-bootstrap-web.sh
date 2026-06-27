@@ -163,6 +163,25 @@ test_install_skill_rejects_symlink() {
     || fail "install_skill symlink: installed despite the symlink"
 }
 
+# An INTERMEDIATE symlink in `path` (not just the final component) is also an escape
+# vector: cp -R follows it and pulls content from outside the extracted repo, and the
+# copied files are real so the post-copy `find -type l` guard can't catch it. Walk every
+# path component and refuse if any is a symlink.
+test_install_skill_rejects_intermediate_symlink() {
+  local src skills log; src="$(mktemp -d "$WORK/is9-src.XXXXXX")"; skills="$WORK/is9-skills"; log="$WORK/is9.log"
+  local outside; outside="$(mktemp -d "$WORK/is9-out.XXXXXX")"
+  mkdir -p "$outside/s"; printf -- '---\nname: evil\n---\n' > "$outside/s/SKILL.md"
+  # path "link/s" where the INTERMEDIATE `link` is a symlink, but the final `s` is real.
+  mkdir -p "$src/p/skills"; ln -s "$outside" "$src/p/skills/link"
+  run_install_skill "$src" "p/skills/link/s" "evil" "$skills" "$log" \
+    && fail "install_skill intermediate-symlink: accepted a symlinked path component" \
+    || ok "install_skill intermediate-symlink: refused a symlinked path component"
+  grep -q 'symlink' "$log" 2>/dev/null && ok "install_skill intermediate-symlink: names the reason" \
+    || fail "install_skill intermediate-symlink: reason not named. Log: $(cat "$log" 2>/dev/null)"
+  [ ! -e "$skills/evil" ] && ok "install_skill intermediate-symlink: installed nothing" \
+    || fail "install_skill intermediate-symlink: installed despite the symlink"
+}
+
 test_install_skill_no_stage_leftover() {
   local src skills log; src="$(mktemp -d "$WORK/is7-src.XXXXXX")"; skills="$WORK/is7-skills"; log="$WORK/is7.log"
   mkdir -p "$src/p/skills/s"; printf -- '---\nname: myleaf\n---\n' > "$src/p/skills/s/SKILL.md"
@@ -351,6 +370,7 @@ test_install_skill_resume_noop
 test_install_skill_path_traversal
 test_install_skill_requires_leaf_eq_name
 test_install_skill_rejects_symlink
+test_install_skill_rejects_intermediate_symlink
 test_install_skill_no_stage_leftover
 test_fetch_tarball_https_and_memoizes
 test_fetch_tarball_anon_then_token
