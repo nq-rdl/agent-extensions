@@ -158,6 +158,38 @@ routes fetch over **HTTPS** (api.github.com tarball → codeload), never git:
    and triggers ``reloadSkills`` (same session, not committed).
 
 
+Failure mode #5 — the non-existent plugin id (dataops#169)
+==========================================================
+
+Distinct from #4: here the marketplace *is* reachable and declared, but the **plugin
+name does not exist in it**. A hallucinated id — ``pyright-lsp@claude-plugins-official``,
+a guessed ``ty-lsp@astral-sh``, ``<lang>-lsp``, or a subject id reconstructed from memory
+— is declared in ``enabledPlugins``, installs **nothing**, and shows up as "Declared but
+NOT installed" every session. Unlike #4 (which clears on the next session via the
+self-heal or by vendoring), a non-existent id **never** resolves: there is nothing to
+install.
+
+Why the existing guards miss it: ``web-settings.sh cover`` and ``ensure`` only check that
+each id's ``@marketplace`` **suffix** is declared/known — never that the plugin **name**
+exists in that marketplace's catalog. So a real-marketplace + fake-name id passes both.
+
+Root cause: the ``marketplace-scout`` agent (or the model) recommending/writing an id it
+did **not** read from a fetched ``marketplace.json`` or the curated ``marketplaces.json``
+— typically after a catalog fetch failed and it filled the gap from memory.
+
+The defences (all shipped here):
+
+- **``web-settings.sh verify <settings.json>``** — fetches each marketplace's catalog and
+  prints any enabled id absent from it (exit 1, stdout). Ids whose marketplace is
+  *unreachable* are reported on stderr as *unverifiable* (it never fails on those — that is
+  #4, not #5). Run in SKILL Phase 2 (step 5) and Phase 4.
+- **The ``web-setup-plugin-check`` PostToolUse hook** (shipped in the ``claude-code``
+  plugin) — runs ``verify`` automatically whenever ``.claude/settings.json`` is written
+  during a setup session and injects an advisory telling the model to fix the bad ids.
+- **The scout's no-guessing rule** — never recommend an id not traceable to a catalog it
+  actually read; if a fetch failed, recommend only the curated ids and say so.
+
+
 Vendoring third-party plugin content
 ====================================
 

@@ -252,6 +252,20 @@ Both wire the two SessionStart hooks and the opinionated defaults (`model: opus`
    ask** the user for that marketplace's source, declare it, and re-run. Always keep
    `claude-plugins-official` declared explicitly (auto-known on the local CLI, unreliable on
    the web).
+5. **Verify every enabled plugin actually exists (#169):**
+   ```bash
+   bash "$WS" verify .claude/settings.json
+   ```
+   `cover`/`ensure` only check the `@marketplace` *suffix* is declared — they do **not**
+   check the plugin **name** exists in that marketplace's catalog. A hallucinated id (real
+   marketplace, non-existent plugin — e.g. `pyright-lsp@claude-plugins-official`, a guessed
+   `<lang>-lsp` or subject id) passes them and then sits as "Declared but NOT installed"
+   **forever**. `verify` fetches each marketplace's `marketplace.json` and prints any enabled
+   id **absent** from its catalog (exit 1) — **remove or correct those ids**. Ids it can't
+   check because the marketplace was unreachable are reported on **stderr** as *unverifiable*
+   (it never fails on those — that's the git-403 case, not a non-existent plugin). Only ever
+   enable ids the `marketplace-scout` confirmed from a fetched catalog or the curated
+   `marketplaces.json`; never hand-write an id from memory.
 
 **Merging into an existing `.claude/settings.json`** (idempotent; **show the diff before
 writing**):
@@ -362,6 +376,11 @@ create it unless the repo needs project-specific steps.
   cover .claude/settings.json` exits 0. Any line is an enabled plugin whose marketplace is
   undeclared (it would install nothing) — fix Phase 2. Configuration only; it cannot prove a
   cloud install succeeded, and the declarative layer is not the first-session guarantee.
+- **Plugin existence (#169):** `bash "$WS" verify .claude/settings.json` exits 0. Any line on
+  **stdout** is an enabled plugin id that does **not exist** in its (reachable) marketplace
+  catalog — a hallucinated id that would be "Declared but NOT installed" forever; remove or
+  correct it (Phase 2 step 5). Ids it could not check (marketplace unreachable) are noted on
+  **stderr** and do not fail the check.
 
 ## Phase 5 — Summarize for the user
 

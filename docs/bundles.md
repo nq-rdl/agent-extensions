@@ -325,6 +325,8 @@ Claude Code — agent-team coordination, hook authoring, and web-session setup.
 
 - `marketplace-scout` (subagent)
 
+**Hooks:** `web-setup-plugin-check`
+
 ---
 
 ## rdl-team
