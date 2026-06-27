@@ -104,9 +104,9 @@ fi
 # alone produced a false positive — the banner looked healthy while the slash
 # menu was empty because the platform's session-start install of a declared plugin
 # had not completed (its marketplace source was unreachable — see
-# docs/notes/claude-code-web-issues.md). Cross-check the two so a declared plugin
-# that did not install is surfaced, not hidden. When the claude CLI is
-# unavailable (some Action runners) we cannot verify, so fall back to declared.
+# docs/claude-code-web.md). Cross-check the two so a declared plugin that did not
+# install is surfaced, not hidden. When the claude CLI is unavailable (some Action
+# runners) or errors, we cannot verify, so report the declared set as UNVERIFIED.
 declared_plugins=()
 if command -v jq >/dev/null 2>&1 && [ -f "$PROJECT_DIR/.claude/settings.json" ]; then
   while IFS= read -r p; do
@@ -116,13 +116,16 @@ if command -v jq >/dev/null 2>&1 && [ -f "$PROJECT_DIR/.claude/settings.json" ];
 fi
 
 # Actually installed + enabled plugin ids, parsed from `claude plugin list`
-# (each plugin is a `> <id>` line followed by a `Status: … enabled` line). Empty
-# when the CLI is missing or errors — the signal we treat as "cannot verify".
+# (each plugin is a `> <id>` line followed by a `Status: … enabled` line). Key
+# "can we verify?" on the COMMAND'S EXIT STATUS, not on non-empty output: a
+# successful-but-empty list means "nothing installed" (so declared plugins are
+# genuinely NOT installed), which must be distinguished from the CLI missing/erroring
+# ("cannot verify"). Treating empty output as "cannot verify" would wrongly demote a
+# real failed-install to merely "unverified".
 installed_enabled=()
 have_plugin_list=0
 if command -v claude >/dev/null 2>&1; then
-  _pl="$(claude plugin list 2>/dev/null)"
-  if [ -n "$_pl" ]; then
+  if _pl="$(claude plugin list 2>/dev/null)"; then
     have_plugin_list=1
     while IFS= read -r id; do
       [ -n "$id" ] && installed_enabled+=("$id")
@@ -134,9 +137,12 @@ if command -v claude >/dev/null 2>&1; then
 fi
 
 # Partition the declared set into verified-loaded vs declared-but-missing — but
-# only when we have a plugin list to verify against (else report declared as-is).
+# only when we have a plugin list to verify against. Without one we must NOT claim
+# the declared plugins are installed (declared ≠ installed): report them as a
+# separate UNVERIFIED state so a failed install is never masked as "installed".
 plugins=()
 missing_plugins=()
+unverified_plugins=()
 if [ "$have_plugin_list" -eq 1 ]; then
   installed_blob="$(printf '%s\n' ${installed_enabled[@]+"${installed_enabled[@]}"})"
   for d in ${declared_plugins[@]+"${declared_plugins[@]}"}; do
@@ -147,7 +153,7 @@ if [ "$have_plugin_list" -eq 1 ]; then
     fi
   done
 else
-  plugins=(${declared_plugins[@]+"${declared_plugins[@]}"})
+  unverified_plugins=(${declared_plugins[@]+"${declared_plugins[@]}"})
 fi
 
 # --- render ----------------------------------------------------------------
@@ -182,25 +188,17 @@ if [ "${#plugins[@]}" -gt 0 ]; then
   add ""
 fi
 
-if [ "${#missing_plugins[@]}" -gt 0 ]; then
-  uniq_missing="$(printf '%s\n' "${missing_plugins[@]}" | join_comma)"
-  add "**⚠️ Declared but NOT installed:** $uniq_missing"
-  add "Enabled in .claude/settings.json but absent from \`claude plugin list\`. On Claude Code (web) declared plugins install at session start from their marketplace (web docs, \"what carries over\"), so this line means that install did not complete — commonly the marketplace's local index was stale (the install reports \"not found in marketplace … local copy may be out of date\"), or its source was unreachable (check the environment's network access), or the plugin id is wrong. install-deps.sh's self-heal refreshes the marketplace index (\`claude plugin marketplace update\`) and retries, so it should clear on the next session — see CONTRIBUTING.md § \"Claude Code on the web\"."
+if [ "${#unverified_plugins[@]}" -gt 0 ]; then
+  uniq_unverified="$(printf '%s\n' "${unverified_plugins[@]}" | join_comma)"
+  add "**Enabled plugins (declared; install unverified):** $uniq_unverified"
+  add "Declared in .claude/settings.json, but \`claude plugin list\` was unavailable here, so their install could NOT be confirmed (this is not a claim that they are installed). If a \`/plugin:skill\` is missing, the marketplace install likely did not complete — vendor the skill into \`.claude/skills/\` for a guaranteed first-session copy."
   add ""
 fi
 
-# Self-heal note. install-deps.sh's ensure_plugins drops a marker (the count) when
-# its retry actually had to install >=1 plugin THIS session — i.e. the platform's
-# own session-start install did not complete and the self-heal stepped in. Surface
-# it once (so the gap is visible), then consume the marker. A hook-installed plugin
-# surfaces from the NEXT session (Claude scans skills at startup, before hooks run);
-# the platform's session-start install is the first-session path.
-fresh_marker="${TMPDIR:-/tmp}/rdl-web-setup-installed"
-if [ "${CLAUDE_CODE_REMOTE:-}" = "true" ] && [ -f "$fresh_marker" ]; then
-  n_fresh="$(cat "$fresh_marker" 2>/dev/null)"
-  rm -f "$fresh_marker" 2>/dev/null || true
-  add "## Claude Code web setup"
-  add "ℹ️ The platform's session-start plugin install did not complete, so install-deps.sh's self-heal installed ${n_fresh:-some} declared plugin(s) this session. Their \`/plugin:skill\` commands appear from your **next** session (Claude scans skills at startup, before these hooks run). If this recurs, the marketplace source is likely intermittently unreachable — check the environment's network access."
+if [ "${#missing_plugins[@]}" -gt 0 ]; then
+  uniq_missing="$(printf '%s\n' "${missing_plugins[@]}" | join_comma)"
+  add "**⚠️ Declared but NOT installed:** $uniq_missing"
+  add "Enabled in .claude/settings.json but absent from \`claude plugin list\`. On Claude Code (web) declared plugins install at session start from their marketplace (web docs, \"what carries over\"), so this line means that install did not complete — commonly the marketplace's source was unreachable (check the environment's network access), the local index was stale, or the plugin id is wrong. Declarative plugins are best-effort and race skill enumeration on the first session; for a guaranteed first-session skill, VENDOR it into \`.claude/skills/\` (part of the clone) — see the cc-web-setup skill."
   add ""
 fi
 
@@ -212,11 +210,11 @@ context="$(printf '%s\n' "${lines[@]}")"
 # `reloadSkills: true`, so any repo-local skills/commands committed under
 # .claude/ are picked up once all SessionStart hooks return. Gate on
 # CLAUDE_CODE_REMOTE so a local session does not pay for a needless re-scan.
-# NOTE: this re-scan covers loose ~/.claude/skills/ only, NOT the plugin install
-# cache (confirmed in #160). The platform installs declared plugins at session
-# start; if anything is still missing, install-deps.sh's ensure_plugins self-heal
-# installs it, but Claude already enumerated skills at startup, so a just-installed
-# plugin's /plugin:skill commands surface from the NEXT session, not via this re-scan.
+# NOTE: this re-scan covers the loose skill/command dirs (~/.claude/skills/,
+# .claude/skills/, .claude/commands/) only, NOT the plugin install cache (confirmed
+# in #160). So it surfaces vendored skills and anything bootstrap-web.sh fetched into
+# ~/.claude/skills/, but NOT a marketplace plugin — a declared plugin that did not
+# install at session start only appears the NEXT session (and is flagged above).
 if command -v jq >/dev/null 2>&1; then
   if [ "${CLAUDE_CODE_REMOTE:-}" = "true" ]; then
     jq -cn --arg ctx "$context" \

@@ -106,6 +106,17 @@ pre-push:
       glob: "{skills/cc-web-setup/**,.claude/scripts/**,plugins/claude-code/skills/web-setup/**}"
       run: bash skills/cc-web-setup/scripts/test-install-deps.sh
 
+    # Opt-in first-session skill hook tests (fetch_repo_tarball / install_skill /
+    # bootstrap_web_skills). Same glob rationale as install-deps-hook-tests.
+    - name: bootstrap-web-hook-tests
+      glob: "{skills/cc-web-setup/**,.claude/scripts/**,plugins/claude-code/skills/web-setup/**}"
+      run: bash skills/cc-web-setup/scripts/test-bootstrap-web.sh
+
+    # Announce-hook canary: declared plugin reported installed/NOT installed/unverified.
+    - name: announce-capabilities-tests
+      glob: "{skills/cc-web-setup/**,.claude/scripts/**,plugins/claude-code/skills/web-setup/**}"
+      run: bash skills/cc-web-setup/scripts/test-announce-capabilities.sh
+
     # Informational: report findings but never block the push (CI uploads the
     # SARIF to the Security tab). scan.sh skips itself when Docker is absent;
     # set SKILLSPECTOR_SKIP=1 to skip explicitly.

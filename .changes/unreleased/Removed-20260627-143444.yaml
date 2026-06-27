@@ -1,0 +1,3 @@
+kind: Removed
+body: Remove the `ensure_plugins` plugin self-heal (and its `register_marketplace_via_tarball` helper) from the cc-web-setup `install-deps.sh` SessionStart hook. A SessionStart plugin install lands in the plugin cache that `reloadSkills` does not re-scan — so it could never surface a plugin the same session — and `claude plugin install` inside a hook can hang web sessions (anthropics/claude-code#18088). `install-deps.sh` now provisions only the gh/Codex CLIs and the project dev toolchain; first-session skill availability comes from vendoring into `.claude/` (and the opt-in `bootstrap-web.sh` hook), with declarative `enabledPlugins` remaining the best-effort plugin layer.
+time: 2026-06-27T14:34:44.058906348+10:00

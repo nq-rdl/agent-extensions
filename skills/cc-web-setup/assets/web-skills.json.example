@@ -1,0 +1,46 @@
+{
+  "//": "web-skills.json — OPTIONAL manifest for .claude/scripts/bootstrap-web.sh.",
+  "//comment": [
+    "DO NOT hand-curate a fixed list here. The cc-web-setup skill GENERATES this file",
+    "from the SAME per-repo selection the user confirms during setup (the marketplace-",
+    "scout agent discovers candidates from the repo's stack; the user picks). The two",
+    "entries below are ILLUSTRATIVE shape only — your real entries come from your picks.",
+    "",
+    "Each entry is a skill that bootstrap-web.sh fetches FRESH each cloud session,",
+    "over HTTPS (no git), into ~/.claude/skills/<leaf>/, then asks Claude Code to",
+    "re-scan (reloadSkills) so it is available THIS session, first prompt. This is",
+    "the DYNAMIC alternative to vendoring: skills here are NOT committed, so they",
+    "track upstream automatically — at the cost of a per-session HTTPS fetch.",
+    "",
+    "Prefer VENDORING (commit the skill into the repo's own .claude/skills/<leaf>/)",
+    "for anything that must be available with zero network — it carries over as part",
+    "of the clone and needs neither this hook nor reloadSkills. Use this manifest for",
+    "the rest. Rename to web-skills.json (drop .example) and commit it to enable.",
+    "",
+    "SKILLS ONLY. AGENTS and slash-COMMANDS cannot be surfaced this way (reloadSkills",
+    "re-scans skill/command dirs but not agents, and these land in ~/.claude/skills/).",
+    "Vendor agents into .claude/agents/ and commands into .claude/commands/ instead.",
+    "",
+    "Fields per entry:",
+    "  repo  owner/repo of the GitHub source (public, or private with GH_TOKEN set)",
+    "  ref   git ref to fetch — PIN AN IMMUTABLE COMMIT SHA for reproducibility. An",
+    "        empty string tracks the moving default branch (logged as a warning).",
+    "  path  path to the skill dir INSIDE that repo (the dir holding SKILL.md)",
+    "  leaf  directory name to install under ~/.claude/skills/; rewritten into the",
+    "        copied SKILL.md's frontmatter name so it drives the /<leaf> command id"
+  ],
+  "skills": [
+    {
+      "repo": "anthropics/claude-plugins-official",
+      "ref": "0000000000000000000000000000000000000000",
+      "path": "plugins/superpowers/skills/brainstorming",
+      "leaf": "brainstorming"
+    },
+    {
+      "repo": "nq-rdl/agent-extensions",
+      "ref": "v0.15.0",
+      "path": "skills/go-naming",
+      "leaf": "go-naming"
+    }
+  ]
+}
