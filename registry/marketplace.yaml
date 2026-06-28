@@ -31,7 +31,6 @@ order:
   - defuddle
   - gh
   - github-actions
-  - jules
   - terraform
   - kubernetes
   - argo-cd

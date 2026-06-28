@@ -158,21 +158,6 @@ GitHub Actions — secure CI/CD workflows, SHA pinning, OIDC, and GitOps deliver
 
 ---
 
-## jules
-
-Jules — dispatch AI coding sessions and scaffold GitHub Actions dispatch workflows.
-
-**Skills**
-
-- `/jules:dispatch`
-- `/jules:dispatch-creator`
-
-**Agents**
-
-- `jules-orchestrator` (subagent)
-
----
-
 ## terraform
 
 Terraform — generate compliant HCL, review IaC for state safety, and author Terratest suites.
