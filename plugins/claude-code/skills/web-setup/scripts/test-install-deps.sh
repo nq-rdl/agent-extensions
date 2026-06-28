@@ -26,7 +26,7 @@ WORK="$(mktemp -d "${TMPDIR:-/tmp}/install-deps-test.XXXXXX")"
 trap 'rm -rf "$WORK"' EXIT
 
 # Coreutils the functions legitimately use (not the stubbed I/O boundary).
-COREUTILS="bash mkdir mktemp find head rm install env cat dirname grep ln tail touch mv chmod printf awk sed id"
+COREUTILS="bash mkdir mktemp find head rm install cat dirname grep ln touch mv chmod printf awk id"
 
 new_stub_dir() {
   local d tool real
@@ -343,398 +343,6 @@ test_persist_path_readonly_warns() {
 }
 
 # ---------------------------------------------------------------------------
-# ensure_plugins()
-# ---------------------------------------------------------------------------
-# A stateful `claude` stub driven by files under $STATE (exported into the
-# subshell), so one stub models every case the self-heal must handle:
-#   * installed        — `> <id>` lines returned by `plugin list` (seed = already present)
-#   * refreshed.<mkt>  — sentinel; `plugin install` succeeds IFF present (absent = stale index)
-#   * badids           — plugin ids whose `plugin install` fails even with a fresh index (wrong id)
-#   * unreachable      — marketplaces whose `marketplace update` fails (network down)
-#   * refreshes        — one line appended per SUCCESSFUL `marketplace update`
-#   * update_attempts  — one line appended per `marketplace update` INVOCATION (memoization counter)
-write_claude_stub() { # <stub_dir> ; reads $STATE at runtime
-  write_stub "$1" claude '
-printf "%s\n" "$*" >> "$STATE/trace"
-case "$1 $2" in
-  "plugin list")
-    cat "$STATE/installed" 2>/dev/null; exit 0 ;;
-  "plugin install")
-    p="$3"; mkt="${p##*@}"
-    if grep -qxF "$p" "$STATE/badids" 2>/dev/null; then
-      echo "Plugin \"$p\" not found in marketplace \"$mkt\"." >&2; exit 1
-    fi
-    if [ -f "$STATE/refreshed.$mkt" ]; then
-      printf "> %s\n" "$p" >> "$STATE/installed"; echo "installed $p"; exit 0
-    fi
-    echo "Plugin \"$p\" not found in marketplace \"$mkt\"; your local copy may be out of date." >&2
-    exit 1 ;;
-  "plugin marketplace")
-    if [ "$3" = "add" ]; then
-      printf "%s\n" "$4" >> "$STATE/added"
-      # A LOCAL-PATH add ($4 begins with /) models the non-git tarball fallback'\''s
-      # `marketplace add <extracted-dir>` — it never touches git, so it always
-      # succeeds here regardless of the git-failure sentinels below.
-      case "$4" in /*) echo "added local $4"; exit 0 ;; esac
-      # Model the idempotent-but-non-zero "already added" exit (see
-      # tests/e2e/marketplace-smoke.sh): if $4 is listed in $STATE/already, exit 1 with
-      # an "already" message so the hook can prove it treats that as benign.
-      if grep -qxF "$4" "$STATE/already" 2>/dev/null; then echo "Marketplace already added: $4"; exit 1; fi
-      # Model the CURRENT CLI rc=0 "already on disk" exit (a re-add of an already
-      # registered name): $4 in $STATE/already_ok exits 0 with an "already" message,
-      # so the hook can prove it still re-registers the index of a github source.
-      if grep -qxF "$4" "$STATE/already_ok" 2>/dev/null; then echo "Marketplace $4 already on disk"; exit 0; fi
-      # Model the GitHub-proxy 403 on `git clone` of a non-session repo: a git
-      # `owner/repo` source listed in $STATE/git_add_fails fails, which must trigger
-      # the non-git tarball fallback (register_marketplace_via_tarball).
-      if grep -qxF "$4" "$STATE/git_add_fails" 2>/dev/null; then
-        echo "Failed to clone marketplace repository: fatal: ... error: 403" >&2; exit 1
-      fi
-      exit 0
-    fi
-    [ "$3" = "update" ] || exit 0
-    printf "%s\n" "$4" >> "$STATE/update_attempts"
-    if grep -qxF "$4" "$STATE/unreachable" 2>/dev/null; then
-      echo "marketplace update failed: $4" >&2; exit 1
-    fi
-    printf "%s\n" "$4" >> "$STATE/refreshes"; touch "$STATE/refreshed.$4"; echo "updated $4"; exit 0 ;;
-esac
-exit 0'
-}
-
-run_ensure_plugins() { # <stub_dir> <out_file> <project_dir> <state_dir>
-  local stub_dir="$1" out_file="$2" proj="$3" state="$4"
-  # shellcheck disable=SC2030,SC2031,SC2034  # PROJECT_DIR/LOG are read by ensure_plugins (sourced)
-  ( export PATH="$stub_dir" TMPDIR="$WORK" STATE="$state"
-    PROJECT_DIR="$proj"; LOG="$out_file"
-    ensure_plugins
-  ) >>"$out_file" 2>&1
-}
-
-# Stage a project dir with a (jq-stubbed) settings.json and a fresh state dir.
-setup_plugins_case() { # <tag> -> echoes "<stub_dir> <out_file> <project_dir> <state_dir>"
-  local tag="$1" d proj state
-  d="$(new_stub_dir)"
-  proj="$(mktemp -d "$WORK/${tag}-proj.XXXXXX")"; mkdir -p "$proj/.claude"; : > "$proj/.claude/settings.json"
-  state="$(mktemp -d "$WORK/${tag}-state.XXXXXX")"; : > "$state/installed"; : > "$state/declared_marketplaces"
-  # jq is stubbed to emit a declared set straight from $STATE (no real jq / no real
-  # settings.json parsing). ensure_plugins calls jq with two different programs: the
-  # enabledPlugins query (=> plugin ids from $STATE/declared) and the
-  # extraKnownMarketplaces query (=> "name<TAB>source" lines from
-  # $STATE/declared_marketplaces). Branch on the program text so one stub serves both.
-  write_stub "$d" jq '
-for a in "$@"; do
-  case "$a" in *extraKnownMarketplaces*) cat "$STATE/declared_marketplaces" 2>/dev/null; exit 0 ;; esac
-done
-cat "$STATE/declared" 2>/dev/null'
-  write_claude_stub "$d"
-  printf '%s %s %s %s' "$d" "$WORK/${tag}.log" "$proj" "$state"
-}
-
-# A missing plugin against a FRESH index installs on the first try — and the
-# self-heal must NOT refresh when it does not need to (stays a quiet, minimal op).
-test_plugins_healthy_index_no_refresh() {
-  read -r d log proj state <<<"$(setup_plugins_case pp1)"
-  printf 'a@m1\n' > "$state/declared"
-  touch "$state/refreshed.m1"            # index already fresh
-  run_ensure_plugins "$d" "$log" "$proj" "$state"
-  grep -q 'Plugin install: 1 installed, 0 failed, 0 already present' "$log" \
-    && ok "plugins healthy-index: installed on first try" \
-    || fail "plugins healthy-index: wrong summary. Log: $(cat "$log" 2>/dev/null)"
-  [ ! -s "$state/refreshes" ] \
-    && ok "plugins healthy-index: no marketplace refresh when index is fresh" \
-    || fail "plugins healthy-index: refreshed unnecessarily ([$(cat "$state/refreshes" 2>/dev/null)])"
-}
-
-# THE FIX: a stale index makes the first install fail; the self-heal refreshes the
-# marketplace and retries. Three plugins across two marketplaces also lock in that
-# each marketplace is refreshed at most once (b@m1 rides a@m1's refresh).
-test_plugins_stale_index_recovers() {
-  read -r d log proj state <<<"$(setup_plugins_case pp2)"
-  printf 'a@m1\nb@m1\nc@m2\n' > "$state/declared"   # cold VM, no sentinels => stale
-  run_ensure_plugins "$d" "$log" "$proj" "$state"
-  grep -q 'Plugin install: 3 installed, 0 failed, 0 already present' "$log" \
-    && ok "plugins stale-index: all recovered after marketplace refresh" \
-    || fail "plugins stale-index: wrong summary. Log: $(cat "$log" 2>/dev/null)"
-  [ "$(wc -l < "$state/refreshes" 2>/dev/null | tr -d ' ')" = "2" ] \
-    && [ "$(sort -u "$state/refreshes" 2>/dev/null | wc -l | tr -d ' ')" = "2" ] \
-    && ok "plugins stale-index: each marketplace refreshed exactly once" \
-    || fail "plugins stale-index: refresh count wrong ([$(cat "$state/refreshes" 2>/dev/null)])"
-}
-
-# A resume where everything is already installed must be a quiet no-op: no install,
-# no marketplace refresh.
-test_plugins_already_present_noop() {
-  read -r d log proj state <<<"$(setup_plugins_case pp3)"
-  printf 'a@m1\n' > "$state/declared"
-  printf '> a@m1\n' > "$state/installed"            # already installed
-  run_ensure_plugins "$d" "$log" "$proj" "$state"
-  grep -q 'Plugin install: 0 installed, 0 failed, 1 already present' "$log" \
-    && ok "plugins already-present: quiet no-op summary" \
-    || fail "plugins already-present: wrong summary. Log: $(cat "$log" 2>/dev/null)"
-  grep -q 'Installing plugin' "$log" \
-    && fail "plugins already-present: attempted an install" \
-    || ok "plugins already-present: no install attempted"
-  [ ! -s "$state/refreshes" ] \
-    && ok "plugins already-present: no marketplace refresh" \
-    || fail "plugins already-present: refreshed unnecessarily"
-}
-
-# When the marketplace update itself fails (unreachable), the diagnostic must NOT
-# claim the index was refreshed — it says the marketplace could not be refreshed.
-test_plugins_unreachable_fails_after_refresh() {
-  read -r d log proj state <<<"$(setup_plugins_case pp4)"
-  printf 'bad@m3\n' > "$state/declared"
-  printf 'm3\n' > "$state/unreachable"              # `marketplace update` fails
-  run_ensure_plugins "$d" "$log" "$proj" "$state"
-  grep -q 'Plugin install: 0 installed, 1 failed, 0 already present' "$log" \
-    && ok "plugins unreachable: counted as failed" \
-    || fail "plugins unreachable: wrong summary. Log: $(cat "$log" 2>/dev/null)"
-  grep -qF "marketplace 'm3' could not be refreshed" "$log" \
-    && ok "plugins unreachable: warning says refresh failed (not 'even after refreshing')" \
-    || fail "plugins unreachable: warning text missing/inaccurate. Log: $(cat "$log" 2>/dev/null)"
-  grep -qF "even after refreshing marketplace 'm3'" "$log" \
-    && fail "plugins unreachable: wrongly claims it refreshed when the update failed" \
-    || ok "plugins unreachable: does NOT claim a refresh that did not happen"
-}
-
-# Memoization (the review fix): several plugins from ONE unreachable marketplace
-# must trigger `marketplace update` at most ONCE, not once per plugin.
-test_plugins_shared_marketplace_refreshes_once() {
-  read -r d log proj state <<<"$(setup_plugins_case pp5)"
-  printf 'a@m4\nb@m4\nc@m4\n' > "$state/declared"
-  printf 'm4\n' > "$state/unreachable"
-  run_ensure_plugins "$d" "$log" "$proj" "$state"
-  grep -q 'Plugin install: 0 installed, 3 failed, 0 already present' "$log" \
-    && ok "plugins shared-mkt: all three counted as failed" \
-    || fail "plugins shared-mkt: wrong summary. Log: $(cat "$log" 2>/dev/null)"
-  [ "$(grep -cxF m4 "$state/update_attempts" 2>/dev/null)" = "1" ] \
-    && ok "plugins shared-mkt: marketplace refreshed exactly once (memoized)" \
-    || fail "plugins shared-mkt: update attempts = [$(cat "$state/update_attempts" 2>/dev/null)] (want m4 once)"
-  # The 2nd/3rd plugins hit the already-attempted branch. m4's earlier update FAILED
-  # (unreachable), so the diagnostic must say a refresh was "already attempted" — NOT
-  # claim m4 "was already refreshed" (which never happened) — to stay accurate.
-  grep -qF "a refresh was already attempted for marketplace 'm4'" "$log" \
-    && ok "plugins shared-mkt: memoized-skip warning is accurate ('already attempted')" \
-    || fail "plugins shared-mkt: memoized-skip warning missing/inaccurate. Log: $(cat "$log" 2>/dev/null)"
-  grep -qF "marketplace 'm4' was already refreshed this run" "$log" \
-    && fail "plugins shared-mkt: wrongly claims m4 'was already refreshed' when its update failed" \
-    || ok "plugins shared-mkt: does NOT claim a refresh that never succeeded"
-}
-
-# Refresh succeeds but the install still fails => wrong plugin id, and the warning
-# must say so (distinct from the unreachable wording above).
-test_plugins_wrong_id_after_successful_refresh() {
-  read -r d log proj state <<<"$(setup_plugins_case pp6)"
-  printf 'bad@m5\n' > "$state/declared"
-  printf 'bad@m5\n' > "$state/badids"               # install fails even on a fresh index
-  run_ensure_plugins "$d" "$log" "$proj" "$state"
-  grep -q 'Plugin install: 0 installed, 1 failed, 0 already present' "$log" \
-    && ok "plugins wrong-id: counted as failed after refresh+retry" \
-    || fail "plugins wrong-id: wrong summary. Log: $(cat "$log" 2>/dev/null)"
-  [ "$(grep -cxF m5 "$state/update_attempts" 2>/dev/null)" = "1" ] \
-    && ok "plugins wrong-id: marketplace was refreshed once" \
-    || fail "plugins wrong-id: expected one m5 refresh, got [$(cat "$state/update_attempts" 2>/dev/null)]"
-  grep -qF "even after refreshing marketplace 'm5'" "$log" \
-    && ok "plugins wrong-id: warning attributes failure to the plugin id" \
-    || fail "plugins wrong-id: warning text missing. Log: $(cat "$log" 2>/dev/null)"
-}
-
-# THE COLD-START RACE FIX: when the marketplace registry is empty, ensure_plugins
-# must `claude plugin marketplace add` every declared marketplace BEFORE attempting
-# installs, so the install never runs against an unregistered marketplace. Sentinels
-# are pre-seeded so the post-registration install succeeds on the first try —
-# isolating the new registration step from the stale-index retry path.
-test_plugins_registers_marketplaces_before_install() {
-  read -r d log proj state <<<"$(setup_plugins_case pp7)"
-  printf 'a@m1\nb@m2\n' > "$state/declared"
-  printf 'm1\tadd\tacme/mkt-one\nm2\tadd\tacme/mkt-two\n' > "$state/declared_marketplaces"
-  touch "$state/refreshed.m1" "$state/refreshed.m2"   # registered => index already fresh
-  run_ensure_plugins "$d" "$log" "$proj" "$state"
-  grep -q 'Plugin install: 2 installed, 0 failed, 0 already present' "$log" \
-    && ok "plugins register: both installed after registration" \
-    || fail "plugins register: wrong summary. Log: $(cat "$log" 2>/dev/null)"
-  { grep -qxF 'acme/mkt-one' "$state/added" 2>/dev/null && grep -qxF 'acme/mkt-two' "$state/added" 2>/dev/null; } \
-    && ok "plugins register: both declared marketplaces were 'marketplace add'-ed" \
-    || fail "plugins register: missing marketplace add ([$(cat "$state/added" 2>/dev/null)])"
-  # Ordering: the LAST 'marketplace add' must precede the FIRST 'plugin install'.
-  local last_add first_install
-  last_add="$(grep -n 'marketplace add' "$state/trace" 2>/dev/null | tail -1 | cut -d: -f1 || true)"
-  first_install="$(grep -n 'plugin install' "$state/trace" 2>/dev/null | head -1 | cut -d: -f1 || true)"
-  { [ -n "$last_add" ] && [ -n "$first_install" ] && [ "$last_add" -lt "$first_install" ]; } \
-    && ok "plugins register: all marketplace adds precede the first install" \
-    || fail "plugins register: add/install order wrong (add@${last_add:-?} install@${first_install:-?})."
-}
-
-# The registration step is gated on $pending: a warm resume where every declared
-# plugin is already installed must NOT register marketplaces, even though they are
-# declared — the whole self-heal stays a quiet no-op.
-test_plugins_warm_resume_skips_registration() {
-  read -r d log proj state <<<"$(setup_plugins_case pp8)"
-  printf 'a@m1\n' > "$state/declared"
-  printf 'm1\tadd\tacme/mkt-one\n' > "$state/declared_marketplaces"
-  printf '> a@m1\n' > "$state/installed"              # already installed => pending=0
-  run_ensure_plugins "$d" "$log" "$proj" "$state"
-  grep -q 'Plugin install: 0 installed, 0 failed, 1 already present' "$log" \
-    && ok "plugins warm-resume: quiet no-op summary" \
-    || fail "plugins warm-resume: wrong summary. Log: $(cat "$log" 2>/dev/null)"
-  [ ! -s "$state/added" ] \
-    && ok "plugins warm-resume: no marketplace registered when nothing to install" \
-    || fail "plugins warm-resume: registered despite pending=0 ([$(cat "$state/added" 2>/dev/null)])"
-}
-
-# Comment #1 (encode ref, skip path): drive ensure_plugins with REAL jq + a real
-# settings.json so the actual source-encoding logic runs end to end (only `claude`
-# is stubbed). Asserts ref pinning (owner/repo@ref, git-url#ref) and that a GitHub
-# source carrying a custom marketplace.json `path` is SKIPPED, not mis-registered.
-test_marketplace_source_encoding() {
-  command -v jq >/dev/null 2>&1 || { skip "marketplace encoding: jq not available"; return; }
-  local d proj state log
-  d="$(new_stub_dir)"
-  ln -sf "$(command -v jq)" "$d/jq"            # real jq, replacing the cat-stub default
-  write_claude_stub "$d"
-  proj="$(mktemp -d "$WORK/enc-proj.XXXXXX")"; mkdir -p "$proj/.claude"
-  state="$(mktemp -d "$WORK/enc-state.XXXXXX")"; : > "$state/installed"
-  cat > "$proj/.claude/settings.json" <<'JSON'
-{
-  "enabledPlugins": {"a@plain": true, "b@pinned": true, "c@subdir": true, "d@viaurl": true},
-  "extraKnownMarketplaces": {
-    "plain":  {"source": {"source": "github", "repo": "acme/plain"}, "autoUpdate": true},
-    "pinned": {"source": {"source": "github", "repo": "acme/pinned", "ref": "v1.0.0"}, "autoUpdate": true},
-    "subdir": {"source": {"source": "github", "repo": "acme/subdir", "path": "catalog"}, "autoUpdate": true},
-    "viaurl": {"source": {"source": "git", "url": "https://example.com/x.git", "ref": "main"}, "autoUpdate": true}
-  }
-}
-JSON
-  log="$WORK/enc.log"
-  run_ensure_plugins "$d" "$log" "$proj" "$state"
-  grep -qxF 'acme/plain'                     "$state/added" 2>/dev/null \
-    && ok "encode: plain github -> owner/repo" || fail "encode: plain missing ([$(cat "$state/added" 2>/dev/null)])"
-  grep -qxF 'acme/pinned@v1.0.0'             "$state/added" 2>/dev/null \
-    && ok "encode: github ref -> owner/repo@ref" || fail "encode: ref not encoded ([$(cat "$state/added" 2>/dev/null)])"
-  grep -qxF 'https://example.com/x.git#main' "$state/added" 2>/dev/null \
-    && ok "encode: git url ref -> url#ref" || fail "encode: url ref not encoded ([$(cat "$state/added" 2>/dev/null)])"
-  grep -q 'acme/subdir' "$state/added" 2>/dev/null \
-    && fail "encode: custom-path source must be SKIPPED, not added ([$(cat "$state/added" 2>/dev/null)])" \
-    || ok "encode: custom marketplace.json path source skipped"
-}
-
-# Comment #2: `marketplace add` can exit non-zero with an "already" message; that is
-# benign and must be treated as success (logged to $LOG, never surfaced as a WARNING).
-test_plugins_already_present_add_is_benign() {
-  read -r d log proj state <<<"$(setup_plugins_case pp9)"
-  printf 'a@m1\n' > "$state/declared"
-  printf 'm1\tadd\tacme/mkt-one\n' > "$state/declared_marketplaces"
-  printf 'acme/mkt-one\n' > "$state/already"   # add exits non-zero with an "already" message
-  touch "$state/refreshed.m1"
-  run_ensure_plugins "$d" "$log" "$proj" "$state"
-  grep -qF 'acme/mkt-one' "$state/added" \
-    && ok "already-add: registration was attempted" \
-    || fail "already-add: add not attempted ([$(cat "$state/added" 2>/dev/null)])"
-  grep -qi "could not register marketplace 'm1'" "$log" \
-    && fail "already-add: spurious WARNING on benign 'already' exit. Log: $(cat "$log" 2>/dev/null)" \
-    || ok "already-add: benign 'already' treated as success (no WARNING)"
-}
-
-# Failure mode #4 (GitHub-proxy repo-scoping): a git `marketplace add owner/repo`
-# 403s for a non-session repo. ensure_plugins must fall back to a NON-GIT tarball
-# fetch (api.github.com -> curl -> tar) and register the marketplace from the
-# extracted LOCAL PATH, after which the plugin installs. curl/tar are stubbed (the
-# real I/O boundary); only the fallback's control flow is under test. XDG_CACHE_HOME
-# is pointed at $WORK so the fallback never writes to the real $HOME.
-test_marketplace_tarball_fallback_on_git_403() {
-  read -r d log proj state <<<"$(setup_plugins_case pp10)"
-  printf 'p@extm\n' > "$state/declared"
-  # 5-field row: name, kind, git-src, owner/repo, ref (empty => trailing tab).
-  printf 'extm\tadd\tacme/extm\tacme/extm\t\n' > "$state/declared_marketplaces"
-  printf 'acme/extm\n' > "$state/git_add_fails"     # git `marketplace add` 403s
-  touch "$state/refreshed.extm"                      # fresh local index after the tarball add
-  # curl stub: record the call and write a dummy tarball to the -o target.
-  write_stub "$d" curl '
-    printf "%s\n" "$*" >> "$STATE/curl_calls"
-    out=""; while [ $# -gt 0 ]; do [ "$1" = "-o" ] && out="$2"; shift; done
-    [ -n "$out" ] && printf dummytar > "$out"; exit 0'
-  # tar stub: lay down a minimal valid marketplace under the -C dest dir.
-  write_stub "$d" tar '
-    dir=""; while [ $# -gt 0 ]; do [ "$1" = "-C" ] && dir="$2"; shift; done
-    if [ -n "$dir" ]; then mkdir -p "$dir/.claude-plugin"; printf "{\"name\":\"extm\"}" > "$dir/.claude-plugin/marketplace.json"; fi
-    exit 0'
-  # Scope XDG_CACHE_HOME to a subshell (inherited by run_ensure_plugins's own
-  # subshell) so it never leaks to later tests, even if a future change lets
-  # ensure_plugins return non-zero under the harness's `set -e`.
-  ( export XDG_CACHE_HOME="$WORK/xdg-pp10"; run_ensure_plugins "$d" "$log" "$proj" "$state" )
-  [ -s "$state/curl_calls" ] \
-    && ok "tarball-fallback: fetched the marketplace tarball over HTTPS" \
-    || fail "tarball-fallback: did not attempt a tarball download. Log: $(cat "$log" 2>/dev/null)"
-  grep -q '/rdl-web-setup/marketplaces/extm$' "$state/added" 2>/dev/null \
-    && ok "tarball-fallback: registered the marketplace from the extracted local path" \
-    || fail "tarball-fallback: no local-path marketplace add ([$(cat "$state/added" 2>/dev/null)])"
-  # Load-bearing: the helper logs this ONLY after the local-path `marketplace add`
-  # succeeds (a seeded `refreshed.extm` would make the *install* pass on its own, so
-  # asserting "1 installed" here would be false-green — it would not prove the fallback ran).
-  grep -qF 'registered from a downloaded tarball' "$log" 2>/dev/null \
-    && ok "tarball-fallback: helper registered the marketplace from the downloaded tarball" \
-    || fail "tarball-fallback: helper did not report a tarball registration. Log: $(cat "$log" 2>/dev/null)"
-}
-
-# The official anthropics marketplace is NAME-RESERVED, so the tarball/local-path
-# trick is rejected by the CLI. The fallback must SHORT-CIRCUIT (no download) and
-# point the user at vendoring. The marketplace is modelled as unreachable so the
-# downstream install genuinely fails (the claude stub can't model "never registered").
-test_marketplace_reserved_official_skipped() {
-  read -r d log proj state <<<"$(setup_plugins_case pp11)"
-  printf 'superpowers@claude-plugins-official\n' > "$state/declared"
-  printf 'claude-plugins-official\tadd\tanthropics/claude-plugins-official\tanthropics/claude-plugins-official\t\n' > "$state/declared_marketplaces"
-  printf 'anthropics/claude-plugins-official\n' > "$state/git_add_fails"   # git add 403s
-  printf 'claude-plugins-official\n' > "$state/unreachable"                # update can't fix it
-  # A curl stub that records any call — the reserved guard must NOT download.
-  write_stub "$d" curl 'printf "%s\n" "$*" >> "$STATE/curl_calls"; exit 1'
-  # Stub tar too so the "no download" assertion is LOAD-BEARING: with both tools
-  # present, only the reserved-name guard can stop the curl. Without this, the
-  # helper's `for tool in curl tar` preflight would fail on the missing tar and
-  # mask the guard (the assertion would pass even if the guard were broken).
-  write_stub "$d" tar 'exit 0'
-  ( export XDG_CACHE_HOME="$WORK/xdg-pp11"; run_ensure_plugins "$d" "$log" "$proj" "$state" )
-  [ ! -e "$state/curl_calls" ] \
-    && ok "reserved-official: short-circuited without downloading a tarball" \
-    || fail "reserved-official: wrongly attempted a download ([$(cat "$state/curl_calls" 2>/dev/null)])"
-  grep -qi 'vendor' "$log" 2>/dev/null \
-    && ok "reserved-official: warned to vendor the plugins' skills" \
-    || fail "reserved-official: no vendoring guidance. Log: $(cat "$log" 2>/dev/null)"
-  grep -q 'Plugin install: 0 installed, 1 failed' "$log" \
-    && ok "reserved-official: the declared plugin is reported as not installed" \
-    || fail "reserved-official: wrong summary. Log: $(cat "$log" 2>/dev/null)"
-}
-
-# Codex review (#189): when the platform pre-registers an external GitHub marketplace
-# before this hook runs, `marketplace add owner/repo` returns rc=0 "already on disk"
-# and the old code skipped the fallback — but that registration's git-backed index can
-# be empty (a later `marketplace update` 403s), stranding the pending plugin. The hook
-# must re-register such a marketplace from a fresh tarball (local path) to populate it.
-test_marketplace_already_registered_github_reregisters() {
-  read -r d log proj state <<<"$(setup_plugins_case pp12)"
-  printf 'p@ghal\n' > "$state/declared"
-  printf 'ghal\tadd\tacme/ghal\tacme/ghal\t\n' > "$state/declared_marketplaces"
-  printf 'acme/ghal\n' > "$state/already_ok"   # git add returns rc=0 "already on disk"
-  touch "$state/refreshed.ghal"                 # fresh local index after the tarball re-register
-  write_stub "$d" curl '
-    printf "%s\n" "$*" >> "$STATE/curl_calls"
-    out=""; while [ $# -gt 0 ]; do [ "$1" = "-o" ] && out="$2"; shift; done
-    [ -n "$out" ] && printf dummytar > "$out"; exit 0'
-  write_stub "$d" tar '
-    dir=""; while [ $# -gt 0 ]; do [ "$1" = "-C" ] && dir="$2"; shift; done
-    if [ -n "$dir" ]; then mkdir -p "$dir/.claude-plugin"; printf "{\"name\":\"ghal\"}" > "$dir/.claude-plugin/marketplace.json"; fi
-    exit 0'
-  ( export XDG_CACHE_HOME="$WORK/xdg-pp12"; run_ensure_plugins "$d" "$log" "$proj" "$state" )
-  [ -s "$state/curl_calls" ] \
-    && ok "already-github: re-registered via tarball despite 'already on disk'" \
-    || fail "already-github: did not re-register the already-on-disk github marketplace. Log: $(cat "$log" 2>/dev/null)"
-  grep -q '/rdl-web-setup/marketplaces/ghal$' "$state/added" 2>/dev/null \
-    && ok "already-github: registered from the extracted local path" \
-    || fail "already-github: no local-path re-registration ([$(cat "$state/added" 2>/dev/null)])"
-}
-
-# ---------------------------------------------------------------------------
 # main() gate + project hook seam (subprocess)
 # ---------------------------------------------------------------------------
 test_gate_local_noop() {
@@ -773,6 +381,29 @@ test_local_hook_sourced() {
     || fail "local-hook: project seam was NOT sourced. Out: $(cat "$out" 2>/dev/null)"
 }
 
+test_local_hook_nonzero_nonfatal() {
+  # A project seam that exits non-zero must NOT fail the hook: main() sources it in a
+  # subshell, logs a warning, and still reaches completion + exit 0.
+  local proj d out; proj="$(mktemp -d "$WORK/projf.XXXXXX")"; d="$(new_stub_dir)"; out="$WORK/lhf.out"
+  mkdir -p "$proj/.claude/scripts"
+  printf 'echo boom; exit 3\n' > "$proj/.claude/scripts/install-deps.local.sh"
+  write_stub "$d" gh "echo 'gh version ${GH_PIN} (2026-01-01)'"
+  write_stub "$d" id "echo 0"
+  # shellcheck disable=SC2030,SC2031
+  if ( export PATH="$d:/usr/bin:/bin" HOME="$WORK/lhf-home" CLAUDE_CODE_REMOTE=true \
+         CLAUDE_PROJECT_DIR="$proj" TMPDIR="$WORK"; bash "$SCRIPT" ) >"$out" 2>&1; then
+    ok "seam-failure: main() still exits 0 when the seam exits non-zero"
+  else
+    fail "seam-failure: a non-zero seam made main() fail. Out: $(cat "$out" 2>/dev/null)"
+  fi
+  grep -q 'install-deps complete' "$out" \
+    && ok "seam-failure: hook still reached completion" \
+    || fail "seam-failure: did not reach completion. Out: $(cat "$out" 2>/dev/null)"
+  grep -qi 'project bootstrap hook reported errors' "$out" \
+    && ok "seam-failure: logged a warning about the failing seam" \
+    || fail "seam-failure: no warning logged. Out: $(cat "$out" 2>/dev/null)"
+}
+
 test_gh_pin_match
 test_gh_pin_mismatch
 test_gh_missing_sha256sum
@@ -787,21 +418,9 @@ test_sandbox_creates
 test_sandbox_respects_existing
 test_persist_path
 test_persist_path_readonly_warns
-test_plugins_healthy_index_no_refresh
-test_plugins_stale_index_recovers
-test_plugins_already_present_noop
-test_plugins_unreachable_fails_after_refresh
-test_plugins_shared_marketplace_refreshes_once
-test_plugins_wrong_id_after_successful_refresh
-test_plugins_registers_marketplaces_before_install
-test_plugins_warm_resume_skips_registration
-test_marketplace_source_encoding
-test_plugins_already_present_add_is_benign
-test_marketplace_tarball_fallback_on_git_403
-test_marketplace_reserved_official_skipped
-test_marketplace_already_registered_github_reregisters
 test_gate_local_noop
 test_local_hook_sourced
+test_local_hook_nonzero_nonfatal
 
 echo ""
 echo "install-deps: ${PASS} passed, ${FAIL} failed, ${SKIP} skipped"

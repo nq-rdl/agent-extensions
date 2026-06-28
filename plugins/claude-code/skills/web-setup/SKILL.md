@@ -1,17 +1,17 @@
 ---
 license: CC-BY-4.0
 description: >-
-  Bootstrap a repository for Claude Code on the web — provision its `.claude/`
-  setup so cloud sessions start with the team's plugins and tooling. Use when the
-  user wants to "set up Claude Code on the web", "bootstrap web sessions", "add
-  the web setup scripts", "configure the SessionStart hook for cloud", "provision
-  a cloud environment", or "make this repo work with Claude Code on the web".
-  Installs a parameterized `.claude/settings.json` that DECLARES the marketplaces
-  and plugins (the platform installs them at session start), plus a portable
-  `.claude/scripts/install-deps.sh` SessionStart hook (GH/Codex CLIs, the project
-  dev toolchain, a plugin self-heal) and `.claude/scripts/announce-capabilities.sh`.
-  Covers the declarative plugin path, the `CLAUDE_CODE_REMOTE` gate, and the
-  `install-deps.local.sh` seam for project dependencies (Docker, toolchains).
+  Bootstrap a repository for Claude Code on the web so cloud sessions start with the
+  team's skills and slash-commands available on the FIRST session. Use when the user
+  wants to "set up Claude Code on the web", "bootstrap web sessions", "add the web
+  setup scripts", fix "skills/commands not available in Claude Code web", "configure
+  the SessionStart hook for cloud", or "make this repo work with Claude Code on the
+  web". The first-session mechanism is VENDORING — committing the chosen skills/agents
+  into `.claude/`, which carry over as part of the clone (first-session, no network).
+  Declarative `enabledPlugins` is kept as best-effort config for plugins that ship real
+  behavior (hooks/MCP/LSP), but its web activation is unverified — not the first-session
+  path. Covers the `CLAUDE_CODE_REMOTE` gate, the GitHub
+  git-proxy 403, and the `install-deps.local.sh` seam (Docker, toolchains).
 argument-hint: "Bootstrap this repo for Claude Code on the web? (run from the repo root; say if you have an existing .claude/settings.json to merge)"
 user-invocable: true
 metadata:
@@ -20,26 +20,68 @@ metadata:
 
 # Bootstrap a repo for Claude Code on the web
 
-Your job is to provision the current repository so **Claude Code on the web** (cloud)
-sessions start correctly configured: the team's marketplace and plugins **declared** so
-the platform installs them at session start, the GitHub (and optionally Codex) CLI
-available, and a SessionStart hook that provisions project tooling and self-heals. The
-portable pieces ship as files in this skill's `assets/` directory; you copy them into the
-target repo's `.claude/scripts/` and merge the settings idempotently.
+Provision the current repository so **Claude Code on the web** (cloud) sessions start with
+the team's skills and slash-commands available **on the first session**, plus the GitHub
+(and optionally Codex) CLI and project tooling. The portable pieces ship in this skill's
+`assets/`; you copy them into the target repo's `.claude/`, **vendor** the chosen skills,
+and merge the settings idempotently.
+
+## Why the first session comes up empty (the invariant)
+
+Skills are enumerated at process startup, and the docs are explicit that this happens
+**before SessionStart hooks finish**:
+
+> *"Skill discovery normally runs before SessionStart hooks finish, so files the hook writes
+> into `~/.claude/skills/` or `.claude/skills/` would otherwise only appear in the next
+> session."* ([hooks reference](https://code.claude.com/docs/en/hooks))
+
+So a plugin installed at session start — by the platform's declarative install **or** any
+SessionStart install hook (this skill ships none) — lands in the **plugin cache**, which
+the same-session re-scan
+(`reloadSkills`) does **not** cover. A **slow** install (cold-start race) lands in the
+cache late, so its `/plugin:skill` commands appear the **next** session (on the web, only a same-sandbox resume — a fresh
+session re-clones and can re-fail); a **failed**
+install (unreachable marketplace, the git-proxy 403 below, or a wrong plugin id) writes no
+cache at all, so it does **not** self-resolve — it re-fails until the cause is fixed. An empty first-session menu most often means the
+declarative install did not land in time — though an unreachable marketplace or a wrong
+plugin id can look the same. (Full evidence and the documented race — upstream issue #63028 —
+live in [`references/web-setup.rst`](references/web-setup.rst).)
+
+The reliable fix is to put skills where they are visible **before** any network step. This
+skill uses **one first-session route plus a best-effort plugin layer**:
+
+1. **Vendoring (the first-session route).** Commit the chosen skills into `.claude/skills/`
+   and agents into `.claude/agents/`. Per the "what carries over" table these are *"part of
+   the clone"* — present at startup, before enumeration, with zero network/git/marketplace.
+   The robust path, and the **only** route for the name-reserved `claude-plugins-official`
+   plugins. See Phase 3A.
+2. **Declarative `enabledPlugins` (best-effort config).** The settings declaration is how you
+   ask the platform for a plugin that ships real **behavior** — bundled hooks, an MCP server,
+   an LSP — which a loose vendored skill **cannot** provide. But its web activation is
+   **unverified**: external marketplaces 403 over the git proxy (below), the install races
+   skill enumeration on session 1 (issue #63028), and the sandbox is ephemeral, so even
+   "session 2+" inheritance is unproven. Treat it as necessary config for plugin-behavior
+   picks, **not** a delivery guarantee — vendoring (route 1) is the guarantee.
+
+> For the rare skill a team is contractually barred from committing (consume-but-not-
+> redistribute) or too large to vendor, an **advanced escape hatch** — a manual HTTPS-fetch
+> into `~/.claude/skills/` followed by `/reload-skills` — is documented in
+> [`references/web-setup.rst`](references/web-setup.rst). It is not a shipped script; it
+> trades the first-session guarantee for not committing copies.
 
 ## Background you must understand before acting
 
-**Plugins install declaratively — there is no setup script, no `make`, no manual step.**
-Per the [web docs' "what carries over" table](https://code.claude.com/docs/en/claude-code-on-the-web):
+**The declarative plugin path is real, but fragile — treat it as best-effort, not the
+guarantee.** Per the [web docs' "what carries over" table](https://code.claude.com/docs/en/claude-code-on-the-web):
 
 > **Plugins declared in `.claude/settings.json`** carry over — *"Installed at session
 > start from the marketplace you declared. Requires network access to reach the
 > marketplace source."*
 
-So declaring the marketplace under `extraKnownMarketplaces` and the plugin under
-`enabledPlugins` is the **whole mechanism** for the platform's session-start install. But
-the docs' one-line *"requires network access to reach the marketplace source"* undersells a
-hard constraint:
+Declaring the marketplace under `extraKnownMarketplaces` and the plugin under
+`enabledPlugins` is the mechanism for the platform's session-start install — there is **no
+`make`, no manual step**. But the docs' one-line *"requires network access to reach the
+marketplace source"* undersells a hard constraint that is why layers 1–2 exist:
 
 > **The in-sandbox GitHub proxy authorizes git only against the session's own repo.**
 > `claude plugin marketplace add owner/repo` is a `git clone`; verified empirically, it
@@ -53,58 +95,54 @@ hard constraint:
 
 Practical consequence: a marketplace whose source repo **is** the session repo (e.g.
 `rdl@rdl` inside `nq-rdl/agent-extensions`) git-clones fine; **every external marketplace**
-(`claude-plugins-official`, `worktrunk`, `astral-sh`, …) 403s over git. Two routes survive
-this (see [`references/web-setup.rst`](references/web-setup.rst) → "Failure mode #4 — git-proxy
-repo-scoping" and Phase 3 below):
+(`claude-plugins-official`, `worktrunk`, `astral-sh`, …) 403s over git. The route that
+survives this (see [`references/web-setup.rst`](references/web-setup.rst) → "Failure mode #4 —
+git-proxy repo-scoping" and Phase 3 below):
 
-- **Vendor the skills into the repo's `.claude/skills/`** — they carry over as part of the
-  clone (zero proxy, zero git, available the **first** session). The robust path, and what
-  this repo does for its own plugins.
-- **Fetch the marketplace as an HTTPS tarball and register it from a local path** — the
-  self-heal does this automatically. Works for every marketplace **except the name-reserved
-  `claude-plugins-official`**, which must be vendored.
+- **Vendor the skills into the repo's `.claude/skills/`** (Phase 3A) — they carry over as
+  part of the clone (zero proxy, zero git, available the **first** session). The robust path,
+  and what this repo does for its own plugins. Works for every source including the
+  name-reserved `claude-plugins-official`. For the rare can't-commit case, the documented
+  HTTPS-fetch escape hatch fetches the same way (over HTTPS, never git).
 
-The `install-deps.sh` **SessionStart hook** this skill installs does **not** drive that
-plugin install. It is gated on `CLAUDE_CODE_REMOTE` (a no-op on a contributor's laptop)
-and provisions only what the declarative path does not:
+The fetch path is **HTTPS** (the git path is what 403s). The `install-deps.sh` **SessionStart
+hook** this skill installs does **not** drive any plugin install. It is gated on
+`CLAUDE_CODE_REMOTE` (a no-op on a contributor's laptop) and provisions only what the
+declarative path does not:
 
 - **Per-session CLIs** the base image may lack — `gh` (PR/CI automation) and, when
   `CODEX_AUTH_JSON`/`CODEX_ACCESS_TOKEN` is set, the Codex CLI.
 - **The project dev toolchain + services** (language toolchains, the Docker daemon,
   git-hook wiring) via the optional `install-deps.local.sh` seam.
-- **A plugin self-heal** (`ensure_plugins`): a cheap, idempotent retry that reinstalls the
-  declared set **only if** the platform's session-start install didn't complete. It first
-  **registers** the declared marketplaces (`claude plugin marketplace add`) — on a cold VM
-  this hook can outrun Claude Code's own registration of `extraKnownMarketplaces`, leaving
-  the registry empty, which is a **race**, not the docs' *"requires network access to reach
-  the marketplace source"* failure — then refreshes a stale index on a failed install,
-  owning the whole add → update → install chain. When a GitHub `marketplace add` 403s
-  (failure mode #4), it falls back to an **HTTPS tarball fetch + local-path registration**
-  (`register_marketplace_via_tarball`) that never touches git. Gated on a pending count, so
-  a warm resume stays a no-op. **Caveat:** anything the self-heal installs surfaces from the
-  **next** session (skills enumerate before SessionStart hooks finish) — for *first-session*
-  availability, vendor into `.claude/skills/`.
+
+`install-deps.sh` does **not** touch plugins. An earlier `ensure_plugins` self-heal was
+removed: a SessionStart plugin install lands in the plugin cache that `reloadSkills` does not
+re-scan (so it can't surface a plugin the same session), and `claude plugin install` in a hook
+has been reported to **hang** web sessions ([#18088](https://github.com/anthropics/claude-code/issues/18088)).
+First-session availability comes from **vendoring** (route 1), not a retry hook.
 
 `announce-capabilities.sh` (the second SessionStart hook) cross-checks the declared set
-against `claude plugin list` and reports **"Enabled plugins (installed)"** vs a
-**"⚠️ Declared but NOT installed"** line — so a marketplace-reachability failure is
-surfaced, never masked. Keep the chain in mind: **declared ≠ installed ≠ surfaced.**
+against `claude plugin list --json` and reports **"Enabled plugins (installed/enabled)"** vs
+a **"⚠️ Declared but NOT installed"** line — so a marketplace-reachability failure is
+surfaced, never masked. (It flags **"install unverified"** when the CLI can't be queried;
+"installed" confirms install, not in-process activation.) Keep the chain in mind:
+**declared ≠ installed ≠ surfaced.**
 
 > **Do NOT drive the plugin install from a Setup-script field via `make`/git.** Earlier
 > revisions set the environment's Setup-script field to `make install-deps`; that was wrong
 > twice over — it drove the install through **git** (which 403s, failure mode #4) and it
 > hard-blocked session startup on any CWD/branch hiccup. Plugins install declaratively; when
-> the git path is blocked, the fix is **vendoring** (or the self-heal's HTTPS-tarball
-> fallback) — never `git`/`make`. A Setup-script field earns its keep only for caching heavy
+> the git path is blocked, the fix is **vendoring** (or the documented HTTPS-fetch escape
+> hatch) — never `git`/`make`. A Setup-script field earns its keep only for caching heavy
 > *packages*, or to pre-bake vendored/tarball-fetched content into the snapshot for
 > first-session availability (it must fetch over HTTPS, never git, and be `|| true`-guarded
 > so a hiccup never fails startup). This skill ships the portable hook, not a Setup-script.
 
-> Authoritative platform facts (the web docs' "what carries over" table), the three-layer
-> architecture (declarative settings ↔ `install-deps.sh` engine ↔ `install-deps.local.sh`
-> project seam), and the hard-won anti-patterns live in
-> [`references/web-setup.rst`](references/web-setup.rst). Read it before bootstrapping an
-> unfamiliar repo, and to debug a "declared but not installed" plugin.
+> Authoritative platform facts (the web docs' "what carries over" table), the first-session
+> route (vendoring) vs the best-effort declarative layer, the `install-deps.sh` engine +
+> `install-deps.local.sh` seam, and the
+> hard-won anti-patterns live in [`references/web-setup.rst`](references/web-setup.rst). Read
+> it before bootstrapping an unfamiliar repo, and to debug a "declared but not installed" plugin.
 
 ## Phase 0 — Confirm context
 
@@ -131,7 +169,7 @@ creating the directory if absent, and `chmod +x` each:
 | `assets/announce-capabilities.sh` | `.claude/scripts/announce-capabilities.sh` |
 
 These are **portable and carry no project-specific dependencies** — do not edit them per
-project. Project specifics go in the optional `install-deps.local.sh` seam (Phase 3).
+project. Project specifics go in the optional `install-deps.local.sh` seam (Phase 3C).
 
 If a target file already exists and differs, show the diff and ask before overwriting.
 
@@ -188,6 +226,17 @@ Both wire the two SessionStart hooks and the opinionated defaults (`model: opus`
    `go`/`python`/`workflow`-tagged entries and the matching `baseline.lsp` entry by language.
    Remember `gh@rdl` (and any other `@rdl` baseline pick) is stripped automatically inside this
    repo by `strip-self` (Phase 0) — it is a suggestion for *consumer* repos.
+
+   **Then classify each confirmed pick** — this single selection drives all three layers, and
+   nothing is hardcoded:
+   - **A skill the user wants on the first session → VENDOR it** (Phase 3A). Default for the
+     baseline picks and the name-reserved `claude-plugins-official` skills. (For the rare skill
+     a team can't commit, the HTTPS-fetch escape hatch in the reference is the fallback.)
+   - **A pick that needs real plugin behavior** (bundled hooks/MCP/LSP, `/plugin:` namespace) →
+     **DECLARE** it in `enabledPlugins` (best-effort config, web-activation unverified); do not
+     loose-vendor it (a partial plugin breaks — see Phase 3A self-containment).
+   - The `enabledPlugins`/`extraKnownMarketplaces` you compose below is the **declare** set;
+     the vendor/fetch sets are handled in Phase 3.
 3. **Strip self-references (Phase 0 enforcement):**
    ```bash
    tmp="$(mktemp)"
@@ -236,74 +285,94 @@ writing**):
 > session-start install so **nothing** surfaces. `strip-self` removes it deterministically;
 > the externals base avoids it by construction.
 
-## Phase 3 — Offer the project extension seam
+## Phase 3 — Make the chosen skills first-session-available
 
-`install-deps.sh` sources an optional, project-owned `.claude/scripts/install-deps.local.sh`
-as its **dev-toolchain** step (every web session). This is the **only** sanctioned place for
-project-specific provisioning — language toolchains on PATH, container runtimes, git-hook
-wiring (`.husky`/`.githooks`/lefthook), fetching the default branch. Keep it out of the
-portable engine so it stays re-syncable.
+This is where the user's confirmed picks (Phase 2) become available. Classify each: a
+**skill** is **vendored** (3A) — the first-session route; a **plugin** that ships real
+behavior stays declared (Phase 2, best-effort config). **Agents and slash-commands are always
+vendored** — `reloadSkills` does not reload agents, so only committed files are guaranteed at
+startup.
 
-Offer to scaffold a commented `.claude/scripts/install-deps.local.sh` from
-`assets/install-deps.local.sh.example`. Do **not** create it unless the repo actually needs
-project-specific steps.
+### Phase 3A — Vendor the chosen skills/agents (the first-session route)
 
-### Vendoring third-party plugin content (the git-403 escape hatch)
-
-When a repo *must* have a third-party plugin's skills available on the **first** session, do
-not rely on the declarative install or the self-heal — the GitHub proxy 403s the git clone
-of any non-session marketplace (failure mode #4), and a self-heal install only surfaces
-next-session. **Vendor the skills into the repo's own `.claude/skills/`**: per the web docs'
-"what carries over" table, `.claude/skills/`, `.claude/agents/`, and `.claude/commands/`
-carry over because they are *part of the clone* — no proxy, no git, no marketplace. This is
-exactly the self-contained real-file-copy model this repo uses for its own plugins.
-
-Fetch the content over **HTTPS** (allowlisted; the git path is what's blocked), copy in only
-the skills you actually want, and commit them:
+`.claude/skills/`, `.claude/agents/`, `.claude/commands/` carry over *as part of the clone* —
+present before enumeration, no proxy/git/marketplace. Vendor self-contained real-file copies
+(the model this repo uses under `plugins/`). It is also the **only** route for the
+name-reserved `claude-plugins-official` plugins (`superpowers`, `pr-review-toolkit`,
+`gopls-lsp`, `skill-creator`, `plugin-dev`). Fetch over **HTTPS**, pinned to an **immutable
+commit SHA**, and copy only what you want:
 
 ```bash
-# api.github.com/repos/<owner>/<repo>/tarball[/<ref>] → codeload (both Trusted-allowlisted).
+# api.github.com/repos/<owner>/<repo>/tarball/<SHA> → codeload (both Trusted-allowlisted).
 # No git. Add `-H "Authorization: Bearer $GH_TOKEN"` only for a PRIVATE marketplace.
+SHA=<immutable-commit-sha>
 ext="$(mktemp -d)"; tgz="$(mktemp)"
-# Download to a file first rather than piping curl into tar — lets you inspect the
-# artifact before extracting, and a partial download can't be half-extracted.
-curl -fsSL "https://api.github.com/repos/OWNER/REPO/tarball" -o "$tgz"
+curl -fsSL "https://api.github.com/repos/OWNER/REPO/tarball/${SHA}" -o "$tgz"
 tar -xzf "$tgz" -C "$ext" --strip-components=1
+src="$ext/<path-to-skill>"
+# Fail CLOSED if <path-to-skill> is wrong, THEN refuse a tree containing symlinks (they can
+# point outside it). For an UNTRUSTED source use the hardened fetch_skill in
+# references/web-setup.rst, which also rejects symlinked / `..` path components.
+[ -f "$src/SKILL.md" ] || { echo "no SKILL.md at <path-to-skill>; refusing"; exit 1; }
+find "$src" -type l -print -quit | grep -q . && { echo "skill has symlinks; refusing"; exit 1; }
 mkdir -p .claude/skills
-cp -R "$ext/plugins/<plugin>/skills/<skill>" .claude/skills/<skill>   # vendor just what you need
-git add .claude/skills/<skill>
+cp -R "$src" .claude/skills/<name>   # dir <name> MUST equal the skill's frontmatter name
+git add .claude/skills/<name>
 ```
 
-This is the **only** route for the name-reserved `claude-plugins-official` plugins
-(`superpowers`, `pr-review-toolkit`, `gopls-lsp`, `skill-creator`, `plugin-dev`): the CLI
-rejects registering that marketplace from a local path, so its content cannot be installed
-as a plugin in a scoped cloud session — vendor the skills instead. Mind the upstream
-licenses and note that vendored copies drift from upstream (refresh deliberately).
+Before committing each vendored skill:
+- **Record provenance** in `.claude/skills/VENDORED.md`: upstream `repo`, the **commit SHA**,
+  source path, install name, and license — this is what makes a later refresh reviewable.
+- **Preserve license/NOTICE** the upstream requires, alongside the skill.
+- **Name agreement:** the install dir name must equal the skill's `name:` frontmatter (a loose
+  skill's `/id` follows its name; a renamed dir alone would not rename the command).
+- **Self-containment:** reject symlinks, and watch for skills that depend on
+  `${CLAUDE_PLUGIN_ROOT}`, sibling plugin files, or bundled hooks/MCP/LSP — loose vendoring of
+  those yields a **broken partial plugin**. If a pick needs real plugin behavior, leave it on
+  the declarative layer (Phase 2) and accept its best-effort, unverified web activation (not a
+  first-session guarantee).
+- **Refresh deliberately:** on update, re-fetch the successor SHA, diff against the committed
+  copy, and never silently overwrite local edits.
 
-### Docker on Claude Code on the web
+Vendor **agents** into `.claude/agents/<name>.md` and slash-**commands** into
+`.claude/commands/` the same way.
 
-A web runner is **not** a laptop: it ships the `docker` CLI and the `dockerd` binary but
-**no running daemon**, and there is **no systemd / service manager** to start one. So any
-repo that needs containers in a web session — devcontainer smoke tests, `testcontainers`,
-k3d/k8s-in-docker, building images — **must start `dockerd` itself**, in the
-`install-deps.local.sh` seam (the portable engine deliberately does not — not every repo
-wants Docker). The pattern is shipped commented in `assets/install-deps.local.sh.example`;
-it is idempotent (a no-op when `docker info` already answers). This — heavy deps and
-services — is the kind of provisioning the SessionStart hook / project seam is for; plugins
-are handled declaratively by the platform.
+### Phase 3B — (Advanced) the no-commit escape hatch
+
+Skip this for almost every repo — vendoring (3A) is the route. Reach for it **only** when a
+team is contractually barred from committing a skill's contents (consume-but-not-redistribute)
+or the skill is too large to vendor. There is **no shipped script**: follow the manual pattern
+in [`references/web-setup.rst`](references/web-setup.rst) → "Escape hatch — fetch without
+committing" — an HTTPS-tarball fetch into `~/.claude/skills/<leaf>/` (`<leaf>` == the skill's
+upstream `name:`), followed by `/reload-skills`. Trade-offs: it fetches over the network each
+session (latency), covers **skills only** (agents/commands must be vendored), surfaces only
+after the re-scan (not committed, so it can drift), and **forfeits the first-session
+guarantee** that vendoring gives.
+
+### Phase 3C — Offer the project extension seam (+ Docker)
+
+`install-deps.sh` sources an optional, project-owned `.claude/scripts/install-deps.local.sh`
+as its dev-toolchain step (every web session) — the sanctioned place for language toolchains,
+container runtimes, git-hook wiring, and **starting `dockerd`** (the web runner ships the
+docker CLI + daemon binary but **no running daemon and no systemd**, so a repo needing
+containers must start it here; the idempotent pattern ships commented in
+`assets/install-deps.local.sh.example`). Offer to scaffold it from the example; do **not**
+create it unless the repo needs project-specific steps.
 
 ## Phase 4 — Verify
 
-- `CLAUDE_CODE_REMOTE=true bash .claude/scripts/install-deps.sh` → runs the full hook (dev
-  toolchain + gh/codex + the plugin self-heal) and exits 0. (Cloud tooling installs may warn
-  if offline — that is fine; it must still exit 0.)
-- `bash .claude/scripts/install-deps.sh` (no env var) → an immediate no-op (exit 0, no
-  output): the committed hook never disturbs a local session.
+- **Vendored skills/agents (route 1, the first-session guarantee):** every vendored skill is
+  at `.claude/skills/<name>/SKILL.md` with `<name>` == its frontmatter `name:`, contains no
+  symlinks (`find .claude/skills -type l` is empty), and its provenance is recorded. Agents at
+  `.claude/agents/<name>.md`. These are what make the slash menu populate on session 1.
+- `CLAUDE_CODE_REMOTE=true bash .claude/scripts/install-deps.sh` → runs the hook (dev toolchain
+  + gh/codex) and exits 0; `bash .claude/scripts/install-deps.sh` (no env var) → an immediate
+  no-op. (Cloud installs may warn if offline — fine; it must still exit 0.)
 - Validate `.claude/settings.json` parses (`jq . .claude/settings.json`).
-- **Marketplace coverage (#157):** `bash "$WS" cover .claude/settings.json` (this skill's
-  bundled helper — `$WS` from Phase 2, an absolute path) exits 0. Any line it prints is an
-  enabled plugin whose marketplace is undeclared — it would install **nothing, silently** —
-  so fix Phase 2. This checks *configuration* only; it cannot prove a cloud install succeeded.
+- **Marketplace coverage (#157), only for the best-effort declarative layer:** `bash "$WS"
+  cover .claude/settings.json` exits 0. Any line is an enabled plugin whose marketplace is
+  undeclared (it would install nothing) — fix Phase 2. Configuration only; it cannot prove a
+  cloud install succeeded, and the declarative layer is not the first-session guarantee.
 - **Plugin existence (#169):** `bash "$WS" verify .claude/settings.json` exits 0. Any line on
   **stdout** is an enabled plugin id that does **not exist** in its (reachable) marketplace
   catalog — a hallucinated id that would be "Declared but NOT installed" forever; remove or
@@ -313,15 +382,14 @@ are handled declaratively by the platform.
 ## Phase 5 — Summarize for the user
 
 Tell the user, concisely:
-- What was created/merged (list the files + the settings keys touched).
-- **No manual step is required.** Plugins install declaratively at session start from the
-  marketplace declared in `.claude/settings.json` — there is **no Setup-script field to set
-  and no `make`**. The marketplace just has to be reachable.
-- That `announce-capabilities.sh` reports **installed** plugins and flags any
-  **"Declared but NOT installed"** — the canary if a marketplace was unreachable.
-- That `install-deps.sh` is safe locally (a no-op unless `CLAUDE_CODE_REMOTE=true`) and on
-  the web provisions the gh/Codex CLIs, the project dev toolchain, and a plugin self-heal.
+- What was created/merged (the vendored skills/agents, the settings keys touched) and to
+  **commit** it all so cloud sessions (which clone the repo) pick it up.
+- **Why skills appear on the first session:** they are **vendored** into `.claude/` (part of
+  the clone) — present before enumeration, with no network. No Setup-script field, no `make`.
+- That declarative `enabledPlugins` is **best-effort config** for plugin behavior (hooks/MCP/
+  LSP) — its web activation is **unverified**, not the first-session mechanism — and that
+  `announce-capabilities.sh` flags any **"Declared but NOT installed"** plugin.
+- That `install-deps.sh` is safe locally (no-op unless `CLAUDE_CODE_REMOTE=true`) and on the
+  web provisions the gh/Codex CLIs and the project dev toolchain; Codex provisioning activates
+  only when `CODEX_AUTH_JSON`/`CODEX_ACCESS_TOKEN` is set.
 - How to add project-specific deps via `.claude/scripts/install-deps.local.sh`.
-- That Codex CLI provisioning activates only when `CODEX_AUTH_JSON` or `CODEX_ACCESS_TOKEN`
-  is set in the environment.
-- To commit the new files so cloud sessions (which clone the repo) pick them up.

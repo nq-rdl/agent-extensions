@@ -6,9 +6,9 @@
 # portable engine carries no project deps, they all live here.
 #
 # PLUGINS are NOT installed here — the platform installs the declared plugins at
-# session start; install-deps.sh's ensure_plugins is only a self-heal that retries
-# if a transient marketplace fetch failed. This seam provisions the tooling needed
-# to WORK ON this repo:
+# session start (best-effort), and install-deps.sh deliberately does not retry that
+# (a hook plugin install can't surface same-session and can hang the session). This
+# seam provisions the tooling needed to WORK ON this repo:
 #   * lefthook + changie — installed from CHECKSUM-PINNED GitHub releases into
 #     ~/.local/bin (github.com is the reliably-allowlisted source on the cloud
 #     sandbox), mirroring install-deps.sh's ensure_gh. They back the local git

@@ -6,11 +6,10 @@ Authoritative facts, the layered architecture, and the anti-patterns behind the
 ``cc-web-setup`` skill. Read this before bootstrapping an unfamiliar repo or when
 debugging a plugin that is *declared* but never *installs*.
 
-The two source-of-truth notes this distills from live in the repo and should be
-read for the full story:
+Companion docs in the repo:
 
-- ``docs/notes/claude-code-web-issues.md`` — the investigation log (why declarative
-  won, why the self-heal stays, the ``reloadSkills`` finding, the Docker note).
+- ``docs/claude-code-web.md`` — the reader-facing "how this repo's setup works" overview
+  (the invariant, the first-session route, why there is no self-heal, the constraints).
 - ``CONTRIBUTING.md`` § "Claude Code on the web" — why a catalog-dev session enables
   *external* dev-helper plugins, never the catalog itself.
 
@@ -33,74 +32,88 @@ Consequences that drive every design choice here:
   authorizes git only against the session's **own repo** (see "Failure mode #4" below), so
   ``claude plugin marketplace add owner/repo`` 403s for every external marketplace. The
   allowlist governs ordinary HTTPS (API, ``raw``, ``codeload``), not the git protocol.
-- The failure modes are: the marketplace registry still **empty** because this hook
-  outran the platform's registration of ``extraKnownMarketplaces`` on a cold VM (a
-  **race**, not a network error — issue #181); the local index being **stale**; the
-  source genuinely **unreachable**; or the git clone **403'd by the GitHub proxy** because
-  the marketplace repo is not the session repo (failure mode #4). All four are handled by
-  the self-heal (below).
+- The declarative install's failure modes are: the source genuinely **unreachable**; the
+  local index being **stale**; or the git clone **403'd by the GitHub proxy** because the
+  marketplace repo is not the session repo (failure mode #4). All of them only delay or block
+  the *best-effort* plugin layer; ``announce-capabilities.sh`` surfaces the gap, and the
+  first-session fix is to **vendor** the skill (route 1) rather than depend on that install.
 - A cloud session is a **fresh VM with only a clone of the repo** — anything not in
   git (or not installed by the SessionStart hook) is absent.
 
 
-The three layers
-================
+First-session routes vs the best-effort plugin layer
+====================================================
 
-1. **Declarative settings (plugins).** ``.claude/settings.json`` carries
-   ``extraKnownMarketplaces`` (sources, ``autoUpdate``) and ``enabledPlugins``. The
-   platform installs them at session start. This skill ships two bases —
-   ``assets/settings.json.tmpl`` (rdl) and ``assets/settings.externals.json.tmpl``
-   (team externals, no rdl) — and ``assets/marketplaces.json`` as the single source
-   of truth for marketplace sources + the curated team-externals set.
+The governing fact: **skill discovery runs before SessionStart hooks finish** (hooks
+reference), and the same-session re-scan ``reloadSkills`` covers the loose **skill and
+command directories** (``.claude/skills/``, ``~/.claude/skills/``, ``.claude/commands/``)
+— **not** the plugin install cache. So a plugin installed at session start (declaratively
+or by a hook) cannot surface that session unless it was already cached before enumeration.
+Vendoring puts skills where they are visible first; the declarative plugin path is a
+best-effort layer on top.
 
-2. **The portable engine** — ``.claude/scripts/install-deps.sh``, a SessionStart
-   hook **gated on** ``CLAUDE_CODE_REMOTE=true`` (a no-op on a contributor's laptop).
-   It provisions only what the declarative path does not: per-session CLIs (``gh``,
-   and Codex when ``CODEX_AUTH_JSON`` is set), the project dev toolchain via the
-   ``install-deps.local.sh`` seam, and a cheap idempotent **plugin self-heal**
-   (``ensure_plugins``). Every step is non-fatal; the hook always exits 0.
+1. **Vendoring (the first-session route).** Commit the chosen skills into
+   ``.claude/skills/`` and agents into ``.claude/agents/`` (commands into
+   ``.claude/commands/``). Per the "what carries over" table these are *part of the clone*
+   — present at startup, before enumeration, with no proxy/git/marketplace. The robust
+   path and the **only** route for the name-reserved ``claude-plugins-official`` skills.
+   Self-contained real files (no symlinks, no ``${CLAUDE_PLUGIN_ROOT}``/sibling/bundled-
+   component dependencies), pinned to a commit SHA, provenance recorded.
 
-3. **The project seam** — ``.claude/scripts/install-deps.local.sh`` (optional,
-   per-repo). Language toolchains, git-hook wiring, and **starting** ``dockerd``
-   (the web runner ships the docker CLI + daemon binary but **no running daemon and
-   no systemd**, so a repo that needs containers must start it here).
+2. **Declarative ``enabledPlugins`` (best-effort config).** ``.claude/settings.json`` carries
+   ``extraKnownMarketplaces`` + ``enabledPlugins``. This is the only way to ask for a plugin
+   that ships real **behavior** — bundled hooks, an MCP server, an LSP — which a loose
+   vendored skill cannot provide. But its **web activation is unverified**, for three
+   compounding reasons: external marketplaces 403 over the git proxy (failure mode #4); the
+   session-start install races skill enumeration (issue #63028, where the engine logs
+   ``getSkills returning: 0 plugin skills`` and finds the plugins ~1.5 s too late); and the
+   sandbox is ephemeral, so the cache an install would populate is discarded before the next
+   session — even "session 2+" inheritance is unproven. Treat it as necessary config for
+   plugin-behavior picks, **not** a delivery route, until a clean-cloud lifecycle test
+   (install → restart → reuse) proves activation. This skill ships two bases —
+   ``assets/settings.json.tmpl`` (rdl) and ``assets/settings.externals.json.tmpl`` — and
+   ``assets/marketplaces.json`` as the source of truth for sources + the team-externals set.
+
+For the rare skill a team cannot commit, see "Escape hatch — fetch without committing" below;
+it is the only non-vendoring way to get a *skill* (not plugin behavior) onto a session, and it
+trades the first-session guarantee for not committing copies.
+
+Supporting hooks (not first-session mechanisms):
+
+- **The portable engine** — ``.claude/scripts/install-deps.sh`` (SessionStart, gated on
+  ``CLAUDE_CODE_REMOTE``). Provisions per-session CLIs (``gh``, Codex when
+  ``CODEX_AUTH_JSON`` is set) and the project dev toolchain via the ``install-deps.local.sh``
+  seam. **It does not touch plugins** (see below).
+- **The project seam** — ``.claude/scripts/install-deps.local.sh`` (optional). Language
+  toolchains, git-hook wiring, and **starting** ``dockerd`` (the web runner ships the docker
+  CLI + daemon binary but **no running daemon and no systemd**).
 
 The chain to keep in mind: **declared ≠ installed ≠ surfaced.**
-``announce-capabilities.sh`` (the second SessionStart hook) cross-checks
-``claude plugin list`` and reports **"Enabled plugins (installed)"** vs **"⚠️
-Declared but NOT installed"**, so a reachability failure is surfaced, never masked.
+``announce-capabilities.sh`` cross-checks ``claude plugin list --json`` and reports **"Enabled
+plugins (installed/enabled)"** vs **"⚠️ Declared but NOT installed"** (and **"install
+unverified"** when the CLI cannot be queried), so a reachability failure is surfaced, never
+masked. "Installed" confirms install, not in-process activation.
 
 
-The self-heal (``ensure_plugins``)
-==================================
+Why there is no plugin self-heal (``ensure_plugins`` was removed)
+================================================================
 
-Declarative install is primary; the self-heal is the backstop kept **deliberately**
-(it has empirically rescued installs). It reads ``enabledPlugins`` from
-``settings.json`` via ``jq``, skips ids already in ``claude plugin list``, and
-installs the rest idempotently. When any plugin is still pending it **first registers
-every declared marketplace** with ``claude plugin marketplace add`` (idempotent — a
-no-op once on disk), so it never depends on the platform having registered
-``extraKnownMarketplaces`` first (the cold-start race, issue #181). A GitHub source
-pins its ref as ``owner/repo@ref`` (a git URL as ``<git-url>#ref``); a source carrying
-a custom ``path`` (a non-default ``marketplace.json``) has no ``marketplace add``
-equivalent and is **skipped**, left to declarative registration. When a GitHub
-``marketplace add`` **fails** — overwhelmingly the proxy 403 of failure mode #4 — it
-falls back to ``register_marketplace_via_tarball``: fetch the marketplace over HTTPS
-(``api.github.com/repos/<owner>/<repo>/tarball`` → ``codeload``, both allowlisted),
-extract to a stable cache dir, and ``claude plugin marketplace add <local-dir>`` — a
-**local-path** registration that never invokes git. The name-reserved
-``claude-plugins-official`` is the one exception (the CLI rejects a local-path source
-for it); it short-circuits with a vendoring pointer. On a failed install it then
-derives the marketplace from the ``@`` suffix, runs ``claude plugin marketplace
-update <mkt>`` (the refresh ``claude plugin install`` does **not** do itself — the
-stale-index failure mode), and retries once, refreshing each marketplace at most once
-per run. The hook owns the whole **add → update → install** chain so it assumes no
-platform-side state; gated on a pending count, a warm resume is a silent no-op.
+``install-deps.sh`` used to carry an ``ensure_plugins`` self-heal — it registered declared
+marketplaces (with an HTTPS-tarball local-path fallback for the git-403), refreshed a stale
+index, and retried ``claude plugin install``. **It was removed**, because it could not do the
+one thing that would justify it:
 
-A plugin the self-heal installs **surfaces from the *next* session**: Claude
-enumerates skills at startup, *before* SessionStart hooks run, and ``reloadSkills``
-empirically *appears* to re-scan only loose ``~/.claude/skills/``, not the plugin
-install cache (unconfirmed upstream — see ``docs/notes/claude-code-web-issues.md``).
+- **It cannot surface a plugin the session it installs.** The install lands in the plugin
+  cache, which ``reloadSkills`` does not re-scan, and a SessionStart hook cannot call
+  ``/reload-plugins`` (disabled in cloud anyway). At best it helped a later resume on the
+  *same* VM; the next fresh session discarded that cache.
+- **It was a hang risk.** ``claude plugin install`` inside a SessionStart hook has been
+  reported to hang web sessions (upstream issue #18088).
+
+So plugins are left to the platform's declarative install (best-effort config, web-activation
+unverified), and first-session availability comes from **vendoring** — committed skills need no
+install at all. ``announce-capabilities.sh`` still flags a declared-but-not-installed plugin
+so the gap is visible.
 
 
 Failure mode #4 — git-proxy repo-scoping (the 403)
@@ -138,11 +151,13 @@ Two facts make this its own failure mode, distinct from "unreachable source":
   HTTPS paths (the tarball fetch, ``gh api``) — useful for the workaround, not the clone.
 
 The consequence: ``claude plugin marketplace add owner/repo`` works **only** when the
-source repo *is* the session repo. Every external marketplace 403s. Two escape routes:
+source repo *is* the session repo. Every external marketplace 403s over git. The escape
+fetches over **HTTPS** (api.github.com tarball → codeload), never git:
 
-1. **Vendor into ``.claude/skills/``** (below) — the robust, first-session path.
-2. **The self-heal's HTTPS-tarball fallback** (above) — works for every marketplace
-   except the name-reserved ``claude-plugins-official``.
+- **Vendor into ``.claude/skills/``** (below) — the robust, first-session path (commit the
+  fetched skills; works for every repo including name-reserved ``claude-plugins-official``).
+  The same HTTPS fetch, run at session start into ``~/.claude/skills/`` instead of committed,
+  is the "Escape hatch" below — for the rare skill a team cannot commit.
 
 
 Failure mode #5 — the non-existent plugin id (dataops#169)
@@ -152,9 +167,9 @@ Distinct from #4: here the marketplace *is* reachable and declared, but the **pl
 name does not exist in it**. A hallucinated id — ``pyright-lsp@claude-plugins-official``,
 a guessed ``ty-lsp@astral-sh``, ``<lang>-lsp``, or a subject id reconstructed from memory
 — is declared in ``enabledPlugins``, installs **nothing**, and shows up as "Declared but
-NOT installed" every session. Unlike #4 (which clears on the next session via the
-self-heal or by vendoring), a non-existent id **never** resolves: there is nothing to
-install.
+NOT installed" every session. Unlike #4 (which **vendoring** resolves first-session — no
+install needed), a non-existent id **never** resolves: there is nothing to install, so the
+id itself must be corrected.
 
 Why the existing guards miss it: ``web-settings.sh cover`` and ``ensure`` only check that
 each id's ``@marketplace`` **suffix** is declared/known — never that the plugin **name**
@@ -196,12 +211,88 @@ session. Fetch upstream over HTTPS (not git), copy in only the skills you want, 
    # half-extracted partial download).
    curl -fsSL "https://api.github.com/repos/OWNER/REPO/tarball" -o "$tgz"
    tar -xzf "$tgz" -C "$ext" --strip-components=1
-   cp -R "$ext/plugins/<plugin>/skills/<skill>" .claude/skills/<skill>
+   # Fail CLOSED if the path is wrong, then refuse a tree with symlinks (they can point
+   # outside it). For an UNTRUSTED source use the hardened fetch_skill below.
+   src="$ext/plugins/<plugin>/skills/<skill>"
+   [ -f "$src/SKILL.md" ] || { echo "no SKILL.md at <skill>; refusing"; exit 1; }
+   find "$src" -type l -print -quit | grep -q . && { echo "skill has symlinks; refusing"; exit 1; }
+   cp -R "$src" .claude/skills/<skill>
    git add .claude/skills/<skill>
 
 Trade-off: vendored copies carry the upstream license and **drift** from upstream —
 refresh them deliberately. This is the model this repo already uses for its own plugins
 (self-contained real-file copies under ``plugins/``).
+
+
+Escape hatch — fetch without committing (advanced)
+==================================================
+
+For almost every repo, **vendoring is the answer** — stop here. Reach for this only when a
+team is contractually barred from committing a skill's contents (consume-but-not-redistribute)
+or the skill is too large to vendor. It is the *only* non-vendoring way to get a **skill**
+(not plugin behavior) onto a session, and it **forfeits the first-session guarantee**: skills
+land via the same-session re-scan, not the clone.
+
+There is **no shipped script** — wire the manual pattern into the project's existing
+``CLAUDE_CODE_REMOTE``-gated SessionStart hook (or run it once by hand and ``/reload-skills``):
+
+.. code-block:: bash
+
+   # Fetch ONE skill over HTTPS (never git — failure mode #4) into ~/.claude/skills/<leaf>/.
+   # Runs inside ( ) so a failure returns non-zero WITHOUT killing the host SessionStart hook
+   # (do not put `set -e` in the caller). Validates <leaf> BEFORE any rm — an empty or
+   # traversal value would otherwise let `rm -rf` delete the wrong directory.
+   fetch_skill() (
+     leaf="$1"; repo="$2"; ref="$3"; src="$4"   # src = path to the skill within the repo tarball
+     case "$leaf" in ''|*[!A-Za-z0-9-]*|-*|*-)
+       echo "refusing invalid leaf '$leaf' (ASCII alnum + interior hyphens only)" >&2; return 2 ;;
+     esac
+     ext="$(mktemp -d)" && tgz="$(mktemp)" || return 1
+     trap 'rm -rf "$ext" "$tgz"' EXIT   # fires when this ( ) subshell-function returns
+     curl -fsSL "https://api.github.com/repos/${repo}/tarball/${ref}" -o "$tgz" || return 1
+     tar -xzf "$tgz" -C "$ext" --strip-components=1 || return 1
+     # Refuse a symlink at ANY component of $src under $ext, not just the final dir: an
+     # intermediate symlink (src "link/skill") would let cp -R follow it OUTSIDE the tarball,
+     # and the post-copy `find -type l` can't catch it (the copied files are real). Split with
+     # parameter expansion so a */?/[ component can't word-split or glob-evade the walk, and
+     # reject `.`/`..` components, which would otherwise let `$src` escape `$ext`.
+     walk="$ext"; rest="$src"
+     while [ -n "$rest" ]; do
+       seg="${rest%%/*}"; case "$rest" in */*) rest="${rest#*/}" ;; *) rest="" ;; esac
+       [ -n "$seg" ] || continue
+       case "$seg" in .|..) echo "path component '$seg' in '$src' not allowed; refusing" >&2; return 1 ;; esac
+       walk="${walk}/${seg}"
+       [ -L "$walk" ] && { echo "path component '$seg' under '$src' is a symlink; refusing" >&2; return 1; }
+     done
+     [ -f "$ext/$src/SKILL.md" ] || { echo "no SKILL.md under '$src'" >&2; return 1; }
+     find "$ext/$src" -type l -print -quit | grep -q . && { echo "skill has symlinks; refusing" >&2; return 1; }
+     # Read name: from the YAML frontmatter block only (first ---…--- fence), not the body.
+     name="$(awk 'NR==1 && $0=="---"{f=1; next} f && $0=="---"{exit} f' "$ext/$src/SKILL.md" \
+               | sed -n 's/^name:[[:space:]]*//p' | head -1)"
+     [ "$name" = "$leaf" ] || { echo "frontmatter name '$name' != leaf '$leaf'; refusing" >&2; return 1; }
+     mkdir -p "$HOME/.claude/skills" || return 1
+     # Stage to a temp dir first, so a failed COPY never deletes the existing skill. Then move
+     # any existing version ASIDE before swapping the new one in, so a failed mv rolls back to
+     # it instead of leaving the skill missing. The swap is not atomic (replacing a directory
+     # can't be one rename) and uses fixed .tmp/.old paths, so do not run two fetches for the
+     # same <leaf> concurrently — fine for a SessionStart fetch before the first turn.
+     dest="$HOME/.claude/skills/$leaf"
+     staged="$HOME/.claude/skills/.$leaf.tmp"; old="$HOME/.claude/skills/.$leaf.old"
+     rm -rf "$staged" "$old"
+     cp -R "$ext/$src" "$staged" || return 1
+     [ -e "$dest" ] && { mv "$dest" "$old" || return 1; }
+     mv "$staged" "$dest" || { [ -e "$old" ] && mv "$old" "$dest"; return 1; }
+     rm -rf "$old"
+   )
+   # <leaf> MUST equal the skill's upstream frontmatter name: (enforced above).
+   fetch_skill "superpowers" "OWNER/REPO" "<immutable-commit-sha>" "plugins/<plugin>/skills/<skill>" || \
+     echo "escape-hatch fetch failed; continuing" >&2
+
+A SessionStart hook that fetches before the first turn must return ``reloadSkills: true`` so
+the skills register the same session (the documented same-session re-scan). Caveats: it
+fetches over the network each session (latency); covers **skills only** (agents/commands must
+be vendored); a pinned SHA is reproducible but not "fresh", a moving ref is fresh but adds
+supply-chain drift; and fetching does not resolve any upstream licensing the team must honor.
 
 
 The two guards this skill enforces
@@ -241,8 +332,8 @@ These each cost a PR (or several) to learn:
   ``claude plugin marketplace add owner/repo`` 403'ing is **not** fixed by switching to
   **Full** network access (the GitHub proxy is independent of that level) nor by adding
   ``GH_TOKEN`` + ``gh auth`` (the git clone uses the proxy's scoped credential, not your
-  token). It is the GitHub proxy scoping git to the session repo. Fix by **vendoring** or
-  the HTTPS-tarball fallback — never by retrying the clone or widening the network level.
+  token). It is the GitHub proxy scoping git to the session repo. Fix by **vendoring** (or
+  the HTTPS-fetch escape hatch) — never by retrying the clone or widening the network.
 - **Believing "the platform registers marketplaces but does not install
   enabledPlugins."** It does install them. An empty ``claude plugin list`` is a
   stale-index / unreachable-source failure **or the cold-start race below** — not a
@@ -250,16 +341,12 @@ These each cost a PR (or several) to learn:
 - **Reporting *declared* plugins as installed.** Build the banner from ``claude plugin
   list``, not from ``settings.json``, or a missing marketplace looks healthy while the
   slash menu is empty.
-- **A naive ``claude plugin install`` retry without ``marketplace update``.** On a
-  cold VM the index can be stale; the retry re-hits the same stale index forever unless
-  it refreshes.
-- **Assuming ``extraKnownMarketplaces`` is already registered when the SessionStart
-  hook runs (issue #181).** On a cold VM this hook can outrun that registration, so the
-  registry is **empty** and ``claude plugin install`` *and* ``claude plugin marketplace
-  update`` both fail with ``Marketplace not found. Available marketplaces:`` (an empty
-  list) — **not** a network failure, and it must not be reported as one. The self-heal
-  must ``claude plugin marketplace add`` every declared marketplace itself and own the
-  whole add → update → install chain, assuming no platform-side state.
+- **Doing plugin installs in a SessionStart hook at all.** A hook-installed plugin lands in
+  the plugin cache that ``reloadSkills`` does not re-scan, so it cannot surface that session
+  (and a hook cannot call ``/reload-plugins``); worse, ``claude plugin install`` in a hook has
+  been reported to **hang** web sessions (issue #18088). This is why the old ``ensure_plugins``
+  self-heal was removed. Make skills first-session-available by **vendoring**, not by retrying
+  the declarative install from a hook.
 - **Leaving ``CODEX_ACCESS_TOKEN`` set.** Codex parses it as a JWT at runtime; a
   blob/blank value breaks every later ``codex exec`` even with a valid ``auth.json``.
   Unset it in-process and via ``CLAUDE_ENV_FILE``.
