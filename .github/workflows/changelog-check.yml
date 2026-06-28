@@ -11,7 +11,9 @@ permissions:
 jobs:
   check-changie-fragment:
     runs-on: ubuntu-latest
-    if: ${{ !contains(github.event.pull_request.labels.*.name, 'skip-changelog') }}
+    # Dependabot PRs never carry a changie fragment; skip the gate for them
+    # (the bot has no way to run `changie new`). Human PRs still require one.
+    if: ${{ !contains(github.event.pull_request.labels.*.name, 'skip-changelog') && github.actor != 'dependabot[bot]' }}
     steps:
       - uses: actions/checkout@v7
         with:

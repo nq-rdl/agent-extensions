@@ -1,0 +1,3 @@
+kind: Fixed
+body: Skip the changelog-fragment gate and auto-triage job for Dependabot PRs so dependency-bump PRs land with green CI (Dependabot runs cannot read Actions secrets or run `changie new`)
+time: 2026-06-29T00:00:00.000000000+10:00
