@@ -120,27 +120,38 @@ if command -v jq >/dev/null 2>&1 && [ -f "$PROJECT_DIR/.claude/settings.json" ];
 fi
 
 # Actually installed + enabled plugin ids, from `claude plugin list --json` (an
-# array of {id, enabled, scope, …}). Parse the JSON with jq rather than scraping the
-# human table: that table's bullet is a non-ASCII `❯` that silently broke an earlier
-# `>`-based parser (it matched nothing, so every declared plugin looked NOT-installed
-# even with 80+ actually installed). Key "can we verify?" on getting PARSEABLE JSON
-# back, not on non-empty output: a successful `[]` means "nothing installed" (declared
-# plugins genuinely NOT installed), distinct from the CLI missing / erroring / emitting
-# non-JSON ("cannot verify") — those must not be demoted to a false "NOT installed".
+# array of {id, enabled, scope, projectPath, …}). Parse the JSON with jq rather than
+# scraping the human table: that table's bullet is a non-ASCII `❯` that silently broke an
+# earlier `>`-based parser (it matched nothing, so every declared plugin looked
+# NOT-installed even with 80+ actually installed). Key "can we verify?" on getting
+# PARSEABLE JSON back, not on non-empty output: a successful `[]` means "nothing
+# installed" (declared plugins genuinely NOT installed), distinct from the CLI missing /
+# erroring / emitting non-JSON ("cannot verify") — those must not be demoted to a false
+# "NOT installed".
+#
+# Scope filter: an entry enabled at PROJECT scope for a DIFFERENT project carries a
+# `projectPath` pointing at that other project's dir; user/global-scoped entries have NO
+# projectPath field. Keep an entry only when it applies to THIS project — it has no
+# projectPath (user/global), OR its projectPath equals the current project dir — so a
+# plugin enabled only for another project's worktree is NOT falsely counted as installed
+# here. (Such a plugin then correctly falls through to "declared but NOT installed" for
+# this project.) PROJECT_DIR (computed above) is passed to jq via --arg.
 installed_enabled=()
 have_plugin_list=0
 if command -v claude >/dev/null 2>&1 && command -v jq >/dev/null 2>&1; then
-  # ONE jq call does the shape check AND extraction, and its exit status is CAPTURED — the
-  # result is assigned to _ids, not read through a process substitution whose exit is
-  # invisible. A non-array shape (a future `{"plugins":[…]}` wrapper or an error object)
-  # raises error() => jq exits non-zero => the `&&` fails => have_plugin_list stays 0 =>
-  # "cannot verify", never a silently-truncated list read as a false "NOT installed". A
+  # ONE jq call does the shape check, scope filter AND extraction, and its exit status is
+  # CAPTURED — the result is assigned to _ids, not read through a process substitution whose
+  # exit is invisible. A non-array shape (a future `{"plugins":[…]}` wrapper or an error
+  # object) raises error() => jq exits non-zero => the `&&` fails => have_plugin_list stays
+  # 0 => "cannot verify", never a silently-truncated list read as a false "NOT installed". A
   # successful empty array `[]` yields no ids and exit 0 => genuinely "NOT installed". (No
   # `-e`: it would wrongly treat the legitimate empty-array case as an error.)
   if _pl="$(claude plugin list --json 2>/dev/null)" \
-     && _ids="$(printf '%s' "$_pl" | jq -r '
+     && _ids="$(printf '%s' "$_pl" | jq -r --arg proj "$PROJECT_DIR" '
           if type == "array"
-          then .[] | select(type == "object" and .enabled == true) | .id // empty
+          then .[] | select(type == "object" and .enabled == true
+                   and ((.projectPath // null) == null or .projectPath == $proj))
+               | .id // empty
           else error("claude plugin list --json did not return an array") end' 2>/dev/null)"; then
     have_plugin_list=1
     while IFS= read -r id; do
