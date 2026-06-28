@@ -1,6 +1,6 @@
 {
   "name": "planning",
-  "version": "0.17.0",
+  "version": "0.18.0",
   "description": "Planning — implementation strategy, file-level sequencing, API/repo architecture, and ADRs",
   "author": {
     "name": "nq-rdl"
