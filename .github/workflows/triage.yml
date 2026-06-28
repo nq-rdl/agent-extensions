@@ -12,6 +12,9 @@ permissions: {}
 
 jobs:
   triage:
+    # Dependabot runs cannot read Actions secrets, so the App-token step in the
+    # reusable workflow fails. Dependency-bump PRs don't need triage anyway.
+    if: ${{ github.actor != 'dependabot[bot]' }}
     uses: nq-rdl/.github/.github/workflows/auto-triage.yml@main
     with:
       domain: RSE
