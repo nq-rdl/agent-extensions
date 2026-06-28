@@ -13,15 +13,17 @@ Two things, kept deliberately separate:
    users install.
 2. **A `.claude/` folder for developing that marketplace** — contributor tooling,
    *not* part of the published product. It configures Claude Code for work *inside
-   this repo*: the project `settings.json` (model, SessionStart hooks, and the
-   curated external-plugin set — see `docs/external-marketplaces.md`), helper scripts
-   under `.claude/scripts/`, and any vendored skills. Editing `.claude/` changes how
-   we *build* the catalog; it never changes what ships to users.
+   this repo*: the project `settings.json` (model, lifecycle hooks — SessionStart
+   and PreToolUse — and the curated external-plugin set, see
+   `docs/external-marketplaces.md`), helper scripts under `.claude/scripts/`, and
+   any vendored skills. Editing `.claude/` changes how we *build* the catalog; it
+   never changes what ships to users.
 
 **Where to look:** **`CONTRIBUTING.md`** outlines the development requirements (skill
-content conventions, the grouping contract, the PR/changelog flow). **`docs/`** is the
-project documentation — `docs/ARCHITECTURE.md` (design + packaging decisions),
-`docs/external-marketplaces.md` (the curated external-plugin set), and
+content conventions, the grouping contract, packaging a skill into a plugin); the
+PR and changelog flow is in this file's **`## PR instructions`** section below.
+**`docs/`** is the project documentation — `docs/ARCHITECTURE.md` (design + packaging
+decisions), `docs/external-marketplaces.md` (the curated external-plugin set), and
 `docs/local-testing.md` (install walkthrough). Read this file (AGENTS.md) in full
 before changing anything under `.claude/`, so settings and docs stay in sync.
 
