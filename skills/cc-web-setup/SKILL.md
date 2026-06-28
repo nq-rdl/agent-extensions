@@ -39,9 +39,10 @@ Skills are enumerated at process startup, and the docs are explicit that this ha
 So a plugin installed at session start — by the platform's declarative install **or** any
 SessionStart install hook (this skill ships none) — lands in the **plugin cache**, which
 the same-session re-scan
-(`reloadSkills`) does **not** cover. If that install is slow or fails (unreachable
-marketplace, the git-proxy 403 below, or a cold-start race), its `/plugin:skill` commands
-appear only the **next** session. An empty first-session menu most often means the
+(`reloadSkills`) does **not** cover. A **slow** install (cold-start race) lands in the
+cache late, so its `/plugin:skill` commands appear the **next** session; a **failed**
+install (unreachable marketplace, the git-proxy 403 below, or a wrong plugin id) writes no
+cache at all, so it does **not** self-resolve — it re-fails until the cause is fixed. An empty first-session menu most often means the
 declarative install did not land in time — though an unreachable marketplace or a wrong
 plugin id can look the same. (Full evidence and the documented race — upstream issue #63028 —
 live in [`references/web-setup.rst`](references/web-setup.rst).)
@@ -308,10 +309,14 @@ SHA=<immutable-commit-sha>
 ext="$(mktemp -d)"; tgz="$(mktemp)"
 curl -fsSL "https://api.github.com/repos/OWNER/REPO/tarball/${SHA}" -o "$tgz"
 tar -xzf "$tgz" -C "$ext" --strip-components=1
-# Real files only — refuse a skill whose tree contains symlinks (they can point outside it):
-test -z "$(find "$ext/<path-to-skill>" -type l)" || { echo "skill has symlinks; refusing"; exit 1; }
+src="$ext/<path-to-skill>"
+# Fail CLOSED if <path-to-skill> is wrong, THEN refuse a tree containing symlinks (they can
+# point outside it). For an UNTRUSTED source use the hardened fetch_skill in
+# references/web-setup.rst, which also rejects symlinked / `..` path components.
+[ -f "$src/SKILL.md" ] || { echo "no SKILL.md at <path-to-skill>; refusing"; exit 1; }
+find "$src" -type l -print -quit | grep -q . && { echo "skill has symlinks; refusing"; exit 1; }
 mkdir -p .claude/skills
-cp -R "$ext/<path-to-skill>" .claude/skills/<name>   # dir <name> MUST equal the skill's frontmatter name
+cp -R "$src" .claude/skills/<name>   # dir <name> MUST equal the skill's frontmatter name
 git add .claude/skills/<name>
 ```
 

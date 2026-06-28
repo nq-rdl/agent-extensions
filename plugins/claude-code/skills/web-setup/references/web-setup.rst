@@ -249,11 +249,13 @@ There is **no shipped script** — wire the manual pattern into the project's ex
      # Refuse a symlink at ANY component of $src under $ext, not just the final dir: an
      # intermediate symlink (src "link/skill") would let cp -R follow it OUTSIDE the tarball,
      # and the post-copy `find -type l` can't catch it (the copied files are real). Split with
-     # parameter expansion so a */?/[ component can't word-split or glob-evade the walk.
+     # parameter expansion so a */?/[ component can't word-split or glob-evade the walk, and
+     # reject `.`/`..` components, which would otherwise let `$src` escape `$ext`.
      walk="$ext"; rest="$src"
      while [ -n "$rest" ]; do
        seg="${rest%%/*}"; case "$rest" in */*) rest="${rest#*/}" ;; *) rest="" ;; esac
        [ -n "$seg" ] || continue
+       case "$seg" in .|..) echo "path component '$seg' in '$src' not allowed; refusing" >&2; return 1 ;; esac
        walk="${walk}/${seg}"
        [ -L "$walk" ] && { echo "path component '$seg' under '$src' is a symlink; refusing" >&2; return 1; }
      done
@@ -264,13 +266,18 @@ There is **no shipped script** — wire the manual pattern into the project's ex
                | sed -n 's/^name:[[:space:]]*//p' | head -1)"
      [ "$name" = "$leaf" ] || { echo "frontmatter name '$name' != leaf '$leaf'; refusing" >&2; return 1; }
      mkdir -p "$HOME/.claude/skills" || return 1
-     # Stage to a temp dir first, so a failed COPY never deletes the existing skill. The
-     # final rm+mv has a brief non-atomic window (replacing a directory can't be one atomic
-     # rename) — acceptable here, since a SessionStart fetch runs before the first turn.
-     staged="$HOME/.claude/skills/.$leaf.tmp"
-     rm -rf "$staged"
+     # Stage to a temp dir first, so a failed COPY never deletes the existing skill. Then move
+     # any existing version ASIDE before swapping the new one in, so a failed mv rolls back to
+     # it instead of leaving the skill missing. The swap is not atomic (replacing a directory
+     # can't be one rename) and uses fixed .tmp/.old paths, so do not run two fetches for the
+     # same <leaf> concurrently — fine for a SessionStart fetch before the first turn.
+     dest="$HOME/.claude/skills/$leaf"
+     staged="$HOME/.claude/skills/.$leaf.tmp"; old="$HOME/.claude/skills/.$leaf.old"
+     rm -rf "$staged" "$old"
      cp -R "$ext/$src" "$staged" || return 1
-     rm -rf "$HOME/.claude/skills/$leaf" && mv "$staged" "$HOME/.claude/skills/$leaf"
+     [ -e "$dest" ] && { mv "$dest" "$old" || return 1; }
+     mv "$staged" "$dest" || { [ -e "$old" ] && mv "$old" "$dest"; return 1; }
+     rm -rf "$old"
    )
    # <leaf> MUST equal the skill's upstream frontmatter name: (enforced above).
    fetch_skill "superpowers" "OWNER/REPO" "<immutable-commit-sha>" "plugins/<plugin>/skills/<skill>" || \
