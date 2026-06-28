@@ -1,6 +1,6 @@
 {
   "name": "jules",
-  "version": "0.16.0",
+  "version": "0.17.0",
   "description": "Jules — dispatch AI coding sessions and scaffold GitHub Actions dispatch workflows",
   "author": {
     "name": "nq-rdl"

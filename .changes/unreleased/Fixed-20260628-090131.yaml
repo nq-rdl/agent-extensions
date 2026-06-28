@@ -1,3 +1,0 @@
-kind: Fixed
-body: 'Fix the cc-web-setup `announce-capabilities.sh` plugin canary, which scraped the human `claude plugin list` table for a `> ` bullet — but the CLI emits a non-ASCII `❯`, so every enabled plugin was misreported as "Declared but NOT installed" even when 80+ were installed. It now parses `claude plugin list --json` (selecting `enabled == true`) and distinguishes installed/enabled from "install unverified" (CLI missing, erroring, or emitting non-JSON), so a genuine failed install is never masked and a healthy one is never mislabeled. The banner no longer implies an installed plugin''s skills/hooks are active in the first web session (anthropics/claude-code#63028).'
-time: 2026-06-28T09:01:31+10:00
