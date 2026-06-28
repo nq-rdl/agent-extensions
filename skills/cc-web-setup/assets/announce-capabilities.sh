@@ -6,11 +6,11 @@
 # runner and injects a concise summary as `additionalContext`, so Claude is
 # aware of them even on a blank / isolated runner (a GitHub Action job, a web
 # sandbox) where it would otherwise have no cheap way to discover what was
-# provisioned. This is the awareness companion to the explicit plugin install
-# done in the Claude workflows (see .github/workflows/claude*.yml) and the
-# enabledPlugins in .claude/settings.json. Plugins are reported as *installed*
-# (verified against `claude plugin list`), not merely declared, so a plugin that
-# failed to install is flagged rather than silently announced as present.
+# provisioned. This is the awareness companion to the platform's declarative plugin
+# install (enabledPlugins in .claude/settings.json) and any vendored skills under
+# .claude/skills/. Plugins are reported as *installed* (verified against `claude
+# plugin list`), not merely declared, so a plugin that failed to install is flagged
+# rather than silently announced as present.
 #
 # Output contract (Claude Code SessionStart hook): emit a single JSON object
 # with hookSpecificOutput.additionalContext, or — as a fallback — plain text on
@@ -197,7 +197,7 @@ fi
 if [ "${#plugins[@]}" -gt 0 ]; then
   uniq_plugins="$(printf '%s\n' "${plugins[@]}" | join_comma)"
   add "**Enabled plugins (installed/enabled):** $uniq_plugins"
-  add "Installed and enabled per \`claude plugin list\`. This confirms install, not in-process activation: on the web's FIRST session a freshly-installed plugin's skills/hooks can land too late to be active this turn (issue #63028). If a \`/plugin:skill\` is missing, a session restart usually applies it (an external marketplace can re-fail on the fresh session) — the same-session re-scan does not cover the plugin cache, so \`/reload-skills\` will not surface it. Vendored skills under \`.claude/skills/\` avoid this entirely."
+  add "Installed and enabled per \`claude plugin list\`. This confirms install, not in-process activation: on the web's FIRST session a freshly-installed plugin's skills/hooks can land too late to be active this turn (issue #63028). If a \`/plugin:skill\` is missing, a session resume on the same VM may surface it (a fresh session re-clones and can re-fail) — the same-session re-scan does not cover the plugin cache, so \`/reload-skills\` will not surface it. Vendored skills under \`.claude/skills/\` avoid this entirely."
   add ""
 fi
 

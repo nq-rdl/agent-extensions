@@ -167,9 +167,9 @@ Distinct from #4: here the marketplace *is* reachable and declared, but the **pl
 name does not exist in it**. A hallucinated id — ``pyright-lsp@claude-plugins-official``,
 a guessed ``ty-lsp@astral-sh``, ``<lang>-lsp``, or a subject id reconstructed from memory
 — is declared in ``enabledPlugins``, installs **nothing**, and shows up as "Declared but
-NOT installed" every session. Unlike #4 (which clears on the next session via the
-self-heal or by vendoring), a non-existent id **never** resolves: there is nothing to
-install.
+NOT installed" every session. Unlike #4 (which **vendoring** resolves first-session — no
+install needed), a non-existent id **never** resolves: there is nothing to install, so the
+id itself must be corrected.
 
 Why the existing guards miss it: ``web-settings.sh cover`` and ``ensure`` only check that
 each id's ``@marketplace`` **suffix** is declared/known — never that the plugin **name**

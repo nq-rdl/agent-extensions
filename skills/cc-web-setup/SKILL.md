@@ -37,7 +37,8 @@ Skills are enumerated at process startup, and the docs are explicit that this ha
 > session."* ([hooks reference](https://code.claude.com/docs/en/hooks))
 
 So a plugin installed at session start — by the platform's declarative install **or** any
-SessionStart self-heal — lands in the **plugin cache**, which the same-session re-scan
+SessionStart install hook (this skill ships none) — lands in the **plugin cache**, which
+the same-session re-scan
 (`reloadSkills`) does **not** cover. If that install is slow or fails (unreachable
 marketplace, the git-proxy 403 below, or a cold-start race), its `/plugin:skill` commands
 appear only the **next** session. An empty first-session menu most often means the

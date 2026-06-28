@@ -37,6 +37,42 @@ run_announce() {
     | jq -r '.hookSpecificOutput.additionalContext // ""'
 }
 
+# Like run_announce but with an explicit enabledPlugins map ($1 = JSON object) so one run
+# can declare several plugins at once. $2 is the optional `claude` stub body (empty => no
+# claude on PATH). Echoes the additionalContext text.
+run_announce_with() {
+  local d proj; d="$(new_path)"; proj="$(mktemp -d "$WORK/proj.XXXXXX")"; mkdir -p "$proj/.claude"
+  printf '{"enabledPlugins":%s}' "$1" > "$proj/.claude/settings.json"
+  if [ -n "${2-}" ]; then printf '#!/usr/bin/env bash\n%s\n' "$2" > "$d/claude"; chmod +x "$d/claude"; fi
+  ( export PATH="$d" CLAUDE_PROJECT_DIR="$proj" TMPDIR="$WORK"; bash "$SCRIPT" ) 2>/dev/null \
+    | jq -r '.hookSpecificOutput.additionalContext // ""'
+}
+
+# Production reality: several plugins declared, some installed and some not, in ONE run.
+# a@m and c@m are installed+enabled; b@m is not. The partition loop must bucket each id
+# correctly and BOTH render blocks must coexist — never collapse to a single verdict.
+test_multi_plugin_mixed() {
+  local out; out="$(run_announce_with '{"a@m":true,"b@m":true,"c@m":true}' \
+    'printf "[{\"id\":\"a@m\",\"enabled\":true},{\"id\":\"c@m\",\"enabled\":true}]\n"; exit 0')"
+  printf '%s' "$out" | grep -q 'Enabled plugins (installed.*a@m.*c@m' \
+    && ok "multi: a@m and c@m reported installed" || fail "multi: installed set wrong. [$out]"
+  printf '%s' "$out" | grep -q 'Declared but NOT installed:.*b@m' \
+    && ok "multi: b@m reported NOT installed" || fail "multi: b@m not flagged missing. [$out]"
+  # No cross-contamination: the NOT-installed line must not carry an installed id.
+  printf '%s' "$out" | grep 'Declared but NOT installed' | grep -qE 'a@m|c@m' \
+    && fail "multi: installed plugin leaked into NOT-installed line. [$out]" \
+    || ok "multi: no installed plugin in NOT-installed line"
+}
+
+# Exact-line match, not substring: declared foo@bar must NOT be satisfied by an installed
+# foo@barbaz. Locks in the script's `grep -qxF`; a regression to substring matching fails here.
+test_exact_match_only() {
+  local out; out="$(run_announce_with '{"foo@bar":true}' \
+    'printf "[{\"id\":\"foo@barbaz\",\"enabled\":true}]\n"; exit 0')"
+  printf '%s' "$out" | grep -q 'Declared but NOT installed:.*foo@bar' \
+    && ok "exact-match: foo@bar not satisfied by foo@barbaz" || fail "exact-match: substring wrongly matched. [$out]"
+}
+
 # `claude plugin list --json` lists foo@bar enabled => installed.
 test_installed() {
   local out; out="$(run_announce 'printf "[{\"id\":\"foo@bar\",\"enabled\":true,\"scope\":\"user\"}]\n"; exit 0')"
@@ -101,6 +137,8 @@ test_unverified_on_no_cli() {
 test_installed
 test_missing_on_successful_empty
 test_disabled_is_missing
+test_multi_plugin_mixed
+test_exact_match_only
 test_unverified_on_error
 test_unverified_on_non_json
 test_unverified_on_wrong_shape
