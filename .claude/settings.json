@@ -19,6 +19,17 @@
           }
         ]
       }
+    ],
+    "PreToolUse": [
+      {
+        "matcher": "Edit|Write|MultiEdit",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "\"$CLAUDE_PROJECT_DIR\"/.claude/scripts/remind-review-agents.sh"
+          }
+        ]
+      }
     ]
   },
   "enabledPlugins": {

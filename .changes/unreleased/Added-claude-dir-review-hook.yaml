@@ -1,0 +1,3 @@
+kind: Added
+body: New `.claude/` PreToolUse hook reminds contributors to review AGENTS.md before editing dev tooling — guards against settings/docs drift
+time: 2026-06-29T07:49:35.138870517+10:00

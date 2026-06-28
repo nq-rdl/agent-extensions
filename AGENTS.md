@@ -2,6 +2,29 @@
 
 Agent guidance for this repository. Use this alongside the README for project context specific to coding agents.
 
+## What this repo is
+
+Two things, kept deliberately separate:
+
+1. **A Claude Code marketplace** — the published product. This repo *is* the `rdl`
+   marketplace: it authors reusable skills and agents (canonical content under
+   `skills/` and `agents/`) and publishes them as self-contained plugins through the
+   repo-root marketplace manifest (`.claude-plugin/marketplace.json`). This is what
+   users install.
+2. **A `.claude/` folder for developing that marketplace** — contributor tooling,
+   *not* part of the published product. It configures Claude Code for work *inside
+   this repo*: the project `settings.json` (model, SessionStart hooks, and the
+   curated external-plugin set — see `docs/external-marketplaces.md`), helper scripts
+   under `.claude/scripts/`, and any vendored skills. Editing `.claude/` changes how
+   we *build* the catalog; it never changes what ships to users.
+
+**Where to look:** **`CONTRIBUTING.md`** outlines the development requirements (skill
+content conventions, the grouping contract, the PR/changelog flow). **`docs/`** is the
+project documentation — `docs/ARCHITECTURE.md` (design + packaging decisions),
+`docs/external-marketplaces.md` (the curated external-plugin set), and
+`docs/local-testing.md` (install walkthrough). Read this file (AGENTS.md) in full
+before changing anything under `.claude/`, so settings and docs stay in sync.
+
 ## Project overview
 
 This repo is a Claude Code agent extension catalog. It maintains a single source of truth for reusable agent skills and agents, and publishes them as self-contained Claude Code plugins through a repo-root marketplace manifest. Canonical content lives once (under `skills/` and `agents/`); each bundle is packaged into `plugins/<bundle>/` as real-file copies so installs are self-contained.
