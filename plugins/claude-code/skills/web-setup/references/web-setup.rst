@@ -211,7 +211,12 @@ session. Fetch upstream over HTTPS (not git), copy in only the skills you want, 
    # half-extracted partial download).
    curl -fsSL "https://api.github.com/repos/OWNER/REPO/tarball" -o "$tgz"
    tar -xzf "$tgz" -C "$ext" --strip-components=1
-   cp -R "$ext/plugins/<plugin>/skills/<skill>" .claude/skills/<skill>
+   # Fail CLOSED if the path is wrong, then refuse a tree with symlinks (they can point
+   # outside it). For an UNTRUSTED source use the hardened fetch_skill below.
+   src="$ext/plugins/<plugin>/skills/<skill>"
+   [ -f "$src/SKILL.md" ] || { echo "no SKILL.md at <skill>; refusing"; exit 1; }
+   find "$src" -type l -print -quit | grep -q . && { echo "skill has symlinks; refusing"; exit 1; }
+   cp -R "$src" .claude/skills/<skill>
    git add .claude/skills/<skill>
 
 Trade-off: vendored copies carry the upstream license and **drift** from upstream —

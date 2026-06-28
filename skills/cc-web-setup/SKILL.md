@@ -40,7 +40,8 @@ So a plugin installed at session start — by the platform's declarative install
 SessionStart install hook (this skill ships none) — lands in the **plugin cache**, which
 the same-session re-scan
 (`reloadSkills`) does **not** cover. A **slow** install (cold-start race) lands in the
-cache late, so its `/plugin:skill` commands appear the **next** session; a **failed**
+cache late, so its `/plugin:skill` commands appear the **next** session (on the web, only a same-sandbox resume — a fresh
+session re-clones and can re-fail); a **failed**
 install (unreachable marketplace, the git-proxy 403 below, or a wrong plugin id) writes no
 cache at all, so it does **not** self-resolve — it re-fails until the cause is fixed. An empty first-session menu most often means the
 declarative install did not land in time — though an unreachable marketplace or a wrong
