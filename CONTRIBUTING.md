@@ -31,8 +31,6 @@ its own plugin — small plugins are fine.
 Put each skill/agent under the one thing it is **primarily about**. Secondary tools it merely
 *uses* do not count.
 
-- `jules-dispatch-creator` sets up **Jules** GitHub Actions workflows → subject is **Jules** →
-  `jules:dispatch-creator`. (Not a GitHub Actions plugin.)
 - `shiny-bslib` themes a **Shiny** app with bslib → subject is **Shiny** → `shiny:bslib`. (Not
   a bslib plugin.)
 
