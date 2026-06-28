@@ -17,24 +17,29 @@ reference states it outright:
 The same-session re-scan, `reloadSkills: true`, re-scans the loose **skill and command
 directories** — but **not** the plugin install cache. So a *plugin* installed at session start
 (by the platform's declarative install, or by any hook) lands in a cache that won't be
-re-scanned, and only surfaces the **next** session. An empty first-session slash menu almost
-always means the declarative plugin install didn't land in time.
+re-scanned, so it can't surface that session — and because the web sandbox is ephemeral (the
+next session re-clones fresh), even a later session isn't guaranteed. An empty first-session
+slash menu usually means the declarative plugin install didn't land; vendored skills sidestep
+the race entirely.
 
-## The approach: two first-session routes + a best-effort plugin layer
+## The approach: vendoring + a best-effort plugin layer
 
-1. **Vendoring (the default).** Commit the chosen skills into `.claude/skills/` and agents into
-   `.claude/agents/`. These are *part of the clone* — present before enumeration, with no
-   network, git, or marketplace. This is the robust, first-session-reliable path, and the only
-   route for the name-reserved `claude-plugins-official` skills.
-2. **`bootstrap-web.sh` (opt-in).** For skills a team prefers to pull *fresh* rather than
-   commit: a `CLAUDE_CODE_REMOTE`-gated SessionStart hook HTTPS-tarball-fetches the skills
-   listed in `.claude/web-skills.json` into `~/.claude/skills/` and returns `reloadSkills: true`
-   — the documented same-session pattern. SHA-pinned; skills only (agents must be vendored).
-3. **Declarative `enabledPlugins` (best-effort).** When the marketplace is reachable, the
-   platform installs declared plugins at session start, giving `/plugin:skill` namespacing and
-   `autoUpdate` from **session 2+**. It is *not* the first-session guarantee — routes 1–2 are.
-   `announce-capabilities.sh` flags any **"Declared but NOT installed"** plugin so a
-   reachability failure is surfaced, never masked.
+1. **Vendoring (the first-session route).** Commit the chosen skills into `.claude/skills/` and
+   agents into `.claude/agents/`. These are *part of the clone* — present before enumeration,
+   with no network, git, or marketplace. This is the robust, first-session-reliable path, and
+   the only route for the name-reserved `claude-plugins-official` skills.
+2. **Declarative `enabledPlugins` (best-effort config).** Declaring a marketplace + plugin is
+   how you ask for a plugin that ships real *behavior* (bundled hooks, an MCP server, an LSP) —
+   which a loose vendored skill can't provide. But its web activation is **unverified**:
+   external marketplaces 403 over the git proxy, the install races skill enumeration on session
+   1 (issue #63028), and the sandbox is ephemeral — so even "session 2+" inheritance is
+   unproven. Treat it as necessary config for plugin-behavior picks, not a delivery guarantee;
+   vendoring is the guarantee. `announce-capabilities.sh` flags any **"Declared but NOT
+   installed"** plugin so a reachability failure is surfaced, never masked.
+
+For the rare skill a team can't commit, an advanced HTTPS-fetch **escape hatch** (documented in
+the skill's `references/web-setup.rst`) drops it into `~/.claude/skills/` via the same-session
+re-scan — trading the first-session guarantee for not committing copies.
 
 ## Why there is no plugin self-heal
 
@@ -53,7 +58,7 @@ First-session availability comes from vendoring, not a retry hook.
 
 - **The GitHub git proxy is repo-scoped.** In a cloud session, `git clone` of any repo *other
   than the session's own* returns 403 — independent of the network-access level and unaffected
-  by `GH_TOKEN`. So vendoring and `bootstrap-web.sh` fetch over **HTTPS** (`api.github.com`
+  by `GH_TOKEN`. So vendoring (and the escape-hatch fetch) use **HTTPS** (`api.github.com`
   tarball → `codeload`, both Trusted-allowlisted), never git.
 - **No running Docker daemon.** The web runner ships the `docker` CLI and `dockerd` binary but
   no running daemon and no systemd. A repo that needs containers must start `dockerd` itself in
@@ -64,7 +69,7 @@ First-session availability comes from vendoring, not a retry hook.
 
 Run **`/claude-code:web-setup`** from the repo root. It discovers the repo's stack (via the
 `marketplace-scout` agent), lets you confirm a plugin/skill set, then vendors the chosen skills
-(default) — optionally wiring `bootstrap-web.sh` for fetch-fresh skills — and writes a
-`.claude/settings.json` that declares the best-effort plugin layer plus the SessionStart hooks.
+into `.claude/` and writes a `.claude/settings.json` that declares the best-effort plugin layer
+plus the SessionStart hooks.
 The skill's full reference (the platform contract and the hard-won anti-patterns) lives in
 `skills/cc-web-setup/references/web-setup.rst`.

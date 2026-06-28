@@ -107,11 +107,6 @@ jobs:
       - name: Run install-deps hook unit tests
         run: bash skills/cc-web-setup/scripts/test-install-deps.sh
 
-      # Pure-bash harness for the opt-in first-session skill hook (fetch_repo_tarball
-      # / install_skill / bootstrap_web_skills). Stubs curl/tar; no network.
-      - name: Run bootstrap-web hook unit tests
-        run: bash skills/cc-web-setup/scripts/test-bootstrap-web.sh
-
       # Canary harness for the announce hook: a declared plugin is reported
       # installed / NOT installed / unverified correctly (never falsely "installed").
       - name: Run announce-capabilities canary tests

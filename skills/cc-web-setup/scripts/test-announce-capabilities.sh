@@ -37,23 +37,30 @@ run_announce() {
     | jq -r '.hookSpecificOutput.additionalContext // ""'
 }
 
-# `claude plugin list` lists foo@bar as enabled => installed.
+# `claude plugin list --json` lists foo@bar enabled => installed.
 test_installed() {
-  local out; out="$(run_announce 'printf "> foo@bar\n  Status: enabled\n"; exit 0')"
-  printf '%s' "$out" | grep -q 'Enabled plugins (installed):.*foo@bar' \
+  local out; out="$(run_announce 'printf "[{\"id\":\"foo@bar\",\"enabled\":true,\"scope\":\"user\"}]\n"; exit 0')"
+  printf '%s' "$out" | grep -q 'Enabled plugins (installed.*foo@bar' \
     && ok "installed: reported as installed" || fail "installed: not reported installed. [$out]"
   printf '%s' "$out" | grep -qiE 'unverified|NOT installed' \
     && fail "installed: also flagged unverified/missing" || ok "installed: not flagged unverified/missing"
 }
 
-# claude SUCCEEDS (exit 0) but lists nothing => the declared plugin genuinely did NOT
+# claude SUCCEEDS with an empty array `[]` => the declared plugin genuinely did NOT
 # install. This must read as "NOT installed", not "unverified".
 test_missing_on_successful_empty() {
-  local out; out="$(run_announce 'exit 0')"
+  local out; out="$(run_announce 'printf "[]\n"; exit 0')"
   printf '%s' "$out" | grep -q 'Declared but NOT installed:.*foo@bar' \
     && ok "empty-success: declared plugin reported NOT installed" || fail "empty-success: not flagged missing. [$out]"
-  printf '%s' "$out" | grep -q 'Enabled plugins (installed):' \
+  printf '%s' "$out" | grep -q 'Enabled plugins (installed' \
     && fail "empty-success: wrongly reported installed" || ok "empty-success: not reported installed"
+}
+
+# A plugin present but enabled:false => NOT installed/enabled (must not count as installed).
+test_disabled_is_missing() {
+  local out; out="$(run_announce 'printf "[{\"id\":\"foo@bar\",\"enabled\":false}]\n"; exit 0')"
+  printf '%s' "$out" | grep -q 'Declared but NOT installed:.*foo@bar' \
+    && ok "disabled: reported NOT installed" || fail "disabled: not flagged missing. [$out]"
 }
 
 # claude ERRORS => cannot verify => report unverified, NEVER "installed".
@@ -61,8 +68,24 @@ test_unverified_on_error() {
   local out; out="$(run_announce 'echo boom >&2; exit 1')"
   printf '%s' "$out" | grep -q 'install unverified.*foo@bar' \
     && ok "cli-error: reported unverified" || fail "cli-error: not unverified. [$out]"
-  printf '%s' "$out" | grep -q 'Enabled plugins (installed):' \
+  printf '%s' "$out" | grep -q 'Enabled plugins (installed' \
     && fail "cli-error: wrongly reported installed" || ok "cli-error: not reported installed"
+}
+
+# claude SUCCEEDS but emits non-JSON (e.g. an old CLI lacking --json) => cannot parse
+# => unverified, never silently "NOT installed".
+test_unverified_on_non_json() {
+  local out; out="$(run_announce 'printf "not json\n"; exit 0')"
+  printf '%s' "$out" | grep -q 'install unverified.*foo@bar' \
+    && ok "non-json: reported unverified" || fail "non-json: not unverified. [$out]"
+}
+
+# claude SUCCEEDS with valid JSON of the WRONG shape (an object, not the documented array)
+# => cannot trust it => unverified, never a false "NOT installed".
+test_unverified_on_wrong_shape() {
+  local out; out="$(run_announce 'printf "{\"plugins\":[{\"id\":\"foo@bar\",\"enabled\":true}]}\n"; exit 0')"
+  printf '%s' "$out" | grep -q 'install unverified.*foo@bar' \
+    && ok "wrong-shape: reported unverified" || fail "wrong-shape: not unverified. [$out]"
 }
 
 # No claude CLI on PATH => cannot verify => unverified (the original false-"installed"
@@ -71,13 +94,16 @@ test_unverified_on_no_cli() {
   local out; out="$(run_announce '')"
   printf '%s' "$out" | grep -q 'install unverified.*foo@bar' \
     && ok "no-cli: reported unverified" || fail "no-cli: not unverified. [$out]"
-  printf '%s' "$out" | grep -q 'Enabled plugins (installed):' \
+  printf '%s' "$out" | grep -q 'Enabled plugins (installed' \
     && fail "no-cli: wrongly reported installed" || ok "no-cli: not reported installed"
 }
 
 test_installed
 test_missing_on_successful_empty
+test_disabled_is_missing
 test_unverified_on_error
+test_unverified_on_non_json
+test_unverified_on_wrong_shape
 test_unverified_on_no_cli
 
 echo ""

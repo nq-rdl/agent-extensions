@@ -10,8 +10,8 @@
 # declared in .claude/settings.json (enabledPlugins + extraKnownMarketplaces) at
 # session start from their marketplaces — see the web docs' "what carries over"
 # table. First-session SKILL availability comes from VENDORING skills into the repo's
-# .claude/ (and the optional bootstrap-web.sh hook + reloadSkills), NOT from this
-# script — see the cc-web-setup skill. A SessionStart plugin install cannot surface a
+# .claude/ — present in the clone before enumeration — NOT from this script (see the
+# cc-web-setup skill). A SessionStart plugin install cannot surface a
 # plugin the same session (its cache is not re-scanned) and `claude plugin install`
 # in a hook can hang web sessions (anthropics/claude-code#18088), so this script does
 # NOT touch plugins. It provisions only per-session tooling the declarative path lacks:
