@@ -315,6 +315,24 @@ Claude Code — agent-team coordination, hook authoring, and web-session setup.
 
 ---
 
+## opencode-dev
+
+OpenCode development toolkit — author plugins, agents, the SDK, custom tools, skills, governance policies, and delegation harnesses.
+
+**Skills**
+
+- `/opencode-dev:plugin`
+- `/opencode-dev:sdk`
+- `/opencode-dev:agent`
+- `/opencode-dev:tools`
+- `/opencode-dev:skill`
+- `/opencode-dev:policies`
+- `/opencode-dev:delegate`
+
+**Hooks:** `opencode-doc-review`
+
+---
+
 ## rdl-team
 
 RDL team workflows — Claude Code onboarding, setup, and config management.

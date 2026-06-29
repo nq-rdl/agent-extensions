@@ -1,0 +1,16 @@
+{
+  "description": "Nudge canonical-doc verification when developing OpenCode solutions with opencode-dev (UserPromptSubmit, fires only on OpenCode markers)",
+  "hooks": {
+    "UserPromptSubmit": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "${CLAUDE_PLUGIN_ROOT}/scripts/opencode-doc-review.sh",
+            "timeout": 15
+          }
+        ]
+      }
+    ]
+  }
+}
