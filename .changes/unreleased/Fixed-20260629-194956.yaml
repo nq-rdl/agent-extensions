@@ -1,0 +1,3 @@
+kind: Fixed
+body: 'opencode-dev: fix reference pointers (.md → .rst) in opencode-sdk/agent skills, and harden the opencode-delegate companion skeleton (create cache dir before save, use fileURLToPath instead of import.meta.filename, correct SDK session.create body/data shape, handle unknown job ids in result/cancel)'
+time: 2026-06-29T19:49:56.265745382Z

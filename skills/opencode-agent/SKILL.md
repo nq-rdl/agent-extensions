@@ -49,7 +49,7 @@ in `opencode.json` — no code required.
 | **Filename = name** | `description:`/`name:` field sets the id | The **markdown filename** is the id: `review.md` → `review` agent; `test.md` → `/test` command |
 | **No CLAUDE.md fallback awareness** | Assuming only `AGENTS.md` is read | OpenCode falls back to `CLAUDE.md` / `~/.claude/CLAUDE.md` when no `AGENTS.md` |
 
-Read `references/*.md` before writing — these are the only non-obvious bits.
+Read `references/*.rst` before writing — these are the only non-obvious bits.
 
 ---
 
