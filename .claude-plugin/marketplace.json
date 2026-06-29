@@ -292,6 +292,21 @@
       ]
     },
     {
+      "name": "opencode-dev",
+      "source": "./plugins/opencode-dev",
+      "description": "OpenCode development toolkit — author plugins, agents, the SDK, custom tools, skills, governance policies, and delegation harnesses",
+      "version": "0.18.0",
+      "keywords": [
+        "opencode",
+        "plugins",
+        "sdk",
+        "agents",
+        "mcp",
+        "policies",
+        "acp"
+      ]
+    },
+    {
       "name": "rdl-team",
       "source": "./plugins/rdl-team",
       "description": "RDL team workflows — Claude Code onboarding, setup, and config management",

@@ -1,0 +1,26 @@
+schemaVersion: v1
+id: opencode-dev
+displayName: OpenCode Dev
+description: OpenCode development toolkit — author plugins, agents, the SDK, custom tools, skills, governance policies, and delegation harnesses
+keywords: [opencode, plugins, sdk, agents, mcp, policies, acp]
+owners:
+  - rdl
+channels:
+  - stable
+skills:
+  - {source: opencode-plugin, leaf: plugin}
+  - {source: opencode-sdk, leaf: sdk}
+  - {source: opencode-agent, leaf: agent}
+  - {source: opencode-tools, leaf: tools}
+  - {source: opencode-skill, leaf: skill}
+  - {source: opencode-policies, leaf: policies}
+  - {source: opencode-delegate, leaf: delegate}
+agents: []
+hooks: [opencode-doc-review]
+prompts: []
+mcp: []
+targets:
+  claude:
+    enabled: true
+    pluginName: opencode-dev
+    marketplaceName: rdl
