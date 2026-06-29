@@ -1,5 +1,5 @@
 // Drive OpenCode from Go via the official SDK.
-// Verify the surface in references/go.md and re-check github.com/sst/opencode-sdk-go for drift.
+// Verify the surface in references/go.rst and re-check github.com/sst/opencode-sdk-go for drift.
 //
 // Official module (NOT the anomalyco/manno23 forks):
 //   go get -u 'github.com/sst/opencode-sdk-go@v0.19.2'   // requires Go 1.22+

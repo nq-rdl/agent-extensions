@@ -1,5 +1,5 @@
 // Drive OpenCode from JS/TS via @opencode-ai/sdk.
-// Verify the surface in references/sdk.md and re-check https://opencode.ai/docs/sdk/ for drift.
+// Verify the surface in references/sdk.rst and re-check https://opencode.ai/docs/sdk/ for drift.
 //   npm install @opencode-ai/sdk
 //
 // createOpencode() spawns `opencode serve` AND returns a connected client.
