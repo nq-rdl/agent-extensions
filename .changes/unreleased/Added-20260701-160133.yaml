@@ -1,3 +1,0 @@
-kind: Added
-body: '`cc-agent-create` / `claude-code:agent-create` skill — a guided, CI-green pipeline for adding a catalog subagent under `agents/<name>/agent.md`. Covers import-and-normalize (adapting an upstream `github/awesome-copilot` `.agent.md`) and from-scratch authoring, wires the agent through the registry → plugin-tree → manifest → changelog → validate pipeline by calling the existing scripts, and installs a session-scoped Stop + PostToolUse guard (auto-torn-down) so the session cannot end with a half-wired agent'
-time: 2026-07-01T16:01:33.715491+10:00

@@ -1,6 +1,6 @@
 {
   "name": "skill",
-  "version": "0.18.0",
+  "version": "0.19.0",
   "description": "Skill quality — audit skills for non-inferable value, review changes, and report issues upstream",
   "author": {
     "name": "nq-rdl"

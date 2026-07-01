@@ -1,6 +1,6 @@
 {
   "name": "defuddle",
-  "version": "0.18.0",
+  "version": "0.19.0",
   "description": "Defuddle — extract clean Markdown from cluttered web pages",
   "author": {
     "name": "nq-rdl"

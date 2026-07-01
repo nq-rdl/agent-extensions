@@ -1,6 +1,6 @@
 {
   "name": "hooks",
-  "version": "0.18.0",
+  "version": "0.19.0",
   "description": "Hooks — forced skill evaluation when prompts mention skills",
   "author": {
     "name": "nq-rdl"
