@@ -10,7 +10,6 @@ tools:
 model: sonnet
 effort: medium
 maxTurns: 30
-max_turns: 30
 skills: []
 color: orange
 metadata:
