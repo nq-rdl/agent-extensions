@@ -1,0 +1,28 @@
+{
+  "description": "Session guard for /claude-code:agent-create. Substitute __AGENT_NAME__ (the kebab-case agent name) and __BUNDLE__ (the target bundle), then MERGE the 'hooks' object into .claude/settings.local.json without clobbering existing hooks. Both entries carry the marker 'rdl-agent-create-guard' in their command so teardown removes exactly what was added. The Stop hook keeps the turn alive until the agent is fully wired, the generated docs/manifests are drift-free (generate_bundles_doc.py --check and generate_manifests.py --check), and validate-plugins.sh passes; it exits 0 when stop_hook_active is true so it never infinite-loops. The PostToolUse hook adds a declarative note (not an imperative command) listing the remaining wiring steps after an agents/*/agent.md write.",
+  "hooks": {
+    "Stop": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash -c '# rdl-agent-create-guard\ninput=$(cat)\n[ \"$(printf %s \"$input\" | jq -r .stop_hook_active)\" = true ] && exit 0\nname=\"__AGENT_NAME__\"; bundle=\"__BUNDLE__\"; missing=\"\"\n[ -f \"agents/$name/agent.md\" ] || missing=\"$missing [author agents/$name/agent.md]\"\ngrep -q \"$name\" \"registry/bundles/$bundle.yaml\" 2>/dev/null || missing=\"$missing [add $name to registry/bundles/$bundle.yaml agents:]\"\n[ -f \"plugins/$bundle/agents/$name.md\" ] || missing=\"$missing [run scripts/sync-plugins.sh $bundle]\"\npython3 scripts/generate_bundles_doc.py . --check >/dev/null 2>&1 || missing=\"$missing [run python3 scripts/generate_bundles_doc.py . to refresh docs/bundles.md]\"\npython3 scripts/generate_manifests.py . --check >/dev/null 2>&1 || missing=\"$missing [run python3 scripts/generate_manifests.py . to refresh the manifests]\"\ngrep -rq \"$name\" .changes/unreleased/ 2>/dev/null || missing=\"$missing [add a changie fragment naming $name]\"\nbash scripts/validate-plugins.sh >\"/tmp/agent-create-$name.log\" 2>&1 || missing=\"$missing [fix scripts/validate-plugins.sh: see /tmp/agent-create-$name.log]\"\n[ -n \"$missing\" ] && jq -nc --arg r \"Pipeline incomplete for $name.$missing Complete these, then stop.\" \"{decision:\\\"block\\\",reason:\\$r}\"\nexit 0'",
+            "timeout": 120
+          }
+        ]
+      }
+    ],
+    "PostToolUse": [
+      {
+        "matcher": "Write|Edit",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash -c '# rdl-agent-create-guard\ninput=$(cat)\npath=$(printf %s \"$input\" | jq -r \".tool_input.file_path // empty\")\ncase \"$path\" in\n  */agents/*/agent.md|agents/*/agent.md)\n    jq -nc \"{hookSpecificOutput:{hookEventName:\\\"PostToolUse\\\",additionalContext:\\\"Adding an agent to this catalog involves five wiring steps beyond the agent.md file: (1) list the agent name in registry/bundles/__BUNDLE__.yaml under agents:, (2) run scripts/sync-plugins.sh __BUNDLE__ to copy it into plugins/__BUNDLE__/agents/, (3) run python3 scripts/generate_bundles_doc.py . and python3 scripts/generate_manifests.py . to refresh the generated docs and manifests, (4) add a changie fragment, (5) run scripts/validate-plugins.sh until it exits 0. Those remaining steps are what make the change CI-green.\\\"}}\"\n    ;;\nesac\nexit 0'",
+            "timeout": 10
+          }
+        ]
+      }
+    ]
+  }
+}

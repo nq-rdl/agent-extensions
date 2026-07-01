@@ -318,6 +318,7 @@ Claude Code — agent-team coordination, hook authoring, and web-session setup.
 
 **Skills**
 
+- `/claude-code:agent-create`
 - `/claude-code:agent-teams`
 - `/claude-code:hook`
 - `/claude-code:web-setup`
