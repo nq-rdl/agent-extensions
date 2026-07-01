@@ -12,7 +12,8 @@ tools:
   - Grep
   - Glob
   - Bash
-model: inherit
+model: sonnet
+effort: medium
 skills: []
 color: teal
 metadata:

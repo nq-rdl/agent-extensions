@@ -9,7 +9,8 @@ tools:
   - Edit
   - Grep
   - Glob
-model: inherit
+model: sonnet
+effort: medium
 skills: []
 color: purple
 metadata:

@@ -13,7 +13,8 @@ tools:
   - Grep
   - Glob
   - Bash
-model: inherit
+model: sonnet
+effort: low
 skills: []
 color: blue
 metadata:

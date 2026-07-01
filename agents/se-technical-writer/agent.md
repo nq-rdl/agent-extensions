@@ -12,7 +12,8 @@ tools:
   - Grep
   - Glob
   - WebFetch
-model: inherit
+model: sonnet
+effort: medium
 skills: []
 color: green
 metadata:

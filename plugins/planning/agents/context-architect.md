@@ -10,7 +10,8 @@ tools:
   - Edit
   - Write
   - Bash
-model: inherit
+model: sonnet
+effort: medium
 skills: []
 color: purple
 metadata:

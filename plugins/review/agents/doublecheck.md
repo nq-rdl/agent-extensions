@@ -7,7 +7,8 @@ tools:
   - Read
   - Grep
   - Glob
-model: inherit
+model: sonnet
+effort: medium
 skills: []
 color: orange
 metadata:

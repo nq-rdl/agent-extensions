@@ -14,7 +14,8 @@ tools:
   - Glob
   - Bash
   - WebFetch
-model: inherit
+model: sonnet
+effort: medium
 skills: []
 color: cyan
 metadata:
