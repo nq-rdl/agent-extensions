@@ -26,10 +26,10 @@ else
   prompt=$(printf '%s' "$input" | grep -oP '"prompt"\s*:\s*"\K[^"]+' || true)
 fi
 
-# Gate: fire only on OpenCode markers. `\bopencode\b` matches "OpenCode"/"opencode"
-# as a token (not "open code"); the path and package markers catch config/SDK work.
-# "OpenAI Codex" matches none of these, so the two stay disambiguated.
-if ! printf '%s' "$prompt" | grep -qiE '\bopencode\b|\.opencode/|@opencode-ai'; then
+# Gate: fire only on OpenCode markers. Match `opencode` as a standalone token (not "open code"),
+# plus config/package markers. "OpenAI Codex" matches none of these, so the two stay disambiguated.
+# NOTE: `\b` isn't portable in grep ERE, so we use an explicit non-word boundary pattern.
+if ! printf '%s' "$prompt" | grep -qiE '(^|[^[:alnum:]_])opencode([^[:alnum:]_]|$)|\.opencode/|@opencode-ai'; then
   exit 0
 fi
 
