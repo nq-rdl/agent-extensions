@@ -1,0 +1,48 @@
+---
+name: __AGENT_NAME__
+description: >-
+  Delegate to this agent when __TRIGGER__; it __WHAT_IT_DOES_AND_HOW__.
+license: CC-BY-4.0
+tools:
+  - Read
+  - Grep
+  - Glob
+model: inherit
+skills: []
+color: __COLOR__
+metadata:
+  repo: https://github.com/nq-rdl/agent-extensions
+---
+
+# __TITLE__
+
+You are __ROLE__. __ONE_OR_TWO_SENTENCES_ON_THE_AGENT_S_REMIT__.
+
+## Your Expertise
+
+- __AREA_1__
+- __AREA_2__
+- __AREA_3__
+
+## Your Approach
+
+1. __STEP_1__
+2. __STEP_2__
+3. __STEP_3__
+
+## Response Style
+
+- __STYLE_1__
+- __STYLE_2__
+
+<!--
+Fill-in notes (delete before saving):
+  • name MUST equal the directory name agents/__AGENT_NAME__/.
+  • Trim the tools list to the minimum this agent uses. Add Write/Edit/Bash only
+    if it actually writes, edits, or runs commands; a review-only agent keeps
+    Read/Grep/Glob.
+  • Pick color from the repo palette (e.g. teal, red, blue, green, purple).
+  • This template is for a FROM-SCRATCH agent — no metadata.upstream. When adapting
+    an upstream .agent.md, follow references/normalization.rst instead (which adds
+    metadata.upstream and the provenance comment, and sets license to the upstream's).
+-->
