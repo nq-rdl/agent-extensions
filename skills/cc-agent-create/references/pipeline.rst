@@ -124,15 +124,23 @@ session cannot end with a half-wired agent.
 - **Install.** Merge the ``hooks`` object into ``.claude/settings.local.json``
   (gitignored) — **never clobber** existing hooks. Both injected entries carry the
   marker string ``rdl-agent-create-guard`` inside their command.
-- **Stop hook** (``type: command``): verifies, in order, that
-  ``agents/<name>/agent.md`` exists → ``<name>`` is in
-  ``registry/bundles/<bundle>.yaml`` → ``plugins/<bundle>/agents/<name>.md`` exists →
-  ``generate_bundles_doc.py . --check`` and ``generate_manifests.py . --check`` report no
-  drift (adding an agent to a bundle regenerates ``docs/bundles.md``) → a changie fragment
-  naming the agent was added → ``validate-plugins.sh`` exits 0. Any gap ⇒
-  ``{"decision":"block","reason":"…"}`` so the turn continues. It **respects the
-  ``stop_hook_active`` cap** — when that is ``true`` it exits 0, so it can redirect but
-  never infinite-loops (so a missing ``pyyaml`` at worst costs one extra cycle, not a loop).
+- **Stop hook** (``type: command``): every turn it runs the cheap checks and collects
+  *all* the hints they produce — ``agents/<name>/agent.md`` exists; ``<name>`` is a member
+  of the ``agents:`` list in ``registry/bundles/<bundle>.yaml`` (the YAML is **parsed and
+  the list membership tested exactly**, not substring-grepped, so a name that merely
+  appears elsewhere in the file can't pass); a changie fragment **word-boundary-matches**
+  the agent name (so a longer name mentioned in a fragment doesn't satisfy a shorter one);
+  ``sync-plugins.sh --check <bundle>`` reports no drift (catches a **stale** plugin copy,
+  not just a missing one, so it can't unblock with drift the CI drift gate would later
+  reject); and ``generate_bundles_doc.py . --check`` / ``generate_manifests.py . --check``
+  report no generated-artifact drift (adding an agent to a bundle regenerates
+  ``docs/bundles.md``). Those are all sub-second, so they run unconditionally and surface
+  together. Only the one heavy gate — ``validate-plugins.sh`` — is **deferred until every
+  other check is already clean**, so it never burns its 120 s timeout budget on a
+  half-wired change. Any gap ⇒ ``{"decision":"block","reason":"…"}`` so the turn continues.
+  It **respects the ``stop_hook_active`` cap** — when that is ``true`` it exits 0, so it can
+  redirect but never infinite-loops (so a missing ``pyyaml`` at worst costs one extra cycle,
+  not a loop).
 - **PostToolUse hook** (matcher ``Write|Edit``, gated to ``agents/*/agent.md``): exits
   0 with a **declarative** ``additionalContext`` that states which wiring steps remain.
   The phrasing is factual, not imperative, so it is not mistaken for prompt injection.
