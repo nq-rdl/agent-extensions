@@ -1,0 +1,2 @@
+kind: Added
+body: Record decision (#206) to keep speckit-lifecycle bespoke worktree scripts rather than consolidate onto Worktrunk; wt positioned as the interactive complement
