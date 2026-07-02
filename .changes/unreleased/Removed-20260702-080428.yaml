@@ -1,3 +1,0 @@
-kind: Removed
-body: 'Plugin consolidation retires plugins `github-actions@rdl` (merged into `gh`), `hooks@rdl` (forced-eval hook ships only via the `/rdl-team:cc-setup` skill), and `skill@rdl` (folded into `claude-code`)'
-time: 2026-07-02T08:04:28+10:00

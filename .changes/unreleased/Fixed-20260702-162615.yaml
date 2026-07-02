@@ -1,3 +1,0 @@
-kind: Fixed
-body: 'Doc drift: refreshed the stale `go`-bundle example in AGENTS.md — it showed `go-gh` in the `go` bundle as `/go:gh`; it lives in `gh` as `/gh:go` since #115'
-time: 2026-07-02T16:26:15.172156+10:00

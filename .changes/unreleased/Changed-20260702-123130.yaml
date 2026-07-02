@@ -1,3 +1,0 @@
-kind: Changed
-body: 'Release flow replaced: dispatching release-prepare opens a reviewable release/v* PR; merging it tags + publishes (no local tagging)'
-time: 2026-07-02T12:31:30+10:00

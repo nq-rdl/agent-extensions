@@ -1,3 +1,0 @@
-kind: Fixed
-body: 'pixi: lefthook and the docs build now invoke every registry script via `pixi run`'
-time: 2026-07-02T16:51:27+10:00

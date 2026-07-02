@@ -1,3 +1,0 @@
-kind: Changed
-body: 'Plugin consolidation (34 → 29): GitHub Actions work now lives under `gh` — `github-actions-expert` home, `se-gitops-ci-specialist` guest'
-time: 2026-07-02T08:04:36+10:00

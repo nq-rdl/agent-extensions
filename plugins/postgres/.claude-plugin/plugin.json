@@ -1,6 +1,6 @@
 {
   "name": "postgres",
-  "version": "0.19.0",
+  "version": "0.20.0",
   "description": "PostgreSQL administration — schema design, query optimisation, backups, and tuning",
   "author": {
     "name": "nq-rdl"
