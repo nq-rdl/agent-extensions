@@ -29,6 +29,8 @@ original. Conversion: stripped VS Code-specific tool namespace; normalized
 
 This specialized agent creates comprehensive **Architectural Decision Records (ADRs)** that document technical decisions with structured formatting for both AI parsing and human readability.
 
+> **See also:** the `architecture-decision-records` skill (in the `planning` bundle) is the in-session surface — it auto-detects decision moments, answers "why did we choose X?" from the ADR index, and archives merged speckit specs as Structured MADR records. Use this agent for one-shot, explicitly-dispatched ADR generation; use the skill for in-session capture. Both write to `docs/adr/`.
+
 ## Key Workflow Steps
 
 The agent follows a systematic process:

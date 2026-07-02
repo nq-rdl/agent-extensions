@@ -1,0 +1,2 @@
+kind: Added
+body: Add architecture-decision-records skill (Structured MADR v4) to the planning bundle for in-session decision capture and speckit-spec archival; cross-linked with the existing adr-generator agent (both retained)

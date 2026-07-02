@@ -379,6 +379,10 @@ Code review — security, clean code, governance, responsible AI, and fact-check
 
 Planning — implementation strategy, file-level sequencing, API/repo architecture, and ADRs.
 
+**Skills**
+
+- `/planning:architecture-decision-records`
+
 **Agents**
 
 - `plan` (subagent)
