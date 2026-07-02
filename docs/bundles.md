@@ -37,6 +37,7 @@ subagents (auto-routed by their description).
 | [`lychee`](#lychee) | Lychee — fast link checking for docs and Markdown |
 | [`charm-tui`](#charm-tui) | Charm — build terminal UIs with Bubbletea, Lip Gloss, and Fang |
 | [`claude-code`](#claude-code) | Claude Code — agent-team coordination, hook authoring, web-session setup, skill-quality auditing, and prompt engineering |
+| [`opencode-dev`](#opencode-dev) | OpenCode development toolkit — author plugins, agents, the SDK, custom tools, skills, governance policies, and delegation harnesses |
 | [`rdl-team`](#rdl-team) | RDL team workflows — Claude Code onboarding, setup, and config management |
 | [`playwright`](#playwright) | Playwright — generate and debug end-to-end browser tests |
 | [`planning`](#planning) | Planning — implementation strategy, technical-spike validation, file-level sequencing, API/repo architecture, and ADRs |
@@ -342,6 +343,24 @@ Claude Code — agent-team coordination, hook authoring, web-session setup, skil
 - `prompt-builder` (subagent)
 
 **Hooks:** `web-setup-plugin-check`, `skill-audit-nudge`
+
+---
+
+## opencode-dev
+
+OpenCode development toolkit — author plugins, agents, the SDK, custom tools, skills, governance policies, and delegation harnesses.
+
+**Skills**
+
+- `/opencode-dev:plugin`
+- `/opencode-dev:sdk`
+- `/opencode-dev:agent`
+- `/opencode-dev:tools`
+- `/opencode-dev:skill`
+- `/opencode-dev:policies`
+- `/opencode-dev:delegate`
+
+**Hooks:** `opencode-doc-review`
 
 ---
 
