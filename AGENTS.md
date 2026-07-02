@@ -267,15 +267,19 @@ sync with `.changie.yaml`).
 
 ### Release
 
-Releases are triggered by pushing a `v*` tag. The tag must point to a commit already on `main`. The release workflow uses a GitHub App token (`RELEASE_APP_ID` / `RELEASE_APP_PRIVATE_KEY`).
-
-The workflow:
-1. Verifies the tag is on `main`.
-2. Batches and merges the changie changelog for the version — idempotent: it skips the batch when `.changes/<version>.md` is already present (e.g. a pre-batched release PR).
-3. Writes the release version to `VERSION`, regenerates all manifests from the registry (`scripts/generate_manifests.py`), and commits the result back to `main`.
-4. Moves the tag forward to include the bump commit and creates the GitHub release.
+Releases are cut from the GitHub UI, not a local tag push. Run the **"Release — Prepare PR"**
+workflow (Actions tab, `workflow_dispatch`) with an explicit `version` input (`X.Y.Z`, no leading
+`v`). It batches the changie changelog, stamps `VERSION` (and `pyproject.toml`), regenerates all
+manifests from the registry, and opens a `release/v<version>` PR labelled `skip-changelog` — all
+via the GitHub App token (`RELEASE_APP_ID` / `RELEASE_APP_PRIVATE_KEY`) so the PR's own CI runs on
+it. Reviewing and squash-merging that PR **is** the release gate (branch protection controls who
+can merge). On merge, **"Release — Finalize on merge"** tags `v<version>` on the squash-merge
+commit and publishes the GitHub release from `.changes/<version>.md` — it never pushes to `main`,
+and it is idempotent (safe to re-run; recovers a tag-pushed-but-release-missing partial failure).
 
 `marketplace.json` sources are relative paths (`./plugins/<bundle>`) — installs read directly from `main` (or whatever ref the user pinned), no separate release branch involved.
+
+See [`docs/releasing.md`](docs/releasing.md) for the step-by-step runbook (cutting a release, partial-failure recovery, rollback).
 
 ## Docs
 

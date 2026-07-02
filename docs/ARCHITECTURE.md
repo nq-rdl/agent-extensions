@@ -202,12 +202,26 @@ MCP servers in `mcp/*-go/` follow a Makefile with a `cross-compile` target that 
 
 ### Release
 
-Releases are triggered by pushing a `v*` tag pointing at a commit already on `main`. The release workflow (GitHub App token: `RELEASE_APP_ID` / `RELEASE_APP_PRIVATE_KEY`):
+Releases are cut through a reviewable PR, not a local tag push, so that **merge authorization
+equals release authorization**: branch protection on `main` already governs who can merge, and
+reusing that gate for releases avoids a second, parallel trust boundary. There is no direct push
+to `main` and no force-moved tag in the flow — a tag is created exactly once, on the commit that
+was actually reviewed.
 
-1. Verifies the tag is on `main`.
-2. Batches and merges the changie changelog for the version — idempotent: it skips the batch when `.changes/<version>.md` is already present (e.g. a pre-batched release PR).
-3. Writes the release version to `VERSION`, regenerates all manifests from the registry (`scripts/generate_manifests.py`), and commits the result back to `main`.
-4. Moves the tag forward to include the bump commit and creates the GitHub release.
+The **"Release — Prepare PR"** workflow (`workflow_dispatch`, GitHub App token:
+`RELEASE_APP_ID` / `RELEASE_APP_PRIVATE_KEY`) takes an explicit `version` input (`X.Y.Z`). Explicit
+version selection is retained deliberately rather than inferring a bump from commit kinds: SemVer
+is silent on what a breaking change means for a `0.x` series, so the human cutting the release
+still decides the number. The workflow batches and merges the changie changelog for that version,
+stamps `VERSION` (and `pyproject.toml`), regenerates all manifests from the registry
+(`scripts/generate_manifests.py`), and opens a `release/v<version>` PR labelled `skip-changelog` —
+run under the App token so the PR's own CI executes on it like any other PR.
+
+Reviewing and squash-merging that PR is the release gate. On merge, **"Release — Finalize on
+merge"** (triggered by `pull_request: closed` against `main`, gated to merged `release/v*` PRs)
+tags `v<version>` on the resulting squash-merge commit and publishes the GitHub release from
+`.changes/<version>.md`. It never pushes to `main`, and it is idempotent: re-running it recovers a
+partial failure where the tag was created but the release publish step did not complete.
 
 `marketplace.json` plugin sources are relative paths (`./plugins/<bundle>`), so installs read directly from the pinned ref — no separate release branch.
 
