@@ -254,3 +254,10 @@ There is **no Setup-script field to set and no manual per-environment step** —
 To add a dev-helper plugin: set it `true` in `enabledPlugins` and register its marketplace under `extraKnownMarketplaces`. Keep the set small and **external** — do not enable the `rdl` marketplace or the `rdl@rdl` meta-plugin here (it is self-referential in this repo's own dev env: per the docs it must reach its marketplace source, and a self-cloning meta batch breaks that install).
 
 **Further reading.** [`docs/claude-code-web.md`](docs/claude-code-web.md) is the reader-facing overview (the first-session invariant, the vendoring route, the constraints); the authoritative platform facts, the git-proxy 403, and the hard-won anti-patterns live in [`skills/cc-web-setup/references/web-setup.rst`](skills/cc-web-setup/references/web-setup.rst). The `/claude-code:web-setup` skill provisions all of this for any repo.
+
+## Cutting a release
+
+Releases are dispatched from the Actions tab (**"Release — Prepare PR"**) and land as a
+reviewable `release/v<version>` PR — reviewing and squash-merging that PR is the release gate.
+See [`docs/releasing.md`](docs/releasing.md) for the full runbook, including partial-failure
+recovery and rollback.
