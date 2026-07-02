@@ -27,7 +27,7 @@ or `docs/external-marketplaces.md` — applying the draft diffs is a user-gated 
 **Target Platform**: This repo's docs tree (consumed by maintainers)
 **Project Type**: Documentation / evaluation deliverable (no product code)
 **Performance Goals**: N/A
-**Constraints**: MUST NOT edit `.claude/settings.json` or `docs/external-marketplaces.md` (adopt decision is user-gated); MUST NOT re-host cc-spex content in `rdl`; every factual claim carries a cited source URL
+**Constraints**: MUST NOT edit `.claude/settings.json` or `docs/external-marketplaces.md` (adopt decision is user-gated); MUST NOT re-host cc-spex content in `rdl`; any wiring targets the distribution marketplace `cc-rhuss-marketplace` (never the dev-only `spex-plugin-development`); every factual claim carries a cited source URL
 **Scale/Scope**: One evaluation doc; six cc-spex extensions × three comparison targets; one changie fragment
 
 ## Constitution Check
