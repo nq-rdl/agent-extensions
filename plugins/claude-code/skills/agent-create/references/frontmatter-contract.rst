@@ -3,7 +3,7 @@ Agent Frontmatter Contract
 
 The exact YAML frontmatter schema for ``agents/<name>/agent.md`` in this catalog,
 grounded in the real repo files (e.g. ``agents/go-mcp-expert/agent.md``,
-``agents/agent-governance-reviewer/agent.md``). CI enforces the required keys — see
+``agents/skill-auditor/agent.md``). CI enforces the required keys — see
 ``references/pipeline.rst`` for which gate checks what.
 
 --------------
@@ -52,7 +52,7 @@ Field         Rule
 ``tools``      Explicit, **minimal** list. Common set: ``Read``, ``Write``,
                ``Edit``, ``Grep``, ``Glob``, ``Bash``. Omit anything the agent
                does not use (a review-only agent typically drops ``Write``/
-               ``Edit``/``Bash`` — see ``agent-governance-reviewer``).
+               ``Edit``/``Bash`` — see ``skill-auditor``).
 ``model``      ``inherit`` — the subagent runs on the session's model.
 ``skills``     ``[]`` unless the agent bundles skills of its own.
 ``color``      From the palette already used in the repo (e.g. ``teal``, ``red``).

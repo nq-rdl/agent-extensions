@@ -106,7 +106,7 @@
     {
       "name": "gh",
       "source": "./plugins/gh",
-      "description": "GitHub workflow — git hooks, changelogs, conventional commits, pull requests, releases, and Go CI/CD",
+      "description": "GitHub workflow — git hooks, changelogs, conventional commits, pull requests, releases, Go CI/CD, and secure GitHub Actions (SHA pinning, OIDC, GitOps delivery)",
       "version": "0.19.0",
       "keywords": [
         "github",
@@ -114,19 +114,11 @@
         "hooks",
         "changelog",
         "pull-request",
-        "ci-cd"
-      ]
-    },
-    {
-      "name": "github-actions",
-      "source": "./plugins/github-actions",
-      "description": "GitHub Actions — secure CI/CD workflows, SHA pinning, OIDC, and GitOps delivery",
-      "version": "0.19.0",
-      "keywords": [
-        "github-actions",
         "ci-cd",
-        "security",
-        "gitops"
+        "github-actions",
+        "oidc",
+        "gitops",
+        "security"
       ]
     },
     {
@@ -281,21 +273,24 @@
     {
       "name": "claude-code",
       "source": "./plugins/claude-code",
-      "description": "Claude Code — agent-team coordination, hook authoring, and web-session setup",
+      "description": "Claude Code — agent-team coordination, hook authoring, web-session setup, skill-quality auditing, and prompt engineering",
       "version": "0.19.0",
       "keywords": [
         "claude-code",
         "agents",
         "hooks",
         "web",
-        "setup"
+        "setup",
+        "skills",
+        "audit",
+        "prompts"
       ]
     },
     {
       "name": "opencode-dev",
       "source": "./plugins/opencode-dev",
       "description": "OpenCode development toolkit — author plugins, agents, the SDK, custom tools, skills, governance policies, and delegation harnesses",
-      "version": "0.18.0",
+      "version": "0.19.0",
       "keywords": [
         "opencode",
         "plugins",
@@ -332,38 +327,15 @@
       ]
     },
     {
-      "name": "skill",
-      "source": "./plugins/skill",
-      "description": "Skill quality — audit skills for non-inferable value, review changes, and report issues upstream",
-      "version": "0.19.0",
-      "keywords": [
-        "skills",
-        "review",
-        "quality",
-        "audit"
-      ]
-    },
-    {
-      "name": "review",
-      "source": "./plugins/review",
-      "description": "Code review — security, clean code, governance, responsible AI, and fact-checking",
-      "version": "0.19.0",
-      "keywords": [
-        "review",
-        "security",
-        "clean-code",
-        "governance"
-      ]
-    },
-    {
       "name": "planning",
       "source": "./plugins/planning",
-      "description": "Planning — implementation strategy, file-level sequencing, API/repo architecture, and ADRs",
+      "description": "Planning — implementation strategy, technical-spike validation, file-level sequencing, API/repo architecture, and ADRs",
       "version": "0.19.0",
       "keywords": [
         "planning",
         "architecture",
-        "adr"
+        "adr",
+        "spike"
       ]
     },
     {
@@ -378,24 +350,13 @@
       ]
     },
     {
-      "name": "docs",
-      "source": "./plugins/docs",
+      "name": "tech-writing",
+      "source": "./plugins/tech-writing",
       "description": "Technical writing — developer docs, tutorials, ADRs, and guides",
       "version": "0.19.0",
       "keywords": [
         "docs",
         "technical-writing"
-      ]
-    },
-    {
-      "name": "research",
-      "source": "./plugins/research",
-      "description": "Research — technical-spike validation and prompt engineering",
-      "version": "0.19.0",
-      "keywords": [
-        "research",
-        "spike",
-        "prompts"
       ]
     },
     {
@@ -409,17 +370,6 @@
         "lucidspark",
         "diagrams",
         "mcp"
-      ]
-    },
-    {
-      "name": "hooks",
-      "source": "./plugins/hooks",
-      "description": "Hooks — forced skill evaluation when prompts mention skills",
-      "version": "0.19.0",
-      "keywords": [
-        "hooks",
-        "skills",
-        "evaluation"
       ]
     },
     {

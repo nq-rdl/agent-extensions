@@ -1,5 +1,5 @@
 {
-  "description": "Verify enabled-plugin ids exist in their marketplace when .claude/settings.json is written during web-setup",
+  "description": "web-setup plugin-id verification when .claude/settings.json is written, plus an advisory nudge to run /claude-code:skill-audit when a SKILL.md is created or edited",
   "hooks": {
     "PostToolUse": [
       {
@@ -9,6 +9,16 @@
             "type": "command",
             "command": "${CLAUDE_PLUGIN_ROOT}/scripts/web-setup-plugin-check.sh",
             "timeout": 30
+          }
+        ]
+      },
+      {
+        "matcher": "Edit|Write",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "${CLAUDE_PLUGIN_ROOT}/scripts/skill-audit-nudge.sh",
+            "timeout": 10
           }
         ]
       }

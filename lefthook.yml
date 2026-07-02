@@ -3,7 +3,8 @@
 # (https://lefthook.dev).
 #
 # Activate:  lefthook install
-# Prereqs:   lefthook, Go (asctl), python3 + pyyaml (registry scripts).
+# Prereqs:   lefthook, Go (asctl), pixi (provides python3 + pyyaml for the
+#            registry scripts — jobs invoke them via `pixi run`).
 # Optional:  lychee (link check), Docker (SkillSpector pre-push scan).
 # Bypass:    LEFTHOOK=0 git commit ...   |   git commit --no-verify
 min_version: 1.9.0
@@ -43,19 +44,19 @@ pre-commit:
     # --- Plugin manifests / hooks / agents are well-formed ---
     - name: validate-plugins
       glob: "{plugins/**,agents/**,registry/bundles/**}"
-      run: bash scripts/validate-plugins.sh
+      run: pixi run bash scripts/validate-plugins.sh
 
     # --- Generated artifacts are in sync with the registry (catches a
     #     forgotten sync-plugins.sh / regenerate before CI does) ---
     - name: generated-in-sync
       glob: "{registry/**,skills/**,agents/**,plugins/**,.claude/scripts/**,VERSION}"
       run: |
-        python3 scripts/check_bundle_refs.py .
-        python3 scripts/check_grouping.py .
-        python3 scripts/check_consistency.py .
-        bash scripts/sync-plugins.sh --check
-        python3 scripts/generate_manifests.py . --check
-        python3 scripts/generate_bundles_doc.py . --check
+        pixi run python3 scripts/check_bundle_refs.py .
+        pixi run python3 scripts/check_grouping.py .
+        pixi run python3 scripts/check_consistency.py .
+        pixi run bash scripts/sync-plugins.sh --check
+        pixi run python3 scripts/generate_manifests.py . --check
+        pixi run python3 scripts/generate_bundles_doc.py . --check
 
     # --- Docs link health. With lychee installed, a broken link in a staged
     #     skill .md fails the commit (the old `|| true` wrongly swallowed real
@@ -94,7 +95,7 @@ pre-push:
 
     - name: python-unit-tests
       glob: "{scripts/**,tests/**}"
-      run: python3 -m unittest discover -s tests -p 'test_*.py'
+      run: pixi run python3 -m unittest discover -s tests -p 'test_*.py'
 
     # cc-web-setup SessionStart hook tests (mirrors the hook-tests CI job, which runs
     # unconditionally). The permission-dependent persist_path case self-skips when run

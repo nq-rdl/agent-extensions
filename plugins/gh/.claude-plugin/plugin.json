@@ -1,7 +1,7 @@
 {
   "name": "gh",
   "version": "0.19.0",
-  "description": "GitHub workflow — git hooks, changelogs, conventional commits, pull requests, releases, and Go CI/CD",
+  "description": "GitHub workflow — git hooks, changelogs, conventional commits, pull requests, releases, Go CI/CD, and secure GitHub Actions (SHA pinning, OIDC, GitOps delivery)",
   "author": {
     "name": "nq-rdl"
   },

@@ -1,0 +1,3 @@
+kind: Fixed
+body: 'Repo-local Python is now managed by pixi: the default environment provides python + pyyaml on linux-64/osx-arm64/osx-64, the Zensical docs toolchain moved to a linux-64-only docs feature/environment, and lefthook + docs invoke every registry script via pixi run'
+time: 2026-07-02T16:51:26.176475+10:00

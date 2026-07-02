@@ -9,7 +9,7 @@ channels:
   - stable
 skills:
   - {source: cc-setup, leaf: cc-setup}
-agents: [marketplace-scout]
+agents: [marketplace-scout]  # guest — home: claude-code
 hooks: []
 prompts: []
 mcp: []
