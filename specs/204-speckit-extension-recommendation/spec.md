@@ -14,6 +14,12 @@ recommendation for which SpecKit-native extension to wire into a fresh speckit r
 enforce Superpowers execution discipline, and how it addresses the reported friction:
 `constitution.md` drift during execution, and session-continuity across pauses.
 
+## Clarifications
+
+### Session 2026-07-02
+
+- Q: Where should the operational edge cases (Spec Kit `>=0.12.0`, catalog `--install-allowed`, external-catalog-disallowed fallback) be recorded — spec, plan, or ADR? → A: Capture in `plan.md` on this branch now; defer the ADR to the epic-branch (#207) merge. No direct pushes to `main`.
+
 ## Options to compare
 
 - **`RbBtSn0w/spec-kit-extensions` → `superpowers-bridge`** (catalog id `superb`): adds

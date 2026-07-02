@@ -27,10 +27,10 @@
       (the deliverable *is* a tool recommendation); SC-2 ("consistent with #203/#205") is
       verifiable by review but subjective.
 - [~] All acceptance scenarios are defined — no explicit Given/When/Then section
-- [ ] Edge cases are identified — **GAP**: the target repo must be on Spec Kit `>=0.12.0`
-      for `superb`; the catalog must allow installs (`--install-allowed`); the team may be
-      unable to add an external catalog. None were captured in the spec. (The playbook now
-      documents the `>=0.12.0` prerequisite — see Notes.)
+- [x] Edge cases are identified — captured in `plan.md` (§ Edge cases & preconditions):
+      Spec Kit `>=0.12.0`, catalog `--install-allowed` policy + external-catalog-disallowed
+      fallback, and baseline-must-stand-alone. Decision recorded in spec `## Clarifications`
+      (2026-07-02): plan now, ADR deferred to the epic (#207) merge.
 - [x] Scope is clearly bounded (Non-goals: no new bridge; no cc-spex adoption)
 - [~] Dependencies and assumptions identified — deps on #203/#205/#124/#207 referenced;
       no explicit **Assumptions** section (e.g., "target repo already runs SpecKit").
@@ -61,6 +61,5 @@
   1. Catalog-add command pointed at the repo HTML page and omitted `--install-allowed`.
   2. The `>=0.12.0` prerequisite was undocumented.
   3. The comparison under-sold `superb`'s coverage of the review/finish tail.
-- **Remaining optional follow-up** (owner's call, not blocking): expand the spec with an
-  explicit Edge Cases entry for the `>=0.12.0` / catalog-policy prerequisites, or capture the
-  decision as an ADR on `main` at trunk merge (per the ephemeral-specs / durable-ADRs practice).
+- **Follow-up resolved (2026-07-02)**: edge cases captured in `plan.md`; ADR deferred to the
+  epic (#207) merge per team convention (no direct pushes to `main`). See spec `## Clarifications`.
