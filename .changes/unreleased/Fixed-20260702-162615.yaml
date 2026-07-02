@@ -1,3 +1,3 @@
 kind: Fixed
-body: 'Doc drift: refreshed the stale `go`-bundle example in AGENTS.md (it still showed `go-gh` living in the `go` bundle as `/go:gh`; it lives in `gh` as `/gh:go` since #115) and replaced the dangling `docs/specs/*` links in CONTRIBUTING.md (specs were removed in the pre-v0.14.0 cleanup)'
+body: 'Doc drift: refreshed the stale `go`-bundle example in AGENTS.md — it showed `go-gh` in the `go` bundle as `/go:gh`; it lives in `gh` as `/gh:go` since #115'
 time: 2026-07-02T16:26:15.172156+10:00
