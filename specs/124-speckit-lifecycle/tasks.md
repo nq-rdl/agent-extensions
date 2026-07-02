@@ -1,0 +1,56 @@
+# Tasks: SpecKit lifecycle skill for worktree-based development
+
+**Feature**: `124-speckit-lifecycle` · **Input**: spec.md, plan.md, research.md, data-model.md, contracts/, quickstart.md
+
+TDD is requested (spec §Testing): bats tests for the two bundled scripts are written **before** their implementation.
+
+## Phase 1: Setup
+
+- [ ] T001 Create skill tree `skills/speckit-lifecycle/{scripts,.tests}/` (`.tests/` hidden so `asctl repo-check` ignores it; asctl only allows `assets/`,`references/`,`scripts/`)
+- [ ] T002 Add bats helper `skills/speckit-lifecycle/.tests/helper.bash` (throwaway fixture-repo setup/teardown: `git init`, seed trunk, stub `.specify/scripts/bash/create-new-feature.sh`)
+
+## Phase 2: Foundational (blocks all stories)
+
+- [ ] T003 Author `skills/speckit-lifecycle/SKILL.md` frontmatter + description (generic trigger phrases, no repo-specific refs) and the runtime-discovery section (trunk via `git symbolic-ref refs/remotes/origin/HEAD` w/ fallback; CLAUDE.md at root or docs/; phase list from CLAUDE.md/.specify/; validation from Makefile/pixi.toml/package.json/CLAUDE.md; PR API from remote URL)
+- [ ] T004 Add context-detection block to `skills/speckit-lifecycle/SKILL.md` (default branch → root mode; `^\d{3}-` → worktree mode; anything else → halt and ask)
+
+## Phase 3: User Story 3 — deterministic provisioning & merge scripts (P2, foundational for US1/US2)
+
+Tests first (TDD):
+- [ ] T005 [P] [US3] Write `skills/speckit-lifecycle/.tests/provision-worktree.bats`: NNN derivation (max across `git branch -a`/`specs/`/worktrees +1, zero-padded), conflict-guard abort, branch+worktree creation, `--base` parentage, `create-new-feature.sh` probe + bare-git fallback
+- [ ] T006 [P] [US3] Write `skills/speckit-lifecycle/.tests/merge-spec.bats`: merge-target via `git merge-base`, `--no-ff` merge, worktree slot removed BEFORE `git branch -d`, idempotent worktree removal, loud refusal on uncommitted changes
+Then implement:
+- [ ] T007 [US3] Implement `skills/speckit-lifecycle/scripts/provision-worktree.sh <slug> [--base <branch>]` to pass T005 (model layout on `skills/bitwarden/scripts`)
+- [ ] T008 [US3] Implement `skills/speckit-lifecycle/scripts/merge-spec.sh <NNN>` to pass T006
+- [ ] T009 [US3] Run `bats skills/speckit-lifecycle/.tests` — all green
+
+## Phase 4: User Story 1 — advance a spec through phases inside a worktree (P1)
+
+- [ ] T010 [US1] Add worktree-mode section to `skills/speckit-lifecycle/SKILL.md`: identify spec from `NNN=${BRANCH:0:3}`; load spec/tasks/plan; advance from first incomplete phase (specify→clarify→plan→tasks→[checklist]→analyze→implement) — never skip a declared phase
+- [ ] T011 [US1] Add the implementation loop to `skills/speckit-lifecycle/SKILL.md`: per `[ ]` task implement→validate→commit (single-line conventional)→mark `[x]`; never mark on failing validation; explicit flag when no automated validation exists; pluggable Implement strategy (default loop, or declared external skill)
+
+## Phase 5: User Story 2 — orchestrate the backlog from the default branch (P2)
+
+- [ ] T012 [US2] Add root-mode **survey** to `skills/speckit-lifecycle/SKILL.md`: status table grouped by parent branch from `specs/`, `.claude/worktrees/`, `git worktree list`
+- [ ] T013 [US2] Add root-mode **create spec + worktree** flow: ensure `.specify/` present (restore from latest spec branch without overwriting CLAUDE.md; error if none); call `provision-worktree.sh`; invoke specify inside worktree; report `claude --worktree` invocation
+- [ ] T014 [US2] Add root-mode **merge** (`merge-spec.sh <NNN>`) + **PR actioning** (fetch review summaries AND inline thread comments; triage HIGH/MEDIUM/LOW; post replies to inline threads)
+
+## Phase 6: User Story 4 — package as a new `speckit` bundle (P3)
+
+- [ ] T015 [US4] Create `registry/bundles/speckit.yaml` (model on `registry/bundles/pixi.yaml`; id `speckit`, displayName `SpecKit`, description, keywords, skills `[speckit-lifecycle]`, targets.claude pluginName `speckit` marketplaceName `rdl`)
+- [ ] T016 [US4] Add `speckit` to `registry/marketplace.yaml` display order + the `rdl` meta-plugin dependency list
+- [ ] T017 [US4] Run `bash scripts/sync-plugins.sh speckit`, `python3 scripts/generate_manifests.py .`, `python3 scripts/generate_bundles_doc.py .`
+
+## Phase 7: Polish & cross-cutting
+
+- [ ] T018 Add a verify-canonical guard + version pins to `skills/speckit-lifecycle/SKILL.md` per CONTRIBUTING §"Skill content conventions"
+- [ ] T019 Add a changie fragment in `.changes/unreleased/` (kind Added)
+- [ ] T020 Run full CI-parity: `asctl repo-check`, `check_bundle_refs.py`/`check_grouping.py`/`check_consistency.py`, `generate_manifests.py --check`, `generate_bundles_doc.py --check`, `validate-plugins.sh`, `python3 -m unittest discover -s tests`
+
+## Dependencies
+
+Setup (T001–T002) → Foundational (T003–T004) → US3 scripts+tests (T005–T009, blocks nothing but underpins US1/US2 provisioning) → US1 (T010–T011) → US2 (T012–T014) → US4 packaging (T015–T017) → Polish (T018–T020). US4 requires the skill dir (T003) to exist for `sync-plugins`.
+
+## MVP
+
+US1 (worktree-mode phase advancement) + US3 (scripts) form the minimum useful increment.
