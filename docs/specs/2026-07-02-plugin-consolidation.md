@@ -40,9 +40,9 @@ Agent reuse across bundles is deliberate and stays — but documented:
 - Docs and hooks always reference the home-qualified name, so guest listings can
   be added or dropped without breaking references.
 
-Current guest listings after this plan: `wg-code-sentinel` (home `go`),
-`github-actions-expert` (home `gh`, guest `go`), `se-gitops-ci-specialist`
-(home `argo-cd`, guest `gh`).
+Current guest listings after this plan: `github-actions-expert` (home `gh`,
+guest `go`), `se-gitops-ci-specialist` (home `argo-cd`, guest `gh`), and
+`marketplace-scout` (home `claude-code`, guest `rdl-team`).
 
 ## Breaking-change inventory (changelog migration notes)
 
@@ -75,7 +75,8 @@ All commands via pixi (see AGENTS.md → Setup commands).
    `pixi run python3 scripts/generate_bundles_doc.py .`
 5. Docs: CONTRIBUTING §2 exception rewrite + §5 cross-listing policy;
    AGENTS.md `/skill:audit` reference → `/claude-code:skill-audit`, and the
-   `plugins/hooks/hooks/hooks.json` example path in the build block.
+   `plugins/hooks/hooks/hooks.json` → `plugins/claude-code/hooks/hooks.json`
+   example path in the build block.
 6. Changie fragments (`Removed` + `Changed`) with the migration notes above.
 7. Full check suite (CONTRIBUTING §"Packaging a new skill" step 6) + unit tests.
 

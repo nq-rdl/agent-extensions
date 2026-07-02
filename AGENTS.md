@@ -221,7 +221,7 @@ skills:                                    # flat <name> (leaf == name), or {sou
 agents:                                    # must exist as agents/<name>/agent.md (subagent)
   - go-mcp-expert
   - wg-code-sentinel
-  - github-actions-expert
+  - github-actions-expert  # guest — home: gh (cross-listing: CONTRIBUTING §5)
 hooks: []
 prompts: []
 mcp: []                                    # wired in plugins/<pluginName>/.mcp.json
