@@ -1,2 +1,2 @@
 kind: Added
-body: Add SpecKit/Superpowers constitution + CLAUDE.md routing templates (#205) — copy-paste clause, routing block, and anti-patterns to prevent dual-ownership drift in target speckit repos
+body: Add SpecKit/Superpowers constitution + CLAUDE.md routing templates (#205) — copy-paste clause, routing block, anti-patterns, ephemeral-spec/durable-ADR lifecycle, and a single-worktree-owner (Worktrunk `wt`) synthesis (#206) to prevent dual-ownership drift in target speckit repos
