@@ -13,5 +13,6 @@ spec is silent on is written **"Not recorded in the spec"** — never fabricated
 | Spec path / PR / issue link | Links |
 | (spec is silent) | "Not recorded in the spec" |
 
-Numbering follows the skill's rules: next = max existing prefix + 1, zero-padded,
-never reused. Write to `docs/adr/NNNN-<kebab-title>.md` and append one index row.
+Numbering follows the skill's rules: next = `max(highest filename prefix, highest index
+entry) + 1`, zero-padded, never reused. Write to `docs/adr/NNNN-<kebab-title>.md` and
+append one index row.
