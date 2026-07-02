@@ -49,5 +49,5 @@ Chosen option: "<option N>", because <ties back to a named Decision Driver above
 
 ## Links
 
-- Supersedes / Superseded by: [NNNN](NNNN-*.md)
+- Supersedes / Superseded by: <NNNN-title.md>
 - Source spec / issue: <url>
