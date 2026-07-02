@@ -57,14 +57,14 @@ violate the constitution's single-pipeline boundary. This analysis is a required
 to the P1 decision but is separately valuable as a capability map.
 
 **Independent Test**: Confirm a written overlap/conflict finding exists for each of the
-five bundled extensions against each of the three comparison targets (`speckit-lifecycle`,
-`review`, `planning`).
+six extensions (the `spex` core plus the five bundled extensions) against each of the three
+comparison targets (`speckit-lifecycle`, `review`, `planning`).
 
 **Acceptance Scenarios**:
 
-1. **Given** the five bundled extensions, **When** the overlap check runs, **Then** each
-   extension is classified as complementary, overlapping, or conflicting versus
-   `speckit-lifecycle`, `review`, and `planning`.
+1. **Given** the six extensions (the `spex` core plus the five bundled), **When** the
+   overlap check runs, **Then** each extension is classified as complementary, overlapping,
+   or conflicting versus `speckit-lifecycle`, `review`, and `planning`.
 2. **Given** a conflict is found (e.g. two competing worktree mechanisms — see #206),
    **When** it is documented, **Then** the finding names the conflicting capability and
    its impact on the SpecKit → Superpowers handoff boundary.
@@ -164,10 +164,10 @@ unchanged by this deliverable.
   friction points — constitution drift and session continuity — using real
   `speckit-lifecycle` usage or a representative dry run, and record a written finding for
   each.
-- **FR-002**: The evaluation MUST document overlap and conflict for each of the five
-  bundled extensions (`spex-gates`, `spex-worktrees`, `spex-teams`, `spex-deep-review`,
-  `spex-collab`) against `speckit-lifecycle` (#124), the `review` bundle, and the
-  `planning` bundle.
+- **FR-002**: The evaluation MUST document overlap and conflict for each of the six
+  extensions — the always-on `spex` core plus the five bundled extensions (`spex-gates`,
+  `spex-worktrees`, `spex-teams`, `spex-deep-review`, `spex-collab`) — against
+  `speckit-lifecycle` (#124), the `review` bundle, and the `planning` bundle.
 - **FR-003**: The evaluation MUST document a maintenance/trust check (release cadence and
   issue responsiveness) and record an explicit `autoUpdate` suitability recommendation.
 - **FR-004**: The evaluation MUST record a single, unambiguous recommendation — adopt,
@@ -205,7 +205,8 @@ unchanged by this deliverable.
   overlap/conflict, and maintenance/trust — each producing a written finding.
 - **Bundled extension**: one of the five `cc-spex` sub-plugins under evaluation
   (`spex-gates`, `spex-worktrees`, `spex-teams`, `spex-deep-review`, `spex-collab`), each
-  mapped to a complementary/overlapping/conflicting relationship with existing tooling.
+  mapped to a complementary/overlapping/conflicting relationship with existing tooling; the
+  overlap matrix additionally classifies the always-on `spex` core, for six rows total.
 - **Decision record**: the adopt / don't-adopt / conditional-adopt recommendation plus
   rationale, anchored in the evaluation doc `docs/evaluations/203-cc-spex-evaluation.md`.
 - **Curated-set entry**: the paired `docs/external-marketplaces.md` table row + install
@@ -222,9 +223,9 @@ unchanged by this deliverable.
   without consulting any outside notes.
 - **SC-002**: All three evaluation dimensions (friction, overlap, maintenance) each have
   at least one written finding; none is left unaddressed.
-- **SC-003**: The overlap analysis covers all 5 bundled extensions across all 3 comparison
-  targets (15 relationship classifications, each labelled complementary, overlapping, or
-  conflicting).
+- **SC-003**: The overlap analysis covers all 6 extensions (the `spex` core plus the 5
+  bundled extensions) across all 3 comparison targets (18 relationship classifications,
+  each labelled complementary, overlapping, or conflicting).
 - **SC-004**: On an adopt or conditional-adopt outcome, a team member can enable `cc-spex`
   by applying only the doc's draft diffs — with zero undocumented steps; `/reload-plugins`
   resolving the plugin is the user's post-apply verification, not part of this deliverable.

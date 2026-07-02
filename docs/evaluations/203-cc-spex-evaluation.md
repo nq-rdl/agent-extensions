@@ -58,22 +58,27 @@ cc-spex extends [`github/spec-kit`](https://github.com/github/spec-kit). **Since
 `.specify/extensions/.registry`. Each manifest declares `schema_version: "1.0"` and
 `requires.speckit_version: ">=0.5.2"`; `github/spec-kit` ships the mechanism itself
 (`extensions/EXTENSION-API-REFERENCE.md`, `RFC-EXTENSION-SYSTEM.md`, first-party `agent-context`/`bug`
-extensions; spec-kit latest **v0.12.3**, 2026-07-01). Everything ships inside a **single plugin,
+extensions; spec-kit latest **v0.12.4**, 2026-07-02). Everything ships inside a **single plugin,
 `spex`**; the six extensions below are enabled/disabled within it.
 
 | Extension | Status | Auto-hooks (from `extension.yml`) | Representative commands | Requires |
 |---|---|---|---|---|
-| `spex` (core) | always active | `before_finish` (smoke-test prompt), `after_finish` (flow-state cleanup) | `/speckit-spex-brainstorm`, `-ship`, `-evolve`, `-spec-refactoring`, `-clear`, `-smoke-test` | speckit ≥0.5.2 |
-| `spex-gates` | stable | `after_specify` = review-spec (**mandatory**), `after_tasks` = review-plan (**mandatory**) | `-gates-review-spec`, `-review-plan`, `-review-code`, `-verify`, `-stamp` | speckit ≥0.5.2 |
+| `spex` (core) | always active | **mandatory** flow-state hooks on every lifecycle step (`after_specify` … `after_implement`, `after_finish`) + `before_finish` smoke-test (optional) | `/speckit-spex-brainstorm`, `-ship`, `-evolve`, `-spec-refactoring`, `-clear`, `-smoke-test` | speckit ≥0.5.2 |
+| `spex-gates` | stable | `after_specify` = review-spec (**mandatory**), `after_tasks` = review-plan (**mandatory**), `after_implement` = review-code (**mandatory**) | `-gates-review-spec`, `-review-plan`, `-review-code`, `-verify`, `-stamp` | speckit ≥0.5.2 |
 | `spex-worktrees` | stable | `after_specify` = manage `create` (**mandatory**) | `-worktrees-manage` | speckit ≥0.5.2, git |
 | `spex-teams` | **experimental** | `before_plan` = research (optional, prompted) | `-teams-orchestrate`, `-research`, `-implement` | speckit ≥0.5.2, **spex-gates** |
 | `spex-deep-review` | stable | `after_implement` = run (optional, prompted) | `-deep-review-run` (5 agents + autonomous fix loop) | speckit ≥0.5.2, **spex-gates** |
-| `spex-collab` | stable | (none auto; integrates into ship watch/triage) | `-collab-reviewers`, `-phase-split`, `-phase-manager`, `-revise`, `-reconcile`, `-triage` | speckit ≥0.5.2, **spex-gates** |
+| `spex-collab` | stable | `after_tasks` = reviewers (**mandatory**), `before_implement` = phase-split (optional, prompted) | `-collab-reviewers`, `-phase-split`, `-phase-manager`, `-revise`, `-reconcile`, `-triage` | speckit ≥0.5.2, **spex-gates** |
 
 `spex-deep-review` runs **five** review agents (Correctness, Architecture & Idioms, Security,
 Production Readiness, Test Quality) with a bounded autonomous fix loop. Note the **hard dependency
 chain**: `spex-teams`, `spex-deep-review`, and `spex-collab` each require `spex-gates`, so the
 minimal viable subset is **`spex` core + `spex-gates`**; the rest are strictly additive on top.
+**Footprint note (verified at `v5.6.0` and `v5.8.0`):** even that minimal subset is not light —
+`spex-gates` auto-hooks a **mandatory** `after_implement` code review (`review-code`), not just the
+`after_specify`/`after_tasks` spec/plan gates, and `spex` core stamps **mandatory** flow-state hooks
+on every lifecycle step (including a mandatory `after_specify`). So `core + gates` already introduces
+a code-review gate that overlaps the `review` stack and alters every `/speckit.*` step.
 
 ### Install path (two repos, not one — verified)
 
@@ -119,8 +124,12 @@ Superpowers handoff boundary and pre-empt #206. If Worktrunk wins, `spex-worktre
 disabled (`specify extension disable spex-worktrees`).
 
 **Review overlap.** `spex-deep-review` + `spex-gates` substantially duplicate the `review` bundle
-and `pr-review-toolkit`. The autonomous fix loop is a genuine differentiator, but running both
-review stacks blind is wasted capacity — the choice (replace vs duplicate) must be made alongside #124.
+and `pr-review-toolkit`. Note the overlap starts at the **minimal subset**: `spex-gates` alone
+auto-runs a **mandatory** `after_implement` code review, so enabling `core + gates` already stands up
+a code-review gate parallel to our review agents — `spex-deep-review` (5 agents + autonomous fix
+loop) then adds a second, heavier pass on top. The autonomous fix loop is a genuine differentiator,
+but running both review stacks blind is wasted capacity — the choice (replace vs duplicate) must be
+made alongside #124.
 
 ## Maintenance / trust (+ `autoUpdate` suitability)
 
@@ -167,7 +176,9 @@ Re-evaluate `autoUpdate: true` once #7 (marketplace-install skill loading) is cl
    installs a competing worktree mechanism.
 3. **Review overlap is deliberately scoped.** Decide, alongside #124, whether
    `spex-deep-review`/`spex-gates` *replace* or *duplicate* the `review` bundle +
-   `pr-review-toolkit`. Don't run both blind.
+   `pr-review-toolkit`. Note this bites even at the minimal subset: `spex-gates` auto-runs a
+   **mandatory** `after_implement` code review, so `core + gates` already overlaps the review
+   stack — don't run both blind.
 4. **Pin, don't track.** Adopt with `autoUpdate: false` and a `ref` tag pin, given the churn + open
    reliability issues (#7, #11).
 
@@ -187,7 +198,7 @@ Provided so the adopt path is turnkey. **These are drafts. This deliverable does
 
 ```diff
  | `svelte` | `sveltejs/ai-tools` | `svelte` | Svelte 5 authoring + the Svelte MCP server |
-+| `cc-rhuss-marketplace` | `rhuss/cc-rhuss-marketplace` | `spex` | Spec-Kit SDD extensions — spec/plan quality gates + spec↔code drift tooling (pinned; worktree/deep-review extensions disabled in favour of `worktrunk` + the `review` bundle) |
++| `cc-rhuss-marketplace` | `rhuss/cc-rhuss-marketplace` | `spex` | Spec-Kit SDD extensions — spec/plan/code quality gates + spec↔code drift tooling (pinned; worktree/deep-review extensions disabled in favour of `worktrunk` + the `review` bundle) |
 ```
 
 Also add a sentence to the "Auto-update and trust" section noting that `spex` is **pinned**

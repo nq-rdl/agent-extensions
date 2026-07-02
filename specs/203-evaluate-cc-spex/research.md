@@ -5,6 +5,13 @@ the GitHub API (`gh api`), the two `marketplace.json` manifests, the cc-spex REA
 and the `github/spec-kit` repo. Where the prior draft research
 (`scratchpad/wave1-prior/203-cc-spex-evaluation.md`) was wrong, the correction is called out.
 
+**Second verification pass (also 2026-07-02)**: every `extension.yml` was re-read at **both** the
+distributed tag `v5.6.0` and `v5.8.0`/main, and the `github/spec-kit` latest release re-checked.
+This pass corrected three hook-wiring claims from the first pass (see D3 corrections **#1**, **#6**,
+**#7**) and refreshed the spec-kit version (D4). None of the corrections change the verdict; they
+sharpen the "scope carefully" case, since the minimal `spex` core + `spex-gates` subset is more
+invasive than first described.
+
 ## Decision log
 
 ### D1 — Wiring target: distribution marketplace, not the dev marketplace
@@ -32,19 +39,21 @@ Read from each `extension.yml` at `main` (v5.8.0 line):
 
 | Extension | Hook(s) registered | Standalone commands | Requires |
 |---|---|---|---|
-| `spex` (core) | `before_finish` (smoke-test prompt), `after_finish` (flow-state cleanup) | brainstorm, ship, evolve, spec-refactoring, help, extensions, finish, … | speckit ≥0.5.2 |
-| `spex-gates` | `after_specify` = review-spec (**mandatory**), `after_tasks` = review-plan (**mandatory**) | review-spec, review-plan, review-code, verify, stamp | speckit ≥0.5.2 |
+| `spex` (core) | **mandatory** flow-state hooks on every lifecycle event (`after_specify`, `before/after_clarify`, `before/after_plan`, `before/after_tasks`, `before/after_implement`, `after_finish`) + `before_finish` (smoke-test, **optional**) | brainstorm, ship, evolve, spec-refactoring, help, extensions, finish, … | speckit ≥0.5.2 |
+| `spex-gates` | `after_specify` = review-spec (**mandatory**), `after_tasks` = review-plan (**mandatory**), `after_implement` = review-code (**mandatory**) | review-spec, review-plan, review-code, verify, stamp | speckit ≥0.5.2 |
 | `spex-worktrees` | `after_specify` = manage `create` (**mandatory**) | manage | speckit ≥0.5.2, git |
 | `spex-teams` | `before_plan` = research (**optional**, prompted) | orchestrate, research, implement | speckit ≥0.5.2, **spex-gates** |
 | `spex-deep-review` | `after_implement` = run (**optional**, prompted) | run | speckit ≥0.5.2, **spex-gates** |
-| `spex-collab` | (none auto; integrates into ship watch/triage) | reviewers, phase-split, phase-manager, revise, reconcile, triage | speckit ≥0.5.2, **spex-gates** |
+| `spex-collab` | `after_tasks` = reviewers (**mandatory**), `before_implement` = phase-split (**optional**, prompted) | reviewers, phase-split, phase-manager, revise, reconcile, triage | speckit ≥0.5.2, **spex-gates** |
 
 - **Corrections vs prior research**:
-  1. `after_implement` code review is registered by **`spex-deep-review`** (optional/prompted),
-     **not** by `spex-gates`. `spex-gates` auto-hooks only `after_specify` + `after_tasks` (both
-     mandatory); it *provides* review-code/verify/stamp as commands but does not auto-hook them
-     in the current manifest. (The v5.0.0 CHANGELOG originally said gates hooked `after_implement`;
-     the current manifest has moved that to deep-review.)
+  1. `after_implement` is hooked by **both** `spex-gates` (review-code, **mandatory**) **and**
+     `spex-deep-review` (run, optional/prompted) — confirmed by reading each `extension.yml` at
+     **both** the distributed tag `v5.6.0` and `v5.8.0`/main (identical wiring). Enabling
+     `spex-gates` therefore auto-runs a **mandatory** code review at `after_implement`, not only
+     the spec/plan gates. (This corrects a first-pass error in an earlier draft of this file, which
+     claimed gates does *not* auto-hook `after_implement`; the live manifests show it does at every
+     relevant version, so `spex` core + `spex-gates` already introduces a code-review gate.)
   2. `spex-worktrees` **also** registers a mandatory `after_specify` hook — so enabling it makes
      worktree creation fire automatically on every `/speckit.specify`.
   3. `spex-teams` **does** ship standalone commands (orchestrate/research/implement) and a
@@ -54,6 +63,13 @@ Read from each `extension.yml` at `main` (v5.8.0 line):
      The minimal scoped adoption is therefore **spex core + spex-gates only**.
   5. deep-review command is `speckit.spex-deep-review.run` → `/speckit-spex-deep-review-run`
      (prior research wrote `-review`).
+  6. `spex-collab` is **not** hook-free: it registers a **mandatory** `after_tasks` = reviewers
+     hook (generates `REVIEWERS.md`) and an optional `before_implement` = phase-split hook
+     (confirmed at `v5.6.0` and `v5.8.0`) — an earlier draft's "(none auto)" was wrong.
+  7. `spex` **core** registers **mandatory** flow-state hooks on essentially every lifecycle event
+     (`after_specify` … `after_implement`, plus `after_finish`), alongside an optional
+     `before_finish` smoke-test — so enabling core alone stamps flow state on every `/speckit.*`
+     step, including a mandatory `after_specify`. An earlier draft listed only the two finish hooks.
 
 ### D4 — Native extension system confirmed
 
@@ -63,7 +79,7 @@ Read from each `extension.yml` at `main` (v5.8.0 line):
   state in `.specify/extensions/.registry`." Each `extension.yml` sets `schema_version: "1.0"` and
   `requires.speckit_version: ">=0.5.2"`. `github/spec-kit` ships the mechanism:
   `extensions/{README.md,EXTENSION-API-REFERENCE.md,RFC-EXTENSION-SYSTEM.md,EXTENSION-*-GUIDE.md}`
-  plus first-party extensions (`agent-context`, `bug`, …). spec-kit latest release: **v0.12.3 (2026-07-01)**.
+  plus first-party extensions (`agent-context`, `bug`, …). spec-kit latest release: **v0.12.4 (2026-07-02)**.
 
 ### D5 — Friction-point fit (nuanced from prior "does not address")
 
