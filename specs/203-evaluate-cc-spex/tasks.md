@@ -35,7 +35,7 @@ sequentially (no `[P]` across sections that touch the same file).
 
 **Purpose**: Establish the deliverable file and its section skeleton.
 
-- [ ] T001 Create `docs/evaluations/` directory and the deliverable file `docs/evaluations/203-cc-spex-evaluation.md` with the required section headings (Summary, Extensions overview, Overlap/conflict, Maintenance/trust, Recommendation, Draft diffs, Sources)
+- [X] T001 Create `docs/evaluations/` directory and the deliverable file `docs/evaluations/203-cc-spex-evaluation.md` with the required section headings (Summary, Extensions overview, Overlap/conflict, Maintenance/trust, Recommendation, Draft diffs, Sources)
 
 ---
 
@@ -45,8 +45,8 @@ sequentially (no `[P]` across sections that touch the same file).
 
 **⚠️ CRITICAL**: No user-story section may be written until fact verification is complete.
 
-- [ ] T002 Re-verify all upstream facts against live sources and record them with citations in `specs/203-evaluate-cc-spex/research.md` (releases/cadence, open/closed issues, both marketplace.json manifests, all six `extension.yml` hook/dependency wirings, spec-kit native extension system, license) — correcting any stale claims from the prior draft
-- [ ] T003 Confirm the curated-set precondition in `specs/203-evaluate-cc-spex/research.md`: `spex@cc-rhuss-marketplace` resolves from `rhuss/cc-rhuss-marketplace` (valid `.claude-plugin/marketplace.json`) and `rhuss/cc-spex`'s root marketplace is the dev-only `spex-plugin-development` (FR-010)
+- [X] T002 Re-verify all upstream facts against live sources and record them with citations in `specs/203-evaluate-cc-spex/research.md` (releases/cadence, open/closed issues, both marketplace.json manifests, all six `extension.yml` hook/dependency wirings, spec-kit native extension system, license) — correcting any stale claims from the prior draft
+- [X] T003 Confirm the curated-set precondition in `specs/203-evaluate-cc-spex/research.md`: `spex@cc-rhuss-marketplace` resolves from `rhuss/cc-rhuss-marketplace` (valid `.claude-plugin/marketplace.json`) and `rhuss/cc-spex`'s root marketplace is the dev-only `spex-plugin-development` (FR-010)
 
 **Checkpoint**: Facts verified and cited — story sections can now be written.
 
@@ -58,9 +58,9 @@ sequentially (no `[P]` across sections that touch the same file).
 
 **Independent Test**: Read `docs/evaluations/203-cc-spex-evaluation.md` and confirm the Summary + Recommendation sections state a single unambiguous verdict with rationale.
 
-- [ ] T004 [US1] Write the "Summary" section of `docs/evaluations/203-cc-spex-evaluation.md` with the one-sentence verdict + primary rationale (FR-004, SC-001)
-- [ ] T005 [US1] Write the "Friction-point fit" findings into the Summary/Recommendation of `docs/evaluations/203-cc-spex-evaluation.md`: one written finding each for constitution drift and session continuity, grounded in a representative dry run (FR-001)
-- [ ] T006 [US1] Write the "Recommendation" section of `docs/evaluations/203-cc-spex-evaluation.md` with the three-way verdict, enumerated conditions (if conditional), and per-extension scoping; ensure the rationale references at least one concrete finding (FR-004, SC-005)
+- [X] T004 [US1] Write the "Summary" section of `docs/evaluations/203-cc-spex-evaluation.md` with the one-sentence verdict + primary rationale (FR-004, SC-001)
+- [X] T005 [US1] Write the "Friction-point fit" findings into the Summary/Recommendation of `docs/evaluations/203-cc-spex-evaluation.md`: one written finding each for constitution drift and session continuity, grounded in a representative dry run (FR-001)
+- [X] T006 [US1] Write the "Recommendation" section of `docs/evaluations/203-cc-spex-evaluation.md` with the three-way verdict, enumerated conditions (if conditional), and per-extension scoping; ensure the rationale references at least one concrete finding (FR-004, SC-005)
 
 **Checkpoint**: US1 delivers a defensible decision on its own (MVP).
 
@@ -72,8 +72,8 @@ sequentially (no `[P]` across sections that touch the same file).
 
 **Independent Test**: Confirm the Overlap/conflict section labels each extension complementary / overlapping / conflicting vs each comparison target.
 
-- [ ] T007 [US2] Write the "Extensions overview" section of `docs/evaluations/203-cc-spex-evaluation.md` (six extensions, their hooks, dependency chain, commands) from `research.md` (FR-002)
-- [ ] T008 [US2] Write the "Overlap/conflict" section of `docs/evaluations/203-cc-spex-evaluation.md` classifying each extension vs `speckit-lifecycle` (#124), the `review` bundle, and the `planning` bundle, naming the `spex-worktrees`↔`worktrunk`/#206 conflict and the SpecKit→Superpowers handoff impact (FR-002, SC-003)
+- [X] T007 [US2] Write the "Extensions overview" section of `docs/evaluations/203-cc-spex-evaluation.md` (six extensions, their hooks, dependency chain, commands) from `research.md` (FR-002)
+- [X] T008 [US2] Write the "Overlap/conflict" section of `docs/evaluations/203-cc-spex-evaluation.md` classifying each extension vs `speckit-lifecycle` (#124), the `review` bundle, and the `planning` bundle, naming the `spex-worktrees`↔`worktrunk`/#206 conflict and the SpecKit→Superpowers handoff impact (FR-002, SC-003)
 
 **Checkpoint**: US1 + US2 both stand alone — decision + capability map.
 
@@ -85,8 +85,8 @@ sequentially (no `[P]` across sections that touch the same file).
 
 **Independent Test**: Confirm the Maintenance/trust section summarizes cadence + issue responsiveness and records an explicit `autoUpdate: true`/pinned recommendation.
 
-- [ ] T009 [US3] Write the "Maintenance/trust" section of `docs/evaluations/203-cc-spex-evaluation.md` (release cadence, open/closed issue responsiveness, version lag, license, single-maintainer posture) with dated evidence (FR-003, SC-006)
-- [ ] T010 [US3] State the explicit `autoUpdate` suitability recommendation (pin vs track) in `docs/evaluations/203-cc-spex-evaluation.md` with rationale tied to the maintenance evidence (FR-003)
+- [X] T009 [US3] Write the "Maintenance/trust" section of `docs/evaluations/203-cc-spex-evaluation.md` (release cadence, open/closed issue responsiveness, version lag, license, single-maintainer posture) with dated evidence (FR-003, SC-006)
+- [X] T010 [US3] State the explicit `autoUpdate` suitability recommendation (pin vs track) in `docs/evaluations/203-cc-spex-evaluation.md` with rationale tied to the maintenance evidence (FR-003)
 
 **Checkpoint**: US1–US3 complete — all three evaluation dimensions have findings (SC-002).
 
@@ -98,9 +98,9 @@ sequentially (no `[P]` across sections that touch the same file).
 
 **Independent Test**: Confirm the doc contains fenced draft diffs for `docs/external-marketplaces.md` (table row + steps) and `.claude/settings.json` (`extraKnownMarketplaces` key `cc-rhuss-marketplace` + `enabledPlugins` line), and that neither real file is modified by this branch.
 
-- [ ] T011 [US4] Write the fenced, unapplied draft diff for `docs/external-marketplaces.md` (table row + install/pin note) into `docs/evaluations/203-cc-spex-evaluation.md`, matching the existing table format (FR-005, SC-004)
-- [ ] T012 [US4] Write the fenced, unapplied draft diff for `.claude/settings.json` (`extraKnownMarketplaces["cc-rhuss-marketplace"]` → `rhuss/cc-rhuss-marketplace` + `enabledPlugins["spex@cc-rhuss-marketplace"]`) into `docs/evaluations/203-cc-spex-evaluation.md`, and name `/reload-plugins` as the user's post-apply verification (FR-006, FR-007)
-- [ ] T013 [US4] Add the "why not re-host" note to `docs/evaluations/203-cc-spex-evaluation.md` and verify no edit is made to `.claude/settings.json` or `docs/external-marketplaces.md` (FR-008, SC-005)
+- [X] T011 [US4] Write the fenced, unapplied draft diff for `docs/external-marketplaces.md` (table row + install/pin note) into `docs/evaluations/203-cc-spex-evaluation.md`, matching the existing table format (FR-005, SC-004)
+- [X] T012 [US4] Write the fenced, unapplied draft diff for `.claude/settings.json` (`extraKnownMarketplaces["cc-rhuss-marketplace"]` → `rhuss/cc-rhuss-marketplace` + `enabledPlugins["spex@cc-rhuss-marketplace"]`) into `docs/evaluations/203-cc-spex-evaluation.md`, and name `/reload-plugins` as the user's post-apply verification (FR-006, FR-007)
+- [X] T013 [US4] Add the "why not re-host" note to `docs/evaluations/203-cc-spex-evaluation.md` and verify no edit is made to `.claude/settings.json` or `docs/external-marketplaces.md` (FR-008, SC-005)
 
 **Checkpoint**: On adopt/conditional-adopt the wiring is turnkey and unapplied; on flat don't-adopt the diffs are omitted.
 
@@ -110,8 +110,8 @@ sequentially (no `[P]` across sections that touch the same file).
 
 **Purpose**: Definition of Done — changelog + green CI-parity gates.
 
-- [ ] T014 Add a `changie` fragment `.changes/unreleased/<kind>-<slug>.yaml` recording the evaluation deliverable (FR-009, SC-007)
-- [ ] T015 Run the repo CI-parity gates and confirm green: `asctl repo-check`, `scripts/check_bundle_refs.py`, `check_grouping.py`, `check_consistency.py`, `generate_manifests.py --check`, `generate_bundles_doc.py --check`, `scripts/validate-plugins.sh`, `python3 -m unittest discover -s tests` (constitution Principle V)
+- [X] T014 Add a `changie` fragment `.changes/unreleased/<kind>-<slug>.yaml` recording the evaluation deliverable (FR-009, SC-007)
+- [X] T015 Run the repo CI-parity gates and confirm green: `asctl repo-check`, `scripts/check_bundle_refs.py`, `check_grouping.py`, `check_consistency.py`, `generate_manifests.py --check`, `generate_bundles_doc.py --check`, `scripts/validate-plugins.sh`, `python3 -m unittest discover -s tests` (constitution Principle V)
 
 ---
 
