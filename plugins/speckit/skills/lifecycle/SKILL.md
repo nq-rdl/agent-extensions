@@ -11,6 +11,11 @@ description: >-
   or anything implying spec creation, lifecycle advancement, or orchestration in a
   speckit repo.
 license: MIT
+compatibility: >-
+  Requires `git` and a SpecKit `.specify/` layout with the
+  `speckit-{specify,clarify,plan,tasks,checklist,analyze}` phase skills; the two bundled
+  scripts are tested with bats-core 1.13.0. Optional: `gh` for PR actioning and
+  `.specify/scripts/bash/create-new-feature.sh` (runtime-probed, bare-git fallback).
 metadata:
   repo: https://github.com/nq-rdl/agent-extensions
 ---
@@ -69,8 +74,11 @@ only provisioned specs (branch + worktree exist) and completed specs recorded in
 ### 2b. Create a new spec + worktree (single session)
 
 1. Ensure `.specify/` is present on the parent branch; if missing, restore **only
-   `.specify/`** from the most recent spec branch (never overwrite `CLAUDE.md`). Error
-   clearly if no spec branch exists.
+   `.specify/`** from the most recent spec branch (never overwrite `CLAUDE.md`). If no
+   spec branch exists to restore from, offer the **opt-in `specify init` bootstrap**
+   (FR-020): scaffold `.specify/` only on explicit confirmation via the official `specify`
+   CLI (e.g. `uvx … specify init`) — never automatically, never vendoring your own
+   templates — and error clearly only if the bootstrap is declined or the CLI is unavailable.
 2. Run `scripts/provision-worktree.sh <slug> [--base <branch>]` — cut from trunk, or
    pass `--base` to group the spec with related work on an existing integration branch.
 3. Invoke `/speckit-specify` **inside the worktree**. All planning phases run in the
@@ -117,11 +125,19 @@ Identify the spec from the branch prefix: `NNN=${BRANCH:0:3}`; load `spec.md`,
 The phase list is repo-configured (`CLAUDE.md` or `.specify/`); the default omits the
 checklist phase. **Never skip a declared phase.**
 
+**`CLAUDE.md` guard (read-only discovery input).** Before advancing any phase whose
+SpecKit tooling writes `CLAUDE.md` — e.g. `plan`'s `update-agent-context.sh` — detect an
+**externally-managed** `CLAUDE.md` (a symlink, or a repo/`.specify/`-declared managed flag)
+and guard it: skip or revert that write, preserving the file or link, then flag it. A repo
+whose `CLAUDE.md` is unmanaged still receives its normal agent-context update (FR-019).
+
 ### 3a. Implementation loop
 
 For each `[ ]` task: implement → validate → commit (single-line conventional:
 imperative, no body, no attribution) → mark `[x]`. Never mark a task complete with
-failing validation. When no test suite exists, discover validation from
+failing validation. **Fail-stop:** a task that cannot be made to pass after your fix
+attempt **halts the loop** — leave it `[ ]`, report the task and its validation output,
+and do not start later tasks (FR-012). When no test suite exists, discover validation from
 `Makefile`/`CLAUDE.md`/`pixi.toml`/`package.json` or perform best-effort lint/syntax
 checks — and **explicitly flag** that no automated validation exists rather than
 silently passing.
@@ -148,3 +164,9 @@ and falls back to bare git if absent.
 Compatibility: SpecKit `.specify/` project layout; speckit phase skills
 `speckit-{specify,clarify,plan,tasks,checklist,analyze}`. Run `bats .tests/` after
 changing either script.
+
+**Verify canonical:** SpecKit conventions evolve — when a phase command, a `.specify/`
+path, or a `create-new-feature.sh` flag would change behavior and being wrong would
+mislead, verify against the authoritative SpecKit docs
+(<https://github.com/github/spec-kit>) rather than trusting this prose. The two bundled
+scripts (guarded by `bats .tests/`) remain the source of truth for the git operations.
