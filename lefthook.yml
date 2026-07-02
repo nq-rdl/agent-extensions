@@ -58,6 +58,15 @@ pre-commit:
         pixi run python3 scripts/generate_manifests.py . --check
         pixi run python3 scripts/generate_bundles_doc.py . --check
 
+    # --- Changie fragment length. Each staged unreleased fragment's body must
+    #     stay under the per-fragment cap (default 200; CHANGIE_MAX_BODY_LENGTH
+    #     overrides). Changie's own body.maxLength guards `changie new`; this
+    #     catches fragments written directly. On failure the script prints the
+    #     split-into-multiple-fragments reminder. ---
+    - name: changie-length
+      glob: ".changes/unreleased/*.yaml"
+      run: pixi run python3 scripts/check_changie_length.py {staged_files}
+
     # --- Docs link health. With lychee installed, a broken link in a staged
     #     skill .md fails the commit (the old `|| true` wrongly swallowed real
     #     failures). When lychee is absent we skip cleanly; CI (link-check.yml)

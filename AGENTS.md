@@ -44,11 +44,12 @@ pixi install
 
 Local hooks mirror CI so failures surface before you push. **pre-commit** runs
 fast checks (gofmt/vet/build of `tools/asctl`, `asctl repo-check`, plugin
-validation, generated-artifact drift, lychee links); **pre-push** runs `asctl`
-tests, the pipeline unit tests, a non-blocking SkillSpector scan, and a hard
-changie-fragment gate. Prereqs: `lefthook`, Go, `pixi` (provides the Python
-toolchain — hook jobs call `pixi run`); optional `lychee` and Docker. Bypass
-with `LEFTHOOK=0` or `git commit --no-verify`.
+validation, generated-artifact drift, a per-fragment changie body-length cap,
+lychee links); **pre-push** runs `asctl` tests, the pipeline unit tests, a
+non-blocking SkillSpector scan, and a hard changie-fragment gate. Prereqs:
+`lefthook`, Go, `pixi` (provides the Python toolchain — hook jobs call
+`pixi run`); optional `lychee` and Docker. Bypass with `LEFTHOOK=0` or
+`git commit --no-verify`.
 
 `skills/` is canonical content authored in this repo (formerly vendored from `nq-rdl/agent-skills`, now merged here), not a submodule. Skills are validated against the agentskills.io spec by `asctl` — the Go CLI under `tools/asctl/` (`asctl repo-check`).
 
@@ -175,7 +176,7 @@ CI runs `validate.yml` on every PR/push to main. It checks:
 - Skills validate against the agentskills.io spec **and the directory-structure standard** (`asctl repo-check`, built from `tools/asctl/`)
 
 Three more workflows run on PRs alongside `validate.yml`:
-- `changelog-check.yml` — fails if no changie fragment was added (bypass with the `skip-changelog` label)
+- `changelog-check.yml` — fails if no changie fragment was added (bypass with the `skip-changelog` label), and lints each *added* fragment's body against the 200-char per-fragment cap (`scripts/check_changie_length.py`)
 - `link-check.yml` — lychee link check over changed `skills/**/*.md`
 - `skillspector.yml` — NVIDIA SkillSpector scan over `skills/`; informational, uploads SARIF to code scanning (non-gating)
 
@@ -249,6 +250,20 @@ changie new               # create an unreleased change entry
 changie batch auto        # batch unreleased into a version (uses semver from kind)
 changie merge             # merge versions into CHANGELOG.md
 ```
+
+**One idea per fragment; keep it short.** Each fragment `body` has a hard
+**200-character cap** (`.changie.yaml` `body.maxLength`). Changie has no `lint`
+command, so this is enforced two ways: `changie new` rejects an over-long body
+at creation, and `scripts/check_changie_length.py` re-lints *added* fragments in
+the pre-commit hook and in `changelog-check.yml` (catching fragments written
+directly, bypassing the prompt). The cap is **per fragment, not per change** —
+there is no limit on how many fragments a branch adds, so split a large change
+into several: run `changie new` once per idea (`Added: thing 1`, `Added: thing
+2`, …) rather than packing everything into one run-on body. The cap governs
+**current unreleased and future** fragments only; already-released versions
+(`.changes/<version>.md` + the GitHub release body) are immutable and out of
+scope. Override the limit for a run with `CHANGIE_MAX_BODY_LENGTH` (keep it in
+sync with `.changie.yaml`).
 
 ### Release
 
