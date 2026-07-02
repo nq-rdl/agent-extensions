@@ -118,10 +118,12 @@ conflicting):
 
 **Sharpest conflict — worktrees (#206).** `spex-worktrees` registers a *mandatory* `after_specify`
 hook that auto-creates a sibling worktree on every `/speckit.specify`. The team already enables the
-curated **`worktrunk`** plugin, and epic item **#206** is deciding the canonical worktree tool.
-Enabling `spex-worktrees` would install a second, competing worktree mechanism at the SpecKit →
-Superpowers handoff boundary and pre-empt #206. If Worktrunk wins, `spex-worktrees` must be
-disabled (`specify extension disable spex-worktrees`).
+curated **`worktrunk`** plugin, and epic item **#206** decided its worktree posture: keep the
+bespoke `#124` `provision-worktree.sh`/`merge-spec.sh` scripts for automation, with `worktrunk`
+(`wt`) as the recommended interactive complement. Enabling `spex-worktrees` would install a second,
+competing worktree mechanism at the SpecKit → Superpowers handoff boundary — its mandatory
+`after_specify` create-hook collides with #124's `provision-worktree.sh` (and with `wt`) alike. So
+`spex-worktrees` must be disabled (`specify extension disable spex-worktrees`).
 
 **Review overlap.** `spex-deep-review` + `spex-gates` substantially duplicate the `review` bundle
 and `pr-review-toolkit`. Note the overlap starts at the **minimal subset**: `spex-gates` alone
@@ -171,9 +173,10 @@ Re-evaluate `autoUpdate: true` once #7 (marketplace-install skill loading) is cl
 1. **Spec-Kit is a committed team workflow.** `spex` is worthless without Spec-Kit running for
    real. Gate adoption on #124 (`speckit-lifecycle`) and #204 (SpecKit-side extension
    recommendation) landing and the team actually running `specify`.
-2. **The worktree tool is decided (#206).** If the team standardizes on Worktrunk, adopt `spex`
-   only with `spex-worktrees` **disabled** — its mandatory `after_specify` create-hook otherwise
-   installs a competing worktree mechanism.
+2. **The worktree tool is decided (#206).** #206 kept the bespoke `#124` scripts (with `wt` as an
+   interactive complement) rather than delegating to Worktrunk, so adopt `spex` only with
+   `spex-worktrees` **disabled** — its mandatory `after_specify` create-hook otherwise installs a
+   competing worktree mechanism at the same lifecycle boundary.
 3. **Review overlap is deliberately scoped.** Decide, alongside #124, whether
    `spex-deep-review`/`spex-gates` *replace* or *duplicate* the `review` bundle +
    `pr-review-toolkit`. Note this bites even at the minimal subset: `spex-gates` auto-runs a
@@ -185,7 +188,7 @@ Re-evaluate `autoUpdate: true` once #7 (marketplace-install skill loading) is cl
 **Scoped adoption path (when the conditions are met):** enable **`spex` core + `spex-gates`** only
 — the minimal subset that delivers the automated spec/plan quality gates and the spec↔code-drift
 tooling that partially answer the epic's friction. Keep `spex-worktrees` disabled (defer to
-Worktrunk/#206), and enable `spex-deep-review`/`spex-collab`/`spex-teams` only after the review-stack
+#206's bespoke scripts + `wt`), and enable `spex-deep-review`/`spex-collab`/`spex-teams` only after the review-stack
 and Agent-Teams decisions are made (note all three require `spex-gates`). The per-extension
 `specify extension enable/disable` model makes this clean.
 
