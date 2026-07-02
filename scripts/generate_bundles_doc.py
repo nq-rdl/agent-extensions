@@ -87,6 +87,16 @@ def generate(repo) -> str:
         "plugin. Skills are invoked as `/<subject>:<facet>`; agents are delegated as",
         "subagents (auto-routed by their description).",
         "",
+        "## At a glance",
+        "",
+        "| Plugin | Description |",
+        "|---|---|",
+    ]
+    for plugin in order:
+        desc = enabled[plugin]["description"].rstrip(".").replace("|", "\\|")
+        lines.append(f"| [`{plugin}`](#{plugin}) | {desc} |")
+    lines += [
+        "",
         "## Install",
         "",
         "Install the whole set in one command via the `rdl` meta-plugin:",

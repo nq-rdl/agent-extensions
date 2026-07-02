@@ -10,6 +10,45 @@ Each **subject** (a tool, library, language, or workflow) is one Claude Code
 plugin. Skills are invoked as `/<subject>:<facet>`; agents are delegated as
 subagents (auto-routed by their description).
 
+## At a glance
+
+| Plugin | Description |
+|---|---|
+| [`go`](#go) | Go — idiomatic naming and secure error handling |
+| [`rust`](#rust) | Rust — read and navigate unfamiliar Rust, explain constructs, sanity-check correctness |
+| [`r`](#r) | R — language expertise, package development, CLI apps, CRAN, lifecycle, async, and testing |
+| [`shiny`](#shiny) | Shiny — modern dashboards with bslib and Bootstrap 5 theming |
+| [`quarto`](#quarto) | Quarto — document authoring and accessible figure alt text |
+| [`obsidian`](#obsidian) | Obsidian — Bases databases, the CLI, and Obsidian-flavored Markdown |
+| [`writerside`](#writerside) | Writerside — author and build JetBrains Writerside documentation |
+| [`defuddle`](#defuddle) | Defuddle — extract clean Markdown from cluttered web pages |
+| [`gh`](#gh) | GitHub workflow — git hooks, changelogs, conventional commits, pull requests, releases, and Go CI/CD |
+| [`github-actions`](#github-actions) | GitHub Actions — secure CI/CD workflows, SHA pinning, OIDC, and GitOps delivery |
+| [`terraform`](#terraform) | Terraform — generate compliant HCL, review IaC for state safety, and author Terratest suites |
+| [`kubernetes`](#kubernetes) | Kubernetes — SRE-grade rollouts, HA design, and incident response |
+| [`argo-cd`](#argo-cd) | Argo CD — GitOps application management and sync for Kubernetes |
+| [`ansible`](#ansible) | Ansible — author, debug, and optimise playbooks, roles, and inventories |
+| [`arch-linux`](#arch-linux) | Arch Linux — pacman, rolling-release maintenance, and system administration |
+| [`starrocks`](#starrocks) | StarRocks — analytical SQL, table design, data loading, and query tuning |
+| [`postgres`](#postgres) | PostgreSQL administration — schema design, query optimisation, backups, and tuning |
+| [`mongodb`](#mongodb) | MongoDB — query and index performance analysis against a live cluster |
+| [`sops`](#sops) | SOPS — encrypt and decrypt secrets with Age and Vault transit |
+| [`bitwarden`](#bitwarden) | Bitwarden — manage .env files and secrets via the Bitwarden CLI |
+| [`pixi`](#pixi) | Pixi — manage Python projects, environments, and dependencies |
+| [`lychee`](#lychee) | Lychee — fast link checking for docs and Markdown |
+| [`charm-tui`](#charm-tui) | Charm — build terminal UIs with Bubbletea, Lip Gloss, and Fang |
+| [`claude-code`](#claude-code) | Claude Code — agent-team coordination, hook authoring, and web-session setup |
+| [`rdl-team`](#rdl-team) | RDL team workflows — Claude Code onboarding, setup, and config management |
+| [`playwright`](#playwright) | Playwright — generate and debug end-to-end browser tests |
+| [`skill`](#skill) | Skill quality — audit skills for non-inferable value, review changes, and report issues upstream |
+| [`review`](#review) | Code review — security, clean code, governance, responsible AI, and fact-checking |
+| [`planning`](#planning) | Planning — implementation strategy, file-level sequencing, API/repo architecture, and ADRs |
+| [`debug`](#debug) | Debugging and cleanup — systematic diagnosis and tech-debt removal |
+| [`docs`](#docs) | Technical writing — developer docs, tutorials, ADRs, and guides |
+| [`research`](#research) | Research — technical-spike validation and prompt engineering |
+| [`lucid`](#lucid) | Lucid — visual collaboration boards and diagrams (Lucidchart / Lucidspark) via the hosted Lucid MCP server |
+| [`hooks`](#hooks) | Hooks — forced skill evaluation when prompts mention skills |
+
 ## Install
 
 Install the whole set in one command via the `rdl` meta-plugin:

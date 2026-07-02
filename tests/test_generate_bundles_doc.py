@@ -68,6 +68,13 @@ class TestGenerate(unittest.TestCase):
             out = generate_bundles_doc.generate(make_repo(t))
             self.assertIn("- `go-mcp-expert` (subagent)", out)
 
+    def test_at_a_glance_table(self):
+        with tempfile.TemporaryDirectory() as t:
+            out = generate_bundles_doc.generate(make_repo(t))
+            self.assertIn("| [`go`](#go) | Go tools |", out)
+            self.assertIn("| [`infra`](#infra) | Infra tools |", out)
+            self.assertLess(out.index("## At a glance"), out.index("## Install"))
+
     def test_marketplace_order_respected(self):
         with tempfile.TemporaryDirectory() as t:
             out = generate_bundles_doc.generate(make_repo(t))
