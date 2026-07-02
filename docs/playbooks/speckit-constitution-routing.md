@@ -52,6 +52,25 @@ carries a changelog entry; the repo's CI-parity checks pass.
   2–5 minute tasks that `/speckit.tasks` produces. Skipping it forces duplicate
   re-planning at execution time. Never hand off to execution without `tasks.md`.
 
+## 4. Spec lifecycle: ephemeral specs, durable ADRs
+
+Add this principle to `constitution.md` alongside §1:
+
+```markdown
+## Principle: specs are ephemeral, ADRs are durable
+
+A `specs/NNN-slug/` directory is scaffolding that lives on its worktree/integration
+branch only. Its decision points — context, options considered, chosen outcome — are the
+lasting value, and are captured as an ADR (`docs/adr/NNNN-*.md`) at merge time.
+
+On a merge to **trunk/main**: (1) archive the spec's decisions as an ADR, then (2) strip
+the ephemeral speckit artifacts from trunk — the `specs/NNN-slug/` directory, the
+`.specify/` scaffolding, and the installed speckit phase skills. Trunk keeps only the
+real deliverables plus `docs/adr/`. On a merge to an **integration branch**, the spec is
+retained (work continues). `speckit-lifecycle`'s `merge-spec.sh` performs the spec strip
+automatically on a trunk merge.
+```
+
 ## How this is delivered to a repo
 
 `speckit-lifecycle` (#124) references this playbook when it sets a repo up: apply §1 to
