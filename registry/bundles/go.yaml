@@ -13,7 +13,7 @@ skills:
 agents:
   - go-mcp-expert
   - wg-code-sentinel
-  - github-actions-expert
+  - github-actions-expert  # guest — home: gh
 hooks: []
 prompts: []
 mcp: []

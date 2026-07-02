@@ -1,8 +1,8 @@
 schemaVersion: v1
 id: gh
 displayName: GitHub
-description: GitHub workflow — git hooks, changelogs, conventional commits, pull requests, releases, and Go CI/CD
-keywords: [github, git, hooks, changelog, pull-request, ci-cd]
+description: GitHub workflow — git hooks, changelogs, conventional commits, pull requests, releases, Go CI/CD, and secure GitHub Actions (SHA pinning, OIDC, GitOps delivery)
+keywords: [github, git, hooks, changelog, pull-request, ci-cd, github-actions, oidc, gitops, security]
 owners:
   - rdl
 channels:
@@ -11,7 +11,7 @@ skills:
   - changie
   - conventional-commits
   - document-release
-  - {source: go-gh, leaf: go}
+  - {source: go-gh, leaf: actions-go}
   - husky
   - lefthook
   - pre-commit
@@ -19,6 +19,8 @@ skills:
 agents:
   - address-comments
   - repo-architect
+  - github-actions-expert
+  - se-gitops-ci-specialist  # guest — home: argo-cd
 hooks: []
 prompts: []
 mcp: []

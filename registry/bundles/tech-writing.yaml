@@ -1,6 +1,6 @@
 schemaVersion: v1
-id: docs
-displayName: Docs
+id: tech-writing
+displayName: Technical Writing
 description: Technical writing — developer docs, tutorials, ADRs, and guides
 keywords: [docs, technical-writing]
 owners:
@@ -16,5 +16,5 @@ mcp: []
 targets:
   claude:
     enabled: true
-    pluginName: docs
+    pluginName: tech-writing
     marketplaceName: rdl

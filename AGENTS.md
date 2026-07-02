@@ -88,11 +88,11 @@ To make installs self-contained, `plugins/<bundle>/skills/<name>/` and `plugins/
 - **Refresh plugin trees** by running `pixi run bash scripts/sync-plugins.sh` (or pass a bundle name to scope it). The script reads `registry/bundles/<b>.yaml`, removes any stale copies, and rewrites `plugins/<b>/skills/<name>/` and `plugins/<b>/agents/<name>.md` from the canonical sources. It also rewrites this repo's own live `.claude/scripts/{install-deps,announce-capabilities}.sh` cc-web-setup SessionStart hook copies from canonical `skills/cc-web-setup/assets/` (forcing them executable — `0o755` — since those copies are invoked directly from `.claude/settings.json`), and drift-checks them under `--check` (bytes, plus a non-executable live copy or canonical asset); the repo-local `.claude/scripts/install-deps.local.sh` seam has no canonical source and is left untouched.
 - **CI** validates that every bundle YAML reference resolves and that every plugin manifest is well-formed. See `scripts/validate-plugins.sh`.
 
-**Grouped skills.** A bundle skill member is either a flat string (`changie` → `leaf == changie`) or an explicit `{source, leaf}` mapping (`{source: go-gh, leaf: go}` in the `gh` bundle → `/gh:go`). `sync-plugins.sh` copies the flat canonical `skills/<source>/` → `plugins/<pluginName>/skills/<leaf>/`, **renaming to the leaf**, so the plugin tree stays one level deep and Claude Code invokes `<pluginName>:<leaf>` (the leaf folder drives invocation). Claude Code labels a skill in `/`-autocomplete as `frontmatter.name || <pluginName>:<leaf>` — so a present `name:` (the canonical `go-gh` **or** the leaf `go`) overrides the namespaced id with a bare, un-prefixed label, and `/gh` lists `go-gh`/`go` instead of `gh:go`. To get the namespaced label, sync **strips the copy's `name:` entirely** so the label falls back to `<pluginName>:<leaf>`. The canonical `skills/` tree is never touched; grouping is owned **here** in the registry and stays flat. See `CONTRIBUTING.md` §6 for the rules, `scripts/check_grouping.py` for the contract, and `scripts/validate-plugins.sh` for the no-name guard.
+**Grouped skills.** A bundle skill member is either a flat string (`changie` → `leaf == changie`) or an explicit `{source, leaf}` mapping (`{source: go-gh, leaf: actions-go}` in the `gh` bundle → `/gh:actions-go`). `sync-plugins.sh` copies the flat canonical `skills/<source>/` → `plugins/<pluginName>/skills/<leaf>/`, **renaming to the leaf**, so the plugin tree stays one level deep and Claude Code invokes `<pluginName>:<leaf>` (the leaf folder drives invocation). Claude Code labels a skill in `/`-autocomplete as `frontmatter.name || <pluginName>:<leaf>` — so a present `name:` (the canonical `go-gh` **or** the leaf `actions-go`) overrides the namespaced id with a bare, un-prefixed label, and `/gh` lists `go-gh`/`actions-go` instead of `gh:actions-go`. To get the namespaced label, sync **strips the copy's `name:` entirely** so the label falls back to `<pluginName>:<leaf>`. The canonical `skills/` tree is never touched; grouping is owned **here** in the registry and stays flat. See `CONTRIBUTING.md` §6 for the rules, `scripts/check_grouping.py` for the contract, and `scripts/validate-plugins.sh` for the no-name guard.
 
 Skills and agents are authored directly under `skills/` and `agents/`. After editing one, run `pixi run bash scripts/sync-plugins.sh` to refresh the plugin trees; CI's `validate-skills` job runs `asctl repo-check` to validate `skills/` against the agentskills.io spec.
 
-When authoring or compressing a skill, follow **CONTRIBUTING.md → "Skill content conventions"** (non-inferable delta, version pins, verify-canonical guard). The `/skill:audit` skill checks these.
+When authoring or compressing a skill, follow **CONTRIBUTING.md → "Skill content conventions"** (non-inferable delta, version pins, verify-canonical guard). The `/claude-code:skill-audit` skill checks these.
 
 ### Python skills (csv, pdf, xlsx, docx)
 
@@ -131,7 +131,7 @@ the pixi environment — hence the `pixi run` prefix on every command below.
 pixi run bash scripts/validate-plugins.sh
 
 # Validate only plugins touched by changed files
-pixi run bash scripts/validate-plugins.sh plugins/hooks/hooks/hooks.json
+pixi run bash scripts/validate-plugins.sh plugins/claude-code/hooks/hooks.json
 
 # Refresh plugin trees from canonical skills/ and agents/. Run after
 # editing a skill or agent.
