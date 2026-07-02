@@ -13,8 +13,10 @@ release), see [`AGENTS.md`](AGENTS.md) and [`docs/ARCHITECTURE.md`](docs/ARCHITE
 > registry-owned `{source, leaf}` mapping + sync/packaging) is
 > [#102](https://github.com/nq-rdl/agent-extensions/issues/102). Grouping is owned **here** in
 > `agent-extensions`, so the canonical `skills/` tree stays flat — no restructuring of the skill
-> sources is required (the earlier grouping-in-source plan, agent-skills#118, was closed as superseded). Design:
-> `docs/specs/2026-06-02-plugin-grouping-design.md`; rollout: `docs/specs/2026-06-05-plugin-mapping-migration.md`.
+> sources is required (the earlier grouping-in-source plan, agent-skills#118, was closed as superseded).
+> The design and rollout specs (`docs/specs/2026-06-02-plugin-grouping-design.md`,
+> `docs/specs/2026-06-05-plugin-mapping-migration.md`) were removed in the pre-v0.14.0 cleanup —
+> recover them from git history if needed.
 
 Every skill and agent is invoked as **`<subject>:<facet>`** — the `subject` is the plugin, the
 `facet` is what it does. The rules below decide both halves. The colon is always present for

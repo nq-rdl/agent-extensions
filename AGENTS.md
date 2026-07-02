@@ -83,7 +83,7 @@ To make installs self-contained, `plugins/<bundle>/skills/<name>/` and `plugins/
 - **Refresh plugin trees** by running `bash scripts/sync-plugins.sh` (or pass a bundle name to scope it). The script reads `registry/bundles/<b>.yaml`, removes any stale copies, and rewrites `plugins/<b>/skills/<name>/` and `plugins/<b>/agents/<name>.md` from the canonical sources. It also rewrites this repo's own live `.claude/scripts/{install-deps,announce-capabilities}.sh` cc-web-setup SessionStart hook copies from canonical `skills/cc-web-setup/assets/` (forcing them executable — `0o755` — since those copies are invoked directly from `.claude/settings.json`), and drift-checks them under `--check` (bytes, plus a non-executable live copy or canonical asset); the repo-local `.claude/scripts/install-deps.local.sh` seam has no canonical source and is left untouched.
 - **CI** validates that every bundle YAML reference resolves and that every plugin manifest is well-formed. See `scripts/validate-plugins.sh`.
 
-**Grouped skills.** A bundle skill member is either a flat string (`go-gh` → `leaf == go-gh`) or an explicit `{source, leaf}` mapping (`{source: go-gh, leaf: gh}`). `sync-plugins.sh` copies the flat canonical `skills/<source>/` → `plugins/<pluginName>/skills/<leaf>/`, **renaming to the leaf**, so the plugin tree stays one level deep and Claude Code invokes `<pluginName>:<leaf>` (the leaf folder drives invocation). Claude Code labels a skill in `/`-autocomplete as `frontmatter.name || <pluginName>:<leaf>` — so a present `name:` (the upstream `go-gh` **or** the leaf `gh`) overrides the namespaced id with a bare, un-prefixed label, and `/go` lists `go-gh`/`gh` instead of `go:gh`. To get the namespaced label, sync **strips the copy's `name:` entirely** so the label falls back to `<pluginName>:<leaf>`. The canonical `skills/` tree is never touched; grouping is owned **here** in the registry and stays flat. See `CONTRIBUTING.md` §6 for the rules, `scripts/check_grouping.py` for the contract, and `scripts/validate-plugins.sh` for the no-name guard.
+**Grouped skills.** A bundle skill member is either a flat string (`changie` → `leaf == changie`) or an explicit `{source, leaf}` mapping (`{source: go-gh, leaf: go}` in the `gh` bundle → `/gh:go`). `sync-plugins.sh` copies the flat canonical `skills/<source>/` → `plugins/<pluginName>/skills/<leaf>/`, **renaming to the leaf**, so the plugin tree stays one level deep and Claude Code invokes `<pluginName>:<leaf>` (the leaf folder drives invocation). Claude Code labels a skill in `/`-autocomplete as `frontmatter.name || <pluginName>:<leaf>` — so a present `name:` (the canonical `go-gh` **or** the leaf `go`) overrides the namespaced id with a bare, un-prefixed label, and `/gh` lists `go-gh`/`go` instead of `gh:go`. To get the namespaced label, sync **strips the copy's `name:` entirely** so the label falls back to `<pluginName>:<leaf>`. The canonical `skills/` tree is never touched; grouping is owned **here** in the registry and stays flat. See `CONTRIBUTING.md` §6 for the rules, `scripts/check_grouping.py` for the contract, and `scripts/validate-plugins.sh` for the no-name guard.
 
 Skills and agents are authored directly under `skills/` and `agents/`. After editing one, run `bash scripts/sync-plugins.sh` to refresh the plugin trees; CI's `validate-skills` job runs `asctl repo-check` to validate `skills/` against the agentskills.io spec.
 
@@ -203,12 +203,17 @@ Schema:
 schemaVersion: v1
 id: go
 displayName: Go
-description: Go — idiomatic naming, secure error handling, and GitHub Actions CI/CD  # no trailing period
-keywords: [go, naming, security, ci-cd]   # marketplace keywords (generated into the manifests)
+description: Go — idiomatic naming and secure error handling  # no trailing period
+keywords: [go, naming, security]           # marketplace keywords (generated into the manifests)
+owners: [rdl]
+channels: [stable]
 skills:                                    # flat <name> (leaf == name), or {source, leaf} to rename
-  - {source: go-gh, leaf: gh}              #   → invokes as /go:gh
-  - {source: go-naming, leaf: naming}      #   → /go:naming
-agents: [go-mcp-expert]                    # must exist as agents/<name>/agent.md (subagent)
+  - {source: go-naming, leaf: naming}      #   → invokes as /go:naming
+  - {source: go-secure, leaf: secure}      #   → /go:secure
+agents:                                    # must exist as agents/<name>/agent.md (subagent)
+  - go-mcp-expert
+  - wg-code-sentinel
+  - github-actions-expert
 hooks: []
 prompts: []
 mcp: []                                    # wired in plugins/<pluginName>/.mcp.json
