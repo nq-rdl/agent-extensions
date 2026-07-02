@@ -53,3 +53,26 @@ load helper
   [ "$status" -ne 0 ]
   [[ "$output" == *"no spec branch"* ]]
 }
+
+@test "trunk merge strips the ephemeral spec dir (ADR holds the record)" {
+  run "$PROVISION" feat
+  [ "$status" -eq 0 ]
+  ( cd .claude/worktrees/001 && mkdir -p specs/001-feat && echo "# spec" > specs/001-feat/spec.md \
+      && git add -A && git commit -q -m "add spec" )
+  run "$MERGE" 001
+  [ "$status" -eq 0 ]
+  [ ! -d "specs/001-feat" ]   # ephemeral spec removed from trunk
+}
+
+@test "integration-branch merge retains the spec dir" {
+  git checkout -q -b epic-y
+  git commit -q --allow-empty -m "epic base"
+  git checkout -q main
+  run "$PROVISION" grp --base epic-y
+  [ "$status" -eq 0 ]
+  ( cd .claude/worktrees/001 && mkdir -p specs/001-grp && echo "# spec" > specs/001-grp/spec.md \
+      && git add -A && git commit -q -m "add spec" )
+  run "$MERGE" 001
+  [ "$status" -eq 0 ]
+  [ -d "specs/001-grp" ]   # spec retained on the integration branch
+}

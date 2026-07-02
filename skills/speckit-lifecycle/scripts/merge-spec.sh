@@ -63,4 +63,16 @@ git worktree prune
 git branch -d "$BRANCH" >&2
 git push origin --delete "$BRANCH" >/dev/null 2>&1 || true   # best-effort; ok if no remote
 
+# On a TRUNK merge the spec is ephemeral — its decision points belong in a durable ADR
+# (archive first via the architecture-decision-records skill). Strip specs/NNN-slug/ so
+# trunk stays clean. On an integration-branch merge the spec is retained (work continues).
+if [ "$TARGET" = "$TRUNK" ]; then
+  SPEC_DIR="$(ls -d "specs/${NNN}-"* 2>/dev/null | head -1 || true)"
+  if [ -n "$SPEC_DIR" ] && [ -d "$SPEC_DIR" ]; then
+    git rm -rq "$SPEC_DIR"
+    git commit -q -m "chore(${NNN}): archive ephemeral spec — decision record lives in docs/adr/"
+    echo "stripped ephemeral ${SPEC_DIR} (archive its decisions as an ADR)" >&2
+  fi
+fi
+
 echo "merged ${BRANCH} -> ${TARGET}"

@@ -79,9 +79,17 @@ only provisioned specs (branch + worktree exist) and completed specs recorded in
 
 ### 2c. Merge a completed spec
 
-Run `scripts/merge-spec.sh <NNN>`. The merge target is resolved from git topology
-(trunk, or the integration branch the spec was cut from). `specs/NNN-slug/` remains as
-the permanent record; `NNN` is never reused.
+**Specs are ephemeral; ADRs are the durable record.** Before merging to **trunk**, offer
+to archive the spec's decision points as an ADR (delegate to the
+`architecture-decision-records` skill or the `adr-generator` agent) — the ADR in
+`docs/adr/` is what survives on trunk.
+
+Then run `scripts/merge-spec.sh <NNN>`. The merge target is resolved from git topology.
+On a **trunk** merge the spec is ephemeral: `merge-spec.sh` strips `specs/NNN-slug/`
+(its decisions now live in `docs/adr/`), keeping trunk clean. On an **integration-branch**
+merge the spec is retained (work continues under the integration branch). `NNN` is never
+reused. The `.specify/` scaffolding and the speckit phase skills are **branch-only**
+execution tooling — they are not trunk deliverables and do not merge to trunk.
 
 ### 2d. Action PR review comments
 
@@ -134,7 +142,8 @@ and falls back to bare git if absent.
   guard, branch + worktree creation, spec seeding. Tested in `.tests/provision-worktree.bats`.
 - `scripts/merge-spec.sh <NNN>` — topology-based merge target, `--no-ff` merge,
   worktree-slot removal **before** branch deletion, idempotent cleanup, loud refusal on
-  uncommitted changes. Tested in `.tests/merge-spec.bats`.
+  uncommitted changes, and **strips the ephemeral `specs/NNN-slug/` on a trunk merge**
+  (retains it on integration merges). Tested in `.tests/merge-spec.bats`.
 
 Compatibility: SpecKit `.specify/` project layout; speckit phase skills
 `speckit-{specify,clarify,plan,tasks,checklist,analyze}`. Run `bats .tests/` after

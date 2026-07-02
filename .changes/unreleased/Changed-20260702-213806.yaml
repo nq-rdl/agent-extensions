@@ -1,0 +1,2 @@
+kind: Changed
+body: speckit-lifecycle merge step now treats specs as ephemeral — on a trunk merge it strips specs/NNN-slug/ (decisions are archived as ADRs), keeping trunk clean; integration merges retain the spec
