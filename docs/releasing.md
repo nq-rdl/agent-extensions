@@ -34,7 +34,11 @@ current `VERSION`; no existing `v<version>` tag, `release/v<version>` branch, or
 `.changes/<version>.md` may be present; and there must be unreleased changie fragments to batch.
 The finalize workflow re-asserts monotonicity at the publish point: it refuses to tag a version at
 or below the newest existing `v*` tag, so merging two open release PRs out of order fails closed
-instead of publishing a downgrade.
+instead of publishing a downgrade. A pre-merge companion, **"Release — PR guard"**
+(`.github/workflows/release-pr-guard.yml`), runs on every `release/v*` PR and fails when the PR's
+version is not strictly greater than `main`'s current `VERSION` — catching a stale release PR
+*before* its downgraded `VERSION` and manifests can land on `main` at all (see the required-check
+prerequisite below for what makes this binding).
 
 A brief red `changelog-check` run on the PR right when it opens is expected and harmless — the
 `skip-changelog` label is applied moments after PR creation, and the label's own event re-runs the
@@ -50,10 +54,16 @@ the Actions tab. The workflow is idempotent and branches on what already exists:
 - Tag exists, release does not → skips tagging, creates only the release.
 - Both already exist → full no-op.
 
-**Need a late changie fragment after the PR is already open.** Either push an additional commit
-with the new fragment directly to the `release/v*` branch (the prepare run only *opens* the PR; it
-doesn't keep re-running), or close the PR, delete the `release/v*` branch, add the fragment on
-`main`, and re-dispatch "Release — Prepare PR" with the same version.
+**Need a late changie fragment after the PR is already open.** The prepare run already batched
+`.changes/unreleased/` into `.changes/<version>.md` — a fragment simply committed to the release
+branch stays in `unreleased/`, is **omitted from the release notes**, and merges back to `main`
+(where it would ship in the *next* release instead). To include it in *this* release, either:
+
+- close the PR, delete the `release/v*` branch, land the fragment on `main`, and re-dispatch
+  "Release — Prepare PR" with the same version (cleanest — the whole batch re-runs), or
+- on the release branch, fold the entry into `.changes/<version>.md` by hand (add the bullet under
+  the right kind heading) and rebuild `CHANGELOG.md` with `changie merge` — never leave the new
+  fragment in `.changes/unreleased/`.
 
 ## Rollback
 
@@ -79,6 +89,11 @@ Tracked in #175 / #176, required before the flow above works end-to-end:
   around as a standing exception.
 - A `v*` tag ruleset is added restricting tag create/delete/non-fast-forward-update to the release
   App, so only the finalize workflow (or a maintainer acting through it) can move release tags.
+- The **"Release — PR guard" / `version-monotonic`** check is marked as a required status check on
+  `main`, and **"require branches to be up to date before merging"** is enabled. Base-branch moves
+  alone do not re-run PR checks, so without the up-to-date requirement a stale release PR keeps the
+  green guard run it earned before a newer version merged. (The guard job is skipped on
+  non-release PRs; GitHub treats a skipped required check as passing.)
 
 **Bootstrap note (#172).** `workflow_dispatch` and `pull_request: closed` both execute the
 workflow file as it exists on the **default branch**, not as it exists on a feature branch. That
