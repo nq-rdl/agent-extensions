@@ -32,7 +32,9 @@ phase to completed, correctly-marked tasks has the core value and can ship a fea
 
 **Independent Test**: In a worktree on a `NNN-slug` branch with a partially-complete spec,
 invoke the skill and confirm it resumes at the first incomplete phase, runs each remaining
-phase's SpecKit skill in order, and drives the implementation loop until every task is `[x]`.
+phase's SpecKit skill in order, and drives the implementation loop until every task is `[x]`;
+and, in a repo declaring an external Implement strategy, confirm the skill invokes that
+strategy rather than its own loop.
 
 **Acceptance Scenarios**:
 
@@ -50,6 +52,14 @@ phase's SpecKit skill in order, and drives the implementation loop until every t
    the skill discovers validation from `Makefile`/`CLAUDE.md`/`pixi.toml`/`package.json` or
    performs best-effort checks and **explicitly flags** that no automated validation exists,
    never silently passing.
+5. **Given** a repo that declares no Implement strategy, **When** the skill reaches the
+   Implement phase, **Then** it runs the default single-agent loop from FR-012 (implement →
+   validate → commit → mark `[x]`). **Given** a repo that declares an external Implement
+   strategy — e.g. `forge-quill` or a Superpowers subagent-driven/TDD loop — in
+   `CLAUDE.md`/`.specify/`, **When** the skill reaches the Implement phase, **Then** it
+   invokes that declared strategy to execute the tasks instead of its own loop, and the
+   phase still completes only when every task is `[x]` — the skill owns *reaching* Implement,
+   never dictating *how* tasks run within it.
 
 ---
 
@@ -190,7 +200,7 @@ rather than re-authored per repo, but it is gated on the skill and scripts exist
 - **FR-011**: The phase sequence MUST be repo-configurable (`CLAUDE.md` or `.specify/`); the default is `specify → clarify → plan → tasks → analyze → implement` with the checklist phase run only when declared.
 - **FR-012**: The implementation loop MUST, for each `[ ]` task, implement → validate → commit (single-line conventional; imperative; no body; no attribution) → mark `[x]`, and MUST NOT mark a task complete while its validation fails.
 - **FR-013**: When no test suite exists, the skill MUST discover validation from `Makefile`/`CLAUDE.md`/`pixi.toml`/`package.json` or perform best-effort checks, and MUST explicitly flag the absence of automated validation rather than silently passing.
-- **FR-014**: The Implement phase strategy MUST be pluggable — the default is the single-agent loop, but a repo MAY delegate it to an external strategy skill (e.g. `forge-quill`) declared in `CLAUDE.md`/`.specify/`; the skill owns reaching the Implement phase, not how tasks within it execute.
+- **FR-014**: The Implement phase strategy MUST be pluggable — the default is the single-agent loop, but a repo MAY delegate it to an external strategy skill (e.g. `forge-quill`) declared in `CLAUDE.md`/`.specify/`; the skill owns reaching the Implement phase, not how tasks within it execute (see epic #207 / #204 for the Superpowers-extension recommendation this delegation consumes).
 - **FR-015**: The skill MUST NOT hardcode paths, commands, or forge API details — trunk branch, merge target, validation commands, PR API, phase list, implement strategy, and `CLAUDE.md` location are all discovered at runtime.
 - **FR-016**: The skill's `description` frontmatter MUST use generic trigger phrases with no repo-specific references (e.g. "new spec", "start/pick up a spec", "what specs are in progress", "drive implementation", "work through the backlog", "merge spec NNN", "action PR comments").
 - **FR-017**: The skill MUST be packaged as a new `speckit` bundle (`registry/bundles/speckit.yaml`, id `speckit`, displayName `SpecKit`, skill `speckit-lifecycle`, target `claude` pluginName `speckit` marketplaceName `rdl`), added to `registry/marketplace.yaml` order + `rdl` meta-plugin deps, with plugin trees, manifests, and docs regenerated so all CI validators stay green.
