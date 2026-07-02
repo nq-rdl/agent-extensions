@@ -23,8 +23,8 @@ consulted for retrieval (FR-009) and next-number derivation (R4).
   legacy `adr-NNNN-slug.md` row and a new `NNNN-title.md` row can coexist. Next-number
   derivation scans the numeric prefix of every entry/file (`max + 1`).
 - **Retrieval (FR-009, SC-004)**: "why did we choose X?" is answered by matching against
-  index titles, reading the matched file, and quoting its Decision Drivers + Decision
-  Outcome. No index match → the skill states "not recorded" and offers to capture — it
-  MUST NOT fabricate a rationale.
+  index titles (and, failing that, the indexed ADRs' Decision Drivers), reading the matched
+  file, and quoting its Decision Drivers + Decision Outcome. No index match → the skill
+  states "not recorded" and offers to capture — it MUST NOT fabricate a rationale.
 - **Missing store**: if `docs/adr/README.md` does not exist, retrieval reports none
   recorded and offers to initialize (consent-gated); it never creates it silently.

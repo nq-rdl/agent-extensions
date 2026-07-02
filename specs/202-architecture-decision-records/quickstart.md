@@ -13,7 +13,7 @@ after step 5 but before the skill is complete they should surface the new skill 
 
 ```bash
 # 1. Author canonical skill
-#    skills/architecture-decision-records/SKILL.md  (+ references/*.md)
+#    skills/architecture-decision-records/SKILL.md  (+ assets/*.md)
 # 2. Cross-link the agent
 #    edit agents/adr-generator/agent.md → add a pointer to the skill
 # 3. Register in the planning bundle
@@ -56,7 +56,7 @@ claude --plugin-dir ./plugins/planning   # single-session, reads the working tre
 | 1 | In a session with no `docs/adr/`, say "let's record why we picked the queue over the cron poller" | Skill OFFERS to capture; **no file written** yet; offers to initialize `docs/adr/` | US1 AC1/AC4, FR-002/FR-007, SC-002 |
 | 2 | Consent to capture | Writes `docs/adr/0001-*.md` as **Structured MADR v4**: Drivers first, one Pros/Cons block per option, outcome that names a driver, a `Links` section; appends a row to `docs/adr/README.md` | US1 AC2/AC3, FR-003/FR-005/FR-006, SC-001/SC-003 |
 | 3 | Trigger a second capture; consent | New file numbered `0002`; index updated | FR-006, SC-003 |
-| 4 | Delete `0002-*.md`, trigger a third capture | Next number is `0003` (max+1, **never reused**) | R4, SC-003 |
+| 4 | Delete `0002-*.md`, trigger a third capture | Next number is `0003` — the retained `0002` index row is the high-water mark, so `max(files, index)+1` **never reuses** it | R4, SC-003 |
 | 5 | Trigger a decision, then **decline** | No file created or modified | US1 AC5, FR-002, SC-002 |
 | 6 | Ask "why did we choose the queue over the cron poller?" | Answer quotes the recorded Drivers + Outcome from `0001` via the index | US2 AC1, FR-009, SC-004 |
 | 7 | Ask "why did we choose GraphQL?" (unrecorded) | "Not recorded" + offer to capture; **no fabricated rationale** | US2 AC2, FR-009, SC-004 |

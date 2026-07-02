@@ -3,7 +3,7 @@
 The `SKILL.md` frontmatter is the skill's public interface — its `description` is the
 trigger contract Claude Code matches against. Must satisfy `asctl repo-check`:
 `name` required ≤ 64 runes; `description` required ≤ 1024 runes; manifest named exactly
-`SKILL.md`; only `SKILL.md` + `lychee.toml` at top level; extras under `references/`.
+`SKILL.md`; only `SKILL.md` + `lychee.toml` at top level; extras under `assets/`.
 
 ## Required frontmatter shape (illustrative)
 

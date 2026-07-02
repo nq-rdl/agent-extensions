@@ -48,7 +48,7 @@ authoring, validation, and packaging pipeline.
   frontmatter `name` (required, ≤ 64 runes — `architecture-decision-records` = 29),
   `description` (required, ≤ 1024 runes); manifest filename must be exactly `SKILL.md`;
   only `SKILL.md` and `lychee.toml` allowed at the skill top level; supporting files
-  live under `references/`.
+  live under `assets/`.
 - **Format spec pinned**: MADR (`adr/madr`) **v4** — the version is pinned in the skill
   frontmatter `compatibility:` so drift is visible/reviewable (FR-004), with a
   verify-canonical guard pointing at `https://adr.github.io/madr/` /
@@ -119,7 +119,7 @@ skills/
 └── architecture-decision-records/        # NEW — canonical skill (single edit point)
     ├── SKILL.md                          #   frontmatter (name, description, license,
     │                                     #   compatibility: MADR v4 pin) + skill body
-    └── references/                       #   supporting files (progressive disclosure)
+    └── assets/                       #   supporting files (progressive disclosure)
         ├── madr-v4-template.md           #   the Structured MADR v4 skeleton emitted
         ├── index-template.md             #   docs/adr/README.md index seed + row format
         └── spec-to-adr-mapping.md        #   speckit spec fields → MADR fields table
@@ -149,7 +149,7 @@ docs/adr/                                 # NOT created by this feature — the 
 **Structure Decision**: Single canonical documentation skill under
 `skills/architecture-decision-records/` (leaf name equals directory name, so it enters
 the `planning` bundle as a **flat** member — no `{source, leaf}` rename needed), with
-supporting material under `references/` per the agentskills.io directory standard. The
+supporting material under `assets/` per the agentskills.io directory standard. The
 `planning` plugin tree is regenerated from canonical sources; generated manifests/docs
 are refreshed by their scripts. `docs/adr/` is a **runtime artifact the skill offers to
 create in the user's own project**, not a repo directory this feature adds.

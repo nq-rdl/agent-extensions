@@ -68,16 +68,23 @@ are reviewable and — fittingly — could themselves be captured as ADRs.
 
 ## R4 — Numbering rule (supports FR-006, SC-003, edge cases)
 
-- **Decision**: next number = **(highest numeric prefix found in `docs/adr/`) + 1**,
-  scanning **both** `NNNN-*.md` and `adr-NNNN-*.md`. Numbers are **sequential and never
-  reused**, even if a file was deleted (the max, not the count, drives it). Zero-padded
-  to 4 digits. First ADR is `0001`.
-- **Rationale**: max+1 is the only rule that survives deleted/renamed files and mixed
-  conventions without reuse; counting files would recycle a deleted number and break
-  supersession links.
-- **Alternatives considered**: *count-based* (`count+1`) — rejected: reuses numbers after
-  deletion. *Date/UUID names* — rejected: not sequential, breaks the index ordering and
-  the spec's monotonic-numbering requirement.
+- **Decision**: next number = **`max(highest numeric prefix across docs/adr/ filenames,
+  highest number recorded in the docs/adr/README.md index) + 1`**, scanning **both**
+  `NNNN-*.md` and `adr-NNNN-*.md` filenames **and** the index. Numbers are **sequential
+  and never reused**, even if a file was deleted — a manual delete leaves the index row
+  behind, so the index preserves the high-water mark that a filename scan alone would lose
+  when the highest-numbered file is removed. Zero-padded to 4 digits. First ADR is `0001`.
+  (Clarified 2026-07-02.)
+- **Rationale**: taking the max over both the filenames and the retained index rows is the
+  only rule that survives deleted/renamed files and mixed conventions without reuse. A
+  filename-only max recycles the top number once its file is deleted; the index (which a
+  manual delete does not prune) carries the high-water mark, while counting files would
+  recycle any deleted number and break supersession links.
+- **Alternatives considered**: *filename-only max* (`max(file prefixes) + 1`) — rejected:
+  reuses the top number after the highest file is deleted (breaks SC-003 / quickstart row
+  4). *count-based* (`count+1`) — rejected: reuses numbers after deletion. *Date/UUID
+  names* — rejected: not sequential, breaks the index ordering and the spec's
+  monotonic-numbering requirement.
 
 ## R5 — Structured MADR v4 record shape (supports FR-003, SC-001)
 
@@ -129,12 +136,12 @@ mandatory and ordered drivers-first. Full skeleton lives in
   consent gate, the speckit-mapping table, the cross-link to the agent) — **not** a
   restatement of the public MADR spec; **pin** MADR v4 in `compatibility:`; include a
   **verify-canonical guard** pointing at the authoritative MADR source. Supporting
-  material goes under `references/`; top level holds only `SKILL.md`.
+  material goes under `assets/`; top level holds only `SKILL.md`.
 - **Rationale**: matches the model skills (`skills/rust-explain/SKILL.md` for the guard
   pattern) and is exactly what `asctl repo-check` + `/skill:audit` enforce.
 - **Alternatives considered**: inlining the whole MADR template into `SKILL.md` prose —
   rejected: "comprehensive" recital scores worst (Biggs/SkillsBench) and bloats the
-  manifest; the template belongs in `references/`.
+  manifest; the template belongs in `assets/`.
 
 ## Open items after Phase 0
 

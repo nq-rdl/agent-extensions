@@ -11,7 +11,7 @@ A single Structured MADR v4 document on disk at `docs/adr/NNNN-title.md`.
 
 | Field | Source | Required | Notes |
 |---|---|---|---|
-| `number` (NNNN) | derived | yes | 4-digit zero-padded; = max existing prefix + 1 (R4). |
+| `number` (NNNN) | derived | yes | 4-digit zero-padded; = `max(highest filename prefix, highest index entry) + 1` (R4). |
 | `title` | decision moment | yes | Short, names problem + solution; slugged into filename. |
 | `status` | user | yes | `proposed \| accepted \| rejected \| deprecated \| superseded by NNNN`. |
 | `date` | today | yes | ISO `YYYY-MM-DD`. |
@@ -62,7 +62,7 @@ initialization that creates `docs/adr/` (FR-007).
 ## Entity: ADR Template
 
 The skeleton used to create a new ADR consistently. Canonical copy authored at
-`skills/architecture-decision-records/references/madr-v4-template.md`; the skill offers
+`skills/architecture-decision-records/assets/madr-v4-template.md`; the skill offers
 to drop a `docs/adr/template.md` copy at initialization (consent-gated). Mirrors the
 Structured MADR v4 element set (R5).
 
@@ -89,7 +89,7 @@ An in-session event that prompts the skill to offer capture (FR-001). Not persis
 | Kind | Examples |
 |---|---|
 | Explicit cue | "let's record this decision", "ADR this", "why did we choose X?" |
-| Implicit cue | user weighs significant alternatives (framework/db/pattern/API/auth/infra) and reaches a conclusion |
+| Implicit cue | user weighs significant alternatives (framework/library/db/pattern/API/auth/infra) and reaches a conclusion |
 | Archival cue | a speckit spec is merged to `main` (#124 step) or the archival path is invoked |
 
 **Rule**: detection only ever produces an **offer**; it never writes (FR-002). A

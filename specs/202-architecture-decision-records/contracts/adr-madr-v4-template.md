@@ -1,7 +1,7 @@
 # Contract: Structured MADR v4 record
 
 The exact skeleton the skill emits (canonical copy shipped at
-`skills/architecture-decision-records/references/madr-v4-template.md`). Drivers appear
+`skills/architecture-decision-records/assets/madr-v4-template.md`). Drivers appear
 **before** options and outcome; **each** option gets its own Pros/Cons block; the
 outcome **references a driver**; a `Links` section supports supersession.
 

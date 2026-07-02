@@ -3,7 +3,7 @@
 Governs User Story 3 (FR-010, SC-005). On a **merged** `specs/NNN-slug/`, the skill
 offers (consent-gated) to archive it as an ADR by mapping spec fields to MADR fields.
 Canonical copy shipped at
-`skills/architecture-decision-records/references/spec-to-adr-mapping.md`.
+`skills/architecture-decision-records/assets/spec-to-adr-mapping.md`.
 
 ## Field mapping
 
