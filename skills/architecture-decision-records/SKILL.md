@@ -100,4 +100,4 @@ explicit user request (no forge polling). OFFER to archive; on consent, map fiel
 | Spec link | Links |
 
 A field the spec is silent on is written **"Not recorded in the spec"** — never
-fabricated. Assign the next number, write `docs/adr/NNNN-<title>.md`, update the index.
+fabricated. Assign the next number, write `docs/adr/NNNN-<kebab-title>.md`, update the index.
