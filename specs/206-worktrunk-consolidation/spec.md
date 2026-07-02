@@ -22,7 +22,7 @@ capabilities against #124's script requirements and the overlap with `cc-spex`.
 
 - FR-1: Compare `wt` against each `provision-worktree.sh`/`merge-spec.sh` requirement:
   NNN derivation, conflict guards, `--base` parentage, merge-target topology, post-merge cleanup, worktree location.
-- FR-2: Document overlap with `cc-spex`'s `spex-worktrees` given #203's outcome.
+- FR-2: Document overlap with `cc-spex`'s `spex-worktrees` given #203's evaluation (`docs/evaluations/203-cc-spex-evaluation.md`, PR #213: conditional — do not adopt now).
 - FR-3: Record the decision (consolidate / keep bespoke) with rationale.
 - FR-4: If keeping bespoke, confirm #124's acceptance criteria need no Worktrunk dependency; if consolidating, update them.
 - FR-5: Capture the follow-up: whether `wt`'s worktree location should be remapped to `.claude/worktrees/` (the epic-execution edge case surfaced during Wave 0).
@@ -31,7 +31,7 @@ capabilities against #124's script requirements and the overlap with `cc-spex`.
 ## Success Criteria
 
 - SC-1: A `docs/evaluations/206-worktrunk-consolidation.md` decision doc exists with the capability matrix, the decision, and rationale.
-- SC-2: The decision is consistent with #124 (no orphaned dependency) and #203 (cc-spex not adopted now).
+- SC-2: The decision is consistent with #124 (no orphaned dependency) and with #203's recommendation (cc-spex conditional-no; if later adopted, `spex-worktrees` stays disabled — no competing worktree mechanism).
 
 ## Non-goals
 

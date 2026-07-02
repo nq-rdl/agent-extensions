@@ -19,10 +19,19 @@ worktree provisioning/merge to the Worktrunk (`wt`) CLI, or keep its bespoke scr
 
 ## Overlap with `cc-spex`'s `spex-worktrees`
 
-Per #203 the recommendation is **CONDITIONAL — do not adopt `cc-spex` now**, so
-`spex-worktrees` is not in play. It provides general git-worktree isolation (overlapping
-`wt`'s core function and Superpowers' `using-git-worktrees`); it does **not** provide the
-speckit-`NNN`/`specs/` semantics either. No consolidation target there today.
+The #203 evaluation (`docs/evaluations/203-cc-spex-evaluation.md`, PR #213 — both land on the
+epic branch before `main`) recommends **CONDITIONAL — do not adopt `cc-spex` now**, so
+`spex-worktrees` is not enabled today. Assessing it against this issue, #203 flags worktrees as
+the **sharpest conflict**: `spex-worktrees` registers a **mandatory `after_specify` hook** that
+auto-creates a sibling worktree on every `/speckit.specify` — a second, competing worktree
+mechanism at the SpecKit → Superpowers boundary. It provides only generic git-worktree isolation
+(overlapping `wt`'s core function and Superpowers' `using-git-worktrees`) and does **not** provide
+the speckit-`NNN`/`specs/` semantics `provision-worktree.sh`/`merge-spec.sh` exist for.
+
+So `spex-worktrees` is not a consolidation target — it is an active conflict to avoid, and #203's
+adoption conditions already prescribe keeping it **disabled** wherever the team runs its own
+worktree tooling (the bespoke scripts and/or Worktrunk). This decision (keep bespoke, `wt`
+complementary) is consistent with that either way: no `cc-spex` worktree mechanism is layered in.
 
 ## Decision: **keep the bespoke scripts** (do not consolidate onto `wt`)
 
@@ -62,4 +71,5 @@ Surfaced during this epic's own execution (Wave 0). Findings:
 ## Outcome
 
 Keep bespoke scripts; position `wt` as the recommended interactive complement; no #124
-changes; revisit only if `cc-spex`/`spex-worktrees` is later adopted (#203).
+changes. `cc-spex` is conditional-no per #203 (PR #213); if it is later adopted, keep
+`spex-worktrees` **disabled** per that evaluation — so this decision stands either way.
