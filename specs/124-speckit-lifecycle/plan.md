@@ -14,7 +14,10 @@ safety-critical, deterministic git operations — worktree provisioning and spec
 two versioned bash scripts shipped under the skill's `scripts/`, unit-tested with `bats`
 against throwaway fixture repos. Everything the skill does is discovered at runtime: trunk
 branch, merge target, validation commands, PR forge/API, phase list, implement strategy,
-and `CLAUDE.md` location are never hardcoded. The skill generalizes the `dst-autoloop`
+and `CLAUDE.md` location are never hardcoded. An externally-managed `CLAUDE.md` (a symlink or a
+declared-managed flag) is treated as read-only and guarded — never overwritten — when a driven
+phase would write it (FR-019), and a repo without `.specify/` is adopted only through an opt-in
+`specify init` bootstrap, never automatically (FR-020). The skill generalizes the `dst-autoloop`
 prior art with all data-science specifics removed. Technical approach: Markdown skill body
 + two POSIX/bash scripts (modeled on `skills/bitwarden/scripts` and
 `skills/cc-web-setup/scripts`) + a hidden `.tests/` bats suite (invisible to
@@ -49,7 +52,10 @@ marketplace-bundle packaging. No frontend/backend split.
 normal repo. No throughput target.
 **Constraints**: Zero hardcoded paths, commands, or forge API details — trunk, merge target,
 validation, PR API, phase list, implement strategy, and `CLAUDE.md` location all discovered
-at runtime (FR-015). Scripts are idempotent where specified (worktree removal), abort loudly
+at runtime (FR-015). `CLAUDE.md` is read-only discovery input: an externally-managed one
+(symlink or declared-managed flag) is guarded against any driven phase's agent-context write,
+never replaced (FR-019); a repo lacking `.specify/` is bootstrapped only opt-in via `specify
+init`, never automatically (FR-020). Scripts are idempotent where specified (worktree removal), abort loudly
 on conflict/uncommitted-changes, and never mutate state on a conflict-guard abort.
 `asctl` structure rules: only `assets/`, `references/` (`.rst` only), `scripts/` allowed as
 non-hidden subdirs; hidden dot-dirs ignored — hence `.tests/`.
@@ -63,7 +69,7 @@ test areas, 1 new registry bundle, plus regenerated plugin tree + manifests + do
 Evaluated against the project constitution v1.0.0 (Principles I–V + Quality Gates).
 
 - **I. Spec-First Authority — PASS.** The "what" lives in `specs/124-speckit-lifecycle/spec.md`
-  (18 FRs, 6 SCs, 4 prioritized user stories). This plan derives only the "how"; any scope
+  (20 FRs, 8 SCs, 4 prioritized user stories). This plan derives only the "how"; any scope
   change routes back to the spec, not to code.
 - **II. Execution via Superpowers — PASS.** Downstream execution follows worktree isolation
   (this work already runs in `.claude/worktrees/124`), TDD, and code review; the plan does not

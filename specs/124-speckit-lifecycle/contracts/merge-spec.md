@@ -25,7 +25,10 @@ merge-spec.sh <NNN>
 3. **Merge-target resolution**: via git topology (`git merge-base`) — trunk, or the integration
    branch the spec was cut from. Never assumed to be trunk.
 4. **Merge**: `git checkout <target>` then `git merge --no-ff <NNN>-slug -m "<conventional msg>"`.
-5. **Cleanup — strict order**:
+   - **On conflict**: `git merge --abort` (restore clean tree), print a loud message, and **exit
+     non-zero without running any cleanup** — slot and branch stay intact. No auto-resolution
+     (no `-X ours/theirs`); conflict resolution is a human/skill task outside the script.
+5. **Cleanup — strict order** (reached only on a clean merge):
    1. `git worktree remove .claude/worktrees/NNN` (**before** branch deletion; idempotent if
       already absent),
    2. `git branch -d <NNN>-slug`,
@@ -37,7 +40,7 @@ merge-spec.sh <NNN>
 | Code | Meaning |
 |---|---|
 | 0 | Merge complete; slot removed then branch deleted; spec dir retained |
-| non-0 | Uncommitted changes in slot, missing branch/NNN, or merge conflict — loud message, no data loss |
+| non-0 | Uncommitted changes in slot, missing branch/NNN, or **merge conflict** (`git merge --abort`, no cleanup) — loud message, no data loss |
 
 ## Idempotency
 
@@ -51,4 +54,5 @@ treated as satisfied, not errors.
 - Worktree slot removed **before** branch deletion (FR-007, SC-006).
 - Worktree removal idempotent (FR-007).
 - Dirty slot → loud refusal, no mutation (FR-007, SC-006).
+- **Merge conflict → `git merge --abort`, non-zero exit, no cleanup (slot + branch intact)** (FR-007, Clarification 2026-07-02).
 - `specs/NNN-slug/` retained; `NNN` never reused (FR-008).

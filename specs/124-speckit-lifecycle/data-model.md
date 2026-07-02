@@ -22,6 +22,8 @@ imposes.
 - **State transitions**:
   `provisioned` (branch + slot exist) → `in-progress` (phases advancing) →
   `completed` (all tasks `[x]`) → `merged` (branch + slot removed, `specs/NNN-slug/` retained).
+  A merge that **conflicts** does not transition to `merged`: `merge-spec.sh` aborts and the Spec
+  stays `completed` with its branch + slot intact (Clarification 2026-07-02).
   There is **no** `planned-but-unprovisioned` state — pre-provisioning ideas live in a project
   tracker, never in `specs/` on trunk (FR-003).
 - **Validation rules**:
@@ -72,6 +74,9 @@ imposes.
   - A **declared** phase is **never skipped** (FR-010/FR-011).
   - Implement strategy is **pluggable**: default single-agent loop, or a declared external
     strategy skill (e.g. `forge-quill`) (FR-014).
+  - The default Implement loop is **fail-stop**: a task that can't pass validation halts
+    advancement (left `[ ]`, task + output reported); later tasks are not started
+    (FR-012, Clarification 2026-07-02).
 
 ## Entity: Parent branch
 

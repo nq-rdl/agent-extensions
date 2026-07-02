@@ -44,7 +44,8 @@ strategy rather than its own loop.
 2. **Given** a spec whose `tasks.md` has unchecked tasks, **When** the implementation loop
    runs, **Then** each task is implemented → validated → committed (single-line conventional,
    no body, no attribution) → marked `[x]`, and a task with failing validation is never marked
-   complete.
+   complete; a task whose validation cannot be made to pass halts the loop (left `[ ]` and
+   reported) rather than advancing to later tasks.
 3. **Given** a repo whose phase list declares a checklist phase, **When** the skill advances,
    **Then** the checklist phase runs; **Given** a repo whose default omits it, **Then** the
    checklist phase is skipped.
@@ -66,8 +67,9 @@ strategy rather than its own loop.
 ### User Story 2 - Orchestrate the backlog from the default branch (Priority: P2)
 
 A maintainer on the default branch invokes the skill; it recognizes root mode, surveys all
-specs first, then can create a new spec + worktree (with the spec authored in the same
-session), merge a completed spec, or action PR review comments — all from one entry point.
+specs first, then can create a new spec + worktree (with `spec.md` authored by a human in the
+handed-off worktree session), merge a completed spec, or action PR review comments — all from
+one entry point.
 
 **Why this priority**: Root-mode orchestration turns the per-spec worktree loop into a managed
 backlog. It depends on the scripts (US3) but delivers the coordination value a team needs to
@@ -85,10 +87,11 @@ each of create / merge / PR-action can be initiated from the same invocation.
    "planned-but-unprovisioned" rows.
 2. **Given** a request to create a new spec, **When** the skill provisions it, **Then** it
    ensures `.specify/` is present on the parent branch (restoring **only** `.specify/` from the
-   most recent spec branch if missing, never overwriting `CLAUDE.md`, and erroring clearly if no
-   spec branch exists), runs `provision-worktree.sh`, invokes `/speckit-specify` inside the new
-   worktree, and reports the worktree path plus the `claude --worktree .claude/worktrees/NNN`
-   invocation.
+   most recent spec branch if missing, never overwriting `CLAUDE.md`, and — if no spec branch
+   exists to restore from — offering the opt-in `specify init` bootstrap), runs
+   `provision-worktree.sh`, invokes `/speckit-specify` inside the new
+   worktree for a human to author `spec.md`, and reports the worktree path plus the
+   `claude --worktree .claude/worktrees/NNN` invocation.
 3. **Given** a completed spec, **When** the skill merges it, **Then** it runs `merge-spec.sh NNN`,
    the merge target is inferred from git topology (trunk or the integration branch it was cut
    from), and `specs/NNN-slug/` remains as a permanent record with `NNN` never reused.
@@ -163,15 +166,21 @@ rather than re-authored per repo, but it is gated on the skill and scripts exist
 - **Ad-hoc branch** (neither the default branch nor `^\d{3}-`) → the skill halts and asks rather
   than guessing a mode.
 - **Missing `.specify/` on the parent branch** → restore only `.specify/` from the most recent
-  spec branch; if no spec branch exists, error clearly.
+  spec branch; if no spec branch exists to restore from, offer the opt-in `specify init` bootstrap
+  (FR-020), erroring clearly only if bootstrap is declined or the `specify` CLI is unavailable.
 - **Concurrent spec creation from two root sessions** → the script conflict guard makes the losing
   session fail safely rather than clobbering an NNN slot (concurrent creation is otherwise a
   non-goal).
 - **Merge target is not trunk** → topology resolves it to the integration branch the spec was cut
   from; the merge never assumes trunk.
 - **Worktree slot has uncommitted changes at merge time** → loud refusal, no data loss.
+- **Merge conflict during the `--no-ff` merge** → `merge-spec.sh` runs `git merge --abort`, exits loudly non-zero, and performs no cleanup; the branch and worktree slot are preserved for human/skill resolution.
 - **`CLAUDE.md` at `docs/CLAUDE.md` instead of root** → discovery finds it; the path is never
   hardcoded.
+- **`CLAUDE.md` is externally managed (e.g. a symlink to `AGENTS.md`, or a repo/`.specify/`-declared
+  managed flag)** → the skill guards it against a phase's agent-context write (skip or revert the
+  write, then flag it), never replacing the file or breaking the link; an unmanaged `CLAUDE.md`
+  is updated as normal.
 
 ## Clarifications
 
@@ -182,6 +191,11 @@ rather than re-authored per repo, but it is gated on the skill and scripts exist
 - Q: What is the default phase sequence, and is the checklist phase included by default? → A: `specify → clarify → plan → tasks → analyze → implement`; the conditional checklist phase runs only when a repo declares it, and the default omits it. No declared phase is ever skipped.
 - Q: When resolving where a merged spec goes and what trunk is, are these fixed or discovered? → A: Both are discovered at runtime — trunk from `git symbolic-ref refs/remotes/origin/HEAD` (fallback: first of `main`, `master`, `trunk`, else current non-spec branch); the merge target from git topology via `git merge-base`. Neither is hardcoded to `main`.
 - Q: What forge does PR actioning target, and how is it chosen? → A: Inferred from the remote URL (GitHub / Gitea / GitLab), with a `CLAUDE.md` override; GitHub via `gh` is the practical default. Bespoke forge support beyond inference is a non-goal.
+- Q: When `git merge --no-ff` conflicts during `merge-spec.sh`, what does the script do? → A: Run `git merge --abort` to restore a clean tree, exit non-zero with a loud message, and leave the worktree slot and branch intact (no cleanup runs); conflict resolution is a human/skill task outside the deterministic script.
+- Q: When a task in the implementation loop cannot be made to pass validation, what does the loop do? → A: Halt on that task — leave it `[ ]`, report the task and its validation output, and do not proceed to later tasks (fail-stop, keeping every committed task validated).
+- Q: When creating a new spec, does the skill hand off `spec.md` authoring to a human or author it autonomously in-session? → A: Hand off — root mode provisions/launches the worktree, invokes `/speckit-specify`, and reports the `claude --worktree` invocation so a human authors `spec.md` interactively in that worktree session; the skill never autonomously authors and commits `spec.md` in root mode.
+- Q: How does the skill avoid clobbering an externally-managed `CLAUDE.md` when it drives phases whose SpecKit tooling writes it (e.g. the plan phase's `update-agent-context.sh`, which overwrote this repo's `CLAUDE.md → AGENTS.md` symlink)? → A: Treat `CLAUDE.md` as read-only discovery input — before any such phase, detect an externally-managed `CLAUDE.md` (a symlink, or a repo/`.specify/`-declared managed flag) and guard it (skip or revert that write, and flag it) so the file or link is preserved; a repo whose `CLAUDE.md` is unmanaged still receives its normal agent-context update.
+- Q: Should a repo without `.specify/` be supported, and if so how is SpecKit bootstrapped into it? → A: Yes, via **opt-in** bootstrap — on an explicit request (or a create action against a repo with no `.specify/` and no spec branch to restore from), the skill offers to scaffold and, only on confirmation, runs the official `specify init` (e.g. `uvx … specify init`), erroring clearly if the CLI is unavailable. Bootstrap never runs automatically; without confirmation the skill halts and asks. This reverses the prior "non-SpecKit repos are out of scope" assumption.
 
 ## Requirements *(mandatory)*
 
@@ -190,21 +204,23 @@ rather than re-authored per repo, but it is gated on the skill and scripts exist
 - **FR-001**: The skill MUST detect its mode from the current branch: the detected default branch → root mode; a branch matching `^\d{3}-` → worktree mode; anything else → halt and ask.
 - **FR-002**: The skill MUST discover and read the project's `CLAUDE.md` (root or `docs/CLAUDE.md`) after detection, never hardcoding the path.
 - **FR-003**: In root mode, the skill MUST run a survey first — a status table of provisioned and completed specs grouped by parent branch, derived from `specs/`, `.claude/worktrees/`, and `git worktree list`, with no unprovisioned rows.
-- **FR-004**: The skill MUST create a new spec + worktree in a single session: ensure `.specify/` on the parent branch (restoring only `.specify/` from the latest spec branch if missing, never overwriting `CLAUDE.md`, erroring if no spec branch exists), provision via script, invoke `/speckit-specify` inside the worktree, and report the worktree path + `claude --worktree` invocation.
+- **FR-004**: The skill MUST create a new spec + worktree in a single root-mode session: ensure `.specify/` on the parent branch (restoring only `.specify/` from the latest spec branch if missing, never overwriting `CLAUDE.md`, or — if no spec branch exists to restore from — offering the opt-in `specify init` bootstrap per FR-020), provision via script, invoke `/speckit-specify` inside the worktree, and report the worktree path + `claude --worktree` invocation. The skill MUST hand `spec.md` authoring to a human in the launched worktree session — it MUST NOT autonomously author or commit `spec.md` in root mode.
 - **FR-005**: Provisioning and merging MUST run via the bundled scripts (`provision-worktree.sh`, `merge-spec.sh`), not embedded bash.
 - **FR-006**: `provision-worktree.sh <slug> [--base <branch>]` MUST derive `NNN` as the max across `git branch -a`, `specs/`, and `.claude/worktrees/` + 1, zero-padded to three digits; abort on any conflict; create the branch + worktree off trunk (or off `--base`); and invoke `create-new-feature.sh --allow-existing-branch` when present, else fall back to bare git.
-- **FR-007**: `merge-spec.sh <NNN>` MUST resolve the merge target via `git merge-base`, perform a `--no-ff` merge, remove the worktree slot **before** deleting the branch, delete the branch locally and on the remote, be idempotent on worktree removal, and refuse loudly on uncommitted changes in the slot.
+- **FR-007**: `merge-spec.sh <NNN>` MUST resolve the merge target via `git merge-base`, perform a `--no-ff` merge, remove the worktree slot **before** deleting the branch, delete the branch locally and on the remote, be idempotent on worktree removal, and refuse loudly on uncommitted changes in the slot. On a `--no-ff` merge conflict it MUST run `git merge --abort` to restore a clean tree, exit non-zero with a loud message, and perform no cleanup — the worktree slot and branch stay intact so conflict resolution remains a human/skill task outside the script.
 - **FR-008**: `specs/NNN-slug/` MUST remain as a permanent record after merge, and `NNN` MUST never be reused.
 - **FR-009**: PR actioning MUST fetch both review summaries and inline thread comments (separate endpoints), triage by severity (HIGH/MEDIUM/LOW), and post replies back to inline threads; auth and API shape MUST be inferred from the remote URL or a `CLAUDE.md` override.
 - **FR-010**: In worktree mode, the skill MUST identify the spec from the branch prefix (`NNN=${BRANCH:0:3}`), load `spec.md`/`tasks.md`/`plan.md`, and advance from the first incomplete phase through the configured phase sequence, never skipping a declared phase.
 - **FR-011**: The phase sequence MUST be repo-configurable (`CLAUDE.md` or `.specify/`); the default is `specify → clarify → plan → tasks → analyze → implement` with the checklist phase run only when declared.
-- **FR-012**: The implementation loop MUST, for each `[ ]` task, implement → validate → commit (single-line conventional; imperative; no body; no attribution) → mark `[x]`, and MUST NOT mark a task complete while its validation fails.
+- **FR-012**: The implementation loop MUST, for each `[ ]` task, implement → validate → commit (single-line conventional; imperative; no body; no attribution) → mark `[x]`, and MUST NOT mark a task complete while its validation fails. When a task cannot be made to pass after the skill's fix attempt, the loop MUST halt on that task, leave it `[ ]`, report the task and its validation output, and not proceed to later tasks.
 - **FR-013**: When no test suite exists, the skill MUST discover validation from `Makefile`/`CLAUDE.md`/`pixi.toml`/`package.json` or perform best-effort checks, and MUST explicitly flag the absence of automated validation rather than silently passing.
 - **FR-014**: The Implement phase strategy MUST be pluggable — the default is the single-agent loop, but a repo MAY delegate it to an external strategy skill (e.g. `forge-quill`) declared in `CLAUDE.md`/`.specify/`; the skill owns reaching the Implement phase, not how tasks within it execute (see epic #207 / #204 for the Superpowers-extension recommendation this delegation consumes).
 - **FR-015**: The skill MUST NOT hardcode paths, commands, or forge API details — trunk branch, merge target, validation commands, PR API, phase list, implement strategy, and `CLAUDE.md` location are all discovered at runtime.
 - **FR-016**: The skill's `description` frontmatter MUST use generic trigger phrases with no repo-specific references (e.g. "new spec", "start/pick up a spec", "what specs are in progress", "drive implementation", "work through the backlog", "merge spec NNN", "action PR comments").
 - **FR-017**: The skill MUST be packaged as a new `speckit` bundle (`registry/bundles/speckit.yaml`, id `speckit`, displayName `SpecKit`, skill `speckit-lifecycle`, target `claude` pluginName `speckit` marketplaceName `rdl`), added to `registry/marketplace.yaml` order + `rdl` meta-plugin deps, with plugin trees, manifests, and docs regenerated so all CI validators stay green.
 - **FR-018**: The bats test suite MUST cover NNN derivation, conflict-guard abort, branch/worktree creation, `--base` parentage, merge-target topology, and post-merge cleanup; it MUST pass and MUST live where `asctl repo-check` continues to pass (a hidden `.tests/` directory).
+- **FR-019**: `CLAUDE.md` is **read-only discovery input** (FR-002); the skill MUST NOT clobber it. Before advancing any phase whose SpecKit tooling writes `CLAUDE.md` (e.g. `update-agent-context.sh` during `plan`), the skill MUST detect an **externally-managed** `CLAUDE.md` — a symlink, or a repo/`.specify/`-declared managed flag — and guard it (skip or revert that write, then flag it), preserving the file or link. A repo whose `CLAUDE.md` is unmanaged still receives its normal agent-context update.
+- **FR-020**: A repo without `.specify/` MAY be bootstrapped **opt-in**. On an explicit request — or a create action against a repo with no `.specify/` and no spec branch to restore from — the skill MUST offer to scaffold `.specify/` and, only on confirmation, run the official `specify init` (e.g. `uvx … specify init`), erroring clearly if the CLI is unavailable. Bootstrap MUST NEVER run automatically; absent confirmation the skill halts and asks (FR-001). SpecKit remains the source of truth — the skill MUST NOT vendor its own `.specify/` templates.
 
 ### Key Entities *(include if feature involves data)*
 
@@ -222,12 +238,14 @@ rather than re-authored per repo, but it is gated on the skill and scripts exist
 - **SC-002**: The bats suite covers all six required areas (NNN derivation, conflict-guard abort, branch/worktree creation, `--base` parentage, merge-target topology, post-merge cleanup) and passes with zero failures.
 - **SC-003**: `asctl repo-check`, `generate_manifests.py --check`, `generate_bundles_doc.py --check`, `check_bundle_refs.py`, `check_grouping.py`, `check_consistency.py`, and `validate-plugins.sh` all pass after the `speckit` bundle is added.
 - **SC-004**: Every acceptance-criteria item in issue #124 maps to at least one functional requirement or acceptance scenario in this spec (full traceability), and the `description` frontmatter contains no repo-specific references.
-- **SC-005**: A new spec is created — worktree provisioned and `spec.md` committed inside it — within a single skill session, with the correct `claude --worktree` invocation reported.
+- **SC-005**: Creating a new spec, in a single root-mode session, provisions the worktree, launches `/speckit-specify`, and reports the correct `claude --worktree` invocation for a human to author `spec.md` interactively in that worktree session; the skill never autonomously authors and commits `spec.md` in root mode.
 - **SC-006**: On merge, the worktree slot is removed before the branch is deleted in 100% of runs, and a slot with uncommitted changes is never silently discarded (loud refusal every time).
+- **SC-007**: A target repo whose `CLAUDE.md` is a symlink or declared-managed never has that file replaced or its link broken by skill-driven phase advancement — the write is guarded and flagged 100% of the time; an unmanaged `CLAUDE.md` still updates normally.
+- **SC-008**: The skill never auto-scaffolds `.specify/`: on a repo without SpecKit it bootstraps only after explicit confirmation (via `specify init`), otherwise halts and asks; a declined or CLI-unavailable bootstrap yields a clear error, never a partial scaffold.
 
 ## Assumptions
 
-- The target repo follows SpecKit conventions: `.specify/`, `specs/NNN-slug/`, and `.claude/worktrees/NNN`. Non-SpecKit repos are out of scope.
+- The target repo follows SpecKit conventions: `.specify/`, `specs/NNN-slug/`, and `.claude/worktrees/NNN`. A repo lacking `.specify/` is supported via **opt-in bootstrap** (FR-020) — the skill offers to scaffold it via the official `specify` CLI on explicit request and never auto-adopts a non-SpecKit repo.
 - `git` is available and the repo has a resolvable trunk (via `origin/HEAD` or one of `main`/`master`/`trunk`).
 - Only one root session creates specs at a time; concurrent creation is guarded (fails safely) but not otherwise supported.
 - Prior art is `dst-autoloop`; the skill generalizes it with no data-science-specific behavior, paths, or commands.

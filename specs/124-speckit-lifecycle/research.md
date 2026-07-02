@@ -74,7 +74,11 @@ on. Each finding is stated as **Decision / Rationale / Alternatives considered**
      (`git -C <slot> status --porcelain` non-empty) or unpushed spec work that would be lost,
      **refuse loudly and abort non-zero** — never auto-stash/discard.
   3. Resolve the **merge target** via topology (§2); `git checkout <target>`.
-  4. `git merge --no-ff <NNN>-slug -m "<conventional message>"`.
+  4. `git merge --no-ff <NNN>-slug -m "<conventional message>"`. **On merge conflict**: run
+     `git merge --abort` to restore a clean tree, print a loud message, and **exit non-zero
+     before any cleanup runs** — the worktree slot and branch are left intact so conflict
+     resolution stays a human/skill task outside the deterministic script (spec Clarification
+     2026-07-02; FR-007). The script never auto-resolves (no `-X ours/theirs`).
   5. **Cleanup order (critical)**: remove the worktree slot **first**
      (`git worktree remove .claude/worktrees/NNN`), *then* `git branch -d <NNN>-slug`, then
      `git push origin --delete <NNN>-slug`. Git refuses `branch -d` while the branch is checked
@@ -111,6 +115,10 @@ on. Each finding is stated as **Decision / Rationale / Alternatives considered**
   `--base` parentage (branch cut from the named base); merge-target topology (trunk vs
   integration branch); post-merge cleanup (slot removed before branch delete + idempotency +
   uncommitted refusal).
+- **Additional case beyond the six** (spec Clarification 2026-07-02): merge-conflict abort —
+  a diverged spec branch → `git merge --abort`, non-zero exit, and **no cleanup** (slot + branch
+  intact). Added to `merge-spec.bats` so the abort-path safety guarantee is verified, not just
+  the happy-path merge.
 
 ## 6. PR actioning — forge inference
 
