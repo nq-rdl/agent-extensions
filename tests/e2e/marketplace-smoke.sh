@@ -29,12 +29,12 @@ if jq -e '.plugins[]|select(.name=="zod")' "$MP" >/dev/null 2>&1; then
 [ -d plugins/zod ] && bad "A: plugins/zod/ still exists" || pass "A: plugins/zod/ gone"
 [ -f registry/bundles/zod.yaml ] && bad "A: registry/bundles/zod.yaml still exists" || pass "A: zod bundle gone"
 
-# (B) /skill:audit present
+# (B) /claude-code:skill-audit present (folded in from the retired `skill` plugin)
 [ -d skills/skill-audit ] && pass "B: skills/skill-audit/ exists" || bad "B: skills/skill-audit/ missing"
-[ -d plugins/skill/skills/audit ] && pass "B: plugins/skill/skills/audit/ synced" || bad "B: audit leaf not synced"
-grep -q 'leaf: audit' registry/bundles/skill.yaml 2>/dev/null && pass "B: skill bundle maps audit" || bad "B: skill bundle missing audit"
+[ -d plugins/claude-code/skills/skill-audit ] && pass "B: plugins/claude-code/skills/skill-audit/ synced" || bad "B: skill-audit leaf not synced"
+grep -q 'leaf: skill-audit' registry/bundles/claude-code.yaml 2>/dev/null && pass "B: claude-code bundle maps skill-audit" || bad "B: claude-code bundle missing skill-audit"
 [ -f agents/skill-auditor/agent.md ] && pass "B: skill-auditor agent exists" || bad "B: skill-auditor agent missing"
-[ -f plugins/skill/hooks/hooks.json ] && pass "B: skill hook present" || bad "B: skill hook missing"
+[ -f plugins/claude-code/hooks/hooks.json ] && pass "B: skill-audit hook present" || bad "B: skill-audit hook missing"
 
 # (C) known plugin still loads
 jq -e '.plugins[]|select(.name=="go")' "$MP" >/dev/null 2>&1 && pass "C: go plugin present" || bad "C: go plugin missing"
@@ -70,9 +70,9 @@ if [ "${1:-}" = "--live" ]; then
     # removal assertion below.
     if list="$(claude plugin list 2>&1)"; then
       printf '%s\n' "$list" | grep -qiw zod && bad "live: zod still installed" || pass "live: zod not installed"
-      # Case-insensitive (matches line 'zod' check) word-bounded match for the
-      # 'skill' plugin name (not a substring of e.g. 'skills').
-      printf '%s\n' "$list" | grep -Eiq '(^|[^[:alnum:]_])skill([^[:alnum:]_]|$)' && pass "live: skill plugin installed" || bad "live: skill plugin missing"
+      # The retired `skill` plugin folded into `claude-code`; verify that new
+      # home plugin is installed (case-insensitive, word-bounded).
+      printf '%s\n' "$list" | grep -Eiq '(^|[^[:alnum:]_])claude-code([^[:alnum:]_]|$)' && pass "live: claude-code plugin installed" || bad "live: claude-code plugin missing"
     else
       bad "live: plugin list failed"; printf '%s\n' "$list" | tail -3
     fi

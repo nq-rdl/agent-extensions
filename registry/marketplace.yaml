@@ -30,7 +30,6 @@ order:
   - writerside
   - defuddle
   - gh
-  - github-actions
   - terraform
   - kubernetes
   - argo-cd
@@ -47,14 +46,10 @@ order:
   - claude-code
   - rdl-team
   - playwright
-  - skill
-  - review
   - planning
   - debug
-  - docs
-  - research
+  - tech-writing
   - lucid
-  - hooks
 
 # External plugins are NOT re-hosted in this marketplace. They are consumed from
 # their own upstream marketplaces, registered for the team in .claude/settings.json

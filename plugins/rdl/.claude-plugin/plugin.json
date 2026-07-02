@@ -12,7 +12,6 @@
     "writerside",
     "defuddle",
     "gh",
-    "github-actions",
     "terraform",
     "kubernetes",
     "argo-cd",
@@ -29,14 +28,10 @@
     "claude-code",
     "rdl-team",
     "playwright",
-    "skill",
-    "review",
     "planning",
     "debug",
-    "docs",
-    "research",
-    "lucid",
-    "hooks"
+    "tech-writing",
+    "lucid"
   ],
   "author": {
     "name": "nq-rdl"

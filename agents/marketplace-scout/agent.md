@@ -139,7 +139,7 @@ Build the recommendation in three tiers:
 3. **Stack-matched.** From the RDL catalog and `teamExternals`, the plugins whose subject
    matches a detected language/tool: e.g. `go@rdl` + `gopls-lsp` + `modern-go-guidelines` for
    a Go repo; `terraform@rdl` for `*.tf`; `kubernetes@rdl`/`argo-cd@rdl` for k8s; `astral@astral-sh`
-   for Python; `docs@rdl`/`quarto@rdl` for docs-heavy repos. Match on keywords/description, and
+   for Python; `tech-writing@rdl`/`quarto@rdl` for docs-heavy repos. Match on keywords/description, and
    keep it tight — only plugins with a real signal in the repo.
 
 Drop anything already enabled in the repo's `.claude/settings.json` (read `enabledPlugins`),

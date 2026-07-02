@@ -44,12 +44,14 @@ If you're tempted to file something under two subjects, you've applied the wrong
 
 > **The `gh` bundle and its one exception.** `gh` is the team's GitHub *workflow* subject (rule
 > 4 below): `changie`, `conventional-commits`, `husky`, `lefthook`, `pre-commit`, `send-pr`, and
-> `document-release` all invoke as `/gh:*`. `go-gh` ("GitHub Actions CI/CD **for Go**") is grouped
-> there too, as `/gh:go` — even though its primary subject is **Go** — a deliberate choice to keep
-> all GitHub-centric work under one namespace
-> ([#115](https://github.com/nq-rdl/agent-extensions/issues/115)). Treat it as the **one
-> sanctioned exception** to "file by primary subject," not a precedent: file everything else by
-> what it is *about*.
+> `document-release` all invoke as `/gh:*`, and it also homes the GitHub Actions CI/CD agents
+> (`github-actions-expert`, plus `se-gitops-ci-specialist` as a guest — see §5). `go-gh` ("GitHub
+> Actions CI/CD **for Go**") is grouped there too, as `/gh:actions-go` — even though its primary
+> subject is **Go** — a deliberate choice to keep all GitHub-centric work under one namespace
+> ([#115](https://github.com/nq-rdl/agent-extensions/issues/115)). The bare `actions` leaf is left
+> reserved for a future generic GitHub Actions skill. Treat `go-gh` as the **one sanctioned
+> exception** to "file by primary subject," not a precedent: file everything else by what it is
+> *about*.
 
 ### 3. The facet is always an action or stage
 
@@ -83,6 +85,21 @@ skill paired with a `debug` agent. Do **not** add a skill just to describe an ag
 `description` already does that. An **agent-only plugin** (e.g. `terraform`, `postgres`) is fine
 when a subject has agents but no skill.
 
+#### Cross-listing an agent (one home, rare guests)
+
+Agent reuse across bundles is deliberate and supported — but every listing has a documented home:
+
+- Every agent has exactly **one home** — its subject bundle, per rules 1–4.
+- A **guest listing** in another bundle is allowed when the agent is load-bearing for that
+  bundle's job. Keep guests rare and annotate them in the registry YAML with a
+  `# guest — home: <bundle>` comment on the agent line.
+- Docs and hooks always reference the **home-qualified** agent, so a guest listing can be added
+  or dropped without breaking references.
+
+Current guest listings: `github-actions-expert` (home `gh`, guest in `go`),
+`se-gitops-ci-specialist` (home `argo-cd`, guest in `gh`), and `marketplace-scout`
+(home `claude-code`, guest in `rdl-team`).
+
 ### 6. How grouping is expressed (owned here in `agent-extensions`)
 
 Skills are authored in this repo as a **flat** library — `skills/<skill>/SKILL.md`, one level, no
@@ -92,13 +109,13 @@ group folders. **Grouping is a packaging decision** expressed in the bundle regi
 - A bundle sets `pluginName: <subject>` and lists each skill member as either:
   - a **flat string** `<name>` — packaged as-is (`leaf == <name>`); or
   - an explicit **`{source, leaf}` mapping** — packages the flat `skills/<source>/` under a
-    different `leaf` (e.g. `{source: go-gh, leaf: go}` → `gh:go`).
+    different `leaf` (e.g. `{source: go-gh, leaf: actions-go}` → `gh:actions-go`).
 - `scripts/sync-plugins.sh` copies `skills/<source>/` → `plugins/<subject>/skills/<leaf>/`, renaming
   to the leaf — so the plugin tree is one level deep and Claude Code invokes `<subject>:<leaf>`.
   **The leaf folder name drives invocation.** Claude Code labels the skill in `/`-autocomplete as
   `frontmatter.name || <subject>:<leaf>` — so a present `name:` (the canonical `go-gh` **or** the
-  leaf `go`) *overrides* the namespaced id with a bare, un-prefixed label, and `/gh` lists
-  `go-gh`/`go` instead of `gh:go`. So `sync-plugins.sh` **strips the copy's `name:` entirely**, letting the
+  leaf `actions-go`) *overrides* the namespaced id with a bare, un-prefixed label, and `/gh` lists
+  `go-gh`/`actions-go` instead of `gh:actions-go`. So `sync-plugins.sh` **strips the copy's `name:` entirely**, letting the
   label fall back to `<subject>:<leaf>`. The canonical `skills/` source is never touched; only the
   derivative plugin copy is stripped.
 - Validators enforce: every member has a valid shape · no duplicate leaf within a bundle ·

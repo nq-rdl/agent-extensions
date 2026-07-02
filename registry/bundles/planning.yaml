@@ -1,8 +1,8 @@
 schemaVersion: v1
 id: planning
 displayName: Planning
-description: Planning — implementation strategy, file-level sequencing, API/repo architecture, and ADRs
-keywords: [planning, architecture, adr]
+description: Planning — implementation strategy, technical-spike validation, file-level sequencing, API/repo architecture, and ADRs
+keywords: [planning, architecture, adr, spike]
 owners:
   - rdl
 channels:
@@ -13,6 +13,7 @@ agents:
   - context-architect
   - hlbpa
   - adr-generator
+  - research-technical-spike
 hooks: []
 prompts: []
 mcp: []

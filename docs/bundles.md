@@ -22,8 +22,7 @@ subagents (auto-routed by their description).
 | [`obsidian`](#obsidian) | Obsidian — Bases databases, the CLI, and Obsidian-flavored Markdown |
 | [`writerside`](#writerside) | Writerside — author and build JetBrains Writerside documentation |
 | [`defuddle`](#defuddle) | Defuddle — extract clean Markdown from cluttered web pages |
-| [`gh`](#gh) | GitHub workflow — git hooks, changelogs, conventional commits, pull requests, releases, and Go CI/CD |
-| [`github-actions`](#github-actions) | GitHub Actions — secure CI/CD workflows, SHA pinning, OIDC, and GitOps delivery |
+| [`gh`](#gh) | GitHub workflow — git hooks, changelogs, conventional commits, pull requests, releases, Go CI/CD, and secure GitHub Actions (SHA pinning, OIDC, GitOps delivery) |
 | [`terraform`](#terraform) | Terraform — generate compliant HCL, review IaC for state safety, and author Terratest suites |
 | [`kubernetes`](#kubernetes) | Kubernetes — SRE-grade rollouts, HA design, and incident response |
 | [`argo-cd`](#argo-cd) | Argo CD — GitOps application management and sync for Kubernetes |
@@ -37,17 +36,13 @@ subagents (auto-routed by their description).
 | [`pixi`](#pixi) | Pixi — manage Python projects, environments, and dependencies |
 | [`lychee`](#lychee) | Lychee — fast link checking for docs and Markdown |
 | [`charm-tui`](#charm-tui) | Charm — build terminal UIs with Bubbletea, Lip Gloss, and Fang |
-| [`claude-code`](#claude-code) | Claude Code — agent-team coordination, hook authoring, and web-session setup |
+| [`claude-code`](#claude-code) | Claude Code — agent-team coordination, hook authoring, web-session setup, skill-quality auditing, and prompt engineering |
 | [`rdl-team`](#rdl-team) | RDL team workflows — Claude Code onboarding, setup, and config management |
 | [`playwright`](#playwright) | Playwright — generate and debug end-to-end browser tests |
-| [`skill`](#skill) | Skill quality — audit skills for non-inferable value, review changes, and report issues upstream |
-| [`review`](#review) | Code review — security, clean code, governance, responsible AI, and fact-checking |
-| [`planning`](#planning) | Planning — implementation strategy, file-level sequencing, API/repo architecture, and ADRs |
+| [`planning`](#planning) | Planning — implementation strategy, technical-spike validation, file-level sequencing, API/repo architecture, and ADRs |
 | [`debug`](#debug) | Debugging and cleanup — systematic diagnosis and tech-debt removal |
-| [`docs`](#docs) | Technical writing — developer docs, tutorials, ADRs, and guides |
-| [`research`](#research) | Research — technical-spike validation and prompt engineering |
+| [`tech-writing`](#tech-writing) | Technical writing — developer docs, tutorials, ADRs, and guides |
 | [`lucid`](#lucid) | Lucid — visual collaboration boards and diagrams (Lucidchart / Lucidspark) via the hosted Lucid MCP server |
-| [`hooks`](#hooks) | Hooks — forced skill evaluation when prompts mention skills |
 
 ## Install
 
@@ -166,14 +161,14 @@ Defuddle — extract clean Markdown from cluttered web pages.
 
 ## gh
 
-GitHub workflow — git hooks, changelogs, conventional commits, pull requests, releases, and Go CI/CD.
+GitHub workflow — git hooks, changelogs, conventional commits, pull requests, releases, Go CI/CD, and secure GitHub Actions (SHA pinning, OIDC, GitOps delivery).
 
 **Skills**
 
 - `/gh:changie`
 - `/gh:conventional-commits`
 - `/gh:document-release`
-- `/gh:go`
+- `/gh:actions-go`
 - `/gh:husky`
 - `/gh:lefthook`
 - `/gh:pre-commit`
@@ -183,15 +178,6 @@ GitHub workflow — git hooks, changelogs, conventional commits, pull requests, 
 
 - `address-comments` (subagent)
 - `repo-architect` (subagent)
-
----
-
-## github-actions
-
-GitHub Actions — secure CI/CD workflows, SHA pinning, OIDC, and GitOps delivery.
-
-**Agents**
-
 - `github-actions-expert` (subagent)
 - `se-gitops-ci-specialist` (subagent)
 
@@ -335,7 +321,7 @@ Charm — build terminal UIs with Bubbletea, Lip Gloss, and Fang.
 
 ## claude-code
 
-Claude Code — agent-team coordination, hook authoring, and web-session setup.
+Claude Code — agent-team coordination, hook authoring, web-session setup, skill-quality auditing, and prompt engineering.
 
 **Skills**
 
@@ -345,12 +331,17 @@ Claude Code — agent-team coordination, hook authoring, and web-session setup.
 - `/claude-code:hook`
 - `/claude-code:pipeline`
 - `/claude-code:web-setup`
+- `/claude-code:skill-audit`
+- `/claude-code:skill-review`
+- `/claude-code:skill-report-issue`
 
 **Agents**
 
 - `marketplace-scout` (subagent)
+- `skill-auditor` (subagent)
+- `prompt-builder` (subagent)
 
-**Hooks:** `web-setup-plugin-check`
+**Hooks:** `web-setup-plugin-check`, `skill-audit-nudge`
 
 ---
 
@@ -380,43 +371,9 @@ Playwright — generate and debug end-to-end browser tests.
 
 ---
 
-## skill
-
-Skill quality — audit skills for non-inferable value, review changes, and report issues upstream.
-
-**Skills**
-
-- `/skill:review`
-- `/skill:report-issue`
-- `/skill:audit`
-
-**Agents**
-
-- `skill-auditor` (subagent)
-
-**Hooks:** `skill-audit-nudge`
-
----
-
-## review
-
-Code review — security, clean code, governance, responsible AI, and fact-checking.
-
-**Agents**
-
-- `wg-code-sentinel` (subagent)
-- `wg-code-alchemist` (subagent)
-- `critical-thinking` (subagent)
-- `doublecheck` (subagent)
-- `agent-governance-reviewer` (subagent)
-- `se-responsible-ai-code` (subagent)
-- `terraform-iac-reviewer` (subagent)
-
----
-
 ## planning
 
-Planning — implementation strategy, file-level sequencing, API/repo architecture, and ADRs.
+Planning — implementation strategy, technical-spike validation, file-level sequencing, API/repo architecture, and ADRs.
 
 **Agents**
 
@@ -424,6 +381,7 @@ Planning — implementation strategy, file-level sequencing, API/repo architectu
 - `context-architect` (subagent)
 - `hlbpa` (subagent)
 - `adr-generator` (subagent)
+- `research-technical-spike` (subagent)
 
 ---
 
@@ -438,7 +396,7 @@ Debugging and cleanup — systematic diagnosis and tech-debt removal.
 
 ---
 
-## docs
+## tech-writing
 
 Technical writing — developer docs, tutorials, ADRs, and guides.
 
@@ -448,27 +406,8 @@ Technical writing — developer docs, tutorials, ADRs, and guides.
 
 ---
 
-## research
-
-Research — technical-spike validation and prompt engineering.
-
-**Agents**
-
-- `research-technical-spike` (subagent)
-- `prompt-builder` (subagent)
-
----
-
 ## lucid
 
 Lucid — visual collaboration boards and diagrams (Lucidchart / Lucidspark) via the hosted Lucid MCP server.
 
 **MCP server(s):** `lucid`
-
----
-
-## hooks
-
-Hooks — forced skill evaluation when prompts mention skills.
-
-**Hooks:** `forced-eval-hook`

@@ -1,7 +1,7 @@
 {
-  "name": "hooks",
+  "name": "tech-writing",
   "version": "0.18.0",
-  "description": "Hooks — forced skill evaluation when prompts mention skills",
+  "description": "Technical writing — developer docs, tutorials, ADRs, and guides",
   "author": {
     "name": "nq-rdl"
   },

@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Advisory PostToolUse nudge: when a skills/**/SKILL.md is edited, suggest /skill:audit.
+# Advisory PostToolUse nudge: when a skills/**/SKILL.md is edited, suggest /claude-code:skill-audit.
 # matcher limits to Edit|Write; this script applies the PATH filter (matcher is tool-name only).
 set -euo pipefail
 # Advisory-only: if jq is unavailable, no-op silently rather than erroring.
@@ -12,7 +12,7 @@ case "$path" in
     jq -nc --arg p "$path" '{
       hookSpecificOutput: {
         hookEventName: "PostToolUse",
-        additionalContext: ("Skill edited (" + $p + "). Consider running /skill:audit to check it encodes non-inferable value (CONTRIBUTING.md → Skill content conventions).")
+        additionalContext: ("Skill edited (" + $p + "). Consider running /claude-code:skill-audit to check it encodes non-inferable value (CONTRIBUTING.md → Skill content conventions).")
       }
     }'
     ;;
