@@ -3,11 +3,12 @@
 **Input**: Design documents from `/specs/202-architecture-decision-records/`
 **Prerequisites**: plan.md (required), spec.md (user stories), research.md, data-model.md, contracts/, quickstart.md
 
-**Status (reconciled 2026-07-03)**: T001–T018 are complete — the skill is authored,
-registered, synced, and passes the full CI-parity gate (T018 verified green). **T019**
-(interactive behavioral walkthrough, `claude --plugin-dir ./plugins/planning`) and **T020**
-(`/skill:audit`) remain open: both require a manual/runtime pass that has not been evidenced,
-so they are intentionally left unchecked rather than asserted complete.
+**Status (updated 2026-07-03)**: T001–T018 complete (skill authored, registered, synced,
+full CI-parity gate green) and **T020** complete — skill-audit passed all three CONTRIBUTING
+skill-content conventions (non-inferable delta, MADR v4 pin, verify-canonical guard). **T019**
+(interactive behavioral walkthrough, `claude --plugin-dir ./plugins/planning`) remains open:
+its conversational SCs (consent/retrieval/archival) need a live session — the human acceptance
+gate to run before merging into the epic.
 
 **Tests**: This is a documentation-only skill (no runtime code). Per plan.md Constitution
 Check III, the "red→green" evidence is the **validation gate** (`asctl repo-check` +
@@ -131,7 +132,7 @@ full CI-parity + behavioral gates.
 - [x] T017 Regenerate manifests + docs: `python3 scripts/generate_manifests.py .` and `python3 scripts/generate_bundles_doc.py .` (refreshes `plugins/planning/.claude-plugin/plugin.json`, `.claude-plugin/marketplace.json`, and `docs/bundles.md`; never hand-edit these).
 - [x] T018 Run the full CI-parity validation gate (quickstart Part A step 8): `/tmp/asctl repo-check`, `python3 scripts/check_bundle_refs.py .`, `python3 scripts/check_grouping.py .`, `python3 scripts/generate_manifests.py . --check`, `python3 scripts/generate_bundles_doc.py . --check`, `python3 scripts/check_consistency.py .`, `bash scripts/validate-plugins.sh`, and `python3 -m unittest discover -s tests -p 'test_*.py'` — all must pass (SC-006).
 - [ ] T019 Run the behavioral acceptance walkthrough (quickstart Part B, `claude --plugin-dir ./plugins/planning`, rows 1–11) confirming consent-gating (SC-002), MADR completeness (SC-001), monotonic never-reused numbering (SC-003), retrieval honesty (SC-004), spec→ADR mapping (SC-005), installability in the `planning` plugin (SC-006), and pre-existing `docs/adr/` files byte-unchanged (SC-007).
-- [ ] T020 [P] Audit `skills/architecture-decision-records/SKILL.md` against CONTRIBUTING "Skill content conventions" (non-inferable delta, MADR v4 version pin, verify-canonical guard) — e.g. via `/skill:audit` (FR-014).
+- [x] T020 [P] Audit `skills/architecture-decision-records/SKILL.md` against CONTRIBUTING "Skill content conventions" (non-inferable delta, MADR v4 version pin, verify-canonical guard) — e.g. via `/skill:audit` (FR-014).
 
 ---
 
