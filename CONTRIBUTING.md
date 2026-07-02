@@ -4,6 +4,9 @@ Thanks for contributing to the RDL agent extension catalog. This file covers the
 grouping skills and agents into plugins**. For repo mechanics (sync scripts, validation,
 release), see [`AGENTS.md`](AGENTS.md) and [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md).
 
+**Tooling:** all repo Python runs via **pixi** (`pixi install` once, then
+`pixi run …` for every script below — the environment is defined in `pyproject.toml`).
+
 ## Plugin grouping: one plugin per subject
 
 > **Status:** live. The legacy domain bundles (`swe`, `infra`, `informatics`, `dev-tools`, `meta`)
@@ -201,18 +204,18 @@ that should become `sql-review:analyse`:
    CI `::warning::`). It joins the `rdl` meta-plugin automatically.
 5. **Build the plugin tree and manifests:**
    ```bash
-   bash scripts/sync-plugins.sh sql-review     # copies skills/<source>/ → plugins/sql-review/skills/<leaf>/
-   python3 scripts/generate_manifests.py .     # writes plugin.json + marketplace.json
-   python3 scripts/generate_bundles_doc.py .   # refreshes docs/bundles.md
+   pixi run bash scripts/sync-plugins.sh sql-review     # copies skills/<source>/ → plugins/sql-review/skills/<leaf>/
+   pixi run python3 scripts/generate_manifests.py .     # writes plugin.json + marketplace.json
+   pixi run python3 scripts/generate_bundles_doc.py .   # refreshes docs/bundles.md
    ```
 6. **Validate** exactly what CI will:
    ```bash
-   python3 scripts/check_bundle_refs.py .   && \
-   python3 scripts/check_grouping.py .      && \
-   python3 scripts/generate_manifests.py . --check && \
-   python3 scripts/generate_bundles_doc.py . --check && \
-   python3 scripts/check_consistency.py .   && \
-   bash scripts/validate-plugins.sh
+   pixi run python3 scripts/check_bundle_refs.py .   && \
+   pixi run python3 scripts/check_grouping.py .      && \
+   pixi run python3 scripts/generate_manifests.py . --check && \
+   pixi run python3 scripts/generate_bundles_doc.py . --check && \
+   pixi run python3 scripts/check_consistency.py .   && \
+   pixi run bash scripts/validate-plugins.sh
    ```
 
 Adding an **agent** follows the same loop: author `agents/<name>/agent.md` (with frontmatter

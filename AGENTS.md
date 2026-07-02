@@ -36,14 +36,19 @@ This repo is a Claude Code agent extension catalog. It maintains a single source
 ```bash
 # Activate local git hooks (pre-commit + pre-push CI parity, via lefthook)
 lefthook install
+
+# Create the pixi environment (python + pyyaml). ALL repo Python is managed by
+# pixi — invoke the registry/pipeline scripts via `pixi run`, never a system python3.
+pixi install
 ```
 
 Local hooks mirror CI so failures surface before you push. **pre-commit** runs
 fast checks (gofmt/vet/build of `tools/asctl`, `asctl repo-check`, plugin
 validation, generated-artifact drift, lychee links); **pre-push** runs `asctl`
 tests, the pipeline unit tests, a non-blocking SkillSpector scan, and a hard
-changie-fragment gate. Prereqs: `lefthook`, Go, `python3` + `pyyaml`; optional
-`lychee` and Docker. Bypass with `LEFTHOOK=0` or `git commit --no-verify`.
+changie-fragment gate. Prereqs: `lefthook`, Go, `pixi` (provides the Python
+toolchain — hook jobs call `pixi run`); optional `lychee` and Docker. Bypass
+with `LEFTHOOK=0` or `git commit --no-verify`.
 
 `skills/` is canonical content authored in this repo (formerly vendored from `nq-rdl/agent-skills`, now merged here), not a submodule. Skills are validated against the agentskills.io spec by `asctl` — the Go CLI under `tools/asctl/` (`asctl repo-check`).
 
@@ -80,18 +85,18 @@ Claude Code installs a plugin by `cp -R`-ing its source directory into a per-use
 To make installs self-contained, `plugins/<bundle>/skills/<name>/` and `plugins/<bundle>/agents/<name>.md` hold **real-file copies** of the canonical content under `skills/` and `agents/`. The canonical source remains the single edit point — the plugin trees are derivative.
 
 - **Edit canonical content** under `skills/<name>/` or `agents/<name>/agent.md` (both authored here).
-- **Refresh plugin trees** by running `bash scripts/sync-plugins.sh` (or pass a bundle name to scope it). The script reads `registry/bundles/<b>.yaml`, removes any stale copies, and rewrites `plugins/<b>/skills/<name>/` and `plugins/<b>/agents/<name>.md` from the canonical sources. It also rewrites this repo's own live `.claude/scripts/{install-deps,announce-capabilities}.sh` cc-web-setup SessionStart hook copies from canonical `skills/cc-web-setup/assets/` (forcing them executable — `0o755` — since those copies are invoked directly from `.claude/settings.json`), and drift-checks them under `--check` (bytes, plus a non-executable live copy or canonical asset); the repo-local `.claude/scripts/install-deps.local.sh` seam has no canonical source and is left untouched.
+- **Refresh plugin trees** by running `pixi run bash scripts/sync-plugins.sh` (or pass a bundle name to scope it). The script reads `registry/bundles/<b>.yaml`, removes any stale copies, and rewrites `plugins/<b>/skills/<name>/` and `plugins/<b>/agents/<name>.md` from the canonical sources. It also rewrites this repo's own live `.claude/scripts/{install-deps,announce-capabilities}.sh` cc-web-setup SessionStart hook copies from canonical `skills/cc-web-setup/assets/` (forcing them executable — `0o755` — since those copies are invoked directly from `.claude/settings.json`), and drift-checks them under `--check` (bytes, plus a non-executable live copy or canonical asset); the repo-local `.claude/scripts/install-deps.local.sh` seam has no canonical source and is left untouched.
 - **CI** validates that every bundle YAML reference resolves and that every plugin manifest is well-formed. See `scripts/validate-plugins.sh`.
 
 **Grouped skills.** A bundle skill member is either a flat string (`changie` → `leaf == changie`) or an explicit `{source, leaf}` mapping (`{source: go-gh, leaf: go}` in the `gh` bundle → `/gh:go`). `sync-plugins.sh` copies the flat canonical `skills/<source>/` → `plugins/<pluginName>/skills/<leaf>/`, **renaming to the leaf**, so the plugin tree stays one level deep and Claude Code invokes `<pluginName>:<leaf>` (the leaf folder drives invocation). Claude Code labels a skill in `/`-autocomplete as `frontmatter.name || <pluginName>:<leaf>` — so a present `name:` (the canonical `go-gh` **or** the leaf `go`) overrides the namespaced id with a bare, un-prefixed label, and `/gh` lists `go-gh`/`go` instead of `gh:go`. To get the namespaced label, sync **strips the copy's `name:` entirely** so the label falls back to `<pluginName>:<leaf>`. The canonical `skills/` tree is never touched; grouping is owned **here** in the registry and stays flat. See `CONTRIBUTING.md` §6 for the rules, `scripts/check_grouping.py` for the contract, and `scripts/validate-plugins.sh` for the no-name guard.
 
-Skills and agents are authored directly under `skills/` and `agents/`. After editing one, run `bash scripts/sync-plugins.sh` to refresh the plugin trees; CI's `validate-skills` job runs `asctl repo-check` to validate `skills/` against the agentskills.io spec.
+Skills and agents are authored directly under `skills/` and `agents/`. After editing one, run `pixi run bash scripts/sync-plugins.sh` to refresh the plugin trees; CI's `validate-skills` job runs `asctl repo-check` to validate `skills/` against the agentskills.io spec.
 
 When authoring or compressing a skill, follow **CONTRIBUTING.md → "Skill content conventions"** (non-inferable delta, version pins, verify-canonical guard). The `/skill:audit` skill checks these.
 
 ### Python skills (csv, pdf, xlsx, docx)
 
-These skills call Python directly (no CLI wrapper). Each has a `requirements.txt` and an `ensure-deps.sh` bootstrap script. Install `uv` (recommended) or `pixi` (linux-64 only) for the docs environment; neither is required for skill execution.
+These skills call Python directly (no CLI wrapper). Each has a `requirements.txt` and an `ensure-deps.sh` bootstrap script, so end users need no extra setup. For work *inside this repo*, Python is managed by **pixi** (`pyproject.toml`): the default environment carries `python` + `pyyaml` for the registry scripts, and the `docs` environment (linux-64 only) carries Zensical.
 
 ## Language Policy
 
@@ -118,35 +123,38 @@ make cross-compile DESTDIR=../../plugins/<subject>/bin/mcp
 
 ## Build, test, lint
 
+All Python (including the `python3` heredocs inside the shell scripts) runs through
+the pixi environment — hence the `pixi run` prefix on every command below.
+
 ```bash
 # Validate all plugin hooks.json, plugin.json, and agents
-bash scripts/validate-plugins.sh
+pixi run bash scripts/validate-plugins.sh
 
 # Validate only plugins touched by changed files
-bash scripts/validate-plugins.sh plugins/hooks/hooks/hooks.json
+pixi run bash scripts/validate-plugins.sh plugins/hooks/hooks/hooks.json
 
 # Refresh plugin trees from canonical skills/ and agents/. Run after
 # editing a skill or agent.
-bash scripts/sync-plugins.sh           # all bundles
-bash scripts/sync-plugins.sh go        # one bundle
+pixi run bash scripts/sync-plugins.sh           # all bundles
+pixi run bash scripts/sync-plugins.sh go        # one bundle
 
 # Regenerate plugin.json + marketplace.json from the registry. These manifests
 # are GENERATED — never hand-edit them. Run after changing a bundle's
 # description/keywords, marketplace.yaml, or VERSION.
-python3 scripts/generate_manifests.py .          # write manifests
-python3 scripts/generate_manifests.py . --check  # CI gate: fail on drift
+pixi run python3 scripts/generate_manifests.py .          # write manifests
+pixi run python3 scripts/generate_manifests.py . --check  # CI gate: fail on drift
 
 # Regenerate docs/bundles.md from the registry (also a --check CI gate).
-python3 scripts/generate_bundles_doc.py .          # write
-python3 scripts/generate_bundles_doc.py . --check  # CI gate: fail on drift
+pixi run python3 scripts/generate_bundles_doc.py .          # write
+pixi run python3 scripts/generate_bundles_doc.py . --check  # CI gate: fail on drift
 
 # Bundle reference + grouping + three-way consistency checks (also run by validate.yml)
-python3 scripts/check_bundle_refs.py .   # registry refs resolve to skills/ & agents/
-python3 scripts/check_grouping.py .      # grouping contract: valid member shape, unique leaf + pluginName
-python3 scripts/check_consistency.py .   # bundle <-> marketplace.json <-> plugins/ agree
+pixi run python3 scripts/check_bundle_refs.py .   # registry refs resolve to skills/ & agents/
+pixi run python3 scripts/check_grouping.py .      # grouping contract: valid member shape, unique leaf + pluginName
+pixi run python3 scripts/check_consistency.py .   # bundle <-> marketplace.json <-> plugins/ agree
 
-# Unit tests for the pipeline scripts (zero deps beyond python3 + pyyaml)
-python3 -m unittest discover -s tests -p 'test_*.py'
+# Unit tests for the pipeline scripts (deps come from the pixi env)
+pixi run python3 -m unittest discover -s tests -p 'test_*.py'
 
 # Build + run the skills spec validator (Go), and its unit tests
 go -C tools/asctl build -o /tmp/asctl ./cmd/asctl/ && /tmp/asctl repo-check
@@ -224,11 +232,11 @@ targets:
     marketplaceName: rdl
 ```
 
-The bundle's `description` + `keywords` (plus `registry/marketplace.yaml` and `VERSION`) **generate** `plugins/<bundle>/.claude-plugin/plugin.json` and the bundle's `marketplace.json` entry — do not hand-edit those (CI `generate_manifests.py --check` enforces it). After editing a bundle's `description`/`keywords`, run `python3 scripts/generate_manifests.py .`.
+The bundle's `description` + `keywords` (plus `registry/marketplace.yaml` and `VERSION`) **generate** `plugins/<bundle>/.claude-plugin/plugin.json` and the bundle's `marketplace.json` entry — do not hand-edit those (CI `generate_manifests.py --check` enforces it). After editing a bundle's `description`/`keywords`, run `pixi run python3 scripts/generate_manifests.py .`.
 
-When adding a skill to a bundle: (1) add it to the YAML (flat `<name>`, or a `{source, leaf}` map to repackage a flat upstream skill under a new leaf), (2) run `bash scripts/sync-plugins.sh <bundle>` to copy `skills/<source>/` into `plugins/<bundle>/skills/<leaf>/`.
+When adding a skill to a bundle: (1) add it to the YAML (flat `<name>`, or a `{source, leaf}` map to repackage a flat upstream skill under a new leaf), (2) run `pixi run bash scripts/sync-plugins.sh <bundle>` to copy `skills/<source>/` into `plugins/<bundle>/skills/<leaf>/`.
 
-When adding an agent to a bundle: (1) create `agents/<name>/agent.md`, (2) add it to the YAML `agents:` list, (3) run `bash scripts/sync-plugins.sh <bundle>` to copy it into `plugins/<bundle>/agents/<name>.md`.
+When adding an agent to a bundle: (1) create `agents/<name>/agent.md`, (2) add it to the YAML `agents:` list, (3) run `pixi run bash scripts/sync-plugins.sh <bundle>` to copy it into `plugins/<bundle>/agents/<name>.md`.
 
 ## PR instructions
 
@@ -256,7 +264,7 @@ The workflow:
 
 ## Docs
 
-The docs site uses Zensical (configured in `zensical.toml`). Source is `docs/`. Architecture decisions live in `docs/ARCHITECTURE.md`. Local install walkthrough: [`docs/local-testing.md`](docs/local-testing.md).
+The docs site uses Zensical (configured in `zensical.toml`), provided by the pixi `docs` environment (linux-64 only — `pixi run -e docs …`). Source is `docs/`. Architecture decisions live in `docs/ARCHITECTURE.md`. Local install walkthrough: [`docs/local-testing.md`](docs/local-testing.md).
 
 ## Platform Notes
 
