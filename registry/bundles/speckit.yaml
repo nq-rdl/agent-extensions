@@ -1,0 +1,20 @@
+schemaVersion: v1
+id: speckit
+displayName: SpecKit
+description: SpecKit — spec-driven development lifecycle with context-aware root/worktree orchestration, provisioning, and merge
+keywords: [speckit, spec-driven, worktree, lifecycle]
+owners:
+  - rdl
+channels:
+  - stable
+skills:
+  - {source: speckit-lifecycle, leaf: lifecycle}
+agents: []
+hooks: []
+prompts: []
+mcp: []
+targets:
+  claude:
+    enabled: true
+    pluginName: speckit
+    marketplaceName: rdl

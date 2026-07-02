@@ -1,0 +1,2 @@
+kind: Added
+body: Add speckit-lifecycle skill in a new `speckit` bundle — context-aware root/worktree orchestration with tested provision-worktree.sh and merge-spec.sh scripts

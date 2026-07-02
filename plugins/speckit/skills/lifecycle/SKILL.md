@@ -1,5 +1,4 @@
 ---
-name: speckit-lifecycle
 description: >-
   Drives the full speckit development lifecycle in any repo following speckit
   conventions. Detects context from the current branch and switches mode: on the

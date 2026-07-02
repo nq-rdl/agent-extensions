@@ -352,6 +352,18 @@
       ]
     },
     {
+      "name": "speckit",
+      "source": "./plugins/speckit",
+      "description": "SpecKit — spec-driven development lifecycle with context-aware root/worktree orchestration, provisioning, and merge",
+      "version": "0.19.0",
+      "keywords": [
+        "speckit",
+        "spec-driven",
+        "worktree",
+        "lifecycle"
+      ]
+    },
+    {
       "name": "debug",
       "source": "./plugins/debug",
       "description": "Debugging and cleanup — systematic diagnosis and tech-debt removal",

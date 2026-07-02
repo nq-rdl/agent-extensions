@@ -1,0 +1,10 @@
+{
+  "name": "speckit",
+  "version": "0.19.0",
+  "description": "SpecKit — spec-driven development lifecycle with context-aware root/worktree orchestration, provisioning, and merge",
+  "author": {
+    "name": "nq-rdl"
+  },
+  "repository": "https://github.com/nq-rdl/agent-extensions",
+  "license": "MIT"
+}

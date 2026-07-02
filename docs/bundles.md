@@ -388,6 +388,16 @@ Planning — implementation strategy, file-level sequencing, API/repo architectu
 
 ---
 
+## speckit
+
+SpecKit — spec-driven development lifecycle with context-aware root/worktree orchestration, provisioning, and merge.
+
+**Skills**
+
+- `/speckit:lifecycle`
+
+---
+
 ## debug
 
 Debugging and cleanup — systematic diagnosis and tech-debt removal.

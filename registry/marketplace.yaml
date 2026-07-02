@@ -50,6 +50,7 @@ order:
   - skill
   - review
   - planning
+  - speckit
   - debug
   - docs
   - research
