@@ -10,7 +10,8 @@ worktree provisioning/merge to the Worktrunk (`wt`) CLI, or keep its bespoke scr
 | **NNN derivation** (max across `git branch -a`, `specs/`, `.claude/worktrees/`, +1, zero-padded) | ✗ `wt` names worktrees by branch/codename; it has no concept of speckit's sequential `NNN` anchored to `specs/` | **gap** |
 | **Conflict guard** on the computed `NNN` slot/branch | ~ `wt` guards path/branch collisions generally, but not speckit-`NNN` semantics | partial |
 | **`--base` parentage** (cut a spec off an integration/epic branch) | ✓ `wt switch --create <b> --base <ref>` (used throughout this very epic) | **match** |
-| **Merge-target topology** (`git merge-base` → trunk *or* the integration branch it was cut from) | ~ `wt merge` targets the default/tracked branch; it does not preserve `specs/NNN-slug/` or the "NNN never reused" invariant | partial |
+| **Merge-target topology** (`git merge-base` → trunk *or* the integration branch it was cut from) | ~ `wt merge [TARGET]` accepts an explicit target but has **no automatic topology detection**; it does not preserve `specs/NNN-slug/` or the "NNN never reused" invariant | partial |
+| **Merge strategy** (#124's `merge-spec.sh` uses `--no-ff` merge commits to preserve branch topology) | ~ `wt merge` **defaults to squash + rebase + fast-forward** (linearizes history) — semantically opposite; `--no-ff` exists as a flag but is not the default | partial |
 | **Post-merge cleanup** (remove worktree slot *before* `git branch -d`) | ✓ `wt merge`/`wt remove` handle worktree teardown cleanly | **match** |
 | **`create-new-feature.sh` seeding** (speckit spec scaffold) | ✗ not `wt`'s concern | **gap** |
 | **Worktree location** | ✓ configurable via `worktree-path` template — *see follow-up* | match (with caveat) |
@@ -48,8 +49,11 @@ Surfaced during this epic's own execution (Wave 0). Findings:
   template (e.g. `worktree-path = "{{ repo_path }}/.claude/worktrees/{{ branch | sanitize }}"`),
   which would make `wt` worktrees match speckit/dst-autoloop convention **and** the harness
   `EnterWorktree` tool (which only accepts worktrees under `.claude/worktrees/`).
-- **Limitation:** `worktree-path` is **user-global** (affects every repo), and
-  `.claude/worktrees/` is not gitignored by default here.
+- **Limitation:** `worktree-path` is documented as **user-global** (user config; affects
+  every repo — per Worktrunk's FAQ), and `.claude/worktrees/` is not gitignored by default
+  here. (`wt` does support a per-repo project config at `.config/wt.toml`, but that is
+  documented for hooks; whether it honors the `worktree-path` template at project scope is
+  unconfirmed.)
 - **Because** automation uses read-execute of the speckit skill files (not `EnterWorktree`),
   aligning the location is **optional** — a convenience for interactive sessions, not a
   requirement. Recommendation: leave `wt` at its default sibling layout; document the remap
