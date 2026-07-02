@@ -7,7 +7,7 @@ TDD is requested (spec §Testing): bats tests for the two bundled scripts are wr
 ## Phase 1: Setup
 
 - [ ] T001 Create skill tree `skills/speckit-lifecycle/{scripts,.tests}/` (`.tests/` hidden so `asctl repo-check` ignores it; asctl only allows `assets/`,`references/`,`scripts/`)
-- [ ] T002 Add bats helper `skills/speckit-lifecycle/.tests/helper.bash` (throwaway fixture-repo setup/teardown: `git init`, seed trunk, stub `.specify/scripts/bash/create-new-feature.sh`)
+- [ ] T002 Add bats helper `skills/speckit-lifecycle/.tests/helpers.bash` (throwaway fixture-repo setup/teardown: `git init`, seed trunk, stub `.specify/scripts/bash/create-new-feature.sh`)
 
 ## Phase 2: Foundational (blocks all stories)
 
@@ -18,7 +18,7 @@ TDD is requested (spec §Testing): bats tests for the two bundled scripts are wr
 
 Tests first (TDD):
 - [ ] T005 [P] [US3] Write `skills/speckit-lifecycle/.tests/provision-worktree.bats`: NNN derivation (max across `git branch -a`/`specs/`/worktrees +1, zero-padded), conflict-guard abort, branch+worktree creation, `--base` parentage, `create-new-feature.sh` probe + bare-git fallback
-- [ ] T006 [P] [US3] Write `skills/speckit-lifecycle/.tests/merge-spec.bats`: merge-target via `git merge-base`, `--no-ff` merge, worktree slot removed BEFORE `git branch -d`, idempotent worktree removal, loud refusal on uncommitted changes, and merge-conflict abort (`git merge --abort`, non-zero exit, **no cleanup** — slot + branch intact; FR-007)
+- [ ] T006 [P] [US3] Write `skills/speckit-lifecycle/.tests/merge-spec.bats`: merge-target via `git merge-base`, `--no-ff` merge, worktree slot removed BEFORE `git branch -d`, idempotent worktree removal, loud refusal on uncommitted changes, merge-conflict abort (`git merge --abort`, non-zero exit, **no cleanup** — slot + branch intact; FR-007), and `specs/NNN-slug/` retention after merge (spec dir survives; `NNN` still counted in later derivation, never reused; FR-008)
 Then implement:
 - [ ] T007 [US3] Implement `skills/speckit-lifecycle/scripts/provision-worktree.sh <slug> [--base <branch>]` to pass T005 (model layout on `skills/bitwarden/scripts`)
 - [ ] T008 [US3] Implement `skills/speckit-lifecycle/scripts/merge-spec.sh <NNN>` to pass T006
