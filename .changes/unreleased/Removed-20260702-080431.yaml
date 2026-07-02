@@ -1,3 +1,0 @@
-kind: Removed
-body: 'Plugin consolidation migration: install the replacement subjects (`gh@rdl`, `claude-code@rdl`, `planning@rdl`) or reinstall `rdl@rdl` to pick up the regenerated set'
-time: 2026-07-02T08:04:31+10:00

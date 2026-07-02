@@ -1,3 +1,0 @@
-kind: Added
-body: '"At a glance" plugin/description table at the top of the generated `docs/bundles.md`, emitted by `generate_bundles_doc.py` from the registry (linked to each plugin section)'
-time: 2026-07-02T16:35:21.280879+10:00

@@ -1,3 +1,0 @@
-kind: Added
-body: Release PR guard workflow — pre-merge check that a release/v* PR matches its branch version and is strictly newer than main's VERSION, so stale release PRs go red before merge
-time: 2026-07-02T20:30:00+10:00

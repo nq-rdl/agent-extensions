@@ -1,3 +1,0 @@
-kind: Added
-body: 'Per-fragment changie body length cap (200): `.changie.yaml` body.maxLength guards `changie new`; a lefthook pre-commit hook + CI check (check_changie_length.py) lint added fragments'
-time: '2026-07-02T10:31:54.013862+00:00'

@@ -1,3 +1,0 @@
-kind: Changed
-body: 'Plugin consolidation renames invocations: `docs@rdl` → `tech-writing@rdl`; `/gh:go` → `/gh:actions-go`; `/skill:audit|review|report-issue` → `/claude-code:skill-audit|skill-review|skill-report-issue`'
-time: 2026-07-02T08:04:35+10:00
