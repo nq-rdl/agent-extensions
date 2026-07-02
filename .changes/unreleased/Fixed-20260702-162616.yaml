@@ -1,0 +1,3 @@
+kind: Fixed
+body: 'Doc drift: replaced the dangling `docs/specs/*` links in CONTRIBUTING.md (the specs were removed in the pre-v0.14.0 cleanup)'
+time: 2026-07-02T16:26:16+10:00

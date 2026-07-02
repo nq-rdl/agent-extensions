@@ -1,3 +1,3 @@
 kind: Removed
-body: 'Plugin consolidation (34 → 29) retires five subject plugins: `github-actions@rdl` (merged into `gh`), `hooks@rdl` (the forced-eval hook now ships only via the `/rdl-team:cc-setup` skill), `skill@rdl` (folded into `claude-code`), `research@rdl` (agents rehomed to `planning`/`claude-code`), and `review@rdl` (a code-review plugin from an external marketplace covers it). Five review-only agents are removed with it: `wg-code-alchemist`, `critical-thinking`, `doublecheck`, `agent-governance-reviewer`, `se-responsible-ai-code`. Migration: install the replacement subjects (`gh@rdl`, `claude-code@rdl`, `planning@rdl`) or reinstall `rdl@rdl` to pick up the regenerated set'
+body: 'Plugin consolidation retires plugins `github-actions@rdl` (merged into `gh`), `hooks@rdl` (forced-eval hook ships only via the `/rdl-team:cc-setup` skill), and `skill@rdl` (folded into `claude-code`)'
 time: 2026-07-02T08:04:28+10:00

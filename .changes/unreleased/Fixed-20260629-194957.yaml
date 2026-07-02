@@ -1,0 +1,3 @@
+kind: Fixed
+body: 'opencode-delegate: harden the skeleton — create cache dir before save, use fileURLToPath not import.meta.filename, fix SDK session.create body/data shape, handle unknown job ids in result/cancel'
+time: 2026-06-29T19:49:57Z

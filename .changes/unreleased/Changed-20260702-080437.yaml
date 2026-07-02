@@ -1,0 +1,3 @@
+kind: Changed
+body: 'Plugin consolidation: the former `research` agents move to `planning` (`research-technical-spike`) and `claude-code` (`prompt-builder`)'
+time: 2026-07-02T08:04:37+10:00
