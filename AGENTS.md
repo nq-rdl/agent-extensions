@@ -182,6 +182,16 @@ Three more workflows run on PRs alongside `validate.yml`:
 
 The same checks run locally via `lefthook` (see Setup commands).
 
+**Required status checks on `main` are coupled to these job names.** The always-run
+`validate.yml` jobs above are marked as required status checks so red CI blocks the merge
+button (`docs/branch-protection.md`). A required check is matched by the **exact job
+`name:`** — renaming or dropping a `name:` in `validate.yml` silently drops the
+requirement (the gate disappears while still showing green). When you rename, add, or
+remove an always-run `validate.yml` job, update the required-checks list per
+`docs/branch-protection.md`. Do **not** require the subset-only checks (`link-check`'s
+`paths:` filter would hang non-skill PRs; `check-changie-fragment`, `version-monotonic`,
+and SkillSpector `scan` are excluded) — see that doc for the reasoning.
+
 ## Testing instructions
 
 To verify skills are visible before release, install the repo as a local Claude Code marketplace:

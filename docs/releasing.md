@@ -94,6 +94,9 @@ Tracked in #175 / #176, required before the flow above works end-to-end:
   alone do not re-run PR checks, so without the up-to-date requirement a stale release PR keeps the
   green guard run it earned before a newer version merged. (The guard job is skipped on
   non-release PRs; GitHub treats a skipped required check as passing.)
+- The always-run `validate.yml` gates are marked as required status checks on `main` so red CI
+  blocks the merge button — see [`docs/branch-protection.md`](branch-protection.md) for the exact
+  list, which checks are deliberately left optional, and the job-name coupling caveat (#221).
 
 **Bootstrap note (#172).** `workflow_dispatch` and `pull_request: closed` both execute the
 workflow file as it exists on the **default branch**, not as it exists on a feature branch. That
