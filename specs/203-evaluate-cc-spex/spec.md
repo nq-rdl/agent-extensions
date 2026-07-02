@@ -161,7 +161,9 @@ unchanged by this deliverable.
 ### Functional Requirements
 
 - **FR-001**: The evaluation MUST assess `cc-spex` against the two upstream-reported
-  friction points — constitution drift and session continuity — using real
+  friction points — constitution drift (spec/constitution-intent decay, assessed via the
+  spec↔code-drift lens since cc-spex targets no constitution/`CLAUDE.md` document) and
+  session continuity — using real
   `speckit-lifecycle` usage or a representative dry run, and record a written finding for
   each.
 - **FR-002**: The evaluation MUST document overlap and conflict for each of the six
@@ -242,7 +244,9 @@ unchanged by this deliverable.
 
 - **`speckit-lifecycle` (#124) is not yet merged** (sibling Wave-1 work), so the friction
   evaluation is performed against a representative dry run of the intended SpecKit +
-  Superpowers workflow rather than the shipped skill.
+  Superpowers workflow rather than the shipped skill. A dry run is "representative" if it
+  exercises the full specify → clarify → plan → tasks → execute sequence against a real
+  spec in this repo (e.g. this #203 branch), not a toy example.
 - The adoptable unit is the single `spex` plugin from the distribution marketplace
   `cc-rhuss-marketplace` (repo `rhuss/cc-rhuss-marketplace`), consumed upstream — not the
   dev-only `spex-plugin-development` marketplace at the root of `rhuss/cc-spex`; individual

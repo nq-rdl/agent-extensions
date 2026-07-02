@@ -41,13 +41,15 @@ or `docs/external-marketplaces.md` — applying the draft diffs is a user-gated 
   (`203-evaluate-cc-spex`), proceeds through subagent-driven execution, and finishes with a
   reviewable branch. There is no product code, so the code-review/refactor legs apply to the
   doc's internal consistency and its cited sources rather than to source files.
-- **III. Test-Driven Development (NON-NEGOTIABLE)** — N/A with justification (see Complexity
-  Tracking). The deliverable is a markdown evaluation with no runtime surface to exercise;
+- **III. Test-Driven Development (NON-NEGOTIABLE)** — N/A with justification, recorded in
+  Complexity Tracking per the constitution's Governance deviation clause. The deliverable is a
+  markdown evaluation with no runtime surface to exercise;
   there is no implementation code that a failing test could gate. Verification is the doc's
   measurable success criteria (SC-001…SC-007) plus the repo CI-parity gates.
-- **IV. Single-Executor Routing (NON-NEGOTIABLE)** — PASS. Exactly one executor
-  (`/speckit.implement`) drives this task; `/speckit.tasks` runs first so `tasks.md` exists
-  before any implementation begins. No dual executor.
+- **IV. Single-Executor Routing (NON-NEGOTIABLE)** — PASS. Exactly one executor — the
+  Superpowers execution workflow (`subagent-driven-development`) — drives this task, matching
+  Check II; `/speckit.tasks` runs first so `tasks.md` exists before execution begins, and
+  `/speckit.implement` is **not** also run. No dual executor.
 - **V. Definition of Done** — PASS (planned). Validation green (CI-parity gates), a changie
   fragment added, lefthook/`validate.yml`-equivalent checks pass before finish.
 
