@@ -116,6 +116,22 @@ hold — no exceptions, no "will fix later":
 **Rationale**: A crisp, machine-checkable done state is what lets subagents and
 reviewers trust "complete" without re-verifying from scratch.
 
+### VI. Ephemeral Specs, Durable ADRs
+
+A `specs/NNN-slug/` directory is **scaffolding** — it lives on its worktree/integration
+branch only. The lasting value is its decision points (context, options, chosen outcome),
+which are captured as an **ADR** (`docs/adr/NNNN-*.md`) at merge time.
+
+On a merge to **trunk/main**: (1) archive the spec's decisions as an ADR, then (2) strip
+the ephemeral speckit artifacts from trunk — the `specs/NNN-slug/` directory, the
+`.specify/` scaffolding, and the installed speckit phase skills. Trunk keeps only the real
+deliverables plus `docs/adr/`. On a merge to an **integration branch**, the spec is
+retained. `speckit-lifecycle`'s `merge-spec.sh` strips the spec automatically on a trunk merge.
+
+**Rationale**: Planning artifacts clutter trunk and go stale; the ADR is the durable,
+searchable record of *why*. Keeping trunk free of `.specify/`/speckit tooling also means
+adopting speckit in a repo never forces that machinery onto its main branch.
+
 ## Workflow Pipeline & Handoff Boundary
 
 Every feature moves left-to-right through one pipeline. **SpecKit** owns the left half;
