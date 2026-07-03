@@ -1,25 +1,15 @@
 # Contributing
 
 Thanks for contributing to the RDL agent extension catalog. This file covers the **rules for
-grouping skills and agents into plugins**. For repo mechanics (sync scripts, validation,
-release), see [`AGENTS.md`](AGENTS.md) and [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md).
+grouping skills and agents into plugins**, the **skill directory structure and content
+conventions**, and the **packaging loop** that turns a new skill or agent into an installable
+plugin. For repo mechanics (sync scripts, validation, release), see [`AGENTS.md`](AGENTS.md) and
+[`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md).
 
 **Tooling:** all repo Python runs via **pixi** (`pixi install` once, then
 `pixi run …` for every script below — the environment is defined in `pyproject.toml`).
 
 ## Plugin grouping: one plugin per subject
-
-> **Status:** live. The legacy domain bundles (`swe`, `infra`, `informatics`, `dev-tools`, `meta`)
-> have been **retired** and every skill and agent is now grouped by subject (`go`, `gh`, `r`,
-> `terraform`, `review`, …). The *strategy* is
-> [#101](https://github.com/nq-rdl/agent-extensions/issues/101); the *mechanism* (the
-> registry-owned `{source, leaf}` mapping + sync/packaging) is
-> [#102](https://github.com/nq-rdl/agent-extensions/issues/102). Grouping is owned **here** in
-> `agent-extensions`, so the canonical `skills/` tree stays flat — no restructuring of the skill
-> sources is required (the earlier grouping-in-source plan, agent-skills#118, was closed as superseded).
-> The design and rollout specs (`docs/specs/2026-06-02-plugin-grouping-design.md`,
-> `docs/specs/2026-06-05-plugin-mapping-migration.md`) were removed in the pre-v0.14.0 cleanup —
-> recover them from git history if needed.
 
 Every skill and agent is invoked as **`<subject>:<facet>`** — the `subject` is the plugin, the
 `facet` is what it does. The rules below decide both halves. The colon is always present for
@@ -28,8 +18,10 @@ plugin content; only Claude Code's built-in skills are bare.
 ### 1. One plugin per subject
 
 A **subject** is a tool, library, language, app, or named workflow (`obsidian`, `go`, `r`,
-`sops`, `release`). Each subject is exactly one plugin. A subject with a single facet still gets
-its own plugin — small plugins are fine.
+`sops`, `planning`). Each subject is exactly one plugin. A subject with a single facet still gets
+its own plugin — small plugins are fine. Its content can be skills, agents, hooks, or MCP servers
+in any combination — a bundle may be skill-only, agent-only, or MCP-only (e.g. `lucid` wires only
+an MCP server).
 
 ### 2. File by *primary* subject, not by tools touched
 
@@ -44,14 +36,10 @@ If you're tempted to file something under two subjects, you've applied the wrong
 
 > **The `gh` bundle and its one exception.** `gh` is the team's GitHub *workflow* subject (rule
 > 4 below): `changie`, `conventional-commits`, `husky`, `lefthook`, `pre-commit`, `send-pr`, and
-> `document-release` all invoke as `/gh:*`, and it also homes the GitHub Actions CI/CD agents
-> (`github-actions-expert`, plus `se-gitops-ci-specialist` as a guest — see §5). `go-gh` ("GitHub
-> Actions CI/CD **for Go**") is grouped there too, as `/gh:actions-go` — even though its primary
-> subject is **Go** — a deliberate choice to keep all GitHub-centric work under one namespace
-> ([#115](https://github.com/nq-rdl/agent-extensions/issues/115)). The bare `actions` leaf is left
-> reserved for a future generic GitHub Actions skill. Treat `go-gh` as the **one sanctioned
-> exception** to "file by primary subject," not a precedent: file everything else by what it is
-> *about*.
+> `document-release` all invoke as `/gh:*`. `go-gh` ("GitHub Actions CI/CD **for Go**") is grouped
+> there too, as `/gh:actions-go`, even though its primary subject is **Go** — the one sanctioned
+> exception to "file by primary subject," not a precedent. The bare `actions` leaf is reserved for
+> a future generic GitHub Actions skill. File everything else by what it is *about*.
 
 ### 3. The facet is always an action or stage
 
@@ -60,17 +48,18 @@ subject.
 
 - ✅ `sops:encrypt`, `pixi:env`, `obsidian:bases`
 - ❌ `sops:sops`, `pixi:pixi`
-- Multi-step workflows use stage facets: `release:start`, `release:middle`, `release:close`.
-  Ordering lives in the skill **content** — each stage points to the next; the namespace does
-  not enforce order.
+- Multi-step workflows use stage facets, e.g. a hypothetical `release` subject with
+  `release:start`, `release:middle`, `release:close`. Ordering lives in the skill **content**
+  — each stage points to the next; the namespace does not enforce order.
 
 The facet is the **leaf** you set in the registry mapping (see rule 6); the canonical skill stays
 flat and is renamed to the leaf when the plugin tree is generated.
 
 ### 4. No-tool subjects → name the workflow
 
-If a skill/agent isn't about a tool, its subject is the **workflow/activity** it performs:
-`git:send-pr`, `git:conventional-commits`, `review:<facet>`.
+If a skill/agent isn't about a tool, its subject is the **workflow/activity** it performs, e.g.
+`gh:send-pr` and `gh:conventional-commits` (subject `gh`, facet the action) — or, as further
+examples of workflow/activity subjects, `planning`, `debug`, and `tech-writing`.
 
 ### 5. Agents: home + description required; companion skill optional
 
@@ -87,36 +76,32 @@ when a subject has agents but no skill.
 
 #### Cross-listing an agent (one home, rare guests)
 
-Agent reuse across bundles is deliberate and supported — but every listing has a documented home:
+Agent reuse across bundles is deliberate and supported, but every listing has a documented home.
+Every agent has exactly **one home** — its subject bundle, per rules 1–4. A **guest listing** in
+another bundle is allowed when the agent is load-bearing for that bundle's job; keep guests rare
+and annotate them in the registry YAML with a `# guest — home: <bundle>` comment on the agent
+line. Docs and hooks always reference the **home-qualified** agent, so a guest listing can be
+added or dropped without breaking references.
 
-- Every agent has exactly **one home** — its subject bundle, per rules 1–4.
-- A **guest listing** in another bundle is allowed when the agent is load-bearing for that
-  bundle's job. Keep guests rare and annotate them in the registry YAML with a
-  `# guest — home: <bundle>` comment on the agent line.
-- Docs and hooks always reference the **home-qualified** agent, so a guest listing can be added
-  or dropped without breaking references.
-
-Current guest listings: `github-actions-expert` (home `gh`, guest in `go`),
-`se-gitops-ci-specialist` (home `argo-cd`, guest in `gh`), and `marketplace-scout`
-(home `claude-code`, guest in `rdl-team`).
+Guest listings are discoverable at a glance: `grep -rn 'guest — home' registry/bundles/`. For
+example, `github-actions-expert` is homed in `gh` and guests in `go`.
 
 ### 6. How grouping is expressed (owned here in `agent-extensions`)
 
 Skills are authored in this repo as a **flat** library — `skills/<skill>/SKILL.md`, one level, no
-group folders. **Grouping is a packaging decision** expressed in the bundle registry (per
-[#102](https://github.com/nq-rdl/agent-extensions/issues/102)):
+group folders. **Grouping is a packaging decision** expressed in the bundle registry:
 
 - A bundle sets `pluginName: <subject>` and lists each skill member as either:
   - a **flat string** `<name>` — packaged as-is (`leaf == <name>`); or
   - an explicit **`{source, leaf}` mapping** — packages the flat `skills/<source>/` under a
     different `leaf` (e.g. `{source: go-gh, leaf: actions-go}` → `gh:actions-go`).
+- A bundle may also wire `hooks:` and `mcp:` entries; see the registry schema in `AGENTS.md`.
 - `scripts/sync-plugins.sh` copies `skills/<source>/` → `plugins/<subject>/skills/<leaf>/`, renaming
   to the leaf — so the plugin tree is one level deep and Claude Code invokes `<subject>:<leaf>`.
-  **The leaf folder name drives invocation.** Claude Code labels the skill in `/`-autocomplete as
-  `frontmatter.name || <subject>:<leaf>` — so a present `name:` (the canonical `go-gh` **or** the
-  leaf `actions-go`) *overrides* the namespaced id with a bare, un-prefixed label, and `/gh` lists
-  `go-gh`/`actions-go` instead of `gh:actions-go`. So `sync-plugins.sh` **strips the copy's `name:` entirely**, letting the
-  label fall back to `<subject>:<leaf>`. The canonical `skills/` source is never touched; only the
+  **The leaf folder name drives invocation.** Claude Code labels a skill in `/`-autocomplete as
+  `frontmatter.name || <subject>:<leaf>` — a present `name:` would override the namespaced id with
+  a bare label (e.g. `/gh` listing `go-gh` instead of `gh:actions-go`), so `sync-plugins.sh`
+  **strips the copy's `name:` entirely**. The canonical `skills/` source is never touched; only the
   derivative plugin copy is stripped.
 - Validators enforce: every member has a valid shape · no duplicate leaf within a bundle ·
   `pluginName` unique across bundles (`scripts/check_grouping.py`) · each plugin skill copy carries
@@ -241,19 +226,29 @@ subject (no skill) is fine — give it its own bundle with an empty `skills: []`
 
 ## Claude Code on the web
 
-Cloud sessions ([Claude Code on the web](https://code.claude.com/docs/en/claude-code-on-the-web)) run on a fresh VM with only a clone of this repo. The dev-helper plugins enabled here are **external** — they help you *work on* this catalog (Go/LSP, PR review, Python tooling, git worktrees, general workflows); they are deliberately **not** this catalog's own `rdl` plugins. A session for developing the catalog should not install the catalog.
+Cloud sessions run on a fresh VM with only a clone of this repo. The dev-helper plugins declared
+in `.claude/settings.json` (`enabledPlugins` + `extraKnownMarketplaces`) are **external** helpers
+for working *on* this catalog (Go/LSP, PR review, Python tooling, git worktrees, general
+workflows) — never enable the `rdl` marketplace or the `rdl@rdl` meta-plugin here; a session for
+developing the catalog should not install the catalog itself.
 
-`.claude/settings.json` declares them under `enabledPlugins` with their sources under `extraKnownMarketplaces`. Per the [web docs' "what carries over" table](https://code.claude.com/docs/en/claude-code-on-the-web), the platform attempts to install declared plugins at session start from the marketplace you declared — with **no setup script and no `make`**. Treat this as **best-effort, not a guarantee**: the in-sandbox GitHub git proxy 403s every repo except the session's own, so an **external** marketplace's `marketplace add` (a git clone) fails; the install also races skill enumeration on the first session ([anthropics/claude-code#63028](https://github.com/anthropics/claude-code/issues/63028)); and the sandbox is ephemeral. So a declared plugin's `/<plugin>:<skill>` commands may not surface — for catalog-dev work that is acceptable (these are dev-helpers, not the catalog itself), and `announce-capabilities.sh` flags any that did not land.
+Declared plugin installs are **best-effort, not guaranteed** — the platform attempts them at
+session start with no setup script and no `make`, but a sandbox-side git proxy or install race can
+cause a declared plugin to not land. `announce-capabilities.sh` cross-checks the declared set
+against `claude plugin list --json` and flags any **"Declared but NOT installed"** plugin, so a
+failure is never silently masked. Guaranteed first-session skills instead come from **vendoring**
+into `.claude/skills/`.
 
-The repo ships a `.claude/scripts/install-deps.sh` **SessionStart hook** (gated on `CLAUDE_CODE_REMOTE`) but it does **not** drive any plugin install — it provisions only what the declarative path does not: per-session tooling the base image lacks (gh/codex CLIs) and the project dev toolchain + Docker daemon (via `install-deps.local.sh`). It deliberately does **not** retry plugin installs: a hook-installed plugin lands in a cache that isn't re-scanned that session (and `claude plugin install` in a hook can hang web sessions, anthropics/claude-code#18088), so declared plugins are best-effort and first-session skills come from **vendoring** into `.claude/skills/` instead. `announce-capabilities.sh` cross-checks the declared set against `claude plugin list --json` and flags any **"Declared but NOT installed"** plugin, so a marketplace-reachability failure is never silently masked.
+The two engine scripts (`install-deps.sh`, `announce-capabilities.sh`) have one canonical source,
+`skills/cc-web-setup/assets/`. Edit only there, then run `pixi run bash scripts/sync-plugins.sh` —
+never hand-edit the `.claude/scripts/` copies (sync's `--check` drift gate enforces bytes and the
+executable bit). `.claude/scripts/install-deps.local.sh` is the repo-local seam with no canonical
+source and is left untouched by sync.
 
-These two engine scripts have one **canonical source**, `skills/cc-web-setup/assets/{install-deps,announce-capabilities}.sh`; both the live `.claude/scripts/` copies and the synced `plugins/claude-code/skills/web-setup/` copies are written by `bash scripts/sync-plugins.sh` and guarded by its `--check` drift gate (bytes **and** the executable bit — the live copies are forced `0o755` and a non-executable canonical asset is flagged). Edit only the canonical copy under `skills/cc-web-setup/assets/`, then re-run sync. `.claude/scripts/install-deps.local.sh` is the repo-local project seam — it has no canonical source and is intentionally left untouched.
-
-There is **no Setup-script field to set and no manual per-environment step** — declaring the plugins is sufficient.
-
-To add a dev-helper plugin: set it `true` in `enabledPlugins` and register its marketplace under `extraKnownMarketplaces`. Keep the set small and **external** — do not enable the `rdl` marketplace or the `rdl@rdl` meta-plugin here (it is self-referential in this repo's own dev env: per the docs it must reach its marketplace source, and a self-cloning meta batch breaks that install).
-
-**Further reading.** [`docs/claude-code-web.md`](docs/claude-code-web.md) is the reader-facing overview (the first-session invariant, the vendoring route, the constraints); the authoritative platform facts, the git-proxy 403, and the hard-won anti-patterns live in [`skills/cc-web-setup/references/web-setup.rst`](skills/cc-web-setup/references/web-setup.rst). The `/claude-code:web-setup` skill provisions all of this for any repo.
+**Further reading.** [`docs/claude-code-web.md`](docs/claude-code-web.md) is the reader-facing
+overview; [`skills/cc-web-setup/references/web-setup.rst`](skills/cc-web-setup/references/web-setup.rst)
+holds the authoritative platform facts. The `/claude-code:web-setup` skill provisions all of this
+for any repo.
 
 ## Cutting a release
 
