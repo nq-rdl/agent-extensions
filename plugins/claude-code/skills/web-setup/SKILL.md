@@ -200,7 +200,7 @@ exactly what you want. `cover` is a read-only assertion (no redirect needed).
 | Base | File | Use for |
 |---|---|---|
 | **rdl** | `assets/settings.json.tmpl` | a *consumer* repo that wants the RDL catalog (`rdl@rdl-agent-extensions`) |
-| **externals** | `assets/settings.externals.json.tmpl` | the team's external dev-helper plugins, **no rdl** — and the **only** correct base when Phase 0 found a `.claude-plugin/marketplace.json` |
+| **externals** | `assets/settings.externals.json.tmpl` | the team's external dev-helper plugins, **no RDL catalog** — and the **only** correct base when Phase 0 found a `.claude-plugin/marketplace.json` |
 
 Both wire the two SessionStart hooks and the opinionated defaults (`model: opus`,
 `alwaysThinkingEnabled`, `effortLevel: xhigh`, `CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS`).
