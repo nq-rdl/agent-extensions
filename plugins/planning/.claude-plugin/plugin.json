@@ -1,6 +1,6 @@
 {
   "name": "planning",
-  "version": "0.20.0",
+  "version": "0.21.0",
   "description": "Planning — implementation strategy, technical-spike validation, file-level sequencing, API/repo architecture, and ADRs",
   "author": {
     "name": "nq-rdl"

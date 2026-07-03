@@ -1,3 +1,0 @@
-kind: Changed
-body: "Rename the marketplace `rdl` → `rdl-agent-extensions` (breaking) — install plugins as `<plugin>@rdl-agent-extensions`, e.g. `gh@rdl-agent-extensions` / `rdl@rdl-agent-extensions`"
-time: 2026-07-03T01:31:45+00:00
