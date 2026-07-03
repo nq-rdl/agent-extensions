@@ -13,11 +13,13 @@ other one-time `main` settings from #175 / #176.
 
 ## Required checks
 
-Mark exactly these **always-run** `validate.yml` job names as required status checks on
-`main`. `validate.yml` is scoped to `branches: [main, 'release/*']` — that filter
-*includes* `main`, so every PR to `main` triggers the workflow. Combined with **no
-`paths:` filter** and **no job-level `if:`** on any of these jobs, each reports a
-pass/fail on every PR to `main`:
+Mark these **always-run** `validate.yml` job names as required status checks on `main`.
+`validate.yml` is scoped to `branches: [main, 'release/*']` — that filter *includes*
+`main`, so every PR to `main` triggers the workflow. Combined with **no `paths:` filter**
+and **no job-level `if:`** on any of these jobs, each reports a pass/fail on every PR to
+`main`. (These six are what issue #221 adds; the full required set on `main` also includes
+the release flow's `version-monotonic` — see [below](#deliberately-not-required) — which
+is why the apply command enumerates it.)
 
 | Required check (job `name:`)                                   | Job id in `validate.yml` |
 | -------------------------------------------------------------- | ------------------------ |
@@ -60,19 +62,31 @@ Against that, the excluded checks and why:
 `version-monotonic` **is** marked required — that decision lives in
 [`docs/releasing.md`](releasing.md#repo-settings-prerequisites-one-time) alongside the
 "require branches to be up to date before merging" requirement it depends on. It is
-listed here only so the two lists don't contradict each other.
+listed here so the two lists don't contradict each other, **and** because the apply
+command below rewrites the whole required-check set, so it has to include
+`version-monotonic` or applying it would drop the guard.
 
 ## Applying the setting
 
-The surgical, non-destructive call is a `PATCH` to the granular
-`required_status_checks` sub-resource — it leaves the existing review and
-conversation-resolution rules untouched (a full `PUT .../protection` would replace the
-*entire* config and must re-send every rule). It also **omits `strict`**, so it does not
-touch "require branches to be up to date before merging" (see the note below). Branch
-protection must already exist on `main` (it does), or the `PATCH` 404s.
+Prefer a `PATCH` to the granular `required_status_checks` sub-resource over a full
+`PUT .../protection` (which would replace the *entire* config and must re-send every
+rule). The `PATCH` leaves the review and conversation-resolution rules untouched and
+**omits `strict`**, so it does not touch "require branches to be up to date before
+merging" (see the note below). Branch protection must already exist on `main` (it does),
+or the `PATCH` 404s.
 
-Via the GitHub UI: **Settings → Branches → `main` → Edit → Require status checks to
-pass before merging**, then add each job name from the [required-checks table](#required-checks).
+!!! warning "The `checks` array replaces the entire required-check set"
+    The `checks` you send **become** the required-check list — the `PATCH` is not
+    additive, so any check you omit is **dropped**. The snippet below therefore also
+    lists `version-monotonic` (the release-flow stale-PR guard required by
+    `docs/releasing.md`); leaving it out would silently un-require it and make stale
+    release PRs mergeable again. The GitHub **UI** path is additive by contrast — ticking
+    a box adds a check without removing the others.
+
+Via the GitHub UI (additive): **Settings → Branches → `main` → Edit → Require status
+checks to pass before merging**, then add each job name from the
+[required-checks table](#required-checks). Leave the release flow's `version-monotonic`
+in place if it is already there.
 
 Via the API (`gh` or `curl`, needs repo-admin):
 
@@ -84,7 +98,8 @@ gh api -X PATCH \
   -f 'checks[][context]=Validate Claude plugin structure, hooks, and agents' \
   -f 'checks[][context]=Unit tests (pipeline scripts)' \
   -f 'checks[][context]=Test cc-web-setup SessionStart hook (install-deps.sh)' \
-  -f 'checks[][context]=Validate skills against the agentskills.io spec (asctl)'
+  -f 'checks[][context]=Validate skills against the agentskills.io spec (asctl)' \
+  -f 'checks[][context]=version-monotonic'   # release-flow guard (docs/releasing.md) — omit and it is dropped
 ```
 
 The `PATCH` above deliberately does **not** send `strict` ("require branches to be up to
