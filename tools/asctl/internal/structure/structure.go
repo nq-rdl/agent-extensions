@@ -18,7 +18,8 @@ var allowedSubdirs = []string{"assets", "references", "scripts"}
 
 // allowedTopLevelFiles lists the non-hidden files permitted at the skill root:
 // SKILL.md (the manifest — required, exact uppercase) and the optional
-// lychee.toml link-check config. Kept small and explicit (see CONTRIBUTING.md §6).
+// lychee.toml link-check config. Kept small and explicit (see CONTRIBUTING.md
+// "Skill directory structure" rule 6).
 var allowedTopLevelFiles = []string{"SKILL.md", "lychee.toml"}
 
 // isHidden reports whether a directory entry name is dot-prefixed. Hidden

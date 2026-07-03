@@ -1,0 +1,3 @@
+kind: Fixed
+body: 'Documented the Release - PR guard workflow in AGENTS.md alongside Prepare-PR and Finalize-on-merge (docs/releasing.md already covered it).'
+time: 2026-07-03T01:03:14Z

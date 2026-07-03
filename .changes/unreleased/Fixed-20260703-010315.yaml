@@ -1,0 +1,3 @@
+kind: Fixed
+body: 'Disambiguated CONTRIBUTING.md section references in asctl and script comments citing the wrong or ambiguous "§6".'
+time: 2026-07-03T01:03:15Z
