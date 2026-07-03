@@ -7,7 +7,7 @@ description: >-
   decide which ones THIS repo should enable. It locates the team's tracked
   marketplace list, enumerates each marketplace's plugin catalog (live), inspects
   the repo's languages and tooling, and returns a ranked suggestion set: the
-  always-useful baseline (pr-review-toolkit, gh@rdl, worktrunk, the applicable LSP)
+  always-useful baseline (pr-review-toolkit, gh@rdl-agent-extensions, worktrunk, the applicable LSP)
   plus language/stack-matched picks, each with id, marketplace, and a one-line reason.
   It only researches and recommends — it does not install or edit settings.
 license: MIT
@@ -61,14 +61,14 @@ Parse its keys:
 
 | Marketplace key | GitHub repo |
 |---|---|
-| `rdl` | `nq-rdl/agent-extensions` |
+| `rdl-agent-extensions` | `nq-rdl/agent-extensions` |
 | `claude-plugins-official` | `anthropics/claude-plugins-official` |
 | `worktrunk` | `max-sixty/worktrunk` |
 | `openai-codex` | `openai/codex-plugin-cc` |
 | `goland-claude-marketplace` | `JetBrains/go-modern-guidelines` |
 | `astral-sh` | `astral-sh/claude-code-plugins` |
 
-Baseline (always suggest): `pr-review-toolkit@claude-plugins-official`, `gh@rdl`,
+Baseline (always suggest): `pr-review-toolkit@claude-plugins-official`, `gh@rdl-agent-extensions`,
 `worktrunk@worktrunk`; plus the applicable LSP (`gopls-lsp@claude-plugins-official` for Go).
 
 ## Step 2 — Enumerate each marketplace's plugin catalog (live)
@@ -117,10 +117,10 @@ Survey the target repo to know what to match against. Look for:
   `DESCRIPTION`/`*.R` (R), `package.json` (TS/JS), `*.tf` (Terraform), `Chart.yaml`/`k8s` manifests, `*.qmd` (Quarto), etc.
 - **Tooling / workflow signals:** `.github/workflows/` (CI), `.pre-commit-config.yaml`/`lefthook.yml`/`.husky` (hooks),
   `CHANGELOG.md`/`.changes/` (changie), `Dockerfile`/`docker-compose` (containers), `.sops.yaml` (secrets), docs sites.
-- **Repo shape:** is the target repo **itself the `rdl` marketplace** — i.e. does
-  `.claude-plugin/marketplace.json` exist with `name: rdl`? If so, **every** `@rdl` plugin
-  (not just `rdl@rdl` — also `gh@rdl`, `go@rdl`, …) is already provided by the working tree,
-  and installing the published copy would shadow local edits. Drop **all** `@rdl` ids from the
+- **Repo shape:** is the target repo **itself the `rdl-agent-extensions` marketplace** — i.e. does
+  `.claude-plugin/marketplace.json` exist with `name: rdl-agent-extensions`? If so, **every** `@rdl-agent-extensions` plugin
+  (not just `rdl@rdl-agent-extensions` — also `gh@rdl-agent-extensions`, `go@rdl-agent-extensions`, …) is already provided by the working tree,
+  and installing the published copy would shadow local edits. Drop **all** `@rdl-agent-extensions` ids from the
   install recommendation for that repo (the web path's `strip-self` enforces this; the local
   path has no such guard, so the recommendation itself must exclude them) and say why in the
   report's Notes.
@@ -131,15 +131,15 @@ Use `Glob`/`Grep` for fast detection; don't read whole files.
 
 Build the recommendation in three tiers:
 
-1. **Baseline (always).** The `baseline.always` set verbatim — pr-review-toolkit, gh@rdl,
+1. **Baseline (always).** The `baseline.always` set verbatim — pr-review-toolkit, gh@rdl-agent-extensions,
    worktrunk. These are useful in essentially every repo.
 2. **Applicable LSP.** From `baseline.lsp` plus any `*-lsp` plugins you found in the official
    catalog, include the one matching each detected language (gopls-lsp for Go, a python LSP
    for Python, etc.). Skip languages the repo doesn't use.
 3. **Stack-matched.** From the RDL catalog and `teamExternals`, the plugins whose subject
-   matches a detected language/tool: e.g. `go@rdl` + `gopls-lsp` + `modern-go-guidelines` for
-   a Go repo; `terraform@rdl` for `*.tf`; `kubernetes@rdl`/`argo-cd@rdl` for k8s; `astral@astral-sh`
-   for Python; `tech-writing@rdl`/`quarto@rdl` for docs-heavy repos. Match on keywords/description, and
+   matches a detected language/tool: e.g. `go@rdl-agent-extensions` + `gopls-lsp` + `modern-go-guidelines` for
+   a Go repo; `terraform@rdl-agent-extensions` for `*.tf`; `kubernetes@rdl-agent-extensions`/`argo-cd@rdl-agent-extensions` for k8s; `astral@astral-sh`
+   for Python; `tech-writing@rdl-agent-extensions`/`quarto@rdl-agent-extensions` for docs-heavy repos. Match on keywords/description, and
    keep it tight — only plugins with a real signal in the repo.
 
 Drop anything already enabled in the repo's `.claude/settings.json` (read `enabledPlugins`),
@@ -156,15 +156,15 @@ Return (do not install) a concise, scannable report the calling skill can presen
 
 ### Baseline (recommended for every repo)
 - pr-review-toolkit@claude-plugins-official — specialized PR-review subagents
-- gh@rdl — GitHub workflow: hooks, changelog, conventional commits, PRs, releases
+- gh@rdl-agent-extensions — GitHub workflow: hooks, changelog, conventional commits, PRs, releases
 - worktrunk@worktrunk — git worktree management via the wt CLI
 
 ### Language / LSP (detected: <languages>)
 - gopls-lsp@claude-plugins-official — gopls language server (go.mod found)
-- go@rdl — idiomatic Go naming and secure error handling
+- go@rdl-agent-extensions — idiomatic Go naming and secure error handling
 
 ### Stack-matched
-- terraform@rdl — *.tf detected; compliant HCL + IaC review
+- terraform@rdl-agent-extensions — *.tf detected; compliant HCL + IaC review
   …
 
 ### Notes

@@ -113,7 +113,7 @@ targets:
   claude:
     enabled: true
     pluginName: go
-    marketplaceName: rdl
+    marketplaceName: rdl-agent-extensions
 ```
 
 Required behavior:
@@ -233,9 +233,9 @@ partial failure where the tag was created but the release publish step did not c
 
 ```bash
 /plugin marketplace add nq-rdl/agent-extensions
-/plugin install rdl@rdl                 # the meta-plugin installs every subject
+/plugin install rdl@rdl-agent-extensions                 # the meta-plugin installs every subject
 # …or install a single subject:
-/plugin install go@rdl --scope project
+/plugin install go@rdl-agent-extensions --scope project
 ```
 
 Publication target: this repository, with `.claude-plugin/marketplace.json` at the root and plugins under `plugins/`.

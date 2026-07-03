@@ -18,4 +18,4 @@ targets:
   claude:
     enabled: true
     pluginName: shiny
-    marketplaceName: rdl
+    marketplaceName: rdl-agent-extensions

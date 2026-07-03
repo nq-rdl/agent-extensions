@@ -105,14 +105,14 @@ def generate(repo) -> str:
         "/plugin marketplace add nq-rdl/agent-extensions",
     ]
     if meta.get("enabled"):
-        lines += [f"/plugin install {meta['name']}@rdl    # installs every subject below"]
+        lines += [f"/plugin install {meta['name']}@{mkt['name']}    # installs every subject below"]
     lines += [
         "```",
         "",
         "Or install a single subject:",
         "",
         "```bash",
-        "/plugin install <subject>@rdl",
+        f"/plugin install <subject>@{mkt['name']}",
         "```",
         "",
     ]

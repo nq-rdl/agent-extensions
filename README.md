@@ -13,10 +13,10 @@ Claude Code is the only publication target.
 /plugin marketplace add nq-rdl/agent-extensions
 
 # Install every subject in one command via the rdl meta-plugin
-/plugin install rdl@rdl
+/plugin install rdl@rdl-agent-extensions
 
 # …or install a single subject
-/plugin install go@rdl
+/plugin install go@rdl-agent-extensions
 ```
 
 See [`docs/bundles.md`](docs/bundles.md) for the full subject list and [`docs/local-testing.md`](docs/local-testing.md) for local/devcontainer install.

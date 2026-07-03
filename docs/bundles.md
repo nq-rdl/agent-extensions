@@ -51,13 +51,13 @@ Install the whole set in one command via the `rdl` meta-plugin:
 
 ```bash
 /plugin marketplace add nq-rdl/agent-extensions
-/plugin install rdl@rdl    # installs every subject below
+/plugin install rdl@rdl-agent-extensions    # installs every subject below
 ```
 
 Or install a single subject:
 
 ```bash
-/plugin install <subject>@rdl
+/plugin install <subject>@rdl-agent-extensions
 ```
 
 ---

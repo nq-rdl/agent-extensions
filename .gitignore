@@ -21,5 +21,5 @@ docs/superpowers/
 
 # Local/personal Claude Code overrides — never committed. Holds machine-local
 # settings, including the optional rdl-self-shadow fix for contributors whose
-# user-scope config enables rdl@rdl: {"enabledPlugins": {"rdl@rdl": false}}
+# user-scope config enables rdl@rdl: {"enabledPlugins": {"rdl@rdl-agent-extensions": false}}
 .claude/settings.local.json

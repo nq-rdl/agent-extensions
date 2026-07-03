@@ -132,7 +132,7 @@ for the mechanical add-and-sync steps.
 `plugin.json` and the `marketplace.json` entry for a subject are **generated from
 `registry/bundles/<subject>.yaml`** — do **not** hand-edit them. When you add a **new subject**,
 it is also registered as a dependency of the **`rdl` meta-plugin**, so `claude plugin install
-rdl@rdl` keeps installing the full set. CI consistency checks fail if registry, generated
+rdl@rdl-agent-extensions` keeps installing the full set. CI consistency checks fail if registry, generated
 manifests, and the meta-plugin dependency list disagree.
 
 ## Skill directory structure
@@ -251,7 +251,7 @@ These two engine scripts have one **canonical source**, `skills/cc-web-setup/ass
 
 There is **no Setup-script field to set and no manual per-environment step** — declaring the plugins is sufficient.
 
-To add a dev-helper plugin: set it `true` in `enabledPlugins` and register its marketplace under `extraKnownMarketplaces`. Keep the set small and **external** — do not enable the `rdl` marketplace or the `rdl@rdl` meta-plugin here (it is self-referential in this repo's own dev env: per the docs it must reach its marketplace source, and a self-cloning meta batch breaks that install).
+To add a dev-helper plugin: set it `true` in `enabledPlugins` and register its marketplace under `extraKnownMarketplaces`. Keep the set small and **external** — do not enable the `rdl-agent-extensions` marketplace or the `rdl@rdl-agent-extensions` meta-plugin here (it is self-referential in this repo's own dev env: per the docs it must reach its marketplace source, and a self-cloning meta batch breaks that install).
 
 **Further reading.** [`docs/claude-code-web.md`](docs/claude-code-web.md) is the reader-facing overview (the first-session invariant, the vendoring route, the constraints); the authoritative platform facts, the git-proxy 403, and the hard-won anti-patterns live in [`skills/cc-web-setup/references/web-setup.rst`](skills/cc-web-setup/references/web-setup.rst). The `/claude-code:web-setup` skill provisions all of this for any repo.
 

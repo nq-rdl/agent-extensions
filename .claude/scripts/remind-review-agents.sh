@@ -79,7 +79,7 @@ if [ -n "$sid" ]; then
 fi
 
 cat <<'JSON'
-{"hookSpecificOutput":{"hookEventName":"PreToolUse","additionalContext":"This path is under .claude/ — contributor tooling for developing the rdl marketplace (project settings, hooks, helper scripts, the curated external-plugin set), not part of the published catalog. AGENTS.md at the repo root is the authoritative guide for .claude/ changes: CONTRIBUTING.md covers the development requirements and docs/ holds the project documentation (docs/external-marketplaces.md documents the curated plugin set). Reviewing AGENTS.md in full before changing .claude/ keeps the project settings and docs in sync."}}
+{"hookSpecificOutput":{"hookEventName":"PreToolUse","additionalContext":"This path is under .claude/ — contributor tooling for developing the rdl-agent-extensions marketplace (project settings, hooks, helper scripts, the curated external-plugin set), not part of the published catalog. AGENTS.md at the repo root is the authoritative guide for .claude/ changes: CONTRIBUTING.md covers the development requirements and docs/ holds the project documentation (docs/external-marketplaces.md documents the curated plugin set). Reviewing AGENTS.md in full before changing .claude/ keeps the project settings and docs in sync."}}
 JSON
 
 exit 0

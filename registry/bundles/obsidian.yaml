@@ -19,4 +19,4 @@ targets:
   claude:
     enabled: true
     pluginName: obsidian
-    marketplaceName: rdl
+    marketplaceName: rdl-agent-extensions
