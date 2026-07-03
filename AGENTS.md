@@ -273,9 +273,12 @@ workflow (Actions tab, `workflow_dispatch`) with an explicit `version` input (`X
 manifests from the registry, and opens a `release/v<version>` PR labelled `skip-changelog` — all
 via the GitHub App token (`RELEASE_APP_ID` / `RELEASE_APP_PRIVATE_KEY`) so the PR's own CI runs on
 it. Reviewing and squash-merging that PR **is** the release gate (branch protection controls who
-can merge). On merge, **"Release — Finalize on merge"** tags `v<version>` on the squash-merge
-commit and publishes the GitHub release from `.changes/<version>.md` — it never pushes to `main`,
-and it is idempotent (safe to re-run; recovers a tag-pushed-but-release-missing partial failure).
+can merge). A pre-merge **"Release — PR guard"** check runs on every `release/v*` PR and fails
+closed if the PR's version doesn't match its branch name or isn't strictly newer than `main`'s
+current `VERSION`, catching a stale release PR before it can merge. On merge, **"Release —
+Finalize on merge"** tags `v<version>` on the squash-merge commit and publishes the GitHub release
+from `.changes/<version>.md` — it never pushes to `main`, and it is idempotent (safe to re-run;
+recovers a tag-pushed-but-release-missing partial failure).
 
 `marketplace.json` sources are relative paths (`./plugins/<bundle>`) — installs read directly from `main` (or whatever ref the user pinned), no separate release branch involved.
 
