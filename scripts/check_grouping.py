@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
-"""Enforce the Option-2 skill-grouping contract (spec §3 / CONTRIBUTING §6).
+"""Enforce the Option-2 skill-grouping contract (spec §3 / CONTRIBUTING
+"How grouping is expressed" (grouping rule 6)).
 
 A bundle skill member is either a flat string ``<leaf>`` (``source == leaf``) or
 an explicit ``{source, leaf}`` mapping that packages the flat upstream skill

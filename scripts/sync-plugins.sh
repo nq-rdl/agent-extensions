@@ -133,8 +133,9 @@ def normalize(member):
     # either a flat string `<name>` (source == leaf) or an explicit
     # {source, leaf} mapping packaging the flat upstream skills/<source>/ under a
     # different leaf, so Claude Code invokes `<pluginName>:<leaf>` (Option-2
-    # grouping, spec §3 / CONTRIBUTING §6). Returns (source, leaf), or None if
-    # malformed — sync stays resilient and warns rather than aborting.
+    # grouping, spec §3 / CONTRIBUTING "How grouping is expressed" (grouping
+    # rule 6)). Returns (source, leaf), or None if malformed — sync stays
+    # resilient and warns rather than aborting.
     if isinstance(member, str):
         return member, member
     if isinstance(member, dict):
