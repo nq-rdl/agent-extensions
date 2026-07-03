@@ -188,9 +188,11 @@ button (`docs/branch-protection.md`). A required check is matched by the **exact
 `name:`** — renaming or dropping a `name:` in `validate.yml` silently drops the
 requirement (the gate disappears while still showing green). When you rename, add, or
 remove an always-run `validate.yml` job, update the required-checks list per
-`docs/branch-protection.md`. Do **not** require the subset-only checks (`link-check`'s
-`paths:` filter would hang non-skill PRs; `check-changie-fragment`, `version-monotonic`,
-and SkillSpector `scan` are excluded) — see that doc for the reasoning.
+`docs/branch-protection.md`. Keep the subset-only checks **out of this always-run set**:
+`link-check`'s `paths:` filter would hang non-skill PRs, and `check-changie-fragment` /
+SkillSpector `scan` are excluded. (`version-monotonic` is also outside this set, but the
+release flow *does* require it separately — see `docs/releasing.md`.) See
+`docs/branch-protection.md` for the reasoning.
 
 ## Testing instructions
 

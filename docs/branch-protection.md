@@ -14,8 +14,10 @@ other one-time `main` settings from #175 / #176.
 ## Required checks
 
 Mark exactly these **always-run** `validate.yml` job names as required status checks on
-`main`. Each runs on every PR to `main` with no workflow-level `paths:`/`branches:`
-filter and no job-level `if:`, so it reports a pass/fail on every PR:
+`main`. `validate.yml` is scoped to `branches: [main, 'release/*']` — that filter
+*includes* `main`, so every PR to `main` triggers the workflow. Combined with **no
+`paths:` filter** and **no job-level `if:`** on any of these jobs, each reports a
+pass/fail on every PR to `main`:
 
 | Required check (job `name:`)                                   | Job id in `validate.yml` |
 | -------------------------------------------------------------- | ------------------------ |
@@ -65,8 +67,9 @@ listed here only so the two lists don't contradict each other.
 The surgical, non-destructive call is a `PATCH` to the granular
 `required_status_checks` sub-resource — it leaves the existing review and
 conversation-resolution rules untouched (a full `PUT .../protection` would replace the
-*entire* config and must re-send every rule). Branch protection must already exist on
-`main` (it does), or the `PATCH` 404s.
+*entire* config and must re-send every rule). It also **omits `strict`**, so it does not
+touch "require branches to be up to date before merging" (see the note below). Branch
+protection must already exist on `main` (it does), or the `PATCH` 404s.
 
 Via the GitHub UI: **Settings → Branches → `main` → Edit → Require status checks to
 pass before merging**, then add each job name from the [required-checks table](#required-checks).
@@ -76,7 +79,6 @@ Via the API (`gh` or `curl`, needs repo-admin):
 ```bash
 gh api -X PATCH \
   repos/nq-rdl/agent-extensions/branches/main/protection/required_status_checks \
-  -f 'strict=false' \
   -f 'checks[][context]=Validate bundle references + registry consistency' \
   -f 'checks[][context]=Validate skill + agent symlinks' \
   -f 'checks[][context]=Validate Claude plugin structure, hooks, and agents' \
@@ -85,10 +87,14 @@ gh api -X PATCH \
   -f 'checks[][context]=Validate skills against the agentskills.io spec (asctl)'
 ```
 
-`strict` = "require branches to be up to date before merging." The release flow wants it
-**on** so the `version-monotonic` guard is binding against a moving base
-(`docs/releasing.md`); weigh that against the rebase friction it adds to every PR before
-flipping it to `true`.
+The `PATCH` above deliberately does **not** send `strict` ("require branches to be up to
+date before merging"), so it leaves that setting exactly as it is. That is on purpose:
+`strict` is owned by the release flow — [`docs/releasing.md`](releasing.md#repo-settings-prerequisites-one-time)
+wants it **on** so the `version-monotonic` guard stays binding against a moving base, and
+sending `strict=false` here would silently turn it off. To manage `strict` in the same
+call, add a **typed** boolean field (`gh api` needs `-F`, not `-f`, for booleans):
+`-F 'strict=true'` (or `-F 'strict=false'`) — weigh the rebase friction `strict=true`
+adds to every PR before enabling it.
 
 ## Maintenance: names are coupled to `validate.yml`
 
