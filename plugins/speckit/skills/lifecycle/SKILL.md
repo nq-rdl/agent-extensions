@@ -79,11 +79,17 @@ only provisioned specs (branch + worktree exist) and completed specs recorded in
    (FR-020): scaffold `.specify/` only on explicit confirmation via the official `specify`
    CLI (e.g. `uvx … specify init`) — never automatically, never vendoring your own
    templates — and error clearly only if the bootstrap is declined or the CLI is unavailable.
-2. Run `scripts/provision-worktree.sh <slug> [--base <branch>]` — cut from trunk, or
+2. **Offer the routing baseline** (first setup in a repo): if `constitution.md` /
+   `CLAUDE.md` lack SpecKit⇄Superpowers routing, offer the setup playbooks from this
+   skill's source repo (`metadata.repo`, under `docs/playbooks/`):
+   `speckit-constitution-routing.md` — the constitution clause + `CLAUDE.md` routing
+   block — then optionally `speckit-superpowers-extension.md` — opt-in `superb`
+   enforcement gates. Apply only on consent; never edit `constitution.md`/`CLAUDE.md` unasked.
+3. Run `scripts/provision-worktree.sh <slug> [--base <branch>]` — cut from trunk, or
    pass `--base` to group the spec with related work on an existing integration branch.
-3. Invoke `/speckit-specify` **inside the worktree**. All planning phases run in the
+4. Invoke `/speckit-specify` **inside the worktree**. All planning phases run in the
    worktree — trunk never holds partial artifacts.
-4. Report the worktree path and the `claude --worktree .claude/worktrees/NNN` invocation.
+5. Report the worktree path and the `claude --worktree .claude/worktrees/NNN` invocation.
 
 ### 2c. Merge a completed spec
 
