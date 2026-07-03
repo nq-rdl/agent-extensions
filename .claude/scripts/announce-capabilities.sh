@@ -103,14 +103,13 @@ fi
 # the *loaded* set comes from `claude plugin list`. Reporting the declared set
 # alone produced a false positive — the banner looked healthy while the slash
 # menu was empty because the platform's session-start install of a declared plugin
-# had not completed (its marketplace source was unreachable — see
-# docs/claude-code-web.md). Cross-check the two so a declared plugin that did not
-# install is surfaced, not hidden. When the claude CLI is unavailable (some Action
+# had not completed (its marketplace source was unreachable). Cross-check the two
+# so a declared plugin that did not install is surfaced, not hidden. When the claude CLI is unavailable (some Action
 # runners) or errors, we cannot verify, so report the declared set as UNVERIFIED.
 # NOTE: jq is required for the whole plugin canary — reading the declared set AND the
 # verify step both use it. Without jq this section is silent (no declared/installed
-# lines at all); jq is present in every cc-web-setup target environment, and the hook's
-# own JSON emit already depends on it.
+# lines at all); jq is present in every target environment this hook runs in, and the
+# hook's own JSON emit already depends on it.
 declared_plugins=()
 if command -v jq >/dev/null 2>&1 && [ -f "$PROJECT_DIR/.claude/settings.json" ]; then
   while IFS= read -r p; do
@@ -222,7 +221,7 @@ fi
 if [ "${#missing_plugins[@]}" -gt 0 ]; then
   uniq_missing="$(printf '%s\n' "${missing_plugins[@]}" | join_comma)"
   add "**⚠️ Declared but NOT installed:** $uniq_missing"
-  add "Declared in .claude/settings.json (enabledPlugins) but not reported installed-and-enabled by \`claude plugin list --json\` — either the session-start marketplace install did not complete (unreachable source, stale index, wrong plugin id, or the in-sandbox git proxy 403'ing an external marketplace) or the plugin is installed but disabled. Declarative plugins are best-effort and their web activation is unverified; for a guaranteed first-session skill, VENDOR it into \`.claude/skills/\` (part of the clone) — see the cc-web-setup skill."
+  add "Declared in .claude/settings.json (enabledPlugins) but not reported installed-and-enabled by \`claude plugin list --json\` — either the session-start marketplace install did not complete (unreachable source, stale index, wrong plugin id, or the in-sandbox git proxy 403'ing an external marketplace) or the plugin is installed but disabled. Declarative plugins are best-effort and their web activation is unverified; for a guaranteed first-session skill, VENDOR it into \`.claude/skills/\` (part of the clone)."
   add ""
 fi
 

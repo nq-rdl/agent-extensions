@@ -72,7 +72,6 @@ def generate(repo) -> str:
     mkt = _read_yaml(repo / "registry" / "marketplace.yaml")
     enabled = _enabled_bundles(repo)
     order = _ordered(list(mkt.get("order") or []), enabled)
-    meta = mkt.get("meta") or {}
 
     lines: list[str] = [
         "---",
@@ -99,20 +98,17 @@ def generate(repo) -> str:
         "",
         "## Install",
         "",
-        "Install the whole set in one command via the `rdl` meta-plugin:",
+        "Add the marketplace, then install the subject plugin(s) you need:",
         "",
         "```bash",
         "/plugin marketplace add nq-rdl/agent-extensions",
-    ]
-    if meta.get("enabled"):
-        lines += [f"/plugin install {meta['name']}@{mkt['name']}    # installs every subject below"]
-    lines += [
+        f"/plugin install <subject>@{mkt['name']}",
         "```",
         "",
-        "Or install a single subject:",
+        "New to the team? Install `rdl-team` first for onboarding, setup, and config-management workflows:",
         "",
         "```bash",
-        f"/plugin install <subject>@{mkt['name']}",
+        f"/plugin install rdl-team@{mkt['name']}",
         "```",
         "",
     ]

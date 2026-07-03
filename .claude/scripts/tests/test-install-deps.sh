@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
-# scripts/test-install-deps.sh
-# Unit + integration tests for assets/install-deps.sh (the portable SessionStart
-# hook shipped by the cc-web-setup skill).
+# .claude/scripts/tests/test-install-deps.sh
+# Unit + integration tests for .claude/scripts/install-deps.sh (this repo's own
+# portable SessionStart hook).
 #
 # install-deps.sh is sourceable (its imperative body is guarded by
 # `[ "${BASH_SOURCE[0]}" = "${0}" ]`), so this harness sources it to get the REAL
@@ -11,7 +11,7 @@
 # the *.local.sh seam are covered by running the script as a subprocess.
 set -euo pipefail
 HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-SCRIPT="${HERE}/../assets/install-deps.sh"
+SCRIPT="${HERE}/../install-deps.sh"
 PASS=0; FAIL=0; SKIP=0
 ok()   { PASS=$((PASS+1)); echo "  PASS  $*"; }
 fail() { FAIL=$((FAIL+1)); echo "  FAIL  $*"; }
@@ -19,7 +19,7 @@ skip() { SKIP=$((SKIP+1)); echo "  SKIP  $*"; }
 
 # Source the script under test. With the main-guard in place, sourcing only
 # defines the functions and never runs the hook body (side-effect free).
-# shellcheck source=../assets/install-deps.sh
+# shellcheck source=../install-deps.sh
 source "$SCRIPT"
 
 WORK="$(mktemp -d "${TMPDIR:-/tmp}/install-deps-test.XXXXXX")"
@@ -230,7 +230,7 @@ test_codex_authjson_drops_stale_token() {
   local proj d out envf home; proj="$(mktemp -d "$WORK/aj-proj.XXXXXX")"; d="$(new_stub_dir)"
   out="$WORK/aj.out"; envf="$WORK/aj-envfile"; : > "$envf"; home="$WORK/aj-home"; mkdir -p "$home"
   mkdir -p "$proj/scripts"
-  printf '#!/usr/bin/env bash\nexit 0\n' > "$proj/scripts/cc-web-setup.sh"; chmod +x "$proj/scripts/cc-web-setup.sh"
+  printf '#!/usr/bin/env bash\nexit 0\n' > "$proj/scripts/bootstrap.sh"; chmod +x "$proj/scripts/bootstrap.sh"
   # gh pinned so ensure_gh short-circuits with no download.
   write_stub "$d" gh "echo 'gh version ${GH_PIN} (2026-01-01)'"
   write_stub "$d" id "echo 0"

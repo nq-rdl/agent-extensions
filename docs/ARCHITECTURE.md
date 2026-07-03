@@ -42,7 +42,7 @@ tools/
 
 registry/
   bundles/*.yaml           ← single source of truth: which skills/agents/hooks/mcp each bundle ships
-  marketplace.yaml         ← marketplace metadata, plugin defaults, display order, and the rdl meta-plugin config
+  marketplace.yaml         ← marketplace metadata, plugin defaults, and display order
 
 .claude-plugin/
   marketplace.json         ← Claude Code marketplace manifest (repo root)
@@ -233,9 +233,7 @@ partial failure where the tag was created but the release publish step did not c
 
 ```bash
 /plugin marketplace add nq-rdl/agent-extensions
-/plugin install rdl@rdl-agent-extensions                 # the meta-plugin installs every subject
-# …or install a single subject:
-/plugin install go@rdl-agent-extensions --scope project
+/plugin install go@rdl-agent-extensions --scope project  # install a single subject
 ```
 
 Publication target: this repository, with `.claude-plugin/marketplace.json` at the root and plugins under `plugins/`.

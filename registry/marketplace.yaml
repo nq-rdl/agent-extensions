@@ -55,16 +55,3 @@ order:
 # External plugins are NOT re-hosted in this marketplace. They are consumed from
 # their own upstream marketplaces, registered for the team in .claude/settings.json
 # via `extraKnownMarketplaces`. See docs/external-marketplaces.md.
-
-# D-1 meta-plugin: a content-less plugin that declares every local subject plugin
-# as a dependency, so `claude plugin install rdl@rdl-agent-extensions` installs the whole set and
-# `claude plugin uninstall rdl --prune` cleans up. The dependency list is
-# generated from the enabled bundles. Emitted only when enabled.
-meta:
-  name: rdl
-  enabled: true
-  description: Install the full RDL agent-extensions set — every subject plugin in one command
-  keywords:
-    - meta
-    - install
-    - rdl

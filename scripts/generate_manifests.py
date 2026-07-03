@@ -5,8 +5,7 @@ The registry is the single source of truth:
 
   * ``VERSION``                    — one version, stamped into every manifest.
   * ``registry/marketplace.yaml``  — marketplace metadata, plugin defaults,
-                                      display order, and the rdl meta-plugin
-                                      config.
+                                      and display order.
   * ``registry/bundles/*.yaml``    — per-subject name/description/keywords.
 
 This is the structural fix for #100's metadata rot: hand-edited manifests can no
@@ -36,7 +35,7 @@ def _read_yaml(path: Path) -> dict:
 # typo, or a stale block like the removed `external:` passthrough), so we warn
 # rather than drop it silently. Same never-silently-drop policy as _ordered_local.
 _KNOWN_MARKETPLACE_KEYS = frozenset(
-    {"name", "owner", "description", "pluginRoot", "pluginDefaults", "order", "meta"}
+    {"name", "owner", "description", "pluginRoot", "pluginDefaults", "order"}
 )
 
 
@@ -100,7 +99,6 @@ def generate(repo) -> dict:
     defaults = mkt.get("pluginDefaults") or {}
     enabled = _enabled_bundles(repo)
     local_order = _ordered_local(list(mkt.get("order") or []), enabled)
-    meta = mkt.get("meta") or {}
 
     # ── marketplace.json ────────────────────────────────────────────────────
     plugins: list[dict] = []
@@ -112,16 +110,6 @@ def generate(repo) -> dict:
                 "description": enabled[p]["description"],
                 "version": version,
                 "keywords": enabled[p]["keywords"],
-            }
-        )
-    if meta.get("enabled"):
-        plugins.append(
-            {
-                "name": meta["name"],
-                "source": f"./plugins/{meta['name']}",
-                "description": meta.get("description", ""),
-                "version": version,
-                "keywords": list(meta.get("keywords") or []),
             }
         )
 
@@ -143,18 +131,6 @@ def generate(repo) -> dict:
             "name": p,
             "version": version,
             "description": enabled[p]["description"],
-            "author": defaults.get("author"),
-            "repository": defaults.get("repository"),
-            "license": defaults.get("license"),
-        }
-    if meta.get("enabled"):
-        out_plugins[meta["name"]] = {
-            "name": meta["name"],
-            "version": version,
-            "description": meta.get("description", ""),
-            # Same-marketplace deps → bare plugin-name strings. Generated from the
-            # enabled local plugins so it auto-tracks subjects as they migrate.
-            "dependencies": list(local_order),
             "author": defaults.get("author"),
             "repository": defaults.get("repository"),
             "license": defaults.get("license"),

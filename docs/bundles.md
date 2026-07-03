@@ -36,7 +36,7 @@ subagents (auto-routed by their description).
 | [`pixi`](#pixi) | Pixi — manage Python projects, environments, and dependencies |
 | [`lychee`](#lychee) | Lychee — fast link checking for docs and Markdown |
 | [`charm-tui`](#charm-tui) | Charm — build terminal UIs with Bubbletea, Lip Gloss, and Fang |
-| [`claude-code`](#claude-code) | Claude Code — agent-team coordination, hook authoring, web-session setup, skill-quality auditing, and prompt engineering |
+| [`claude-code`](#claude-code) | Claude Code — agent-team coordination, hook authoring, skill-quality auditing, and prompt engineering |
 | [`opencode-dev`](#opencode-dev) | OpenCode development toolkit — author plugins, agents, the SDK, custom tools, skills, governance policies, and delegation harnesses |
 | [`rdl-team`](#rdl-team) | RDL team workflows — Claude Code onboarding, setup, and config management |
 | [`playwright`](#playwright) | Playwright — generate and debug end-to-end browser tests |
@@ -47,17 +47,17 @@ subagents (auto-routed by their description).
 
 ## Install
 
-Install the whole set in one command via the `rdl` meta-plugin:
+Add the marketplace, then install the subject plugin(s) you need:
 
 ```bash
 /plugin marketplace add nq-rdl/agent-extensions
-/plugin install rdl@rdl-agent-extensions    # installs every subject below
+/plugin install <subject>@rdl-agent-extensions
 ```
 
-Or install a single subject:
+New to the team? Install `rdl-team` first for onboarding, setup, and config-management workflows:
 
 ```bash
-/plugin install <subject>@rdl-agent-extensions
+/plugin install rdl-team@rdl-agent-extensions
 ```
 
 ---
@@ -322,7 +322,7 @@ Charm — build terminal UIs with Bubbletea, Lip Gloss, and Fang.
 
 ## claude-code
 
-Claude Code — agent-team coordination, hook authoring, web-session setup, skill-quality auditing, and prompt engineering.
+Claude Code — agent-team coordination, hook authoring, skill-quality auditing, and prompt engineering.
 
 **Skills**
 
@@ -331,7 +331,6 @@ Claude Code — agent-team coordination, hook authoring, web-session setup, skil
 - `/claude-code:create-workflow`
 - `/claude-code:hook`
 - `/claude-code:pipeline`
-- `/claude-code:web-setup`
 - `/claude-code:skill-audit`
 - `/claude-code:skill-review`
 - `/claude-code:skill-report-issue`
@@ -342,7 +341,7 @@ Claude Code — agent-team coordination, hook authoring, web-session setup, skil
 - `skill-auditor` (subagent)
 - `prompt-builder` (subagent)
 
-**Hooks:** `web-setup-plugin-check`, `skill-audit-nudge`
+**Hooks:** `skill-audit-nudge`
 
 ---
 

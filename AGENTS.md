@@ -67,8 +67,7 @@ plugins/          ← Claude Code plugins, one per bundle (SELF-CONTAINED — re
     agents/<name>.md     ← real-file copy of agents/<name>/agent.md
 registry/
   bundles/*.yaml   ← single source of truth: skills/agents/keywords per bundle
-  marketplace.yaml ← marketplace metadata, plugin defaults, display order, and the
-                     rdl meta-plugin config
+  marketplace.yaml ← marketplace metadata, plugin defaults, and display order
 VERSION           ← single version source; stamped into every generated manifest
 mcp/
   <name>-go/      ← Go MCP servers, built to plugins/<bundle>/bin/mcp/
@@ -86,7 +85,7 @@ Claude Code installs a plugin by `cp -R`-ing its source directory into a per-use
 To make installs self-contained, `plugins/<bundle>/skills/<name>/` and `plugins/<bundle>/agents/<name>.md` hold **real-file copies** of the canonical content under `skills/` and `agents/`. The canonical source remains the single edit point — the plugin trees are derivative.
 
 - **Edit canonical content** under `skills/<name>/` or `agents/<name>/agent.md` (both authored here).
-- **Refresh plugin trees** by running `pixi run bash scripts/sync-plugins.sh` (or pass a bundle name to scope it). The script reads `registry/bundles/<b>.yaml`, removes any stale copies, and rewrites `plugins/<b>/skills/<name>/` and `plugins/<b>/agents/<name>.md` from the canonical sources. It also rewrites this repo's own live `.claude/scripts/{install-deps,announce-capabilities}.sh` cc-web-setup SessionStart hook copies from canonical `skills/cc-web-setup/assets/` (forcing them executable — `0o755` — since those copies are invoked directly from `.claude/settings.json`), and drift-checks them under `--check` (bytes, plus a non-executable live copy or canonical asset); the repo-local `.claude/scripts/install-deps.local.sh` seam has no canonical source and is left untouched.
+- **Refresh plugin trees** by running `pixi run bash scripts/sync-plugins.sh` (or pass a bundle name to scope it). The script reads `registry/bundles/<b>.yaml`, removes any stale copies, and rewrites `plugins/<b>/skills/<name>/` and `plugins/<b>/agents/<name>.md` from the canonical sources. `.claude/scripts/{install-deps,announce-capabilities}.sh` are this repo's own standalone SessionStart hook tooling — they have no canonical skill source and are no longer touched by `sync-plugins.sh`; edit them directly. `.claude/scripts/install-deps.local.sh` remains the repo-local seam alongside them.
 - **CI** validates that every bundle YAML reference resolves and that every plugin manifest is well-formed. See `scripts/validate-plugins.sh`.
 
 **Grouped skills.** A bundle skill member is either a flat string (`changie` → `leaf == changie`) or an explicit `{source, leaf}` mapping (`{source: go-gh, leaf: actions-go}` in the `gh` bundle → `/gh:actions-go`). `sync-plugins.sh` copies the flat canonical `skills/<source>/` → `plugins/<pluginName>/skills/<leaf>/`, **renaming to the leaf**, so the plugin tree stays one level deep and Claude Code invokes `<pluginName>:<leaf>` (the leaf folder drives invocation). Claude Code labels a skill in `/`-autocomplete as `frontmatter.name || <pluginName>:<leaf>` — so a present `name:` (the canonical `go-gh` **or** the leaf `actions-go`) overrides the namespaced id with a bare, un-prefixed label, and `/gh` lists `go-gh`/`actions-go` instead of `gh:actions-go`. To get the namespaced label, sync **strips the copy's `name:` entirely** so the label falls back to `<pluginName>:<leaf>`. The canonical `skills/` tree is never touched; grouping is owned **here** in the registry and stays flat. See `CONTRIBUTING.md` §6 for the rules, `scripts/check_grouping.py` for the contract, and `scripts/validate-plugins.sh` for the no-name guard.
@@ -206,10 +205,8 @@ claude --plugin-dir ./plugins/go
 claude plugin marketplace add /workspace
 claude plugin install go@rdl-agent-extensions
 
-# One command installs every subject via the rdl meta-plugin (it declares each
-# subject as a dependency). Requires Claude Code ≥ 2.1.110; prune needs ≥ 2.1.121.
-claude plugin install rdl@rdl-agent-extensions
-claude plugin uninstall rdl --prune   # remove the set + orphaned dependencies
+# Onboarding onto the team's Claude Code setup goes through the rdl-team plugin:
+claude plugin install rdl-team@rdl-agent-extensions
 ```
 
 See [`docs/local-testing.md`](docs/local-testing.md) for the full walkthrough including cleanup and self-contained plugin tree details.
@@ -303,4 +300,4 @@ The docs site uses Zensical (configured in `zensical.toml`), provided by the pix
 ## Platform Notes
 
 - macOS and Linux only — the build scripts require POSIX shell tooling (WSL2 for Windows)
-- Generated outputs (`plugins/` trees, `plugins/*/.claude-plugin/plugin.json`, `.claude-plugin/marketplace.json`, `docs/bundles.md`, `.claude/scripts/{install-deps,announce-capabilities}.sh`) are produced by the generator scripts — do not hand-edit
+- Generated outputs (`plugins/` trees, `plugins/*/.claude-plugin/plugin.json`, `.claude-plugin/marketplace.json`, `docs/bundles.md`) are produced by the generator scripts — do not hand-edit. `.claude/scripts/{install-deps,announce-capabilities}.sh` are standalone repo tooling, not generated — edit them directly.
