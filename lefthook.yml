@@ -106,6 +106,18 @@ pre-push:
       glob: "{scripts/**,tests/**}"
       run: pixi run python3 -m unittest discover -s tests -p 'test_*.py'
 
+    # The live SessionStart hooks run BY PATH from .claude/settings.json, so their
+    # exec bit is load-bearing (sync-plugins.sh no longer owns it). Fail the push if
+    # either is committed non-executable — mirrors the CI hook-tests exec-bit gate.
+    - name: session-hook-exec-bit
+      glob: ".claude/scripts/*.sh"
+      run: |
+        rc=0
+        for f in .claude/scripts/install-deps.sh .claude/scripts/announce-capabilities.sh; do
+          [ -x "$f" ] || { echo "$f must be executable (0755 — runs from .claude/settings.json)"; rc=1; }
+        done
+        exit $rc
+
     # SessionStart hook tests (mirrors the hook-tests CI job, which runs
     # unconditionally). The permission-dependent persist_path case self-skips when run
     # as root.
