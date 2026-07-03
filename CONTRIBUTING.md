@@ -3,7 +3,7 @@
 Thanks for contributing to the RDL agent extension catalog. This file covers the **rules for
 grouping skills and agents into plugins**, the **skill directory structure and content
 conventions**, and the **packaging loop** that turns a new skill or agent into an installable
-plugin. For repo mechanics (sync scripts, validation, release), see [`AGENTS.md`](AGENTS.md) and
+plugin. For repo mechanics (sync scripts, validation, CI), see [`AGENTS.md`](AGENTS.md) and
 [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md).
 
 **Tooling:** all repo Python runs via **pixi** (`pixi install` once, then
@@ -57,9 +57,10 @@ flat and is renamed to the leaf when the plugin tree is generated.
 
 ### 4. No-tool subjects → name the workflow
 
-If a skill/agent isn't about a tool, its subject is the **workflow/activity** it performs, e.g.
-`gh:send-pr` and `gh:conventional-commits` (subject `gh`, facet the action) — or, as further
-examples of workflow/activity subjects, `planning`, `debug`, and `tech-writing`.
+If a skill/agent isn't about a tool, its subject is the **workflow/activity** it performs — real
+workflow subjects include `planning`, `debug`, and `tech-writing`. An action filed under a
+workflow subject invokes like any other facet: `gh:send-pr`, `gh:conventional-commits` (subject
+`gh`, facet the action).
 
 ### 5. Agents: home + description required; companion skill optional
 
@@ -230,14 +231,19 @@ Cloud sessions run on a fresh VM with only a clone of this repo. The dev-helper 
 in `.claude/settings.json` (`enabledPlugins` + `extraKnownMarketplaces`) are **external** helpers
 for working *on* this catalog (Go/LSP, PR review, Python tooling, git worktrees, general
 workflows) — never enable the `rdl` marketplace or the `rdl@rdl` meta-plugin here; a session for
-developing the catalog should not install the catalog itself.
+developing the catalog should not install the catalog itself. To add a dev-helper, set it `true`
+under `enabledPlugins` and register its marketplace under `extraKnownMarketplaces` — declaring it
+is sufficient; there is no Setup-script field and no per-environment step.
 
 Declared plugin installs are **best-effort, not guaranteed** — the platform attempts them at
 session start with no setup script and no `make`, but a sandbox-side git proxy or install race can
 cause a declared plugin to not land. `announce-capabilities.sh` cross-checks the declared set
 against `claude plugin list --json` and flags any **"Declared but NOT installed"** plugin, so a
 failure is never silently masked. Guaranteed first-session skills instead come from **vendoring**
-into `.claude/skills/`.
+into `.claude/skills/`. The `CLAUDE_CODE_REMOTE`-gated `install-deps.sh` SessionStart hook
+provisions per-session tooling only and deliberately does **not** retry plugin installs — a
+hook-installed plugin isn't re-scanned that session, and `claude plugin install` in a hook can
+hang web sessions ([anthropics/claude-code#18088](https://github.com/anthropics/claude-code/issues/18088)).
 
 The two engine scripts (`install-deps.sh`, `announce-capabilities.sh`) have one canonical source,
 `skills/cc-web-setup/assets/`. Edit only there, then run `pixi run bash scripts/sync-plugins.sh` —
@@ -247,8 +253,8 @@ source and is left untouched by sync.
 
 **Further reading.** [`docs/claude-code-web.md`](docs/claude-code-web.md) is the reader-facing
 overview; [`skills/cc-web-setup/references/web-setup.rst`](skills/cc-web-setup/references/web-setup.rst)
-holds the authoritative platform facts. The `/claude-code:web-setup` skill provisions all of this
-for any repo.
+holds the authoritative platform facts and the hard-won anti-patterns. The `/claude-code:web-setup`
+skill provisions all of this for any repo.
 
 ## Cutting a release
 
