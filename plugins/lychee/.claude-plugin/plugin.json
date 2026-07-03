@@ -1,6 +1,6 @@
 {
   "name": "lychee",
-  "version": "0.20.0",
+  "version": "0.21.0",
   "description": "Lychee — fast link checking for docs and Markdown",
   "author": {
     "name": "nq-rdl"
