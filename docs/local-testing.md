@@ -30,9 +30,7 @@ claude plugin marketplace add /workspace
 # Confirm it registered
 claude plugin marketplace list
 
-# Install every subject in one command via the meta-plugin…
-claude plugin install rdl@rdl-agent-extensions
-# …or install a single subject
+# Install a single subject
 claude plugin install go@rdl-agent-extensions
 ```
 

@@ -113,13 +113,12 @@ maps `{source: obsidian-bases, leaf: bases}` under `pluginName: obsidian`. Agent
 under `agents/<name>/agent.md` and placed by subject in the registry. See [`AGENTS.md`](AGENTS.md)
 for the mechanical add-and-sync steps.
 
-### 7. Manifests are generated; new subjects join the `rdl` meta-plugin
+### 7. Manifests are generated
 
 `plugin.json` and the `marketplace.json` entry for a subject are **generated from
 `registry/bundles/<subject>.yaml`** — do **not** hand-edit them. When you add a **new subject**,
-it is also registered as a dependency of the **`rdl` meta-plugin**, so `claude plugin install
-rdl@rdl-agent-extensions` keeps installing the full set. CI consistency checks fail if registry, generated
-manifests, and the meta-plugin dependency list disagree.
+append it to the `order:` list in `registry/marketplace.yaml` (see step 4 below). CI consistency
+checks fail if the registry and the generated manifests disagree.
 
 ## Skill directory structure
 
@@ -204,7 +203,7 @@ that should become `sql-review:analyse`:
    ```
 4. **If it is a brand-new subject, add it to the marketplace order.** Append `sql-review` to the
    `order:` list in `registry/marketplace.yaml` (otherwise it is appended alphabetically with a
-   CI `::warning::`). It joins the `rdl` meta-plugin automatically.
+   CI `::warning::`).
 5. **Build the plugin tree and manifests:**
    ```bash
    pixi run bash scripts/sync-plugins.sh sql-review     # copies skills/<source>/ → plugins/sql-review/skills/<leaf>/
@@ -230,31 +229,25 @@ subject (no skill) is fine — give it its own bundle with an empty `skills: []`
 Cloud sessions run on a fresh VM with only a clone of this repo. The dev-helper plugins declared
 in `.claude/settings.json` (`enabledPlugins` + `extraKnownMarketplaces`) are **external** helpers
 for working *on* this catalog (Go/LSP, PR review, Python tooling, git worktrees, general
-workflows) — never enable the `rdl-agent-extensions` marketplace or the `rdl@rdl-agent-extensions` meta-plugin here; a session for
+workflows) — never enable the `rdl-agent-extensions` marketplace or any of its published plugins here; a session for
 developing the catalog should not install the catalog itself. To add a dev-helper, set it `true`
 under `enabledPlugins` and register its marketplace under `extraKnownMarketplaces` — declaring it
 is sufficient; there is no Setup-script field and no per-environment step.
 
 Declared plugin installs are **best-effort, not guaranteed** — the platform attempts them at
 session start with no setup script and no `make`, but a sandbox-side git proxy or install race can
-cause a declared plugin to not land. `announce-capabilities.sh` cross-checks the declared set
-against `claude plugin list --json` and flags any **"Declared but NOT installed"** plugin, so a
-failure is never silently masked. Guaranteed first-session skills instead come from **vendoring**
-into `.claude/skills/`. The `CLAUDE_CODE_REMOTE`-gated `install-deps.sh` SessionStart hook
-provisions per-session tooling only and deliberately does **not** retry plugin installs — a
-hook-installed plugin isn't re-scanned that session, and `claude plugin install` in a hook can
-hang web sessions ([anthropics/claude-code#18088](https://github.com/anthropics/claude-code/issues/18088)).
+cause a declared plugin to not land. `.claude/scripts/announce-capabilities.sh` cross-checks the
+declared set against `claude plugin list --json` and flags any **"Declared but NOT installed"**
+plugin, so a failure is never silently masked. The `CLAUDE_CODE_REMOTE`-gated
+`.claude/scripts/install-deps.sh` SessionStart hook provisions per-session tooling only and
+deliberately does **not** retry plugin installs — a hook-installed plugin isn't re-scanned that
+session, and `claude plugin install` in a hook can hang web sessions
+([anthropics/claude-code#18088](https://github.com/anthropics/claude-code/issues/18088)).
 
-The two engine scripts (`install-deps.sh`, `announce-capabilities.sh`) have one canonical source,
-`skills/cc-web-setup/assets/`. Edit only there, then run `pixi run bash scripts/sync-plugins.sh` —
-never hand-edit the `.claude/scripts/` copies (sync's `--check` drift gate enforces bytes and the
-executable bit). `.claude/scripts/install-deps.local.sh` is the repo-local seam with no canonical
-source and is left untouched by sync.
-
-**Further reading.** [`docs/claude-code-web.md`](docs/claude-code-web.md) is the reader-facing
-overview; [`skills/cc-web-setup/references/web-setup.rst`](skills/cc-web-setup/references/web-setup.rst)
-holds the authoritative platform facts and the hard-won anti-patterns. The `/claude-code:web-setup`
-skill provisions all of this for any repo.
+The two engine scripts (`install-deps.sh`, `announce-capabilities.sh`) are this repo's own
+standalone SessionStart hook tooling — edit them directly under `.claude/scripts/`; they have no
+canonical skill source and are not touched by `sync-plugins.sh`. `.claude/scripts/install-deps.local.sh`
+is the repo-local seam alongside them, for project-specific provisioning.
 
 ## Cutting a release
 

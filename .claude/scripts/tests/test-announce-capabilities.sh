@@ -1,12 +1,13 @@
 #!/usr/bin/env bash
-# scripts/test-announce-capabilities.sh
-# Tests for assets/announce-capabilities.sh — focused on the plugin CANARY: a
-# declared plugin must be reported as installed / NOT installed / unverified
-# correctly, and NEVER mislabeled "installed" when it isn't. Runs the hook as a
-# subprocess with a stubbed `claude` (and jq) on a scoped PATH. No network.
+# .claude/scripts/tests/test-announce-capabilities.sh
+# Tests for .claude/scripts/announce-capabilities.sh — focused on the plugin
+# CANARY: a declared plugin must be reported as installed / NOT installed /
+# unverified correctly, and NEVER mislabeled "installed" when it isn't. Runs
+# the hook as a subprocess with a stubbed `claude` (and jq) on a scoped PATH.
+# No network.
 set -euo pipefail
 HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-SCRIPT="${HERE}/../assets/announce-capabilities.sh"
+SCRIPT="${HERE}/../announce-capabilities.sh"
 PASS=0; FAIL=0; SKIP=0
 ok()   { PASS=$((PASS+1)); echo "  PASS  $*"; }
 fail() { FAIL=$((FAIL+1)); echo "  FAIL  $*"; }

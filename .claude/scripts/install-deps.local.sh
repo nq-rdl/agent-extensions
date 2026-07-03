@@ -20,8 +20,7 @@
 #     NO running daemon (no systemd), so a cloud session that needs containers
 #     (devcontainer smoke tests, testcontainers, image builds) must start dockerd
 #     itself. ensure_docker is idempotent: a no-op when `docker info` already
-#     answers (a resume, or a base image that started it). See the "Docker on
-#     Claude Code web" note in the cc-web-setup skill.
+#     answers (a resume, or a base image that started it).
 #   * PATH persistence, `lefthook install`, and an origin/main fetch for changie's
 #     merge-base diffs.
 #

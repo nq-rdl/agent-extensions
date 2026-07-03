@@ -4,8 +4,8 @@ plugin.json + marketplace.json are generated from registry/marketplace.yaml,
 registry/bundles/*.yaml, and VERSION. These tests pin the structure, ordering,
 key order (needed for byte-identical no-diff output), that unknown top-level
 keys (e.g. the removed `external:` block) are ignored with a ::warning::,
-version stamping, the rdl meta-plugin dependency list, and the --check drift
-detector — all on a hermetic synthetic repo.
+version stamping, and the --check drift detector — all on a hermetic synthetic
+repo.
 """
 
 import contextlib
@@ -33,11 +33,6 @@ pluginDefaults:
   repository: https://github.com/nq-rdl/agent-extensions
   license: MIT
 order: [swe, infra]
-meta:
-  name: rdl
-  enabled: true
-  description: Install everything
-  keywords: [meta]
 """
 
 # A legacy `external:` passthrough block — the mechanism it fed was removed. The
@@ -109,7 +104,7 @@ class TestGenerate(unittest.TestCase):
                 m = generate_manifests.generate(repo)["marketplace"]
             names = [p["name"] for p in m["plugins"]]
             self.assertNotIn("worktrunk", names)
-            self.assertEqual(names, ["swe", "infra", "rdl"])
+            self.assertEqual(names, ["swe", "infra"])
             self.assertIn("::warning::", err.getvalue())
             # Pin the dedicated migration message, not just the substring
             # "external" (which the generic fallback warning also emits) — so
@@ -138,14 +133,6 @@ class TestGenerate(unittest.TestCase):
                 generate_manifests.generate(make_repo(t))
             self.assertEqual(err.getvalue(), "")
 
-    def test_meta_plugin_marketplace_entry(self):
-        with tempfile.TemporaryDirectory() as t:
-            m = generate_manifests.generate(make_repo(t))["marketplace"]
-            rdl = next(p for p in m["plugins"] if p["name"] == "rdl")
-            self.assertEqual(rdl["source"], "./plugins/rdl")
-            self.assertEqual(rdl["version"], "1.2.3")
-            self.assertEqual(rdl["keywords"], ["meta"])
-
     def test_plugin_json_fields_and_key_order(self):
         with tempfile.TemporaryDirectory() as t:
             pj = generate_manifests.generate(make_repo(t))["plugins"]["swe"]
@@ -157,17 +144,6 @@ class TestGenerate(unittest.TestCase):
             self.assertEqual(pj["description"], "SWE desc")
             self.assertEqual(pj["author"], {"name": "nq-rdl"})
             self.assertEqual(pj["license"], "MIT")
-
-    def test_meta_plugin_dependencies(self):
-        with tempfile.TemporaryDirectory() as t:
-            mp = generate_manifests.generate(make_repo(t))["plugins"]["rdl"]
-            self.assertEqual(mp["dependencies"], ["swe", "infra"])
-            self.assertNotIn("rdl", mp["dependencies"])
-            # dependencies sits after description, before author
-            self.assertEqual(
-                list(mp.keys()),
-                ["name", "version", "description", "dependencies", "author", "repository", "license"],
-            )
 
     def test_check_clean_after_write(self):
         with tempfile.TemporaryDirectory() as t:

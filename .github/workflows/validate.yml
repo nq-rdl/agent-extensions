@@ -96,21 +96,36 @@ jobs:
         run: python3 -m unittest discover -s tests -p 'test_*.py' -v
 
   hook-tests:
-    name: Test cc-web-setup SessionStart hook (install-deps.sh)
+    name: Test SessionStart hooks (install-deps.sh)
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7
+
+      # The live SessionStart hooks run BY PATH from .claude/settings.json, so their
+      # executable bit is load-bearing. sync-plugins.sh used to own/drift-check that
+      # (issue #166); after decoupling, assert it here so a hook committed 0644 fails
+      # CI instead of silently breaking web SessionStart with "permission denied".
+      - name: Assert SessionStart hooks are executable
+        run: |
+          rc=0
+          for f in .claude/scripts/install-deps.sh .claude/scripts/announce-capabilities.sh; do
+            if [ ! -x "$f" ]; then
+              echo "::error file=$f::$f is not executable (must be 0755 — it runs directly from .claude/settings.json)"
+              rc=1
+            fi
+          done
+          exit $rc
 
       # Pure-bash harness for the SessionStart hook (ensure_gh / codex auth /
       # persist_path). Runs as a non-root user here, so the
       # permission-dependent persist_path case is exercised (it self-skips as root).
       - name: Run install-deps hook unit tests
-        run: bash skills/cc-web-setup/scripts/test-install-deps.sh
+        run: bash .claude/scripts/tests/test-install-deps.sh
 
       # Canary harness for the announce hook: a declared plugin is reported
       # installed / NOT installed / unverified correctly (never falsely "installed").
       - name: Run announce-capabilities canary tests
-        run: bash skills/cc-web-setup/scripts/test-announce-capabilities.sh
+        run: bash .claude/scripts/tests/test-announce-capabilities.sh
 
   validate-skills:
     name: Validate skills against the agentskills.io spec (asctl)

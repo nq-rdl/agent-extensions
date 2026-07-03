@@ -273,14 +273,12 @@
     {
       "name": "claude-code",
       "source": "./plugins/claude-code",
-      "description": "Claude Code — agent-team coordination, hook authoring, web-session setup, skill-quality auditing, and prompt engineering",
+      "description": "Claude Code — agent-team coordination, hook authoring, skill-quality auditing, and prompt engineering",
       "version": "0.21.0",
       "keywords": [
         "claude-code",
         "agents",
         "hooks",
-        "web",
-        "setup",
         "skills",
         "audit",
         "prompts"
@@ -370,17 +368,6 @@
         "lucidspark",
         "diagrams",
         "mcp"
-      ]
-    },
-    {
-      "name": "rdl",
-      "source": "./plugins/rdl",
-      "description": "Install the full RDL agent-extensions set — every subject plugin in one command",
-      "version": "0.21.0",
-      "keywords": [
-        "meta",
-        "install",
-        "rdl"
       ]
     }
   ]

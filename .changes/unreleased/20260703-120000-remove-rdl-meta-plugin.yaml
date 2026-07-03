@@ -1,0 +1,3 @@
+kind: Removed
+body: 'Removed the `rdl` meta-plugin (the install-everything meta-plugin). Install subject plugins individually; new team members install `rdl-team@rdl-agent-extensions` for onboarding.'
+time: 2026-07-03T12:00:00Z

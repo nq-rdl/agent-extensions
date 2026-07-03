@@ -1,6 +1,6 @@
 """Tests for scripts/generate_bundles_doc.py — docs/bundles.md generation.
 
-The bundles doc is generated from registry/marketplace.yaml (order + meta) and
+The bundles doc is generated from registry/marketplace.yaml (order) and
 registry/bundles/*.yaml, mirroring generate_manifests. These tests pin the
 section ordering, the leaf rename in skill invocations, empty-section
 suppression, disabled-bundle exclusion, null-description handling, the
@@ -20,9 +20,6 @@ import generate_bundles_doc  # noqa: E402
 MARKETPLACE_YAML = """\
 name: rdl
 order: [go, infra]
-meta:
-  name: rdl
-  enabled: true
 """
 
 
@@ -129,16 +126,6 @@ class TestGenerate(unittest.TestCase):
             out = generate_bundles_doc.generate(repo)
             self.assertIn("**MCP server(s):** `playwright`", out)
             self.assertIn("**Hooks:** `format`", out)
-
-    def test_meta_disabled_omits_install_command(self):
-        with tempfile.TemporaryDirectory() as t:
-            repo = make_repo(t)
-            (repo / "registry" / "marketplace.yaml").write_text(
-                "name: rdl\norder: [go, infra]\nmeta:\n  name: rdl\n  enabled: false\n"
-            )
-            out = generate_bundles_doc.generate(repo)
-            self.assertNotIn("/plugin install rdl@rdl", out)
-
 
 class TestCheck(unittest.TestCase):
     def test_write_then_check_clean(self):

@@ -162,8 +162,8 @@ whenever the user re-runs setup** (it is idempotent: it drops anything already e
 the user declines, skip straight to Phase 5.
 
 **Delegate the discovery to the `marketplace-scout` agent** (Task tool). It locates the
-team's tracked-marketplace list (`marketplaces.json` — shipped in this skill's own `assets/`,
-also in the `cc-web-setup` plugin), enumerates the *live* plugin catalog of every tracked
+team's tracked-marketplace list (`marketplaces.json` — shipped in this skill's own `assets/`),
+enumerates the *live* plugin catalog of every tracked
 marketplace, inspects this repo's languages/tooling, and returns a ranked suggestion list:
 
 - **Baseline (always-useful)** — `pr-review-toolkit@claude-plugins-official`, `gh@rdl-agent-extensions`,
@@ -177,8 +177,7 @@ same way as the hook script in Phase 1: prefer the installed plugin-cache copy, 
 the path beside this `SKILL.md`). The agent reads it; you don't have to.
 
 Present the scout's menu and let the user pick. For each marketplace a chosen plugin needs,
-register it and install **only the confirmed plugins** — locally this skill *can* install
-(unlike the web path, which is declarative):
+register it and install **only the confirmed plugins** (this skill installs them directly):
 
 ```bash
 # Register each marketplace the chosen plugins need (idempotent), then install.
@@ -188,10 +187,10 @@ claude plugin install <plugin>@<marketplace>      # only the ones the user confi
 
 Never install without confirmation. **Self-marketplace guard:** if the target repo is
 itself the `rdl-agent-extensions` marketplace (a `.claude-plugin/marketplace.json` with `name: rdl-agent-extensions` — e.g.
-`agent-extensions` itself), skip **every** `@rdl-agent-extensions` plugin, not just `rdl@rdl-agent-extensions`. Installing the
+`agent-extensions` itself), skip **every** `@rdl-agent-extensions` plugin. Installing the
 published copy of *any* `@rdl-agent-extensions` id (including the baseline's `gh@rdl-agent-extensions`) shadows the working
-tree's own copy. Unlike the web path, this local install has no automatic `strip-self`, so
-you must exclude `@rdl-agent-extensions` ids yourself there — the working tree already provides those skills.
+tree's own copy. This install has no automatic self-exclusion, so you must exclude
+`@rdl-agent-extensions` ids yourself here — the working tree already provides those skills.
 
 ## Phase 5 — Summarize
 
