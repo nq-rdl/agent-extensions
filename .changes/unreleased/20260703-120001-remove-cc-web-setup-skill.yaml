@@ -1,3 +1,0 @@
-kind: Removed
-body: 'Deleted the `cc-web-setup` skill (`/claude-code:web-setup`) and its `web-setup-plugin-check` hook. Its SessionStart scripts stay as this repo''s own `.claude/scripts/` tooling.'
-time: 2026-07-03T12:00:01Z
