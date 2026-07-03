@@ -23,4 +23,4 @@ targets:
   claude:
     enabled: true
     pluginName: opencode-dev
-    marketplaceName: rdl
+    marketplaceName: rdl-agent-extensions

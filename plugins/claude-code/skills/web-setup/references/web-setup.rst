@@ -71,7 +71,7 @@ best-effort layer on top.
    session — even "session 2+" inheritance is unproven. Treat it as necessary config for
    plugin-behavior picks, **not** a delivery route, until a clean-cloud lifecycle test
    (install → restart → reuse) proves activation. This skill ships two bases —
-   ``assets/settings.json.tmpl`` (rdl) and ``assets/settings.externals.json.tmpl`` — and
+   ``assets/settings.json.tmpl`` (rdl-agent-extensions) and ``assets/settings.externals.json.tmpl`` — and
    ``assets/marketplaces.json`` as the source of truth for sources + the team-externals set.
 
 For the rare skill a team cannot commit, see "Escape hatch — fetch without committing" below;
@@ -317,7 +317,7 @@ Anti-patterns — do not repeat these
 
 These each cost a PR (or several) to learn:
 
-- **Self-referential / meta marketplace in its own dev env.** Enabling ``rdl@rdl``
+- **Self-referential / meta marketplace in its own dev env.** Enabling ``rdl@rdl-agent-extensions``
   inside ``nq-rdl/agent-extensions`` re-clones the repo and fans out to dozens of
   dependency plugins; that oversized self-cloning batch broke the whole session-start
   install so **nothing** surfaced. A catalog-dev env enables *external* dev-helper

@@ -6,7 +6,7 @@ Agent guidance for this repository. Use this alongside the README for project co
 
 Two things, kept deliberately separate:
 
-1. **A Claude Code marketplace** — the published product. This repo *is* the `rdl`
+1. **A Claude Code marketplace** — the published product. This repo *is* the `rdl-agent-extensions`
    marketplace: it authors reusable skills and agents (canonical content under
    `skills/` and `agents/`) and publishes them as self-contained plugins through the
    repo-root marketplace manifest (`.claude-plugin/marketplace.json`). This is what
@@ -204,11 +204,11 @@ claude --plugin-dir ./plugins/go
 
 # Persistent install (workspace must stay mounted at /workspace)
 claude plugin marketplace add /workspace
-claude plugin install go@rdl
+claude plugin install go@rdl-agent-extensions
 
 # One command installs every subject via the rdl meta-plugin (it declares each
 # subject as a dependency). Requires Claude Code ≥ 2.1.110; prune needs ≥ 2.1.121.
-claude plugin install rdl@rdl
+claude plugin install rdl@rdl-agent-extensions
 claude plugin uninstall rdl --prune   # remove the set + orphaned dependencies
 ```
 
@@ -242,7 +242,7 @@ targets:
   claude:
     enabled: true
     pluginName: go
-    marketplaceName: rdl
+    marketplaceName: rdl-agent-extensions
 ```
 
 The bundle's `description` + `keywords` (plus `registry/marketplace.yaml` and `VERSION`) **generate** `plugins/<bundle>/.claude-plugin/plugin.json` and the bundle's `marketplace.json` entry — do not hand-edit those (CI `generate_manifests.py --check` enforces it). After editing a bundle's `description`/`keywords`, run `pixi run python3 scripts/generate_manifests.py .`.

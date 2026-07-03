@@ -99,8 +99,8 @@ class TestMarketplacesJson(unittest.TestCase):
         # a curated team external, or strip-self's self-marketplace target would reappear.
         for ext in self.externals:
             with self.subTest(plugin=ext["id"]):
-                self.assertNotEqual(ext["marketplace"], "rdl")
-                self.assertNotEqual(ext["id"], "rdl@rdl")
+                self.assertNotEqual(ext["marketplace"], "rdl-agent-extensions")
+                self.assertNotEqual(ext["id"], "rdl@rdl-agent-extensions")
 
     def test_baseline_ids_reference_known_marketplaces(self):
         # The always-useful set the setup skills + marketplace-scout suggest. Every id must
@@ -124,7 +124,7 @@ class TestMarketplacesJson(unittest.TestCase):
             always,
             {
                 "pr-review-toolkit@claude-plugins-official",
-                "gh@rdl",
+                "gh@rdl-agent-extensions",
                 "worktrunk@worktrunk",
             },
         )
@@ -203,13 +203,13 @@ class TestTemplates(unittest.TestCase):
 
 class TestTemplateExactSets(unittest.TestCase):
     def test_rdl_template_enables_exactly_rdl(self):
-        self.assertEqual(load(RDL_TMPL)["enabledPlugins"], {"rdl@rdl": True})
+        self.assertEqual(load(RDL_TMPL)["enabledPlugins"], {"rdl@rdl-agent-extensions": True})
 
     def test_externals_template_matches_team_externals_and_excludes_rdl(self):
         external_ids = {e["id"] for e in load(MARKETPLACES)["teamExternals"]}
         enabled = load(EXT_TMPL)["enabledPlugins"]
         self.assertEqual(set(enabled), external_ids)
-        self.assertNotIn("rdl@rdl", enabled)
+        self.assertNotIn("rdl@rdl-agent-extensions", enabled)
 
 
 class TestEngineByteIdentity(unittest.TestCase):
@@ -254,9 +254,9 @@ class TestWebSettingsHelper(unittest.TestCase):
         self.externals = load(EXT_TMPL)
 
     def _externals_plus_rdl(self):
-        """The 'rdl + externals' composition: the 7 externals + rdl@rdl enabled."""
+        """The 'rdl + externals' composition: the 7 externals + rdl@rdl-agent-extensions enabled."""
         both = dict(self.externals)
-        both["enabledPlugins"] = dict(both["enabledPlugins"], **{"rdl@rdl": True})
+        both["enabledPlugins"] = dict(both["enabledPlugins"], **{"rdl@rdl-agent-extensions": True})
         return both
 
     # --- cover ---
@@ -282,7 +282,7 @@ class TestWebSettingsHelper(unittest.TestCase):
             set(out["extraKnownMarketplaces"]),
             {
                 "claude-plugins-official", "openai-codex", "goland-claude-marketplace",
-                "astral-sh", "worktrunk", "rdl",
+                "astral-sh", "worktrunk", "rdl-agent-extensions",
             },
         )
 
@@ -320,7 +320,7 @@ class TestWebSettingsHelper(unittest.TestCase):
 
     def test_composed_rdl_plus_externals(self):
         # The 'rdl + externals' outcome: externals template + the single rdl line,
-        # reconciled by ensure. No duplicate hooks, exactly one rdl@rdl, all 8
+        # reconciled by ensure. No duplicate hooks, exactly one rdl@rdl-agent-extensions, all 8
         # plugins, 6 marketplaces, and top-level keys preserved.
         both = self._externals_plus_rdl()
         path = self._write(both)
@@ -329,8 +329,8 @@ class TestWebSettingsHelper(unittest.TestCase):
         out = json.loads(res.stdout)
         self.assertEqual(session_start_commands(out), HOOK_CMDS)
         self.assertEqual(set(out["enabledPlugins"]), set(both["enabledPlugins"]))
-        self.assertIs(out["enabledPlugins"]["rdl@rdl"], True)
-        self.assertIn("rdl", out["extraKnownMarketplaces"])
+        self.assertIs(out["enabledPlugins"]["rdl@rdl-agent-extensions"], True)
+        self.assertIn("rdl-agent-extensions", out["extraKnownMarketplaces"])
         self.assertEqual(len(out["extraKnownMarketplaces"]), 6)
         # ensure must only touch extraKnownMarketplaces — model/env/effortLevel survive.
         for key in ("model", "env", "effortLevel"):
@@ -453,7 +453,7 @@ class TestWebSettingsHelper(unittest.TestCase):
         self.assertEqual(set(l for l in lines if l), {"ghost1@acme", "ghost2@acme"})
 
     # --- strip-self ---
-    def _marketplace_repo(self, name="rdl"):
+    def _marketplace_repo(self, name="rdl-agent-extensions"):
         root = tempfile.mkdtemp(dir=self.tmp)
         plugin_dir = Path(root) / ".claude-plugin"
         plugin_dir.mkdir()
@@ -466,15 +466,15 @@ class TestWebSettingsHelper(unittest.TestCase):
         both = self._externals_plus_rdl()
         both["extraKnownMarketplaces"] = dict(
             both["extraKnownMarketplaces"],
-            rdl={"source": {"source": "github", "repo": "nq-rdl/agent-extensions"}, "autoUpdate": True},
+            **{"rdl-agent-extensions": {"source": {"source": "github", "repo": "nq-rdl/agent-extensions"}, "autoUpdate": True}},
         )
         path = self._write(both)
-        root = self._marketplace_repo("rdl")
+        root = self._marketplace_repo("rdl-agent-extensions")
         res = run_helper(HELPER, "strip-self", root, path)
         self.assertEqual(res.returncode, 0, res.stderr)
         out = json.loads(res.stdout)
-        self.assertNotIn("rdl@rdl", out["enabledPlugins"])
-        self.assertNotIn("rdl", out["extraKnownMarketplaces"])
+        self.assertNotIn("rdl@rdl-agent-extensions", out["enabledPlugins"])
+        self.assertNotIn("rdl-agent-extensions", out["extraKnownMarketplaces"])
         self.assertEqual(set(out["enabledPlugins"]), set(self.externals["enabledPlugins"]))
 
     def test_strip_self_keeps_a_differently_named_marketplace(self):
@@ -568,10 +568,10 @@ class TestWebSettingsHelper(unittest.TestCase):
         both = self._externals_plus_rdl()
         both["extraKnownMarketplaces"] = dict(
             both["extraKnownMarketplaces"],
-            rdl={"source": {"source": "github", "repo": "nq-rdl/agent-extensions"}, "autoUpdate": True},
+            **{"rdl-agent-extensions": {"source": {"source": "github", "repo": "nq-rdl/agent-extensions"}, "autoUpdate": True}},
         )
         path = self._write(both)
-        root = self._marketplace_repo("rdl")
+        root = self._marketplace_repo("rdl-agent-extensions")
         stripped = run_helper(HELPER, "strip-self", root, path)
         self.assertEqual(stripped.returncode, 0, stripped.stderr)
         p2 = self._write(json.loads(stripped.stdout))
@@ -583,8 +583,8 @@ class TestWebSettingsHelper(unittest.TestCase):
         self.assertEqual(covered.stdout.strip(), "")
         # No rdl left anywhere after the pipeline.
         final = json.loads(ensured.stdout)
-        self.assertNotIn("rdl@rdl", final["enabledPlugins"])
-        self.assertNotIn("rdl", final["extraKnownMarketplaces"])
+        self.assertNotIn("rdl@rdl-agent-extensions", final["enabledPlugins"])
+        self.assertNotIn("rdl-agent-extensions", final["extraKnownMarketplaces"])
 
     def test_ensure_is_idempotent(self):
         # ensure∘ensure is a fixed point: a second pass over ensure's own output is a no-op.
@@ -601,9 +601,9 @@ class TestWebSettingsHelper(unittest.TestCase):
         both = self._externals_plus_rdl()
         both["extraKnownMarketplaces"] = dict(
             both["extraKnownMarketplaces"],
-            rdl={"source": {"source": "github", "repo": "nq-rdl/agent-extensions"}, "autoUpdate": True},
+            **{"rdl-agent-extensions": {"source": {"source": "github", "repo": "nq-rdl/agent-extensions"}, "autoUpdate": True}},
         )
-        root = self._marketplace_repo("rdl")
+        root = self._marketplace_repo("rdl-agent-extensions")
         first = run_helper(HELPER, "strip-self", root, self._write(both))
         self.assertEqual(first.returncode, 0, first.stderr)
         out = json.loads(first.stdout)

@@ -24,16 +24,16 @@ Inside the devcontainer the repo is mounted at `/workspace` and `CLAUDE_CONFIG_D
 # Validate manifests first — catch schema errors before install
 claude plugin validate /workspace
 
-# Register the local repo as a marketplace named "rdl"
+# Register the local repo as a marketplace named "rdl-agent-extensions"
 claude plugin marketplace add /workspace
 
 # Confirm it registered
 claude plugin marketplace list
 
 # Install every subject in one command via the meta-plugin…
-claude plugin install rdl@rdl
+claude plugin install rdl@rdl-agent-extensions
 # …or install a single subject
-claude plugin install go@rdl
+claude plugin install go@rdl-agent-extensions
 ```
 
 Then launch `claude` and type `/` — confirm the expected skills appear (e.g. `/go:secure`, `/gh:changie`, `/claude-code:hook`).
@@ -53,7 +53,7 @@ After mapping a new skill (e.g. `go-secure` → `/go:secure`) into a subject bun
    `- {source: go-secure, leaf: secure}` mapping to rename the facet.
 2. Ensure the real-file copy exists: `test -d plugins/go/skills/secure && echo ok`
    (run `bash scripts/sync-plugins.sh go` if it does not).
-3. Re-run install: `claude plugin install go@rdl`.
+3. Re-run install: `claude plugin install go@rdl-agent-extensions`.
 4. In the Claude REPL, type `/go:secure` — it should autocomplete.
 
 ## Self-Contained Plugin Trees
@@ -78,7 +78,7 @@ claude --plugin-dir ./plugins/go
 Remove the marketplace registration and all installed plugins from it:
 
 ```bash
-claude plugin marketplace remove rdl
+claude plugin marketplace remove rdl-agent-extensions
 ```
 
 ## Why Not Copy Into `.claude/`?

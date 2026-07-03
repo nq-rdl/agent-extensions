@@ -64,7 +64,7 @@ if [ "${1:-}" = "--live" ]; then
     else
       bad "live: marketplace add failed"; tail -3 "$tmp/add.out"
     fi
-    if claude plugin install rdl@rdl >"$tmp/install.out" 2>&1; then pass "live: install rdl@rdl"; else bad "live: install rdl@rdl failed"; tail -3 "$tmp/install.out"; fi
+    if claude plugin install rdl@rdl-agent-extensions >"$tmp/install.out" 2>&1; then pass "live: install rdl@rdl-agent-extensions"; else bad "live: install rdl@rdl-agent-extensions failed"; tail -3 "$tmp/install.out"; fi
     # Verify `plugin list` itself succeeded before drawing conclusions from its
     # output — otherwise an errored listing has no "zod" line and false-PASSes the
     # removal assertion below.

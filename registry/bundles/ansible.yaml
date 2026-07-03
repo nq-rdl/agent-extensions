@@ -17,4 +17,4 @@ targets:
   claude:
     enabled: true
     pluginName: ansible
-    marketplaceName: rdl
+    marketplaceName: rdl-agent-extensions

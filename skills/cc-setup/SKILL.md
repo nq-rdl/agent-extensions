@@ -167,11 +167,11 @@ team's tracked-marketplace list (`marketplaces.json` — shipped in this skill's
 also in the `cc-web-setup` plugin), enumerates the *live* plugin catalog of every tracked
 marketplace, inspects this repo's languages/tooling, and returns a ranked suggestion list:
 
-- **Baseline (always-useful)** — `pr-review-toolkit@claude-plugins-official`, `gh@rdl`,
+- **Baseline (always-useful)** — `pr-review-toolkit@claude-plugins-official`, `gh@rdl-agent-extensions`,
   `worktrunk@worktrunk`, plus the applicable LSP (`gopls-lsp@claude-plugins-official` for Go;
   the official marketplace ships more `*-lsp` plugins the scout matches by language).
 - **Language/stack-matched** — RDL subject plugins and team externals whose subject matches a
-  detected language/tool (`go@rdl`, `terraform@rdl`, `astral@astral-sh`, …).
+  detected language/tool (`go@rdl-agent-extensions`, `terraform@rdl-agent-extensions`, `astral@astral-sh`, …).
 
 The marketplace list lives in `assets/marketplaces.json` beside this skill (resolve it the
 same way as the hook script in Phase 1: prefer the installed plugin-cache copy, fall back to
@@ -183,16 +183,16 @@ register it and install **only the confirmed plugins** — locally this skill *c
 
 ```bash
 # Register each marketplace the chosen plugins need (idempotent), then install.
-claude plugin marketplace add <owner>/<repo>      # e.g. nq-rdl/agent-extensions for @rdl
+claude plugin marketplace add <owner>/<repo>      # e.g. nq-rdl/agent-extensions for @rdl-agent-extensions
 claude plugin install <plugin>@<marketplace>      # only the ones the user confirmed
 ```
 
 Never install without confirmation. **Self-marketplace guard:** if the target repo is
-itself the `rdl` marketplace (a `.claude-plugin/marketplace.json` with `name: rdl` — e.g.
-`agent-extensions` itself), skip **every** `@rdl` plugin, not just `rdl@rdl`. Installing the
-published copy of *any* `@rdl` id (including the baseline's `gh@rdl`) shadows the working
+itself the `rdl-agent-extensions` marketplace (a `.claude-plugin/marketplace.json` with `name: rdl-agent-extensions` — e.g.
+`agent-extensions` itself), skip **every** `@rdl-agent-extensions` plugin, not just `rdl@rdl-agent-extensions`. Installing the
+published copy of *any* `@rdl-agent-extensions` id (including the baseline's `gh@rdl-agent-extensions`) shadows the working
 tree's own copy. Unlike the web path, this local install has no automatic `strip-self`, so
-you must exclude `@rdl` ids yourself there — the working tree already provides those skills.
+you must exclude `@rdl-agent-extensions` ids yourself there — the working tree already provides those skills.
 
 ## Phase 5 — Summarize
 

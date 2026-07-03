@@ -94,7 +94,7 @@ marketplace source"* undersells a hard constraint that is why layers 1–2 exist
 > work — **not** the git protocol.
 
 Practical consequence: a marketplace whose source repo **is** the session repo (e.g.
-`rdl@rdl` inside `nq-rdl/agent-extensions`) git-clones fine; **every external marketplace**
+`rdl@rdl-agent-extensions` inside `nq-rdl/agent-extensions`) git-clones fine; **every external marketplace**
 (`claude-plugins-official`, `worktrunk`, `astral-sh`, …) 403s over git. The route that
 survives this (see [`references/web-setup.rst`](references/web-setup.rst) → "Failure mode #4 —
 git-proxy repo-scoping" and Phase 3 below):
@@ -150,7 +150,7 @@ surfaced, never masked. (It flags **"install unverified"** when the CLI can't be
 - Check whether `.claude/settings.json` and `.claude/scripts/` already exist — this decides
   create-fresh vs. merge for each.
 - **Self-marketplace check.** If the target repo has a `.claude-plugin/marketplace.json`, it
-  **is itself a Claude Code marketplace** — enabling a plugin it publishes (e.g. `rdl@rdl`
+  **is itself a Claude Code marketplace** — enabling a plugin it publishes (e.g. `rdl@rdl-agent-extensions`
   inside `nq-rdl/agent-extensions`) installs `main`'s *published* copy into the plugin cache,
   silently **shadowing the working-tree edits** under development. Pick the **externals** base
   (not rdl) in Phase 2; the bundled `web-settings.sh strip-self` enforces this
@@ -199,14 +199,14 @@ exactly what you want. `cover` is a read-only assertion (no redirect needed).
 
 | Base | File | Use for |
 |---|---|---|
-| **rdl** | `assets/settings.json.tmpl` | a *consumer* repo that wants the RDL catalog (`rdl@rdl`) |
-| **externals** | `assets/settings.externals.json.tmpl` | the team's external dev-helper plugins, **no rdl** — and the **only** correct base when Phase 0 found a `.claude-plugin/marketplace.json` |
+| **rdl** | `assets/settings.json.tmpl` | a *consumer* repo that wants the RDL catalog (`rdl@rdl-agent-extensions`) |
+| **externals** | `assets/settings.externals.json.tmpl` | the team's external dev-helper plugins, **no RDL catalog** — and the **only** correct base when Phase 0 found a `.claude-plugin/marketplace.json` |
 
 Both wire the two SessionStart hooks and the opinionated defaults (`model: opus`,
 `alwaysThinkingEnabled`, `effortLevel: xhigh`, `CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS`).
 
 1. **Pick the base** per the table. For *rdl + externals* (a consumer wanting both), start
-   from the externals base and add `"rdl@rdl": true` to `enabledPlugins`.
+   from the externals base and add `"rdl@rdl-agent-extensions": true` to `enabledPlugins`.
 2. **Discover and tailor the plugin set.** Delegate the "what does this repo need?" work to
    the **`marketplace-scout`** agent (Task tool): it locates `assets/marketplaces.json`,
    enumerates the *live* catalog of every tracked marketplace (the RDL marketplace **and**
@@ -215,16 +215,16 @@ Both wire the two SessionStart hooks and the opinionated defaults (`model: opus`
    recommends — **you** present its menu and let the user confirm; never silently decide.
    The scout's report is organized as:
    - **Baseline (always-useful)** — from `marketplaces.json` → `baseline`: `pr-review-toolkit@claude-plugins-official`,
-     `gh@rdl`, `worktrunk@worktrunk`, plus the applicable LSP (`gopls-lsp@claude-plugins-official`
+     `gh@rdl-agent-extensions`, `worktrunk@worktrunk`, plus the applicable LSP (`gopls-lsp@claude-plugins-official`
      for Go; the official marketplace ships more `*-lsp` plugins the scout enumerates per language).
    - **Language/LSP + stack-matched** — RDL subject plugins and `teamExternals` whose subject
-     matches a detected language/tool (e.g. `go@rdl` + `modern-go-guidelines` + `gopls-lsp` for Go,
-     `terraform@rdl` for `*.tf`, `astral@astral-sh` for Python).
+     matches a detected language/tool (e.g. `go@rdl-agent-extensions` + `modern-go-guidelines` + `gopls-lsp` for Go,
+     `terraform@rdl-agent-extensions` for `*.tf`, `astral@astral-sh` for Python).
 
    If you cannot or do not delegate, tailor by hand from `assets/marketplaces.json`: always
    offer the `baseline.always` set and the `agnostic`-tagged `teamExternals`; add the
    `go`/`python`/`workflow`-tagged entries and the matching `baseline.lsp` entry by language.
-   Remember `gh@rdl` (and any other `@rdl` baseline pick) is stripped automatically inside this
+   Remember `gh@rdl-agent-extensions` (and any other `@rdl-agent-extensions` baseline pick) is stripped automatically inside this
    repo by `strip-self` (Phase 0) — it is a suggestion for *consumer* repos.
 
    **Then classify each confirmed pick** — this single selection drives all three layers, and
@@ -279,7 +279,7 @@ writing**):
 - `model` / `alwaysThinkingEnabled` / `effortLevel`: set **only if absent** — never override a
   deliberate user choice.
 
-> **Why externals-not-rdl for a marketplace repo.** Enabling `rdl@rdl` inside
+> **Why externals-not-rdl for a marketplace repo.** Enabling `rdl@rdl-agent-extensions` inside
 > `nq-rdl/agent-extensions` installs `main`'s published catalog into the plugin cache,
 > shadowing your working-tree edits, and the self-cloning batch can break the whole
 > session-start install so **nothing** surfaces. `strip-self` removes it deterministically;

@@ -20,7 +20,7 @@
       "source": { "source": "github", "repo": "max-sixty/worktrunk" },
       "autoUpdate": true
     },
-    "rdl": {
+    "rdl-agent-extensions": {
       "source": { "source": "github", "repo": "nq-rdl/agent-extensions" },
       "autoUpdate": true
     }
@@ -70,7 +70,7 @@
     }
   ],
   "baseline": {
-    "description": "Always-useful plugins to suggest on every setup (cc-setup / cc-web-setup), regardless of the repo's stack. The `always` set is language-agnostic; the `lsp` set is language-applicable — offer the entry whose `language` matches a detected language. Every id's @marketplace must be declared in `marketplaces` above. Caveat for marketplace repos: when the repo being set up is itself the `rdl` marketplace (a .claude-plugin/marketplace.json named `rdl`, e.g. agent-extensions), the gh@rdl suggestion is removed — automatically by web-settings.sh strip-self on the web path, and manually by the cc-setup self-marketplace guard on the local path.",
+    "description": "Always-useful plugins to suggest on every setup (cc-setup / cc-web-setup), regardless of the repo's stack. The `always` set is language-agnostic; the `lsp` set is language-applicable — offer the entry whose `language` matches a detected language. Every id's @marketplace must be declared in `marketplaces` above. Caveat for marketplace repos: when the repo being set up is itself the `rdl-agent-extensions` marketplace (a .claude-plugin/marketplace.json named `rdl-agent-extensions`, e.g. agent-extensions), the gh@rdl-agent-extensions suggestion is removed — automatically by web-settings.sh strip-self on the web path, and manually by the cc-setup self-marketplace guard on the local path.",
     "always": [
       {
         "id": "pr-review-toolkit@claude-plugins-official",
@@ -78,8 +78,8 @@
         "purpose": "specialized PR-review subagents (silent-failure-hunter, type-design, etc.) — the team's default review toolkit"
       },
       {
-        "id": "gh@rdl",
-        "marketplace": "rdl",
+        "id": "gh@rdl-agent-extensions",
+        "marketplace": "rdl-agent-extensions",
         "purpose": "GitHub workflow — git hooks, changelogs, conventional commits, pull requests, releases, and CI/CD (the RDL gh plugin)"
       },
       {

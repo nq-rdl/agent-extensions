@@ -1,15 +1,15 @@
 # External marketplaces
 
-This repo's `rdl` marketplace ships **only the plugins the team authors here**
+This repo's `rdl-agent-extensions` marketplace ships **only the plugins the team authors here**
 (under `skills/` and `agents/`). Plugins maintained by *other people* —
-Anthropic, vendors, OSS projects — are **not** re-hosted in `rdl`. Instead the
+Anthropic, vendors, OSS projects — are **not** re-hosted in `rdl-agent-extensions`. Instead the
 team consumes them straight from their **upstream marketplaces**, which Claude
 Code registers via the `extraKnownMarketplaces` setting.
 
-## Why not re-host them in `rdl`?
+## Why not re-host them in `rdl-agent-extensions`?
 
 A Claude Code marketplace catalogs *plugins*, not other marketplaces — you
-cannot nest one inside another. Re-publishing someone else's plugin into `rdl`
+cannot nest one inside another. Re-publishing someone else's plugin into `rdl-agent-extensions`
 (the old `external:` passthrough, now removed) meant **we** owned its source and
 version pin, and had to bump it to deliver upstream updates. Registering the
 upstream marketplace instead hands versioning and auto-update back to the people

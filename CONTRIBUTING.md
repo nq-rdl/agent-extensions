@@ -118,7 +118,7 @@ for the mechanical add-and-sync steps.
 `plugin.json` and the `marketplace.json` entry for a subject are **generated from
 `registry/bundles/<subject>.yaml`** — do **not** hand-edit them. When you add a **new subject**,
 it is also registered as a dependency of the **`rdl` meta-plugin**, so `claude plugin install
-rdl@rdl` keeps installing the full set. CI consistency checks fail if registry, generated
+rdl@rdl-agent-extensions` keeps installing the full set. CI consistency checks fail if registry, generated
 manifests, and the meta-plugin dependency list disagree.
 
 ## Skill directory structure
@@ -230,7 +230,7 @@ subject (no skill) is fine — give it its own bundle with an empty `skills: []`
 Cloud sessions run on a fresh VM with only a clone of this repo. The dev-helper plugins declared
 in `.claude/settings.json` (`enabledPlugins` + `extraKnownMarketplaces`) are **external** helpers
 for working *on* this catalog (Go/LSP, PR review, Python tooling, git worktrees, general
-workflows) — never enable the `rdl` marketplace or the `rdl@rdl` meta-plugin here; a session for
+workflows) — never enable the `rdl-agent-extensions` marketplace or the `rdl@rdl-agent-extensions` meta-plugin here; a session for
 developing the catalog should not install the catalog itself. To add a dev-helper, set it `true`
 under `enabledPlugins` and register its marketplace under `extraKnownMarketplaces` — declaring it
 is sufficient; there is no Setup-script field and no per-environment step.

@@ -28,4 +28,4 @@ targets:
   claude:
     enabled: true
     pluginName: gh
-    marketplaceName: rdl
+    marketplaceName: rdl-agent-extensions
