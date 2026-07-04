@@ -101,3 +101,10 @@ explicit user request (no forge polling). OFFER to archive; on consent, map fiel
 
 A field the spec is silent on is written **"Not recorded in the spec"** — never
 fabricated. Assign the next number, write `docs/adr/NNNN-<kebab-title>.md`, update the index.
+
+**Extension migration (epic #207 re-architecture).** The archival mechanics (spec→ADR
+plus the ephemeral spec strip) are migrating speckit-side to the **rdl-adr** extension's
+`speckit.adr.finalize` command (`nq-rdl/spec-kit-extensions`), so any agent or a human
+can run them without this skill. Probe the repo: when that command is installed,
+delegate the mechanics to it — this skill still owns the offer, the consent gate, and
+the authoring guidance above. Until it ships, this flow is canonical.
