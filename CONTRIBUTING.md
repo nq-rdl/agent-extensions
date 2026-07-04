@@ -226,22 +226,15 @@ subject (no skill) is fine — give it its own bundle with an empty `skills: []`
 
 ## Claude Code on the web
 
-Cloud sessions run on a fresh VM with only a clone of this repo. This repo used to
-auto-configure dev-helper plugins for those sessions through a project `.claude/settings.json`
-(`enabledPlugins` + `extraKnownMarketplaces`) plus a pair of SessionStart hooks under
-`.claude/scripts/` — `install-deps.sh` (per-session tooling) and `announce-capabilities.sh`
-(cross-checking which declared plugins actually landed). That `.claude/` tooling has been
-**removed**; how dev-helper plugins are provisioned for web sessions is being re-approached.
-
-The external dev-helpers themselves (Go/LSP, PR review, Python tooling, git worktrees, general
-workflows) are unchanged — see [`docs/external-marketplaces.md`](docs/external-marketplaces.md)
-for the curated set and how to enable them in your **user** settings in the meantime. As before,
-never enable the `rdl-agent-extensions` marketplace or any of its published plugins for catalog
-development — a session for developing the catalog should not install the catalog itself.
+Cloud sessions run on a fresh VM with only a clone of this repo. Dev-helper plugins are not
+auto-configured for these sessions — enable the external dev-helpers (Go/LSP, PR review, Python
+tooling, git worktrees, general workflows) yourself in your **user** settings; see
+[`docs/external-marketplaces.md`](docs/external-marketplaces.md) for the curated set and how to
+enable them. Never enable the `rdl-agent-extensions` marketplace or any of its published plugins
+for catalog development — a session for developing the catalog should not install the catalog
+itself.
 
 ## Cutting a release
 
 Releases are dispatched from the Actions tab (**"Release — Prepare PR"**) and land as a
 reviewable `release/v<version>` PR — reviewing and squash-merging that PR is the release gate.
-See [`docs/releasing.md`](docs/releasing.md) for the full runbook, including partial-failure
-recovery and rollback.

@@ -21,8 +21,7 @@ users install.
 content conventions, the grouping contract, packaging a skill into a plugin); the
 PR and changelog flow is in this file's **`## PR instructions`** section below.
 **`docs/`** is the project documentation — `docs/ARCHITECTURE.md` (design + packaging
-decisions), `docs/external-marketplaces.md` (recommended external dev-helper plugins), and
-`docs/local-testing.md` (install walkthrough).
+decisions) and `docs/external-marketplaces.md` (recommended external dev-helper plugins).
 
 ## Project overview
 
@@ -180,15 +179,14 @@ The same checks run locally via `lefthook` (see Setup commands).
 
 **Required status checks on `main` are coupled to these job names.** The always-run
 `validate.yml` jobs above are marked as required status checks so red CI blocks the merge
-button (`docs/branch-protection.md`). A required check is matched by the **exact job
+button. A required check is matched by the **exact job
 `name:`** — renaming or dropping a `name:` in `validate.yml` silently drops the
 requirement (the gate disappears while still showing green). When you rename, add, or
-remove an always-run `validate.yml` job, update the required-checks list per
-`docs/branch-protection.md`. Keep the subset-only checks **out of this always-run set**:
+remove an always-run `validate.yml` job, update `main`'s required-checks list in the repo's
+branch-protection settings to match. Keep the subset-only checks **out of this always-run set**:
 `link-check`'s `paths:` filter would hang non-skill PRs, and `check-changie-fragment` /
 SkillSpector `scan` are excluded. (`version-monotonic` is also outside this set, but the
-release flow *does* require it separately — see `docs/releasing.md`.) See
-`docs/branch-protection.md` for the reasoning.
+release flow *does* require it separately.)
 
 ## Testing instructions
 
@@ -205,8 +203,6 @@ claude plugin install go@rdl-agent-extensions
 # Onboarding onto the team's Claude Code setup goes through the rdl-team plugin:
 claude plugin install rdl-team@rdl-agent-extensions
 ```
-
-See [`docs/local-testing.md`](docs/local-testing.md) for the full walkthrough including cleanup and self-contained plugin tree details.
 
 ## Registry Bundles
 
@@ -288,11 +284,9 @@ recovers a tag-pushed-but-release-missing partial failure).
 
 `marketplace.json` sources are relative paths (`./plugins/<bundle>`) — installs read directly from `main` (or whatever ref the user pinned), no separate release branch involved.
 
-See [`docs/releasing.md`](docs/releasing.md) for the step-by-step runbook (cutting a release, partial-failure recovery, rollback).
-
 ## Docs
 
-The docs site uses Zensical (configured in `zensical.toml`), provided by the pixi `docs` environment (linux-64 only — `pixi run -e docs …`). Source is `docs/`. Architecture decisions live in `docs/ARCHITECTURE.md`. Local install walkthrough: [`docs/local-testing.md`](docs/local-testing.md).
+The docs site uses Zensical (configured in `zensical.toml`), provided by the pixi `docs` environment (linux-64 only — `pixi run -e docs …`). Source is `docs/`. Architecture decisions live in `docs/ARCHITECTURE.md`.
 
 ## Platform Notes
 
