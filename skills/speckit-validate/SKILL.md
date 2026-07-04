@@ -51,7 +51,7 @@ metadata:
 - [ ] if `provides.config[]` present → each `template` file exists.
 
 **hooks**
-- [ ] every hook event name is one of the 18 valid `before_/after_` × phase names.
+- [ ] every hook event name is one of the 18 documented `before_/after_` × phase names (an unrecognized name isn't bound to any stage, so the hook silently never fires).
 - [ ] each entry has a non-empty `command`; `priority` (if present) is an int ≥ 1.
 
 Report a compact table: rule → PASS/FAIL → offending value. End with an overall

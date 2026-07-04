@@ -63,11 +63,14 @@ provides block
 hooks (optional)
 ----------------
 
-- Each hook key must be one of the 18 valid event names: ``before_``/``after_``
+- Each hook key should be one of the 18 documented event names: ``before_``/``after_``
   crossed with ``specify``, ``plan``, ``tasks``, ``implement``, ``analyze``,
-  ``checklist``, ``clarify``, ``constitution``, ``taskstoissues``. Valid:
-  ``before_plan``, ``after_implement``. Invalid: ``before_build`` (not a
-  known phase), ``pre_plan`` (wrong prefix).
+  ``checklist``, ``clarify``, ``constitution``, ``taskstoissues`` (the
+  Development Guide lists these as the valid set). Valid: ``before_plan``,
+  ``after_implement``. An unrecognized key (e.g. ``before_build`` — not a known
+  phase, or ``pre_plan`` — wrong prefix) is not bound to any workflow stage, so
+  the hook silently never fires — flag it even though the installer may not
+  reject it outright.
 - Each hook entry (single object or list of objects) must have a non-empty
   ``command``. ``priority``, if present, must be an int ≥ 1 (default 10 when
   omitted). Valid: ``priority: 1``. Invalid: ``priority: 0``,
