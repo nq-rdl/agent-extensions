@@ -43,11 +43,28 @@ Public community catalog (``github/spec-kit``)
   merges the entry into ``catalog.community.json`` on acceptance. The
   ``verified`` field is maintainer-set on acceptance, never author-set.
 
+Catalog file structure
+----------------------
+
+A catalog is a single JSON object (not a bare list). Top-level keys:
+
+- ``schema_version`` — catalog schema version, currently ``"1.0"``.
+- ``updated_at`` — ISO 8601, when the catalog file was last changed.
+- ``catalog_url`` — the raw URL the catalog is served from.
+- ``extensions`` — an **object keyed by extension id** (NOT an array). Each
+  value is one entry object (fields below).
+
+To publish, add or replace the entry at ``extensions["<your-extension-id>"]``.
+The reader looks entries up by id, so appending to an array — or using a key
+that does not match the entry's ``extension.id`` — leaves the entry
+undiscoverable/uninstallable.
+
 Catalog entry schema
 ----------------------
 
-Each catalog entry is one JSON object in the catalog's ``extensions`` array
-(see ``assets/catalog-entry.json`` for a filled-in example). Fields:
+Each entry (the value stored under ``extensions["<id>"]``) is one JSON object;
+see ``assets/catalog-entry.json`` for a filled-in example of a single entry.
+Fields:
 
 - ``name`` — display name.
 - ``id`` — matches the extension manifest's ``extension.id``
