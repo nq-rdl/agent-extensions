@@ -375,6 +375,8 @@ SpecKit extension toolkit — scaffold, validate, manage, and publish spec-kit e
 - `/speckit-dev:manage`
 - `/speckit-dev:publish`
 
+**Hooks:** `speckit-publish-target`
+
 ---
 
 ## rdl-team
