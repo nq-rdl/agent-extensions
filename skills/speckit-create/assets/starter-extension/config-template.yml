@@ -1,0 +1,8 @@
+# Copied to .specify/extensions/my-extension/my-extension-config.yml on install.
+# Local overrides: my-extension-config.local.yml (gitignored).
+# Env overrides:   SPECKIT_MY_EXTENSION_<SECTION>_<KEY>
+features:
+  enabled: true
+  verbose: false
+defaults:
+  priority: 10
