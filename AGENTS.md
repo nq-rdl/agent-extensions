@@ -4,28 +4,25 @@ Agent guidance for this repository. Use this alongside the README for project co
 
 ## What this repo is
 
-Two things, kept deliberately separate:
+This repo is **a Claude Code marketplace** — the published product. It *is* the `rdl-agent-extensions`
+marketplace: it authors reusable skills and agents (canonical content under
+`skills/` and `agents/`) and publishes them as self-contained plugins through the
+repo-root marketplace manifest (`.claude-plugin/marketplace.json`). This is what
+users install.
 
-1. **A Claude Code marketplace** — the published product. This repo *is* the `rdl-agent-extensions`
-   marketplace: it authors reusable skills and agents (canonical content under
-   `skills/` and `agents/`) and publishes them as self-contained plugins through the
-   repo-root marketplace manifest (`.claude-plugin/marketplace.json`). This is what
-   users install.
-2. **A `.claude/` folder for developing that marketplace** — contributor tooling,
-   *not* part of the published product. It configures Claude Code for work *inside
-   this repo*: the project `settings.json` (model, lifecycle hooks — SessionStart
-   and PreToolUse — and the curated external-plugin set, see
-   `docs/external-marketplaces.md`), helper scripts under `.claude/scripts/`, and
-   any vendored skills. Editing `.claude/` changes how we *build* the catalog; it
-   never changes what ships to users.
+> **`.claude/` contributor tooling was removed.** This repo previously carried a
+> `.claude/` folder — *not* part of the published product — that configured Claude
+> Code for work *inside this repo*: a project `settings.json` (model, SessionStart /
+> PreToolUse hooks, and a curated external-plugin set) plus helper scripts under
+> `.claude/scripts/`. That tooling has been removed; how we configure Claude Code for
+> developing the catalog is being re-approached. It never affected what ships to users.
 
 **Where to look:** **`CONTRIBUTING.md`** outlines the development requirements (skill
 content conventions, the grouping contract, packaging a skill into a plugin); the
 PR and changelog flow is in this file's **`## PR instructions`** section below.
 **`docs/`** is the project documentation — `docs/ARCHITECTURE.md` (design + packaging
-decisions), `docs/external-marketplaces.md` (the curated external-plugin set), and
-`docs/local-testing.md` (install walkthrough). Read this file (AGENTS.md) in full
-before changing anything under `.claude/`, so settings and docs stay in sync.
+decisions), `docs/external-marketplaces.md` (recommended external dev-helper plugins), and
+`docs/local-testing.md` (install walkthrough).
 
 ## Project overview
 
@@ -85,7 +82,7 @@ Claude Code installs a plugin by `cp -R`-ing its source directory into a per-use
 To make installs self-contained, `plugins/<bundle>/skills/<name>/` and `plugins/<bundle>/agents/<name>.md` hold **real-file copies** of the canonical content under `skills/` and `agents/`. The canonical source remains the single edit point — the plugin trees are derivative.
 
 - **Edit canonical content** under `skills/<name>/` or `agents/<name>/agent.md` (both authored here).
-- **Refresh plugin trees** by running `pixi run bash scripts/sync-plugins.sh` (or pass a bundle name to scope it). The script reads `registry/bundles/<b>.yaml`, removes any stale copies, and rewrites `plugins/<b>/skills/<name>/` and `plugins/<b>/agents/<name>.md` from the canonical sources. `.claude/scripts/{install-deps,announce-capabilities}.sh` are this repo's own standalone SessionStart hook tooling — they have no canonical skill source and are no longer touched by `sync-plugins.sh`; edit them directly. `.claude/scripts/install-deps.local.sh` remains the repo-local seam alongside them.
+- **Refresh plugin trees** by running `pixi run bash scripts/sync-plugins.sh` (or pass a bundle name to scope it). The script reads `registry/bundles/<b>.yaml`, removes any stale copies, and rewrites `plugins/<b>/skills/<name>/` and `plugins/<b>/agents/<name>.md` from the canonical sources.
 - **CI** validates that every bundle YAML reference resolves and that every plugin manifest is well-formed. See `scripts/validate-plugins.sh`.
 
 **Grouped skills.** A bundle skill member is either a flat string (`changie` → `leaf == changie`) or an explicit `{source, leaf}` mapping (`{source: go-gh, leaf: actions-go}` in the `gh` bundle → `/gh:actions-go`). `sync-plugins.sh` copies the flat canonical `skills/<source>/` → `plugins/<pluginName>/skills/<leaf>/`, **renaming to the leaf**, so the plugin tree stays one level deep and Claude Code invokes `<pluginName>:<leaf>` (the leaf folder drives invocation). Claude Code labels a skill in `/`-autocomplete as `frontmatter.name || <pluginName>:<leaf>` — so a present `name:` (the canonical `go-gh` **or** the leaf `actions-go`) overrides the namespaced id with a bare, un-prefixed label, and `/gh` lists `go-gh`/`actions-go` instead of `gh:actions-go`. To get the namespaced label, sync **strips the copy's `name:` entirely** so the label falls back to `<pluginName>:<leaf>`. The canonical `skills/` tree is never touched; grouping is owned **here** in the registry and stays flat. See `CONTRIBUTING.md` §6 for the rules, `scripts/check_grouping.py` for the contract, and `scripts/validate-plugins.sh` for the no-name guard.
@@ -300,4 +297,4 @@ The docs site uses Zensical (configured in `zensical.toml`), provided by the pix
 ## Platform Notes
 
 - macOS and Linux only — the build scripts require POSIX shell tooling (WSL2 for Windows)
-- Generated outputs (`plugins/` trees, `plugins/*/.claude-plugin/plugin.json`, `.claude-plugin/marketplace.json`, `docs/bundles.md`) are produced by the generator scripts — do not hand-edit. `.claude/scripts/{install-deps,announce-capabilities}.sh` are standalone repo tooling, not generated — edit them directly.
+- Generated outputs (`plugins/` trees, `plugins/*/.claude-plugin/plugin.json`, `.claude-plugin/marketplace.json`, `docs/bundles.md`) are produced by the generator scripts — do not hand-edit.

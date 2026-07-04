@@ -6,6 +6,13 @@ Anthropic, vendors, OSS projects — are **not** re-hosted in `rdl-agent-extensi
 team consumes them straight from their **upstream marketplaces**, which Claude
 Code registers via the `extraKnownMarketplaces` setting.
 
+> **Note:** This repo previously registered the curated set for the whole team via a
+> project `.claude/settings.json`. That file was removed along with the rest of the
+> `.claude/` contributor tooling, and how the team configures these for repo work is
+> being re-approached. The curated set below still stands as a **recommendation** —
+> until the team mechanism is settled, enable what you want in your **user** settings
+> (`~/.claude/settings.json`), as described under [Scope](#scope-where-this-applies).
+
 ## Why not re-host them in `rdl-agent-extensions`?
 
 A Claude Code marketplace catalogs *plugins*, not other marketplaces — you
@@ -17,9 +24,8 @@ who actually maintain the plugin. We stop being a middleman.
 
 ## The curated set
 
-Registered for the team in the project's `.claude/settings.json` (at the repo
-root). Each is a real Claude Code marketplace (has
-`.claude-plugin/marketplace.json`).
+The dev-helper marketplaces the team recommends for working *on* this catalog. Each
+is a real Claude Code marketplace (has `.claude-plugin/marketplace.json`).
 
 | Marketplace (`name`) | Source repo | Plugin | What it's for |
 |---|---|---|---|
@@ -35,7 +41,7 @@ because it comes from `claude-plugins-official`, the catalog bundled with Claude
 Code. That marketplace is auto-available in the desktop/CLI, but on Claude Code
 (web) it must be registered explicitly in `extraKnownMarketplaces` for its
 enabled plugins (`pr-review-toolkit`, `superpowers`, `gopls-lsp`) to resolve and
-install — so it appears in `.claude/settings.json` alongside the curated set.
+install — so register it alongside the curated set.
 
 ## How it's wired
 
@@ -50,7 +56,7 @@ install — so it appears in `.claude/settings.json` alongside the curated set.
   `pr-review-toolkit`, `superpowers`, and `gopls-lsp` — not the whole set.
 
 ```jsonc
-// .claude/settings.json (excerpt)
+// settings.json (excerpt)
 "extraKnownMarketplaces": {
   "svelte": { "source": { "source": "github", "repo": "sveltejs/ai-tools" }, "autoUpdate": true }
 },
@@ -62,13 +68,12 @@ install — so it appears in `.claude/settings.json` alongside the curated set.
 
 ## Scope: where this applies
 
-`.claude/settings.json` is **project-scoped** — it configures Claude Code when
-you are working *inside this repo*. It does not automatically propagate to your
-other projects.
-
-To get the same curated set everywhere you use Claude Code, copy the
-`extraKnownMarketplaces` / `enabledPlugins` blocks into your **user** settings at
-`~/.claude/settings.json`.
+Claude Code reads settings from two places: a **project** `.claude/settings.json`
+(applies only inside that repo) and your **user** `~/.claude/settings.json` (applies
+everywhere). This repo no longer ships a project `.claude/settings.json`, so to use
+the curated set today, add the `extraKnownMarketplaces` / `enabledPlugins` blocks to
+your **user** settings at `~/.claude/settings.json` — they then apply in every project,
+including this one.
 
 ## Adding or removing a marketplace
 
