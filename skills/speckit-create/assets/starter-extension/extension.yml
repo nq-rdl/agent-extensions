@@ -5,9 +5,9 @@ extension:
   id: "my-extension"
   name: "My Extension"
   version: "1.0.0"                       # strict X.Y.Z
-  description: "Brief description (under 200 characters)"
-  # category: "process"                  # docs|code|process|integration|visibility
-  # effect: "read-write"                 # read-only | read-write
+  description: "Brief summary of what the extension does"
+  category: "process"                    # docs|code|process|integration|visibility
+  effect: "read-write"                   # read-only | read-write
   author: "Your Name"
   repository: "https://github.com/nq-rdl/spec-kit-my-extension"
   license: "MIT"
