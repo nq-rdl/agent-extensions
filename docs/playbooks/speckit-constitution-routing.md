@@ -2,9 +2,14 @@
 
 Part of epic #207. Drop-in templates for a **target** speckit repo that prevent
 dual-ownership drift: SpecKit planning stays authoritative, Superpowers owns execution,
-and the handoff is explicit at the task-list boundary. Pair with #204's extension
-recommendation (the `superb` gates mechanically enforce what these templates route by
-convention).
+and the handoff is explicit at the task-list boundary.
+
+> **Interim delivery.** Per ADR-0001 (#204, the epic's re-architecture), this payload
+> migrates into the planned **rdl-routing** speckit extension in
+> `nq-rdl/spec-kit-extensions` — installed per repo via the RDL catalog
+> (`specify extension add rdl-routing`) instead of copied from here. Until that ships,
+> this playbook is the copy-paste source of truth; when it ships, this file becomes a
+> pointer. The templates are deliberately zero-dependency so they stand alone either way.
 
 ## 1. Constitution clause (add to `constitution.md`)
 
@@ -52,8 +57,7 @@ being explained once and forgotten.
 
 - **Dual-executor conflict** — running **both** `/speckit.implement` **and** the
   Superpowers execution workflow on the same task. Pick one executor per task; they will
-  otherwise duplicate work and fight over the same files. (The `superb` verify gate, #204,
-  makes this mechanical.)
+  otherwise duplicate work and fight over the same files.
 - **Skipping `/speckit.tasks`** — Superpowers' plan-decomposition expects the small
   2–5 minute tasks that `/speckit.tasks` produces. Skipping it forces duplicate
   re-planning at execution time. Never hand off to execution without `tasks.md`.
@@ -77,6 +81,10 @@ retained (work continues). `speckit-lifecycle`'s `merge-spec.sh` performs the sp
 automatically on a trunk merge.
 ```
 
+The archive+strip mechanics are planned to move speckit-side as the **rdl-adr**
+extension's `speckit.adr.finalize` command (see ADR-0001, #204), so GitHub-PR merges get
+the same mechanization as CLI merges; the principle text above is unaffected.
+
 ## 5. Worktree isolation: standardize on one tool (#206)
 
 The execution discipline in §1/§2 begins with **worktree isolation** — but three
@@ -87,24 +95,27 @@ exactly the divergence this playbook exists to prevent:
 - `cc-spex`'s `spex-worktrees` extension (#203),
 - Superpowers' own `using-git-worktrees` skill.
 
-Route worktree provisioning through a **single owner**: Worktrunk's `wt` CLI (`worktrunk`,
-already in this repo's curated external-marketplace set since #147). In a target repo,
-have `speckit-lifecycle` / `cc-spex` worktree logic delegate to `wt` rather than maintain
-parallel branch/worktree creation and cleanup. Superpowers' `using-git-worktrees` is
-upstream (out of scope to change) — note only whether `wt` complements or conflicts with
-it for the target repo. Where `wt` can't cover `speckit-lifecycle`'s `NNN`-derivation or
-conflict-guard semantics, record why and keep the bespoke script — but never run all three
-against the same task.
+Route worktree provisioning through a **single owner**: the speckit-side provision/merge
+mechanics — today `speckit-lifecycle`'s bundled scripts, migrating to the planned
+**rdl-worktree** extension (`nq-rdl/spec-kit-extensions`; see ADR-0001, #204). The #206
+evaluation settled the roles: the bespoke semantics (`NNN` derivation anchored to
+`specs/`, spec seeding, topology-aware merge) are the automation owner, and Worktrunk's
+`wt` CLI (`worktrunk`, in this repo's curated external-marketplace set since #147) is the
+recommended **interactive complement** — not the owner. Superpowers' `using-git-worktrees`
+is upstream (out of scope to change) — note only whether it complements or conflicts for
+the target repo. Never run more than one provisioning mechanism against the same task.
 
 ## How this is delivered to a repo
 
-`speckit-lifecycle` (#124) references this playbook when it sets a repo up: apply §1 to
-`constitution.md` and §2 to `CLAUDE.md`, then (optionally) add the `superb` gates from
-#204 for mechanical enforcement.
+**Target:** `specify extension add rdl-routing` from the RDL catalog
+(`nq-rdl/spec-kit-extensions`) installs §1/§2/§4 natively — any agent or a human can run
+it. **Interim:** `speckit-lifecycle` (#124) offers this playbook when it sets a repo up —
+apply §1 and §4 to `constitution.md` and §2 to `CLAUDE.md`, on consent only.
 
 ## References
 
 - Epic constitution (this repo, `.specify/memory/constitution.md`) — encodes the same principles.
-- #204 — extension recommendation (mechanical enforcement layer).
-- #203 — cc-spex evaluation. #206 — standardize worktree management on Worktrunk (`wt`).
-- #124 — `speckit-lifecycle` (applies these at setup).
+- #204 — ADR-0001: RDL-owned speckit extensions (`superb` evaluated, not adopted).
+- #203 — cc-spex evaluation. #206 — worktree evaluation (bespoke semantics own automation; `wt` complementary).
+- #124 — `speckit-lifecycle` (offers these at setup).
+- `nq-rdl/spec-kit-extensions` — target home of rdl-routing / rdl-adr / rdl-worktree / brainstorm-handoff.
