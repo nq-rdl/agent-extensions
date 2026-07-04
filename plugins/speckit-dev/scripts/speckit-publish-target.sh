@@ -13,7 +13,9 @@ if command -v jq >/dev/null 2>&1; then
 elif command -v python3 >/dev/null 2>&1; then
   prompt=$(printf '%s' "$input" | python3 -c 'import sys, json; print(json.load(sys.stdin).get("prompt") or "")' 2>/dev/null || true)
 else
-  prompt=$(printf '%s' "$input" | grep -oP '"prompt"\s*:\s*"\K[^"]+' || true)
+  # Last-resort POSIX fallback (no jq/python3): scrape the "prompt" string
+  # value with sed. Avoids grep -oP (PCRE), which BSD grep (macOS) lacks.
+  prompt=$(printf '%s' "$input" | sed -n 's/.*"prompt"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/p' || true)
 fi
 
 # Gate: require a spec-kit marker AND a publish/distribute marker (or the explicit
