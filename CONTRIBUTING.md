@@ -226,32 +226,15 @@ subject (no skill) is fine — give it its own bundle with an empty `skills: []`
 
 ## Claude Code on the web
 
-Cloud sessions run on a fresh VM with only a clone of this repo. The dev-helper plugins declared
-in `.claude/settings.json` (`enabledPlugins` + `extraKnownMarketplaces`) are **external** helpers
-for working *on* this catalog (Go/LSP, PR review, Python tooling, git worktrees, general
-workflows) — never enable the `rdl-agent-extensions` marketplace or any of its published plugins here; a session for
-developing the catalog should not install the catalog itself. To add a dev-helper, set it `true`
-under `enabledPlugins` and register its marketplace under `extraKnownMarketplaces` — declaring it
-is sufficient; there is no Setup-script field and no per-environment step.
-
-Declared plugin installs are **best-effort, not guaranteed** — the platform attempts them at
-session start with no setup script and no `make`, but a sandbox-side git proxy or install race can
-cause a declared plugin to not land. `.claude/scripts/announce-capabilities.sh` cross-checks the
-declared set against `claude plugin list --json` and flags any **"Declared but NOT installed"**
-plugin, so a failure is never silently masked. The `CLAUDE_CODE_REMOTE`-gated
-`.claude/scripts/install-deps.sh` SessionStart hook provisions per-session tooling only and
-deliberately does **not** retry plugin installs — a hook-installed plugin isn't re-scanned that
-session, and `claude plugin install` in a hook can hang web sessions
-([anthropics/claude-code#18088](https://github.com/anthropics/claude-code/issues/18088)).
-
-The two engine scripts (`install-deps.sh`, `announce-capabilities.sh`) are this repo's own
-standalone SessionStart hook tooling — edit them directly under `.claude/scripts/`; they have no
-canonical skill source and are not touched by `sync-plugins.sh`. `.claude/scripts/install-deps.local.sh`
-is the repo-local seam alongside them, for project-specific provisioning.
+Cloud sessions run on a fresh VM with only a clone of this repo. Dev-helper plugins are not
+auto-configured for these sessions — enable the external dev-helpers (Go/LSP, PR review, Python
+tooling, git worktrees, general workflows) yourself in your **user** settings; see
+[`docs/external-marketplaces.md`](docs/external-marketplaces.md) for the curated set and how to
+enable them. Never enable the `rdl-agent-extensions` marketplace or any of its published plugins
+for catalog development — a session for developing the catalog should not install the catalog
+itself.
 
 ## Cutting a release
 
 Releases are dispatched from the Actions tab (**"Release — Prepare PR"**) and land as a
 reviewable `release/v<version>` PR — reviewing and squash-merging that PR is the release gate.
-See [`docs/releasing.md`](docs/releasing.md) for the full runbook, including partial-failure
-recovery and rollback.

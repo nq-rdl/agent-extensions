@@ -11,7 +11,7 @@ name: Release — PR guard
 #
 # Base-branch moves alone do NOT re-trigger PR checks — to make this guard
 # binding, mark it as a required status check and enable "require branches to
-# be up to date before merging" (see docs/releasing.md).
+# be up to date before merging".
 
 on:
   pull_request:

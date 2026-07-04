@@ -49,7 +49,7 @@ pre-commit:
     # --- Generated artifacts are in sync with the registry (catches a
     #     forgotten sync-plugins.sh / regenerate before CI does) ---
     - name: generated-in-sync
-      glob: "{registry/**,skills/**,agents/**,plugins/**,.claude/scripts/**,VERSION}"
+      glob: "{registry/**,skills/**,agents/**,plugins/**,VERSION}"
       run: |
         pixi run python3 scripts/check_bundle_refs.py .
         pixi run python3 scripts/check_grouping.py .
@@ -105,30 +105,6 @@ pre-push:
     - name: python-unit-tests
       glob: "{scripts/**,tests/**}"
       run: pixi run python3 -m unittest discover -s tests -p 'test_*.py'
-
-    # The live SessionStart hooks run BY PATH from .claude/settings.json, so their
-    # exec bit is load-bearing (sync-plugins.sh no longer owns it). Fail the push if
-    # either is committed non-executable — mirrors the CI hook-tests exec-bit gate.
-    - name: session-hook-exec-bit
-      glob: ".claude/scripts/*.sh"
-      run: |
-        rc=0
-        for f in .claude/scripts/install-deps.sh .claude/scripts/announce-capabilities.sh; do
-          [ -x "$f" ] || { echo "$f must be executable (0755 — runs from .claude/settings.json)"; rc=1; }
-        done
-        exit $rc
-
-    # SessionStart hook tests (mirrors the hook-tests CI job, which runs
-    # unconditionally). The permission-dependent persist_path case self-skips when run
-    # as root.
-    - name: install-deps-hook-tests
-      glob: ".claude/scripts/**"
-      run: bash .claude/scripts/tests/test-install-deps.sh
-
-    # Announce-hook canary: declared plugin reported installed/NOT installed/unverified.
-    - name: announce-capabilities-tests
-      glob: ".claude/scripts/**"
-      run: bash .claude/scripts/tests/test-announce-capabilities.sh
 
     # Informational: report findings but never block the push (CI uploads the
     # SARIF to the Security tab). scan.sh skips itself when Docker is absent;

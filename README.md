@@ -19,7 +19,7 @@ Claude Code is the only publication target.
 /plugin install rdl-team@rdl-agent-extensions
 ```
 
-See [`docs/bundles.md`](docs/bundles.md) for the full subject list and [`docs/local-testing.md`](docs/local-testing.md) for local/devcontainer install.
+See [`docs/bundles.md`](docs/bundles.md) for the full subject list.
 
 ## Agent File Management
 
