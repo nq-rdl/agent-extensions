@@ -73,3 +73,19 @@ Surfaced during this epic's own execution (Wave 0). Findings:
 Keep bespoke scripts; position `wt` as the recommended interactive complement; no #124
 changes. `cc-spex` is conditional-no per #203 (PR #213); if it is later adopted, keep
 `spex-worktrees` **disabled** per that evaluation — so this decision stands either way.
+
+## Addendum (2026-07-04): the bespoke semantics promote to the rdl-worktree extension
+
+The epic's re-architecture (ADR-0001, #204) moves pipeline mechanics speckit-side: the
+bespoke scripts' semantics (`NNN` derivation, spec seeding, topology-aware merge, strip
+delegation) become the planned **rdl-worktree** extension in
+`nq-rdl/spec-kit-extensions`, runnable by any agent or a human. This changes the *home*,
+not the decision:
+
+- `wt` remains the recommended **interactive complement**. The extension wraps our
+  bespoke semantics, **not** `wt` — and its final id must avoid that product name.
+- The scripts (13 bats cases @ `2787fc6`, PR #211) are the acceptance baseline for the
+  extension; `speckit-lifecycle` prefers the extension commands when installed and keeps
+  the scripts as its fallback until then.
+- The FR-5 follow-up above (`wt` worktree-location remap) is unaffected — still an
+  opt-in convenience for interactive sessions.
