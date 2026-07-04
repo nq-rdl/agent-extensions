@@ -1,2 +1,2 @@
 kind: Added
-body: Add SpecKit-side Superpowers extension recommendation playbook (#204) — layered baseline constitution clause + opt-in superpowers-bridge (superb); cc-spex deferred per #203
+body: Record the SpecKit-side extension strategy in ADR-0001 (#204) — RDL-owned speckit extensions planned in nq-rdl/spec-kit-extensions; superb evaluated, not adopted; cc-spex deferred per #203
