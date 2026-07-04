@@ -1,3 +1,0 @@
-kind: Removed
-body: 'CI: drop the SessionStart hook-tests job from validate.yml and its lefthook pre-push mirror, after the .claude/ hooks they exercised were removed'
-time: 2026-07-04T13:20:00.0000000+10:00
