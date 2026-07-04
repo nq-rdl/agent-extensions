@@ -56,7 +56,7 @@ install — so register it alongside the curated set.
   `pr-review-toolkit`, `superpowers`, and `gopls-lsp` — not the whole set.
 
 ```jsonc
-// settings.json (excerpt)
+// ~/.claude/settings.json (excerpt)
 "extraKnownMarketplaces": {
   "svelte": { "source": { "source": "github", "repo": "sveltejs/ai-tools" }, "autoUpdate": true }
 },
