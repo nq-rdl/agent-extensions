@@ -17,7 +17,7 @@ Mark these **always-run** `validate.yml` job names as required status checks on 
 `validate.yml` is scoped to `branches: [main, 'release/*']` — that filter *includes*
 `main`, so every PR to `main` triggers the workflow. Combined with **no `paths:` filter**
 and **no job-level `if:`** on any of these jobs, each reports a pass/fail on every PR to
-`main`. (These six are what issue #221 adds; the full required set on `main` also includes
+`main`. (These five are what issue #221 adds; the full required set on `main` also includes
 the release flow's `version-monotonic` — see [below](#deliberately-not-required) — which
 is why the apply command enumerates it.)
 
@@ -27,24 +27,16 @@ is why the apply command enumerates it.)
 | `Validate skill + agent symlinks`                              | `validate-symlinks`      |
 | `Validate Claude plugin structure, hooks, and agents`          | `validate-plugins`       |
 | `Unit tests (pipeline scripts)`                                | `unit-tests`             |
-| `Test SessionStart hooks (install-deps.sh)`                    | `hook-tests`             |
 | `Validate skills against the agentskills.io spec (asctl)`      | `validate-skills`        |
 
-!!! note "`hook-tests` is required too"
-    Issue #221's proposal listed five checks as an illustrative example (*"e.g."*) and
-    omitted `hook-tests`. It is an always-run `validate.yml` gate like the others — it
-    exercises this repo's own SessionStart hooks (`.claude/scripts/install-deps.sh` and
-    `.claude/scripts/announce-capabilities.sh`) — so it belongs in the required set.
-    The rule is "**every always-run `validate.yml` job**," not "the five that were typed
-    out."
-
-!!! warning "This job's `name:` was just renamed"
-    `hook-tests`'s `name:` changed from `Test cc-web-setup SessionStart hook
-    (install-deps.sh)` to `Test SessionStart hooks (install-deps.sh)` (the
-    `cc-web-setup` skill it used to reference was removed). Required-status-check
-    bindings on `main` are matched by the exact `name:` string, not the job id — an
-    admin must update the required-check entry to the new name or the old one stays
-    "required" forever with nothing reporting under it. See
+!!! warning "`hook-tests` was removed — un-require it on `main`"
+    The `hook-tests` job (`Test SessionStart hooks (install-deps.sh)`) was deleted from
+    `validate.yml` when this repo's SessionStart hooks (`.claude/scripts/`) were removed.
+    A required check that never reports leaves every PR stuck at *"Expected — Waiting for
+    status to be reported."* An admin **must** drop `Test SessionStart hooks
+    (install-deps.sh)` from `main`'s required status checks (**Settings → Branches →
+    `main` → Edit**, or re-run the [apply command](#applying-the-setting) below, whose
+    `checks` array no longer lists it). See
     [Maintenance: names are coupled to `validate.yml`](#maintenance-names-are-coupled-to-validateyml).
 
 ## Deliberately *not* required
@@ -107,7 +99,6 @@ gh api -X PATCH \
   -f 'checks[][context]=Validate skill + agent symlinks' \
   -f 'checks[][context]=Validate Claude plugin structure, hooks, and agents' \
   -f 'checks[][context]=Unit tests (pipeline scripts)' \
-  -f 'checks[][context]=Test SessionStart hooks (install-deps.sh)' \
   -f 'checks[][context]=Validate skills against the agentskills.io spec (asctl)' \
   -f 'checks[][context]=version-monotonic'   # release-flow guard (docs/releasing.md) — omit and it is dropped
 ```
