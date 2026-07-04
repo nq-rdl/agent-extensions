@@ -1,0 +1,13 @@
+# .specify/extension-catalogs.yml — a non-empty project file takes full
+# precedence over the user-level (~/.specify) one.
+catalogs:
+  - name: "team"
+    url: "https://raw.githubusercontent.com/nq-rdl/spec-kit-extensions/main/catalog.json"
+    priority: 1
+    install_allowed: true
+    description: "Team catalog (nq-rdl/spec-kit-extensions)"
+  - name: "community"
+    url: "https://raw.githubusercontent.com/github/spec-kit/main/extensions/catalog.community.json"
+    priority: 3
+    install_allowed: false
+    description: "Community-contributed extensions (discovery only)"

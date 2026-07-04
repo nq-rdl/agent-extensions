@@ -1,0 +1,41 @@
+schema_version: "1.0"
+
+extension:
+  # CUSTOMIZE: lowercase, hyphen-separated id — the command namespace
+  id: "my-extension"
+  name: "My Extension"
+  version: "1.0.0"                       # strict X.Y.Z
+  description: "Brief description (under 200 characters)"
+  # category: "process"                  # docs|code|process|integration|visibility
+  # effect: "read-write"                 # read-only | read-write
+  author: "Your Name"
+  repository: "https://github.com/nq-rdl/spec-kit-my-extension"
+  license: "MIT"
+
+requires:
+  speckit_version: ">=0.12.0"
+  # tools:
+  #   - name: "example-mcp-server"
+  #     version: ">=1.0.0"
+  #     required: true
+
+provides:
+  commands:
+    - name: "speckit.my-extension.example"
+      file: "commands/example.md"
+      description: "Example command that demonstrates functionality"
+  config:
+    - name: "my-extension-config.yml"
+      template: "config-template.yml"
+      description: "Extension configuration"
+      required: false
+
+# hooks:                                  # bind to a workflow phase if needed
+#   after_tasks:
+#     command: "speckit.my-extension.example"
+#     optional: true
+#     prompt: "Run example command?"
+
+tags:
+  - "example"
+  - "template"

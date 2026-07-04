@@ -1,0 +1,23 @@
+schemaVersion: v1
+id: speckit-dev
+displayName: SpecKit Dev
+description: SpecKit extension toolkit — scaffold, validate, manage, and publish spec-kit extensions
+keywords: [spec-kit, speckit, extensions, sdd, specify]
+owners:
+  - rdl
+channels:
+  - stable
+skills:
+  - {source: speckit-create,   leaf: create}
+  - {source: speckit-validate, leaf: validate}
+  - {source: speckit-manage,   leaf: manage}
+  - {source: speckit-publish,  leaf: publish}
+agents: []
+hooks: []
+prompts: []
+mcp: []
+targets:
+  claude:
+    enabled: true
+    pluginName: speckit-dev
+    marketplaceName: rdl-agent-extensions

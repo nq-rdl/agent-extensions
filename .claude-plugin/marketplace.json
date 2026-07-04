@@ -300,6 +300,19 @@
       ]
     },
     {
+      "name": "speckit-dev",
+      "source": "./plugins/speckit-dev",
+      "description": "SpecKit extension toolkit — scaffold, validate, manage, and publish spec-kit extensions",
+      "version": "0.22.1",
+      "keywords": [
+        "spec-kit",
+        "speckit",
+        "extensions",
+        "sdd",
+        "specify"
+      ]
+    },
+    {
       "name": "rdl-team",
       "source": "./plugins/rdl-team",
       "description": "RDL team workflows — Claude Code onboarding, setup, and config management",

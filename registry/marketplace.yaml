@@ -45,6 +45,7 @@ order:
   - charm-tui
   - claude-code
   - opencode-dev
+  - speckit-dev
   - rdl-team
   - playwright
   - planning
