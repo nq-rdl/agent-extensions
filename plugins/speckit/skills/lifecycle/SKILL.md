@@ -80,13 +80,18 @@ only provisioned specs (branch + worktree exist) and completed specs recorded in
    CLI (e.g. `uvx … specify init`) — never automatically, never vendoring your own
    templates — and error clearly only if the bootstrap is declined or the CLI is unavailable.
 2. **Offer the routing baseline** (first setup in a repo): if `constitution.md` /
-   `CLAUDE.md` lack SpecKit⇄Superpowers routing, offer the setup playbooks from this
-   skill's source repo (`metadata.repo`, under `docs/playbooks/`):
-   `speckit-constitution-routing.md` — the constitution clause + `CLAUDE.md` routing
-   block — then optionally `speckit-superpowers-extension.md` — opt-in `superb`
-   enforcement gates. Apply only on consent; never edit `constitution.md`/`CLAUDE.md` unasked.
+   `CLAUDE.md` lack SpecKit⇄Superpowers routing, offer it. Probe the repo's registered
+   extension catalogs first — when the **rdl-routing** extension is available
+   (`nq-rdl/spec-kit-extensions` via the RDL catalog), offer
+   `specify extension add rdl-routing`; otherwise fall back to the copy-paste playbook in
+   this skill's source repo (`metadata.repo`,
+   `docs/playbooks/speckit-constitution-routing.md`) — the constitution clause +
+   `CLAUDE.md` routing block. Apply only on consent; never edit
+   `constitution.md`/`CLAUDE.md` unasked.
 3. Run `scripts/provision-worktree.sh <slug> [--base <branch>]` — cut from trunk, or
    pass `--base` to group the spec with related work on an existing integration branch.
+   (When the repo has the **rdl-worktree** extension installed, prefer its provision
+   command — see *Extension migration* below.)
 4. Invoke `/speckit-specify` **inside the worktree**. All planning phases run in the
    worktree — trunk never holds partial artifacts.
 5. Report the worktree path and the `claude --worktree .claude/worktrees/NNN` invocation.
@@ -98,7 +103,9 @@ to archive the spec's decision points as an ADR (delegate to the
 `architecture-decision-records` skill or the `adr-generator` agent) — the ADR in
 `docs/adr/` is what survives on trunk.
 
-Then run `scripts/merge-spec.sh <NNN>`. The merge target is resolved from git topology.
+Then run `scripts/merge-spec.sh <NNN>` (or, when the repo has the **rdl-worktree** /
+**rdl-adr** extensions installed, prefer their merge + `speckit.adr.finalize` commands —
+see *Extension migration* below). The merge target is resolved from git topology.
 On a **trunk** merge the spec is ephemeral: `merge-spec.sh` strips `specs/NNN-slug/`
 (its decisions now live in `docs/adr/`), keeping trunk clean. On an **integration-branch**
 merge the spec is retained (work continues under the integration branch). `NNN` is never
@@ -170,6 +177,14 @@ and falls back to bare git if absent.
 Compatibility: SpecKit `.specify/` project layout; speckit phase skills
 `speckit-{specify,clarify,plan,tasks,checklist,analyze}`. Run `bats .tests/` after
 changing either script.
+
+**Extension migration (epic #207 re-architecture).** These mechanics are migrating
+speckit-side to RDL-owned extensions in `nq-rdl/spec-kit-extensions`, so any agent or a
+human can run them without this skill: **rdl-worktree** (provision/merge, wrapping these
+scripts' semantics) and **rdl-adr** (`speckit.adr.finalize` — spec→ADR archive + the
+ephemeral strip). Probe the repo at runtime: when those extension commands are installed,
+prefer them and treat the bundled scripts as the fallback; until they ship, the scripts
+remain canonical. This skill keeps only discovery + delegation either way.
 
 **Verify canonical:** SpecKit conventions evolve — when a phase command, a `.specify/`
 path, or a `create-new-feature.sh` flag would change behavior and being wrong would
