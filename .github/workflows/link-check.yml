@@ -4,6 +4,7 @@ on:
   pull_request:
     paths:
       - skills/**/*.md
+      - skills/**/*.rst
 
 permissions:
   contents: read
@@ -21,4 +22,4 @@ jobs:
           installOnly: true
 
       - name: Check skill links
-        run: bash skills/lychee/scripts/check-links.sh 'skills/**/*.md'
+        run: bash skills/lychee/scripts/check-links.sh 'skills/**/*.md' 'skills/**/*.rst'
