@@ -1,0 +1,4 @@
+# gitignore-syntax; excludes dev-only files from `specify extension add`.
+tests/
+.github/
+*.log

@@ -38,6 +38,9 @@ exclude = [
   "^mailto:",
   # Private GitHub repositories
   # "^https://github\\.com/your-org/"  # add org-specific exclusions here
+  # Team spec-kit catalog (may be private) — referenced by speckit-dev skills/hook
+  "^https://github\\.com/nq-rdl/spec-kit-extensions",
+  "^https://raw\\.githubusercontent\\.com/nq-rdl/spec-kit-extensions",
   # Exclude conventional commits due to rate limiting / connection reset in CI
   "^https://www\\.conventionalcommits\\.org/",
   "^https?://icons\\.getbootstrap\\.com",

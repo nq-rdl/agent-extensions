@@ -1,0 +1,16 @@
+{
+  "description": "Nudge the publish target (team catalog nq-rdl/spec-kit-extensions) when publishing a spec-kit extension with speckit-dev (UserPromptSubmit, fires only on spec-kit + publish markers)",
+  "hooks": {
+    "UserPromptSubmit": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "${CLAUDE_PLUGIN_ROOT}/scripts/speckit-publish-target.sh",
+            "timeout": 15
+          }
+        ]
+      }
+    ]
+  }
+}
