@@ -13,7 +13,7 @@ skills:
   - {source: speckit-manage,   leaf: manage}
   - {source: speckit-publish,  leaf: publish}
 agents: []
-hooks: []
+hooks: [speckit-publish-target]
 prompts: []
 mcp: []
 targets:
