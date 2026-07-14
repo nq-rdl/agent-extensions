@@ -1,6 +1,6 @@
 {
   "name": "gh",
-  "version": "0.23.0",
+  "version": "0.23.1",
   "description": "GitHub workflow — git hooks, changelogs, conventional commits, pull requests, releases, Go CI/CD, and secure GitHub Actions (SHA pinning, OIDC, GitOps delivery)",
   "author": {
     "name": "nq-rdl"
