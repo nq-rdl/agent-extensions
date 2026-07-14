@@ -295,7 +295,7 @@ pixi run zensical serve   # live-reload preview at http://localhost:8000
 pixi run zensical build   # build the static site into ./site
 ```
 
-The task forwards any subcommand and flags to Zensical (`pixi run zensical <cmd> …`). The `docs` environment is linux-64 only; on macOS install Zensical separately (`uv tool install zensical` or `pip install zensical`) and run `zensical` directly.
+The task forwards any subcommand and flags to Zensical (`pixi run zensical <cmd> …`). The `docs` environment is linux-64 only; on macOS either use the dedicated **Zensical Docs** dev container (`.devcontainer/docs/` — pinned to `linux/amd64`, forwards port 8000; see its `README.md`) or install Zensical separately (`uv tool install zensical` or `pip install zensical`) and run `zensical` directly.
 
 ## Platform Notes
 
