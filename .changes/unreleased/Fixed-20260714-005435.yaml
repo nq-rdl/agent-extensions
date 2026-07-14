@@ -1,0 +1,3 @@
+kind: Fixed
+body: 'lychee link-check: include_fragments was a bare bool, invalid for lychee v0.24''s string-enum schema; set to a valid string so config parsing succeeds again'
+time: 2026-07-14T00:54:41.0000000+00:00
