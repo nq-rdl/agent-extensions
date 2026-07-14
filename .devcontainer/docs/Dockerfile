@@ -2,14 +2,17 @@
 #
 # The repo's `docs` pixi environment solves only for `linux-64` — Zensical has
 # no macOS or aarch64 conda build (see pixi.lock: only conda-forge/linux-64).
-# The build/run platform is therefore pinned to linux/amd64 in devcontainer.json
-# so the pinned `docs` env resolves; on an Apple Silicon host this runs under
-# Docker's amd64 emulation, which is fine for a preview server.
+# The platform is therefore pinned to linux/amd64 so the `docs` env resolves; on
+# an Apple Silicon host this runs under Docker's amd64 emulation, which is fine
+# for a preview server. The pin is enforced in three layers so it can't be
+# silently dropped: this FROM flag (build-time, honored regardless of how the
+# Dev Containers CLI invokes docker build), `build.options` (the documented
+# devcontainer.json way to pass docker-build flags), and `runArgs` (docker run).
 #
 # This is intentionally lightweight: no iptables firewall (unlike the
 # marketplace sandbox in ../Dockerfile) — a docs preview box needs open
 # outbound to fetch conda/PyPI packages, not the locked-down sandbox.
-FROM node:20-slim
+FROM --platform=linux/amd64 node:20-slim
 
 ARG TZ=America/Los_Angeles
 ENV TZ="$TZ"

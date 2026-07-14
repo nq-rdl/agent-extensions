@@ -3,7 +3,9 @@
   "build": {
     "dockerfile": "Dockerfile",
     // Pin build to linux/amd64: the `docs` pixi env solves only for linux-64
-    // (Zensical has no macOS/aarch64 conda build). See the Dockerfile header.
+    // (Zensical has no macOS/aarch64 conda build). `build.options` is the
+    // documented devcontainer.json way to pass flags to `docker build`; the
+    // Dockerfile's `FROM --platform` backs this up so the pin can't be dropped.
     "options": [
       "--platform=linux/amd64"
     ],
