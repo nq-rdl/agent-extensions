@@ -192,7 +192,7 @@ MCP servers in `mcp/*-go/` follow a Makefile with a `cross-compile` target that 
 
 ### Python / pixi
 
-`pixi` is optional — its only role here is a reproducible docs environment (`zensical`) on linux-64. The `pixi.lock` is linux-64 only; macOS contributors use `uv`. Python skill `ensure-deps.sh` scripts walk `pixi > uv > mamba > conda > pip`, so they work without pixi.
+`pixi` provides the repo's reproducible Python environments — the default (`python` + `pyyaml`) for the registry/pipeline scripts, and `docs` (`zensical`, linux-64 only) for building the docs site via the `zensical` pixi task (`pixi run zensical serve` / `pixi run zensical build`). It stays optional, though: the `pixi.lock` is linux-64 only, macOS contributors use `uv`, and Python skill `ensure-deps.sh` scripts walk `pixi > uv > mamba > conda > pip`, so they work without pixi.
 
 ## CI and release design
 

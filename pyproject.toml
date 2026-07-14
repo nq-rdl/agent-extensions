@@ -28,5 +28,14 @@ platforms = ["linux-64"]
 [tool.pixi.feature.docs.dependencies]
 zensical = ">=0.0.31,<0.0.32"
 
+# Drive Zensical for local docs review. Zensical lives only in the linux-64
+# `docs` environment, so a plain `pixi install` (default env) does not carry
+# it. These tasks are defined on the `docs` feature, so `pixi run zensical …`
+# auto-selects the docs environment (and provisions it on first run) — no
+# `-e docs` needed. Extra args are forwarded, so `pixi run zensical serve`,
+# `pixi run zensical build`, etc. all work.
+[tool.pixi.feature.docs.tasks]
+zensical = "zensical"
+
 [tool.pixi.environments]
 docs = ["docs"]
