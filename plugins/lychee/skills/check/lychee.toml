@@ -41,6 +41,8 @@ exclude = [
   # Team spec-kit catalog (may be private) — referenced by speckit-dev skills/hook
   "^https://github\\.com/nq-rdl/spec-kit-extensions",
   "^https://raw\\.githubusercontent\\.com/nq-rdl/spec-kit-extensions",
+  # RDL Service Desk (access-controlled) — referenced by the new-service-request skill
+  "^https://github\\.com/rdl-service-desk/service-desk",
   # Exclude conventional commits due to rate limiting / connection reset in CI
   "^https://www\\.conventionalcommits\\.org/",
   "^https?://icons\\.getbootstrap\\.com",
