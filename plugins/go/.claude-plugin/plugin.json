@@ -1,6 +1,6 @@
 {
   "name": "go",
-  "version": "0.22.1",
+  "version": "0.23.0",
   "description": "Go — idiomatic naming and secure error handling",
   "author": {
     "name": "nq-rdl"
