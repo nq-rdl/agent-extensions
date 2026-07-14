@@ -1,6 +1,6 @@
 {
   "name": "sops",
-  "version": "0.23.0",
+  "version": "0.24.0",
   "description": "SOPS — encrypt and decrypt secrets with Age and Vault transit",
   "author": {
     "name": "nq-rdl"
