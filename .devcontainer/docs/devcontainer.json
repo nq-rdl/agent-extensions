@@ -1,0 +1,54 @@
+{
+  "name": "Zensical Docs",
+  "build": {
+    "dockerfile": "Dockerfile",
+    // Pin build to linux/amd64: the `docs` pixi env solves only for linux-64
+    // (Zensical has no macOS/aarch64 conda build). See the Dockerfile header.
+    "options": [
+      "--platform=linux/amd64"
+    ],
+    "args": {
+      "TZ": "${localEnv:TZ:America/Los_Angeles}",
+      "CLAUDE_CODE_VERSION": "latest"
+    }
+  },
+  // Run under amd64 too (emulated on Apple Silicon) so it matches the image.
+  "runArgs": [
+    "--platform=linux/amd64"
+  ],
+  "workspaceFolder": "/workspace",
+  "workspaceMount": "source=${localWorkspaceFolder},target=/workspace,type=bind,consistency=delegated",
+  "remoteUser": "node",
+  // Sync the container `node` user to the host uid/gid so bind-mount writes
+  // work regardless of the host uid.
+  "updateRemoteUserUID": true,
+  // Zensical's dev server listens on 8000; forward it and pop the browser.
+  "forwardPorts": [
+    8000
+  ],
+  "portsAttributes": {
+    "8000": {
+      "label": "Zensical docs preview",
+      "onAutoForward": "openBrowser"
+    }
+  },
+  "containerEnv": {
+    "CLAUDE_CONFIG_DIR": "/home/node/.claude"
+  },
+  // Persist Claude Code login across rebuilds.
+  "mounts": [
+    "source=zensical-docs-claude-config-${devcontainerId},target=/home/node/.claude,type=volume"
+  ],
+  "customizations": {
+    "vscode": {
+      "extensions": [
+        "anthropic.claude-code",
+        "yzhang.markdown-all-in-one",
+        "tamasfe.even-better-toml"
+      ]
+    }
+  },
+  // Provision the docs env once on create so `pixi run zensical serve` is
+  // ready immediately when you open a terminal.
+  "postCreateCommand": "pixi install -e docs"
+}

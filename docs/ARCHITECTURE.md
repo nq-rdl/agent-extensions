@@ -192,7 +192,7 @@ MCP servers in `mcp/*-go/` follow a Makefile with a `cross-compile` target that 
 
 ### Python / pixi
 
-`pixi` provides the repo's reproducible Python environments — the default (`python` + `pyyaml`, solved for `linux-64`/`osx-64`/`osx-arm64`) runs the registry/pipeline scripts, and `docs` (`zensical`) builds the docs site via the `zensical` pixi task (`pixi run zensical serve` / `pixi run zensical build`). It stays optional, though: the `docs` environment is `linux-64` only, so macOS contributors build docs with `uv`/`pip` instead, and Python skill `ensure-deps.sh` scripts walk `pixi > uv > mamba > conda > pip`, so they work without pixi.
+`pixi` provides the repo's reproducible Python environments — the default (`python` + `pyyaml`, solved for `linux-64`/`osx-64`/`osx-arm64`) runs the registry/pipeline scripts, and `docs` (`zensical`) builds the docs site via the `zensical` pixi task (`pixi run zensical serve` / `pixi run zensical build`). It stays optional, though: the `docs` environment is `linux-64` only, so macOS contributors build docs either in the dedicated **Zensical Docs** dev container (`.devcontainer/docs/`, pinned to `linux/amd64` so the `linux-64` env resolves) or with `uv`/`pip` directly, and Python skill `ensure-deps.sh` scripts walk `pixi > uv > mamba > conda > pip`, so they work without pixi.
 
 ## CI and release design
 
