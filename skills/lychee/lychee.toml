@@ -6,8 +6,8 @@
 # Cache results to .lycheecache to avoid re-checking on repeated runs
 cache = true
 
-# Include fragment checking (e.g., #section-name anchors)
-include_fragments = true
+# Check intra-document anchor fragments (#section-name); v0.24 needs a string mode, not a boolean
+include_fragments = "anchor-only"
 
 # Max concurrent requests — throttle to avoid rate limiting
 max_concurrency = 32

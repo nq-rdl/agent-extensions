@@ -5,6 +5,9 @@
 # generated output
 dist/
 
+# lychee link-checker cache (config sets cache = true; local runs / lefthook write it)
+.lycheecache
+
 # Node.js dependencies
 node_modules/
 
