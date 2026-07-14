@@ -5,6 +5,9 @@
 # generated output
 dist/
 
+# Zensical local build output (`pixi run zensical build`)
+site/
+
 # lychee link-checker cache (config sets cache = true; local runs / lefthook write it)
 .lycheecache
 

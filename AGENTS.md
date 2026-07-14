@@ -286,7 +286,16 @@ recovers a tag-pushed-but-release-missing partial failure).
 
 ## Docs
 
-The docs site uses Zensical (configured in `zensical.toml`), provided by the pixi `docs` environment (linux-64 only — `pixi run -e docs …`). Source is `docs/`. Architecture decisions live in `docs/ARCHITECTURE.md`.
+The docs site uses Zensical (configured in `zensical.toml`), provided by the pixi `docs` environment (linux-64 only). Source is `docs/`. Architecture decisions live in `docs/ARCHITECTURE.md`.
+
+Review the docs locally with the `zensical` pixi task — it runs Zensical from the `docs` environment and provisions it on first run, so no `-e docs` flag is needed:
+
+```bash
+pixi run zensical serve   # live-reload preview at http://localhost:8000
+pixi run zensical build   # build the static site into ./site
+```
+
+The task forwards any subcommand and flags to Zensical (`pixi run zensical <cmd> …`). The `docs` environment is linux-64 only; on macOS install Zensical separately (`uv tool install zensical` or `pip install zensical`) and run `zensical` directly.
 
 ## Platform Notes
 
