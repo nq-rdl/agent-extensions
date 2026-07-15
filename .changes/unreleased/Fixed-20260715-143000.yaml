@@ -1,3 +1,0 @@
-kind: Fixed
-body: Rewrite the new-service-request skill to create the issue with gh — it told users to run a `new_service_request` command that does not exist
-time: '2026-07-15T14:30:00+00:00'

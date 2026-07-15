@@ -1,6 +1,6 @@
 {
   "name": "argo-cd",
-  "version": "0.24.0",
+  "version": "0.25.0",
   "description": "Argo CD — GitOps application management and sync for Kubernetes",
   "author": {
     "name": "nq-rdl"

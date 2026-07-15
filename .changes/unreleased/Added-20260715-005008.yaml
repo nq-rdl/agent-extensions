@@ -1,3 +1,0 @@
-kind: Added
-body: Wire the new exposure check as a strict CI gate in validate.yml and a non-blocking pre-commit reminder in lefthook.yml
-time: '2026-07-15T00:50:08+00:00'
