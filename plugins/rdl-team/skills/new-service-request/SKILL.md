@@ -5,7 +5,8 @@ description: >-
   GitHub issues for the RDL Service Desk repository with data request, enquiry,
   or ICT request templates.
 compatibility: >-
-  Requires access to the rdl-service-desk/service-desk GitHub repository.
+  Requires write access to the private rdl-service-desk/service-desk repository,
+  via either the GitHub MCP server or an authenticated GitHub CLI (`gh`).
 metadata:
   repo: https://github.com/nq-rdl/agent-extensions
 ---
@@ -25,27 +26,58 @@ When it is invoked (e.g. `/rdl-team:new-service-request`), **you** create the
 issue using whatever GitHub tooling is available in the session, preferring:
 
 1. the **GitHub MCP server**'s create-issue tool, or
-2. the **`gh` CLI**:
-   `gh issue create --repo rdl-service-desk/service-desk --template <name> ...`.
+2. the **`gh` CLI** (worked command below).
 
 First confirm you can reach `rdl-service-desk/service-desk` (see *Compatibility*
 above). If you cannot, tell the user what access is missing instead of
 guessing.
+
+## Available templates
+
+| Template | Label | Source | Fields |
+|---|---|---|---|
+| data-request | `data-request` | `data_request_template.md` | Project title, Approval ID, Workflow Checklist |
+| enquiry | `enquiry` | `enquiry_template.md` | Overview, Priority |
+| ict | `ICT` | `ict_request_template.md` | Overview, Priority |
+
+Labels are case-sensitive: `ICT` is uppercase, the other two are not.
 
 ## Workflow
 
 1. **Ask which template** the request uses — `data-request`, `enquiry`, or
    `ict` (1, 2, or 3).
 2. **Ask for the issue number** — the user must supply this; never invent one.
+   It is allocated outside this repository, so it cannot be derived or guessed.
 3. **Collect the template's required fields** (see *Template details* below).
-4. **Create the issue** in `rdl-service-desk/service-desk` from that template,
-   and **assign it to the requesting user**.
+4. **Create the issue** in `rdl-service-desk/service-desk`, and **assign it to
+   the requesting user**.
 5. **Return the new issue's URL** so the user can confirm it.
 
-**Title convention:** match the prefix the service-desk repo already uses for
-the chosen template — e.g. an enquiry with issue number `1181` is titled
-`THHSRDLENQ-1181`. If you are unsure of the prefix for a template, check an
-existing issue of that type in the repo rather than assuming one.
+**Title convention:** the issue number prefixed with `THHSRDLENQ-`, uniform
+across all three templates — issue number `1181` becomes the title
+`THHSRDLENQ-1181`.
+
+```bash
+gh issue create \
+  --repo rdl-service-desk/service-desk \
+  --title "THHSRDLENQ-1181" \
+  --label enquiry \
+  --assignee @me \
+  --body "$(cat <<'EOF'
+## Overview
+
+Data management review
+
+## Priority
+
+medium
+EOF
+)"
+```
+
+The body must use the template's `##` headings verbatim — the repo's
+`.github/ISSUE_TEMPLATE/*.md` files are the source of truth, so read the
+relevant one first if you need to confirm the current headings.
 
 ## Template details
 

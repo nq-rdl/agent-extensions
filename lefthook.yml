@@ -63,7 +63,7 @@ pre-commit:
     #     exits 0 (non-blocking); CI's strict `check_exposure.py .` is the hard
     #     gate (validate.yml).
     - name: exposure-reminder
-      glob: "{skills/**,agents/**,hooks/**,mcp/**,registry/bundles/**}"
+      glob: "{skills/**,agents/**,hooks/**,mcp/**,registry/bundles/**,registry/unbundled.yaml}"
       run: pixi run python3 scripts/check_exposure.py . --warn
 
     # --- Changie fragment length. Each staged unreleased fragment's body must
