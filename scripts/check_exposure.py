@@ -38,6 +38,16 @@ from _registry import normalize_member
 
 KINDS = ("skill", "agent", "hook", "mcp", "prompt")
 
+# The bundle-YAML list key for each kind. Note `mcp` does NOT pluralise — the
+# bundle key is `mcp:`, not `mcps:` — so messages must not naively append "s".
+KIND_TO_BUNDLE_KEY = {
+    "skill": "skills",
+    "agent": "agents",
+    "hook": "hooks",
+    "mcp": "mcp",
+    "prompt": "prompts",
+}
+
 
 @dataclass(frozen=True)
 class Orphan:
@@ -64,6 +74,12 @@ def collect_bundle_refs(repo) -> dict[str, set[str]]:
     for bundle_file in bundle_files:
         with bundle_file.open() as fh:
             data = yaml.safe_load(fh) or {}
+        # A bundle whose Claude target is explicitly disabled ships nothing, so a
+        # reference from it does not make an artifact "exposed" (mirrors
+        # check_consistency.py, which reconciles only enabled Claude targets).
+        claude = (data.get("targets") or {}).get("claude") or {}
+        if claude.get("enabled") is False:
+            continue
         for member in data.get("skills") or []:
             try:
                 source, _leaf = normalize_member(member)
@@ -241,7 +257,7 @@ def main(argv=None) -> int:
             print(
                 f"hint: {o.name} ({o.kind}) is authored under {o.path} but no bundle "
                 "references it yet — add it to a registry/bundles/*.yaml "
-                f"{o.kind}s list, or to registry/unbundled.yaml with a reason.",
+                f"`{KIND_TO_BUNDLE_KEY[o.kind]}:` list, or to registry/unbundled.yaml with a reason.",
                 file=sys.stderr,
             )
         for msg in allowlist_problems:
@@ -252,7 +268,7 @@ def main(argv=None) -> int:
         print(
             f"::error file={o.path}::{o.name} ({o.kind}) is authored under {o.path} "
             f"but no bundle references it — add it to a registry/bundles/*.yaml "
-            f"{o.kind}s list, or to registry/unbundled.yaml with a reason.",
+            f"`{KIND_TO_BUNDLE_KEY[o.kind]}:` list, or to registry/unbundled.yaml with a reason.",
             file=sys.stderr,
         )
     for msg in allowlist_problems:

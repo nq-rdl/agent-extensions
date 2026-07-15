@@ -80,6 +80,39 @@ class TestUnreferencedSkills(unittest.TestCase):
             self.assertEqual(check_exposure.find_unexposed(repo), [])
 
 
+class TestDisabledBundles(unittest.TestCase):
+    def test_ref_from_disabled_bundle_does_not_expose(self):
+        # A bundle with targets.claude.enabled: false ships nothing, so a skill
+        # referenced only by it is still an orphan.
+        with tempfile.TemporaryDirectory() as tmp:
+            repo = make_repo(
+                tmp,
+                skills=["shipped-nowhere"],
+                bundles={
+                    "off": (
+                        "id: off\nskills:\n  - shipped-nowhere\n"
+                        "targets:\n  claude:\n    enabled: false\n"
+                    )
+                },
+            )
+            orphans = check_exposure.find_unexposed(repo)
+            self.assertEqual([o.name for o in orphans], ["shipped-nowhere"])
+
+    def test_ref_from_enabled_bundle_exposes(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            repo = make_repo(
+                tmp,
+                skills=["shipped"],
+                bundles={
+                    "on": (
+                        "id: on\nskills:\n  - shipped\n"
+                        "targets:\n  claude:\n    enabled: true\n"
+                    )
+                },
+            )
+            self.assertEqual(check_exposure.find_unexposed(repo), [])
+
+
 class TestUnreferencedAgents(unittest.TestCase):
     def test_flags_orphan_agent(self):
         with tempfile.TemporaryDirectory() as tmp:
@@ -239,6 +272,19 @@ class TestCli(unittest.TestCase):
             self.assertEqual(rc, 0)
             self.assertIn("orphan-skill", err.getvalue())
             self.assertIn("hint:", err.getvalue())
+
+    def test_mcp_orphan_message_uses_correct_bundle_key(self):
+        # The bundle key for mcp is `mcp:`, not the naive plural `mcps:`.
+        with tempfile.TemporaryDirectory() as tmp:
+            repo = make_repo(tmp)
+            (Path(repo) / "mcp" / "some-server").mkdir(parents=True)
+            err = io.StringIO()
+            with redirect_stderr(err):
+                rc = check_exposure.main([str(repo)])
+            self.assertEqual(rc, 1)
+            out = err.getvalue()
+            self.assertIn("`mcp:`", out)
+            self.assertNotIn("mcps", out)
 
 
 if __name__ == "__main__":
