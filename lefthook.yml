@@ -58,6 +58,14 @@ pre-commit:
         pixi run python3 scripts/generate_manifests.py . --check
         pixi run python3 scripts/generate_bundles_doc.py . --check
 
+    # --- Reverse-exposure reminder. Just a nudge: a new skill/agent/hook/mcp
+    #     that no bundle references yet is easy to miss locally. --warn always
+    #     exits 0 (non-blocking); CI's strict `check_exposure.py .` is the hard
+    #     gate (validate.yml).
+    - name: exposure-reminder
+      glob: "{skills/**,agents/**,hooks/**,mcp/**,registry/bundles/**,registry/unbundled.yaml}"
+      run: pixi run python3 scripts/check_exposure.py . --warn
+
     # --- Changie fragment length. Each staged unreleased fragment's body must
     #     stay under the per-fragment cap (default 200; CHANGIE_MAX_BODY_LENGTH
     #     overrides). Changie's own body.maxLength guards `changie new`; this

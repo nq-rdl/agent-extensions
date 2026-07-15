@@ -186,7 +186,9 @@ References: Biggs, *You're Probably Using Agent Skills Wrong*; SkillsBench (arXi
 
 A new skill authored under `skills/<name>/` is **not installable until you map it into a bundle**
 — authoring the `SKILL.md` only adds it to the flat library; the registry decides which plugin
-(subject) it belongs to. Here is the full loop, using a hypothetical `sql-review-analyse` skill
+(subject) it belongs to. CI enforces this: `scripts/check_exposure.py` fails if a canonical
+skill/agent/hook isn't referenced by any `registry/bundles/*.yaml` (or explicitly allowlisted in
+`registry/unbundled.yaml`). Here is the full loop, using a hypothetical `sql-review-analyse` skill
 that should become `sql-review:analyse`:
 
 1. **Pick the subject and facet** (the rules above). Subject → the plugin (`sql-review`); facet →
@@ -213,6 +215,7 @@ that should become `sql-review:analyse`:
 6. **Validate** exactly what CI will:
    ```bash
    pixi run python3 scripts/check_bundle_refs.py .   && \
+   pixi run python3 scripts/check_exposure.py .      && \
    pixi run python3 scripts/check_grouping.py .      && \
    pixi run python3 scripts/generate_manifests.py . --check && \
    pixi run python3 scripts/generate_bundles_doc.py . --check && \

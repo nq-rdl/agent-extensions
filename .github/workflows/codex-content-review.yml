@@ -1,0 +1,158 @@
+# Codex Content Review
+#
+# WHAT THIS DOES: an LLM "plausibility" reviewer (openai/codex-action running
+# GPT) that catches semantic errors static validation can't. Static checks
+# (asctl repo-check, check_bundle_refs.py, check_grouping.py,
+# check_consistency.py, validate-plugins.sh, generate_manifests.py --check,
+# ...) verify structure and that cross-references resolve, but none of them
+# can tell that a skill's prose instructs running a `new_service_request`
+# command/binary/file that ships nowhere in the repo. This workflow asks
+# Codex to read the skills/, agents/, hooks/, mcp/, and — MOST IMPORTANTLY —
+# plugins/<bundle>/ files changed in a PR and flag claims that are impossible
+# or inconsistent with what the repo actually ships, weighting the installed
+# plugins/<bundle>/ trees highest since that's what users install and run.
+# It posts its findings as a single PR comment.
+#
+# INFORMATIONAL / NON-GATING: like skillspector.yml, this check is advisory
+# only — it never fails the job (see the continue-on-error / no-op steps
+# below) and MUST stay OUT of the branch-protection required-checks list on
+# `main` (see CLAUDE.md's "Required status checks on main" note). Its purpose
+# is to give reviewers a second opinion, not to block merges.
+#
+# PREREQUISITES (both optional — the workflow no-ops cleanly, staying green,
+# until they're configured):
+#   - Repo secret `OPENAI_API_KEY`: an OpenAI API key with access to the
+#     configured model. Not yet configured as of writing; until it is, the
+#     "Check for OPENAI_API_KEY" step below detects its absence and every
+#     downstream step is skipped as a deliberate no-op.
+#   - Repo variable `CODEX_REVIEW_MODEL` (optional): overrides the default
+#     model (`gpt-5.6-terra`) without editing this file.
+
+name: Codex Content Review
+
+on:
+  pull_request:
+    paths:
+      - skills/**
+      - agents/**
+      - hooks/**
+      - mcp/**
+      - plugins/**
+
+permissions:
+  contents: read
+  pull-requests: write
+
+concurrency:
+  group: codex-content-review-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  review:
+    name: Codex plausibility review
+    runs-on: ubuntu-latest
+    # Fork PRs can't read repo secrets (the GITHUB_TOKEN they get is
+    # read-only and OPENAI_API_KEY isn't shared with fork runs at all), so
+    # skip them outright rather than let the codex step fail there.
+    if: github.event.pull_request.head.repo.full_name == github.repository
+    steps:
+      - name: Check out PR (full history, for base-ref diffing)
+        uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd # v5.0.1
+        with:
+          fetch-depth: 0
+
+      # Secret-gated no-op: OPENAI_API_KEY is not yet configured in this
+      # repo, and this workflow must land (and stay green) before it is.
+      # Never print the secret itself — only whether it's present.
+      - name: Check for OPENAI_API_KEY
+        id: key
+        run: echo "present=${{ secrets.OPENAI_API_KEY != '' }}" >> "$GITHUB_OUTPUT"
+
+      - name: Skip (no-op)
+        if: steps.key.outputs.present != 'true'
+        run: echo "OPENAI_API_KEY not set; skipping (no-op)"
+
+      - name: Run Codex plausibility review
+        id: codex
+        if: steps.key.outputs.present == 'true'
+        continue-on-error: true # informational — a Codex/API failure must not gate the PR
+        uses: openai/codex-action@52fe01ec70a42f454c9d2ebd47598f9fd6893d56 # v1.11
+        with:
+          openai-api-key: ${{ secrets.OPENAI_API_KEY }}
+          model: ${{ vars.CODEX_REVIEW_MODEL || 'gpt-5.6-terra' }}
+          effort: high
+          permission-profile: ":read-only" # read-only enforced via the profile (leading colon = built-in)
+          # Keep the default drop-sudo, NOT safety-strategy: read-only — the
+          # read-only strategy forces the legacy sandbox, which per the action's
+          # README cannot be combined with a permission-profile (the codex step
+          # would error and, being continue-on-error, silently post nothing).
+          safety-strategy: drop-sudo
+          prompt: |
+            You are reviewing a pull request in a Claude Code plugin
+            marketplace repo. Static validation already runs elsewhere in CI
+            (schema/reference checks, generated-manifest drift, plugin-tree
+            byte-for-byte sync with canonical skills/ and agents/). Your job
+            is different: catch semantic "plausibility" errors that static
+            checks cannot, e.g. a skill whose prose instructs running a
+            `new_service_request` command/binary/file that ships nowhere in
+            the repo.
+
+            Step 1 — scope. Determine the files changed in this PR with:
+              git diff --name-only origin/${{ github.base_ref }}...HEAD
+            From that list, keep only paths under skills/, agents/, hooks/,
+            mcp/, and plugins/. Review ONLY those changed files. Ignore any
+            other changed files and anything unchanged.
+
+            Step 2 — check each changed file for claims that are IMPOSSIBLE
+            OR INCONSISTENT WITH THE REPO:
+              (a) Instructions to run a command, binary, script, or file
+                  that exists nowhere in the repo (e.g. a tool name like
+                  `new_service_request` invented by the prose but never
+                  shipped anywhere in the tree).
+              (b) Instructions that contradict the files actually shipped
+                  under plugins/<bundle>/ — weight the plugin trees
+                  HIGHEST, since that is exactly what users install and
+                  run. If a changed skill or agent claims a script,
+                  template, or asset ships alongside it, verify that file
+                  is actually present in the corresponding
+                  plugins/<bundle>/... copy, not only in the canonical
+                  skills/ or agents/ source.
+              (c) A hook or MCP config/manifest referencing a path, tool,
+                  or asset it does not itself ship (e.g. a hooks/*.sh
+                  script invoking a binary not present in the repo, or an
+                  .mcp.json wiring a command/URL that doesn't exist).
+
+            Step 3 — report. For each finding, give:
+              - file:line
+              - the exact impossible or inconsistent claim (quote it)
+              - why it is impossible or inconsistent (what you checked and
+                did not find)
+
+            If you find no such issues, output EXACTLY the following line
+            and nothing else:
+            No plausibility issues found.
+
+            This is a report-only review: make no file changes, run no
+            destructive commands, and do not attempt to fix anything you
+            find.
+
+      - name: Post review as PR comment
+        if: steps.key.outputs.present == 'true'
+        continue-on-error: true # informational — a comment-post failure must not gate the PR
+        uses: actions/github-script@f28e40c7f34bde8b3046d885e986cb6290c5673b # v7.1.0
+        env:
+          REVIEW_BODY: ${{ steps.codex.outputs.final-message }}
+        with:
+          script: |
+            const raw = (process.env.REVIEW_BODY || '').trim();
+            const body = raw.length > 0
+              ? raw
+              : '_Codex produced no output for this run._';
+            await github.rest.issues.createComment({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: context.issue.number,
+              body:
+                '### Codex content review (informational — non-gating)\n\n' +
+                body,
+            });

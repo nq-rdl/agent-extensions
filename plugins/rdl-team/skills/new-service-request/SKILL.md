@@ -1,5 +1,4 @@
 ---
-name: new-service-request
 license: CC-BY-4.0
 description: >-
   Create a new service desk issue from available templates. Use when creating

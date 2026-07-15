@@ -146,6 +146,7 @@ pixi run python3 scripts/generate_bundles_doc.py . --check  # CI gate: fail on d
 
 # Bundle reference + grouping + three-way consistency checks (also run by validate.yml)
 pixi run python3 scripts/check_bundle_refs.py .   # registry refs resolve to skills/ & agents/
+pixi run python3 scripts/check_exposure.py .      # every canonical skill/agent/hook/mcp is exposed by >=1 bundle (strict); add --warn for a non-blocking reminder
 pixi run python3 scripts/check_grouping.py .      # grouping contract: valid member shape, unique leaf + pluginName
 pixi run python3 scripts/check_consistency.py .   # bundle <-> marketplace.json <-> plugins/ agree
 
@@ -164,6 +165,7 @@ CI runs `validate.yml` on every PR/push to main. It checks:
 - Generated `plugin.json` + `marketplace.json` match the registry (`scripts/generate_manifests.py --check`)
 - Generated `docs/bundles.md` matches the registry (`scripts/generate_bundles_doc.py --check`)
 - Registry bundles, `marketplace.json`, and `plugins/` dirs stay in lockstep (`scripts/check_consistency.py`)
+- Every canonical skill/agent/hook/mcp is exposed by >=1 bundle (`scripts/check_exposure.py`); intentional exclusions live in `registry/unbundled.yaml`
 - Plugin manifests, hooks, skills, and `.mcp.json` wiring are valid (`scripts/validate-plugins.sh`)
 - Any symlink under `plugins/` resolves (`validate-symlinks` — plugin trees are real-file copies, so this guards against accidental links)
 - Every `agents/<name>/agent.md` has frontmatter `name` + `description`
