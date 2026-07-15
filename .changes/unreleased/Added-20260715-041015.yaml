@@ -1,0 +1,3 @@
+kind: Added
+body: Add codex-content-review CI workflow — an informational GPT-5.6 Terra reviewer flagging skill/agent/hook/plugin instructions that reference commands or files the repo does not ship
+time: '2026-07-15T03:05:00+00:00'
