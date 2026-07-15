@@ -12,42 +12,52 @@ metadata:
 
 # New Service Request Skill
 
-Creates a new GitHub issue for the RDL Service Desk repository using one of the available templates.
+Create a new GitHub issue in the RDL Service Desk repository from one of its
+issue templates.
 
-**Repository:** https://github.com/rdl-service-desk/service-desk
+**Repository:** `rdl-service-desk/service-desk`
+(<https://github.com/rdl-service-desk/service-desk>)
 
-## Available Templates
+## How to run it
 
-1. **data-request** - Data Request Template
-   - Fields: Project title, Approval ID, Workflow Checklist
+This is an agent skill, not a CLI — there is no `new_service_request` binary.
+When it is invoked (e.g. `/rdl-team:new-service-request`), **you** create the
+issue using whatever GitHub tooling is available in the session, preferring:
 
-2. **enquiry** - Enquiry Request Template
-   - Fields: Overview, Priority (low/medium/high)
+1. the **GitHub MCP server**'s create-issue tool, or
+2. the **`gh` CLI**:
+   `gh issue create --repo rdl-service-desk/service-desk --template <name> ...`.
 
-3. **ict** - ICT Request Template
-   - Fields: Overview, Priority (low/medium/high)
+First confirm you can reach `rdl-service-desk/service-desk` (see *Compatibility*
+above). If you cannot, tell the user what access is missing instead of
+guessing.
 
-## Usage
+## Workflow
 
-Run `new_service_request` in your terminal and you'll be guided through:
-1. Selecting which template to use (1, 2, or 3)
-2. Entering the issue number you provide (you must supply this)
-3. Filling in the required fields for that template
-4. Creating the issue automatically and assigning it to you
+1. **Ask which template** the request uses — `data-request`, `enquiry`, or
+   `ict` (1, 2, or 3).
+2. **Ask for the issue number** — the user must supply this; never invent one.
+3. **Collect the template's required fields** (see *Template details* below).
+4. **Create the issue** in `rdl-service-desk/service-desk` from that template,
+   and **assign it to the requesting user**.
+5. **Return the new issue's URL** so the user can confirm it.
 
-Example: You provide issue number `1181`, and it creates `THHSRDLENQ-1181`
+**Title convention:** match the prefix the service-desk repo already uses for
+the chosen template — e.g. an enquiry with issue number `1181` is titled
+`THHSRDLENQ-1181`. If you are unsure of the prefix for a template, check an
+existing issue of that type in the repo rather than assuming one.
 
-## Template Details
+## Template details
 
-### Data Request
-- **Project title**: e.g., "Emergency Examination Authority Presentations in the Emergency Department"
-- **Approval ID**: e.g., THHSAQUIRE-1234 or SSAQTHS-123456
-- **Workflow items**: Mark checklist items as complete (repo bootstrapped, released)
+### 1. Data Request (`data-request`)
+- **Project title** — e.g. "Emergency Examination Authority Presentations in the Emergency Department"
+- **Approval ID** — e.g. `THHSAQUIRE-1234` or `SSAQTHS-123456`
+- **Workflow checklist** — mark items complete (e.g. repo bootstrapped, released)
 
-### Enquiry Request
-- **Overview**: Brief description (e.g., "Data management review")
-- **Priority**: low, medium, or high
+### 2. Enquiry Request (`enquiry`)
+- **Overview** — brief description (e.g. "Data management review")
+- **Priority** — `low`, `medium`, or `high`
 
-### ICT Request
-- **Overview**: Brief description (e.g., "New user account setup")
-- **Priority**: low, medium, or high
+### 3. ICT Request (`ict`)
+- **Overview** — brief description (e.g. "New user account setup")
+- **Priority** — `low`, `medium`, or `high`
