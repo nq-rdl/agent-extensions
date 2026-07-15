@@ -1,3 +1,0 @@
-kind: Fixed
-body: Expose the new-service-request skill through the rdl-team bundle — it was authored under skills/ but never wired into any plugin
-time: '2026-07-15T00:50:09+00:00'

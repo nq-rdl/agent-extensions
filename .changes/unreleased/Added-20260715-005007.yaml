@@ -1,3 +1,0 @@
-kind: Added
-body: Add scripts/check_exposure.py — a reverse-reference check that every canonical skill/agent/hook/mcp is exposed by at least one bundle
-time: '2026-07-15T00:50:07+00:00'
