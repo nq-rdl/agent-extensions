@@ -1,0 +1,18 @@
+# Allowlist for scripts/check_exposure.py — the reverse-reference check that
+# fails CI when a canonical skill/agent/hook/mcp is authored but no
+# registry/bundles/*.yaml exposes it to an install.
+#
+# An entry here suppresses that check for content that is intentionally NOT
+# shipped through any plugin. Every entry needs a `reason`: this is a
+# reviewable choice, not a place to silence the check because wiring it up is
+# inconvenient. A stale entry — one that no longer matches anything on disk,
+# or that a bundle now references anyway — is itself a check_exposure.py
+# failure, so this file cannot silently rot.
+schemaVersion: v1
+unbundled:
+  - kind: hook
+    name: changie-fragment-lint
+    reason: >-
+      Repo-internal PreToolUse dev hook that lints 'changie new' in THIS repo; its command is a
+      repo-relative path (bash hooks/changie-fragment-lint.sh), not a shipped ${CLAUDE_PLUGIN_ROOT} asset.
+      Not distributed through any plugin.

@@ -386,6 +386,7 @@ RDL team workflows — Claude Code onboarding, setup, and config management.
 **Skills**
 
 - `/rdl-team:cc-setup`
+- `/rdl-team:new-service-request`
 
 **Agents**
 

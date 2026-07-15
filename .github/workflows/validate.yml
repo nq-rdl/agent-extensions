@@ -24,6 +24,9 @@ jobs:
       - name: Check bundle references resolve
         run: python3 scripts/check_bundle_refs.py .
 
+      - name: Check every canonical artifact is exposed in a bundle
+        run: python3 scripts/check_exposure.py .
+
       - name: Check skill grouping contract
         run: python3 scripts/check_grouping.py .
 
