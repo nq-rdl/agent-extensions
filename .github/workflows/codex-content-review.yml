@@ -81,8 +81,12 @@ jobs:
           openai-api-key: ${{ secrets.OPENAI_API_KEY }}
           model: ${{ vars.CODEX_REVIEW_MODEL || 'gpt-5.6-terra' }}
           effort: high
-          permission-profile: ":read-only" # built-in profile — leading colon required
-          safety-strategy: read-only
+          permission-profile: ":read-only" # read-only enforced via the profile (leading colon = built-in)
+          # Keep the default drop-sudo, NOT safety-strategy: read-only — the
+          # read-only strategy forces the legacy sandbox, which per the action's
+          # README cannot be combined with a permission-profile (the codex step
+          # would error and, being continue-on-error, silently post nothing).
+          safety-strategy: drop-sudo
           prompt: |
             You are reviewing a pull request in a Claude Code plugin
             marketplace repo. Static validation already runs elsewhere in CI
