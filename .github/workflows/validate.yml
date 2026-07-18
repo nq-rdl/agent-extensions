@@ -107,7 +107,7 @@ jobs:
       # asctl is the spec validator for skills/ (imported from the former
       # nq-rdl/agent-skills repo when it was merged here). It replaces the
       # upstream-side validation that the old vendoring sync relied on.
-      - uses: actions/setup-go@v6
+      - uses: actions/setup-go@v7
         with:
           go-version-file: tools/asctl/go.mod
           cache: true
