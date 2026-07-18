@@ -14,7 +14,7 @@ jobs:
     name: Validate bundle references + registry consistency
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@v7.0.0
 
       - name: Install PyYAML
         run: python3 -m pip install --user pyyaml
@@ -50,7 +50,7 @@ jobs:
     name: Validate skill + agent symlinks
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@v7.0.0
 
       - name: Check all symlinks resolve
         run: |
@@ -78,7 +78,7 @@ jobs:
     name: Validate Claude plugin structure, hooks, and agents
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@v7.0.0
 
       - name: Install PyYAML for agent frontmatter validation
         run: python3 -m pip install --user pyyaml
@@ -90,7 +90,7 @@ jobs:
     name: Unit tests (pipeline scripts)
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@v7.0.0
 
       - name: Install PyYAML
         run: python3 -m pip install --user pyyaml
@@ -102,7 +102,7 @@ jobs:
     name: Validate skills against the agentskills.io spec (asctl)
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@v7.0.0
 
       # asctl is the spec validator for skills/ (imported from the former
       # nq-rdl/agent-skills repo when it was merged here). It replaces the
