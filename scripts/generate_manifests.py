@@ -47,9 +47,9 @@ def _warn_unknown_marketplace_keys(mkt: dict) -> None:
         unknown.discard("external")
         print(
             "::warning::registry/marketplace.yaml still defines 'external:' — "
-            "external plugins are now consumed from their upstream marketplaces "
-            "via extraKnownMarketplaces (see docs/external-marketplaces.md); this "
-            "key is ignored.",
+            "external plugins are installed by users from their own upstream "
+            "marketplaces via user-level Claude Code config (see "
+            "docs/external-marketplaces.md); this key is ignored.",
             file=sys.stderr,
         )
     for key in sorted(unknown):
@@ -73,6 +73,9 @@ def _enabled_bundles(repo: Path) -> dict[str, dict]:
         out[plugin] = {
             "description": data.get("description") or "",
             "keywords": list(data.get("keywords") or []),
+            # Optional per-bundle SPDX license override (e.g. Apache-2.0 for a
+            # vendored fork). None means "fall back to pluginDefaults.license".
+            "license": data.get("license"),
         }
     return out
 
@@ -133,7 +136,8 @@ def generate(repo) -> dict:
             "description": enabled[p]["description"],
             "author": defaults.get("author"),
             "repository": defaults.get("repository"),
-            "license": defaults.get("license"),
+            # A bundle's own `license:` wins; otherwise the marketplace default.
+            "license": enabled[p].get("license") or defaults.get("license"),
         }
 
     return {"marketplace": marketplace, "plugins": out_plugins}

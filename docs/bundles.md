@@ -37,6 +37,7 @@ subagents (auto-routed by their description).
 | [`lychee`](#lychee) | Lychee — fast link checking for docs and Markdown |
 | [`charm-tui`](#charm-tui) | Charm — build terminal UIs with Bubbletea, Lip Gloss, and Fang |
 | [`claude-code`](#claude-code) | Claude Code — agent-team coordination, hook authoring, skill-quality auditing, and prompt engineering |
+| [`codex`](#codex) | Delegate work to the OpenAI Codex CLI — reviews, background tasks, and rescue sessions |
 | [`opencode-dev`](#opencode-dev) | OpenCode development toolkit — author plugins, agents, the SDK, custom tools, skills, governance policies, and delegation harnesses |
 | [`speckit-dev`](#speckit-dev) | SpecKit extension toolkit — scaffold, validate, manage, and publish spec-kit extensions |
 | [`rdl-team`](#rdl-team) | RDL team workflows — Claude Code onboarding, setup, and config management |
@@ -343,6 +344,33 @@ Claude Code — agent-team coordination, hook authoring, skill-quality auditing,
 - `prompt-builder` (subagent)
 
 **Hooks:** `skill-audit-nudge`
+
+---
+
+## codex
+
+Delegate work to the OpenAI Codex CLI — reviews, background tasks, and rescue sessions.
+
+**Skills**
+
+- `/codex:setup`
+- `/codex:review`
+- `/codex:adversarial-review`
+- `/codex:rescue`
+- `/codex:result`
+- `/codex:status`
+- `/codex:transfer`
+- `/codex:cancel`
+- `/codex:cli-runtime`
+- `/codex:result-handling`
+- `/codex:prompting`
+- `/codex:model-guide`
+
+**Agents**
+
+- `codex-rescue` (subagent)
+
+**Hooks:** `codex-session-lifecycle`, `codex-stop-review-gate`
 
 ---
 
