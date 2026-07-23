@@ -1,6 +1,9 @@
 ---
+license: Apache-2.0
 description: Internal guidance for composing Codex and GPT-5.6 prompts for coding, review, diagnosis, and research tasks inside the Codex Claude Code plugin
 user-invocable: false
+metadata:
+  repo: https://github.com/nq-rdl/agent-extensions
 ---
 
 <!--

@@ -1,9 +1,12 @@
 ---
+license: Apache-2.0
 description: Show active and recent Codex jobs for this repository, including review-gate status
 argument-hint: '[job-id] [--wait] [--timeout-ms <ms>] [--all]'
 user-invocable: true
 disable-model-invocation: true
 allowed-tools: Bash(node:*)
+metadata:
+  repo: https://github.com/nq-rdl/agent-extensions
 ---
 
 <!--

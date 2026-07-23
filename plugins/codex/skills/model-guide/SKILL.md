@@ -1,6 +1,9 @@
 ---
+license: Apache-2.0
 description: Internal guide for selecting a Codex model and reasoning effort (GPT-5.6 Sol/Terra/Luna) when delegating work to Codex
 user-invocable: false
+metadata:
+  repo: https://github.com/nq-rdl/agent-extensions
 ---
 
 <!--

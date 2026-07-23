@@ -1,9 +1,12 @@
 ---
+license: Apache-2.0
 description: Transfer the current Claude Code session into a resumable Codex thread
 argument-hint: "[--source <claude-jsonl>]"
 user-invocable: true
 disable-model-invocation: true
 allowed-tools: Bash(node:*)
+metadata:
+  repo: https://github.com/nq-rdl/agent-extensions
 ---
 
 <!--

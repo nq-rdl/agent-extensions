@@ -1,10 +1,13 @@
 ---
 name: codex-result
+license: Apache-2.0
 description: Show the stored final output for a finished Codex job in this repository
 argument-hint: '[job-id]'
 user-invocable: true
 disable-model-invocation: true
 allowed-tools: Bash(node:*)
+metadata:
+  repo: https://github.com/nq-rdl/agent-extensions
 ---
 
 <!--

@@ -1,7 +1,10 @@
 ---
 name: codex-result-handling
+license: Apache-2.0
 description: Internal guidance for presenting Codex helper output back to the user
 user-invocable: false
+metadata:
+  repo: https://github.com/nq-rdl/agent-extensions
 ---
 
 <!--

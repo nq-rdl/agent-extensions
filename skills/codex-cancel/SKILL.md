@@ -1,10 +1,13 @@
 ---
 name: codex-cancel
+license: Apache-2.0
 description: Cancel an active background Codex job in this repository
 argument-hint: '[job-id]'
 user-invocable: true
 disable-model-invocation: true
 allowed-tools: Bash(node:*)
+metadata:
+  repo: https://github.com/nq-rdl/agent-extensions
 ---
 
 <!--

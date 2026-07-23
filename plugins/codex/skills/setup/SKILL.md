@@ -1,8 +1,11 @@
 ---
+license: Apache-2.0
 description: Check whether the local Codex CLI is ready and optionally toggle the stop-time review gate
 argument-hint: '[--enable-review-gate|--disable-review-gate]'
 user-invocable: true
 allowed-tools: Bash(node:*), Bash(npm:*), AskUserQuestion
+metadata:
+  repo: https://github.com/nq-rdl/agent-extensions
 ---
 
 <!--

@@ -1,7 +1,10 @@
 ---
 name: codex-cli-runtime
+license: Apache-2.0
 description: Internal helper contract for calling the codex-companion runtime from Claude Code (Codex CLI 0.144.6)
 user-invocable: false
+metadata:
+  repo: https://github.com/nq-rdl/agent-extensions
 ---
 
 <!--

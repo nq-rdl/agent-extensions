@@ -1,9 +1,12 @@
 ---
 name: codex-rescue
+license: Apache-2.0
 description: Delegate investigation, an explicit fix request, or follow-up rescue work to the Codex rescue subagent
 argument-hint: "[--background|--wait] [--resume|--fresh] [--model <model|spark>] [--effort <low|medium|high|xhigh|max|ultra>] [what Codex should investigate, solve, or continue]"
 user-invocable: true
 allowed-tools: Bash(node:*), AskUserQuestion, Agent
+metadata:
+  repo: https://github.com/nq-rdl/agent-extensions
 ---
 
 <!--

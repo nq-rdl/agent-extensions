@@ -1,10 +1,13 @@
 ---
 name: codex-review
+license: Apache-2.0
 description: Run a Codex code review against local git state
 argument-hint: '[--wait|--background] [--base <ref>] [--scope auto|working-tree|branch]'
 user-invocable: true
 disable-model-invocation: true
 allowed-tools: Read, Glob, Grep, Bash(node:*), Bash(git:*), AskUserQuestion
+metadata:
+  repo: https://github.com/nq-rdl/agent-extensions
 ---
 
 <!--
