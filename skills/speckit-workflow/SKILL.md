@@ -10,12 +10,14 @@ compatibility: >-
 description: >-
   The RDL team's standard end-to-end development workflow — it bridges superpowers
   (brainstorming, subagent-driven-development, test-driven-development) with GitHub
-  spec-kit's spec-driven flow (specify → clarify → plan → tasks → analyze). Use
-  this whenever starting real feature or epic work in an RDL spec-kit repo, or when
-  the user says "run the RDL workflow", "let's spec this out", "spec-driven
-  development", "brainstorm then speckit", "turn this into specs / an epic", or asks
-  how brainstorming hands off to spec-kit or how to implement spec-kit tasks with
-  superpowers. Reach for this before a plain brainstorming or a bare /speckit
+  spec-kit's spec-driven flow (specify → clarify → plan → tasks → analyze). Use this
+  whenever starting real feature or epic work in an RDL spec-kit repo, resuming or
+  picking up an in-progress spec, or driving implementation of an existing tasks.md.
+  Triggers on "run the RDL workflow", "let's spec this out", "spec-driven
+  development", "brainstorm then speckit", "turn this into specs / an epic", "pick up
+  the next spec", "work through the backlog", "drive implementation", or questions
+  about how brainstorming hands off to spec-kit or how to implement spec-kit tasks
+  with superpowers. Reach for this before a plain brainstorming or a bare /speckit
   command, so the two systems get stitched at the seams instead of colliding.
 argument-hint: "What are we building? (a single feature, or a larger epic spanning several specs)"
 user-invocable: true
@@ -70,6 +72,26 @@ superpowers:finishing-a-development-branch ← per spec, then close the epic
   so rather than approximating them.
 - **Derive the trunk branch at runtime** (don't assume `main`) — later steps branch
   and merge against it.
+
+## Orient — you rarely start at the top
+
+The phases are written top-to-bottom, but a real invocation lands mid-stream just as
+often — a fresh idea on trunk, a half-planned spec, or an in-progress worktree. Read
+the state first, then jump to the phase that matches. This is **orientation, not an
+auto-loop**: confirm where you are, run that phase, and stop where the underlying
+skills stop — don't silently advance the whole pipeline.
+
+| What you observe | Jump to |
+|---|---|
+| Fresh idea, no `specs/<n>-…/` yet | Phase 1 (brainstorm) |
+| `specs/<n>-<slug>/` exists, no `tasks.md` | Phase 4 — resume at the first missing artifact |
+| `tasks.md` present, tasks unchecked, on the spec's branch/worktree | Phase 5 (subagent-driven-development) |
+| All tasks `[x]`, branch unmerged | Phase 6 (finish) |
+| Several specs in flight | you're orchestrating an epic — pick the next unblocked spec per the epic doc's order, then jump by its state above |
+
+From trunk you **orchestrate** (survey specs, pick the next one, provision a
+worktree); inside a spec worktree you **execute** that one spec. Don't write feature
+code from trunk — that's what the per-spec branch/worktree is for.
 
 ## Phase 1 — Brainstorm the design (superpowers:brainstorming)
 
@@ -157,9 +179,12 @@ re-implement branch/worktree mechanics here.
 When a spec's tasks are done and reviewed, use
 `superpowers:finishing-a-development-branch` to integrate it (into the epic branch
 for an epic, else trunk). For an epic, repeat Phases 3-6 for the next spec, then
-close the epic branch once every child has landed. Durable decisions worth keeping
-beyond the (ephemeral) spec belong in an ADR — point at the team's ADR skill rather
-than inventing a record format here.
+close the epic branch once every child has landed. Each spec owns its branch
+(`<n>-<slug>`) and reaches trunk only through that integration — the team's
+convention is a `--no-ff` merge, so each spec lands as one legible unit in history
+rather than a direct commit on trunk. Durable decisions worth keeping beyond the
+(ephemeral) spec belong in an ADR — point at the team's ADR skill rather than
+inventing a record format here.
 
 ## What this skill does NOT do
 
