@@ -1,0 +1,20 @@
+schemaVersion: v1
+id: speckit
+displayName: SpecKit Workflow
+description: SpecKit + Superpowers standard development workflow — brainstorm through spec-driven implementation
+keywords: [speckit, spec-kit, superpowers, workflow, sdd, brainstorming]
+owners:
+  - rdl
+channels:
+  - stable
+skills:
+  - {source: speckit-workflow, leaf: workflow}   # → invokes as /speckit:workflow
+agents: []
+hooks: []
+prompts: []
+mcp: []
+targets:
+  claude:
+    enabled: true
+    pluginName: speckit
+    marketplaceName: rdl-agent-extensions

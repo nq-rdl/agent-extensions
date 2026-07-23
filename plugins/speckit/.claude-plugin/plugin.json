@@ -1,0 +1,10 @@
+{
+  "name": "speckit",
+  "version": "0.25.0",
+  "description": "SpecKit + Superpowers standard development workflow — brainstorm through spec-driven implementation",
+  "author": {
+    "name": "nq-rdl"
+  },
+  "repository": "https://github.com/nq-rdl/agent-extensions",
+  "license": "MIT"
+}

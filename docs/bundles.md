@@ -38,6 +38,7 @@ subagents (auto-routed by their description).
 | [`charm-tui`](#charm-tui) | Charm — build terminal UIs with Bubbletea, Lip Gloss, and Fang |
 | [`claude-code`](#claude-code) | Claude Code — agent-team coordination, hook authoring, skill-quality auditing, and prompt engineering |
 | [`opencode-dev`](#opencode-dev) | OpenCode development toolkit — author plugins, agents, the SDK, custom tools, skills, governance policies, and delegation harnesses |
+| [`speckit`](#speckit) | SpecKit + Superpowers standard development workflow — brainstorm through spec-driven implementation |
 | [`speckit-dev`](#speckit-dev) | SpecKit extension toolkit — scaffold, validate, manage, and publish spec-kit extensions |
 | [`rdl-team`](#rdl-team) | RDL team workflows — Claude Code onboarding, setup, and config management |
 | [`playwright`](#playwright) | Playwright — generate and debug end-to-end browser tests |
@@ -361,6 +362,16 @@ OpenCode development toolkit — author plugins, agents, the SDK, custom tools, 
 - `/opencode-dev:delegate`
 
 **Hooks:** `opencode-doc-review`
+
+---
+
+## speckit
+
+SpecKit + Superpowers standard development workflow — brainstorm through spec-driven implementation.
+
+**Skills**
+
+- `/speckit:workflow`
 
 ---
 
