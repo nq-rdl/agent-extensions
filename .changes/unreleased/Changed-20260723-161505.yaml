@@ -1,0 +1,3 @@
+kind: Changed
+body: 'Language policy: vendored runtimes may retain upstream languages with documented prerequisites; Codex requires Node.js >=18.18.0'
+time: 2026-07-23T16:15:05.000000+10:00
