@@ -14,6 +14,10 @@ site/
 # Node.js dependencies
 node_modules/
 
+# Codex plugin: upstream clone + locally-generated app-server types (never committed)
+.tmp/
+plugins/codex/.generated/
+
 # Python bytecode (pipeline-script unit tests)
 __pycache__/
 *.pyc

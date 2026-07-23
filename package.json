@@ -1,0 +1,14 @@
+{
+  "name": "rdl-agent-extensions",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "test:codex": "node --test tests/codex/*.test.mjs",
+    "typegen:codex": "rm -rf plugins/codex/.generated/app-server-types && codex app-server generate-ts --out plugins/codex/.generated/app-server-types",
+    "typecheck:codex": "bun run typegen:codex && tsc --noEmit -p tests/codex/tsconfig.json"
+  },
+  "devDependencies": {
+    "@types/node": "^25.5.0",
+    "typescript": "^6.0.2"
+  }
+}
