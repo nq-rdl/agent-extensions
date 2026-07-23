@@ -13,10 +13,12 @@ Copyright 2026 OpenAI; fork point v1.0.6 @ db52e28):
   agents/codex-rescue/
   hooks/codex-session-lifecycle.sh  hooks/codex-stop-review-gate.sh
   plugins/codex/scripts/  plugins/codex/prompts/  plugins/codex/schemas/
+  tests/codex/
 
-The Markdown and shell files above carry an `SPDX-License-Identifier: Apache-2.0`
-header. The vendored runtime trees (`plugins/codex/scripts/`,
-`plugins/codex/prompts/`, `plugins/codex/schemas/`) are kept as-is from upstream
-without per-file headers and are covered as a whole. All of the paths above are
+The Markdown, shell, and `tests/codex/` JavaScript files above carry an
+`SPDX-License-Identifier: Apache-2.0` header. The vendored runtime trees
+(`plugins/codex/scripts/`, `plugins/codex/prompts/`, `plugins/codex/schemas/`)
+are kept as-is from upstream without per-file headers and are covered as a
+whole. All of the paths above are
 governed by `plugins/codex/LICENSE` and `plugins/codex/NOTICE`; every other file
 in the repository remains under the MIT License.

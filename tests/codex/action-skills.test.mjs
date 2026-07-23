@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: Apache-2.0
+// Rewritten from tests/commands.test.mjs of openai/codex-plugin-cc v1.0.6 (db52e28), Apache-2.0.
+
 import fs from "node:fs";
 import path from "node:path";
 import test from "node:test";

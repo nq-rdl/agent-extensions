@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: Apache-2.0
+
 import path from "node:path";
 import test from "node:test";
 import assert from "node:assert/strict";
