@@ -114,6 +114,10 @@ pre-push:
       glob: "{scripts/**,tests/**}"
       run: pixi run python3 -m unittest discover -s tests -p 'test_*.py'
 
+    - name: codex-js-tests
+      glob: "{plugins/codex/**,tests/codex/**,hooks/codex-*.sh}"
+      run: node --test tests/codex/*.test.mjs
+
     # Informational: report findings but never block the push (CI uploads the
     # SARIF to the Security tab). scan.sh skips itself when Docker is absent;
     # set SKILLSPECTOR_SKIP=1 to skip explicitly.
