@@ -1,97 +1,44 @@
 # External marketplaces
 
-This repo's `rdl-agent-extensions` marketplace ships **only the plugins the team authors here**
-(under `skills/` and `agents/`). Plugins maintained by *other people* —
-Anthropic, vendors, OSS projects — are **not** re-hosted in `rdl-agent-extensions`. Instead the
-team consumes them straight from their **upstream marketplaces**, which Claude
-Code registers via the `extraKnownMarketplaces` setting.
+This repo's `rdl-agent-extensions` marketplace ships **only the plugins the team
+authors and owns here** (canonical content under `skills/` and `agents/`, packaged
+into `plugins/`). Plugins maintained by *other people* — Anthropic, vendors, OSS
+projects — are **not** re-hosted, nested, or version-pinned in `rdl-agent-extensions`.
 
-> **Note:** This repo previously registered the curated set for the whole team via a
-> project `.claude/settings.json`. That file was removed along with the rest of the
-> `.claude/` contributor tooling, and how the team configures these for repo work is
-> being re-approached. The curated set below still stands as a **recommendation** —
-> until the team mechanism is settled, enable what you want in your **user** settings
-> (`~/.claude/settings.json`), as described under [Scope](#scope-where-this-applies).
+## Policy: external plugins are user-level
 
-## Why not re-host them in `rdl-agent-extensions`?
+A Claude Code marketplace catalogs *plugins*, not other marketplaces — you cannot
+nest one inside another, and re-publishing someone else's plugin here would make
+**us** own its source and version pin. So external plugins are installed by each
+user **from their own upstream marketplaces**, via **user-level** Claude Code
+configuration (`~/.claude/settings.json` → `extraKnownMarketplaces` /
+`enabledPlugins`). Versioning and auto-update stay with the people who maintain
+the plugin; we are not a middleman.
 
-A Claude Code marketplace catalogs *plugins*, not other marketplaces — you
-cannot nest one inside another. Re-publishing someone else's plugin into `rdl-agent-extensions`
-(the old `external:` passthrough, now removed) meant **we** owned its source and
-version pin, and had to bump it to deliver upstream updates. Registering the
-upstream marketplace instead hands versioning and auto-update back to the people
-who actually maintain the plugin. We stop being a middleman.
+This repo no longer ships a project `.claude/settings.json`, and the previously
+curated dev-helper set that it registered for the whole team has been removed
+along with the rest of the `.claude/` contributor tooling. A future
+`/rdl-team:suggested-plugins` skill is the intended replacement for team-level
+recommendations; until then, enable what you want in your own user settings.
 
-## The curated set
+## Codex: in-house fork, not the upstream plugin
 
-The dev-helper marketplaces the team recommends for working *on* this catalog. Each
-is a real Claude Code marketplace (has `.claude-plugin/marketplace.json`).
+The `codex` plugin in this marketplace is an **in-house fork** of
+`openai/codex-plugin-cc`, modernized for GPT-5.6 (see
+[`ARCHITECTURE.md`](ARCHITECTURE.md)). It **supersedes** the upstream
+`codex@openai-codex` plugin. If you previously installed that plugin from its
+upstream marketplace, **uninstall it** to avoid two plugins registering
+duplicate `/codex:*` actions:
 
-| Marketplace (`name`) | Source repo | Plugin | What it's for |
-|---|---|---|---|
-| `openai-codex` | `openai/codex-plugin-cc` | `codex` | Delegate work to the OpenAI Codex CLI (rescue / second-opinion) |
-| `worktrunk` | `max-sixty/worktrunk` | `worktrunk` | Git worktree CLI for parallel agent workflows (the `wt` tooling) |
-| `motherduck-skills` | `motherduckdb/agent-skills` | `motherduck-skills` | DuckDB / MotherDuck data skills |
-| `astral-sh` | `astral-sh/claude-code-plugins` | `astral` | Astral Python tooling — `ruff`, `uv`, `ty` |
-| `goland-claude-marketplace` | `JetBrains/go-modern-guidelines` | `modern-go-guidelines` | Modern Go syntax guidance (complements the `go` bundle) |
-| `svelte` | `sveltejs/ai-tools` | `svelte` | Svelte 5 authoring + the Svelte MCP server |
-
-**Anthropic's `pr-review-toolkit`** (six PR-review agents) is *not* in the table
-because it comes from `claude-plugins-official`, the catalog bundled with Claude
-Code. That marketplace is auto-available in the desktop/CLI, but on Claude Code
-(web) it must be registered explicitly in `extraKnownMarketplaces` for its
-enabled plugins (`pr-review-toolkit`, `superpowers`, `gopls-lsp`) to resolve and
-install — so register it alongside the curated set.
-
-## How it's wired
-
-- **`extraKnownMarketplaces`** registers each upstream catalog. The key is the
-  marketplace's own `name` (so `@<name>` references resolve), and `autoUpdate:
-  true` lets Claude Code refresh the catalog and update installed plugins at
-  startup.
-- **`enabledPlugins`** turns specific plugins on after install, addressed as
-  `<plugin>@<marketplace>`. From each third-party marketplace above we enable a
-  single plugin (the one listed in the table); from the much larger
-  `claude-plugins-official` catalog we enable only the handful we want —
-  `pr-review-toolkit`, `superpowers`, and `gopls-lsp` — not the whole set.
-
-```jsonc
-// ~/.claude/settings.json (excerpt)
-"extraKnownMarketplaces": {
-  "svelte": { "source": { "source": "github", "repo": "sveltejs/ai-tools" }, "autoUpdate": true }
-},
-"enabledPlugins": {
-  "svelte@svelte": true,
-  "pr-review-toolkit@claude-plugins-official": true
-}
+```bash
+claude plugin uninstall codex@openai-codex
+claude plugin install codex@rdl-agent-extensions
 ```
 
-## Scope: where this applies
+## Trust
 
-Claude Code reads settings from two places: a **project** `.claude/settings.json`
-(applies only inside that repo) and your **user** `~/.claude/settings.json` (applies
-everywhere). This repo no longer ships a project `.claude/settings.json`, so to use
-the curated set today, add the `extraKnownMarketplaces` / `enabledPlugins` blocks to
-your **user** settings at `~/.claude/settings.json` — they then apply in every project,
-including this one.
-
-## Adding or removing a marketplace
-
-1. Confirm the repo is a marketplace: it must have `.claude-plugin/marketplace.json`.
-   Note its `name` and the plugin id(s) you want.
-2. Add an `extraKnownMarketplaces["<name>"]` entry with a `github` source and
-   `autoUpdate`.
-3. Add the `enabledPlugins` line(s) you want on by default (`<plugin>@<name>`).
-4. Reload with `/reload-plugins` (or restart) to pick up the change.
-
-## Auto-update and trust
-
-`autoUpdate: true` means Claude Code pulls the latest from each vendor's default
-branch at startup. Plugins run with your privileges, so only register
-marketplaces you trust. To stop tracking a vendor's default branch, pin that
-marketplace's `source` to a specific branch or tag with `ref` and set
-`autoUpdate: false` (exact-commit `sha` pins are documented for individual
-plugin sources inside a `marketplace.json`, not for marketplace sources). See
-the Claude Code docs on
+Plugins run with your privileges. Only register marketplaces you trust, and
+prefer pinning a vendor `source` to a specific `ref` with `autoUpdate: false`
+when you do not want to track its default branch. See the Claude Code docs on
 [discovering plugins](https://code.claude.com/docs/en/discover-plugins) and
 [plugin marketplaces](https://code.claude.com/docs/en/plugin-marketplaces).
