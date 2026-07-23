@@ -1,11 +1,12 @@
 ---
 license: CC-BY-4.0
 compatibility: >-
-  spec-kit >=0.12 (verified against 0.12.x) and superpowers >=6.1 (verified
-  against 6.1.1). The value here is behavioral coupling to those two systems, so
-  phase/command/skill names are runtime-discovered, not hardcoded — re-verify the
-  phase set at github.github.io/spec-kit and the superpowers handoffs in the
-  installed skills when a wrong name would misroute the flow.
+  spec-kit >=0.12 (verified against 0.13.4), superpowers >=6.1 (verified against
+  6.1.1). Coupled to both systems' behavior, so phase names and git side effects are
+  runtime-discovered, not hardcoded: in current spec-kit (0.13.x) core phases touch
+  no git — branch/commit are an optional extension (older lines differ). Re-verify
+  phases and git behavior at github.github.io/spec-kit when being wrong would
+  misroute the flow.
 description: >-
   The RDL team's standard end-to-end development workflow — it bridges superpowers
   (brainstorming, subagent-driven-development, test-driven-development) with GitHub
@@ -71,6 +72,16 @@ superpowers:finishing-a-development-branch ← per spec, then close the epic
   so rather than approximating them.
 - **Derive the trunk branch at runtime** (don't assume `main`) — later steps branch
   and merge against it.
+- **Know what spec-kit does to git — it may be nothing.** In current spec-kit
+  (0.13.x) the core phases touch **no git**: `specify` creates `specs/<n>-<slug>/`
+  and `.specify/feature.json` but **creates no branch and commits nothing**. Branch
+  creation, `git init`, and auto-commit are an **optional git extension** — check for
+  `.specify/extensions.yml`. If it registers the git extension, `before_specify` runs
+  `git checkout -b <n>-<slug>` in the *current* checkout (plus a `git fetch`); if it
+  doesn't, you manage branches yourself. Either way spec-kit resolves the feature via
+  `.specify/feature.json` / `$SPECIFY_FEATURE`, **never the branch name**. Those
+  `before_`/`after_` phase events are spec-kit's *only* hook mechanism — there's no
+  other core hook to wire.
 
 ## Orient — you rarely start at the top
 
@@ -113,7 +124,9 @@ multiple independently-shippable pieces is an **epic**.
 - In this repo family, an **epic is a git convention** (not a spec-kit feature): a
   base integration branch that groups related spec branches. Create the epic branch
   off trunk; each child spec branches off the epic branch and merges back; the epic
-  merges to trunk once all its specs land.
+  merges to trunk once all its specs land. (With the git extension active, run
+  `specify` while checked out on the epic branch so the new spec branch forks from
+  it; without it, create the spec branch yourself.)
 - Capture brainstorming's decomposition in a short **epic doc**: the child specs and
   the build order (dependencies first). It's a running order, not a second design.
 - Then run Phases 3-6 **per spec, sequentially**, in that order.
@@ -134,6 +147,9 @@ here:
   unit of work — no `tasks.md`, nothing to drive.
 - **`spec.md` (the _what_) + `plan.md` (the _how_) become Phase 5's Global
   Constraints** — keep them; Phase 5 needs them.
+- **`specify` produces files, not a commit.** It writes the `specs/<n>-<slug>/` tree
+  and `.specify/feature.json`; core spec-kit leaves them **uncommitted** — which
+  Phase 5 must handle before spawning a worktree.
 
 If **analyze** surfaces inconsistencies across spec/plan/tasks, resolve them (loop
 back to the relevant phase) *before* handing off to execution.
@@ -152,7 +168,10 @@ superpowers plans normally live under `docs/superpowers/plans/`). spec-kit sprea
 that same information across three files, so bridge it explicitly when you dispatch:
 
 - Point `subagent-driven-development` at **`specs/<n>-<slug>/tasks.md`** as its
-  plan — each spec-kit task is one SDD task.
+  plan — each spec-kit task (`T001`, `T002`, …) is one SDD task. Follow tasks.md's
+  phase/dependency order, and tick each task to `[X]` as it lands (what `speckit
+  implement` would have done, so status stays readable). The `[P]` parallel markers
+  don't override SDD's one-implementer-at-a-time rule.
 - Supply **`spec.md`** and **`plan.md`** as the **Global Constraints / interface
   context** the plan header would otherwise hold. Without them, implementer
   subagents see tasks with no binding requirements around them.
@@ -169,9 +188,20 @@ implementation task still starts from a red test.
 same task. They're two executors for one job and will fight — pick the superpowers
 loop; that's the RDL resolution.
 
-Execution needs an isolated workspace and must not run on trunk — delegate that to
-`superpowers:using-git-worktrees` (or the team's worktree provisioning). Don't
-re-implement branch/worktree mechanics here.
+**Worktree ↔ spec-kit reconciliation (the load-bearing gotcha).** Execution should
+run in an isolated workspace off trunk — delegate provisioning to
+`superpowers:using-git-worktrees` (or the team's worktree tooling); don't
+re-implement it. But two spec-kit facts will silently break the handoff if ignored:
+
+- **Core spec-kit commits nothing**, so `specs/<n>-<slug>/` (including `tasks.md`) is
+  *uncommitted*. A fresh `git worktree add` starts clean and **won't carry those
+  files** — SDD would find no plan. So **commit `specs/<n>-<slug>/` (and
+  `.specify/feature.json`) before spawning the worktree**, or run the spec-kit phases
+  inside the worktree from the start.
+- **If the git extension is active**, `before_specify` already did
+  `git checkout -b <n>-<slug>` in your current checkout, and git won't let one branch
+  live in two worktrees. Either implement in that existing checkout, or switch it back
+  to trunk before adding a worktree for `<n>-<slug>`. Don't double-create the branch.
 
 ## Phase 6 — Finish
 
