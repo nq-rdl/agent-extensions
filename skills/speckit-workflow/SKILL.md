@@ -76,7 +76,7 @@ superpowers:finishing-a-development-branch ← per spec, then close the epic
 - **Know what spec-kit does to git — it may be nothing.** In current spec-kit
   (0.13.x) the core phases touch **no git**: `specify` creates `specs/<n>-<slug>/`
   and `.specify/feature.json` but **creates no branch and commits nothing**. Branch
-  creation, `git init`, and auto-commit are an **optional git extension** — check for
+  creation and auto-commit are an **optional git extension** — check for
   `.specify/extensions.yml`. If it registers the git extension, `before_specify` runs
   `git checkout -b <n>-<slug>` in the *current* checkout (plus a `git fetch`); if it
   doesn't, you manage branches yourself. Either way spec-kit resolves the feature via
@@ -94,7 +94,6 @@ skills stop — don't silently advance the whole pipeline.
 
 | What you observe | Jump to |
 |---|---|
-| Fresh idea, no `specs/<n>-…/` yet | Phase 1 (brainstorm) |
 | `specs/<n>-<slug>/` exists, no `tasks.md` | Phase 4 — resume at the first missing artifact |
 | `tasks.md` present, tasks unchecked, on the spec's branch/worktree | Phase 5 (subagent-driven-development) |
 | All tasks `[x]`, branch unmerged | Phase 6 (finish) |
@@ -148,9 +147,8 @@ here:
   unit of work — no `tasks.md`, nothing to drive.
 - **`spec.md` (the _what_) + `plan.md` (the _how_) become Phase 5's Global
   Constraints** — keep them; Phase 5 needs them.
-- **`specify` produces files, not a commit.** It writes the `specs/<n>-<slug>/` tree
-  and `.specify/feature.json`; core spec-kit leaves them **uncommitted** — which
-  Phase 5 must handle before spawning a worktree.
+- **`specify` writes files, not a commit** — Phase 5 commits the `specs/<n>-<slug>/`
+  tree before the worktree (see there).
 
 If **analyze** surfaces inconsistencies across spec/plan/tasks, resolve them (loop
 back to the relevant phase) *before* handing off to execution.
