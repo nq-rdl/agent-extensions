@@ -4,7 +4,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 
-import { renderReviewResult, renderStoredJobResult } from "../../plugins/codex/scripts/lib/render.mjs";
+import { renderReviewResult, renderStatusReport, renderStoredJobResult } from "../../plugins/codex/scripts/lib/render.mjs";
 
 test("renderReviewResult degrades gracefully when JSON is missing required review fields", () => {
   const output = renderReviewResult(
@@ -59,4 +59,30 @@ test("renderStoredJobResult prefers rendered output for structured review jobs",
   assert.doesNotMatch(output, /^\{/);
   assert.match(output, /Codex session ID: thr_123/);
   assert.match(output, /Resume in Codex: codex resume thr_123/);
+});
+
+test("renderStatusReport escapes backslashes before pipes in active-job table cells", () => {
+  const output = renderStatusReport({
+    sessionRuntime: { label: "direct startup" },
+    config: { stopReviewGate: false },
+    running: [
+      {
+        id: "job-1",
+        kindLabel: "task",
+        status: "running",
+        // Literal characters in the summary: payload \| breakout
+        summary: "payload \\| breakout"
+      }
+    ],
+    latestFinished: null,
+    recent: [],
+    needsReview: false
+  });
+
+  // The backslash must be escaped first (\ -> \\), then the pipe (| -> \|),
+  // yielding the literal sequence: payload \\\| breakout
+  assert.ok(output.includes("payload \\\\\\| breakout"), "backslash and pipe both escaped");
+  // The broken form (\\ followed by a live |) must not appear: an input of
+  // "\|" rendering as "\\|" leaves the pipe unescaped and splits the cell.
+  assert.ok(!output.includes("payload \\\\| breakout"), "no unescaped pipe after escaped backslash");
 });
