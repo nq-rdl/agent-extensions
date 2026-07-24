@@ -1,6 +1,6 @@
 {
   "name": "charm-tui",
-  "version": "0.25.0",
+  "version": "0.26.0",
   "description": "Charm — build terminal UIs with Bubbletea, Lip Gloss, and Fang",
   "author": {
     "name": "nq-rdl"
