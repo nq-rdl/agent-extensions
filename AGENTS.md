@@ -21,7 +21,8 @@ users install.
 content conventions, the grouping contract, packaging a skill into a plugin); the
 PR and changelog flow is in this file's **`## PR instructions`** section below.
 **`docs/`** is the project documentation — `docs/ARCHITECTURE.md` (design + packaging
-decisions) and `docs/external-marketplaces.md` (recommended external dev-helper plugins).
+decisions) and `docs/external-marketplaces.md` (policy: external plugins are installed
+by users from their own upstream marketplaces via user-level Claude Code config).
 
 ## Project overview
 
@@ -98,10 +99,13 @@ These skills call Python directly (no CLI wrapper). Each has a `requirements.txt
 
 | Work type | Language |
 |---|---|
-| New CLI helper or MCP server | Go (`CGO_ENABLED=0`, prebuilt binaries) |
+| New first-party CLI helper or MCP server | Go (`CGO_ENABLED=0`, prebuilt binaries) |
+| Vendored/forked plugin runtime | May retain its upstream language when full fidelity requires it and the design documents runtime availability and distribution |
 | File-format or ML skills | Python + `ensure-deps.sh` |
 | Documentation-only skill | Markdown |
 | New TypeScript | Not permitted |
+
+The Codex plugin exercises the vendored-runtime exception: it vendors the upstream Node.js `.mjs` runtime as-is, Bun is the local dev manager, it carries zero runtime npm dependencies, and Node.js >=18.18.0 is an external user prerequisite enforced by a first-use preflight. If such a runtime is ever packaged, GitHub Packages/ghcr is the org distribution channel.
 
 MCP servers are authored in `mcp/*-go/` and distributed as prebuilt binaries under `plugins/<bundle>/bin/mcp/`. See `docs/ARCHITECTURE.md` for the full language and packaging policy.
 

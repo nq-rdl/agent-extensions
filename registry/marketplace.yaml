@@ -44,6 +44,7 @@ order:
   - lychee
   - charm-tui
   - claude-code
+  - codex
   - opencode-dev
   - speckit-dev
   - rdl-team
@@ -53,6 +54,6 @@ order:
   - tech-writing
   - lucid
 
-# External plugins are NOT re-hosted in this marketplace. They are consumed from
-# their own upstream marketplaces, registered for the team in .claude/settings.json
-# via `extraKnownMarketplaces`. See docs/external-marketplaces.md.
+# External plugins are NOT re-hosted in this marketplace. Users install them from
+# their own upstream marketplaces via user-level Claude Code configuration. See
+# docs/external-marketplaces.md.

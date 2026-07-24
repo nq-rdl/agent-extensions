@@ -109,7 +109,7 @@ class TestGenerate(unittest.TestCase):
             # Pin the dedicated migration message, not just the substring
             # "external" (which the generic fallback warning also emits) — so
             # this guards the tailored `if "external" in unknown` branch.
-            self.assertIn("extraKnownMarketplaces", err.getvalue())
+            self.assertIn("user-level Claude Code config", err.getvalue())
 
     def test_unknown_top_level_key_warns(self):
         # Any unrecognized top-level key (e.g. a typo like `oder:`) is ignored
@@ -144,6 +144,22 @@ class TestGenerate(unittest.TestCase):
             self.assertEqual(pj["description"], "SWE desc")
             self.assertEqual(pj["author"], {"name": "nq-rdl"})
             self.assertEqual(pj["license"], "MIT")
+
+    def test_per_bundle_license_override(self):
+        # A bundle may override the default license (e.g. Apache-2.0 for a
+        # vendored fork); bundles that omit `license:` keep the pluginDefaults
+        # license (MIT).
+        with tempfile.TemporaryDirectory() as t:
+            repo = make_repo(t)
+            (repo / "registry" / "bundles" / "forked.yaml").write_text(
+                "id: forked\ndescription: Forked desc\nkeywords: [x]\n"
+                "license: Apache-2.0\n"
+                "targets:\n  claude:\n    enabled: true\n    pluginName: forked\n"
+            )
+            with contextlib.redirect_stderr(io.StringIO()):
+                gen = generate_manifests.generate(repo)["plugins"]
+            self.assertEqual(gen["forked"]["license"], "Apache-2.0")
+            self.assertEqual(gen["swe"]["license"], "MIT")
 
     def test_check_clean_after_write(self):
         with tempfile.TemporaryDirectory() as t:

@@ -1,0 +1,88 @@
+// SPDX-License-Identifier: Apache-2.0
+// Derived from openai/codex-plugin-cc v1.0.6 (db52e28), Apache-2.0. Modified for rdl-agent-extensions.
+
+import test from "node:test";
+import assert from "node:assert/strict";
+
+import { renderReviewResult, renderStatusReport, renderStoredJobResult } from "../../plugins/codex/scripts/lib/render.mjs";
+
+test("renderReviewResult degrades gracefully when JSON is missing required review fields", () => {
+  const output = renderReviewResult(
+    {
+      parsed: {
+        verdict: "approve",
+        summary: "Looks fine."
+      },
+      rawOutput: JSON.stringify({
+        verdict: "approve",
+        summary: "Looks fine."
+      }),
+      parseError: null
+    },
+    {
+      reviewLabel: "Adversarial Review",
+      targetLabel: "working tree diff"
+    }
+  );
+
+  assert.match(output, /Codex returned JSON with an unexpected review shape\./);
+  assert.match(output, /Missing array `findings`\./);
+  assert.match(output, /Raw final message:/);
+});
+
+test("renderStoredJobResult prefers rendered output for structured review jobs", () => {
+  const output = renderStoredJobResult(
+    {
+      id: "review-123",
+      status: "completed",
+      title: "Codex Adversarial Review",
+      jobClass: "review",
+      threadId: "thr_123"
+    },
+    {
+      threadId: "thr_123",
+      rendered: "# Codex Adversarial Review\n\nTarget: working tree diff\nVerdict: needs-attention\n",
+      result: {
+        result: {
+          verdict: "needs-attention",
+          summary: "One issue.",
+          findings: [],
+          next_steps: []
+        },
+        rawOutput:
+          '{"verdict":"needs-attention","summary":"One issue.","findings":[],"next_steps":[]}'
+      }
+    }
+  );
+
+  assert.match(output, /^# Codex Adversarial Review/);
+  assert.doesNotMatch(output, /^\{/);
+  assert.match(output, /Codex session ID: thr_123/);
+  assert.match(output, /Resume in Codex: codex resume thr_123/);
+});
+
+test("renderStatusReport escapes backslashes before pipes in active-job table cells", () => {
+  const output = renderStatusReport({
+    sessionRuntime: { label: "direct startup" },
+    config: { stopReviewGate: false },
+    running: [
+      {
+        id: "job-1",
+        kindLabel: "task",
+        status: "running",
+        // Literal characters in the summary: payload \| breakout
+        summary: "payload \\| breakout"
+      }
+    ],
+    latestFinished: null,
+    recent: [],
+    needsReview: false
+  });
+
+  // The backslash must be escaped first (\ -> \\), then the pipe (| -> \|),
+  // yielding the literal sequence: payload \\\| breakout
+  assert.ok(output.includes("payload \\\\\\| breakout"), "backslash and pipe both escaped");
+  // The broken form (\\ followed by a live |) must not appear: an input of
+  // "\|" rendering as "\\|" leaves the pipe unescaped and splits the cell.
+  assert.ok(!output.includes("payload \\\\| breakout"), "no unescaped pipe after escaped backslash");
+});

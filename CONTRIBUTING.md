@@ -232,8 +232,8 @@ subject (no skill) is fine — give it its own bundle with an empty `skills: []`
 Cloud sessions run on a fresh VM with only a clone of this repo. Dev-helper plugins are not
 auto-configured for these sessions — enable the external dev-helpers (Go/LSP, PR review, Python
 tooling, git worktrees, general workflows) yourself in your **user** settings; see
-[`docs/external-marketplaces.md`](docs/external-marketplaces.md) for the curated set and how to
-enable them. Never enable the `rdl-agent-extensions` marketplace or any of its published plugins
+[`docs/external-marketplaces.md`](docs/external-marketplaces.md) for the policy on installing
+external plugins from their own upstream marketplaces. Never enable the `rdl-agent-extensions` marketplace or any of its published plugins
 for catalog development — a session for developing the catalog should not install the catalog
 itself.
 

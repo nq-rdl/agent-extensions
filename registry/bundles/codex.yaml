@@ -1,0 +1,32 @@
+schemaVersion: v1
+id: codex
+displayName: Codex
+description: Delegate work to the OpenAI Codex CLI — reviews, background tasks, and rescue sessions
+keywords: [codex, openai, delegation, review, gpt-5-6]
+owners:
+  - rdl
+channels:
+  - stable
+license: Apache-2.0
+skills:
+  - {source: codex-setup, leaf: setup}
+  - {source: codex-review, leaf: review}
+  - {source: codex-adversarial-review, leaf: adversarial-review}
+  - {source: codex-rescue, leaf: rescue}
+  - {source: codex-result, leaf: result}
+  - {source: codex-status, leaf: status}
+  - {source: codex-transfer, leaf: transfer}
+  - {source: codex-cancel, leaf: cancel}
+  - {source: codex-cli-runtime, leaf: cli-runtime}
+  - {source: codex-result-handling, leaf: result-handling}
+  - {source: gpt-5-6-prompting, leaf: prompting}
+  - {source: codex-model-guide, leaf: model-guide}
+agents: [codex-rescue]
+hooks: [codex-session-lifecycle, codex-stop-review-gate]
+prompts: []
+mcp: []
+targets:
+  claude:
+    enabled: true
+    pluginName: codex
+    marketplaceName: rdl-agent-extensions

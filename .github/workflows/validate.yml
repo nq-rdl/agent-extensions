@@ -98,6 +98,13 @@ jobs:
       - name: Run pipeline-script unit tests
         run: python3 -m unittest discover -s tests -p 'test_*.py' -v
 
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Run codex plugin JS tests
+        run: node --test tests/codex/*.test.mjs
+
   validate-skills:
     name: Validate skills against the agentskills.io spec (asctl)
     runs-on: ubuntu-latest

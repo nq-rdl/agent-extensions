@@ -180,11 +180,14 @@ Agents derived from external sources (e.g. `github/awesome-copilot`, MIT) carry 
 
 | Work type | Language | Rationale |
 |---|---|---|
-| New CLI helper or MCP server | Go (`CGO_ENABLED=0`, `GOOS`/`GOARCH` matrix) | Zero-install prebuilt binaries; no runtime dep on Node |
+| New first-party CLI helper or MCP server | Go (`CGO_ENABLED=0`, `GOOS`/`GOARCH` matrix) | Zero-install prebuilt binaries; no runtime dep on Node |
+| Vendored/forked plugin runtime | May retain its upstream language | Full-fidelity forks must not be rewritten; allowed when the design documents runtime availability and distribution |
 | File-format or ML skill | Python + `ensure-deps.sh` | Direct library access; bootstrapping handled by the script |
 | Documentation-only skill | Markdown | No execution needed |
 | Plugin wiring | JSON/YAML/shell | Manifests and glue only |
 | New TypeScript | Not permitted | Bun hard-dependency, no CI, no binary output path |
+
+The **vendored-runtime** row exists for the Codex plugin (see *Codex plugin: full-fidelity fork* below). It vendors the upstream Node.js `.mjs` runtime as-is; Bun is the local dev manager; it carries zero runtime npm dependencies; and Node.js >=18.18.0 is an external user prerequisite enforced by a first-use preflight (the hook `.sh` wrappers and the setup skill both check it and emit one exact message). This is a scoped exception to "new executable code is Go" — it applies only to code inherited from an upstream fork, not to net-new first-party tooling. If such a runtime is ever packaged rather than vendored in-tree, GitHub Packages/ghcr is the org distribution channel.
 
 ### Go house style
 
@@ -193,6 +196,49 @@ MCP servers in `mcp/*-go/` follow a Makefile with a `cross-compile` target that 
 ### Python / pixi
 
 `pixi` provides the repo's reproducible Python environments — the default (`python` + `pyyaml`, solved for `linux-64`/`osx-64`/`osx-arm64`) runs the registry/pipeline scripts, and `docs` (`zensical`) builds the docs site via the `zensical` pixi task (`pixi run zensical serve` / `pixi run zensical build`). It stays optional, though: the `docs` environment is `linux-64` only, so macOS contributors build docs either in the dedicated **Zensical Docs** dev container (`.devcontainer/docs/`, pinned to `linux/amd64` so the `linux-64` env resolves) or with `uv`/`pip` directly, and Python skill `ensure-deps.sh` scripts walk `pixi > uv > mamba > conda > pip`, so they work without pixi.
+
+## Codex plugin: full-fidelity fork
+
+The `codex` plugin is a **full-fidelity fork** of
+[`openai/codex-plugin-cc`](https://github.com/openai/codex-plugin-cc) at **v1.0.6
+@ `db52e28`** (Apache-2.0). "Full-fidelity" means the upstream Node.js `.mjs`
+runtime (broker, job store, socket protocol, app-server wiring) is vendored **as-is**
+under `plugins/codex/scripts/` with only surgical patches — it is not rewritten in
+Go. This is the concrete case the *vendored-runtime* language-policy row was added
+for: rewriting a live agent runtime would forfeit correctness, so the fork keeps
+upstream's language.
+
+**Targeted-modernization boundary.** The modifications are deliberately narrow:
+
+- The 8 deprecated upstream slash-commands become 8 user-invocable **action skills**
+  (1:1), invoked as `/codex:setup`, `/codex:review`, `/codex:rescue`, etc.
+- The prompting knowledge is rewritten for the **GPT-5.6** catalog (Sol / Terra /
+  Luna, the `low|medium|high|xhigh|max|ultra` effort ladder, `spark`), with a new
+  `codex-model-guide` skill.
+- Hooks are re-expressed in Claude Code **exec form** with a Node.js >=18.18.0
+  external preflight in the `.sh` wrappers.
+
+Everything else — the broker/job-store/socket internals — is untouched.
+
+**Licensing.** Provenance is preserved with a split-license treatment:
+
+- a per-bundle `license: Apache-2.0` override in `registry/bundles/codex.yaml`,
+  stamped into the generated `plugin.json` and `marketplace.json` (the generator's
+  default is the repo's MIT);
+- `plugins/codex/LICENSE` (Apache-2.0 text) and `plugins/codex/NOTICE` (upstream
+  copyright + fork/modification statement);
+- a repo-root `NOTICE` that maps every Apache-derived path under the otherwise-MIT
+  repo;
+- per-file `SPDX-License-Identifier: Apache-2.0` headers on the derived canonical
+  Markdown/shell/rST files, while the vendored `.mjs`/prompt/schema trees are
+  covered wholesale by the plugin LICENSE/NOTICE (kept header-free to stay
+  "vendored as-is").
+
+**Future evolution.** The long-term direction (Approach C) is to replace the
+vendored app-server broker with native `codex exec --json` / `--output-schema`
+once that CLI surface stabilizes, shrinking the vendored runtime toward a thin
+Go or shell adapter. The fork boundary above is what keeps that migration
+tractable.
 
 ## CI and release design
 
