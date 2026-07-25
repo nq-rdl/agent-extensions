@@ -49,7 +49,12 @@ const USAGE_AND_ENVIRONMENT = [
   },
   {
     cause: "rate-limit",
-    pattern: /rate limit|usage limit|\bquota\b|\b429\b/i,
+    // A bare `\b429\b` is a fail-open: it matches a stack-frame column number
+    // (e.g. "codex.mjs:429:12") or a JSON.parse error offset (V8's "... in
+    // JSON at position 429") just as readily as an HTTP 429, silently
+    // discarding a genuine crash as "rate limit, retry later" with no
+    // cross-check. Require explicit status-code context instead.
+    pattern: /rate limit|usage limit|\bquota\b|\b(?:status(?: code)?|http)\s+429\b/i,
     remedy: "Wait for the limit to reset and retry."
   }
 ];

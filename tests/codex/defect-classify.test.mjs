@@ -64,8 +64,38 @@ test("the observed auth failure defers to a setup cross-check", () => {
 });
 
 test("rate limiting is not a defect", () => {
-  assert.equal(classifyDefect({ message: "429 rate limit exceeded" }).verdict, "not-a-defect");
-  assert.equal(classifyDefect({ message: "You have hit your usage limit." }).verdict, "not-a-defect");
+  const rateLimitMessage = classifyDefect({ message: "429 rate limit exceeded" });
+  assert.equal(rateLimitMessage.verdict, "not-a-defect");
+  assert.equal(rateLimitMessage.cause, "rate-limit");
+
+  const usageLimitMessage = classifyDefect({ message: "You have hit your usage limit." });
+  assert.equal(usageLimitMessage.verdict, "not-a-defect");
+  assert.equal(usageLimitMessage.cause, "rate-limit");
+});
+
+test("a bare 429 with status-code context is a rate limit, not a defect", () => {
+  const httpForm = classifyDefect({ message: "Request failed: HTTP 429" });
+  assert.equal(httpForm.verdict, "not-a-defect");
+  assert.equal(httpForm.cause, "rate-limit");
+
+  const statusCodeForm = classifyDefect({ message: "Request failed with status code 429" });
+  assert.equal(statusCodeForm.verdict, "not-a-defect");
+  assert.equal(statusCodeForm.cause, "rate-limit");
+});
+
+test("a bare 429 without status-code context is a candidate defect, not a rate limit", () => {
+  // A stack-frame column number can contain "429" with no HTTP status in
+  // sight; the rate-limit rule must not fire on it.
+  const stackFrame = classifyDefect({
+    message: "TypeError: Cannot read properties of undefined\n    at run (/x/codex.mjs:429:12)"
+  });
+  assert.equal(stackFrame.verdict, "candidate-defect");
+  assert.notEqual(stackFrame.cause, "rate-limit");
+
+  // V8's JSON.parse error message embeds a character offset, not a status code.
+  const jsonOffset = classifyDefect({ message: "Unexpected token < in JSON at position 429" });
+  assert.equal(jsonOffset.verdict, "candidate-defect");
+  assert.notEqual(jsonOffset.cause, "rate-limit");
 });
 
 test("classifyDefect also inspects the stderr tail", () => {
