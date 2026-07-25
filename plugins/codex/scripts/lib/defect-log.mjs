@@ -30,8 +30,26 @@ const SAFE_VALUE_FLAGS = new Set([
   "--poll-interval-ms"
 ]);
 
+// Ids only ever originate from recordDefect's own template
+// (`defect-<iso-with-dashes>-<random>`): letters, digits, hyphens. Anything
+// else — including a path separator or `..` — is rejected before it can be
+// joined into a filesystem path.
+const DEFECT_ID_PATTERN = /^defect-[A-Za-z0-9-]+$/;
+
 export function resolveDefectsDir(cwd) {
-  return path.join(resolveStateDir(cwd), DEFECTS_DIR_NAME);
+  // resolveStateDir (via resolveWorkspaceRoot) throws for a non-string,
+  // non-nullish cwd. Every other export in this module absorbs that behind a
+  // try/catch; this is the one export those functions call unguarded, so it
+  // must degrade to a usable fallback instead of throwing itself.
+  try {
+    return path.join(resolveStateDir(cwd), DEFECTS_DIR_NAME);
+  } catch {
+    try {
+      return path.join(resolveStateDir(process.cwd()), DEFECTS_DIR_NAME);
+    } catch {
+      return path.join(os.tmpdir(), "codex-companion", DEFECTS_DIR_NAME);
+    }
+  }
 }
 
 function ensureDefectsDir(cwd) {
@@ -90,6 +108,19 @@ export function tailText(value) {
     tail = tail.slice(-STDERR_TAIL_BYTES);
   }
   return tail;
+}
+
+// Conservative by design: only the user's home directory is scrubbed, not
+// every absolute path. Plugin-relative paths in a stack trace are the useful
+// part of the diagnostic; the home directory name is the part that leaks who
+// the user is once a marker is attached to a public GitHub issue.
+function scrubHomeDir(value) {
+  const text = typeof value === "string" ? value : "";
+  if (!text) {
+    return text;
+  }
+  const home = os.homedir();
+  return home ? text.split(home).join("~") : text;
 }
 
 function probeVersion(command, args) {
@@ -183,8 +214,8 @@ export function recordDefect(cwd, details = {}) {
       surface: details.surface ?? "companion",
       argv: redactArgv(details.argv),
       exitCode: details.exitCode ?? 1,
-      message: String(details.message ?? "").slice(0, MESSAGE_MAX_CHARS),
-      stderrTail: tailText(details.stderr),
+      message: scrubHomeDir(String(details.message ?? "")).slice(0, MESSAGE_MAX_CHARS),
+      stderrTail: tailText(scrubHomeDir(details.stderr)),
       jobId: details.jobId ?? null,
       threadId: details.threadId ?? null,
       environment: collectEnvironment(cwd),
@@ -229,6 +260,12 @@ export function readDefect(cwd, id) {
 
 export function markDefectReported(cwd, id, { url = null } = {}) {
   try {
+    if (typeof id !== "string" || !DEFECT_ID_PATTERN.test(id)) {
+      // Defense-in-depth: id is caller-supplied and gets joined into a path.
+      // Reject anything that isn't the shape recordDefect generates (only
+      // letters, digits, hyphens) before it can escape defects/.
+      return false;
+    }
     const dir = resolveDefectsDir(cwd);
     const file = path.join(dir, `${id}.json`);
     const marker = JSON.parse(fs.readFileSync(file, "utf8"));
