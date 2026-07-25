@@ -15,7 +15,7 @@ jobs:
     # (the bot has no way to run `changie new`). Human PRs still require one.
     if: ${{ !contains(github.event.pull_request.labels.*.name, 'skip-changelog') && github.actor != 'dependabot[bot]' }}
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@v7.0.1
         with:
           fetch-depth: 0
 
