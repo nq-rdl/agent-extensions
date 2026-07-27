@@ -1,4 +1,14 @@
+import process from "node:process";
+
 import { ensureGitRepository } from "./git.mjs";
+
+// Callers path.join / path.basename the result, so this must always hand back a
+// usable string. A caller's own cwd is preferred; process.cwd() is the last
+// resort for a nullish or non-string one, which is a programming error rather
+// than a workspace this function could name.
+function fallbackRoot(cwd) {
+  return typeof cwd === "string" && cwd !== "" ? cwd : process.cwd();
+}
 
 export function resolveWorkspaceRoot(cwd) {
   try {
@@ -11,8 +21,8 @@ export function resolveWorkspaceRoot(cwd) {
     // into one shared state directory and concurrent processes split-brain
     // across two different surfaced.json files. Fall back to cwd, which is
     // what an explicitly non-git workspace already resolves to.
-    return ensureGitRepository(cwd) || cwd;
+    return ensureGitRepository(cwd) || fallbackRoot(cwd);
   } catch {
-    return cwd;
+    return fallbackRoot(cwd);
   }
 }

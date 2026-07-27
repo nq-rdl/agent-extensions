@@ -22,22 +22,33 @@ const WRAPPERS = [
   ["defect-report", DEFECT_WRAPPER]
 ];
 
-// A fake `node` that answers the wrapper's version probes with `major.minor` and,
-// when exec'd on the hook script, streams stdin through and exits with `exitCode`.
+// A fake `node` that answers the wrapper's single version probe with
+// `major minor` and, when exec'd on the hook script, streams stdin through and
+// exits with `exitCode`. The wrapper deliberately issues one `-p` rather than
+// two — a second Node start-up costs ~40ms on every hook invocation — so this
+// stub answers any `-p` with the pair rather than matching on the expression.
 function fakeNode(major, minor, exitCode = 0) {
   return `#!/bin/sh
 case "$1" in
   -p)
-    case "$2" in
-      *'[0]'*) echo ${major} ;;
-      *'[1]'*) echo ${minor} ;;
-      *) echo "" ;;
-    esac
+    echo "${major} ${minor}"
     ;;
   *)
     while IFS= read -r line; do printf '%s\n' "$line"; done
     exit ${exitCode}
     ;;
+esac
+`;
+}
+
+// A `node` that exists but whose version probe yields nothing usable. Without
+// the wrapper's parse guard this dies inside `[ "$major" -lt 18 ]` under
+// `set -e`, exiting non-zero with no explanation of what the user must install.
+function fakeNodeWithUnusableProbe() {
+  return `#!/bin/sh
+case "$1" in
+  -p) echo "" ;;
+  *)  exit 0 ;;
 esac
 `;
 }
@@ -89,5 +100,19 @@ for (const [name, wrapperPath] of WRAPPERS) {
 
     assert.equal(result.status, 1);
     assert.equal(result.stderr.trim(), NODE_PREFLIGHT_MESSAGE);
+  });
+
+  test(`${name} wrapper reports the preflight message when the version probe is unusable`, () => {
+    const binDir = makeTempDir();
+    writeExecutable(path.join(binDir, "node"), fakeNodeWithUnusableProbe());
+
+    const result = runWrapper(wrapperPath, binDir, "");
+
+    assert.equal(result.status, 1);
+    assert.equal(
+      result.stderr.trim(),
+      NODE_PREFLIGHT_MESSAGE,
+      "an unparseable probe must name the requirement, not exit bare from `set -e`"
+    );
   });
 }

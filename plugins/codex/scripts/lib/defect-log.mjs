@@ -67,10 +67,11 @@ const FLAG_PATTERN = /^--?[A-Za-z][A-Za-z0-9-]*$/;
 const SUBCOMMAND_PATTERN = /^[a-z][a-z0-9-]*$/;
 
 export function resolveDefectsDir(cwd) {
-  // resolveStateDir (via resolveWorkspaceRoot) throws for a non-string,
-  // non-nullish cwd. Every other export in this module absorbs that behind a
-  // try/catch; this is the one export those functions call unguarded, so it
-  // must degrade to a usable fallback instead of throwing itself.
+  // resolveWorkspaceRoot now falls back to process.cwd() for a malformed cwd
+  // rather than handing one on, so resolveStateDir is total for every input
+  // this module passes it. The guard stays because this is the one export the
+  // others call unguarded: it must degrade to a usable path, not throw, if any
+  // step below it (a realpath, a PLUGIN_DATA env var) ever regains a throw.
   try {
     return path.join(resolveStateDir(cwd), DEFECTS_DIR_NAME);
   } catch {
