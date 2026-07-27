@@ -217,8 +217,16 @@ upstream's language.
   `codex-model-guide` skill.
 - Hooks are re-expressed in Claude Code **exec form** with a Node.js >=18.18.0
   external preflight in the `.sh` wrappers.
+- A **first-party defect-logging subsystem** (`scripts/lib/defect-log.mjs`,
+  `scripts/lib/defect-classify.mjs`, `scripts/codex-defects.mjs`,
+  `scripts/defect-report-hook.mjs`, its `.sh` wrapper, and the
+  `codex-report-defect` skill) is added alongside the vendored runtime, and
+  `codex-companion.mjs`'s top-level `main().catch` handler is patched to record a
+  marker. This is original nq-rdl code, not an upstream derivation — see
+  **Licensing** below.
 
-Everything else — the broker/job-store/socket internals — is untouched.
+Beyond the entrypoint patch noted above, the vendored internals — broker, job
+store, socket protocol, app-server wiring — are untouched.
 
 **Licensing.** Provenance is preserved with a split-license treatment:
 
@@ -232,7 +240,15 @@ Everything else — the broker/job-store/socket internals — is untouched.
 - per-file `SPDX-License-Identifier: Apache-2.0` headers on the derived canonical
   Markdown/shell/rST files, while the vendored `.mjs`/prompt/schema trees are
   covered wholesale by the plugin LICENSE/NOTICE (kept header-free to stay
-  "vendored as-is").
+  "vendored as-is");
+- a **first-party carve-out**: the defect-logging subsystem listed above is
+  original nq-rdl work living inside the vendored `scripts/` tree. It is licensed
+  Apache-2.0 to match the bundle, but its copyright is nq-rdl's, so each of those
+  files carries both an `SPDX-License-Identifier: Apache-2.0` and an
+  `SPDX-FileCopyrightText: 2026 nq-rdl` line. Header *presence* alone is
+  therefore not a provenance signal inside `plugins/codex/scripts/` — the
+  `SPDX-FileCopyrightText` line is. The repo-root `NOTICE` holds the
+  authoritative path list.
 
 **Future evolution.** The long-term direction (Approach C) is to replace the
 vendored app-server broker with native `codex exec --json` / `--output-schema`

@@ -11,13 +11,15 @@ const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..", ".
 const PLUGIN_ROOT = path.join(ROOT, "plugins", "codex");
 const SESSION_WRAPPER = path.join(PLUGIN_ROOT, "scripts", "codex-session-lifecycle.sh");
 const STOP_WRAPPER = path.join(PLUGIN_ROOT, "scripts", "codex-stop-review-gate.sh");
+const DEFECT_WRAPPER = path.join(PLUGIN_ROOT, "scripts", "codex-defect-report.sh");
 
 const NODE_PREFLIGHT_MESSAGE =
   "Codex plugin requires Node.js >=18.18.0; install or upgrade Node: https://nodejs.org/en/download";
 
 const WRAPPERS = [
   ["session-lifecycle", SESSION_WRAPPER],
-  ["stop-review-gate", STOP_WRAPPER]
+  ["stop-review-gate", STOP_WRAPPER],
+  ["defect-report", DEFECT_WRAPPER]
 ];
 
 // A fake `node` that answers the wrapper's version probes with `major.minor` and,

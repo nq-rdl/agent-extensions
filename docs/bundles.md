@@ -365,12 +365,13 @@ Delegate work to the OpenAI Codex CLI — reviews, background tasks, and rescue 
 - `/codex:result-handling`
 - `/codex:prompting`
 - `/codex:model-guide`
+- `/codex:report-defect`
 
 **Agents**
 
 - `codex-rescue` (subagent)
 
-**Hooks:** `codex-session-lifecycle`, `codex-stop-review-gate`
+**Hooks:** `codex-session-lifecycle`, `codex-stop-review-gate`, `codex-defect-report`
 
 ---
 

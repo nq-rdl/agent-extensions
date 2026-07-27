@@ -1080,6 +1080,11 @@ async function main() {
 main().catch((error) => {
   const message = error instanceof Error ? error.message : String(error);
   const argv = process.argv.slice(2);
+  // Surface the failure before recording it. recordDefect writes the marker
+  // synchronously and probes `codex --version` under a timeout, so reporting
+  // must never sit in front of the message the user is waiting on.
+  process.stderr.write(`${message}\n`);
+  process.exitCode = 1;
   // Best-effort and fully guarded. recordDefect already swallows its own
   // failures, but parseCommandInput/resolveCommandCwd can throw on malformed
   // argv — and a reporting problem must never mask the original error.
@@ -1095,6 +1100,4 @@ main().catch((error) => {
   } catch {
     // Losing the marker is acceptable; losing the error message is not.
   }
-  process.stderr.write(`${message}\n`);
-  process.exitCode = 1;
 });

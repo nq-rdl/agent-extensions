@@ -1,4 +1,5 @@
 // SPDX-License-Identifier: Apache-2.0
+// SPDX-FileCopyrightText: 2026 nq-rdl
 
 import test from "node:test";
 import assert from "node:assert/strict";
@@ -96,6 +97,71 @@ test("a bare 429 without status-code context is a candidate defect, not a rate l
   const jsonOffset = classifyDefect({ message: "Unexpected token < in JSON at position 429" });
   assert.equal(jsonOffset.verdict, "candidate-defect");
   assert.notEqual(jsonOffset.cause, "rate-limit");
+});
+
+test("a quota-shaped ref or path without limit context is a candidate defect", () => {
+  // `message` embeds the user's --base ref and raw git stderr via
+  // formatCommandFailure, so a branch named `quota-fix` must not be swallowed
+  // as a rate limit -- not-a-defect is the one verdict that discards the marker.
+  const gitRef = classifyDefect({
+    message:
+      "git merge-base HEAD quota-fix: exit=128: fatal: Not a valid object name quota-fix"
+  });
+  assert.equal(gitRef.verdict, "candidate-defect");
+  assert.notEqual(gitRef.cause, "rate-limit");
+
+  const installPath = classifyDefect({
+    message:
+      "TypeError: Cannot read properties of undefined\n    at run (/srv/quota/lib/codex.mjs:12:3)"
+  });
+  assert.equal(installPath.verdict, "candidate-defect");
+  assert.notEqual(installPath.cause, "rate-limit");
+});
+
+test("a real quota exhaustion is still not a defect", () => {
+  for (const message of [
+    "You exceeded your current quota, please check your plan and billing details.",
+    'openai error: {"code":"insufficient_quota"}',
+    "Quota exceeded for this organization",
+    "You have run out of quota for this billing period"
+  ]) {
+    const verdict = classifyDefect({ message });
+    assert.equal(verdict.verdict, "not-a-defect", message);
+    assert.equal(verdict.cause, "rate-limit", message);
+  }
+});
+
+test("a bare 401 with status-code context needs an auth cross-check", () => {
+  const httpForm = classifyDefect({ message: "Request failed: HTTP 401" });
+  assert.equal(httpForm.verdict, "needs-cross-check");
+  assert.equal(httpForm.cause, "auth");
+
+  const statusCodeForm = classifyDefect({ message: "Request failed with status code 401" });
+  assert.equal(statusCodeForm.verdict, "needs-cross-check");
+  assert.equal(statusCodeForm.cause, "auth");
+
+  const unauthorized = classifyDefect({ message: "stream error: unexpected status 401 Unauthorized" });
+  assert.equal(unauthorized.verdict, "needs-cross-check");
+  assert.equal(unauthorized.cause, "auth");
+});
+
+test("a bare 401 without status-code context is a candidate defect, not auth", () => {
+  // stderrTail is a real V8 stack (codex-companion.mjs passes error.stack), so
+  // a frame at line 401 must not be read as an HTTP 401.
+  const stackFrame = classifyDefect({
+    message: "TypeError: Cannot read properties of undefined (reading 'threadId')",
+    stderrTail:
+      "TypeError: Cannot read properties of undefined\n    at belongsToTurn (file:///x/lib/codex.mjs:401:22)"
+  });
+  assert.equal(stackFrame.verdict, "candidate-defect");
+  assert.notEqual(stackFrame.cause, "auth");
+
+  // V8's JSON.parse offset, surfaced verbatim by app-server.mjs's parse guard.
+  const jsonOffset = classifyDefect({
+    message: "Failed to parse codex app-server JSONL: Unexpected token } in JSON at position 401"
+  });
+  assert.equal(jsonOffset.verdict, "candidate-defect");
+  assert.notEqual(jsonOffset.cause, "auth");
 });
 
 test("classifyDefect also inspects the stderr tail", () => {

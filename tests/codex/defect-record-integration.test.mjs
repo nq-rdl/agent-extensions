@@ -1,4 +1,5 @@
 // SPDX-License-Identifier: Apache-2.0
+// SPDX-FileCopyrightText: 2026 nq-rdl
 
 import path from "node:path";
 import process from "node:process";

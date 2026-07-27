@@ -1,4 +1,5 @@
 // SPDX-License-Identifier: Apache-2.0
+// SPDX-FileCopyrightText: 2026 nq-rdl
 
 import path from "node:path";
 import process from "node:process";
@@ -6,6 +7,7 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import { fileURLToPath } from "node:url";
 
+import { buildEnv, installFakeCodex } from "./fake-codex-fixture.mjs";
 import { makeTempDir, run } from "./helpers.mjs";
 import {
   listDefects,
@@ -17,11 +19,11 @@ import {
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..", "..");
 const CLI = path.join(ROOT, "plugins", "codex", "scripts", "codex-defects.mjs");
 
-function runCli(args, cwd) {
-  return run(process.execPath, [CLI, ...args, "--cwd", cwd], { env: process.env });
+function runCli(args, cwd, env = process.env) {
+  return run(process.execPath, [CLI, ...args, "--cwd", cwd], { env });
 }
 
-test("list --json reports unreported defects with a classification verdict", () => {
+test("list reports unreported defects with a classification verdict", () => {
   const workspace = makeTempDir();
   recordDefect(workspace, { message: "Stored job task-abc is missing its task request payload." });
 
@@ -41,7 +43,7 @@ test("list --json reports unreported defects with a classification verdict", () 
   assert.equal(entry.cause, "unclassified");
 });
 
-test("list --json defaults to unreported markers; --all returns every retained marker", () => {
+test("list defaults to unreported markers; --all returns every retained marker", () => {
   const workspace = makeTempDir();
   recordDefect(workspace, { message: "Stored job task-abc is missing its task request payload." });
   recordDefect(workspace, { message: "Unknown subcommand: taks" });
@@ -57,11 +59,24 @@ test("list --json defaults to unreported markers; --all returns every retained m
   assert.equal(JSON.parse(all.stdout).defects.length, 2);
 });
 
-test("list --json is empty and still valid JSON when there are no defects", () => {
+test("list is empty and still valid JSON when there are no defects", () => {
   const result = runCli(["list", "--json"], makeTempDir());
 
   assert.equal(result.status, 0, result.stderr);
   assert.deepEqual(JSON.parse(result.stdout).defects, []);
+});
+
+test("--json is accepted but is a no-op: output is identical with and without it", () => {
+  const workspace = makeTempDir();
+  recordDefect(workspace, { message: "Stored job task-abc is missing its task request payload." });
+
+  const withFlag = runCli(["list", "--json"], workspace);
+  const withoutFlag = runCli(["list"], workspace);
+
+  assert.equal(withFlag.status, 0, withFlag.stderr);
+  assert.equal(withoutFlag.status, 0, withoutFlag.stderr);
+  assert.equal(withFlag.stdout, withoutFlag.stdout);
+  assert.equal(JSON.parse(withoutFlag.stdout).defects.length, 1);
 });
 
 test("show --latest returns the full marker plus its classification", () => {
@@ -145,4 +160,37 @@ test("an unknown subcommand exits non-zero", () => {
 
   assert.equal(result.status, 1);
   assert.match(result.stderr, /Unknown subcommand/);
+});
+
+// The message defect-classify.test.mjs already pins to needs-cross-check.
+const AUTH_FAILURE =
+  "Your access token could not be refreshed because your refresh token was already used. Please log out and sign in again.";
+
+test("an auth marker resolves to a terminal verdict when the readiness check reports ready", () => {
+  const workspace = makeTempDir();
+  const binDir = makeTempDir();
+  installFakeCodex(binDir); // default behavior: logged in
+  recordDefect(workspace, { message: AUTH_FAILURE });
+
+  const result = runCli(["show", "--latest"], workspace, buildEnv(binDir));
+  assert.equal(result.status, 0, result.stderr);
+
+  const payload = JSON.parse(result.stdout);
+  assert.equal(payload.classification.verdict, "candidate-defect");
+  assert.equal(payload.classification.cause, "readiness-check-disagreement");
+});
+
+test("an auth marker resolves to not-a-defect when the readiness check agrees the session is logged out", () => {
+  const workspace = makeTempDir();
+  const binDir = makeTempDir();
+  installFakeCodex(binDir, "logged-out");
+  recordDefect(workspace, { message: AUTH_FAILURE });
+
+  const result = runCli(["list"], workspace, buildEnv(binDir));
+  assert.equal(result.status, 0, result.stderr);
+
+  const [entry] = JSON.parse(result.stdout).defects;
+  assert.notEqual(entry.verdict, "needs-cross-check", "list must never emit a non-terminal verdict");
+  assert.equal(entry.verdict, "not-a-defect");
+  assert.equal(entry.cause, "auth");
 });
