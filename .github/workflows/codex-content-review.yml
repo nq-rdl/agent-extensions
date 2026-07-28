@@ -57,7 +57,7 @@ jobs:
     if: github.event.pull_request.head.repo.full_name == github.repository
     steps:
       - name: Check out PR (full history, for base-ref diffing)
-        uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd # v5.0.1
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           fetch-depth: 0
 
@@ -139,7 +139,7 @@ jobs:
       - name: Post review as PR comment
         if: steps.key.outputs.present == 'true'
         continue-on-error: true # informational — a comment-post failure must not gate the PR
-        uses: actions/github-script@f28e40c7f34bde8b3046d885e986cb6290c5673b # v7.1.0
+        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
         env:
           REVIEW_BODY: ${{ steps.codex.outputs.final-message }}
         with:
