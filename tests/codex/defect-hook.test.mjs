@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: Apache-2.0
 // SPDX-FileCopyrightText: 2026 nq-rdl
 
+import fs from "node:fs";
 import path from "node:path";
 import process from "node:process";
 import test from "node:test";
@@ -91,25 +92,65 @@ test("a failed job is surfaced exactly once", () => {
   assert.equal(second.stdout.trim(), "", "the same failed job must not be surfaced twice");
 });
 
-test("PostToolUse only fires for a codex-companion command", () => {
-  const workspace = makeTempDir();
-  recordDefect(workspace, { message: "Unknown subcommand: taks" });
+// Both tool outcomes, not just the success one. A Bash call that exits non-zero
+// raises PostToolUseFailure and *not* PostToolUse -- and recordDefect always
+// precedes a non-zero exit, so the failure event is the one carrying the turn a
+// marker is actually written on.
+for (const event of ["PostToolUse", "PostToolUseFailure"]) {
+  test(`${event} only fires for a codex-companion command`, () => {
+    const workspace = makeTempDir();
+    recordDefect(workspace, { message: "Unknown subcommand: taks" });
 
-  const unrelated = runHook(
-    { hook_event_name: "PostToolUse", tool_name: "Bash", tool_input: { command: "ls -la" } },
-    workspace
-  );
-  assert.equal(unrelated.stdout.trim(), "", "an unrelated Bash call must not trigger the nudge");
+    const unrelated = runHook(
+      { hook_event_name: event, tool_name: "Bash", tool_input: { command: "ls -la" } },
+      workspace
+    );
+    assert.equal(unrelated.stdout.trim(), "", "an unrelated Bash call must not trigger the nudge");
 
-  const relevant = runHook(
-    {
-      hook_event_name: "PostToolUse",
-      tool_name: "Bash",
-      tool_input: { command: 'node "/x/scripts/codex-companion.mjs" status' }
-    },
-    workspace
-  );
-  assert.match(relevant.stdout, /\/codex:report-defect/);
+    const relevant = runHook(
+      {
+        hook_event_name: event,
+        tool_name: "Bash",
+        tool_input: { command: 'node "/x/scripts/codex-companion.mjs" status' }
+      },
+      workspace
+    );
+    assert.match(relevant.stdout, /\/codex:report-defect/);
+    assert.equal(
+      JSON.parse(relevant.stdout).hookSpecificOutput.hookEventName,
+      event,
+      "the advisory must be labelled with the event Claude Code sent"
+    );
+  });
+}
+
+// The gap this closes was a wiring omission, not a logic bug: the hook handled
+// the events correctly and hooks.json simply never sent it the ones that matter.
+// Nothing else in the suite reads hooks.json, so nothing else can catch that.
+test("hooks.json wires the defect hook for every event it handles", () => {
+  const hooks = JSON.parse(
+    fs.readFileSync(path.join(ROOT, "plugins", "codex", "hooks", "hooks.json"), "utf8")
+  ).hooks;
+
+  const wiredFor = (event) =>
+    (hooks[event] ?? []).some((entry) =>
+      (entry.hooks ?? []).some((hook) => String(hook.command).includes("codex-defect-report.sh"))
+    );
+
+  // PostToolUseFailure is the load-bearing one: a recorded defect exits non-zero,
+  // so without it the nudge waits for an unrelated later event.
+  for (const event of ["SessionStart", "SubagentStop", "PostToolUse", "PostToolUseFailure"]) {
+    assert.equal(wiredFor(event), true, `${event} must invoke codex-defect-report.sh`);
+  }
+
+  // Both tool events must stay narrowed to Bash; the hook's own command filter
+  // assumes tool_input.command exists.
+  for (const event of ["PostToolUse", "PostToolUseFailure"]) {
+    const entry = hooks[event].find((candidate) =>
+      (candidate.hooks ?? []).some((hook) => String(hook.command).includes("codex-defect-report.sh"))
+    );
+    assert.equal(entry.matcher, "Bash", `${event} must match only Bash`);
+  }
 });
 
 test("completed and cancelled jobs are ignored", () => {

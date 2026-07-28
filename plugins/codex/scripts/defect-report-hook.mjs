@@ -14,6 +14,13 @@ import { listSurfacedJobs, listUnreportedDefects, markJobsSurfaced } from "./lib
 import { loadState } from "./lib/state.mjs";
 
 const COMPANION_MARKER = "codex-companion.mjs";
+// The two tool-call outcomes are mutually exclusive: a Bash call that exits 0
+// raises PostToolUse, a non-zero exit raises PostToolUseFailure and *not*
+// PostToolUse. Recording a defect always precedes a non-zero exit, so the
+// failure event is the one that fires on the turn a marker is written — but it
+// fires for every failing Bash call in the session, so it needs the same
+// command filter as its success twin rather than the open default below.
+const TOOL_EVENTS = new Set(["PostToolUse", "PostToolUseFailure"]);
 // A failed job's summary is firstMeaningfulLine(rawOutput) — Codex-side text
 // with no length bound — so cap it here the way the companion caps its own.
 const DETAIL_MAX_CHARS = 200;
@@ -40,9 +47,11 @@ function readHookInput() {
   }
 }
 
-// PostToolUse fires on every Bash call; only codex-companion invocations are ours.
+// Tool events fire on every Bash call; only codex-companion invocations are
+// ours. Every other wired event (SessionStart, SubagentStop) is a lifecycle
+// event with no tool to filter on, so it passes.
 function isRelevant(input) {
-  if (input.hook_event_name !== "PostToolUse") {
+  if (!TOOL_EVENTS.has(input.hook_event_name)) {
     return true;
   }
   return String(input.tool_input?.command ?? "").includes(COMPANION_MARKER);
