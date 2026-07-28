@@ -1,6 +1,6 @@
 {
   "name": "codex",
-  "version": "0.26.0",
+  "version": "0.27.0",
   "description": "Delegate work to the OpenAI Codex CLI — reviews, background tasks, and rescue sessions",
   "author": {
     "name": "nq-rdl"

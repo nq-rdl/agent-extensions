@@ -1,3 +1,0 @@
-kind: Security
-body: 'Tests: the codex test helper never spawns through a shell now, so environment-derived absolute paths cannot be re-parsed by cmd.exe (CodeQL js/shell-command-injection-from-environment).'
-time: 2026-07-28T13:38:57.852397+10:00

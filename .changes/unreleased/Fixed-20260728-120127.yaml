@@ -1,3 +1,0 @@
-kind: Fixed
-body: 'codex plugin: the defect-report hook now fires on PostToolUseFailure. A recorded defect exits non-zero, which raises that event and not PostToolUse, so the nudge missed the turn it was written.'
-time: 2026-07-28T12:01:27.000000+10:00
