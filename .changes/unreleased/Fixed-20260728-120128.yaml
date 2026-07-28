@@ -1,3 +1,0 @@
-kind: Fixed
-body: 'codex plugin: the defect-report hook is now wired for SessionStart, so a defect recorded in one session surfaces at the start of the next instead of waiting for a SubagentStop.'
-time: 2026-07-28T12:01:28.504226+10:00

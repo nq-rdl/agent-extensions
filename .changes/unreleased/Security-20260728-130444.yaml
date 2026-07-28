@@ -1,3 +1,0 @@
-kind: Security
-body: 'CI: every third-party GitHub Action is now pinned to a full commit SHA with a version comment, replacing mutable floating tags across all workflows and docs.yml.tmpl.'
-time: 2026-07-28T13:04:44.07898+10:00

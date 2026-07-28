@@ -1,3 +1,0 @@
-kind: Fixed
-body: 'codex plugin: the surfaced-marker lock now waits on a wall-clock deadline instead of an attempt budget, so a loaded machine no longer declines marks it had time to write'
-time: 2026-07-27T14:41:00.000000+00:00

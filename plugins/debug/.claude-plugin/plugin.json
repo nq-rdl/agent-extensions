@@ -1,6 +1,6 @@
 {
   "name": "debug",
-  "version": "0.26.0",
+  "version": "0.27.0",
   "description": "Debugging and cleanup — systematic diagnosis and tech-debt removal",
   "author": {
     "name": "nq-rdl"
