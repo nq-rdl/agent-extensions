@@ -1,0 +1,3 @@
+kind: Fixed
+body: 'codex plugin: hook wrappers preflight the Node floor with one `node -p` instead of two, saving a ~40ms Node start-up on every hook invocation'
+time: 2026-07-27T15:15:00.000000+00:00

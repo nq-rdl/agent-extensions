@@ -1,5 +1,5 @@
 {
-  "description": "Codex session lifecycle + optional stop-time review gate.",
+  "description": "Codex session lifecycle, optional stop-time review gate, and defect-report nudges.",
   "hooks": {
     "SessionStart": [
       {
@@ -7,6 +7,12 @@
           {
             "type": "command",
             "command": "${CLAUDE_PLUGIN_ROOT}/scripts/codex-session-lifecycle.sh",
+            "args": [],
+            "timeout": 5
+          },
+          {
+            "type": "command",
+            "command": "${CLAUDE_PLUGIN_ROOT}/scripts/codex-defect-report.sh",
             "args": [],
             "timeout": 5
           }
@@ -33,6 +39,44 @@
             "command": "${CLAUDE_PLUGIN_ROOT}/scripts/codex-stop-review-gate.sh",
             "args": [],
             "timeout": 900
+          }
+        ]
+      }
+    ],
+    "PostToolUse": [
+      {
+        "matcher": "Bash",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "${CLAUDE_PLUGIN_ROOT}/scripts/codex-defect-report.sh",
+            "args": [],
+            "timeout": 5
+          }
+        ]
+      }
+    ],
+    "PostToolUseFailure": [
+      {
+        "matcher": "Bash",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "${CLAUDE_PLUGIN_ROOT}/scripts/codex-defect-report.sh",
+            "args": [],
+            "timeout": 5
+          }
+        ]
+      }
+    ],
+    "SubagentStop": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "${CLAUDE_PLUGIN_ROOT}/scripts/codex-defect-report.sh",
+            "args": [],
+            "timeout": 5
           }
         ]
       }

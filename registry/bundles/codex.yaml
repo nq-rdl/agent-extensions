@@ -21,8 +21,9 @@ skills:
   - {source: codex-result-handling, leaf: result-handling}
   - {source: gpt-5-6-prompting, leaf: prompting}
   - {source: codex-model-guide, leaf: model-guide}
+  - {source: codex-report-defect, leaf: report-defect}
 agents: [codex-rescue]
-hooks: [codex-session-lifecycle, codex-stop-review-gate]
+hooks: [codex-session-lifecycle, codex-stop-review-gate, codex-defect-report]
 prompts: []
 mcp: []
 targets:

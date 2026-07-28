@@ -1,9 +1,9 @@
 #!/bin/sh
 # SPDX-License-Identifier: Apache-2.0
-# Derived from openai/codex-plugin-cc v1.0.6 (db52e28), Apache-2.0. Modified for rdl-agent-extensions.
+# SPDX-FileCopyrightText: 2026 nq-rdl
 #
-# Codex session lifecycle hook wrapper. Preflights Node >=18.18.0, then execs the
-# vendored session-lifecycle-hook.mjs, preserving stdin and the child exit status.
+# Codex defect-report hook wrapper. Preflights Node >=18.18.0, then execs the
+# first-party defect-report-hook.mjs, preserving stdin and the child exit status.
 set -eu
 
 codex_require_node() {
@@ -32,4 +32,4 @@ codex_require_node() {
 }
 
 codex_require_node
-exec node "${CLAUDE_PLUGIN_ROOT}/scripts/session-lifecycle-hook.mjs"
+exec node "${CLAUDE_PLUGIN_ROOT}/scripts/defect-report-hook.mjs"

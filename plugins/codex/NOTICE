@@ -22,5 +22,17 @@ Fork source: openai/codex-plugin-cc v1.0.6, commit db52e28.
 Modifications by nq-rdl (rdl-agent-extensions): converted slash-commands to
 skills; updated the model/effort catalog to GPT-5.6 (Sol/Terra/Luna); added a
 model-selection guide; adapted hooks to Claude Code exec form with a Node.js
-preflight. See docs/ARCHITECTURE.md for the fork rationale and modernization
-boundary.
+preflight; patched `scripts/codex-companion.mjs`'s top-level `main().catch`
+handler to record a defect marker. See docs/ARCHITECTURE.md for the fork
+rationale and modernization boundary.
+
+First-party additions. The defect-logging and reporting subsystem shipped in this
+bundle is original nq-rdl work, not derived from openai/codex-plugin-cc:
+
+    scripts/codex-defects.mjs        scripts/defect-report-hook.mjs
+    scripts/codex-defect-report.sh   scripts/lib/defect-classify.mjs
+    scripts/lib/defect-log.mjs       skills/report-defect/
+
+It is licensed Apache-2.0 to match this bundle; copyright is held by nq-rdl and
+the OpenAI copyright statement above does not extend to it. Each of those files
+carries an `SPDX-FileCopyrightText: 2026 nq-rdl` line.

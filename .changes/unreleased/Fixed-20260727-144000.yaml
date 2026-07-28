@@ -1,0 +1,3 @@
+kind: Fixed
+body: 'codex plugin: resolveWorkspaceRoot no longer returns an empty root when the git toplevel probe fails, which collapsed every workspace onto one shared state dir'
+time: 2026-07-27T14:40:00.000000+00:00

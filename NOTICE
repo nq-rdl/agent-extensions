@@ -15,10 +15,36 @@ Copyright 2026 OpenAI; fork point v1.0.6 @ db52e28):
   plugins/codex/scripts/  plugins/codex/prompts/  plugins/codex/schemas/
   tests/codex/
 
-The Markdown, shell, and `tests/codex/` JavaScript files above carry an
-`SPDX-License-Identifier: Apache-2.0` header. The vendored runtime trees
-(`plugins/codex/scripts/`, `plugins/codex/prompts/`, `plugins/codex/schemas/`)
-are kept as-is from upstream without per-file headers and are covered as a
-whole. All of the paths above are
-governed by `plugins/codex/LICENSE` and `plugins/codex/NOTICE`; every other file
-in the repository remains under the MIT License.
+Header convention: the derived Markdown, shell, and `tests/codex/` JavaScript
+files above carry an `SPDX-License-Identifier: Apache-2.0` header, while the
+vendored runtime trees (`plugins/codex/scripts/`, `plugins/codex/prompts/`,
+`plugins/codex/schemas/`) are kept as-is from upstream without per-file headers
+and are covered wholesale. Header presence alone is therefore not a provenance
+signal inside those trees — see the carve-out below.
+
+First-party carve-out. The files below sit inside the paths listed above but are
+original nq-rdl work, NOT derived from openai/codex-plugin-cc. They are licensed
+Apache-2.0 to match the bundle they ship in (`registry/bundles/codex.yaml` sets
+`license: Apache-2.0`), and each carries an explicit
+`SPDX-FileCopyrightText: 2026 nq-rdl` line alongside its
+`SPDX-License-Identifier`:
+
+  plugins/codex/scripts/codex-defects.mjs
+  plugins/codex/scripts/defect-report-hook.mjs
+  plugins/codex/scripts/codex-defect-report.sh
+  plugins/codex/scripts/lib/defect-classify.mjs
+  plugins/codex/scripts/lib/defect-log.mjs
+  hooks/codex-defect-report.sh
+  skills/codex-report-defect/
+  tests/codex/defect-classify.test.mjs
+  tests/codex/defect-cli.test.mjs
+  tests/codex/defect-hook.test.mjs
+  tests/codex/defect-log.test.mjs
+  tests/codex/defect-record-integration.test.mjs
+
+Copyright in these files is held by nq-rdl; the OpenAI copyright statement in
+`plugins/codex/NOTICE` does not extend to them.
+
+All of the paths above are governed by `plugins/codex/LICENSE` and
+`plugins/codex/NOTICE`; every other file in the repository remains under the MIT
+License.
