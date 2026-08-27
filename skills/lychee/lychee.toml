@@ -45,6 +45,9 @@ exclude = [
   "^https://github\\.com/rdl-service-desk/service-desk",
   # Exclude conventional commits due to rate limiting / connection reset in CI
   "^https://www\\.conventionalcommits\\.org/",
+  # Australian Government Style Manual — referenced by tech-writing-copyedit. lychee on the
+  # GitHub runner fails with "HTTP/2 protocol error" against this host (curl/browsers are fine).
+  "^https?://www\\.stylemanual\\.gov\\.au/",
   "^https?://icons\\.getbootstrap\\.com",
   "^https?://quarto\\.org/docs$",
   "^https?://quarto\\.org/docs/$",
