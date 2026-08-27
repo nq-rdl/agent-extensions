@@ -305,13 +305,7 @@ A: [Clear answer with link to deeper docs if needed]
 ## Style Guidelines
 
 ### House style (documentation, tutorials, guides, ADRs)
-The preloaded `tech-writing-copyedit` skill is the house style – apply it to every content type except blog posts. The decisions it settles, in brief:
-- **Locale**: Australian English (organise, colour, licence/license); spaced en dash ( – ) for parentheticals, never an em dash. Keep a project's existing locale if it already has one.
-- **Person and mood**: descriptions in third-person indicative; instructions in second-person imperative, present tense, with no modal verbs (*should*, *could*, *might*); no "I", no "we" except "we recommend", never "one"
-- **Purpose before action**: "To delete the document, click **Delete**" – not "Click Delete if you want to…"
-- **Procedures**: one action per step; a single-step procedure is a bullet; "press Enter" goes inside the step; sub-steps `a.`/`i.`
-- **Words**: no *e.g.*/*i.e.*/*etc.*/*approx.*; spell an acronym out on first use and never introduce one you use once; one term per concept; the brand is not the product
-- **Copyedit pass**: run the skill's six-step pass on the draft before the Quality Checklist
+The preloaded `tech-writing-copyedit` skill is the house style (en-AU, spaced en dash, sentence-case headings, imperative instructions with no modals, no first person, purpose before action) – apply it to every content type except blog posts, and run its copyedit pass on the draft before the Quality Checklist.
 
 ### Voice and Tone (blog posts only)
 - **Active voice**: "The function processes data" not "Data is processed by the function"
@@ -326,7 +320,7 @@ The preloaded `tech-writing-copyedit` skill is the house style – apply it to e
 - **Versions**: Include version numbers for all tools/libraries
 
 ### Formatting Conventions
-- **Headers**: Title Case for Levels 1–2, Sentence case for Levels 3+ (full rules in the skill's `references/house-style.rst`)
+- **Headers**: Sentence case at every level for documentation (house style); blog posts may keep Title Case for the H1
 - **Lists**: Bullets for unordered, numbers for sequences; all items sentences with full stops or all fragments without – never mixed
 - **Emphasis**: Bold for UI elements, italics for first use of terms
 - **Code**: Backticks for inline, fenced blocks for multi-line
