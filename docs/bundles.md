@@ -27,6 +27,7 @@ subagents (auto-routed by their description).
 | [`kubernetes`](#kubernetes) | Kubernetes — SRE-grade rollouts, HA design, and incident response |
 | [`argo-cd`](#argo-cd) | Argo CD — GitOps application management and sync for Kubernetes |
 | [`ansible`](#ansible) | Ansible — author, debug, and optimise playbooks, roles, and inventories |
+| [`redhat`](#redhat) | Red Hat — fetch product documentation and Customer Portal (KCS) content with your own credentials via curl, on macOS and Linux |
 | [`arch-linux`](#arch-linux) | Arch Linux — pacman, rolling-release maintenance, and system administration |
 | [`starrocks`](#starrocks) | StarRocks — analytical SQL, table design, data loading, and query tuning |
 | [`postgres`](#postgres) | PostgreSQL administration — schema design, query optimisation, backups, and tuning |
@@ -229,6 +230,23 @@ Ansible — author, debug, and optimise playbooks, roles, and inventories.
 **Skills**
 
 - `/ansible:playbook`
+
+---
+
+## redhat
+
+Red Hat — fetch product documentation and Customer Portal (KCS) content with your own credentials via curl, on macOS and Linux.
+
+**Skills**
+
+- `/redhat:fetch-docs`
+- `/redhat:setup`
+
+**Agents**
+
+- `redhat-docs-fetcher` (subagent)
+
+**Hooks:** `redhat-docs-preflight`, `redhat-docs-guard`
 
 ---
 

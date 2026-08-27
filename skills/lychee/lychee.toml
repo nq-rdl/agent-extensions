@@ -43,6 +43,10 @@ exclude = [
   "^https://raw\\.githubusercontent\\.com/nq-rdl/spec-kit-extensions",
   # RDL Service Desk (access-controlled) — referenced by the new-service-request skill
   "^https://github\\.com/rdl-service-desk/service-desk",
+  # Red Hat: docs.redhat.com bot-blocks non-browser clients (Akamai 403 — see redhat plugin,
+  # nq-rdl/agent-extensions#261) and the API-token page is login-gated — referenced by the redhat skills
+  "^https?://docs\\.redhat\\.com/",
+  "^https://access\\.redhat\\.com/management/api",
   # Exclude conventional commits due to rate limiting / connection reset in CI
   "^https://www\\.conventionalcommits\\.org/",
   "^https?://icons\\.getbootstrap\\.com",
