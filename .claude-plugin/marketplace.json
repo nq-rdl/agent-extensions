@@ -380,7 +380,9 @@
       "version": "0.26.0",
       "keywords": [
         "docs",
-        "technical-writing"
+        "technical-writing",
+        "style-guide",
+        "copyedit"
       ]
     },
     {

@@ -2,12 +2,13 @@ schemaVersion: v1
 id: tech-writing
 displayName: Technical Writing
 description: Technical writing — developer docs, tutorials, ADRs, and guides
-keywords: [docs, technical-writing]
+keywords: [docs, technical-writing, style-guide, copyedit]
 owners:
   - rdl
 channels:
   - stable
-skills: []
+skills:
+  - {source: tech-writing-copyedit, leaf: copyedit}   # → /tech-writing:copyedit
 agents:
   - se-technical-writer
 hooks: []
