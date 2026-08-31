@@ -29,10 +29,10 @@ person's **own** Red Hat account. This skill's scripts pick the working route fo
 
 | Target | Route | Credential |
 |---|---|---|
-| `docs.redhat.com/…/html/<book>/<page>#anchor` | The product's **open-source doc repo on GitHub** (AsciiDoc) | none |
+| `docs.redhat.com/…/html/<book>/<page>#anchor` (also the legacy `access.redhat.com/documentation/<locale>/…` form) | The product's **open-source doc repo on GitHub** (AsciiDoc) | none |
 | `access.redhat.com/solutions/<id>`, `/articles/<id>`, `kcs:<id>` | Customer Portal **KCS search API** with `fq=id:` + Bearer token | offline token |
 | `search:<terms>` | KCS search API (metadata is public) | none |
-| `docs-text:<docs URL>` | *Experimental* — the KCS index's stored page text; only route for closed-source products (RHEL) | offline token |
+| `docs-text:<docs URL>` | *Experimental* — the KCS index's stored page text (keyed by page URL; `#anchor` ignored); only route for closed-source products (RHEL) | offline token |
 
 ## Do this
 
@@ -46,7 +46,8 @@ bash "$S/rh-fetch.sh" --kind Solution --rows 5 'search:automation hub proxy 403'
 bash "$S/rh-token.sh" --check                            # source=… access_token=ok expires_in=900s
 ```
 
-Exit codes: `3` = no credential or not entitled → tell the user to run **`/redhat:setup`**;
+Exit codes: `3` = no credential, not entitled, or the offline token was rejected (30-day
+idle expiry — the message says to regenerate) → tell the user to run **`/redhat:setup`**;
 `4` = unresolvable (unknown product/slug) → say so and offer `search:` / `docs-text:` /
 a browser. Render AsciiDoc to Markdown yourself; keep the `// source:` provenance line
 in your answer.

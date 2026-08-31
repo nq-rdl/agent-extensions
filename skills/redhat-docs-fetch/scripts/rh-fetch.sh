@@ -6,6 +6,7 @@
 # targets
 #   https://docs.redhat.com/<lang>/documentation/<product>/<ver>/html/<book>/<page>[#anchor]
 #   https://docs.redhat.com/<lang>/documentation/<product>/<ver>/html-single/<book>/index#anchor
+#   https://access.redhat.com/documentation/<locale>/<product>/<ver>/html/…   (legacy host form)
 #        → the product's open-source doc repo on GitHub (docs.redhat.com itself returns
 #          Akamai 403 to every non-browser client). AsciiDoc source to stdout.
 #   https://access.redhat.com/solutions/<id> | /articles/<id> | kcs:<id>
@@ -13,61 +14,79 @@
 #          through rh-token.sh. Markdown to stdout. Subscriber-only placeholders = exit 3.
 #   search:<terms>           → KCS search (no credential needed for metadata)
 #   docs-text:<docs URL>     → EXPERIMENTAL: the KCS index's stored text for a docs.redhat.com
-#                              page (Bearer-authenticated). The only route for closed-source
-#                              products such as RHEL if the index exposes text to your account.
+#                              page (Bearer-authenticated; any #anchor is ignored — the index is
+#                              keyed by page URL). The only route for closed-source products such
+#                              as RHEL if the index exposes text to your account.
 #
-# exit: 0 ok · 1 usage · 2 network/HTTP · 3 not authenticated / not entitled · 4 unresolvable
+# exit: 0 ok · 1 usage · 2 network/HTTP · 4 unresolvable
+#       3 no credential, not entitled, or offline token rejected (invalid_grant) → /redhat:setup
 set -u
 set -o pipefail   # a failed fetch on the left of "| emit" must surface as a non-zero exit
 here="$(cd "$(dirname "$0")" && pwd)"
 # shellcheck source=rh-lib.sh
 . "$here/rh-lib.sh"
 
+usage() { sed -n '2,/^set -u/p' "$0" | sed '$d'; }   # the comment header above
 out=""; includes=0; kind=""; rows="${RH_ROWS:-10}"; target=""
 while [ $# -gt 0 ]; do
+  case "$1" in
+    -o|--kind|--rows) [ -n "${2:-}" ] || { echo "$1 needs a value" >&2; exit 1; } ;;
+  esac
   case "$1" in
     -o) out="$2"; shift 2 ;;
     --includes) includes=1; shift ;;
     --kind) kind="$2"; shift 2 ;;
     --rows) rows="$2"; shift 2 ;;
-    -h|--help) sed -n '2,22p' "$0"; exit 0 ;;
+    -h|--help) usage; exit 0 ;;
     -*) echo "unknown option: $1" >&2; exit 1 ;;
     *) target="$1"; shift ;;
   esac
 done
-[ -n "$target" ] || { sed -n '2,22p' "$0" >&2; exit 1; }
+[ -n "$target" ] || { usage >&2; exit 1; }
+case "$rows" in ''|*[!0-9]*) echo "--rows / RH_ROWS must be an integer (got '$rows')" >&2; exit 1 ;; esac
 command -v jq >/dev/null 2>&1 || { echo "jq is required (brew install jq / dnf install jq / apt install jq)" >&2; exit 1; }
 [ "$(rh_fetcher)" != none ] || { echo "neither curl nor wget found — install curl" >&2; exit 1; }
 
 emit() { if [ -n "$out" ]; then cat > "$out"; echo "wrote $out" >&2; else cat; fi; }
 urlenc() { jq -rn --arg s "$1" '$s|@uri'; }
-tmpf() { local f; f="$(mktemp "${TMPDIR:-/tmp}/rh-fetch.XXXXXX")"; chmod 600 "$f"; printf '%s\n' "$f"; }
+tmpf() { local f; f="$(mktemp "${TMPDIR:-/tmp}/rh-fetch.XXXXXX")" || { echo "mktemp failed in ${TMPDIR:-/tmp}" >&2; exit 2; }; chmod 600 "$f"; printf '%s\n' "$f"; }
+# rh-token.sh exit 4 (offline token rejected) is a credential problem for this script's callers: map to 3.
+curl_config() { local c; c="$("$here/rh-token.sh" --curl-config)" || { local rc=$?; [ "$rc" = 4 ] && rc=3; return "$rc"; }; printf '%s\n' "$c"; }
 
 # ---------- GitHub source-repo route ----------
 tree_paths() { # <repo> <ref> → path list (cached 24h)
-  local repo="$1" ref="$2" cache f age
-  cache="$(rh_cache_dir)/tree-$(printf '%s' "$repo" | tr '/' '_')-$ref.txt"
+  local repo="$1" ref="$2" cache f age dir
+  dir="$(rh_cache_dir)" || return 2
+  cache="$dir/tree-$(printf '%s' "$repo" | tr '/' '_')-$ref.txt"
   if [ -s "$cache" ]; then
     age=$(( $(date +%s) - $(rh_file_mtime "$cache") ))
     [ "$age" -lt 86400 ] && { cat "$cache"; return 0; }
   fi
   f="$(tmpf)"
   if command -v gh >/dev/null 2>&1 && gh auth status >/dev/null 2>&1; then
-    gh api "repos/$repo/git/trees/$ref?recursive=1" --jq '.tree[].path' > "$f" 2>/dev/null
+    if ! gh api "repos/$repo/git/trees/$ref?recursive=1" --jq '.tree[].path' > "$f" 2>"$f.err"; then
+      echo "gh api repos/$repo/git/trees/$ref failed: $(tail -1 "$f.err")" >&2; rm -f "$f" "$f.err"; return 2
+    fi
+    rm -f "$f.err"
   else
     local code; code="$(rh_http_get "https://api.github.com/repos/$repo/git/trees/$ref?recursive=1" "$f")"
     [ "$code" = "200" ] || { echo "GitHub tree for $repo@$ref: HTTP $code (unauthenticated api.github.com is rate-limited to 60/h — install and log in to gh)" >&2; rm -f "$f"; return 2; }
+    [ "$(jq -r '.truncated // false' "$f")" != true ] || echo "warning: GitHub truncated the tree for $repo@$ref (>100k entries) — some files may not resolve" >&2
     jq -r '.tree[].path' "$f" > "$f.paths" && mv "$f.paths" "$f"
   fi
   [ -s "$f" ] || { echo "empty tree for $repo@$ref — does the branch exist?" >&2; rm -f "$f"; return 4; }
   mv "$f" "$cache"; cat "$cache"
 }
 raw_get() { # <repo> <ref> <path> <outfile>
-  local code; code="$(rh_http_get "https://raw.githubusercontent.com/$1/$2/$3" "$4")"
+  # refs/heads/<branch> is unambiguous (no tag/branch clash) and sidesteps stale raw-CDN entries
+  # seen for the bare <ref>/ form; fall back to the bare form for non-branch refs.
+  local code; code="$(rh_http_get "https://raw.githubusercontent.com/$1/refs/heads/$2/$3" "$4")"
+  [ "$code" = "200" ] || code="$(rh_http_get "https://raw.githubusercontent.com/$1/$2/$3" "$4")"
   [ "$code" = "200" ] || { echo "raw fetch $1@$2:$3 → HTTP $code" >&2; return 2; }
 }
 find_in_tree() { # <treefile> <slug> [prefer-prefix]
-  local hits; hits="$(grep -E "(^|/)$2\.adoc\$" "$1" || true)"
+  local hits esc; esc="$(printf '%s' "$2" | sed 's/[][\.*^$+?(){}|]/\\&/g')"   # slug is a literal, not a regex
+  hits="$(grep -E "(^|/)$esc\.adoc\$" "$1" || true)"
   [ -n "$hits" ] || return 1
   if [ -n "${3:-}" ] && printf '%s\n' "$hits" | grep -q "^$3"; then hits="$(printf '%s\n' "$hits" | grep "^$3")"; fi
   printf '%s\n' "$hits" | head -1
@@ -87,8 +106,9 @@ no_source() { # <slug> <repo> <ref>
 }
 
 route_docs() { # <url>
-  local url="$1" rest product ver form book page anchor repo ref base tree path modpath f body rc
+  local url="$1" rest product ver form book page anchor repo ref base tree path modpath f body rc page_url
   anchor="${url#*#}"; [ "$anchor" = "$url" ] && anchor=""
+  page_url="${url%%#*}"; page_url="${page_url%%\?*}"   # what the KCS Documentation index is keyed by
   rest="${url%%#*}"; rest="${rest#https://docs.redhat.com/}"; rest="${rest#*/documentation/}"
   product="${rest%%/*}"; rest="${rest#*/}"
   ver="${rest%%/*}"; rest="${rest#*/}"
@@ -96,21 +116,23 @@ route_docs() { # <url>
   book="${rest%%/*}"; page="${rest#*/}"; page="${page%%/*}"; page="${page%%\?*}"
   case "$product" in
     red_hat_ansible_automation_platform) repo=ansible/aap-docs; ref="$ver"; base=downstream/modules ;;
-    openshift_container_platform)        repo=openshift/openshift-docs; ref="enterprise-$ver"; base="" ;;
+    openshift_container_platform|openshift_container_platform_*)   # sibling slugs build from the same repo
+                                         repo=openshift/openshift-docs; ref="enterprise-$ver"; base="" ;;
     *)
       cat >&2 <<MSG
 No known public source repo for product '$product' (docs.redhat.com itself blocks non-browser fetches).
 Known: red_hat_ansible_automation_platform → ansible/aap-docs · openshift_container_platform → openshift/openshift-docs
 Satellite docs build from theforeman/foreman-documentation (guides/doc-<Title>/, BUILD=satellite) — search it with gh.
-RHEL and other closed products: try  rh-fetch.sh 'docs-text:$url'  (needs your offline token) or read the page in a browser.
+RHEL and other closed products: try  rh-fetch.sh 'docs-text:$page_url'  (needs your offline token) or read the page in a browser.
 MSG
       return 4 ;;
   esac
   case "$form" in
-    html) ;;
-    html-single) [ -n "$anchor" ] || { echo "html-single URLs need a #anchor (or use the multi-page /html/ URL)" >&2; return 4; } ;;
-    *) echo "unrecognised docs.redhat.com URL form '$form' — expected /html/<book>/<page> or /html-single/<book>/index#anchor; try docs-text:$url" >&2; return 4 ;;
+    html) [ "$page" != index ] || form=html-single ;;   # a book landing page has no page slug either
+    html-single) ;;
+    *) echo "unrecognised docs.redhat.com URL form '$form' — expected /html/<book>/<page> or /html-single/<book>/index#anchor; try docs-text:$page_url" >&2; return 4 ;;
   esac
+  [ "$form" = html ] || [ -n "$anchor" ] || { echo "$url is a book landing page: add the #anchor of the section you want, or use its /html/<book>/<page> URL" >&2; return 4; }
   tree="$(tmpf)"; tree_paths "$repo" "$ref" > "$tree" || { rc=$?; rm -f "$tree"; return "$rc"; }
   modpath=""
   if [ "$form" = html ]; then
@@ -155,24 +177,29 @@ MSG
 }
 
 # ---------- Customer Portal routes ----------
-subscriber_only_fields() { jq -r '[.response.docs[0] | to_entries[] | select(.value == "subscriber_only") | .key] | join(", ")' "$1"; }
+subscriber_only_fields() { # scalar "subscriber_only" or an array containing it
+  jq -r '[.response.docs[0] | to_entries[] | select(.value == "subscriber_only" or ((.value|type) == "array" and (.value|index("subscriber_only")) != null)) | .key] | join(", ")' "$1"
+}
+not_entitled() { # <what> <fields>
+  echo "$1 returned subscriber_only for: $2. The API answers 200 even when the Bearer token is ignored, so this means your token was not accepted or your account is not entitled. Run: rh-token.sh --check   (then /redhat:setup if it fails)" >&2
+}
 
 route_kcs_id() { # <id>
-  local id="$1" cfg f code n so
-  cfg="$("$here/rh-token.sh" --curl-config)" || exit $?
+  local id="$1" cfg f code n so got
+  case "$id" in ''|*[!0-9]*) echo "kcs:<id> needs a numeric solution/article id (got '$id')" >&2; exit 1 ;; esac
+  cfg="$(curl_config)" || exit $?
   f="$(tmpf)"
   code="$(rh_http_get "$RH_KCS_API?q=*&fq=id:$id&fl=id,documentKind,publishedTitle,view_uri,lastModifiedDate,solution_environment,issue,solution_resolution,solution_rootcause,solution_diagnosticsteps,body,abstract" "$f" "$cfg")"
   [ "$code" = "200" ] || { echo "KCS API: HTTP $code" >&2; rm -f "$f"; exit 2; }
   n="$(jq -r '.response.numFound // 0' "$f")"; [ "$n" -gt 0 ] || { echo "no KCS document with id $id" >&2; rm -f "$f"; exit 4; }
+  got="$(jq -r '.response.docs[0].id // empty' "$f")"; [ "$got" = "$id" ] || { echo "KCS API returned document '$got' for id $id" >&2; rm -f "$f"; exit 4; }
   so="$(subscriber_only_fields "$f")"
-  if [ -n "$so" ]; then
-    echo "KCS $id returned subscriber_only for: $so. The API answers 200 even when the Bearer token is ignored, so this means your token was not accepted or your account is not entitled. Run: rh-token.sh --check   (then /redhat:setup if it fails)" >&2; rm -f "$f"; exit 3
-  fi
+  if [ -n "$so" ]; then not_entitled "KCS $id" "$so"; rm -f "$f"; exit 3; fi
   jq -r '
     def s: if type=="array" then join("\n") elif .==null then "" else tostring end;
     .response.docs[0] as $d |
     "# \($d.publishedTitle|s)\n\nSource: \($d.view_uri|s) (KCS \($d.id|s), \($d.documentKind|s), modified \($d.lastModifiedDate|s))\n" +
-    ([ ["Environment", ($d.solution_environment|s)], ["Issue", ($d.issue|s)], ["Resolution", ($d.solution_resolution|s)],
+    ([ ["Abstract", ($d.abstract|s)], ["Environment", ($d.solution_environment|s)], ["Issue", ($d.issue|s)], ["Resolution", ($d.solution_resolution|s)],
        ["Root Cause", ($d.solution_rootcause|s)], ["Diagnostic Steps", ($d.solution_diagnosticsteps|s)], ["Body", ($d.body|s)] ]
       | map(select(.[1] != "")) | map("\n## \(.[0])\n\n\(.[1])\n") | join(""))' "$f" | emit || { rm -f "$f"; exit 2; }
   rm -f "$f"
@@ -181,19 +208,22 @@ route_kcs_id() { # <id>
 route_search() { # <terms>
   local f code url; f="$(tmpf)"
   url="$RH_KCS_API?q=$(urlenc "$1")&rows=$rows&fl=id,documentKind,publishedTitle,view_uri"
-  [ -n "$kind" ] && url="$url&fq=documentKind:$kind"
+  [ -n "$kind" ] && url="$url&fq=documentKind:$(urlenc "$kind")"
   code="$(rh_http_get "$url" "$f")"; [ "$code" = "200" ] || { echo "KCS search: HTTP $code" >&2; rm -f "$f"; exit 2; }
   jq -r '"numFound: \(.response.numFound)", (.response.docs[] | "\(.id)\t\(.documentKind)\t\(.publishedTitle // "-")\t\(.view_uri // "-")")' "$f" | emit || { rm -f "$f"; exit 2; }
   rm -f "$f"
 }
 
 route_docs_text() { # <docs url>
-  local url="$1" cfg f code n
-  cfg="$("$here/rh-token.sh" --curl-config)" || exit $?
+  local url="$1" cfg f code n so
+  url="${url%%#*}"; url="${url%%\?*}"   # the index is keyed by page URL — a #anchor would match nothing
+  cfg="$(curl_config)" || exit $?
   f="$(tmpf)"
   code="$(rh_http_get "$RH_KCS_API?q=*&fq=id:$(urlenc "\"$url\"")&fl=publishedTitle,view_uri,docs_text_store,large_text_store" "$f" "$cfg")"
   [ "$code" = "200" ] || { echo "KCS API: HTTP $code" >&2; rm -f "$f"; exit 2; }
   n="$(jq -r '.response.numFound // 0' "$f")"; [ "$n" -gt 0 ] || { echo "that URL is not in the KCS Documentation index" >&2; rm -f "$f"; exit 4; }
+  so="$(subscriber_only_fields "$f")"
+  if [ -n "$so" ]; then not_entitled "docs-text for $url" "$so"; rm -f "$f"; exit 3; fi
   # First NON-EMPTY of docs_text_store / large_text_store (jq's // only skips null/false, not "").
   jq -r '
     def s: if type=="array" then join("\n") elif .==null then "" else tostring end;
@@ -210,9 +240,15 @@ case "$target" in
   kcs:*)       route_kcs_id "${target#kcs:}" ;;
   docs-text:*) route_docs_text "${target#docs-text:}" ;;
   https://docs.redhat.com/*)   route_docs "$target" ;;
+  https://access.redhat.com/documentation/*)
+    # Legacy host form (…/documentation/en-us/<product>/…) still linked from KCS solutions and
+    # bookmarks; it 301s to docs.redhat.com with the same path after the locale.
+    rest="${target#https://access.redhat.com/documentation/}"; rest="${rest#*/}"
+    route_docs "https://docs.redhat.com/en/documentation/$rest" ;;
   https://access.redhat.com/*)
-    id="$(printf '%s' "$target" | sed -n 's#.*/\(solutions\|articles\)/\([0-9]\{1,\}\).*#\2#p')"
+    # -E: BSD sed has no \| alternation in basic regexps
+    id="$(printf '%s' "$target" | sed -nE 's#.*/(solutions|articles)/([0-9]+).*#\2#p')"
     [ -n "$id" ] || { echo "cannot find a solution/article id in $target" >&2; exit 4; }
     route_kcs_id "$id" ;;
-  *) echo "unsupported target: $target" >&2; sed -n '2,22p' "$0" >&2; exit 1 ;;
+  *) echo "unsupported target: $target" >&2; usage >&2; exit 1 ;;
 esac

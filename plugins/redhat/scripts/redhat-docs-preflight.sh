@@ -8,8 +8,12 @@
 # exactly where the "jq=no" advice matters.
 set -u
 cat >/dev/null 2>&1 || true   # drain stdin
-pre="${CLAUDE_PLUGIN_ROOT:-}/skills/fetch-docs/scripts/rh-preflight.sh"
-[ -f "$pre" ] || exit 0
+pre=""
+for c in "${CLAUDE_PLUGIN_ROOT:-/nonexistent}/skills/fetch-docs/scripts/rh-preflight.sh" \
+         "$(cd "$(dirname "$0")" 2>/dev/null && pwd)/../skills/fetch-docs/scripts/rh-preflight.sh"; do
+  [ -f "$c" ] && { pre="$c"; break; }
+done
+[ -n "$pre" ] || exit 0
 line="$(bash "$pre" 2>/dev/null)" || exit 0
 [ -n "$line" ] || exit 0
 ctx="Red Hat docs plugin preflight: $line. docs.redhat.com returns 403 to non-browser fetches; /redhat:fetch-docs (rh-fetch.sh) routes to the product's source repo or the Customer Portal API with curl."

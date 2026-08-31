@@ -63,7 +63,8 @@ rh_cred_source() {
     if [ -s "$f" ]; then echo file; return 0; fi
   fi
   if _rh_source_enabled bitwarden && command -v bw >/dev/null 2>&1 && [ -n "${BW_SESSION:-}" ]; then
-    if bw get notes "$RH_BW_ITEM" --session "$BW_SESSION" >/dev/null 2>&1; then echo bitwarden; return 0; fi
+    # bw reads BW_SESSION from the environment — never pass it as --session (it would show in ps).
+    if bw get notes "$RH_BW_ITEM" >/dev/null 2>&1; then echo bitwarden; return 0; fi
   fi
   return 1
 }
@@ -88,17 +89,46 @@ rh_cred_token() {
       esac
       head -1 "$f" | tr -d '[:space:]' ;;
     bitwarden)
-      notes="$(bw get notes "$RH_BW_ITEM" --session "$BW_SESSION" 2>/dev/null)"
-      # Accept `export RH_OFFLINE_TOKEN=…`, `RH_OFFLINE_TOKEN=…`, or a bare token line.
+      notes="$(bw get notes "$RH_BW_ITEM" 2>/dev/null | tr -d '\r')"
+      # Accept `export RH_OFFLINE_TOKEN=…`, `RH_OFFLINE_TOKEN=…`, or a bare JWT line (three
+      # base64url segments — a label-like line such as a date or a name is not a token).
       printf '%s\n' "$notes" | sed -n 's/^[[:space:]]*\(export[[:space:]]\{1,\}\)\{0,1\}RH_OFFLINE_TOKEN=["'"'"']\{0,1\}\([^"'"'"'[:space:]]*\).*/\2/p' | head -1 | grep . \
-        || printf '%s\n' "$notes" | grep -m1 -E '^[A-Za-z0-9._-]{20,}$' ;;
+        || printf '%s\n' "$notes" | grep -m1 -E '^[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+$' ;;
   esac
 }
 
+# Per-user runtime cache dir. The location is predictable, so a pre-planted directory or symlink in
+# a shared /tmp must not be adopted: it has to be a real directory we own, mode 700.
 rh_cache_dir() {
   local d="${XDG_RUNTIME_DIR:-${TMPDIR:-/tmp}}/rh-token-$(id -u)"
-  mkdir -p "$d" 2>/dev/null && chmod 700 "$d" 2>/dev/null
+  [ -d "${d%/*}" ] || mkdir -p "${d%/*}" 2>/dev/null
+  [ -e "$d" ] || [ -L "$d" ] || mkdir -m 700 "$d" 2>/dev/null || { echo "cannot create cache dir $d — point XDG_RUNTIME_DIR or TMPDIR at a writable private directory" >&2; return 1; }
+  if [ -L "$d" ] || [ ! -d "$d" ] || [ ! -O "$d" ]; then
+    echo "refusing cache dir $d: it must be a directory owned by you (not a symlink) — remove it, or point XDG_RUNTIME_DIR/TMPDIR at a private directory" >&2; return 1
+  fi
+  chmod 700 "$d" 2>/dev/null
+  [ "$(rh_file_mode "$d")" = 700 ] || { echo "refusing cache dir $d: cannot set mode 700" >&2; return 1; }
   printf '%s\n' "$d"
+}
+
+# rh_atomic_write <file>  (content on stdin): write via a 0600 temp file in the same dir, then
+# rename over the target, so a pre-existing file or symlink is replaced rather than followed.
+rh_atomic_write() {
+  local t; t="$(mktemp "$1.XXXXXX")" || return 1
+  cat > "$t" && chmod 600 "$t" && mv -f "$t" "$1"
+}
+
+# _rh_wget <outfile> <url> [wget args…] → prints the last HTTP status seen (like curl -w). Keeps the
+# response body on 4xx/5xx (--content-on-error) so callers can read error_description; when no HTTP
+# status came back at all (DNS/connect failure) prints nothing, echoes wget's message, returns 1.
+_rh_wget() {
+  local out="$1" url="$2" errf code; shift 2
+  errf="$(mktemp "${TMPDIR:-/tmp}/rh-wget.XXXXXX")" || return 1
+  wget -q -S --content-on-error -O "$out" "$@" "$url" 2>"$errf"
+  code="$(sed -n 's/^ *HTTP\/[0-9.]* \([0-9]*\).*/\1/p' "$errf" | tail -1)"
+  [ -n "$code" ] || echo "wget: $(grep -v '^ ' "$errf" | tail -1)" >&2
+  rm -f "$errf"
+  printf '%s' "$code"; [ -n "$code" ]
 }
 
 # rh_http_get <url> <outfile> [curl-config]  → prints HTTP status; curl first, wget fallback.
@@ -110,15 +140,15 @@ rh_http_get() {
   if command -v curl >/dev/null 2>&1; then
     if [ -n "$cfg" ]; then curl -sS -L -K "$cfg" -o "$out" -w '%{http_code}' "$url"; else curl -sS -L -o "$out" -w '%{http_code}' "$url"; fi
   elif command -v wget >/dev/null 2>&1; then
-    local rc="" status=0
+    local rc=""
     if [ -n "$cfg" ]; then
       rc="$(mktemp "${TMPDIR:-/tmp}/rh-wgetrc.XXXXXX")" || return 1
       chmod 600 "$rc"
       # curl:  header = "Authorization: Bearer …"   →   wgetrc:  header = Authorization: Bearer …
       sed -n 's/^header = "\(.*\)"$/header = \1/p' "$cfg" > "$rc"
     fi
-    wget -q -S -O "$out" ${rc:+"--config=$rc"} "$url" 2>&1 | sed -n 's/^ *HTTP\/[0-9.]* \([0-9]*\).*/\1/p' | tail -1
-    status=$?
+    _rh_wget "$out" "$url" ${rc:+"--config=$rc"}
+    local status=$?
     [ -z "$rc" ] || rm -f "$rc"
     return $status
   else
@@ -132,7 +162,7 @@ rh_http_post_form() {
   if command -v curl >/dev/null 2>&1; then
     curl -sS -o "$out" -w '%{http_code}' -X POST -H 'Content-Type: application/x-www-form-urlencoded' --data-binary "@$body" "$url"
   elif command -v wget >/dev/null 2>&1; then
-    wget -q -S -O "$out" --header='Content-Type: application/x-www-form-urlencoded' --post-file="$body" "$url" 2>&1 | sed -n 's/^ *HTTP\/[0-9.]* \([0-9]*\).*/\1/p' | tail -1
+    _rh_wget "$out" "$url" --header='Content-Type: application/x-www-form-urlencoded' --post-file="$body"
   else
     echo "no fetcher: install curl (preferred) or wget" >&2; return 1
   fi

@@ -28,5 +28,11 @@ The scripts detect the platform with ``uname -s`` (``Darwin`` / ``Linux``; WSL v
   Linux ``secret-tool lookup service redhat key RH_OFFLINE_TOKEN`` (needs a running Secret
   Service — typically absent on headless hosts, where the 0600 file or Bitwarden applies).
 * **Runtime cache** — ``$XDG_RUNTIME_DIR`` (Linux, tmpfs, per-user) falling back to
-  ``$TMPDIR`` (macOS per-user) then ``/tmp``; directory mode 700, files 600.
+  ``$TMPDIR`` (macOS per-user) then ``/tmp``. Because ``/tmp/rh-token-<uid>`` is predictable
+  on a shared host, ``rh_cache_dir`` refuses a symlink or a directory it does not own, forces
+  mode 700, and ``rh-token.sh`` writes ``curl.cfg`` via mktemp + rename (never truncating a
+  pre-existing file in place).
+* **wget errors** — ``--content-on-error`` keeps 4xx/5xx bodies (so ``invalid_grant`` is
+  still readable), the status is taken from wget's own stderr, and a connect/DNS failure
+  prints wget's message and returns non-zero instead of an empty status.
 * **sed -i** — not used (BSD needs ``-i ''``).
