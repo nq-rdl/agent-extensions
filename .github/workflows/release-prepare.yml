@@ -86,12 +86,23 @@ jobs:
           fi
 
           # Refuse to start if this version is already in flight or shipped.
-          if git ls-remote --exit-code --tags origin "refs/tags/v$VERSION" >/dev/null 2>&1; then
-            echo "::error::tag v$VERSION already exists."; exit 1
-          fi
-          if git ls-remote --exit-code --heads origin "refs/heads/release/v$VERSION" >/dev/null 2>&1; then
-            echo "::error::branch release/v$VERSION already exists."; exit 1
-          fi
+          # Each probe distinguishes "absent" from "errored" (git ls-remote
+          # --exit-code: 0 = ref found, 2 = no match, anything else = the
+          # lookup itself failed) so a transient failure stops the run instead
+          # of being read as "absent" and waving the version through — the
+          # same fail-closed pattern release-finalize.yml uses (issue #282).
+          rc=0; git ls-remote --exit-code --tags origin "refs/tags/v$VERSION" >/dev/null 2>&1 || rc=$?
+          case "$rc" in
+            0) echo "::error::tag v$VERSION already exists."; exit 1 ;;
+            2) ;;
+            *) echo "::error::git ls-remote for tag v$VERSION failed (exit $rc)."; exit 1 ;;
+          esac
+          rc=0; git ls-remote --exit-code --heads origin "refs/heads/release/v$VERSION" >/dev/null 2>&1 || rc=$?
+          case "$rc" in
+            0) echo "::error::branch release/v$VERSION already exists."; exit 1 ;;
+            2) ;;
+            *) echo "::error::git ls-remote for branch release/v$VERSION failed (exit $rc)."; exit 1 ;;
+          esac
           if [ -f ".changes/$VERSION.md" ]; then
             echo "::error::.changes/$VERSION.md already exists on main."; exit 1
           fi
