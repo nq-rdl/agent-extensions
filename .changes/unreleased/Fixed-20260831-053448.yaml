@@ -1,3 +1,0 @@
-kind: Fixed
-body: 'release-prepare: the tag/branch existence probes now fail the run when git ls-remote itself errors (network, auth) instead of reading the failure as "absent" and proceeding (#282)'
-time: 2026-08-31T05:34:48.913277+00:00
