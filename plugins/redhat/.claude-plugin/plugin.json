@@ -1,0 +1,10 @@
+{
+  "name": "redhat",
+  "version": "0.28.0",
+  "description": "Red Hat — fetch product documentation and Customer Portal (KCS) content with your own credentials via curl, on macOS and Linux",
+  "author": {
+    "name": "nq-rdl"
+  },
+  "repository": "https://github.com/nq-rdl/agent-extensions",
+  "license": "MIT"
+}

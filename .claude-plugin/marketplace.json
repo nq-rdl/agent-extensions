@@ -168,6 +168,21 @@
       ]
     },
     {
+      "name": "redhat",
+      "source": "./plugins/redhat",
+      "description": "Red Hat — fetch product documentation and Customer Portal (KCS) content with your own credentials via curl, on macOS and Linux",
+      "version": "0.28.0",
+      "keywords": [
+        "redhat",
+        "documentation",
+        "customer-portal",
+        "kcs",
+        "curl",
+        "openshift",
+        "ansible"
+      ]
+    },
+    {
       "name": "arch-linux",
       "source": "./plugins/arch-linux",
       "description": "Arch Linux — pacman, rolling-release maintenance, and system administration",

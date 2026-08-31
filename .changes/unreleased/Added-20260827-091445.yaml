@@ -1,0 +1,3 @@
+kind: Added
+body: 'redhat plugin (#261): fetch Red Hat documentation and Customer Portal (KCS) content with your own offline token via curl/wget on macOS and Linux.'
+time: 2026-08-27T09:14:44.000000+00:00

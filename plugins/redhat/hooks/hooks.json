@@ -1,0 +1,28 @@
+{
+  "description": "Red Hat docs guardrails: SessionStart preflight (OS, curl/wget, offline-token presence) and a PreToolUse guard that keeps Red Hat fetches on curl/wget, blocks token leakage, and points at /redhat:setup when no credential is loaded.",
+  "hooks": {
+    "SessionStart": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "${CLAUDE_PLUGIN_ROOT}/scripts/redhat-docs-preflight.sh",
+            "timeout": 5
+          }
+        ]
+      }
+    ],
+    "PreToolUse": [
+      {
+        "matcher": "Bash|WebFetch",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "${CLAUDE_PLUGIN_ROOT}/scripts/redhat-docs-guard.sh",
+            "timeout": 10
+          }
+        ]
+      }
+    ]
+  }
+}
