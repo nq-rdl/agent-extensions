@@ -39,6 +39,13 @@ rh_file_mode() { # octal permission bits of a file, GNU or BSD stat
   if stat -c %a "$1" >/dev/null 2>&1; then stat -c %a "$1"; else stat -f %Lp "$1" 2>/dev/null; fi
 }
 
+# Epoch mtime of a file: GNU `stat -c %Y`, then BSD `stat -f %m`, else 0. (BSD `date -r` takes an
+# epoch, not a path, so it cannot be used for this; GNU must be probed first because GNU `stat -f`
+# means "file-system status" and would succeed with the wrong answer.)
+rh_file_mtime() {
+  stat -c %Y "$1" 2>/dev/null || stat -f %m "$1" 2>/dev/null || echo 0
+}
+
 _rh_source_enabled() { case ",$RH_CRED_SOURCES," in *",$1,"*) return 0 ;; *) return 1 ;; esac; }
 
 # Print the name of the first credential source that yields a token, or nothing.
@@ -95,14 +102,25 @@ rh_cache_dir() {
 }
 
 # rh_http_get <url> <outfile> [curl-config]  → prints HTTP status; curl first, wget fallback.
+# The optional config carries the Authorization header. curl reads it with -K; for wget it is
+# translated into a 0600 wgetrc passed via --config, so the Bearer token never enters argv
+# (/proc/<pid>/cmdline, ps) on either fetcher.
 rh_http_get() {
   local url="$1" out="$2" cfg="${3:-}"
   if command -v curl >/dev/null 2>&1; then
     if [ -n "$cfg" ]; then curl -sS -L -K "$cfg" -o "$out" -w '%{http_code}' "$url"; else curl -sS -L -o "$out" -w '%{http_code}' "$url"; fi
   elif command -v wget >/dev/null 2>&1; then
-    local hdr=""
-    [ -n "$cfg" ] && hdr="$(sed -n 's/^header = "\(.*\)"$/\1/p' "$cfg" | head -1)"
-    wget -q -S -O "$out" ${hdr:+--header="$hdr"} "$url" 2>&1 | sed -n 's/^ *HTTP\/[0-9.]* \([0-9]*\).*/\1/p' | tail -1
+    local rc="" status=0
+    if [ -n "$cfg" ]; then
+      rc="$(mktemp "${TMPDIR:-/tmp}/rh-wgetrc.XXXXXX")" || return 1
+      chmod 600 "$rc"
+      # curl:  header = "Authorization: Bearer …"   →   wgetrc:  header = Authorization: Bearer …
+      sed -n 's/^header = "\(.*\)"$/header = \1/p' "$cfg" > "$rc"
+    fi
+    wget -q -S -O "$out" ${rc:+"--config=$rc"} "$url" 2>&1 | sed -n 's/^ *HTTP\/[0-9.]* \([0-9]*\).*/\1/p' | tail -1
+    status=$?
+    [ -z "$rc" ] || rm -f "$rc"
+    return $status
   else
     echo "no fetcher: install curl (preferred) or wget" >&2; return 1
   fi

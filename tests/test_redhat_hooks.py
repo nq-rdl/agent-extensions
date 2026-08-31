@@ -1,6 +1,7 @@
 """Behavioural tests for the redhat plugin's guardrail hooks and credential scripts.
 
-The hooks are shell (hooks/redhat-docs-*.sh, hand-copied to plugins/redhat/scripts/).
+The hooks are shell (hooks/redhat-docs-*.sh, hand-copied to plugins/redhat/scripts/ — a test
+asserts the copies are byte-identical).
 Each test pipes a Claude Code event JSON through the hook with a sanitised environment
 (no RH_* variables, a throwaway HOME, credential sources restricted to `env`) and asserts
 the permissionDecision / additionalContext. No network: every path exercised here stops
@@ -95,6 +96,22 @@ class GuardHook(unittest.TestCase):
 
     def test_assignment_from_secret_store_is_allowed(self):
         self.assert_passthrough(run_hook(GUARD, bash_event('export RH_OFFLINE_TOKEN="$(bw get notes redhat-credentials)"'), self.env))
+        self.assert_passthrough(run_hook(GUARD, bash_event("export RH_OFFLINE_TOKEN=`bw get notes redhat-credentials`"), self.env))
+        self.assert_passthrough(run_hook(GUARD, bash_event('RH_OFFLINE_TOKEN=$TOKEN_FROM_ELSEWHERE bash "$S/rh-token.sh" --check'), self.env))
+
+    def test_quoted_literal_token_assignment_is_denied(self):
+        # Quoting is the conventional form — the guard must not be bypassable by it.
+        for cmd in (
+            "export RH_OFFLINE_TOKEN='eyJhbGciOiJIUzI1NiJ9.literal'",
+            'RH_OFFLINE_TOKEN="eyJhbGciOiJIUzI1NiJ9.literal" bash "$S/rh-token.sh" --check',
+        ):
+            with self.subTest(cmd=cmd):
+                d = decision(run_hook(GUARD, bash_event(cmd), self.env))
+                self.assertEqual(d["permissionDecision"], "deny")
+                self.assertIn("literal", d["permissionDecisionReason"])
+
+    def test_empty_or_unset_assignment_passes(self):
+        self.assert_passthrough(run_hook(GUARD, bash_event('RH_OFFLINE_TOKEN="" bash "$S/rh-preflight.sh"'), self.env))
 
     def test_echoing_the_token_is_denied(self):
         r = run_hook(GUARD, bash_event("echo $RH_OFFLINE_TOKEN"), self.env)
@@ -122,9 +139,50 @@ class GuardHook(unittest.TestCase):
     def test_plugin_scripts_pass(self):
         self.assert_passthrough(run_hook(GUARD, bash_event("bash $S/rh-fetch.sh kcs:7137578 # https://access.redhat.com/solutions/7137578"), self.env))
 
+    def test_plugin_script_invocation_forms_pass(self):
+        # Command-position variants that must stay exempt: env prefix, quoted path, after && / ;,
+        # inside a loop body, inside $(…), and piped into a post-processor.
+        for cmd in (
+            'RH_CRED_SOURCES=env,file bash "$S/rh-token.sh" --check',
+            '"$S/rh-fetch.sh" https://access.redhat.com/solutions/7137578',
+            'cd /tmp && bash -x "$S/rh-fetch.sh" https://access.redhat.com/solutions/7137578',
+            'S=x; bash "$S/rh-fetch.sh" https://access.redhat.com/solutions/7137578',
+            'for u in https://access.redhat.com/solutions/1; do bash "$S/rh-fetch.sh" "$u"; done',
+            'python3 render.py "$(bash "$S/rh-fetch.sh" https://docs.redhat.com/en/documentation/x/1/html/b/p)"',
+            'bash "$S/rh-fetch.sh" https://docs.redhat.com/en/documentation/x/1/html/b/p | python3 render.py',
+        ):
+            with self.subTest(cmd=cmd):
+                self.assert_passthrough(run_hook(GUARD, bash_event(cmd), self.env))
+
+    def test_script_name_in_comment_does_not_exempt(self):
+        # A mention is not an invocation: the fetcher policy still applies.
+        for cmd in (
+            "python3 -c \"import requests; requests.get('https://api.access.redhat.com/support/search/kcs')\" # rh-fetch.sh",
+            "node -e \"fetch('https://api.access.redhat.com/support/search/kcs')\" # see rh-fetch.sh",
+            "python3 -c \"import requests; requests.get('https://api.access.redhat.com/support/search/kcs')\"; bash $S/rh-fetch.sh --help",
+        ):
+            with self.subTest(cmd=cmd):
+                d = decision(run_hook(GUARD, bash_event(cmd), self.env))
+                self.assertEqual(d["permissionDecision"], "deny")
+                self.assertIn("curl", d["permissionDecisionReason"])
+
+    def test_direct_sso_call_asks_even_next_to_plugin_script(self):
+        sso = "curl -X POST https://sso.redhat.com/auth/realms/redhat-external/protocol/openid-connect/token -d @body"
+        for cmd in (sso + "; : rh-token.sh", sso + ' && bash "$S/rh-token.sh" --check'):
+            with self.subTest(cmd=cmd):
+                self.assertEqual(decision(run_hook(GUARD, bash_event(cmd), self.env))["permissionDecision"], "ask")
+
     def test_plain_curl_to_docs_host_passes_to_curl_policy(self):
         # docs.redhat.com is not a gated host and curl is the sanctioned fetcher: no verdict.
         self.assert_passthrough(run_hook(GUARD, bash_event("curl -I https://docs.redhat.com/robots.txt"), self.env))
+
+
+class PluginCopies(unittest.TestCase):
+    def test_hook_copies_match_canonical(self):
+        # hooks.json points at plugins/redhat/scripts/; those are hand-copied from hooks/.
+        for name in ("redhat-docs-guard.sh", "redhat-docs-preflight.sh"):
+            with self.subTest(name=name):
+                self.assertEqual((REPO / "hooks" / name).read_bytes(), (PLUGIN / "scripts" / name).read_bytes())
 
 
 class PreflightHook(unittest.TestCase):

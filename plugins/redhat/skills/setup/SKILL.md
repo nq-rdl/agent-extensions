@@ -65,13 +65,16 @@ lands in the transcript). Give only the chosen block:
 
 ```bash
 export BW_SESSION="$(bw unlock --raw)"
-printf 'export RH_OFFLINE_TOKEN=%s\n' "$(read -rs -p 'Paste offline token: ' t; echo "$t")" \
-  | bw get template item | jq --rawfile notes /dev/stdin --arg name redhat-credentials \
-      '.type = 2 | .secureNote.type = 0 | .notes = $notes | .name = $name' \
-  | bw encode | bw create item >/dev/null && echo stored
+printf 'Paste offline token: '; IFS= read -rs t; echo
+[ -n "$t" ] && bw get template item \
+  | jq --rawfile notes <(printf 'export RH_OFFLINE_TOKEN=%s\n' "$t") --arg name redhat-credentials \
+       '.type = 2 | .secureNote.type = 0 | .notes = $notes | .name = $name' \
+  | bw encode | bw create item >/dev/null && echo stored; unset t
 ```
 
-If that one-liner is unfamiliar, the equivalent is: create a Secure Note called
+Works in bash and zsh (the macOS default). The template goes to `jq` on stdin and the
+note text through a process substitution, so the token is never an argument of any
+process. If the block is unfamiliar, the equivalent is: create a Secure Note called
 `redhat-credentials` whose content is one line, `export RH_OFFLINE_TOKEN=<token>`.
 
 **macOS keychain** (prompts for the secret, keeps it out of shell history):
@@ -86,10 +89,11 @@ security add-generic-password -a "$USER" -s RH_OFFLINE_TOKEN -U -w
 secret-tool store --label='Red Hat offline token' service redhat key RH_OFFLINE_TOKEN
 ```
 
-**0600 file**:
+**0600 file** (bash or zsh — `read -p` is deliberately avoided: zsh reads it as a coprocess
+and would silently store an empty file):
 
 ```bash
-mkdir -p ~/.config/redhat && (umask 077; read -rs -p 'Paste offline token: ' t; printf '%s\n' "$t" > ~/.config/redhat/offline-token) && echo stored
+mkdir -p ~/.config/redhat && (umask 077; printf 'Paste offline token: '; IFS= read -rs t; echo; [ -n "$t" ] && printf '%s\n' "$t" > ~/.config/redhat/offline-token && chmod 600 ~/.config/redhat/offline-token && echo stored)
 ```
 
 ## 4. Load

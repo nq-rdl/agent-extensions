@@ -18,6 +18,7 @@
 #
 # exit: 0 ok · 1 usage · 2 network/HTTP · 3 not authenticated / not entitled · 4 unresolvable
 set -u
+set -o pipefail   # a failed fetch on the left of "| emit" must surface as a non-zero exit
 here="$(cd "$(dirname "$0")" && pwd)"
 # shellcheck source=rh-lib.sh
 . "$here/rh-lib.sh"
@@ -47,7 +48,7 @@ tree_paths() { # <repo> <ref> → path list (cached 24h)
   local repo="$1" ref="$2" cache f age
   cache="$(rh_cache_dir)/tree-$(printf '%s' "$repo" | tr '/' '_')-$ref.txt"
   if [ -s "$cache" ]; then
-    age=$(( $(date +%s) - $(date -r "$cache" +%s 2>/dev/null || stat -c %Y "$cache" 2>/dev/null || echo 0) ))
+    age=$(( $(date +%s) - $(rh_file_mtime "$cache") ))
     [ "$age" -lt 86400 ] && { cat "$cache"; return 0; }
   fi
   f="$(tmpf)"
@@ -71,9 +72,22 @@ find_in_tree() { # <treefile> <slug> [prefer-prefix]
   if [ -n "${3:-}" ] && printf '%s\n' "$hits" | grep -q "^$3"; then hits="$(printf '%s\n' "$hits" | grep "^$3")"; fi
   printf '%s\n' "$hits" | head -1
 }
+resolve_anchor() { # <treefile> <anchor> [prefer-prefix] → file for an [id=…] anchor
+  # AAP anchors are file basenames. OpenShift module ids are "<basename>_{context}" (the context
+  # is one hyphenated token, so "_" never occurs inside the basename): strip "_<suffix>" from the
+  # right until a file matches.
+  local cand="$2" hit
+  while :; do
+    if hit="$(find_in_tree "$1" "$cand" "${3:-}")"; then printf '%s\n' "$hit"; return 0; fi
+    case "$cand" in *_*) cand="${cand%_*}" ;; *) return 1 ;; esac
+  done
+}
+no_source() { # <slug> <repo> <ref>
+  echo "no '$1.adoc' in $2@$3 — the slug is not a file name here (OpenShift anchors carry a _{context} suffix, which was already tried); search the source: gh api -X GET search/code -f q='\"$1\" repo:$2'" >&2
+}
 
 route_docs() { # <url>
-  local url="$1" rest product ver form book page anchor repo ref base tree path modpath f inc rel cand
+  local url="$1" rest product ver form book page anchor repo ref base tree path modpath f body rc
   anchor="${url#*#}"; [ "$anchor" = "$url" ] && anchor=""
   rest="${url%%#*}"; rest="${rest#https://docs.redhat.com/}"; rest="${rest#*/documentation/}"
   product="${rest%%/*}"; rest="${rest#*/}"
@@ -93,19 +107,31 @@ MSG
       return 4 ;;
   esac
   case "$form" in
-    html) slug="$page" ;;
-    html-single) [ -n "$anchor" ] || { echo "html-single URLs need a #anchor (or use the multi-page /html/ URL)" >&2; return 4; }; slug="$anchor" ;;
+    html) ;;
+    html-single) [ -n "$anchor" ] || { echo "html-single URLs need a #anchor (or use the multi-page /html/ URL)" >&2; return 4; } ;;
     *) echo "unrecognised docs.redhat.com URL form '$form' — expected /html/<book>/<page> or /html-single/<book>/index#anchor; try docs-text:$url" >&2; return 4 ;;
   esac
-  tree="$(tmpf)"; tree_paths "$repo" "$ref" > "$tree" || return $?
-  path="$(find_in_tree "$tree" "$slug" "${base%%/*}")" || { echo "no '$slug.adoc' in $repo@$ref — the page slug is not a file name here; try: gh api -X GET search/code -f q='\"[id=\\\"$slug\\\"]\" repo:$repo'" >&2; rm -f "$tree"; return 4; }
+  tree="$(tmpf)"; tree_paths "$repo" "$ref" > "$tree" || { rc=$?; rm -f "$tree"; return "$rc"; }
   modpath=""
-  if [ -n "$anchor" ] && [ "$anchor" != "$slug" ]; then modpath="$(find_in_tree "$tree" "$anchor" "${base%%/*}" || true)"; fi
-  f="$(tmpf)"
-  {
+  if [ "$form" = html ]; then
+    # page slug = assembly file; the anchor (if any) may additionally name a module.
+    path="$(find_in_tree "$tree" "$page" "${base%%/*}")" || { no_source "$page" "$repo" "$ref"; rm -f "$tree"; return 4; }
+    if [ -n "$anchor" ] && [ "$anchor" != "$page" ]; then modpath="$(resolve_anchor "$tree" "$anchor" "${base%%/*}" || true)"; fi
+  else
+    # html-single has no page slug: the anchor is the only handle, resolved to a module or assembly.
+    path="$(resolve_anchor "$tree" "$anchor" "${base%%/*}")" || { no_source "$anchor" "$repo" "$ref"; rm -f "$tree"; return 4; }
+  fi
+  f="$(tmpf)"; body="$(tmpf)"
+  # Render into a file first: "exit 2" inside a "{ … } | emit" pipeline would be lost.
+  (
     echo "// source: https://github.com/$repo/blob/$ref/$path"
-    [ -n "$modpath" ] && echo "// anchor '$anchor' → https://github.com/$repo/blob/$ref/$modpath (module printed first)"
-    [ -n "$anchor" ] && [ -z "$modpath" ] && echo "// anchor '$anchor' is inside this assembly or one of its includes (use --includes)"
+    if [ -n "$modpath" ]; then
+      echo "// anchor '$anchor' → https://github.com/$repo/blob/$ref/$modpath (module printed first)"
+    elif [ -n "$anchor" ] && [ "$form" = html ]; then
+      echo "// anchor '$anchor' is inside this assembly or one of its includes (use --includes)"
+    elif [ -n "$anchor" ] && [ "$(basename "$path" .adoc)" != "$anchor" ]; then
+      echo "// anchor '$anchor' resolved by stripping its _{context} suffix"
+    fi
     echo "// docs: $url"; echo "// fetched: $(date -u +%Y-%m-%dT%H:%M:%SZ) by rh-fetch.sh"; echo
     if [ -n "$modpath" ]; then raw_get "$repo" "$ref" "$modpath" "$f" || exit 2; cat "$f"; echo; echo "// ---- containing assembly: $path ----"; fi
     raw_get "$repo" "$ref" "$path" "$f" || exit 2; cat "$f"
@@ -117,12 +143,15 @@ MSG
         done
         [ -n "$cand" ] || cand="$(find_in_tree "$tree" "$(basename "$rel" .adoc)" || true)"
         echo; echo "// ---- include: ${cand:-$rel (NOT FOUND in tree)} ----"
-        [ -n "$cand" ] && { raw_get "$repo" "$ref" "$cand" "$f.inc" && cat "$f.inc"; }
+        if [ -n "$cand" ]; then raw_get "$repo" "$ref" "$cand" "$f.inc" && cat "$f.inc" || echo "// (fetch of $cand failed — see stderr)"; fi
       done
       rm -f "$f.inc"
     fi
-  } | emit
-  rm -f "$f" "$tree"
+  ) > "$body"
+  rc=$?
+  if [ "$rc" != 0 ]; then rm -f "$f" "$f.inc" "$tree" "$body"; return "$rc"; fi
+  emit < "$body"
+  rm -f "$f" "$f.inc" "$tree" "$body"
 }
 
 # ---------- Customer Portal routes ----------
@@ -145,7 +174,7 @@ route_kcs_id() { # <id>
     "# \($d.publishedTitle|s)\n\nSource: \($d.view_uri|s) (KCS \($d.id|s), \($d.documentKind|s), modified \($d.lastModifiedDate|s))\n" +
     ([ ["Environment", ($d.solution_environment|s)], ["Issue", ($d.issue|s)], ["Resolution", ($d.solution_resolution|s)],
        ["Root Cause", ($d.solution_rootcause|s)], ["Diagnostic Steps", ($d.solution_diagnosticsteps|s)], ["Body", ($d.body|s)] ]
-      | map(select(.[1] != "")) | map("\n## \(.[0])\n\n\(.[1])\n") | join(""))' "$f" | emit
+      | map(select(.[1] != "")) | map("\n## \(.[0])\n\n\(.[1])\n") | join(""))' "$f" | emit || { rm -f "$f"; exit 2; }
   rm -f "$f"
 }
 
@@ -154,7 +183,7 @@ route_search() { # <terms>
   url="$RH_KCS_API?q=$(urlenc "$1")&rows=$rows&fl=id,documentKind,publishedTitle,view_uri"
   [ -n "$kind" ] && url="$url&fq=documentKind:$kind"
   code="$(rh_http_get "$url" "$f")"; [ "$code" = "200" ] || { echo "KCS search: HTTP $code" >&2; rm -f "$f"; exit 2; }
-  jq -r '"numFound: \(.response.numFound)", (.response.docs[] | "\(.id)\t\(.documentKind)\t\(.publishedTitle // "-")\t\(.view_uri // "-")")' "$f" | emit
+  jq -r '"numFound: \(.response.numFound)", (.response.docs[] | "\(.id)\t\(.documentKind)\t\(.publishedTitle // "-")\t\(.view_uri // "-")")' "$f" | emit || { rm -f "$f"; exit 2; }
   rm -f "$f"
 }
 
@@ -165,11 +194,15 @@ route_docs_text() { # <docs url>
   code="$(rh_http_get "$RH_KCS_API?q=*&fq=id:$(urlenc "\"$url\"")&fl=publishedTitle,view_uri,docs_text_store,large_text_store" "$f" "$cfg")"
   [ "$code" = "200" ] || { echo "KCS API: HTTP $code" >&2; rm -f "$f"; exit 2; }
   n="$(jq -r '.response.numFound // 0' "$f")"; [ "$n" -gt 0 ] || { echo "that URL is not in the KCS Documentation index" >&2; rm -f "$f"; exit 4; }
-  if [ "$(jq -r '.response.docs[0] | ((.docs_text_store // "")|tostring|length) + ((.large_text_store // "")|tostring|length)' "$f")" = "0" ]; then
-    echo "Documentation text fields came back empty (experimental route — the index may not expose page text to your account). Use the source-repo route or a browser." >&2; rm -f "$f"; exit 3
+  # First NON-EMPTY of docs_text_store / large_text_store (jq's // only skips null/false, not "").
+  jq -r '
+    def s: if type=="array" then join("\n") elif .==null then "" else tostring end;
+    .response.docs[0] | [.docs_text_store, .large_text_store] | map(s) | map(select(length > 0)) | .[0] // empty' "$f" > "$f.txt"
+  if [ ! -s "$f.txt" ]; then
+    echo "Documentation text fields came back empty (experimental route — the index may not expose page text to your account). Use the source-repo route or a browser." >&2; rm -f "$f" "$f.txt"; exit 3
   fi
-  jq -r '.response.docs[0] | "# \(.publishedTitle // "")\n\nSource: \(.view_uri // "")\n\n" + ((.docs_text_store // .large_text_store) | if type=="array" then join("\n") else tostring end)' "$f" | emit
-  rm -f "$f"
+  { jq -r '.response.docs[0] | "# \(.publishedTitle // "")\n\nSource: \(.view_uri // "")\n"' "$f"; cat "$f.txt"; } | emit || { rm -f "$f" "$f.txt"; exit 2; }
+  rm -f "$f" "$f.txt"
 }
 
 case "$target" in

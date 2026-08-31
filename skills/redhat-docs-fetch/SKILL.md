@@ -58,7 +58,8 @@ in your answer.
   (`proc-set-community-remote.adoc`) whose `[id=…]` equals the anchor. OpenShift:
   `openshift/openshift-docs`, branch `enterprise-<ver>`; the page slug is the assembly
   file name located via `_topic_maps/_topic_map.yml` (nested `Dir`/`File`), modules under
-  `modules/`. Satellite builds from `theforeman/foreman-documentation`
+  `modules/`, and anchors are `<module-file>_{context}` — the script strips the suffix to
+  find the module (so `html-single/…/index#anchor` URLs resolve too). Satellite builds from `theforeman/foreman-documentation`
   (`guides/doc-<Title>/`, `BUILD=satellite`). **RHEL has no public source.**
   Details: `references/source-repos.rst`.
 - **No "get solution by id" endpoint exists.** The `resource_uri` the API returns

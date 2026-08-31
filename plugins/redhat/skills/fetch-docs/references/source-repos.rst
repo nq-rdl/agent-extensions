@@ -24,8 +24,10 @@ reference); the AsciiDoc source on GitHub is the route for products that publish
      - ``enterprise-4.18`` … ``enterprise-4.22``
      - ``_topic_maps/_topic_map.yml`` (nested ``Dir``/``File`` groups) places the
        assembly at ``<dir>/…/<file>.adoc``; the page slug equals ``File``; modules live
-       under ``modules/`` and ``include::`` paths are repo-root relative. Anchors inside
-       modules carry a ``_{context}`` suffix, so an anchor is not a file name here.
+       under ``modules/`` and ``include::`` paths are repo-root relative. Module ids are
+       ``[id="<file-basename>_{context}"]`` (verified on ``enterprise-4.18``), so a rendered
+       anchor such as ``nodes-pods-autoscaling-about_nodes-pods-autoscaling`` is the module file
+       ``modules/nodes-pods-autoscaling-about.adoc`` plus a one-token context suffix.
    * - Satellite
      - ``theforeman/foreman-documentation``
      - ``master`` + release branches
@@ -45,8 +47,11 @@ How ``rh-fetch.sh`` resolves a URL
 2. Map product → repo/branch (table above). ``html-single`` URLs need the ``#anchor``.
 3. Fetch the branch's git tree once (``gh api`` if logged in, else ``api.github.com`` —
    unauthenticated is limited to 60 requests/hour; cached 24 h in the runtime dir).
-4. Find ``<slug>.adoc`` in the tree (prefer ``downstream/`` for AAP). If the anchor is
-   also a file, print that module first, then the assembly.
+4. Find ``<slug>.adoc`` in the tree (prefer ``downstream/`` for AAP). Anchors are resolved
+   by ``resolve_anchor``: try ``<anchor>.adoc``, then strip ``_<suffix>`` from the right
+   until a file matches (OpenShift's ``_{context}``). For ``/html/`` URLs a resolved anchor
+   module is printed first, then the assembly; for ``html-single`` URLs (no page slug) the
+   resolved file *is* the output, with a header line noting when the suffix was stripped.
 5. Fetch from ``raw.githubusercontent.com`` (public, no auth). ``--includes`` inlines
    first-level ``include::`` targets, trying repo-root, file-relative, and
    ``downstream/modules/`` bases, then a basename lookup.

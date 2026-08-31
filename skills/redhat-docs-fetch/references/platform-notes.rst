@@ -9,7 +9,18 @@ The scripts detect the platform with ``uname -s`` (``Darwin`` / ``Linux``; WSL v
   (python/requests, httpie, node) is used or allowed by the guard hook.
 * **bash 3.2** (macOS default) — no associative arrays, ``mapfile``, or ``${var,,}``.
 * **stat** — GNU ``stat -c %a`` vs BSD ``stat -f %Lp`` (file-mode check on the token file);
-  GNU ``stat -c %Y`` vs ``date -r`` for cache age.
+  GNU ``stat -c %Y`` vs BSD ``stat -f %m`` for the tree-cache age (``rh_file_mtime``). BSD
+  ``date -r`` takes an epoch, not a path, so it is not used; GNU is probed first because GNU
+  ``stat -f`` means *file-system* status and would succeed with the wrong answer.
+* **wget auth** — the Bearer header is handed to wget through a 0600 ``--config`` wgetrc
+  translated from the curl ``-K`` config, never as a ``--header=`` argument (which would show
+  in ``ps`` / ``/proc/<pid>/cmdline``).
+* **pipefail** — ``rh-fetch.sh`` sets it and renders the docs route into a file before
+  ``emit``, so a failed ``raw.githubusercontent.com`` fetch exits 2 instead of printing only the
+  provenance header with exit 0.
+* **read -p** — not used in the commands users paste (``/redhat:setup``): zsh, the macOS
+  default shell, treats ``read -p`` as "read from a coprocess" and would store an empty
+  token. The prompts use ``printf`` + ``IFS= read -rs``, which behave the same in bash and zsh.
 * **mktemp** — always called with an explicit ``XXXXXX`` template (BSD requires it).
 * **base64** — avoided entirely: GitHub content is fetched raw
   (``raw.githubusercontent.com``) rather than decoded from the contents API.
