@@ -271,19 +271,27 @@ to `main` and no force-moved tag in the flow — a tag is created exactly once, 
 was actually reviewed.
 
 The **"Release — Prepare PR"** workflow (`workflow_dispatch`, GitHub App token:
-`RELEASE_APP_ID` / `RELEASE_APP_PRIVATE_KEY`) takes an explicit `version` input (`X.Y.Z`). Explicit
+`RELEASE_APP_ID` / `RELEASE_APP_PRIVATE_KEY`) takes an explicit `version` input (`X.Y.Z`, no
+leading `v`, no zero-padded components). Explicit
 version selection is retained deliberately rather than inferring a bump from commit kinds: SemVer
 is silent on what a breaking change means for a `0.x` series, so the human cutting the release
 still decides the number. The workflow batches and merges the changie changelog for that version,
 stamps `VERSION` (and `pyproject.toml`), regenerates all manifests from the registry
 (`scripts/generate_manifests.py`), and opens a `release/v<version>` PR labelled `skip-changelog` —
-run under the App token so the PR's own CI executes on it like any other PR.
+run under the App token so the PR's own CI executes on it like any other PR. If opening the PR
+fails after the branch is pushed, the run deletes the branch itself (lease-protected, so a branch
+someone has since moved is left alone and reported) so Prepare can simply be re-dispatched.
 
 Reviewing and squash-merging that PR is the release gate. On merge, **"Release — Finalize on
 merge"** (triggered by `pull_request: closed` against `main`, gated to merged `release/v*` PRs)
 tags `v<version>` on the resulting squash-merge commit and publishes the GitHub release from
 `.changes/<version>.md`. It never pushes to `main`, and it is idempotent: re-running it recovers a
-partial failure where the tag was created but the release publish step did not complete.
+partial failure where the tag was created but the release publish step did not complete. It also
+fails closed: in every state an existing `v<version>` tag must point at the merge commit, a
+release that exists without its tag is a hard failure, and a remote lookup error stops the run
+rather than being read as "absent". Finalize runs are serialized in a single job-level concurrency
+queue (`queue: max`, FIFO across versions), so the newest-tag monotonic backstop is sound even when
+two release PRs merge within seconds of each other.
 
 `marketplace.json` plugin sources are relative paths (`./plugins/<bundle>`), so installs read directly from the pinned ref — no separate release branch.
 
