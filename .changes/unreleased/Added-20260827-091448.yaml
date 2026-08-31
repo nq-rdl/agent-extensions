@@ -1,3 +1,0 @@
-kind: Added
-body: 'redhat-docs-fetcher agent: autonomous preflight → route → fetch → extract → provenance executor for Red Hat docs; stops at /redhat:setup when no credential is loaded.'
-time: 2026-08-27T09:14:44.000000+00:00
