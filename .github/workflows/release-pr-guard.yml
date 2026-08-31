@@ -44,8 +44,12 @@ jobs:
         run: |
           set -euo pipefail
           version="${HEAD_REF#release/v}"
-          if ! printf '%s' "$version" | grep -Eq '^[0-9]+\.[0-9]+\.[0-9]+$'; then
-            echo "::error::could not derive X.Y.Z from head ref '$HEAD_REF'"; exit 1
+          # Same canonical form release-prepare.yml enforces: plain integer
+          # components, no leading zeros. A hand-made release/v1.0.00 branch
+          # would otherwise sort -V after 1.0.0 and pass as "newer".
+          SEMVER_RE='^(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)$'
+          if ! printf '%s' "$version" | grep -Eq "$SEMVER_RE"; then
+            echo "::error::could not derive canonical X.Y.Z (no zero-padded components) from head ref '$HEAD_REF'"; exit 1
           fi
 
           # The PR content must match the branch name — the same consistency

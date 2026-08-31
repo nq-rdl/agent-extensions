@@ -1,0 +1,3 @@
+kind: Fixed
+body: 'release-prepare: Changie is pinned to v1.26.0 on the changie-action step instead of latest, so an upstream release cannot change or break the batched changelog unreviewed (#279)'
+time: 2026-08-31T14:38:40.510632+10:00
