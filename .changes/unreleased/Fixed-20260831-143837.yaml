@@ -1,3 +1,0 @@
-kind: Fixed
-body: 'release workflows: version regex now rejects zero-padded components (1.0.00), which sort -V ordered after 1.0.0 and let a duplicate non-SemVer release through (#276)'
-time: 2026-08-31T14:38:37.510632+10:00
