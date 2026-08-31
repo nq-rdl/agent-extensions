@@ -1,0 +1,3 @@
+kind: Added
+body: "CI: weekly \"Changie pin check\" workflow opens a tracking issue when the Changie pin in release-prepare.yml falls behind the latest upstream release; it only notifies (#283)"
+time: 2026-08-31T05:53:06.123526+10:00

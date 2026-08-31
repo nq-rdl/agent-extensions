@@ -290,7 +290,9 @@ to `main`, and it is idempotent (safe to re-run; recovers a tag-pushed-but-relea
 failure).
 
 Prepare runs a pinned Changie (`version:` on the `changie-action` step in `release-prepare.yml`),
-so an unchanged workflow batches the same changelog; bump the pin deliberately on a normal PR.
+so an unchanged workflow batches the same changelog; bump the pin deliberately on a normal PR. A
+weekly **Changie pin check** workflow (`changie-pin-check.yml`) opens a `changie-pin` tracking issue
+when that pin falls behind upstream's latest release — it only notifies; the bump stays a reviewed PR.
 
 **Recovery.** Finalize fails closed rather than guessing: in every state an existing `v<version>`
 tag must point at the PR's merge commit, and a remote lookup error is an error, not "absent".
