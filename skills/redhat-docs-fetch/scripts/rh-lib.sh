@@ -4,6 +4,7 @@
 # no ${var,,}, no mapfile. Never prints a token to stdout unless the caller
 # explicitly asks via rh_cred_token (used only by rh-token.sh).
 
+{ set +x +v; } 2>/dev/null   # a caller's bash -x or exported SHELLOPTS=xtrace would trace the token into stderr
 RH_SSO_TOKEN_URL='https://sso.redhat.com/auth/realms/redhat-external/protocol/openid-connect/token'
 RH_SSO_CLIENT_ID='rhsm-api'
 RH_KCS_API='https://api.access.redhat.com/support/search/kcs'
