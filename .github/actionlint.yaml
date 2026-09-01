@@ -5,7 +5,7 @@
 paths:
   # Glob (not a literal path) so the ignore applies however actionlint is
   # invoked: bare from the repo root, or with a relative/absolute file path.
-  "**/release-finalize.yml":
+  "**/release-*.yml":
     ignore:
       # `concurrency.queue` shipped in GitHub Actions on 2026-05-07 (up to 100
       # pending runs per group). actionlint's schema has not caught up as of

@@ -1,0 +1,92 @@
+name: Release — Recovery watchdog
+
+# Independent compensation for Release — Verify Finalize recovery. workflow_run
+# still fires when the drill fails, times out, or is cancelled. The baseline
+# artifact is uploaded before deletion, so its presence is the durable signal
+# that compensation may be required. This job shares Finalize's concurrency
+# group and cannot race a production release mutation.
+on:
+  workflow_run:
+    workflows: ["Release — Verify Finalize recovery"]
+    types: [completed]
+
+permissions:
+  actions: read
+  contents: read
+
+jobs:
+  restore:
+    if: >-
+      github.event.workflow_run.event == 'workflow_dispatch' &&
+      github.event.workflow_run.head_branch == 'main' &&
+      github.event.workflow_run.head_repository.full_name == github.repository
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    concurrency:
+      group: release-finalize
+      cancel-in-progress: false
+      queue: max
+    steps:
+      - name: Locate durable baseline
+        id: baseline
+        env:
+          GH_TOKEN: ${{ github.token }}
+          SOURCE_RUN_ID: ${{ github.event.workflow_run.id }}
+        run: |
+          set -euo pipefail
+          count="$(gh api "repos/${GITHUB_REPOSITORY}/actions/runs/${SOURCE_RUN_ID}/artifacts?per_page=100" \
+            --jq '[.artifacts[] | select(.name == "release-recovery-baseline" and .expired == false)] | length')"
+          if [ "$count" -eq 0 ]; then
+            jobs_json="$(gh api "repos/${GITHUB_REPOSITORY}/actions/runs/${SOURCE_RUN_ID}/jobs?filter=all&per_page=100")"
+            mutation="$(printf '%s' "$jobs_json" | jq -r \
+              '[.jobs[].steps[]? | select(.name == "Queue tag-only recovery and delete only the release")][-1].conclusion // "absent"')"
+            case "$mutation" in
+              absent|skipped)
+                echo "::notice::No durable baseline remains, but the destructive step did not run; no compensation is reachable."
+                echo "present=false" >> "$GITHUB_OUTPUT"
+                ;;
+              *)
+                echo "::error::The baseline artifact is missing/expired and the destructive step concluded '$mutation'." \
+                  "Inspect v<version> immediately and restore it from .changes/<version>.md if absent."
+                exit 1
+                ;;
+            esac
+          elif [ "$count" -eq 1 ]; then
+            echo "present=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "::error::Expected at most one release-recovery-baseline artifact; found $count."
+            exit 1
+          fi
+
+      - name: Generate contents-only app token
+        if: steps.baseline.outputs.present == 'true'
+        id: app-token
+        uses: actions/create-github-app-token@bcd2ba49218906704ab6c1aa796996da409d3eb1 # v3.2.0
+        with:
+          app-id: ${{ vars.RELEASE_APP_ID }}
+          private-key: ${{ secrets.RELEASE_APP_PRIVATE_KEY }}
+          permission-contents: write
+
+      - name: Check out main
+        if: steps.baseline.outputs.present == 'true'
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: main
+          fetch-depth: 0
+
+      - name: Download durable baseline
+        if: steps.baseline.outputs.present == 'true'
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          name: release-recovery-baseline
+          path: baseline
+          repository: ${{ github.repository }}
+          run-id: ${{ github.event.workflow_run.id }}
+          github-token: ${{ github.token }}
+
+      - name: Verify or restore release
+        if: steps.baseline.outputs.present == 'true'
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+          RELEASE_TOKEN: ${{ steps.app-token.outputs.token }}
+        run: scripts/verify-release-recovery.sh watchdog baseline
