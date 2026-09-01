@@ -1,6 +1,6 @@
 {
   "name": "bitwarden",
-  "version": "0.28.0",
+  "version": "0.29.0",
   "description": "Bitwarden — manage .env files and secrets via the Bitwarden CLI",
   "author": {
     "name": "nq-rdl"

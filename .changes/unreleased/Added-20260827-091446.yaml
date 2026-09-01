@@ -1,3 +1,0 @@
-kind: Added
-body: '/redhat:fetch-docs skill: routes docs.redhat.com URLs to the product source repo (AAP, OpenShift) and solution/article ids to the KCS API; search: and docs-text: targets.'
-time: 2026-08-27T09:14:44.000000+00:00
