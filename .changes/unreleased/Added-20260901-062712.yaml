@@ -1,0 +1,3 @@
+kind: Added
+body: 'Guarded live verification for Finalize no-op and tag-only recovery, serialized with releases and backed by a durable baseline watchdog after failure or cancellation.'
+time: 2026-09-01T06:27:12.000000+00:00

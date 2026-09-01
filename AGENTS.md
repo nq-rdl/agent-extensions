@@ -297,6 +297,21 @@ when that pin falls behind upstream's latest release — it only notifies; the b
 **Recovery.** Finalize fails closed rather than guessing: in every state an existing `v<version>`
 tag must point at the PR's merge commit, and a remote lookup error is an error, not "absent".
 
+To deliberately exercise both idempotency paths, dispatch **"Release — Verify Finalize recovery"**
+from `main` for the current Latest release and enter the exact confirmation string shown by the
+workflow. The drill first proves the tag-plus-release no-op, then queues another Finalize attempt
+before temporarily deleting only the GitHub release. Its mutation jobs share Finalize's FIFO
+concurrency group, preventing a newer release from publishing in that window. A baseline artifact
+is stored before deletion; an independent **"Release — Recovery watchdog"** run verifies or restores
+the supported metadata after success, failure, timeout, or cancellation. The drill refuses older,
+immutable, draft, prerelease, asset-bearing, discussion-linked, or body-drifted releases.
+
+Deletion/recreation necessarily changes the release database ID, creation/publication timestamps,
+and release-event/webhook history; those cannot be restored. The title, body, tag target,
+`target_commitish`, author identity, and safe Latest state are verified. If the watchdog itself
+fails (for example during a GitHub outage), restore `.changes/<version>.md` manually before any
+new release. This is a verification drill, not the routine recovery path.
+
 - *Prepare failed after pushing the branch* (e.g. an API error while opening the PR): the run
   deletes `release/v<version>` itself — lease-protected, so only while the branch still points at
   the commit it pushed — and you simply re-dispatch. If the log says the branch was not deleted,

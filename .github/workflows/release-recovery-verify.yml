@@ -1,0 +1,170 @@
+name: Release — Verify Finalize recovery
+
+# Destructive, explicitly confirmed production drill for issue #179. A durable
+# baseline artifact is uploaded before any mutation. Jobs that queue a Finalize
+# re-run or delete a release share Finalize's repository-wide FIFO concurrency
+# group, so a newer release cannot publish in the destructive window. The
+# companion workflow_run watchdog restores supported metadata after success,
+# failure, timeout, cancellation, or an ambiguous delete response.
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: "Current Latest release (X.Y.Z). Older releases are rejected."
+        required: true
+        type: string
+      confirmation:
+        description: "Type DELETE-AND-RECREATE-vX.Y.Z using the exact version above."
+        required: true
+        type: string
+
+permissions:
+  actions: read
+  contents: read
+  pull-requests: read
+
+# One complete drill at a time. The job-level release-finalize group below is a
+# separate cross-workflow lock around each operation that can affect releases.
+concurrency:
+  group: release-recovery-verification
+  cancel-in-progress: false
+  queue: max
+
+jobs:
+  baseline:
+    name: Capture baseline and queue no-op
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      actions: write
+      contents: read
+      pull-requests: read
+    concurrency:
+      group: release-finalize
+      cancel-in-progress: false
+      queue: max
+    steps:
+      - name: Require a main-branch dispatch
+        env:
+          DISPATCH_REF: ${{ github.ref }}
+        run: |
+          if [ "$DISPATCH_REF" != refs/heads/main ]; then
+            echo "::error::Run this workflow from the main branch, not $DISPATCH_REF."
+            exit 1
+          fi
+
+      - name: Check out main
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: main
+          fetch-depth: 0
+
+      - name: Capture immutable baseline inputs
+        env:
+          VERSION: ${{ inputs.version }}
+          CONFIRMATION: ${{ inputs.confirmation }}
+          GITHUB_TOKEN: ${{ github.token }}
+        run: scripts/verify-release-recovery.sh capture baseline
+
+      - name: Upload durable release baseline
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: release-recovery-baseline
+          path: baseline/
+          if-no-files-found: error
+          retention-days: 30
+
+      # Queued only after the artifact is durable. The re-run waits behind this
+      # job's release-finalize lock and starts as soon as the job exits.
+      - name: Queue no-op Finalize attempt
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        run: scripts/verify-release-recovery.sh queue-noop baseline
+
+  verify-noop:
+    name: Verify no-op attempt
+    needs: baseline
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Check out main
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: main
+          fetch-depth: 0
+
+      - name: Download release baseline
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          name: release-recovery-baseline
+          path: baseline
+
+      - name: Verify tag-plus-release no-op
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        run: scripts/verify-release-recovery.sh verify-noop baseline
+
+  queue-recovery:
+    name: Queue recovery and remove release
+    needs: verify-noop
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      actions: write
+      contents: read
+    concurrency:
+      group: release-finalize
+      cancel-in-progress: false
+      queue: max
+    steps:
+      - name: Generate contents-only app token
+        id: app-token
+        uses: actions/create-github-app-token@bcd2ba49218906704ab6c1aa796996da409d3eb1 # v3.2.0
+        with:
+          app-id: ${{ vars.RELEASE_APP_ID }}
+          private-key: ${{ secrets.RELEASE_APP_PRIVATE_KEY }}
+          permission-contents: write
+
+      - name: Check out main
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: main
+          fetch-depth: 0
+
+      - name: Download release baseline
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          name: release-recovery-baseline
+          path: baseline
+
+      # The script queues Finalize before deletion. Because this job owns the
+      # same concurrency group, that attempt cannot observe the release until
+      # the deletion is complete and this job releases the lock.
+      - name: Queue tag-only recovery and delete only the release
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+          RELEASE_TOKEN: ${{ steps.app-token.outputs.token }}
+        run: scripts/verify-release-recovery.sh queue-recovery baseline
+
+  verify-recovery:
+    name: Verify release-only recovery
+    needs: queue-recovery
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Check out main
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: main
+          fetch-depth: 0
+
+      - name: Download release baseline
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          name: release-recovery-baseline
+          path: baseline
+
+      - name: Verify tag-only recovery
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        run: scripts/verify-release-recovery.sh verify-recovery baseline
