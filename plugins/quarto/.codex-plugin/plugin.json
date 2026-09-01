@@ -1,0 +1,28 @@
+{
+  "name": "quarto",
+  "version": "0.28.0",
+  "description": "Quarto — document authoring and accessible figure alt text",
+  "author": {
+    "name": "nq-rdl"
+  },
+  "repository": "https://github.com/nq-rdl/agent-extensions",
+  "license": "MIT",
+  "keywords": [
+    "quarto",
+    "authoring",
+    "accessibility",
+    "alt-text"
+  ],
+  "skills": "./skills/",
+  "interface": {
+    "displayName": "Quarto",
+    "shortDescription": "Quarto — document authoring and accessible figure alt text",
+    "longDescription": "Quarto — document authoring and accessible figure alt text",
+    "developerName": "nq-rdl",
+    "category": "Productivity",
+    "capabilities": [
+      "Skills"
+    ],
+    "websiteURL": "https://github.com/nq-rdl/agent-extensions"
+  }
+}

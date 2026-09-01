@@ -1,5 +1,5 @@
 #!/bin/bash
-# Validate Claude Code plugin structure, hooks, and agents.
+# Validate Claude Code and native Codex plugin structure, hooks, skills, and agents.
 #
 # Checks:
 #   Claude plugin manifests
@@ -7,6 +7,10 @@
 #     2. plugin.json has required "name" and "description" fields
 #     3. plugin.json must NOT declare an "agents" field (Claude Code auto-discovers from ./agents/)
 #     4. If a .claude-plugin/ directory exists, its plugin.json must too
+#
+#   Codex plugin manifests
+#     5. plugin.json is valid JSON with name, version, and description
+#     6. skills points to the existing plugin-local ./skills/ directory
 #
 #   hooks.json (optional — only if present)
 #     5. hooks.json is valid JSON
@@ -96,6 +100,50 @@ validate_manifest_json() {
   fi
 }
 
+# Validate the phase-one native Codex manifest. Non-skill capabilities remain
+# gated off in the registry generator until they have dedicated runtime tests.
+validate_codex_manifest_json() {
+  local manifest_json="$1"
+
+  if ! jq empty "$manifest_json" 2>/dev/null; then
+    error "$manifest_json" "Invalid JSON in $(basename "$manifest_json")"
+    return
+  fi
+
+  local skills
+  if ! jq -e '(.name | type) == "string" and (.name | test("\\S"))' \
+    "$manifest_json" >/dev/null; then
+    error "$manifest_json" "Codex plugin.json name must be a non-empty string"
+  fi
+  if ! jq -e '(.version | type) == "string" and (.version | test("\\S"))' \
+    "$manifest_json" >/dev/null; then
+    error "$manifest_json" "Codex plugin.json version must be a non-empty string"
+  fi
+  if ! jq -e '(.description | type) == "string" and (.description | test("\\S"))' \
+    "$manifest_json" >/dev/null; then
+    error "$manifest_json" "Codex plugin.json description must be a non-empty string"
+  fi
+  if ! jq -e \
+    'if has("keywords") then (.keywords | type) == "array" and all(.keywords[]; type == "string") else true end' \
+    "$manifest_json" >/dev/null; then
+    error "$manifest_json" "Codex plugin.json keywords must be a list of strings"
+  fi
+  if ! jq -e 'if has("interface") then (.interface | type) == "object" else true end' \
+    "$manifest_json" >/dev/null; then
+    error "$manifest_json" "Codex plugin.json interface must be an object"
+  fi
+
+  skills=$(jq -r 'if (.skills | type) == "string" then .skills else empty end' "$manifest_json")
+
+  if [ -z "$skills" ]; then
+    error "$manifest_json" "Phase-one Codex plugin.json missing required 'skills' field"
+  elif [ "$skills" != "./skills/" ]; then
+    error "$manifest_json" "Phase-one Codex skills must be declared as './skills/'"
+  elif [ ! -d "$(dirname "$manifest_json")/../skills" ]; then
+    error "$manifest_json" "Codex skills path './skills/' does not exist at the plugin root"
+  fi
+}
+
 # ── Determine which plugins to validate ─────────────────────────────────────
 if [ $# -gt 0 ]; then
   declare -A plugin_dirs
@@ -109,7 +157,7 @@ if [ $# -gt 0 ]; then
 else
   plugins=()
   for d in "$REPO_ROOT"/plugins/*/; do
-    if [ -d "$d/.claude-plugin" ]; then
+    if [ -d "$d/.claude-plugin" ] || [ -d "$d/.codex-plugin" ]; then
       plugins+=("plugins/$(basename "$d")")
     fi
   done
@@ -123,6 +171,7 @@ else
 for plugin_rel in "${plugins[@]}"; do
   plugin_dir="$REPO_ROOT/$plugin_rel"
   claude_plugin_json="$plugin_dir/.claude-plugin/plugin.json"
+  codex_plugin_json="$plugin_dir/.codex-plugin/plugin.json"
   hooks_json="$plugin_dir/hooks/hooks.json"
   agents_dir="$plugin_dir/agents"
 
@@ -137,6 +186,14 @@ for plugin_rel in "${plugins[@]}"; do
       validate_manifest_json "$claude_plugin_json"
     else
       error "$plugin_rel" "Missing .claude-plugin/plugin.json"
+    fi
+  fi
+
+  if [ -d "$plugin_dir/.codex-plugin" ]; then
+    if [ -f "$codex_plugin_json" ]; then
+      validate_codex_manifest_json "$codex_plugin_json"
+    else
+      error "$plugin_rel" "Missing .codex-plugin/plugin.json"
     fi
   fi
 
@@ -294,6 +351,18 @@ for bundle in sorted(list(_bundles_dir.glob("*.yaml")) + list(_bundles_dir.glob(
     claude = (data.get("targets") or {}).get("claude") or {}
     claude_enabled = claude.get("enabled")
     plugin_name = claude.get("pluginName") or bundle_id
+    codex = (data.get("targets") or {}).get("codex") or {}
+    codex_enabled = codex.get("enabled")
+    codex_plugin_name = codex.get("pluginName") or bundle_id
+
+    if codex_enabled:
+        codex_manifest = repo / "plugins" / codex_plugin_name / ".codex-plugin" / "plugin.json"
+        if not codex_manifest.is_file():
+            err(
+                bundle,
+                f"Codex target is enabled but missing plugins/{codex_plugin_name}/"
+                ".codex-plugin/plugin.json",
+            )
 
     for name in data.get("agents") or []:
         src = repo / "agents" / name / "agent.md"
@@ -352,6 +421,45 @@ for bundle in sorted(list(_bundles_dir.glob("*.yaml")) + list(_bundles_dir.glob(
                         f"re-run scripts/sync-plugins.sh {bundle_id}",
                     )
 
+        if codex_enabled:
+            copy = repo / "plugins" / codex_plugin_name / "skills" / leaf
+            skill_md = copy / "SKILL.md"
+            if not skill_md.is_file():
+                err(
+                    bundle,
+                    f"Skill '{source}' declared for Codex target but missing plugin copy "
+                    f"plugins/{codex_plugin_name}/skills/{leaf}/SKILL.md",
+                )
+            else:
+                try:
+                    parts = skill_md.read_text(encoding="utf-8").split("---\n", 2)
+                    if len(parts) < 3 or parts[0].strip():
+                        raise ValueError("missing YAML frontmatter")
+                    frontmatter = yaml.safe_load(parts[1]) or {}
+                    if not isinstance(frontmatter, dict):
+                        raise ValueError("frontmatter must be a mapping")
+                except (ValueError, yaml.YAMLError) as exc:
+                    err(skill_md, f"invalid Codex skill frontmatter: {exc}")
+                    frontmatter = {}
+                description = frontmatter.get("description")
+                if "description" not in frontmatter:
+                    err(skill_md, "Codex skill frontmatter missing required 'description'")
+                elif not isinstance(description, str) or not description.strip():
+                    err(skill_md, "Codex skill description must be a non-empty string")
+                elif len(description) > 1024:
+                    err(skill_md, "Codex skill description exceeds 1024 characters")
+                if len(leaf) > 64:
+                    err(
+                        skill_md,
+                        f"Codex base skill name '{leaf}' exceeds 64 characters",
+                    )
+                if len(f"{codex_plugin_name}:{leaf}") > 129:
+                    err(
+                        skill_md,
+                        f"Codex qualified skill name '{codex_plugin_name}:{leaf}' exceeds "
+                        "129 characters",
+                    )
+
     mcp_json = repo / "plugins" / plugin_name / ".mcp.json"
     declared_mcp = data.get("mcp") or []
     if declared_mcp and not mcp_json.is_file():
@@ -404,9 +512,9 @@ fi
 
 if [ $errors -gt 0 ]; then
   echo ""
-  echo "Plugin/agent validation failed with $errors error(s)"
+  echo "Plugin/skill/agent validation failed with $errors error(s)"
   exit 1
 fi
 
 echo ""
-echo "All plugins and agents valid"
+echo "All plugins, skills, and agents valid"

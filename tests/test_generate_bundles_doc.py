@@ -59,6 +59,7 @@ class TestGenerate(unittest.TestCase):
             self.assertIn("- `/go:secure`", out)   # {source, leaf} → renamed facet
             self.assertIn("- `/go:naming`", out)    # flat member → leaf == source
             self.assertNotIn("/go:go-secure", out)  # never the source name
+            self.assertIn("**Claude Code skills**", out)
 
     def test_agents_rendered_as_subagents(self):
         with tempfile.TemporaryDirectory() as t:
@@ -68,8 +69,8 @@ class TestGenerate(unittest.TestCase):
     def test_at_a_glance_table(self):
         with tempfile.TemporaryDirectory() as t:
             out = generate_bundles_doc.generate(make_repo(t))
-            self.assertIn("| [`go`](#go) | Go tools |", out)
-            self.assertIn("| [`infra`](#infra) | Infra tools |", out)
+            self.assertIn("| [`go`](#go) | Yes | - | Go tools |", out)
+            self.assertIn("| [`infra`](#infra) | Yes | - | Infra tools |", out)
             self.assertLess(out.index("## At a glance"), out.index("## Install"))
 
     def test_marketplace_order_respected(self):
@@ -81,8 +82,8 @@ class TestGenerate(unittest.TestCase):
         with tempfile.TemporaryDirectory() as t:
             out = generate_bundles_doc.generate(make_repo(t))
             infra_block = out[out.index("## infra"):]
-            self.assertNotIn("**Skills**", infra_block)
-            self.assertNotIn("**Agents**", infra_block)
+            self.assertNotIn("**Claude Code skills**", infra_block)
+            self.assertNotIn("**Claude Code agents**", infra_block)
 
     def test_disabled_bundle_excluded(self):
         with tempfile.TemporaryDirectory() as t:
@@ -124,8 +125,20 @@ class TestGenerate(unittest.TestCase):
                 _bundle("go", "Go tools", mcp="[playwright]", hooks="[format]")
             )
             out = generate_bundles_doc.generate(repo)
-            self.assertIn("**MCP server(s):** `playwright`", out)
-            self.assertIn("**Hooks:** `format`", out)
+            self.assertIn("**Claude Code MCP server(s):** `playwright`", out)
+            self.assertIn("**Claude Code hooks:** `format`", out)
+
+    def test_codex_target_rendered(self):
+        with tempfile.TemporaryDirectory() as t:
+            repo = make_repo(t)
+            bundle = repo / "registry" / "bundles" / "go.yaml"
+            bundle.write_text(bundle.read_text() + "  codex:\n    enabled: true\n")
+            out = generate_bundles_doc.generate(repo)
+            self.assertIn("| [`go`](#go) | Yes | Yes | Go tools |", out)
+            self.assertIn("codex plugin marketplace add", out)
+            self.assertIn("**Codex skills**", out)
+            self.assertIn("- `$go:secure`", out)
+            self.assertIn("**Claude Code agents**", out)
 
 class TestCheck(unittest.TestCase):
     def test_write_then_check_clean(self):
