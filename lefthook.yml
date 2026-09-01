@@ -43,13 +43,13 @@ pre-commit:
 
     # --- Plugin manifests / hooks / agents are well-formed ---
     - name: validate-plugins
-      glob: "{plugins/**,agents/**,registry/bundles/**}"
+      glob: "{.agents/**,plugins/**,agents/**,registry/bundles/**}"
       run: pixi run bash scripts/validate-plugins.sh
 
     # --- Generated artifacts are in sync with the registry (catches a
     #     forgotten sync-plugins.sh / regenerate before CI does) ---
     - name: generated-in-sync
-      glob: "{registry/**,skills/**,agents/**,plugins/**,VERSION}"
+      glob: "{.agents/**,registry/**,skills/**,agents/**,plugins/**,VERSION}"
       run: |
         pixi run python3 scripts/check_bundle_refs.py .
         pixi run python3 scripts/check_grouping.py .

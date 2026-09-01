@@ -4,9 +4,9 @@ icon: lucide/network
 
 # Architecture
 
-This repository is a **Claude Code extension catalog**. It keeps a single source of truth for reusable agent behavior — *skills* and *agents* — and publishes them as self-contained Claude Code plugins through a repo-root marketplace manifest.
+This repository is an **agent extension catalog**. It keeps a single source of truth for reusable agent behavior — *skills* and *agents* — and publishes self-contained plugins for Claude Code plus a skill-only native Codex pilot.
 
-> Claude Code is the **only** publication target. Tools with a different install model (their own CLI or package manager) are out of scope — they belong in CLI- or package-driven repos, not here.
+Claude Code remains the complete publication target. Codex support is explicitly gated per bundle and currently exposes only portable skills; other runtimes remain out of scope until they have a generated target and validation.
 
 ## Problem statement
 
@@ -47,9 +47,13 @@ registry/
 .claude-plugin/
   marketplace.json         ← Claude Code marketplace manifest (repo root)
 
+.agents/plugins/
+  marketplace.json         ← native Codex marketplace manifest (repo root)
+
 plugins/                   ← Claude Code plugins, one per bundle (SELF-CONTAINED — real files)
   <bundle>/
     .claude-plugin/plugin.json
+    .codex-plugin/plugin.json  ← present only for Codex-enabled bundles
     skills/<name>/         ← real-file copy of skills/<name>/
     agents/<name>.md       ← real-file copy of agents/<name>/agent.md
     bin/mcp/               ← prebuilt MCP server binaries
@@ -69,6 +73,11 @@ To make installs self-contained, `plugins/<bundle>/skills/<name>/` and `plugins/
 
 `skills/` is canonical content authored in this repo. It was formerly vendored from `nq-rdl/agent-skills` through a `repository_dispatch` + clone-and-overwrite sync; that repo has been merged here and the sync removed (it was the single biggest source of operational brittleness — a non-atomic cross-repo handoff that could push a branch but then fail to open the PR). Skills are now authored directly, validated by `asctl`, and packaged into plugin trees by `scripts/sync-plugins.sh`.
 
+The phase-one Codex target shares the Claude-generated plugin copies, whose frontmatter omits
+`name:` to preserve Claude's namespaced autocomplete labels. Current Codex derives the missing name
+from the leaf directory and qualifies it with the plugin name. This runtime fallback is smoke-tested;
+strict public Codex packaging will require target-specific copies with explicit names.
+
 ### `asctl` — the skills spec validator
 
 `tools/asctl/` is a Go CLI imported from the former agent-skills repo. `asctl repo-check` validates every skill directory under `skills/` (frontmatter, structure, and prompt generation) against the [agentskills.io](https://agentskills.io) spec. It runs in CI as the `validate-skills` job, and locally:
@@ -81,9 +90,9 @@ go -C tools/asctl build -o /tmp/asctl ./cmd/asctl/ && /tmp/asctl repo-check
 
 ### `validate.yml` — on every PR / push to main
 
-- `validate-bundles`: bundle references resolve, the grouping contract holds, and the generated manifests + `docs/bundles.md` match the registry (`check_bundle_refs`, `check_grouping`, `generate_manifests --check`, `generate_bundles_doc --check`, `check_consistency`).
+- `validate-bundles`: bundle references resolve, the grouping contract holds, and generated Claude/Codex manifests plus `docs/bundles.md` match the registry (`check_bundle_refs`, `check_grouping`, `generate_manifests --check`, `generate_bundles_doc --check`, `check_consistency`).
 - `validate-symlinks`: any symlink under `plugins/` resolves (plugin trees are real-file copies, so this is a guardrail against accidental links).
-- `validate-plugins`: plugin manifests (`plugin.json`), hooks, and `.mcp.json` wiring are well-formed (`scripts/validate-plugins.sh`).
+- `validate-plugins`: plugin manifests (`plugin.json`), hooks, and `.mcp.json` wiring are well-formed (`scripts/validate-plugins.sh`); a pinned Codex CLI then installs every native marketplace entry and verifies installed skill discovery (`scripts/smoke-codex-marketplace.sh`).
 - `unit-tests`: the pipeline scripts' unit tests pass (`python3 -m unittest discover -s tests`).
 - `validate-skills`: every skill under `skills/` passes `asctl repo-check` (agentskills.io spec + prompt generation), built from `tools/asctl/`.
 
@@ -114,11 +123,23 @@ targets:
     enabled: true
     pluginName: go
     marketplaceName: rdl-agent-extensions
+  codex:
+    enabled: true
+    pluginName: go
+    marketplaceName: rdl-agent-extensions
+    category: Developer Tools
+    components:
+      skills: true
+      mcp: false
+      hooks: false
+      apps: false
 ```
 
 Required behavior:
 
 - A bundle maps to one Claude Code plugin. `targets.claude.enabled: false` disables a bundle without deleting it.
+- A phase-one Codex bundle must share its enabled Claude `pluginName`, expose skills, and leave MCP, hooks, and apps disabled.
+- Codex-enabled skill content must not depend on Claude-only plugin-root variables, tools, or slash-qualified invocations.
 - Skills and agents are referenced by name and resolved from `skills/` and `agents/`. Hooks, prompts, and MCP integrations resolve from their respective root-level directories.
 
 ## Agents primitive
@@ -301,12 +322,21 @@ two release PRs merge within seconds of each other.
 
 ## Install flow
 
+Claude Code:
+
 ```bash
 /plugin marketplace add nq-rdl/agent-extensions
 /plugin install go@rdl-agent-extensions --scope project  # install a single subject
 ```
 
-Publication target: this repository, with `.claude-plugin/marketplace.json` at the root and plugins under `plugins/`.
+Codex:
+
+```bash
+codex plugin marketplace add nq-rdl/agent-extensions
+codex plugin add go@rdl-agent-extensions --json
+```
+
+Both marketplaces publish from this repository and resolve self-contained plugin roots under `plugins/`. OpenAI's public Plugins Directory is a separate submission process.
 
 ## Platform requirements
 
@@ -323,7 +353,7 @@ macOS and Linux only — the build and sync scripts require POSIX shell tooling 
 
 This repository should not:
 
-- republish to hosts whose install model isn't Claude Code's `/plugin` marketplace — those belong in CLI- or package-driven repos;
-- hand-edit generated output (`plugins/*/` trees, `plugin.json`, `marketplace.json`, `docs/bundles.md`) — run the generator scripts instead.
+- publish to a target without a native marketplace/install model and target-specific generated validation;
+- hand-edit generated output (`plugins/*/` trees, target `plugin.json` and `marketplace.json` files, `docs/bundles.md`) — run the generator scripts instead.
 
 For contribution expectations and authoring guidance, see the repository-root `AGENTS.md`.

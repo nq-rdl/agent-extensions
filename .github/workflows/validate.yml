@@ -83,8 +83,21 @@ jobs:
       - name: Install PyYAML for agent frontmatter validation
         run: python3 -m pip install --user pyyaml
 
-      - name: Validate plugin manifests, hooks, and agents
+      - name: Validate Claude and Codex plugin manifests, hooks, skills, and agents
         run: scripts/validate-plugins.sh
+
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: '20'
+
+      # The shared skill copies intentionally omit `name:` for Claude's
+      # namespaced labels. Pin the Codex runtime that verifies its documented
+      # directory-name fallback instead of assuming that compatibility holds.
+      - name: Install Codex CLI 0.152.0
+        run: npm install --global @openai/codex@0.152.0
+
+      - name: Smoke test native Codex marketplace installation and skill discovery
+        run: scripts/smoke-codex-marketplace.sh
 
   unit-tests:
     name: Unit tests (pipeline scripts)

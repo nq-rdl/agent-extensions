@@ -2,8 +2,8 @@
 
 Thanks for contributing to the RDL agent extension catalog. This file covers the **rules for
 grouping skills and agents into plugins**, the **skill directory structure and content
-conventions**, and the **packaging loop** that turns a new skill or agent into an installable
-plugin. For repo mechanics (sync scripts, validation, CI), see [`AGENTS.md`](AGENTS.md) and
+conventions**, and the **packaging loop** that turns a new skill or agent into installable
+Claude Code and Codex artifacts. For repo mechanics (sync scripts, validation, CI), see [`AGENTS.md`](AGENTS.md) and
 [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md).
 
 **Tooling:** all repo Python runs via **pixi** (`pixi install` once, then
@@ -11,9 +11,9 @@ plugin. For repo mechanics (sync scripts, validation, CI), see [`AGENTS.md`](AGE
 
 ## Plugin grouping: one plugin per subject
 
-Every skill and agent is invoked as **`<subject>:<facet>`** — the `subject` is the plugin, the
-`facet` is what it does. The rules below decide both halves. The colon is always present for
-plugin content; only Claude Code's built-in skills are bare.
+Every skill and agent is identified as **`<subject>:<facet>`** — the `subject` is the plugin and
+the facet is what it does. Claude Code invokes skills as `/<subject>:<facet>`; Codex references
+enabled skills as `$<subject>:<facet>`.
 
 ### 1. One plugin per subject
 
@@ -108,6 +108,11 @@ group folders. **Grouping is a packaging decision** expressed in the bundle regi
   `pluginName` unique across bundles (`scripts/check_grouping.py`) · each plugin skill copy carries
   **no** frontmatter `name:` (`scripts/validate-plugins.sh`).
 
+The phase-one Codex target intentionally shares these Claude-oriented copies. Codex 0.152.0 derives
+a missing skill name from the leaf directory, then qualifies it as `<plugin>:<leaf>`. This is a
+tested runtime compatibility path, not the stricter Agent Skills/public-directory contract; strict
+Codex publication will require target-specific copies with explicit `name: <leaf>` frontmatter.
+
 So to add `obsidian:bases`, the canonical skill stays flat `skills/obsidian-bases/`; the registry
 maps `{source: obsidian-bases, leaf: bases}` under `pluginName: obsidian`. Agents are authored here
 under `agents/<name>/agent.md` and placed by subject in the registry. See [`AGENTS.md`](AGENTS.md)
@@ -115,7 +120,7 @@ for the mechanical add-and-sync steps.
 
 ### 7. Manifests are generated
 
-`plugin.json` and the `marketplace.json` entry for a subject are **generated from
+Claude and Codex `plugin.json` and `marketplace.json` artifacts are **generated from
 `registry/bundles/<subject>.yaml`** — do **not** hand-edit them. When you add a **new subject**,
 append it to the `order:` list in `registry/marketplace.yaml` (see step 4 below). CI consistency
 checks fail if the registry and the generated manifests disagree.
@@ -203,13 +208,31 @@ that should become `sql-review:analyse`:
    skills:
      - {source: sql-review-analyse, leaf: analyse}   # → /sql-review:analyse
    ```
+   To include a portable skill bundle in the current Codex pilot, add an explicit target. Keep
+   non-skill components disabled until their Codex runtime validation exists:
+   ```yaml
+   targets:
+     codex:
+       enabled: true
+       pluginName: sql-review
+       marketplaceName: rdl-agent-extensions
+       category: Developer Tools
+       components:
+         skills: true
+         mcp: false
+         hooks: false
+         apps: false
+   ```
+   Codex-enabled skills must be usable by Codex itself. The pipeline unit tests reject
+   `${CLAUDE_PLUGIN_ROOT}`, `AskUserQuestion`, and Claude-style `/plugin:skill` invocations in
+   their canonical content. Convert those dependencies or leave the Codex target disabled.
 4. **If it is a brand-new subject, add it to the marketplace order.** Append `sql-review` to the
    `order:` list in `registry/marketplace.yaml` (otherwise it is appended alphabetically with a
    CI `::warning::`).
 5. **Build the plugin tree and manifests:**
    ```bash
    pixi run bash scripts/sync-plugins.sh sql-review     # copies skills/<source>/ → plugins/sql-review/skills/<leaf>/
-   pixi run python3 scripts/generate_manifests.py .     # writes plugin.json + marketplace.json
+   pixi run python3 scripts/generate_manifests.py .     # writes Claude + Codex manifests
    pixi run python3 scripts/generate_bundles_doc.py .   # refreshes docs/bundles.md
    ```
 6. **Validate** exactly what CI will:

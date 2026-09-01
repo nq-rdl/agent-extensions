@@ -22,3 +22,13 @@ targets:
     enabled: true
     pluginName: go
     marketplaceName: rdl-agent-extensions
+  codex:
+    enabled: true
+    pluginName: go
+    marketplaceName: rdl-agent-extensions
+    category: Developer Tools
+    components:
+      skills: true
+      mcp: false
+      hooks: false
+      apps: false

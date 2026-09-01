@@ -1,9 +1,9 @@
 #!/usr/bin/env python3
 """Three-way registry consistency check (audit finding #8).
 
-For a Claude-targeted bundle to be coherent, three things must agree:
+For each published target, three things must agree:
 
-  registry/bundles/<b>.yaml  ↔  .claude-plugin/marketplace.json  ↔  plugins/<p>/
+  registry/bundles/<b>.yaml  ↔  target marketplace.json  ↔  target plugin manifest
 
 This generalises the issue #100 failure mode beyond skills: it catches a retired
 bundle still listed in the marketplace, a published plugin with no bundle, or an
@@ -22,61 +22,97 @@ from pathlib import Path
 import yaml
 
 LOCAL_PREFIX = "./plugins/"
+TARGETS = {
+    "claude": (Path(".claude-plugin/marketplace.json"), ".claude-plugin"),
+    "codex": (Path(".agents/plugins/marketplace.json"), ".codex-plugin"),
+}
+
+
+def _local_source(entry: dict) -> str | None:
+    source = entry.get("source")
+    if isinstance(source, str) and source.startswith(LOCAL_PREFIX):
+        return source
+    if (
+        isinstance(source, dict)
+        and source.get("source") == "local"
+        and isinstance(source.get("path"), str)
+        and source["path"].startswith(LOCAL_PREFIX)
+    ):
+        return source["path"]
+    return None
 
 
 def find_consistency_issues(repo) -> list[str]:
     repo = Path(repo)
 
-    # Enabled Claude-target bundles, keyed by plugin name.
-    bundle_plugins: dict[str, str] = {}
+    bundle_plugins: dict[str, dict[str, str]] = {target: {} for target in TARGETS}
     bundles_dir = repo / "registry" / "bundles"
     for bf in sorted(list(bundles_dir.glob("*.yaml")) + list(bundles_dir.glob("*.yml"))):
         with bf.open() as fh:
             data = yaml.safe_load(fh) or {}
-        claude = (data.get("targets") or {}).get("claude") or {}
-        if not claude.get("enabled"):
-            continue
-        plugin = claude.get("pluginName") or data.get("id") or bf.stem
-        bundle_plugins[plugin] = bf.stem
-
-    # Marketplace plugins published from a LOCAL source (./plugins/<name>).
-    local_marketplace: set[str] = set()
-    mkt_path = repo / ".claude-plugin" / "marketplace.json"
-    if mkt_path.is_file():
-        mkt = json.loads(mkt_path.read_text())
-        for entry in mkt.get("plugins", []):
-            src = entry.get("source")
-            if isinstance(src, str) and src.startswith(LOCAL_PREFIX):
-                local_marketplace.add(entry["name"])
-
-    # plugins/<name>/ directories that look like real plugins.
-    plugin_dirs: set[str] = set()
-    plugins_root = repo / "plugins"
-    if plugins_root.is_dir():
-        plugin_dirs = {
-            d.name for d in plugins_root.iterdir() if (d / ".claude-plugin").is_dir()
-        }
+        for target in TARGETS:
+            config = (data.get("targets") or {}).get(target) or {}
+            if config.get("enabled"):
+                plugin = config.get("pluginName") or data.get("id") or bf.stem
+                bundle_plugins[target][plugin] = bf.stem
 
     issues: list[str] = []
-    for plugin, stem in sorted(bundle_plugins.items()):
-        if plugin not in local_marketplace:
-            issues.append(
-                f"bundle '{stem}' (plugin '{plugin}') has no marketplace.json entry"
-            )
-        if plugin not in plugin_dirs:
-            issues.append(
-                f"bundle '{stem}' (plugin '{plugin}') has no plugins/{plugin}/ directory"
-            )
-    for name in sorted(local_marketplace):
-        if name not in bundle_plugins:
-            issues.append(
-                f"marketplace plugin '{name}' has no enabled bundle in registry/bundles/"
-            )
-    for name in sorted(plugin_dirs):
-        if name not in bundle_plugins:
-            issues.append(
-                f"plugins/{name}/ has no enabled bundle in registry/bundles/"
-            )
+    plugins_root = repo / "plugins"
+    for target, (marketplace_rel, manifest_dir) in TARGETS.items():
+        local_marketplace: dict[str, str] = {}
+        mkt_path = repo / marketplace_rel
+        if mkt_path.is_file():
+            mkt = json.loads(mkt_path.read_text())
+            for entry in mkt.get("plugins", []):
+                source = _local_source(entry)
+                if source:
+                    name = entry["name"]
+                    expected_source = f"{LOCAL_PREFIX}{name}"
+                    if source != expected_source:
+                        issues.append(
+                            f"{target} marketplace plugin '{name}' source is '{source}', "
+                            f"expected '{expected_source}'"
+                        )
+                    if name in local_marketplace:
+                        issues.append(
+                            f"{target} marketplace contains duplicate local plugin '{name}'"
+                        )
+                    local_marketplace[name] = source
+
+        plugin_dirs: set[str] = set()
+        if plugins_root.is_dir():
+            for plugin_dir in plugins_root.iterdir():
+                target_manifest_dir = plugin_dir / manifest_dir
+                if not target_manifest_dir.is_dir():
+                    continue
+                plugin_dirs.add(plugin_dir.name)
+                manifest = target_manifest_dir / "plugin.json"
+                if not manifest.is_file():
+                    issues.append(f"{manifest.relative_to(repo)} is missing")
+
+        configured = bundle_plugins[target]
+        for plugin, stem in sorted(configured.items()):
+            if plugin not in local_marketplace:
+                issues.append(
+                    f"{target} bundle '{stem}' (plugin '{plugin}') has no marketplace.json entry"
+                )
+            if plugin not in plugin_dirs:
+                issues.append(
+                    f"{target} bundle '{stem}' (plugin '{plugin}') has no "
+                    f"plugins/{plugin}/{manifest_dir}/ directory"
+                )
+        for name in sorted(local_marketplace):
+            if name not in configured:
+                issues.append(
+                    f"{target} marketplace plugin '{name}' has no enabled bundle in "
+                    "registry/bundles/"
+                )
+        for name in sorted(plugin_dirs):
+            if name not in configured:
+                issues.append(
+                    f"plugins/{name}/{manifest_dir}/ has no enabled {target} bundle in "
+                    "registry/bundles/"
+                )
     return issues
 
 

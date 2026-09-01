@@ -20,3 +20,13 @@ targets:
     enabled: true
     pluginName: obsidian
     marketplaceName: rdl-agent-extensions
+  codex:
+    enabled: true
+    pluginName: obsidian
+    marketplaceName: rdl-agent-extensions
+    category: Productivity
+    components:
+      skills: true
+      mcp: false
+      hooks: false
+      apps: false

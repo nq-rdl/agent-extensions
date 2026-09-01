@@ -1,0 +1,28 @@
+{
+  "name": "obsidian",
+  "version": "0.28.0",
+  "description": "Obsidian — Bases databases, the CLI, and Obsidian-flavored Markdown",
+  "author": {
+    "name": "nq-rdl"
+  },
+  "repository": "https://github.com/nq-rdl/agent-extensions",
+  "license": "MIT",
+  "keywords": [
+    "obsidian",
+    "bases",
+    "cli",
+    "markdown"
+  ],
+  "skills": "./skills/",
+  "interface": {
+    "displayName": "Obsidian",
+    "shortDescription": "Obsidian — Bases databases, the CLI, and Obsidian-flavored Markdown",
+    "longDescription": "Obsidian — Bases databases, the CLI, and Obsidian-flavored Markdown",
+    "developerName": "nq-rdl",
+    "category": "Productivity",
+    "capabilities": [
+      "Skills"
+    ],
+    "websiteURL": "https://github.com/nq-rdl/agent-extensions"
+  }
+}

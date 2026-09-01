@@ -18,3 +18,15 @@ targets:
     enabled: true
     pluginName: rust
     marketplaceName: rdl-agent-extensions
+  codex:
+    enabled: true
+    pluginName: rust
+    marketplaceName: rdl-agent-extensions
+    category: Developer Tools
+    components:
+      skills: true
+      mcp: false
+      hooks: false
+      apps: false
+    interface:
+      shortDescription: Read and navigate Rust, explain constructs, and sanity-check correctness

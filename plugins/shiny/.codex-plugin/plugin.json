@@ -1,0 +1,28 @@
+{
+  "name": "shiny",
+  "version": "0.28.0",
+  "description": "Shiny — modern dashboards with bslib and Bootstrap 5 theming",
+  "author": {
+    "name": "nq-rdl"
+  },
+  "repository": "https://github.com/nq-rdl/agent-extensions",
+  "license": "MIT",
+  "keywords": [
+    "shiny",
+    "bslib",
+    "bootstrap",
+    "theming"
+  ],
+  "skills": "./skills/",
+  "interface": {
+    "displayName": "Shiny",
+    "shortDescription": "Shiny — modern dashboards with bslib and Bootstrap 5 theming",
+    "longDescription": "Shiny — modern dashboards with bslib and Bootstrap 5 theming",
+    "developerName": "nq-rdl",
+    "category": "Developer Tools",
+    "capabilities": [
+      "Skills"
+    ],
+    "websiteURL": "https://github.com/nq-rdl/agent-extensions"
+  }
+}

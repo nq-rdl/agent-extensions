@@ -1,8 +1,6 @@
 # Agent Extensions
 
-Curated reusable agent skills and agents packaged as Claude Code plugins. Each **subject** (a tool, library, language, or workflow) is one plugin: skills are invoked as `/<subject>:<facet>` (e.g. `/go:secure`, `/gh:send-pr`) and agents are delegated as subagents. Canonical skills live under `skills/` and agents under `agents/`; each subject is published as a self-contained plugin under `plugins/`, listed in the repo-root marketplace manifest (`.claude-plugin/marketplace.json`).
-
-Claude Code is the only publication target.
+Curated reusable agent skills and agents packaged as self-contained plugins. Claude Code publishes the complete catalog; Codex publishes a skill-only pilot. Canonical skills live under `skills/` and agents under `agents/`, while generated manifests expose target-supported bundles from `plugins/`.
 
 ## Installation
 
@@ -20,6 +18,19 @@ Claude Code is the only publication target.
 ```
 
 See [`docs/bundles.md`](docs/bundles.md) for the full subject list.
+
+### Codex
+
+```bash
+# Add the native marketplace (once)
+codex plugin marketplace add nq-rdl/agent-extensions
+
+# List and install a Codex-enabled subject
+codex plugin list --marketplace rdl-agent-extensions --available --json
+codex plugin add go@rdl-agent-extensions --json
+```
+
+The initial Codex catalog contains `go`, `rust`, `shiny`, `quarto`, and `obsidian`. See [`docs/codex.md`](docs/codex.md) for verification commands and current limitations.
 
 ## Agent File Management
 

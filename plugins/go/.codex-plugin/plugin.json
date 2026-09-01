@@ -1,0 +1,27 @@
+{
+  "name": "go",
+  "version": "0.28.0",
+  "description": "Go — idiomatic naming and secure error handling",
+  "author": {
+    "name": "nq-rdl"
+  },
+  "repository": "https://github.com/nq-rdl/agent-extensions",
+  "license": "MIT",
+  "keywords": [
+    "go",
+    "naming",
+    "security"
+  ],
+  "skills": "./skills/",
+  "interface": {
+    "displayName": "Go",
+    "shortDescription": "Go — idiomatic naming and secure error handling",
+    "longDescription": "Go — idiomatic naming and secure error handling",
+    "developerName": "nq-rdl",
+    "category": "Developer Tools",
+    "capabilities": [
+      "Skills"
+    ],
+    "websiteURL": "https://github.com/nq-rdl/agent-extensions"
+  }
+}
