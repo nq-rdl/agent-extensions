@@ -410,6 +410,20 @@
         "diagrams",
         "mcp"
       ]
+    },
+    {
+      "name": "pandera",
+      "source": "./plugins/pandera",
+      "description": "Pandera — dataframe schema validation and debugging for pandas and Polars",
+      "version": "0.29.0",
+      "keywords": [
+        "pandera",
+        "validation",
+        "dataframe",
+        "schema",
+        "pandas",
+        "polars"
+      ]
     }
   ]
 }

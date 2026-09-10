@@ -47,6 +47,7 @@ subagents (auto-routed by their description).
 | [`debug`](#debug) | Debugging and cleanup — systematic diagnosis and tech-debt removal |
 | [`tech-writing`](#tech-writing) | Technical writing — developer docs, tutorials, ADRs, and guides |
 | [`lucid`](#lucid) | Lucid — visual collaboration boards and diagrams (Lucidchart / Lucidspark) via the hosted Lucid MCP server |
+| [`pandera`](#pandera) | Pandera — dataframe schema validation and debugging for pandas and Polars |
 
 ## Install
 
@@ -493,3 +494,13 @@ Technical writing — developer docs, tutorials, ADRs, and guides.
 Lucid — visual collaboration boards and diagrams (Lucidchart / Lucidspark) via the hosted Lucid MCP server.
 
 **MCP server(s):** `lucid`
+
+---
+
+## pandera
+
+Pandera — dataframe schema validation and debugging for pandas and Polars.
+
+**Skills**
+
+- `/pandera:validate`

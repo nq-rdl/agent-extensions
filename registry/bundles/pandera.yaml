@@ -1,0 +1,20 @@
+schemaVersion: v1
+id: pandera
+displayName: Pandera
+description: Pandera — dataframe schema validation and debugging for pandas and Polars
+keywords: [pandera, validation, dataframe, schema, pandas, polars]
+owners:
+  - rdl
+channels:
+  - stable
+skills:
+  - {source: pandera-validate, leaf: validate}
+agents: []
+hooks: []
+prompts: []
+mcp: []
+targets:
+  claude:
+    enabled: true
+    pluginName: pandera
+    marketplaceName: rdl-agent-extensions
