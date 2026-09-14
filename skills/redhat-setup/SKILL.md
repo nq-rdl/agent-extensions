@@ -70,7 +70,7 @@ Use `AskUserQuestion` exactly once, options in this order:
 
 - **Bitwarden personal vault (Recommended)** – team standard; syncs across machines.
 - **OS keychain** – macOS Keychain or Linux Secret Service; no vault needed.
-- **0600 file** – `${XDG_CONFIG_HOME:-~/.config}/redhat/offline-token` (or `$RH_OFFLINE_TOKEN_FILE`);
+- **0600 file** – `${XDG_CONFIG_HOME:-$HOME/.config}/redhat/offline-token` (or `$RH_OFFLINE_TOKEN_FILE`);
   least preferred (plaintext at rest).
 
 The user runs the store command **in their own terminal** (not via `!`, whose output
@@ -81,30 +81,43 @@ lands in the transcript). Give only the chosen block:
 ```bash
 s="$(bw unlock --raw)"; [ -n "$s" ] && export BW_SESSION="$s"; unset s
 if [ -z "${BW_SESSION:-}" ] || ! bw sync >/dev/null; then echo "unlock or sync failed – fix that, then re-run" >&2; else
-  printf 'Paste offline token: '; IFS= read -rs t; echo
   # the scripts read the note with `bw get notes redhat-credentials`, which matches names as a case-insensitive substring
-  hits="$(bw list items --search redhat-credentials | jq -c '[.[] | select((.name // "" | ascii_downcase) | contains("redhat-credentials")) | {id, name}]')"
-  id="$(printf '%s' "$hits" | jq -r '.[] | select(.name == "redhat-credentials") | .id')"   # empty until the note exists
-  names="$(printf '%s' "$hits" | jq -r '[.[].name] | join(", ")')"
-  if [ "$(printf '%s' "$hits" | jq -r '.[].name' | grep -c .)" -gt 1 ]; then
+  if ! items="$(bw list items --search redhat-credentials 2>/dev/null)"; then
+    echo "vault lookup failed – fix that, then re-run" >&2
+  elif ! hits="$(printf '%s' "$items" | jq -ecs '
+    if length != 1 or (.[0] | type) != "array" then error("expected one item array")
+    else .[0] | map(
+      if (.id | type) != "string" or .id == "" or (.name | type) != "string"
+      then error("invalid item") else {id, name} end)
+      | map(select(.name | ascii_downcase | contains("redhat-credentials"))) end' 2>/dev/null)"; then
+    echo "vault lookup returned invalid data – fix that, then re-run" >&2
+  elif ! count="$(printf '%s' "$hits" | jq -er 'length')" \
+    || ! id="$(printf '%s' "$hits" | jq -r '.[] | select(.name == "redhat-credentials") | .id')" \
+    || ! names="$(printf '%s' "$hits" | jq -r '[.[].name] | join(", ")')"; then
+    echo "vault lookup filter failed – fix that, then re-run" >&2
+  elif [ "$count" -gt 1 ]; then
     echo "more than one note matches 'redhat-credentials' ($names) – keep exactly one, named redhat-credentials, then re-run" >&2
   elif [ -n "$names" ] && [ -z "$id" ]; then
     echo "a note named '$names' would shadow 'redhat-credentials' – rename it to redhat-credentials (or delete it), then re-run" >&2
-  elif [ -n "$t" ] && [ -n "$id" ]; then
-    bw get item "$id" | jq --rawfile notes <(printf 'export RH_OFFLINE_TOKEN=%s\n' "$t") '.notes = $notes' \
-      | bw encode | bw edit item "$id" >/dev/null && echo updated
-  elif [ -n "$t" ]; then
-    bw get template item \
-      | jq --rawfile notes <(printf 'export RH_OFFLINE_TOKEN=%s\n' "$t") --arg name redhat-credentials \
-           '.type = 2 | .secureNote.type = 0 | .notes = $notes | .name = $name' \
-      | bw encode | bw create item >/dev/null && echo stored
+  else
+    printf 'Paste offline token: '; IFS= read -rs t; echo
+    if [ -n "$t" ] && [ -n "$id" ]; then
+      bw get item "$id" | jq --rawfile notes <(printf 'export RH_OFFLINE_TOKEN=%s\n' "$t") '.notes = $notes' \
+        | bw encode | bw edit item "$id" >/dev/null && echo updated
+    elif [ -n "$t" ]; then
+      bw get template item \
+        | jq --rawfile notes <(printf 'export RH_OFFLINE_TOKEN=%s\n' "$t") --arg name redhat-credentials \
+             '.type = 2 | .secureNote.type = 0 | .notes = $notes | .name = $name' \
+        | bw encode | bw create item >/dev/null && echo stored
+    fi
   fi
-fi; unset t id hits names
+fi; unset t id hits names items count
 ```
 
 Works in bash and zsh (the macOS default). The template goes to `jq` on stdin and the
 note text through a process substitution, so the token is never an argument of any
-process. A failed unlock or sync stops the block before it asks for the token. Re-running
+process. An unavailable session, failed sync, failed lookup, or invalid lookup JSON stops
+the block before it asks for the token or writes to the vault. Re-running
 (a regenerated token) **edits the existing note in place**. The block refuses when the vault
 holds more than one note named `redhat-credentials`, or any other note whose name contains
 `redhat-credentials` (any case, e.g. `redhat-credentials-old`): `bw get notes redhat-credentials`

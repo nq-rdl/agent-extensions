@@ -205,6 +205,10 @@ def fake_bw_vault(tmp: str) -> Path:
         f"JQ='{jq}'\n"
         'state="${FAKE_BW_STATE:?FAKE_BW_STATE unset}"; items="$state/items"; mkdir -p "$items"\n'
         'printf \'bw %s\\n\' "$*" >> "$state/calls.log"\n'
+        'if [ "${1:-} ${2:-}" = "list items" ]; then\n'
+        '  [ -z "${FAKE_BW_LIST_FAIL:-}" ] || { echo "[]"; exit 1; }\n'
+        '  if [ "${FAKE_BW_LIST_OUTPUT+x}" = x ]; then printf \'%s\' "$FAKE_BW_LIST_OUTPUT"; exit 0; fi\n'
+        'fi\n'
         'vault() { if ls "$items"/*.json >/dev/null 2>&1; then "$JQ" -s . "$items"/*.json; else echo "[]"; fi; }\n'
         "ids_for() { # exact id first, then case-insensitive substring on name (the real CLI's lookup)\n"
         '  vault | "$JQ" -r --arg q "$1" \'([.[] | select(.id == $q)]) as $byid'
@@ -236,6 +240,7 @@ def fake_bw_vault(tmp: str) -> Path:
         bindir,
         "jq",
         'printf \'JQ-ARGV: %s\\n\' "$*" >> "${FAKE_BW_STATE:?}/calls.log"\n'
+        'if [ -n "${FAKE_JQ_FAIL_AT:-}" ] && [ "$(grep -c \'^JQ-ARGV:\' "$FAKE_BW_STATE/calls.log")" = "$FAKE_JQ_FAIL_AT" ]; then exit 5; fi\n'
         f'exec "{jq}" "$@"\n',
     )
     return state
@@ -809,6 +814,33 @@ class PasteBlocks(unittest.TestCase):
         self.assertTrue(lookups, lines)
         tail = lines[lookups[-1] + 1:]
         self.assertFalse([l for l in tail if l.startswith(("bw get item", "bw edit item", "bw create item"))], tail)
+
+    def test_bitwarden_lookup_errors_stop_before_prompt_or_write(self):
+        block = skill_block("bw create item", "bw edit item")
+        cases = [{"FAKE_BW_LIST_FAIL": "1"}]
+        cases += [{"FAKE_BW_LIST_OUTPUT": value} for value in (
+            "", "not JSON", "null", "{}", "[] []", '[{"name":"redhat-credentials"}]',
+            '[{"id":"", "name":"redhat-credentials"}]',
+        )]
+        cases += [{"FAKE_JQ_FAIL_AT": str(n)} for n in range(1, 5)]
+        for overrides in cases:
+            with self.subTest(overrides=overrides), tempfile.TemporaryDirectory() as tmp:
+                env, state = self._bw_env(tmp)
+                original = json.dumps({"id": "existing", "name": "redhat-credentials",
+                                       "notes": "export RH_OFFLINE_TOKEN=old\n"})
+                item = state / "items" / "existing.json"
+                item.write_text(original)
+                env.update(overrides)
+                r = run(["bash", "-c", block], env, stdin="tok-123\n")
+                self.assertIn("vault lookup", r.stderr)
+                self.assertNotIn("Paste offline token", r.stdout)
+                self.assertNotIn("stored", r.stdout)
+                self.assertNotIn("updated", r.stdout)
+                self.assertEqual(self._items(state), [item])
+                self.assertEqual(item.read_text(), original)
+                calls = (state / "calls.log").read_text()
+                self.assertNotIn("tok-123", r.stdout + r.stderr + calls)
+                self._assert_no_write_after_lookup(calls)
 
     def test_bitwarden_block_refuses_when_a_near_name_note_would_shadow_the_lookup(self):
         # `bw get notes redhat-credentials` matches names as a case-insensitive substring, so a lone
