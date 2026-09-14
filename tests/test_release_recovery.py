@@ -3,7 +3,6 @@
 import json
 import os
 import shutil
-import signal
 import subprocess
 import tempfile
 import textwrap
@@ -52,7 +51,7 @@ def release_json():
         "body": state["release_body"],
         "draft": False,
         "prerelease": False,
-        "immutable": state.get("immutable", False),
+        **({"immutable": state["immutable"]} if "immutable" in state else {}),
         "assets": state.get("assets", []),
         "discussion_url": state.get("discussion_url"),
         "target_commitish": state["target_commitish"],
@@ -354,6 +353,51 @@ class ReleaseRecoveryVerifierTests(unittest.TestCase):
         self.assertNotEqual(result.returncode, 0)
         self.assertIn(f"confirmation must be exactly 'DELETE-AND-RECREATE-{TAG}'", result.stderr)
         self.assertEqual(self._load_state()["calls"], [])
+
+    def test_exercises_recovery_when_immutable_is_omitted(self):
+        del self.state["immutable"]
+        self._save_state()
+        self._through_recovery_queue()
+        self._assert_ok("verify-recovery")
+        self._assert_ok("watchdog")
+        self.assertEqual(
+            self._load_state()["calls"],
+            ["rerun", "rerun", "delete", "workflow_recreated"],
+        )
+
+    def test_watchdog_accepts_omitted_and_false_immutable_as_equivalent(self):
+        for baseline_omits in (True, False):
+            with self.subTest(baseline_omits=baseline_omits):
+                self.state.pop("immutable", None)
+                if not baseline_omits:
+                    self.state["immutable"] = False
+                self._save_state()
+                self._assert_ok("capture")
+                self.state = self._load_state()
+                if baseline_omits:
+                    self.state["immutable"] = False
+                else:
+                    del self.state["immutable"]
+                self._save_state()
+                self._assert_ok("watchdog")
+                self.assertEqual(self._load_state()["calls"], [])
+
+    def test_rejects_immutable_release_without_side_effects(self):
+        self.state["immutable"] = True
+        self._save_state()
+        result = self._run("capture")
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("must be published, mutable", result.stderr)
+        self.assertEqual(self._load_state()["calls"], [])
+
+    def test_rejects_release_made_immutable_after_capture(self):
+        self._through_noop()
+        self.state = self._load_state()
+        self.state["immutable"] = True
+        self._save_state()
+        result = self._run("queue-recovery")
+        self.assertNotEqual(result.returncode, 0)
+        self.assertEqual(self._load_state()["calls"], ["rerun"])
 
     def test_binds_finalize_run_to_pr_head_and_workflow_path(self):
         self.state["run_head_sha"] = "c" * 40

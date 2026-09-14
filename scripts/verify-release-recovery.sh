@@ -137,7 +137,7 @@ latest_release_tag() {
 assert_safe_release_json() {
   local release_json="$1"
   printf '%s' "$release_json" | "$JQ_BIN" -e \
-    '.draft == false and .prerelease == false and .immutable == false and
+    '.draft == false and .prerelease == false and (.immutable // false) == false and
      (.assets | length) == 0 and .discussion_url == null' >/dev/null \
     || fail "$TAG must be published, mutable, non-prerelease, asset-free, and have no linked discussion"
 }
@@ -149,11 +149,12 @@ release_matches_baseline() {
   release_json="$RELEASE_JSON"
   baseline_json="$(cat "$RELEASE_FILE")"
   printf '%s' "$release_json" | "$JQ_BIN" -e \
-    '.draft == false and .prerelease == false and .immutable == false and
+    '.draft == false and .prerelease == false and (.immutable // false) == false and
      (.assets | length) == 0 and .discussion_url == null' >/dev/null \
     || return 1
 
-  for field in tag_name name draft prerelease immutable target_commitish discussion_url; do
+  # Mutability is enforced above; absent and explicit false are equivalent.
+  for field in tag_name name draft prerelease target_commitish discussion_url; do
     expected="$(printf '%s' "$baseline_json" | "$JQ_BIN" -c ".$field")"
     actual="$(printf '%s' "$release_json" | "$JQ_BIN" -c ".$field")"
     [[ "$actual" == "$expected" ]] || return 1
