@@ -12,7 +12,7 @@ argument-hint: '[--check-only]'
 user-invocable: true
 compatibility: >-
   Red Hat SSO offline tokens from access.redhat.com/management/api (30-day idle
-  expiry) as of 2026-08; Bitwarden CLI with `bw get template item` / `bw edit item`;
+  expiry) as of 2026-08; Bitwarden CLI 2026.8.0 (source-verified sync/list/get/create/edit contract);
   macOS security(1) keychain; libsecret secret-tool on Linux; jq >= 1.6 (`--rawfile`);
   bash or zsh for the paste prompts.
 allowed-tools: Bash, AskUserQuestion
@@ -26,6 +26,11 @@ Each teammate uses their **own** Red Hat account. The plugin never asks for the 
 in conversation: every step below either prompts the user in their own terminal or reads
 the secret from a store. **Never ask the user to paste the token here, and never run a
 command that would print it.**
+
+Before changing or relying on Bitwarden CLI behavior, verify the installed version against
+the [official CLI documentation](https://bitwarden.com/help/cli/) and the
+[pinned lookup implementation](https://github.com/bitwarden/clients/blob/cli-v2026.8.0/apps/cli/src/commands/get.command.ts).
+The offline tests use shims; they do not replace verification against the installed CLI.
 
 ## 1. Check
 
@@ -81,15 +86,14 @@ lands in the transcript). Give only the chosen block:
 ```bash
 s="$(bw unlock --raw)"; [ -n "$s" ] && export BW_SESSION="$s"; unset s
 if [ -z "${BW_SESSION:-}" ] || ! bw sync >/dev/null; then echo "unlock or sync failed – fix that, then re-run" >&2; else
-  # the scripts read the note with `bw get notes redhat-credentials`, which matches names as a case-insensitive substring
+  # get notes and list --search use the same basic search, including names and note contents
   if ! items="$(bw list items --search redhat-credentials 2>/dev/null)"; then
     echo "vault lookup failed – fix that, then re-run" >&2
   elif ! hits="$(printf '%s' "$items" | jq -ecs '
     if length != 1 or (.[0] | type) != "array" then error("expected one item array")
     else .[0] | map(
       if (.id | type) != "string" or .id == "" or (.name | type) != "string"
-      then error("invalid item") else {id, name} end)
-      | map(select(.name | ascii_downcase | contains("redhat-credentials"))) end' 2>/dev/null)"; then
+      then error("invalid item") else {id, name} end) end' 2>/dev/null)"; then
     echo "vault lookup returned invalid data – fix that, then re-run" >&2
   elif ! count="$(printf '%s' "$hits" | jq -er 'length')" \
     || ! id="$(printf '%s' "$hits" | jq -r '.[] | select(.name == "redhat-credentials") | .id')" \
@@ -119,11 +123,11 @@ note text through a process substitution, so the token is never an argument of a
 process. An unavailable session, failed sync, failed lookup, or invalid lookup JSON stops
 the block before it asks for the token or writes to the vault. Re-running
 (a regenerated token) **edits the existing note in place**. The block refuses when the vault
-holds more than one note named `redhat-credentials`, or any other note whose name contains
-`redhat-credentials` (any case, e.g. `redhat-credentials-old`): `bw get notes redhat-credentials`
-matches names as a case-insensitive substring, so the scripts would read the wrong note or
-report no credential – delete or rename the extras first. If the block is unfamiliar, the
-equivalent is: create (or update) a Secure Note called `redhat-credentials` whose content is
+returns more than one search result, or a result not named exactly `redhat-credentials`.
+Bitwarden 2026.8.0 searches names, notes, and other indexed fields, so even a differently
+named item mentioning `redhat-credentials` can make the lookup ambiguous. Remove the
+matching text from unrelated items or rename the intended note, then retry. If the block
+is unfamiliar, the equivalent is: create (or update) a Secure Note called `redhat-credentials` whose content is
 one line, `export RH_OFFLINE_TOKEN=<token>`.
 
 **macOS keychain** (prompts for the secret, keeps it out of shell history):
@@ -169,8 +173,14 @@ it verifies the token that was just stored. Success prints the source and `expir
 only. Then hand back to `/redhat:fetch-docs`. If it prints `invalid_grant`, the pasted
 token is wrong or expired – regenerate (step 2) and re-store.
 
-If it exits `3`, read the message. "No Red Hat offline token found" means the store is not
-visible to this session: for Bitwarden, `BW_SESSION` (or the `bwe`-loaded `RH_OFFLINE_TOKEN`)
+If it exits `3`, first confirm storage completed: Bitwarden must report `stored` or
+`updated`, the file block must report `stored in ...`, and the keychain command must
+finish successfully. An empty paste, cancelled prompt, or failed write means step 3
+must be retried; do not diagnose a session problem until storage succeeds.
+
+Then read the message. "No Red Hat offline token found" means no usable credential
+was found; after successful storage, check visibility to this session: for Bitwarden,
+`BW_SESSION` (or the `bwe`-loaded `RH_OFFLINE_TOKEN`)
 must be in the environment `claude` was launched from – finish step 4 in that shell and
 restart `claude`, or have the user run the same `rh-token.sh --check` in the terminal where
 the vault is unlocked (give the expanded `$S` path; `CLAUDE_PLUGIN_ROOT` is not set there; it

@@ -186,7 +186,7 @@ def fake_bw_vault(tmp: str) -> Path:
 
     Items persist as ``$FAKE_BW_STATE/items/<id>.json``. Supports ``unlock --raw`` (prints
     SESSION), ``sync``, ``encode`` (base64), ``get template item``, ``get item <id-or-name>``
-    and ``get notes <id-or-name>`` (exact id, else case-insensitive substring match on name –
+    and ``get notes <id-or-name>`` (exact id, else case-insensitive substring match on name/notes –
     exit 1 with ``Not found.`` / ``More than one result was found.`` on stderr like the real
     CLI), ``list items --search <q>`` (same matching), ``create item`` and ``edit item <id>``
     (base64 JSON on stdin). ``unlock --raw`` fails like a wrong master password when
@@ -212,7 +212,7 @@ def fake_bw_vault(tmp: str) -> Path:
         'vault() { if ls "$items"/*.json >/dev/null 2>&1; then "$JQ" -s . "$items"/*.json; else echo "[]"; fi; }\n'
         "ids_for() { # exact id first, then case-insensitive substring on name (the real CLI's lookup)\n"
         '  vault | "$JQ" -r --arg q "$1" \'([.[] | select(.id == $q)]) as $byid'
-        " | (if ($byid | length) > 0 then $byid else [.[] | select(.name | ascii_downcase | contains($q | ascii_downcase))] end) | .[].id'\n"
+        " | (if ($byid | length) > 0 then $byid else [.[] | select((.name + \" \" + (.notes // \"\")) | ascii_downcase | contains($q | ascii_downcase))] end) | .[].id'\n"
         "}\n"
         "resolve() { # <id-or-name> -> the one item as JSON, or the CLI's own error on stderr\n"
         '  local ids n; ids="$(ids_for "$1")"; n="$(printf \'%s\\n\' "$ids" | grep -c .)"\n'
@@ -229,7 +229,7 @@ def fake_bw_vault(tmp: str) -> Path:
         f"  'get template') printf '%s\\n' '{BW_TEMPLATE}' ;;\n"
         "  'get item') locked; resolve \"${3:?}\" ;;\n"
         '  \'get notes\') locked; item="$(resolve "${3:?}")" || exit 1; printf \'%s\\n\' "$item" | "$JQ" -r .notes ;;\n'
-        '  \'list items\') locked; q=""; [ "${3:-}" = "--search" ] && q="${4:-}"; vault | "$JQ" -c --arg q "$q" \'[.[] | select(.name | ascii_downcase | contains($q | ascii_downcase))]\' ;;\n'
+        '  \'list items\') locked; q=""; [ "${3:-}" = "--search" ] && q="${4:-}"; vault | "$JQ" -c --arg q "$q" \'[.[] | select((.name + " " + (.notes // "")) | ascii_downcase | contains($q | ascii_downcase))]\' ;;\n'
         '  \'create item\') locked; id="$(next_id)"; base64 -d | "$JQ" --arg id "$id" \'.id = $id\' > "$items/$id.json" && cat "$items/$id.json" ;;\n'
         '  \'edit item\') locked; id="${3:?}"; [ -f "$items/$id.json" ] || { echo "Not found." >&2; exit 1; }\n'
         '    base64 -d | "$JQ" --arg id "$id" \'.id = $id\' > "$items/$id.json.tmp" && mv "$items/$id.json.tmp" "$items/$id.json" && cat "$items/$id.json" ;;\n'
@@ -878,14 +878,22 @@ class PasteBlocks(unittest.TestCase):
             self.assertIn("redhat-credentials-old", r.stderr)
             self._assert_no_write_after_lookup((state / "calls.log").read_text())
 
-    def test_bitwarden_block_stores_when_only_unrelated_notes_match_the_search(self):
-        # a note that merely mentions redhat-credentials in its body, or `aws credentials`, must not block
+    def test_bitwarden_block_refuses_when_unrelated_note_contents_match(self):
+        # The pinned CLI searches note contents too, so this must block an ambiguous sibling.
         block = skill_block("bw create item", "bw edit item")
         with tempfile.TemporaryDirectory() as tmp:
             env, state = self._bw_env(tmp)
             (state / "items" / "id-aws.json").write_text(json.dumps({
                 "id": "id-aws", "type": 2, "name": "aws credentials", "notes": "see redhat-credentials\n", "secureNote": {"type": 0},
             }))
+            r = run(["bash", "-c", block], env, stdin="tok-123\n")
+            self.assertIn("shadow", r.stderr)
+            self.assertNotIn("Paste offline token", r.stdout)
+            self.assertEqual(len(self._items(state)), 1)
+            self._assert_no_write_after_lookup((state / "calls.log").read_text())
+            # An item with no matching name or content remains unrelated and allows creation.
+            item = state / "items" / "id-aws.json"
+            item.write_text(item.read_text().replace("see redhat-credentials", "unrelated"))
             r = run(["bash", "-c", block], env, stdin="tok-123\n")
             self.assertEqual(r.stdout.strip().splitlines()[-1], "stored", r.stderr)
             self.assertEqual(len(self._items(state)), 2)
