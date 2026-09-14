@@ -59,6 +59,9 @@ Blog posts and personal write-ups use first person; documentation does not.
 
 - A procedure gets a gerund heading ("Closing the program") and an intro
   sentence that adds context without repeating the heading.
+- Use one meaningful action per step and parallel imperative structure
+  across steps.
+- Use bullets for options and numbers for actions that must happen in order.
 - **A single-step procedure is a bullet, not "1."**
 - Sub-steps are `a.`, `b.`; sub-sub-steps are `i.`, `ii.`.
 - **"Press Enter" belongs inside the step it completes**, never as its own step.
@@ -71,10 +74,13 @@ Blog posts and personal write-ups use first person; documentation does not.
 ## Punctuation and word decisions
 
 - Oxford comma in lists of three or more.
+- Use a semicolon between related independent clauses without a conjunction;
+  never join them with a comma alone.
 - A slash means a combination (TCP/IP, client/server). **Never use a slash for
   "or"** – write "product or service".
-- *command-line tool* but *the command line*; *e-book*, *e-commerce*, but
-  *email*.
+- Hyphenate compound modifiers before a noun: *read-only access*,
+  *well-defined behaviour*, *5-point scale*, *command-line tool* (but
+  *the command line*). Write *e-book* and *e-commerce*, but *email*.
 - Contractions are fine (*it's*, *don't*); never contract a noun
   ("Proxmox's the leading …").
 - No *approx.* (write "about"), no *etc.*, no *e.g.* or *i.e.* – write
@@ -100,10 +106,12 @@ Blog posts and personal write-ups use first person; documentation does not.
 1. Name the content type (description, instruction, recommendation) and set
    person and mood accordingly.
 2. Fix front-loading, modal verbs, and first person.
-3. Fix procedures and lists (single-step bullet, Enter inside the step,
-   consistent list punctuation).
+3. Fix procedures and lists (one meaningful action per step, parallel
+   structure, bullets for options, numbers for order, single-step bullet,
+   Enter inside the step, consistent list punctuation).
 4. Fix words: abbreviations, acronyms, one term per concept, en-AU spelling.
-5. Fix punctuation: Oxford comma, slash, hyphen, spaced en dash; heading case.
+5. Fix punctuation: Oxford comma, semicolon, slash, compound-modifier hyphen,
+   spaced en dash; heading case.
 6. Report each change as *before → after* with the rule that drove it.
 
 Do not change meaning, code, commands, file paths, UI labels, or quoted
