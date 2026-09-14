@@ -8,7 +8,39 @@ import test from "node:test";
 import assert from "node:assert/strict";
 
 import { makeTempDir } from "./helpers.mjs";
-import { resolveJobFile, resolveJobLogFile, resolveStateDir, resolveStateFile, saveState } from "../../plugins/codex/scripts/lib/state.mjs";
+import { loadState, readJobFile, resolveJobFile, resolveJobLogFile, resolveStateDir, resolveStateFile, saveState, writeJobFile } from "../../plugins/codex/scripts/lib/state.mjs";
+
+for (const kind of ["state", "job"]) {
+  test(`${kind} readers see the previous complete record while an update is being written`, (t) => {
+    const workspace = makeTempDir();
+    const queued = { id: "task-test", status: "queued" };
+    const running = { ...queued, status: "running" };
+    const write = (job) => kind === "state"
+      ? saveState(workspace, { jobs: [job] })
+      : writeJobFile(workspace, job.id, job);
+    const read = () => kind === "state"
+      ? loadState(workspace).jobs[0]
+      : readJobFile(resolveJobFile(workspace, queued.id));
+    write(queued);
+
+    // Pause at the actual truncation boundary, making the CI reader/writer race deterministic.
+    const originalWrite = fs.writeFileSync;
+    let duringWrite;
+    t.mock.method(fs, "writeFileSync", (file, data, options) => {
+      const fd = fs.openSync(file, "w");
+      try {
+        duringWrite = read();
+        originalWrite(fd, data, options);
+      } finally {
+        fs.closeSync(fd);
+      }
+    });
+
+    write(running);
+    assert.deepEqual(duringWrite, queued);
+    assert.deepEqual(read(), running);
+  });
+}
 
 test("resolveStateDir uses a temp-backed per-workspace directory", () => {
   const workspace = makeTempDir();
