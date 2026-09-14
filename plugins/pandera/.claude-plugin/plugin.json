@@ -1,0 +1,10 @@
+{
+  "name": "pandera",
+  "version": "0.29.0",
+  "description": "Pandera — dataframe schema validation and debugging for pandas and Polars",
+  "author": {
+    "name": "nq-rdl"
+  },
+  "repository": "https://github.com/nq-rdl/agent-extensions",
+  "license": "MIT"
+}
