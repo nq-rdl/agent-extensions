@@ -41,11 +41,17 @@ lesson – your default grammar is fine. Long form, tables, and examples live in
 | Content | Person and mood | Never |
 |---|---|---|
 | Description – what a thing is or does | Third-person indicative: "The scheduler retries failed jobs." | "one", "I" |
-| Instruction – what the reader does | Second-person imperative, present tense: "Insert the card." | modal verbs (*should*, *could*, *might*), "I", "we" |
+| Instruction – what the reader does | Second-person imperative, present tense: "Insert the card." | incidental modal verbs (*should*, *could*, *might*), "I", "we" |
 | Recommendation | "We recommend …" is the one permitted "we" | – |
 
 Prefer "To create a container, run …" over "You can create a container by …".
-Blog posts and personal write-ups use first person; documentation does not.
+Blog posts and personal write-ups use first person. In documentation,
+"We recommend …" is the only first-person exception.
+
+Remove incidental modals in procedural instructions, such as "You should
+click **Save**". Preserve normative *must*, *may*, and *should* when they
+express a requirement, permission, or recommendation in contracts, policies,
+ADRs, requirements, or safety notes. Never strengthen or weaken that meaning.
 
 ## Front-load what the reader needs
 
@@ -64,7 +70,9 @@ Blog posts and personal write-ups use first person; documentation does not.
   across steps.
 - Use bullets for options and numbers for actions that must happen in order.
 - **A single-step procedure is a bullet, not "1."**
-- Sub-steps are `a.`, `b.`; sub-sub-steps are `i.`, `ii.`.
+- In formats supporting alphabetic enumerators, sub-steps are `a.`, `b.`
+  and sub-sub-steps are `i.`, `ii.`. In Markdown, use indented decimal
+  numbering at every level so nested lists render correctly.
 - **"Press Enter" belongs inside the step it completes**, never as its own step.
 - Average 15–20 words a sentence; three or more items inline become a list.
 - One style per list: **all** full sentences ending in a full stop, or **all**
@@ -106,7 +114,8 @@ Blog posts and personal write-ups use first person; documentation does not.
 
 1. Name the content type (description, instruction, recommendation) and set
    person and mood accordingly.
-2. Fix front-loading, modal verbs, and first person.
+2. Fix front-loading, incidental procedural modals, and first person;
+   preserve normative modals and the "We recommend …" exception.
 3. Fix procedures and lists (one meaningful action per step, parallel
    structure, bullets for options, numbers for order, single-step bullet,
    Enter inside the step, consistent list punctuation).

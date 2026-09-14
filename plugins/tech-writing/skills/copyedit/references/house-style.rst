@@ -86,8 +86,8 @@ Single-step procedure – a bullet, never ``1.``::
 
    * To close the program, choose Exit on the File menu.
 
-Sub-steps take lowercase letters; sub-sub-steps take lowercase Roman
-numerals::
+In formats supporting alphabetic enumerators, sub-steps take lowercase
+letters and sub-sub-steps take lowercase Roman numerals::
 
    1. First, do foo, as follows:
       a. Do the first part of foo.
@@ -95,6 +95,16 @@ numerals::
          i.  Do the first sub-part of foo part two.
          ii. Do the second sub-part of foo part two.
    2. Next, do bar.
+
+For Markdown, use decimal markers at every level and indent each nested
+list beneath its parent item::
+
+   1. Configure the service.
+      1. Set the port.
+      2. Configure authentication.
+         1. Select the identity provider.
+         2. Enter the client ID.
+   2. Start the service.
 
 Enter inside the step::
 
