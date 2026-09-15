@@ -1,0 +1,95 @@
+"""Run the team's hook against isolated installs; never touch contributor settings."""
+
+import json
+import os
+from pathlib import Path
+import shutil
+import subprocess
+import tempfile
+import unittest
+
+
+REPO = Path(__file__).resolve().parent.parent
+HOOK = REPO / "skills/cc-setup/assets/forced-eval-hook.sh"
+
+
+@unittest.skipUnless(shutil.which("jq"), "plugin discovery requires jq")
+class SqlDiscovery(unittest.TestCase):
+    def setUp(self):
+        self.tmp = tempfile.TemporaryDirectory()
+        self.addCleanup(self.tmp.cleanup)
+        self.home = Path(self.tmp.name)
+        self.manifest = self.home / ".claude/plugins/installed_plugins.json"
+        self.manifest.parent.mkdir(parents=True)
+        self.cache = self.home / ".cache/claude-hooks/skill-catalog.cache"
+        self.env = {**os.environ, "HOME": str(self.home),
+                    "XDG_CACHE_HOME": str(self.home / ".cache")}
+        self.install(sql=True)
+
+    def install(self, sql):
+        plugins = {"go@rdl-agent-extensions": [
+            {"installPath": str(REPO / "plugins/go")}]}
+        if sql:
+            plugins["sql-code@rdl-agent-extensions"] = [
+                {"installPath": str(REPO / "plugins/sql-code")}]
+        self.manifest.write_text(json.dumps({"plugins": plugins}))
+
+    def run_hook(self, prompt):
+        result = subprocess.run(["bash", str(HOOK)],
+                                input=json.dumps({"prompt": prompt}), text=True,
+                                capture_output=True, env=self.env, check=True)
+        if not result.stdout:
+            return ""
+        output = json.loads(result.stdout)["hookSpecificOutput"]
+        self.assertEqual(output["hookEventName"], "UserPromptSubmit")
+        self.assertNotIn("permissionDecision", output)
+        return output["additionalContext"]
+
+    def test_ordinary_cohort_and_sql_requests_surface_installed_guardrails(self):
+        for prompt in ("Draft the diabetes cohort", "Review requests/1186.sql",
+                       "Fix the CLINICAL_EVENT join", "Map a query-builder resolver",
+                       "Validate SQL against the request"):
+            with self.subTest(prompt=prompt):
+                context = self.run_hook(prompt)
+                self.assertIn("sql-code:guardrails", context)
+                self.assertIn("sql-code:draft", context)
+                self.assertNotIn("go:naming", context)
+                self.assertIn("Advisory only", context)
+
+    def test_unrelated_prompts_are_quiet(self):
+        for prompt in ("Fix the CSS button", "skills should always be reviewed", "", None):
+            with self.subTest(prompt=prompt):
+                self.assertEqual(self.run_hook(prompt), "")
+
+    def test_absent_plugin_is_quiet_even_with_a_cached_full_catalogue(self):
+        self.assertIn("sql-code:guardrails", self.run_hook("Use a skill"))
+        self.install(sql=False)
+        self.assertEqual(self.run_hook("Draft cohort SQL"), "")
+
+    def test_installation_is_visible_after_cache_was_built_without_sql(self):
+        self.install(sql=False)
+        self.assertNotIn("sql-code:guardrails", self.run_hook("Use a skill"))
+        self.install(sql=True)
+        self.assertIn("sql-code:guardrails", self.run_hook("Draft cohort SQL"))
+
+    def test_sql_discovery_neither_uses_nor_overwrites_full_catalogue_cache(self):
+        full = self.run_hook("Use a skill")
+        self.assertIn("go:naming", full)
+        cached = self.cache.read_bytes()
+        self.assertNotIn("go:naming", self.run_hook("Draft cohort SQL"))
+        self.assertEqual(self.cache.read_bytes(), cached)
+        self.assertEqual(self.run_hook("Use a skill"), full)
+
+    def test_sql_first_does_not_create_a_partial_catalogue_cache(self):
+        self.assertIn("sql-code:guardrails", self.run_hook("Draft cohort SQL"))
+        self.assertFalse(self.cache.exists())
+        self.assertIn("go:naming", self.run_hook("Use a skill"))
+
+    def test_explicit_skill_use_keeps_full_catalogue_for_sql_too(self):
+        context = self.run_hook("Use a skill to draft SQL")
+        self.assertIn("sql-code:guardrails", context)
+        self.assertIn("go:naming", context)
+
+
+if __name__ == "__main__":
+    unittest.main()

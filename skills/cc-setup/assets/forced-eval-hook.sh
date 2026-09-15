@@ -21,8 +21,8 @@
 #   3. Ensure this script is executable: chmod +x forced-eval-hook.sh
 #
 # How it works:
-#   - Fires only when the prompt expresses intent to use a skill (an action
-#     verb appears near "skill"/"skills"); silent no-op otherwise.
+#   - SQL/cohort prompts surface the installed SQL Code skills, including guardrails.
+#   - Explicit skill-use prompts surface the full catalogue; silent no-op otherwise.
 #   - Emits the discovered skill/command catalogue as advisory context via the
 #     UserPromptSubmit additionalContext channel (plain stdout when jq absent).
 #   - The framing is descriptive: it invites the model to consider the skills,
@@ -31,10 +31,8 @@
 set -euo pipefail
 
 # ---------------------------------------------------------------------------
-# Intent gate — fire only when an action verb sits near "skill"/"skills",
-# signalling intent to use one. Metalinguistic mentions ("skills should
-# always be reviewed") no longer trigger a catalogue dump. Silent no-op
-# otherwise.
+# Intent gate — explicit skill use gets the full catalogue; SQL/cohort work
+# gets only SQL Code guidance. This is advisory discovery, not SQL enforcement.
 # ---------------------------------------------------------------------------
 input=$(cat)
 
@@ -52,8 +50,13 @@ else
 fi
 
 intent='use|using|invoke|invoking|run|running|apply|applying|activate|activating|load|loading|call|calling|trigger|triggering'
+catalog_mode=all
 if ! printf '%s' "$prompt" | grep -qiE "\b(${intent})\b.{0,40}\bskills?\b|\bskills?\b.{0,40}\b(${intent})\b"; then
-  exit 0
+  if printf '%s' "$prompt" | grep -qiE '\b(sql|cohorts?|clinical_event)\b|query[- ]builder.{0,60}resolvers?|resolvers?.{0,60}query[- ]builder'; then
+    catalog_mode=sql
+  else
+    exit 0
+  fi
 fi
 
 SKILLS_DIR="${HOME}/.claude/skills"
@@ -311,7 +314,7 @@ emit() {
 # ---------------------------------------------------------------------------
 main() {
   # Return cached output if still fresh
-  if check_cache; then
+  if [[ "$catalog_mode" == all ]] && check_cache; then
     emit "$(cat "$CACHE_FILE")"
     return 0
   fi
@@ -339,6 +342,14 @@ main() {
       "$PLUGINS_JSON" >&2
   fi
 
+  # SQL prompts get fresh, installed SQL Code entries only. Never reuse/write the
+  # full-catalogue cache here: installation changes must be visible immediately,
+  # and a SQL-specific result must not poison later explicit skill-use discovery.
+  if [[ "$catalog_mode" == sql ]]; then
+    skill_data=$(printf '%s\n' "$skill_data" | grep -E '^sql-code(:|-)' || true)
+    cmd_data=""
+  fi
+
   # Format skill list. `|| true` keeps an empty skill_data from tripping
   # `set -o pipefail` — grep -v exits 1 when it filters every line away.
   local skills_block
@@ -359,7 +370,7 @@ main() {
   # Build, cache, and emit the prompt
   local output
   output=$(build_prompt "$skills_block" "$commands_block")
-  write_cache "$output"
+  if [[ "$catalog_mode" == all ]]; then write_cache "$output"; fi
   emit "$output"
 }
 
