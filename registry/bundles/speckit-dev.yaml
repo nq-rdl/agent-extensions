@@ -12,7 +12,6 @@ skills:
   - {source: speckit-validate, leaf: validate}
   - {source: speckit-manage,   leaf: manage}
   - {source: speckit-publish,  leaf: publish}
-agents: []
 hooks: [speckit-publish-target]
 prompts: []
 mcp: []

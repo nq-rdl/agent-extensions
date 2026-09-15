@@ -10,7 +10,6 @@ channels:
 skills:
   - {source: quarto-authoring, leaf: authoring}
   - {source: quarto-alt-text, leaf: alt-text}
-agents: []
 hooks: []
 prompts: []
 mcp: []

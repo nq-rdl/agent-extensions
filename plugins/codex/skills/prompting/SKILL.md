@@ -14,7 +14,7 @@ Rewritten from the GPT-5.4 guide against OpenAI's GPT-5.6 prompting guidance.
 
 # GPT-5.6 Prompting
 
-Use this skill when `codex:codex-rescue` needs to ask Codex or another GPT-5.6-based workflow for help.
+Use this skill when `codex:rescue` needs to ask Codex or another GPT-5.6-based workflow for help.
 
 GPT-5.6 rewards leaner prompts than 5.4/5.5. Prompt Codex like an operator: state the task once, give the output contract, set follow-through defaults, and stop. Do not pad with repeated instructions or long natural-language explanations.
 

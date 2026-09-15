@@ -37,6 +37,8 @@ def _enabled_bundles(repo: Path) -> dict[str, dict]:
     bundles_dir = repo / "registry" / "bundles"
     for bf in sorted(list(bundles_dir.glob("*.yaml")) + list(bundles_dir.glob("*.yml"))):
         data = _read_yaml(bf)
+        if data.get("agents"):
+            raise ValueError(f"{bf.name}: agents are retired; use skills with delegation references")
         claude = (data.get("targets") or {}).get("claude") or {}
         codex = (data.get("targets") or {}).get("codex") or {}
         if not claude.get("enabled"):
@@ -56,7 +58,6 @@ def _enabled_bundles(repo: Path) -> dict[str, dict]:
         out[plugin] = {
             "description": data.get("description") or "",
             "skills": leaves,
-            "agents": list(data.get("agents") or []),
             "mcp": list(data.get("mcp") or []),
             "hooks": list(data.get("hooks") or []),
             "codex": bool(codex.get("enabled")),
@@ -87,6 +88,7 @@ def generate(repo) -> str:
         "Each **subject** (a tool, library, language, or workflow) is one plugin.",
         "Claude Code publishes every bundle; Codex currently publishes the portable",
         "skill-only pilot shown below.",
+        "Delegation outlines are optional skill references, not registered agent types.",
         "",
         "## At a glance",
         "",
@@ -147,12 +149,6 @@ def generate(repo) -> str:
                 for leaf in b["skills"]:
                     lines.append(f"- `${plugin}:{leaf}`")
                 lines.append("")
-        if b["agents"]:
-            lines.append("**Claude Code agents**")
-            lines.append("")
-            for a in b["agents"]:
-                lines.append(f"- `{a}` (subagent)")
-            lines.append("")
         if b["mcp"]:
             lines.append(
                 f"**Claude Code MCP server(s):** {', '.join('`' + m + '`' for m in b['mcp'])}"

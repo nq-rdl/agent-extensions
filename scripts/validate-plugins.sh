@@ -1,45 +1,10 @@
 #!/bin/bash
-# Validate Claude Code and native Codex plugin structure, hooks, skills, and agents.
+# Validate Claude Code and native Codex plugin structure, hooks, skills.
 #
-# Checks:
-#   Claude plugin manifests
-#     1. plugin.json is valid JSON
-#     2. plugin.json has required "name" and "description" fields
-#     3. plugin.json must NOT declare an "agents" field (Claude Code auto-discovers from ./agents/)
-#     4. If a .claude-plugin/ directory exists, its plugin.json must too
-#
-#   Codex plugin manifests
-#     5. plugin.json is valid JSON with name, version, and description
-#     6. skills points to the existing plugin-local ./skills/ directory
-#
-#   hooks.json (optional — only if present)
-#     5. hooks.json is valid JSON
-#     6. Each event maps to an array of rule groups
-#     7. Each rule group has a "hooks" array (not bare hook objects)
-#     8. Each hook has a type and its command or model prompt
-#     9. Event names are from the known set
-#    10. Scripts referenced via ${CLAUDE_PLUGIN_ROOT} exist relative to plugin root
-#
-#   agents
-#    11. Every agent listed in registry/bundles/<b>.yaml has a source file
-#        at agents/<name>/agent.md
-#    12. Every Claude-target bundle agent has a symlink at
-#        plugins/<plugin>/agents/<name>.md (cross-checked against the bundle
-#        YAML, not just scanned from disk — catches missing symlinks)
-#    13. Every agents/<name>/agent.md has frontmatter keys `name`, `description`
-#    14. Every mcp entry in a bundle YAML is wired in the bundle plugin's
-#        .mcp.json (at plugin root, per Claude Code plugin spec)
-#
-#   skills
-#    15. Every bundle skill resolves to a canonical skills/<source>/ and (for
-#        Claude targets) to a plugin copy at plugins/<plugin>/skills/<leaf>/
-#    16. Each plugin skill copy carries NO frontmatter `name:`, so the
-#        /-autocomplete label falls back to the <plugin>:<leaf> invocation
-#        (a present `name:` overrides it with a bare, un-prefixed label)
-#
-# Usage:
-#   validate-plugins.sh                       # validate all plugins + agents
-#   validate-plugins.sh plugins/swe/...       # validate only plugins touched by changed files
+# Validate manifests, hooks, skill copies, and MCP wiring against the registry.
+# Standalone agent declarations and trees are retired; delegation lives in
+# optional skill references. Claude prompt/agent hooks remain hook components.
+# Usage: validate-plugins.sh [plugins/<bundle>/changed-file ...]
 
 set -euo pipefail
 
@@ -93,11 +58,10 @@ validate_manifest_json() {
   [ -z "$name" ] && error "$manifest_json" "$(basename "$manifest_json") missing required 'name' field"
   [ -z "$desc" ] && error "$manifest_json" "$(basename "$manifest_json") missing required 'description' field"
 
-  # Claude Code auto-discovers agents from ./agents/ — no manifest field required.
-  # Reject the "agents" field if present (Claude's validator rejects it).
-  if [ -n "$(jq -r '.agents // empty' "$manifest_json")" ]; then
+  # Repository packaging policy: reusable behavior is shipped as skills.
+  if jq -e 'has("agents")' "$manifest_json" >/dev/null; then
     error "$manifest_json" \
-      "plugin.json must not declare an \"agents\" field — agents are auto-discovered from ./agents/"
+      "plugin.json must not declare an \"agents\" field — this catalog uses skill delegation references"
   fi
 }
 
@@ -198,14 +162,8 @@ for plugin_rel in "${plugins[@]}"; do
     fi
   fi
 
-  # ── agent symlinks under plugins/<b>/agents/ ─────────────────────────────
-  if [ -d "$agents_dir" ]; then
-    for link in "$agents_dir"/*.md; do
-      [ -e "$link" ] || [ -L "$link" ] || continue
-      if [ ! -e "$link" ]; then
-        error "$plugin_rel" "Broken agent symlink: $link -> $(readlink "$link" || echo '?')"
-      fi
-    done
+  if [ -e "$agents_dir" ] || [ -L "$agents_dir" ]; then
+    error "$plugin_rel" "Retired agents/ tree — run sync-plugins.sh; use skill references for delegation"
   fi
 
   # ── hooks.json (optional) ────────────────────────────────────────────────
@@ -303,16 +261,9 @@ done
 
 fi
 
-# ── Agent-level validation ──────────────────────────────────────────────────
-# 1. Every bundle YAML agents: entry resolves to agents/<name>/agent.md
-# 2. Every agents/<name>/agent.md has frontmatter name + description
-echo ""
-echo "Validating agents"
+# Cross-check canonical skills, plugin copies, registry fields, and MCP wiring.
+echo "Validating skill packaging"
 
-# Cross-check every bundle YAML: each declared agent resolves to a source file,
-# each declared Claude-targeted agent has a plugin symlink, and each declared
-# mcp: entry is wired in the bundle's .mcp.json. Uses PyYAML so inline-flow
-# lists (agents: [a, b]) and inline comments parse correctly.
 python3 - "$REPO_ROOT" <<'PY' || errors=$((errors + 1))
 import sys, json
 from pathlib import Path
@@ -337,7 +288,7 @@ def frontmatter_name(skill_md):
 
     Raise ValueError when a frontmatter block IS present but is unparseable YAML,
     so the caller fails validation instead of silently skipping the no-name
-    guard on a broken header (mirrors the agent-frontmatter check below).
+    guard on a broken header.
     """
     if not skill_md.is_file():
         return None
@@ -351,6 +302,18 @@ def frontmatter_name(skill_md):
     val = fm.get("name")
     return None if val is None else str(val)
 
+
+if (repo / "agents").exists():
+    err(repo / "agents", "Canonical agents/ is retired; use skills with references/subagent.rst")
+
+for skill_md in sorted((repo / "skills").glob("*/SKILL.md")):
+    outline = skill_md.parent / "references" / "subagent.rst"
+    text = skill_md.read_text(encoding="utf-8")
+    linked = "(references/subagent.rst)" in text
+    if outline.exists() and not linked:
+        err(skill_md, "Delegation outline exists but SKILL.md does not link references/subagent.rst")
+    if linked and not outline.is_file():
+        err(skill_md, "Linked references/subagent.rst does not exist")
 
 _bundles_dir = repo / "registry" / "bundles"
 for bundle in sorted(list(_bundles_dir.glob("*.yaml")) + list(_bundles_dir.glob("*.yml"))):
@@ -375,14 +338,8 @@ for bundle in sorted(list(_bundles_dir.glob("*.yaml")) + list(_bundles_dir.glob(
                 ".codex-plugin/plugin.json",
             )
 
-    for name in data.get("agents") or []:
-        src = repo / "agents" / name / "agent.md"
-        if not src.is_file():
-            err(bundle, f"Agent '{name}' declared but missing source file agents/{name}/agent.md")
-        if claude_enabled:
-            link = repo / "plugins" / plugin_name / "agents" / f"{name}.md"
-            if not link.exists():
-                err(bundle, f"Agent '{name}' declared for Claude target but missing symlink plugins/{plugin_name}/agents/{name}.md")
+    if data.get("agents"):
+        err(bundle, "Standalone agents are retired; use skills with references/subagent.rst")
 
     # Skills: declared bundle skills must resolve to a canonical source and (for
     # Claude targets) to a self-contained plugin copy. Without this, the issue
@@ -488,44 +445,11 @@ for bundle in sorted(list(_bundles_dir.glob("*.yaml")) + list(_bundles_dir.glob(
 sys.exit(1 if fail else 0)
 PY
 
-# Validate every agents/<name>/agent.md has the required frontmatter.
-if [ -d "$REPO_ROOT/agents" ]; then
-  for agent_md in "$REPO_ROOT"/agents/*/agent.md; do
-    [ -f "$agent_md" ] || continue
-    python3 - "$agent_md" <<'PY' || errors=$((errors + 1))
-import sys
-import yaml
-path = sys.argv[1]
-with open(path, "r", encoding="utf-8") as f:
-    text = f.read()
-if not text.startswith("---\n"):
-    print(f"::error file={path}::missing YAML frontmatter", file=sys.stderr)
-    sys.exit(1)
-parts = text.split("---\n", 2)
-if len(parts) < 3:
-    print(f"::error file={path}::unterminated YAML frontmatter", file=sys.stderr)
-    sys.exit(1)
-try:
-    fm = yaml.safe_load(parts[1]) or {}
-except yaml.YAMLError as exc:
-    print(f"::error file={path}::invalid YAML frontmatter: {exc}", file=sys.stderr)
-    sys.exit(1)
-missing = [k for k in ("name", "description") if not fm.get(k)]
-if missing:
-    print(
-        f"::error file={path}::agent frontmatter missing required key(s): {', '.join(missing)}",
-        file=sys.stderr,
-    )
-    sys.exit(1)
-PY
-  done
-fi
-
 if [ $errors -gt 0 ]; then
   echo ""
-  echo "Plugin/skill/agent validation failed with $errors error(s)"
+  echo "Plugin/skill validation failed with $errors error(s)"
   exit 1
 fi
 
 echo ""
-echo "All plugins, skills, and agents valid"
+echo "All plugins and skills valid"

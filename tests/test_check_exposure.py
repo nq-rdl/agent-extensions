@@ -1,7 +1,7 @@
 """Tests for scripts/check_exposure.py — the reverse bundle-reference check.
 
 check_bundle_refs.py verifies every bundle reference resolves to something on
-disk; this is the other direction: every canonical skill/agent/hook must be
+disk; this is the other direction: every canonical skill/hook must be
 referenced by at least one bundle, or explicitly allowlisted in
 registry/unbundled.yaml. Closes the "authored but unshipped" gap.
 """
@@ -30,21 +30,15 @@ def bundle(stem, body, enabled=True):
     return f"id: {stem}\n{body}{tmpl.format(p=stem)}"
 
 
-def make_repo(tmp, bundles=None, skills=(), agents=(), hooks=(), unbundled=None):
-    """Build a throwaway repo skeleton with the given bundles/skills/agents/hooks."""
+def make_repo(tmp, bundles=None, skills=(), hooks=(), unbundled=None):
+    """Build a throwaway repo skeleton with the given bundles/skills/hooks."""
     repo = Path(tmp)
     (repo / "registry" / "bundles").mkdir(parents=True)
     (repo / "skills").mkdir()
-    (repo / "agents").mkdir()
     (repo / "hooks").mkdir()
     for name in skills:
         (repo / "skills" / name).mkdir()
         (repo / "skills" / name / "SKILL.md").write_text(f"---\nname: {name}\n---\n")
-    for name in agents:
-        (repo / "agents" / name).mkdir()
-        (repo / "agents" / name / "agent.md").write_text(
-            f"---\nname: {name}\ndescription: x\n---\n"
-        )
     for name in hooks:
         (repo / "hooks" / f"{name}.sh").write_text("#!/usr/bin/env bash\n")
     for stem, body in (bundles or {}).items():
@@ -143,24 +137,6 @@ class TestDisabledBundles(unittest.TestCase):
                         "targets:\n  claude:\n    enabled: true\n"
                     )
                 },
-            )
-            self.assertEqual(check_exposure.find_unexposed(repo), [])
-
-
-class TestUnreferencedAgents(unittest.TestCase):
-    def test_flags_orphan_agent(self):
-        with tempfile.TemporaryDirectory() as tmp:
-            repo = make_repo(tmp, agents=["orphan-agent"])
-            orphans = check_exposure.find_unexposed(repo)
-            self.assertEqual([o.name for o in orphans], ["orphan-agent"])
-            self.assertEqual(orphans[0].kind, "agent")
-
-    def test_referenced_agent_not_flagged(self):
-        with tempfile.TemporaryDirectory() as tmp:
-            repo = make_repo(
-                tmp,
-                agents=["used-agent"],
-                bundles={"b": bundle("b", "agents:\n  - used-agent\n")},
             )
             self.assertEqual(check_exposure.find_unexposed(repo), [])
 
@@ -425,7 +401,7 @@ class TestStructurallyInvalidRegistry(unittest.TestCase):
             "id: b\nskills: [ok]\ntargets:\n  claude: nope\n",
         ),
         ("skills", "registry/bundles/b.yaml", bundle("b", "skills: 7\n")),
-        ("agents", "registry/bundles/b.yaml", bundle("b", "agents: 5\n")),
+        ("hooks", "registry/bundles/b.yaml", bundle("b", "hooks: 5\n")),
         ("mcp", "registry/bundles/b.yaml", bundle("b", "mcp: 3\n")),
         ("unbundled", "registry/unbundled.yaml", "unbundled: 1\n"),
     )

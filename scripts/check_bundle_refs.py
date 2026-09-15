@@ -2,7 +2,7 @@
 """Resolve registry bundle references against the canonical trees.
 
 Every skill named in ``registry/bundles/*.yaml`` must resolve to
-``skills/<name>/`` and every agent to ``agents/<name>/agent.md``. This logic was
+``skills/<name>/``. Standalone agent declarations are rejected. This logic was
 previously inlined in ``.github/workflows/validate.yml``; extracting it here
 makes it unit-testable and reusable.
 
@@ -24,7 +24,7 @@ from _registry import normalize_member
 @dataclass(frozen=True)
 class Problem:
     bundle: str  # bundle id (or filename stem)
-    kind: str  # "skill" or "agent"
+    kind: str  # "skill" or "retired-agent"
     name: str
     bundle_file: str = ""  # path relative to repo root, for CI annotations
 
@@ -54,9 +54,8 @@ def find_unresolved_refs(repo) -> list[Problem]:
                 continue
             if not (repo / "skills" / source).is_dir():
                 problems.append(Problem(bundle, "skill", source, rel))
-        for name in data.get("agents") or []:
-            if not (repo / "agents" / name / "agent.md").is_file():
-                problems.append(Problem(bundle, "agent", name, rel))
+        if data.get("agents"):
+            problems.append(Problem(bundle, "retired-agent", "agents", rel))
     return problems
 
 
@@ -66,14 +65,12 @@ def main(argv=None) -> int:
     problems = find_unresolved_refs(repo)
     for p in problems:
         loc = f" file={p.bundle_file}" if p.bundle_file else ""
-        suffix = (
-            f"skills/{p.name}/" if p.kind == "skill" else f"agents/{p.name}/agent.md"
-        )
-        print(
-            f"::error{loc}::Bundle '{p.bundle}' references {p.kind} "
-            f"'{p.name}' but {suffix} does not exist",
-            file=sys.stderr,
-        )
+        if p.kind == "retired-agent":
+            message = "Standalone agents are retired; use skills with references/subagent.rst"
+        else:
+            message = (f"Bundle '{p.bundle}' references skill '{p.name}' but "
+                       f"skills/{p.name}/ does not exist")
+        print(f"::error{loc}::{message}", file=sys.stderr)
     if problems:
         print(f"{len(problems)} unresolved bundle reference(s)", file=sys.stderr)
         return 1

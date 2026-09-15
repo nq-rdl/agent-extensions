@@ -9,7 +9,6 @@ channels:
   - stable
 skills:
   - {source: rust-explain, leaf: explain}
-agents: []
 hooks: []
 prompts: []
 mcp: []

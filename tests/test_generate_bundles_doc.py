@@ -23,12 +23,11 @@ order: [go, infra]
 """
 
 
-def _bundle(p, d, enabled=True, skills="[]", agents="[]", mcp="[]", hooks="[]"):
+def _bundle(p, d, enabled=True, skills="[]", mcp="[]", hooks="[]"):
     return (
         f"id: {p}\n"
         f"description: {d}\n"
         f"skills: {skills}\n"
-        f"agents: {agents}\n"
         f"mcp: {mcp}\n"
         f"hooks: {hooks}\n"
         "targets:\n"
@@ -43,11 +42,11 @@ def make_repo(tmp, go_desc="Go tools"):
     (repo / "registry" / "bundles").mkdir(parents=True)
     (repo / "docs").mkdir()
     (repo / "registry" / "marketplace.yaml").write_text(MARKETPLACE_YAML)
-    # go: a renamed leaf ({source, leaf}) and a flat member (leaf == source) + an agent.
+    # go: a renamed leaf ({source, leaf}) and a flat member (leaf == source) + a migrated workflow.
     (repo / "registry" / "bundles" / "go.yaml").write_text(
-        _bundle("go", go_desc, skills="[{source: go-secure, leaf: secure}, naming]", agents="[go-mcp-expert]")
+        _bundle("go", go_desc, skills="[{source: go-secure, leaf: secure}, naming, {source: go-mcp-expert, leaf: build-mcp}]")
     )
-    # infra: no skills, no agents — exercises empty-section suppression.
+    # infra: no skills — exercises empty-section suppression.
     (repo / "registry" / "bundles" / "infra.yaml").write_text(_bundle("infra", "Infra tools"))
     return repo
 
@@ -61,10 +60,11 @@ class TestGenerate(unittest.TestCase):
             self.assertNotIn("/go:go-secure", out)  # never the source name
             self.assertIn("**Claude Code skills**", out)
 
-    def test_agents_rendered_as_subagents(self):
+    def test_migrated_workflow_rendered_as_skill(self):
         with tempfile.TemporaryDirectory() as t:
             out = generate_bundles_doc.generate(make_repo(t))
-            self.assertIn("- `go-mcp-expert` (subagent)", out)
+            self.assertIn("- `/go:build-mcp`", out)
+            self.assertNotIn("(subagent)", out)
 
     def test_at_a_glance_table(self):
         with tempfile.TemporaryDirectory() as t:
@@ -138,7 +138,7 @@ class TestGenerate(unittest.TestCase):
             self.assertIn("codex plugin marketplace add", out)
             self.assertIn("**Codex skills**", out)
             self.assertIn("- `$go:secure`", out)
-            self.assertIn("**Claude Code agents**", out)
+            self.assertNotIn("**Claude Code agents**", out)
 
 class TestCheck(unittest.TestCase):
     def test_write_then_check_clean(self):

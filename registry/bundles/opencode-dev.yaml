@@ -15,7 +15,6 @@ skills:
   - {source: opencode-skill, leaf: skill}
   - {source: opencode-policies, leaf: policies}
   - {source: opencode-delegate, leaf: delegate}
-agents: []
 hooks: [opencode-doc-review]
 prompts: []
 mcp: []

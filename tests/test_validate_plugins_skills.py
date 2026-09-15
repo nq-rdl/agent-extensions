@@ -35,7 +35,6 @@ def base_plugin(repo: Path, plugin="test"):
         repo / "plugins" / plugin / ".claude-plugin" / "plugin.json",
         '{"name": "%s", "description": "x"}' % plugin,
     )
-    (repo / "agents").mkdir(parents=True, exist_ok=True)
     (repo / "skills").mkdir(parents=True, exist_ok=True)
 
 
@@ -392,3 +391,38 @@ class TestSkillValidation(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class TestDelegationReferences(unittest.TestCase):
+    def test_outline_link_must_resolve_and_existing_outline_must_be_linked(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            repo = Path(tmp)
+            base_plugin(repo)
+            skill = repo / "skills/review/SKILL.md"
+            outline = repo / "skills/review/references/subagent.rst"
+            linked = "---\nname: review\n---\n[Worker](references/subagent.rst)\n"
+            write(skill, linked)
+            result = run_validate(repo)
+            self.assertNotEqual(result.returncode, 0)
+            self.assertIn("does not exist", result.stderr)
+            write(outline, "Worker\n======\n\nRead only; return evidence.\n")
+            self.assertEqual(run_validate(repo).returncode, 0)
+            skill.write_text("---\nname: review\n---\nReview directly.\n")
+            result = run_validate(repo)
+            self.assertNotEqual(result.returncode, 0)
+            self.assertIn("does not link", result.stderr)
+
+    def test_rejects_retired_agent_trees_and_registry_declarations(self):
+        for location in ("agents/old/agent.md", "plugins/test/agents/old.md"):
+            with self.subTest(location=location), tempfile.TemporaryDirectory() as tmp:
+                repo = Path(tmp)
+                base_plugin(repo)
+                write(repo / location, "old agent")
+                self.assertNotEqual(run_validate(repo).returncode, 0)
+        with tempfile.TemporaryDirectory() as tmp:
+            repo = Path(tmp)
+            base_plugin(repo)
+            write(repo / "registry/bundles/test.yaml", "id: test\nagents: [old]\n")
+            result = run_validate(repo)
+            self.assertNotEqual(result.returncode, 0)
+            self.assertIn("Standalone agents are retired", result.stderr)

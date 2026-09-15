@@ -9,7 +9,6 @@ channels:
   - stable
 skills:
   - {source: lychee, leaf: check}
-agents: []
 hooks: []
 prompts: []
 mcp: []

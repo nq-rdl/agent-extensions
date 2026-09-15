@@ -1,10 +1,10 @@
 #!/usr/bin/env python3
 """Find canonical content that no bundle exposes (the reverse of check_bundle_refs).
 
-``check_bundle_refs.py`` checks the FORWARD direction: every skill/agent named
+``check_bundle_refs.py`` checks the FORWARD direction: every skill named
 in ``registry/bundles/*.yaml`` must resolve to something on disk. This module
 checks the REVERSE direction: every skill authored under ``skills/<name>/``,
-every agent under ``agents/<name>/agent.md``, and every hook under
+every hook under
 ``hooks/<name>.sh`` must be *referenced* by at least one bundle — otherwise it
 is authored but never shipped in any plugin, which is easy to miss because
 nothing else in the pipeline fails.
@@ -20,7 +20,6 @@ always the on-disk basename:
 
   * skill  — ``skills/<name>/SKILL.md``   -> ``<name>`` (a dir without the
     SKILL.md marker is not a skill and is invisible here)
-  * agent  — ``agents/<name>/agent.md``   -> ``<name>``
   * hook   — ``hooks/<name>.sh``          -> ``<name>``
   * mcp    — ``mcp/<name>-go/``           -> ``<name>``: the ``-go`` suffix is a
     directory-naming convention (AGENTS.md, mcp/README.md "Layout"), while a
@@ -49,7 +48,7 @@ import yaml
 
 from _registry import normalize_member
 
-KINDS = ("skill", "agent", "hook", "mcp", "prompt")
+KINDS = ("skill", "hook", "mcp", "prompt")
 
 # The bundle-YAML list key that exposes each kind. Not derivable by appending
 # "s" to the kind — `mcp:` is singular in the bundle schema — so this map is the
@@ -57,7 +56,6 @@ KINDS = ("skill", "agent", "hook", "mcp", "prompt")
 # key to add an orphan to.
 BUNDLE_KEY = {
     "skill": "skills",
-    "agent": "agents",
     "hook": "hooks",
     "mcp": "mcp",
     "prompt": "prompts",
@@ -194,7 +192,7 @@ def collect_bundle_refs(repo) -> dict[str, set[str]]:
                 # the skill it named simply reads as unexposed.
                 continue
             refs["skill"].add(source)
-        for kind in ("agent", "hook", "mcp", "prompt"):
+        for kind in ("hook", "mcp", "prompt"):
             for name in _as_list(
                 data.get(BUNDLE_KEY[kind]), bundle_file, BUNDLE_KEY[kind]
             ):
@@ -218,12 +216,6 @@ def collect_canonical(repo) -> dict[str, dict[str, str]]:
     for d in sorted(skills_dir.iterdir()):
         if d.is_dir() and (d / "SKILL.md").is_file():
             canonical["skill"][d.name] = f"skills/{d.name}/SKILL.md"
-
-    agents_dir = repo / "agents"
-    if agents_dir.is_dir():
-        for d in sorted(agents_dir.iterdir()):
-            if d.is_dir() and (d / "agent.md").is_file():
-                canonical["agent"][d.name] = f"agents/{d.name}/agent.md"
 
     hooks_dir = repo / "hooks"
     if hooks_dir.is_dir():

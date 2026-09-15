@@ -276,117 +276,44 @@ class TestNameStrip(unittest.TestCase):
             )
 
 
-def _agent_skills(agent_md: Path):
-    """The frontmatter ``skills:`` preload list of an agent copy (or None)."""
-    parts = agent_md.read_text().split("---\n", 2)
-    if len(parts) < 3 or parts[0].strip():
-        return None
-    fm = yaml.safe_load(parts[1]) or {}
-    return fm.get("skills")
-
-
-class TestAgentSkillRewrite(unittest.TestCase):
-    """A copied agent's frontmatter ``skills:`` preload is rewritten to the target
-    plugin's leaves: a grouped {source, leaf} skill is referenced by its LEAF, and
-    a preload the plugin does not ship is dropped (Claude Code can't resolve a
-    skill that isn't installed, so it would silently no-op). The canonical
-    agents/ tree keeps the flat source names — only the derivative copy is
-    rewritten, so a cross-listed agent can carry a different list per plugin.
-    Everything outside the skills: block is preserved byte-for-byte."""
-
-    # Preloads go-gh (grouped under a leaf in some plugins) and sops (not always
-    # shipped) so one fixture exercises both the rename and the drop paths.
-    AGENT = (
-        "---\nname: myagent\ndescription: x\nskills:\n"
-        "  - go-gh\n  - sops\n---\n# Body\n\nuse the skills above.\n"
-    )
-
-    def test_grouped_skill_rewritten_to_leaf_and_unshipped_dropped(self):
+class TestDelegationPackaging(unittest.TestCase):
+    def test_reference_survives_install_and_legacy_agents_are_pruned(self):
         with tempfile.TemporaryDirectory() as tmp:
             repo = Path(tmp)
-            # gh ships go-gh under leaf `go`; it does NOT ship sops.
-            write(
-                repo / "registry" / "bundles" / "gh.yaml",
-                "id: gh\nskills:\n  - source: go-gh\n    leaf: go\nagents:\n  - myagent\n"
-                "targets:\n  claude:\n    enabled: true\n    pluginName: gh\n",
-            )
-            write(repo / "skills" / "go-gh" / "SKILL.md", "---\nname: go-gh\n---\n")
-            write(repo / "agents" / "myagent" / "agent.md", self.AGENT)
+            write(repo / "registry/bundles/demo.yaml",
+                  "id: demo\nskills: [{source: review-source, leaf: review}]\n"
+                  "targets:\n  claude:\n    enabled: true\n")
+            write(repo / "skills/review-source/SKILL.md",
+                  "---\nname: review-source\ndescription: Review code\n---\n"
+                  "Read [outline](references/subagent.rst) when delegation is useful.\n")
+            outline = "Worker\n======\n\nRead only; return evidence.\n"
+            write(repo / "skills/review-source/references/subagent.rst", outline)
+            write(repo / "plugins/demo/agents/old.md", "retired")
+            # Check mode must report the retired tree without deleting it.
             run_sync(repo)
-            copy = repo / "plugins" / "gh" / "agents" / "myagent.md"
-            self.assertEqual(
-                _agent_skills(copy),
-                ["go"],
-                "go-gh must be rewritten to leaf 'go'; sops (unshipped) dropped",
-            )
-            text = copy.read_text()
-            self.assertNotIn("go-gh", text)
-            self.assertNotIn("sops", text)
-            self.assertIn("use the skills above.", text)  # body preserved
-            self.assertEqual(
-                _agent_skills(repo / "agents" / "myagent" / "agent.md"),
-                ["go-gh", "sops"],
-                "canonical agent skills: must NOT be touched",
-            )
+            write(repo / "plugins/demo/agents/old.md", "retired")
+            check = subprocess.run(["bash", str(repo / "scripts/sync-plugins.sh"), "--check"],
+                                   capture_output=True, text=True)
+            self.assertNotEqual(check.returncode, 0)
+            self.assertTrue((repo / "plugins/demo/agents/old.md").exists())
+            self.assertEqual(run_sync(repo).returncode, 0)
+            self.assertFalse((repo / "plugins/demo/agents").exists())
+            with tempfile.TemporaryDirectory() as cache:
+                installed = Path(cache) / "demo"
+                shutil.copytree(repo / "plugins/demo", installed)
+                self.assertEqual((installed / "skills/review/references/subagent.rst").read_text(), outline)
+                self.assertFalse((installed / "skills/review/references/subagent.rst").is_symlink())
+            (repo / "plugins/demo/skills/review/references/subagent.rst").write_text("drift")
+            check = subprocess.run(["bash", str(repo / "scripts/sync-plugins.sh"), "--check"],
+                                   capture_output=True, text=True)
+            self.assertNotEqual(check.returncode, 0)
 
-    def test_all_preloads_dropped_render_empty_list(self):
+    def test_sync_rejects_retired_registry_agents(self):
         with tempfile.TemporaryDirectory() as tmp:
             repo = Path(tmp)
-            # review ships no skills, so every preload is dropped.
-            write(
-                repo / "registry" / "bundles" / "review.yaml",
-                "id: review\nskills: []\nagents:\n  - myagent\n"
-                "targets:\n  claude:\n    enabled: true\n    pluginName: review\n",
-            )
-            write(repo / "agents" / "myagent" / "agent.md", self.AGENT)
-            run_sync(repo)
-            copy = repo / "plugins" / "review" / "agents" / "myagent.md"
-            self.assertEqual(_agent_skills(copy), [], "no shipped skills → skills: []")
-            self.assertIn("skills: []", copy.read_text())
-
-    def test_empty_skills_list_is_copied_verbatim(self):
-        with tempfile.TemporaryDirectory() as tmp:
-            repo = Path(tmp)
-            src = "---\nname: a\ndescription: x\nskills: []\ncolor: red\n---\nbody\n"
-            write(repo / "agents" / "a" / "agent.md", src)
-            write(
-                repo / "registry" / "bundles" / "go.yaml",
-                "id: go\nskills: []\nagents:\n  - a\n"
-                "targets:\n  claude:\n    enabled: true\n    pluginName: go\n",
-            )
-            run_sync(repo)
-            self.assertEqual(
-                (repo / "plugins" / "go" / "agents" / "a.md").read_text(),
-                src,
-                "skills: [] with nothing to map → copied byte-for-byte",
-            )
-
-    def test_cross_listed_agent_gets_per_plugin_lists(self):
-        with tempfile.TemporaryDirectory() as tmp:
-            repo = Path(tmp)
-            write(repo / "agents" / "myagent" / "agent.md", self.AGENT)
-            write(repo / "skills" / "go-gh" / "SKILL.md", "---\nname: go-gh\n---\n")
-            # gh ships go-gh (leaf go); review ships nothing.
-            write(
-                repo / "registry" / "bundles" / "gh.yaml",
-                "id: gh\nskills:\n  - source: go-gh\n    leaf: go\nagents:\n  - myagent\n"
-                "targets:\n  claude:\n    enabled: true\n    pluginName: gh\n",
-            )
-            write(
-                repo / "registry" / "bundles" / "review.yaml",
-                "id: review\nskills: []\nagents:\n  - myagent\n"
-                "targets:\n  claude:\n    enabled: true\n    pluginName: review\n",
-            )
-            run_sync(repo)
-            self.assertEqual(
-                _agent_skills(repo / "plugins" / "gh" / "agents" / "myagent.md"),
-                ["go"],
-            )
-            self.assertEqual(
-                _agent_skills(repo / "plugins" / "review" / "agents" / "myagent.md"),
-                [],
-                "same canonical agent, but the plugin without the skill drops it",
-            )
+            write(repo / "registry/bundles/demo.yaml",
+                  "id: demo\nagents: [old]\ntargets:\n  claude:\n    enabled: true\n")
+            self.assertNotEqual(run_sync(repo).returncode, 0)
 
 
 if __name__ == "__main__":

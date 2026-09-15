@@ -10,7 +10,7 @@ Devcontainer run from the host:
     devcontainer up --workspace-folder .
     devcontainer exec --workspace-folder . bash -lc 'bash tests/e2e/marketplace-smoke.sh --live'
 
-Not wired into CI (no docker-in-docker there); it is the local acceptance gate.
+The Claude live test is a local acceptance gate; it is not currently wired into CI.
 
 # SQL Review plugin smoke E2E
 
@@ -35,3 +35,15 @@ as the host uid, and give Claude a throwaway home seeded with your own OAuth cre
       -e WORKSPACE_DIR="$W" -e PATH=/usr/local/share/npm-global/bin:/home/node/.pixi/bin:/usr/local/bin:/usr/bin:/bin \
       -v "$H":/tmp/home -v "$W":"$W" -v "$G":"$G" -w "$W" rdl-plugin-sandbox \
       bash -c 'git config --global --add safe.directory "*"; pixi run python3 -m unittest discover -s tests -p "test_sql_review_*.py"; bash tests/e2e/sql-review-smoke.sh --live'
+
+# Codex plugin smoke E2E
+
+Run `bash scripts/smoke-codex-marketplace.sh` with Codex and jq installed, or use
+[the dedicated Codex devcontainer](../../.devcontainer/codex/README.md).
+The existing required plugin-validation CI job builds that image and runs the
+same smoke test with a read-only checkout and networking disabled.
+
+Coverage includes all enabled marketplace plugins, qualified skill discovery,
+complete cached skill trees (including delegation references), removal, and
+reinstallation. It needs no API key and makes no model requests. The Claude SQL
+Review first-run model test above remains a separate authenticated acceptance test.

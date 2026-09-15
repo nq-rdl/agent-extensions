@@ -1,6 +1,6 @@
 # Agent Extensions
 
-Curated reusable agent skills and agents packaged as self-contained plugins. Claude Code publishes the complete catalog; Codex publishes a skill-only pilot. Canonical skills live under `skills/` and agents under `agents/`, while generated manifests expose target-supported bundles from `plugins/`.
+Curated reusable agent skills packaged as self-contained plugins. Claude Code publishes the complete catalog; Codex publishes a skill-only pilot. Canonical skills and optional delegation outlines live under `skills/`, while generated manifests expose target-supported bundles from `plugins/`.
 
 ## Installation
 
@@ -31,6 +31,8 @@ codex plugin add go@rdl-agent-extensions --json
 ```
 
 The initial Codex catalog contains `go`, `rust`, `shiny`, `quarto`, and `obsidian`. See [`docs/codex.md`](docs/codex.md) for verification commands and current limitations.
+
+See [Delegation](docs/delegation.md) for optional subagent execution and migrated agent names.
 
 ## Agent File Management
 

@@ -197,6 +197,8 @@ def _enabled_bundles(repo: Path) -> dict[str, dict]:
     bundles_dir = repo / "registry" / "bundles"
     for bf in sorted(list(bundles_dir.glob("*.yaml")) + list(bundles_dir.glob("*.yml"))):
         data = _read_yaml(bf)
+        if data.get("agents"):
+            raise ValueError(f"{bf.name}: agents are retired; use skills with delegation references")
         claude = (data.get("targets") or {}).get("claude") or {}
         if not claude.get("enabled"):
             continue
@@ -217,13 +219,15 @@ def _codex_enabled_bundles(repo: Path, marketplace_name: str) -> dict[str, dict]
     """Return validated phase-one Codex bundles keyed by target plugin name.
 
     Phase one deliberately publishes only skills from the existing shared plugin
-    trees. MCP, hooks, apps, and Claude subagents remain disabled until they have
+    trees. MCP, hooks, and apps remain disabled until they have
     target-specific runtime validation.
     """
     out: dict[str, dict] = {}
     bundles_dir = repo / "registry" / "bundles"
     for bf in sorted(list(bundles_dir.glob("*.yaml")) + list(bundles_dir.glob("*.yml"))):
         data = _read_yaml(bf)
+        if data.get("agents"):
+            raise ValueError(f"{bf.name}: agents are retired; use skills with delegation references")
         targets = data.get("targets")
         if targets is None:
             targets = {}

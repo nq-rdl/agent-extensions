@@ -1,5 +1,6 @@
 """CI contracts for the native Codex publication target."""
 
+import json
 import re
 import tempfile
 import unittest
@@ -47,6 +48,20 @@ class TestCodexCi(unittest.TestCase):
         self.assertIn("@openai/codex@0.152.0", workflow)
         self.assertIn("@openai/codex@0.154.0", workflow)
         self.assertIn("scripts/smoke-codex-marketplace.sh", workflow)
+
+        job = yaml.safe_load(workflow)["jobs"]["validate-plugins"]
+        self.assertFalse(job.get("continue-on-error", False))
+        commands = [step for step in job["steps"] if "docker " in step.get("run", "")]
+        self.assertEqual(len(commands), 2, "required job must build and run the container")
+        self.assertTrue(all(not step.get("continue-on-error", False) for step in commands))
+        build, run = [step["run"] for step in commands]
+        config = json.loads((REPO / ".devcontainer/codex/devcontainer.json").read_text())
+        version = config["build"]["args"]["CODEX_VERSION"]
+        self.assertIn(f"CODEX_VERSION={version}", build)
+        self.assertIn(".devcontainer/codex/Dockerfile", build)
+        self.assertIn("scripts/smoke-codex-marketplace.sh", run)
+        self.assertIn("--network none", run)
+        self.assertIn("readonly", run)
 
     def test_local_generated_drift_hook_includes_codex_marketplace(self):
         lefthook = (REPO / "lefthook.yml").read_text()

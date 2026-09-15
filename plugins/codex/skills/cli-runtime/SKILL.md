@@ -13,15 +13,15 @@ Derived from openai/codex-plugin-cc v1.0.6 (db52e28), Apache-2.0. Modified for r
 
 # Codex Runtime
 
-Use this skill only inside the `codex:codex-rescue` subagent.
+Use this skill when executing `codex:rescue`, directly or in a delegated worker.
 
 Primary helper:
 - `node "${CLAUDE_PLUGIN_ROOT}/scripts/codex-companion.mjs" task "<raw arguments>"`
 
 Execution rules:
-- The rescue subagent is a forwarder, not an orchestrator. Its only job is to invoke `task` once and return that stdout unchanged.
+- The rescue executor is a forwarder, not an orchestrator. Its only job is to invoke `task` once and return that stdout unchanged.
 - Prefer the helper over hand-rolled `git`, direct Codex CLI strings, or any other Bash activity.
-- Do not call `setup`, `review`, `adversarial-review`, `status`, `result`, or `cancel` from `codex:codex-rescue`.
+- Do not call `setup`, `review`, `adversarial-review`, `status`, `result`, or `cancel` from `codex:rescue`.
 - Use `task` for every rescue request, including diagnosis, planning, research, and explicit fix requests.
 - You may use the `codex:prompting` skill (GPT-5.6 prompting) to rewrite the user's request into a tighter Codex prompt before the single `task` call.
 - Consult the `codex:model-guide` skill when the user asks for a specific model or effort; leave both unset otherwise.
@@ -50,7 +50,7 @@ Codex CLI facts (pinned to 0.144.6 — verify with `codex --version`):
 - Approval policies: `untrusted | on-request | never`.
 
 Safety rules:
-- Default to write-capable Codex work in `codex:codex-rescue` unless the user explicitly asks for read-only behavior.
+- Default to write-capable Codex work in `codex:rescue` unless the user explicitly asks for read-only behavior.
 - Preserve the user's task text as-is apart from stripping routing flags.
 - Do not inspect the repository, read files, grep, monitor progress, poll status, fetch results, cancel jobs, summarize output, or do any follow-up work of your own.
 - Return the stdout of the `task` command exactly as-is.

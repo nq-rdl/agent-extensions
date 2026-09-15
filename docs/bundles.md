@@ -9,6 +9,7 @@ icon: lucide/package
 Each **subject** (a tool, library, language, or workflow) is one plugin.
 Claude Code publishes every bundle; Codex currently publishes the portable
 skill-only pilot shown below.
+Delegation outlines are optional skill references, not registered agent types.
 
 ## At a glance
 
@@ -88,17 +89,17 @@ Go — idiomatic naming and secure error handling.
 
 - `/go:naming`
 - `/go:secure`
+- `/go:build-mcp`
+- `/go:review-security`
+- `/go:actions`
 
 **Codex skills**
 
 - `$go:naming`
 - `$go:secure`
-
-**Claude Code agents**
-
-- `go-mcp-expert` (subagent)
-- `wg-code-sentinel` (subagent)
-- `github-actions-expert` (subagent)
+- `$go:build-mcp`
+- `$go:review-security`
+- `$go:actions`
 
 ---
 
@@ -217,13 +218,10 @@ GitHub workflow — git hooks, changelogs, conventional commits, pull requests, 
 - `/gh:lefthook`
 - `/gh:pre-commit`
 - `/gh:send-pr`
-
-**Claude Code agents**
-
-- `address-comments` (subagent)
-- `repo-architect` (subagent)
-- `github-actions-expert` (subagent)
-- `se-gitops-ci-specialist` (subagent)
+- `/gh:address-comments`
+- `/gh:configure-repo`
+- `/gh:actions`
+- `/gh:debug-delivery`
 
 ---
 
@@ -231,11 +229,11 @@ GitHub workflow — git hooks, changelogs, conventional commits, pull requests, 
 
 Terraform — generate compliant HCL, review IaC for state safety, and author Terratest suites.
 
-**Claude Code agents**
+**Claude Code skills**
 
-- `terraform` (subagent)
-- `terraform-iac-reviewer` (subagent)
-- `terratest-module-testing` (subagent)
+- `/terraform:provision`
+- `/terraform:review`
+- `/terraform:test`
 
 ---
 
@@ -243,9 +241,9 @@ Terraform — generate compliant HCL, review IaC for state safety, and author Te
 
 Kubernetes — SRE-grade rollouts, HA design, and incident response.
 
-**Claude Code agents**
+**Claude Code skills**
 
-- `platform-sre-kubernetes` (subagent)
+- `/kubernetes:operate`
 
 ---
 
@@ -256,10 +254,7 @@ Argo CD — GitOps application management and sync for Kubernetes.
 **Claude Code skills**
 
 - `/argo-cd:manage`
-
-**Claude Code agents**
-
-- `se-gitops-ci-specialist` (subagent)
+- `/argo-cd:debug-delivery`
 
 ---
 
@@ -282,10 +277,6 @@ Red Hat — fetch product documentation and Customer Portal (KCS) content with y
 - `/redhat:fetch-docs`
 - `/redhat:setup`
 
-**Claude Code agents**
-
-- `redhat-docs-fetcher` (subagent)
-
 **Claude Code hooks:** `redhat-docs-preflight`, `redhat-docs-guard`
 
 ---
@@ -294,9 +285,9 @@ Red Hat — fetch product documentation and Customer Portal (KCS) content with y
 
 Arch Linux — pacman, rolling-release maintenance, and system administration.
 
-**Claude Code agents**
+**Claude Code skills**
 
-- `arch-linux-expert` (subagent)
+- `/arch-linux:maintain`
 
 ---
 
@@ -314,9 +305,9 @@ StarRocks — analytical SQL, table design, data loading, and query tuning.
 
 PostgreSQL administration — schema design, query optimisation, backups, and tuning.
 
-**Claude Code agents**
+**Claude Code skills**
 
-- `postgresql-dba` (subagent)
+- `/postgres:administer`
 
 ---
 
@@ -324,9 +315,9 @@ PostgreSQL administration — schema design, query optimisation, backups, and tu
 
 MongoDB — query and index performance analysis against a live cluster.
 
-**Claude Code agents**
+**Claude Code skills**
 
-- `mongodb-performance-advisor` (subagent)
+- `/mongodb:analyse`
 
 ---
 
@@ -394,12 +385,8 @@ Claude Code — agent-team coordination, hook authoring, skill-quality auditing,
 - `/claude-code:skill-audit`
 - `/claude-code:skill-review`
 - `/claude-code:skill-report-issue`
-
-**Claude Code agents**
-
-- `marketplace-scout` (subagent)
-- `skill-auditor` (subagent)
-- `prompt-builder` (subagent)
+- `/claude-code:discover-plugins`
+- `/claude-code:engineer-prompts`
 
 **Claude Code hooks:** `skill-audit-nudge`
 
@@ -424,10 +411,6 @@ Delegate work to the OpenAI Codex CLI — reviews, background tasks, and rescue 
 - `/codex:prompting`
 - `/codex:model-guide`
 - `/codex:report-defect`
-
-**Claude Code agents**
-
-- `codex-rescue` (subagent)
 
 **Claude Code hooks:** `codex-session-lifecycle`, `codex-stop-review-gate`, `codex-defect-report`
 
@@ -474,10 +457,7 @@ RDL team workflows — Claude Code onboarding, setup, and config management.
 
 - `/rdl-team:cc-setup`
 - `/rdl-team:new-service-request`
-
-**Claude Code agents**
-
-- `marketplace-scout` (subagent)
+- `/rdl-team:discover-plugins`
 
 ---
 
@@ -485,9 +465,9 @@ RDL team workflows — Claude Code onboarding, setup, and config management.
 
 Playwright — generate and debug end-to-end browser tests.
 
-**Claude Code agents**
+**Claude Code skills**
 
-- `playwright-tester` (subagent)
+- `/playwright:test`
 
 **Claude Code MCP server(s):** `playwright`
 
@@ -497,13 +477,13 @@ Playwright — generate and debug end-to-end browser tests.
 
 Planning — implementation strategy, technical-spike validation, file-level sequencing, API/repo architecture, and ADRs.
 
-**Claude Code agents**
+**Claude Code skills**
 
-- `plan` (subagent)
-- `context-architect` (subagent)
-- `hlbpa` (subagent)
-- `adr-generator` (subagent)
-- `research-technical-spike` (subagent)
+- `/planning:strategy`
+- `/planning:sequence`
+- `/planning:architecture`
+- `/planning:record-decision`
+- `/planning:research`
 
 ---
 
@@ -511,10 +491,10 @@ Planning — implementation strategy, technical-spike validation, file-level seq
 
 Debugging and cleanup — systematic diagnosis and tech-debt removal.
 
-**Claude Code agents**
+**Claude Code skills**
 
-- `debug` (subagent)
-- `janitor` (subagent)
+- `/debug:diagnose`
+- `/debug:clean`
 
 ---
 
@@ -525,10 +505,7 @@ Technical writing — developer docs, tutorials, ADRs, and guides.
 **Claude Code skills**
 
 - `/tech-writing:copyedit`
-
-**Claude Code agents**
-
-- `se-technical-writer` (subagent)
+- `/tech-writing:author`
 
 **Claude Code hooks:** `stylepedia-reminder`
 

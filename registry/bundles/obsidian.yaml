@@ -11,7 +11,6 @@ skills:
   - {source: obsidian-bases, leaf: bases}
   - {source: obsidian-cli, leaf: cli}
   - {source: obsidian-markdown, leaf: markdown}
-agents: []
 hooks: []
 prompts: []
 mcp: []
