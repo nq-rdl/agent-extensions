@@ -30,6 +30,7 @@ order:
   - writerside
   - defuddle
   - gh
+  - git
   - terraform
   - kubernetes
   - argo-cd

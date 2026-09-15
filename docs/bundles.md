@@ -23,6 +23,7 @@ subagents (auto-routed by their description).
 | [`writerside`](#writerside) | Writerside — author and build JetBrains Writerside documentation |
 | [`defuddle`](#defuddle) | Defuddle — extract clean Markdown from cluttered web pages |
 | [`gh`](#gh) | GitHub workflow — git hooks, changelogs, conventional commits, pull requests, releases, Go CI/CD, and secure GitHub Actions (SHA pinning, OIDC, GitOps delivery) |
+| [`git`](#git) | Git PR feedback — review all comments, push fixes to the same PR, and resolve handled threads |
 | [`terraform`](#terraform) | Terraform — generate compliant HCL, review IaC for state safety, and author Terratest suites |
 | [`kubernetes`](#kubernetes) | Kubernetes — SRE-grade rollouts, HA design, and incident response |
 | [`argo-cd`](#argo-cd) | Argo CD — GitOps application management and sync for Kubernetes |
@@ -186,6 +187,16 @@ GitHub workflow — git hooks, changelogs, conventional commits, pull requests, 
 - `repo-architect` (subagent)
 - `github-actions-expert` (subagent)
 - `se-gitops-ci-specialist` (subagent)
+
+---
+
+## git
+
+Git PR feedback — review all comments, push fixes to the same PR, and resolve handled threads.
+
+**Skills**
+
+- `/git:pr-comments`
 
 ---
 
