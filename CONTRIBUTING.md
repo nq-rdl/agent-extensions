@@ -39,7 +39,10 @@ If you're tempted to file something under two subjects, you've applied the wrong
 > `document-release` all invoke as `/gh:*`. `go-gh` ("GitHub Actions CI/CD **for Go**") is grouped
 > there too, as `/gh:actions-go`, even though its primary subject is **Go** — the one sanctioned
 > exception to "file by primary subject," not a precedent. The bare `actions` leaf is reserved for
-> a future generic GitHub Actions skill. File everything else by what it is *about*.
+> a future generic GitHub Actions skill. The `/git:pr-comments` entrypoint
+> is a separate packaging exception under `git`; existing GitHub workflow skills
+> remain in `gh` without duplication.
+> File everything else by what it is *about*.
 
 ### 3. The facet is always an action or stage
 

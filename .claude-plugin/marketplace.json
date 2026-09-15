@@ -122,6 +122,19 @@
       ]
     },
     {
+      "name": "git",
+      "source": "./plugins/git",
+      "description": "Git PR feedback — review all comments, push fixes to the same PR, and resolve handled threads",
+      "version": "0.29.0",
+      "keywords": [
+        "git",
+        "github",
+        "pull-request",
+        "review",
+        "comments"
+      ]
+    },
+    {
       "name": "terraform",
       "source": "./plugins/terraform",
       "description": "Terraform — generate compliant HCL, review IaC for state safety, and author Terratest suites",
