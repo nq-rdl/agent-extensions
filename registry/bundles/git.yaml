@@ -7,7 +7,6 @@ owners: [rdl]
 channels: [stable]
 skills:
   - pr-comments
-agents: []
 hooks: []
 prompts: []
 mcp: []

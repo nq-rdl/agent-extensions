@@ -1,7 +1,7 @@
 ---
 name: codex-rescue
 license: Apache-2.0
-description: Delegate investigation, an explicit fix request, or follow-up rescue work to the Codex rescue subagent
+description: Forward investigation, an explicit fix request, or follow-up rescue work to the Codex companion runtime
 argument-hint: "[--background|--wait] [--resume|--fresh] [--model <model|spark>] [--effort <low|medium|high|xhigh|max|ultra>] [what Codex should investigate, solve, or continue]"
 user-invocable: true
 allowed-tools: Bash(node:*), AskUserQuestion, Agent
@@ -14,8 +14,10 @@ SPDX-License-Identifier: Apache-2.0
 Derived from openai/codex-plugin-cc v1.0.6 (db52e28), Apache-2.0. Modified for rdl-agent-extensions.
 -->
 
-Invoke the `codex:codex-rescue` subagent via the `Agent` tool (`subagent_type: "codex:codex-rescue"`), forwarding the raw user request as the prompt.
-`codex:codex-rescue` is a subagent, not a skill — do not call `Skill(codex:codex-rescue)` (no such skill) or `Skill(codex:rescue)` (that re-enters this command and hangs the session). The command runs inline so the `Agent` tool stays in scope; forked general-purpose subagents do not expose it.
+Forward the request through the `codex:cli-runtime` skill's companion `task`
+contract. Read that skill before executing the task call. Run directly unless
+isolation is useful or the user requests a subagent; the optional outline below
+specifies the worker handoff. Do not recursively invoke `codex:rescue`.
 The final user-visible response must be Codex's output verbatim.
 
 ## Preflight — Node.js runtime
@@ -33,8 +35,8 @@ $ARGUMENTS
 
 Execution mode:
 
-- If the request includes `--background`, run the `codex:codex-rescue` subagent in the background.
-- If the request includes `--wait`, run the `codex:codex-rescue` subagent in the foreground.
+- If the request includes `--background`, run the forwarding task using the host’s background execution support.
+- If the request includes `--wait`, run the forwarding task in the foreground.
 - If neither flag is present, default to foreground.
 - `--background` and `--wait` are execution flags for Claude Code. Do not forward them to `task`, and do not treat them as part of the natural-language task text.
 - `--model` and `--effort` are runtime-selection flags. Preserve them for the forwarded `task` call, but do not treat them as part of the natural-language task text.
@@ -52,18 +54,25 @@ node "${CLAUDE_PLUGIN_ROOT}/scripts/codex-companion.mjs" task-resume-candidate -
   - `Start a new Codex thread`
 - If the user is clearly giving a follow-up instruction such as "continue", "keep going", "resume", "apply the top fix", or "dig deeper", put `Continue current Codex thread (Recommended)` first.
 - Otherwise put `Start a new Codex thread (Recommended)` first.
-- If the user chooses continue, add `--resume` before routing to the subagent.
-- If the user chooses a new thread, add `--fresh` before routing to the subagent.
+- If the user chooses continue, add `--resume` before forwarding the task.
+- If the user chooses a new thread, add `--fresh` before forwarding the task.
 - If the helper reports `available: false`, do not ask. Route normally.
 
 Operating rules:
 
-- The subagent is a thin forwarder only. It should use one `Bash` call to invoke `node "${CLAUDE_PLUGIN_ROOT}/scripts/codex-companion.mjs" task ...` and return that command's stdout as-is.
+- The executor is a thin forwarder only. Use one `Bash` call to invoke `node "${CLAUDE_PLUGIN_ROOT}/scripts/codex-companion.mjs" task ...` and return that command's stdout as-is.
 - Return the Codex companion stdout verbatim to the user.
 - Do not paraphrase, summarize, rewrite, or add commentary before or after it.
-- Do not ask the subagent to inspect files, monitor progress, poll `/codex:status`, fetch `/codex:result`, call `/codex:cancel`, summarize output, or do follow-up work of its own.
+- The executor must not inspect files, monitor progress, poll `/codex:status`, fetch `/codex:result`, call `/codex:cancel`, summarize output, or do follow-up work of its own.
 - Leave `--effort` unset unless the user explicitly asks for a specific reasoning effort. Accepted efforts are `low`, `medium`, `high`, `xhigh`, `max`, and `ultra` (`ultra` is Sol/Terra only); unknown values warn and pass through to Codex.
 - Leave the model unset unless the user explicitly asks for one. If they ask for `spark`, map it to `gpt-5.3-codex-spark`. If they ask for `sol`, `terra`, or `luna`, map to `gpt-5.6-sol`, `gpt-5.6-terra`, or `gpt-5.6-luna`.
-- Leave `--resume` and `--fresh` in the forwarded request. The subagent handles that routing when it builds the `task` command.
+- Leave `--resume` and `--fresh` in the forwarded request. The runtime contract handles that routing when it builds the `task` command.
 - If the helper reports that Codex is missing or unauthenticated, stop and tell the user to run `/codex:setup`.
 - If the user did not supply a request, ask what Codex should investigate or fix.
+
+## Optional delegation
+
+[references/subagent.rst](references/subagent.rst) contains the subagent outline,
+handoff inputs, execution boundaries, and expected result. Read it when delegating
+would help or the user asks to “create a subagent to execute this.” Otherwise,
+work directly from this skill; the reference does not need to be loaded.

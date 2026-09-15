@@ -9,8 +9,7 @@ channels:
   - stable
 skills:
   - {source: tech-writing-copyedit, leaf: copyedit}   # → /tech-writing:copyedit
-agents:
-  - se-technical-writer
+  - {source: se-technical-writer, leaf: author}
 hooks: [stylepedia-reminder]
 prompts: []
 mcp: []

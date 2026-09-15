@@ -1,9 +1,9 @@
 # Contributing
 
 Thanks for contributing to the RDL agent extension catalog. This file covers the **rules for
-grouping skills and agents into plugins**, the **skill directory structure and content
-conventions**, and the **packaging loop** that turns a new skill or agent into an installable
-plugin. For repo mechanics (sync scripts, validation, CI), see [`AGENTS.md`](AGENTS.md) and
+grouping skills into plugins**, the **skill directory structure and content
+conventions**, and the **packaging loop** that turns a new skill into installable
+Claude Code and Codex artifacts. For repo mechanics (sync scripts, validation, CI), see [`AGENTS.md`](AGENTS.md) and
 [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md).
 
 **Tooling:** all repo Python runs via **pixi** (`pixi install` once, then
@@ -11,21 +11,21 @@ plugin. For repo mechanics (sync scripts, validation, CI), see [`AGENTS.md`](AGE
 
 ## Plugin grouping: one plugin per subject
 
-Every skill and agent is invoked as **`<subject>:<facet>`** — the `subject` is the plugin, the
-`facet` is what it does. The rules below decide both halves. The colon is always present for
-plugin content; only Claude Code's built-in skills are bare.
+Every skill is identified as **`<subject>:<facet>`** — the `subject` is the plugin and
+the facet is what it does. Claude Code invokes skills as `/<subject>:<facet>`; Codex references
+enabled skills as `$<subject>:<facet>`.
 
 ### 1. One plugin per subject
 
 A **subject** is a tool, library, language, app, or named workflow (`obsidian`, `go`, `r`,
 `sops`, `planning`). Each subject is exactly one plugin. A subject with a single facet still gets
-its own plugin — small plugins are fine. Its content can be skills, agents, hooks, or MCP servers
-in any combination — a bundle may be skill-only, agent-only, or MCP-only (e.g. `lucid` wires only
+its own plugin — small plugins are fine. Its content can be skills, hooks, or MCP servers
+in any combination — a bundle may be skill-only or MCP-only (e.g. `lucid` wires only
 an MCP server).
 
 ### 2. File by *primary* subject, not by tools touched
 
-Put each skill/agent under the one thing it is **primarily about**. Secondary tools it merely
+Put each skill under the one thing it is **primarily about**. Secondary tools it merely
 *uses* do not count.
 
 - `shiny-bslib` themes a **Shiny** app with bslib → subject is **Shiny** → `shiny:bslib`. (Not
@@ -60,35 +60,32 @@ flat and is renamed to the leaf when the plugin tree is generated.
 
 ### 4. No-tool subjects → name the workflow
 
-If a skill/agent isn't about a tool, its subject is the **workflow/activity** it performs — real
+If a skill isn't about a tool, its subject is the **workflow/activity** it performs — real
 workflow subjects include `planning`, `debug`, and `tech-writing`. An action filed under a
 workflow subject invokes like any other facet: `gh:send-pr`, `gh:conventional-commits` (subject
 `gh`, facet the action).
 
-### 5. Agents: home + description required; companion skill optional
+### 5. Optional delegation belongs to the skill
 
-Every agent MUST have:
+The catalog publishes skills, hooks, and MCP integrations. It does not publish
+standalone named agents. Put reusable task instructions in `skills/<name>/SKILL.md`
+and a worker outline in `skills/<name>/references/subagent.rst` when delegation
+adds value. The skill must link to the outline and explain when to read it:
+when the main agent chooses delegation or the user requests a subagent.
+Do not require loading the outline for ordinary direct execution.
 
-- a **home plugin** (its subject, per rules 1–4), and
-- a clear **`description`** — the "Use when…" frontmatter is the agent's explainer.
+Keep the worker's objective, handoff inputs, capability requirements, scope,
+companion references, and return contract in that reference. Use the host's
+available subagent mechanism; the filename does not register an agent type.
+Tool restrictions expressed in prose do not create runtime permission controls.
+Preserve upstream attribution and licenses in the skill and adapted reference.
 
-Add a **companion skill only when the agent encodes a reusable methodology**: the skill is the
-method (runnable by anyone), the agent is the autonomous executor — e.g. a `systematic-debugging`
-skill paired with a `debug` agent. Do **not** add a skill just to describe an agent; the
-`description` already does that. An **agent-only plugin** (e.g. `terraform`, `postgres`) is fine
-when a subject has agents but no skill.
-
-#### Cross-listing an agent (one home, rare guests)
-
-Agent reuse across bundles is deliberate and supported, but every listing has a documented home.
-Every agent has exactly **one home** — its subject bundle, per rules 1–4. A **guest listing** in
-another bundle is allowed when the agent is load-bearing for that bundle's job; keep guests rare
-and annotate them in the registry YAML with a `# guest — home: <bundle>` comment on the agent
-line. Docs and hooks always reference the **home-qualified** agent, so a guest listing can be
-added or dropped without breaking references.
-
-Guest listings are discoverable at a glance: `grep -rn 'guest — home' registry/bundles/`. For
-example, `github-actions-expert` is homed in `gh` and guests in `go`.
+Each skill has one home subject. Existing guest listings carried over from the
+agent migration remain supported: GitHub Actions in `go` (home `gh`), delivery
+debugging in `gh` (home `argo-cd`), and plugin discovery in `rdl-team` (home
+`claude-code`). Keep their registry comments and use home-qualified names in
+cross-plugin documentation. This preserves existing bundle coverage; new skills
+follow the primary-subject rule above.
 
 ### 6. How grouping is expressed (owned here in `agent-extensions`)
 
@@ -111,14 +108,18 @@ group folders. **Grouping is a packaging decision** expressed in the bundle regi
   `pluginName` unique across bundles (`scripts/check_grouping.py`) · each plugin skill copy carries
   **no** frontmatter `name:` (`scripts/validate-plugins.sh`).
 
+The phase-one Codex target intentionally shares these Claude-oriented copies. Codex 0.152.0 derives
+a missing skill name from the leaf directory, then qualifies it as `<plugin>:<leaf>`. This is a
+tested runtime compatibility path, not the stricter Agent Skills/public-directory contract; strict
+Codex publication will require target-specific copies with explicit `name: <leaf>` frontmatter.
+
 So to add `obsidian:bases`, the canonical skill stays flat `skills/obsidian-bases/`; the registry
-maps `{source: obsidian-bases, leaf: bases}` under `pluginName: obsidian`. Agents are authored here
-under `agents/<name>/agent.md` and placed by subject in the registry. See [`AGENTS.md`](AGENTS.md)
+maps `{source: obsidian-bases, leaf: bases}` under `pluginName: obsidian`. Delegation outlines are authored inside the owning skill’s `references/`. See [`AGENTS.md`](AGENTS.md)
 for the mechanical add-and-sync steps.
 
 ### 7. Manifests are generated
 
-`plugin.json` and the `marketplace.json` entry for a subject are **generated from
+Claude and Codex `plugin.json` and `marketplace.json` artifacts are **generated from
 `registry/bundles/<subject>.yaml`** — do **not** hand-edit them. When you add a **new subject**,
 append it to the `order:` list in `registry/marketplace.yaml` (see step 4 below). CI consistency
 checks fail if the registry and the generated manifests disagree.
@@ -138,10 +139,10 @@ The rules:
    Any other non-hidden subdirectory is an error.
 3. **`references/` is `.rst`-only.** Every file under `references/` (at any depth) must be `.rst`;
    anything else is an error.
-4. **No `agents/` inside a skill.** Agents are not skill content — they live in top-level
-   `agents/<name>/agent.md` and are bundled into the plugin through the registry (see
-   [§5](#5-agents-home--description-required-companion-skill-optional) and the agent add-and-sync
-   steps in [`AGENTS.md`](AGENTS.md)). A `skills/*/agents/` directory is an error.
+4. **Delegation outlines use `references/subagent.rst`.** Keep them separate from
+   `SKILL.md` and load them only when needed. An `agents/` directory inside a skill
+   remains invalid under this repository's layout contract; OpenAI UI metadata
+   is not required by this migration.
 5. **Hidden entries are ignored.** Dot-prefixed files and directories (e.g. `.evals`) are not
    linted; the structure check does not descend into or flag them.
 6. **Top-level files: `SKILL.md` plus a small config allowlist.** The only non-hidden top-level
@@ -190,7 +191,7 @@ References: Biggs, *You're Probably Using Agent Skills Wrong*; SkillsBench (arXi
 A new skill authored under `skills/<name>/` is **not installable until you map it into a bundle**
 — authoring the `SKILL.md` only adds it to the flat library; the registry decides which plugin
 (subject) it belongs to. CI enforces this: `scripts/check_exposure.py` fails if a canonical
-skill/agent/hook isn't referenced by any `registry/bundles/*.yaml` (or explicitly allowlisted in
+skill/hook isn't referenced by any `registry/bundles/*.yaml` (or explicitly allowlisted in
 `registry/unbundled.yaml`). Here is the full loop, using a hypothetical `sql-code-analyse` skill
 that should become `sql-code:analyse`:
 
@@ -206,13 +207,31 @@ that should become `sql-code:analyse`:
    skills:
      - {source: sql-code-analyse, leaf: analyse}   # → /sql-code:analyse
    ```
+   To include a portable skill bundle in the current Codex pilot, add an explicit target. Keep
+   non-skill components disabled until their Codex runtime validation exists:
+   ```yaml
+   targets:
+     codex:
+       enabled: true
+       pluginName: sql-code
+       marketplaceName: rdl-agent-extensions
+       category: Developer Tools
+       components:
+         skills: true
+         mcp: false
+         hooks: false
+         apps: false
+   ```
+   Codex-enabled skills must be usable by Codex itself. The pipeline unit tests reject
+   `${CLAUDE_PLUGIN_ROOT}`, `AskUserQuestion`, and Claude-style `/plugin:skill` invocations in
+   their canonical content. Convert those dependencies or leave the Codex target disabled.
 4. **If it is a brand-new subject, add it to the marketplace order.** Append `sql-code` to the
    `order:` list in `registry/marketplace.yaml` (otherwise it is appended alphabetically with a
    CI `::warning::`).
 5. **Build the plugin tree and manifests:**
    ```bash
    pixi run bash scripts/sync-plugins.sh sql-code     # copies skills/<source>/ → plugins/sql-code/skills/<leaf>/
-   pixi run python3 scripts/generate_manifests.py .     # writes plugin.json + marketplace.json
+   pixi run python3 scripts/generate_manifests.py .     # writes Claude + Codex manifests
    pixi run python3 scripts/generate_bundles_doc.py .   # refreshes docs/bundles.md
    ```
 6. **Validate** exactly what CI will:
@@ -226,9 +245,9 @@ that should become `sql-code:analyse`:
    pixi run bash scripts/validate-plugins.sh
    ```
 
-Adding an **agent** follows the same loop: author `agents/<name>/agent.md` (with frontmatter
-`name` + `description`), list it under a bundle's `agents:`, then run steps 5–6. An agent-only
-subject (no skill) is fine — give it its own bundle with an empty `skills: []`.
+Adding a **delegatable workflow** follows the same skill packaging loop. Keep the
+ordinary workflow in `SKILL.md` and its optional worker instructions under
+`references/subagent.rst`. There is no registry `agents:` list or agent preload.
 
 ## Claude Code on the web
 
@@ -262,10 +281,10 @@ adds advisory context for `PreToolUse` on the `Skill` tool and
 `UserPromptExpansion` on a typed `/tech-writing:copyedit` command. It makes no
 network requests and does not change tool permissions. Claude versions without
 `UserPromptExpansion` still have the lookup instruction in the skill itself;
-agent preloads likewise rely on that instruction. Hook event details:
+delegated workers likewise receive that instruction. Hook event details:
 https://code.claude.com/docs/en/hooks#userpromptexpansion
 
-The plugin also registers a native agent review on `Stop` and a targeted
+The plugin also registers a native agent review on `Stop` and a task-scoped
 `SubagentStop`. These hooks block on findings in the simplified STE profile;
 see [Technical-writing completion review](docs/tech-writing-ste-review.md)
 for scope, source review, and harness limitations.

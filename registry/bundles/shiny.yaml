@@ -10,7 +10,6 @@ channels:
 skills:
   - {source: shiny-bslib, leaf: bslib}
   - {source: shiny-bslib-theming, leaf: bslib-theming}
-agents: []
 hooks: []
 prompts: []
 mcp: []
@@ -19,3 +18,13 @@ targets:
     enabled: true
     pluginName: shiny
     marketplaceName: rdl-agent-extensions
+  codex:
+    enabled: true
+    pluginName: shiny
+    marketplaceName: rdl-agent-extensions
+    category: Developer Tools
+    components:
+      skills: true
+      mcp: false
+      hooks: false
+      apps: false

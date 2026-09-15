@@ -1,80 +1,29 @@
-Agent Frontmatter Contract
-==========================
+Skill and delegation contract
+=============================
 
-The exact YAML frontmatter schema for ``agents/<name>/agent.md`` in this catalog,
-grounded in the real repo files (e.g. ``agents/go-mcp-expert/agent.md``,
-``agents/skill-auditor/agent.md``). CI enforces the required keys — see
-``references/pipeline.rst`` for which gate checks what.
+Author ``skills/<name>/SKILL.md`` with YAML frontmatter containing ``name``
+(matching the canonical directory), a task-specific ``description``, and the
+correct ``license``. Preserve ``metadata.upstream`` for imported content and
+``metadata.repo`` for this catalog. API examples need a compatibility pin and
+an instruction to verify the matching canonical source.
 
---------------
+Keep the direct workflow in SKILL.md. Link ``references/subagent.rst`` and say
+that the main agent reads it when delegation helps or the user requests a
+subagent. Do not force every skill invocation to load the worker outline.
 
-The shape
----------
+The outline contains:
 
-.. code:: yaml
+* The worker's objective and scope, including read-only boundaries.
+* Inputs: task, source paths, relevant context, and authorized changes.
+* Needed capabilities and companion instructions, resolved from the installed
+  environment. No automatic skill preload is available.
+* The task-specific execution procedure and expected result with evidence.
+* The parent's verification responsibilities and behavior if workers are unavailable.
 
-   ---
-   name: my-agent
-   description: >-
-     Delegate to this agent when <trigger>; it <what it does and how>.
-   license: MIT
-   tools:
-     - Read
-     - Write
-     - Edit
-     - Grep
-     - Glob
-     - Bash
-   model: inherit
-   skills: []
-   color: teal
-   metadata:
-     upstream: https://github.com/github/awesome-copilot/blob/main/agents/my-agent.agent.md
-     repo: https://github.com/nq-rdl/agent-extensions
-   ---
+Use the host's supported subagent mechanism; do not assume a custom agent type
+exists. Model and permission selection belong to the host and user's settings.
+A prose capability list does not enforce tool restrictions or create a sandbox.
 
---------------
-
-Field-by-field
---------------
-
-============== =================================================================
-Field         Rule
-============== =================================================================
-``name``       kebab-case; **must equal the directory name** ``agents/<name>/``.
-               CI-required (``validate-plugins.sh`` agent-frontmatter check).
-``description`` Folded scalar (``>-``); **triggering**, in the "Delegate to this
-               agent when…" voice — this is what routes work to the subagent.
-               CI-required. State the trigger and what the agent does.
-``license``    ``MIT`` for ``github/awesome-copilot`` adaptations (their license);
-               otherwise ``CC-BY-4.0`` or the source's actual license. For a
-               from-scratch agent with no upstream, ``CC-BY-4.0``.
-``tools``      Explicit, **minimal** list. Common set: ``Read``, ``Write``,
-               ``Edit``, ``Grep``, ``Glob``, ``Bash``. Omit anything the agent
-               does not use (a review-only agent typically drops ``Write``/
-               ``Edit``/``Bash`` — see ``skill-auditor``).
-``model``      ``inherit`` — the subagent runs on the session's model.
-``skills``     ``[]`` unless the agent bundles skills of its own.
-``color``      From the palette already used in the repo (e.g. ``teal``, ``red``).
-               Pick one that is not overloaded within the target bundle.
-``metadata.upstream`` The source URL — include **iff** the agent is adapted from
-               an upstream. Omit entirely for from-scratch agents.
-``metadata.repo`` Always ``https://github.com/nq-rdl/agent-extensions``.
-============== =================================================================
-
---------------
-
-Body
-----
-
-After the frontmatter:
-
-1. For an **adapted** agent, a provenance HTML comment immediately after the
-   frontmatter (see ``references/normalization.rst`` for the exact wording).
-2. The **system prompt** — a top-level ``# Title`` heading, then the agent's role,
-   expertise, approach, and checklists. For an adapted agent this is the upstream
-   body, normalized but with its methodology and checklists retained verbatim.
-
-Keep ``name`` in the frontmatter, the directory ``agents/<name>/``, and the changie
-fragment's mention of the agent all spelling the same kebab-case string — the Stop
-hook and the CI cross-checks key off it.
+Do not create a canonical or packaged ``agents/`` tree or registry ``agents:``
+entry. The existing asctl structure validator accepts ``scripts/``,
+``references/`` (rST only), and ``assets/`` inside skills.

@@ -1,7 +1,7 @@
 # External marketplaces
 
 This repo's `rdl-agent-extensions` marketplace ships **only the plugins the team
-authors and owns here** (canonical content under `skills/` and `agents/`, packaged
+authors and owns here** (canonical content under `skills/`, packaged
 into `plugins/`). Plugins maintained by *other people* — Anthropic, vendors, OSS
 projects — are **not** re-hosted, nested, or version-pinned in `rdl-agent-extensions`.
 

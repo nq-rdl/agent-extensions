@@ -6,7 +6,7 @@ Codex Prompt Recipes
 
 Starting templates for Codex ``task`` prompts or other Codex/GPT-5.6 prompt
 construction. Copy the smallest recipe that fits the task, then trim anything you
-do not need. In ``codex:codex-rescue``, run diagnosis and fix-oriented recipes in
+do not need. In ``codex:rescue``, run diagnosis and fix-oriented recipes in
 write mode by default unless the user explicitly asked for read-only behavior.
 
 Diagnosis

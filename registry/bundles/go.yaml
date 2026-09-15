@@ -10,10 +10,9 @@ channels:
 skills:
   - {source: go-naming, leaf: naming}
   - {source: go-secure, leaf: secure}
-agents:
-  - go-mcp-expert
-  - wg-code-sentinel
-  - github-actions-expert  # guest — home: gh
+  - {source: go-mcp-expert, leaf: build-mcp}
+  - {source: wg-code-sentinel, leaf: review-security}
+  - {source: github-actions-expert, leaf: actions}  # guest — home: gh
 hooks: []
 prompts: []
 mcp: []
@@ -22,3 +21,13 @@ targets:
     enabled: true
     pluginName: go
     marketplaceName: rdl-agent-extensions
+  codex:
+    enabled: true
+    pluginName: go
+    marketplaceName: rdl-agent-extensions
+    category: Developer Tools
+    components:
+      skills: true
+      mcp: false
+      hooks: false
+      apps: false

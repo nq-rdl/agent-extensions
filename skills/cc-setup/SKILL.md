@@ -165,7 +165,10 @@ the team's extra marketplaces and suggest a set for this repo. Run this on first
 whenever the user re-runs setup** (it is idempotent: it drops anything already enabled). If
 the user declines, skip straight to Phase 5.
 
-**Delegate the discovery to the `marketplace-scout` agent** (Task tool). It locates the
+Use the `discover-plugins` skill shipped alongside this setup skill (canonical
+`marketplace-scout`). Its `references/subagent.rst` contains an optional worker
+outline for delegated discovery; read it when delegation is useful or requested.
+Pass the resolved marketplace-list path and repository path. The workflow locates the
 team's tracked-marketplace list (`marketplaces.json` — shipped in this skill's own `assets/`),
 enumerates the *live* plugin catalog of every tracked
 marketplace, inspects this repo's languages/tooling, and returns a ranked suggestion list:
@@ -178,7 +181,7 @@ marketplace, inspects this repo's languages/tooling, and returns a ranked sugges
 
 The marketplace list lives in `assets/marketplaces.json` beside this skill (resolve it the
 same way as the hook script in Phase 1: prefer the installed plugin-cache copy, fall back to
-the path beside this `SKILL.md`). The agent reads it; you don't have to.
+the path beside this `SKILL.md`). Pass that path to the discovery workflow.
 
 Present the scout's menu and let the user pick. For each marketplace a chosen plugin needs,
 register it and install **only the confirmed plugins** (this skill installs them directly):

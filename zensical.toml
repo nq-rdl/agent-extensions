@@ -47,6 +47,8 @@ Copyright &copy; 2026 The authors
 nav = [
     { "Architecture" = "ARCHITECTURE.md" },
     { "Bundles" = "bundles.md" },
+    { "Codex" = "codex.md" },
+    { "Delegation" = "delegation.md" },
     { "External marketplaces" = "external-marketplaces.md" },
 ]
 

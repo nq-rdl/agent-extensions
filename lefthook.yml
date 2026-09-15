@@ -41,15 +41,15 @@ pre-commit:
         CGO_ENABLED=0 go -C tools/asctl build -o "$bin" ./cmd/asctl
         "$bin" repo-check
 
-    # --- Plugin manifests / hooks / agents are well-formed ---
+    # --- Plugin manifests / hooks / skills are well-formed ---
     - name: validate-plugins
-      glob: "{plugins/**,agents/**,registry/bundles/**}"
+      glob: "{.agents/**,plugins/**,registry/bundles/**}"
       run: pixi run bash scripts/validate-plugins.sh
 
     # --- Generated artifacts are in sync with the registry (catches a
     #     forgotten sync-plugins.sh / regenerate before CI does) ---
     - name: generated-in-sync
-      glob: "{registry/**,skills/**,agents/**,plugins/**,VERSION}"
+      glob: "{.agents/**,registry/**,skills/**,plugins/**,VERSION}"
       run: |
         pixi run python3 scripts/check_bundle_refs.py .
         pixi run python3 scripts/check_grouping.py .
@@ -63,7 +63,7 @@ pre-commit:
     #     exits 0 (non-blocking); CI's strict `check_exposure.py .` is the hard
     #     gate (validate.yml).
     - name: exposure-reminder
-      glob: "{skills/**,agents/**,hooks/**,mcp/**,registry/bundles/**,registry/unbundled.yaml}"
+      glob: "{skills/**,hooks/**,mcp/**,registry/bundles/**,registry/unbundled.yaml}"
       run: pixi run python3 scripts/check_exposure.py . --warn
 
     # --- Changie fragment length. Each staged unreleased fragment's body must

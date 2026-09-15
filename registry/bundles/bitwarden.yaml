@@ -9,7 +9,6 @@ channels:
   - stable
 skills:
   - {source: bitwarden, leaf: secrets}
-agents: []
 hooks: []
 prompts: []
 mcp: []

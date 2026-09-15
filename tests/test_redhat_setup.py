@@ -38,8 +38,8 @@ from test_redhat_hooks import GUARD, PLUGIN, PREFLIGHT_HOOK, REPO, SCRIPTS, clea
 
 SETUP_SKILL = REPO / "skills" / "redhat-setup" / "SKILL.md"
 SETUP_COPY = PLUGIN / "skills" / "setup" / "SKILL.md"
-AGENT = REPO / "agents" / "redhat-docs-fetcher" / "agent.md"
-AGENT_COPY = PLUGIN / "agents" / "redhat-docs-fetcher.md"
+AGENT = REPO / "skills/redhat-docs-fetch/references/subagent.rst"
+AGENT_COPY = PLUGIN / "skills/fetch-docs/references/subagent.rst"
 RH_LIB = SCRIPTS / "rh-lib.sh"
 RH_TOKEN = SCRIPTS / "rh-token.sh"
 RH_PREFLIGHT = SCRIPTS / "rh-preflight.sh"
@@ -410,19 +410,19 @@ class DriftGuards(unittest.TestCase):
         self.assertIn("/redhat:setup", lib.group(1))
         self.assertEqual((PLUGIN / "skills" / "fetch-docs" / "scripts" / "rh-lib.sh").read_bytes(), RH_LIB.read_bytes())
 
-    def test_agent_stop_message_names_setup(self):
+    def test_delegation_stop_message_names_setup(self):
         text = AGENT.read_text()
         for marker in ("**Credential gate**", "**Extract**"):
             self.assertIn(marker, text, f"section marker renamed in {AGENT}")
         gate = text.split("**Credential gate**", 1)[1].split("**Extract**", 1)[0]
-        self.assertIn("Run `/redhat:setup` to generate and store your", gate)
+        self.assertIn("Run `/redhat:setup` to generate and store your", " ".join(gate.replace("``", "`").split()))
         self.assertRegex(gate, r"(Do not|Never) retry")
-        self.assertIn("/redhat:setup", text.split("---", 2)[1])  # description
-        self.assertRegex(text, r"(do not|never) ask the user for it")
+        self.assertIn("/redhat:setup", text)
+        self.assertRegex(" ".join(text.split()), r"(?i)(do not|never) ask the user for it")
         self.assertIn("rh-token.sh --check", text)
         copy = AGENT_COPY.read_text()
-        self.assertIn("Run `/redhat:setup` to generate and store your", copy)
-        self.assertRegex(copy, r"(do not|never) ask the user for it")
+        self.assertIn("Run `/redhat:setup` to generate and store your", " ".join(copy.replace("``", "`").split()))
+        self.assertRegex(" ".join(copy.split()), r"(?i)(do not|never) ask the user for it")
 
     def test_plugin_root_references_resolve_inside_the_plugin(self):
         ref = re.compile(r"\$\{CLAUDE_PLUGIN_ROOT\}/([^\"'\s`]+)")

@@ -7,9 +7,8 @@ owners:
   - rdl
 channels:
   - stable
-skills: []
-agents:
-  - platform-sre-kubernetes
+skills:
+  - {source: platform-sre-kubernetes, leaf: operate}
 hooks: []
 prompts: []
 mcp: []

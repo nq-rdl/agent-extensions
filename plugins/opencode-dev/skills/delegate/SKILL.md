@@ -106,10 +106,10 @@ The thing users clone is a Claude Code plugin whose entire CC-facing surface is
 layer** inside the companion.
 
 ```
-Claude Code plugin (UNCHANGED across Codex/OpenCode)
-  commands/{review,transfer,status,result,cancel,setup}.md   ← thin bash forwarders
-  agents/<delegator>.md                                       ← delegation subagent
-        │  every command/agent shells out to ONE call:
+Catalog skill package (same wrapper across Codex/OpenCode)
+  skills/<action>/SKILL.md                 ← thin forwarding workflow
+  skills/<action>/references/subagent.rst   ← optional delegation outline
+        │  each executor shells out to ONE call:
         ▼
   node "${CLAUDE_PLUGIN_ROOT}/scripts/companion.mjs" <verb> ...
         │
@@ -124,8 +124,8 @@ Claude Code plugin (UNCHANGED across Codex/OpenCode)
   OpenCode daemon  ← serve+SDK  |  acp  |  run --attach
 ```
 
-**What stays identical** when porting from codex-plugin-cc: the slash commands, the
-delegation subagent, the `${CLAUDE_PLUGIN_ROOT}/scripts/*.mjs` forwarder convention,
+**What stays identical** in this catalog’s adaptation: the action skills and
+optional delegation outline, the `${CLAUDE_PLUGIN_ROOT}/scripts/*.mjs` forwarder convention,
 the detached-job store with `status`/`result`/`cancel`, and the `/<plugin>:setup`
 command that checks/installs the foreign CLI (here: `opencode`; needs Node 18+).
 

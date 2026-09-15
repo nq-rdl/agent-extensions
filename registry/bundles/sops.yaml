@@ -9,7 +9,6 @@ channels:
   - stable
 skills:
   - {source: sops, leaf: encrypt}
-agents: []
 hooks: []
 prompts: []
 mcp: []

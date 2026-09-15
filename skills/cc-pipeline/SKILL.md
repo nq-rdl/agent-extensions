@@ -52,7 +52,7 @@ The core question: do steps just need to run **in order**, or must order be
 
 > **Custom commands are skills now.** `.claude/commands/x.md` and
 > `.claude/skills/x/SKILL.md` both create `/x`. So "a step" = a skill; a plugin
-> just bundles several of them (plus agents, MCP, hooks) under one namespace.
+> just bundles several of them (plus MCP and hooks) under one namespace.
 
 **Default recommendation:** one skill containing the ordered steps + a marker
 file for state. Escalate to multiple commands only when each step is genuinely
@@ -67,14 +67,15 @@ A single plugin holds everything the pipeline needs:
 plugins/thing/
   skills/run/SKILL.md     # the ordered procedure (steps 1→3)
   scripts/*.sh            # write/read .thing/ state markers
-  agents/*.md             # subagent roles a step can delegate to
+  skills/run/references/subagent.rst  # optional worker outline
   hooks/hooks.json        # the gate (Step 3)
   .mcp.json               # any MCP servers a step calls
 ```
 
 The skill body drives the flow: it runs the bundled scripts to record progress
-(`.thing/step-1.done`) and reads them to decide what's next. Ship subagent
-*definitions* alongside so a step can delegate to them by name.
+(`.thing/step-1.done`) and reads them to decide what's next. Link optional worker instructions under the skill’s `references/`. Read them
+when delegation helps or the user requests a subagent; pass them to the host’s
+available worker mechanism. This catalog does not register named agent types.
 
 ## Step 3 — Enforce order with a marker file + hook
 
@@ -114,7 +115,7 @@ skill body, and choose the primitive by how much determinism you need:
 
 | Per-step need | Use | Bake into the skill? |
 |---------------|-----|----------------------|
-| Offload one noisy side-task; only the summary matters | **Subagent** | ✅ Fully — write the delegation, ship the `agents/*.md` definition in the plugin, reference it by name |
+| Offload one noisy side-task; only the summary matters | **Subagent** | ✅ Fully — link a `references/subagent.rst` outline from the skill; read it when delegating and pass it to a host-supported worker |
 | A few workers that must talk/challenge each other | **Agent team** | ✅ Guidance only — the skill designs the team + spawn prompt (see `/claude-code:agent-teams`) |
 | **Deterministic, large-scale** fan-out (same orchestration every run) | **Workflow** | ⚠️ Point at it — the skill tells the user to create/run it via `/claude-code:create-workflow`; the JS can't ship in the plugin |
 

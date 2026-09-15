@@ -16,11 +16,10 @@ skills:
   - lefthook
   - pre-commit
   - send-pr
-agents:
-  - address-comments
-  - repo-architect
-  - github-actions-expert
-  - se-gitops-ci-specialist  # guest — home: argo-cd
+  - {source: address-comments, leaf: address-comments}
+  - {source: repo-architect, leaf: configure-repo}
+  - {source: github-actions-expert, leaf: actions}
+  - {source: se-gitops-ci-specialist, leaf: debug-delivery}  # guest — home: argo-cd
 hooks: []
 prompts: []
 mcp: []

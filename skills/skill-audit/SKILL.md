@@ -26,8 +26,15 @@ rules this enforces.
 6. **Complexity contract:** the skill earns its context cost.
 
 ## How to run
-Use the `Agent` tool with `subagent_type: skill-auditor` (high effort). Pass the
-target path(s) and the rubric above inline; the subagent reads the SKILL.md,
-scores each rubric item, and returns severity-rated findings (CRITICAL / MODERATE / MINOR)
-with file:line anchors and a keep/cut/pin recommendation. Do not set
-`run_in_background: true` — the user wants to see the findings.
+
+Read the target skill or diff and score each rubric item. Return severity-rated
+findings (CRITICAL / MODERATE / MINOR) with file:line anchors and a concrete
+keep/cut/compress/pin recommendation. End with KEEP / COMPRESS / REMOVE.
+This is a read-only audit; do not edit the target files.
+
+## Optional delegation
+
+[references/subagent.rst](references/subagent.rst) contains the subagent outline,
+handoff inputs, execution boundaries, and expected result. Read it when delegating
+would help or the user asks to “create a subagent to execute this.” Otherwise,
+work directly from this skill; the reference does not need to be loaded.

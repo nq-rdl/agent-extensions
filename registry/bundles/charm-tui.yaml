@@ -9,7 +9,6 @@ channels:
   - stable
 skills:
   - {source: charm-tui, leaf: build}
-agents: []
 hooks: []
 prompts: []
 mcp: []

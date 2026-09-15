@@ -7,11 +7,10 @@ owners:
   - rdl
 channels:
   - stable
-skills: []
-agents:
-  - terraform
-  - terraform-iac-reviewer
-  - terratest-module-testing
+skills:
+  - {source: terraform, leaf: provision}
+  - {source: terraform-iac-reviewer, leaf: review}
+  - {source: terratest-module-testing, leaf: test}
 hooks: []
 prompts: []
 mcp: []

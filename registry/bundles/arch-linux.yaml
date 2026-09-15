@@ -7,9 +7,8 @@ owners:
   - rdl
 channels:
   - stable
-skills: []
-agents:
-  - arch-linux-expert
+skills:
+  - {source: arch-linux-expert, leaf: maintain}
 hooks: []
 prompts: []
 mcp: []

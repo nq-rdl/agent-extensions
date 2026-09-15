@@ -67,7 +67,7 @@ func ValidateStructure(skillDir string) []string {
 func checkSubdir(skillDir, name string) []string {
 	if name == "agents" {
 		return []string{
-			"agents/ is not allowed inside a skill; agents live in the top-level agents/<name>/agent.md and are bundled into the plugin via the registry (registry/bundles/<bundle>.yaml)",
+			"agents/ is not allowed inside a skill; put optional delegation outlines in references/subagent.rst",
 		}
 	}
 	if !slices.Contains(allowedSubdirs, name) {

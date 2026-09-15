@@ -40,10 +40,10 @@ jobs:
         run: python3 scripts/check_consistency.py .
 
       # Content-level drift gate: the plugins/ trees are real-file copies of the
-      # canonical skills/ and agents/. The checks above only compare dir sets and
+      # canonical skills/. The checks above only compare dir sets and
       # manifests, so editing a canonical skill without running sync-plugins.sh
       # would ship stale plugin content undetected. --check compares the bytes.
-      - name: Check plugin trees match canonical skills/ and agents/
+      - name: Check plugin trees match canonical skills/
         run: bash scripts/sync-plugins.sh --check
 
   validate-symlinks:
@@ -75,16 +75,51 @@ jobs:
           exit $exit_code
 
   validate-plugins:
+    # Keep this legacy job name: main branch protection requires this exact status.
     name: Validate Claude plugin structure, hooks, and agents
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
-      - name: Install PyYAML for agent frontmatter validation
+      - name: Install PyYAML for skill packaging validation
         run: python3 -m pip install --user pyyaml
 
-      - name: Validate plugin manifests, hooks, and agents
+      - name: Validate Claude and Codex plugin manifests, hooks, and skills
         run: scripts/validate-plugins.sh
+
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: '20'
+
+      # The shared skill copies intentionally omit `name:` for Claude's
+      # namespaced labels. Pin the Codex runtime that verifies its documented
+      # directory-name fallback instead of assuming that compatibility holds.
+      - name: Install Codex CLI 0.152.0
+        run: npm install --global @openai/codex@0.152.0
+
+      - name: Smoke test native Codex marketplace installation and skill discovery
+        run: scripts/smoke-codex-marketplace.sh
+
+      - name: Install Codex CLI 0.154.0
+        run: npm install --global @openai/codex@0.154.0
+
+      - name: Smoke test Codex 0.154.0 compatibility
+        run: scripts/smoke-codex-marketplace.sh
+
+      # Same image and command as .devcontainer/codex; no API key or model call.
+      # Keep this in the existing required job so container failures block merges.
+      - name: Build Codex smoke devcontainer
+        timeout-minutes: 10
+        run: >-
+          docker build --build-arg CODEX_VERSION=0.154.0
+          -t rdl-codex-smoke -f .devcontainer/codex/Dockerfile .devcontainer/codex
+
+      - name: Test Codex plugins in the devcontainer image
+        timeout-minutes: 3
+        run: |
+          docker run --rm --network none \
+            --mount "type=bind,source=$GITHUB_WORKSPACE,target=/workspace,readonly" \
+            rdl-codex-smoke bash scripts/smoke-codex-marketplace.sh
 
   unit-tests:
     name: Unit tests (pipeline scripts)

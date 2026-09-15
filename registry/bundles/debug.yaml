@@ -7,10 +7,9 @@ owners:
   - rdl
 channels:
   - stable
-skills: []
-agents:
-  - debug
-  - janitor
+skills:
+  - {source: debug, leaf: diagnose}
+  - {source: janitor, leaf: clean}
 hooks: []
 prompts: []
 mcp: []
