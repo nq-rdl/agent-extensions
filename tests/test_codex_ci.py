@@ -1,6 +1,7 @@
 """CI contracts for the native Codex publication target."""
 
 import re
+import tempfile
 import unittest
 from pathlib import Path
 
@@ -10,6 +11,32 @@ from scripts._registry import normalize_member
 
 
 REPO = Path(__file__).resolve().parent.parent
+
+
+def claude_runtime_dependencies(repo):
+    """Scan all shipped text; NUL-containing or non-UTF-8 files are binary."""
+    forbidden_literals = ("${CLAUDE_PLUGIN_ROOT}", "AskUserQuestion")
+    slash_invocation = re.compile(r"(?<![A-Za-z0-9])/[a-z0-9][a-z0-9-]*:[a-z0-9]")
+    bundles = repo / "registry" / "bundles"
+    for bundle_path in sorted([*bundles.glob("*.yaml"), *bundles.glob("*.yml")]):
+        bundle = yaml.safe_load(bundle_path.read_text()) or {}
+        codex = (bundle.get("targets") or {}).get("codex") or {}
+        if not codex.get("enabled"):
+            continue
+        for member in bundle.get("skills") or []:
+            source, _leaf = normalize_member(member)
+            for path in sorted((repo / "skills" / source).rglob("*")):
+                if not path.is_file():
+                    continue
+                raw = path.read_bytes()
+                if b"\x00" in raw:
+                    continue
+                try:
+                    content = raw.decode("utf-8")
+                except UnicodeDecodeError:
+                    continue
+                if any(marker in content for marker in forbidden_literals) or slash_invocation.search(content):
+                    yield str(path.relative_to(repo))
 
 
 class TestCodexCi(unittest.TestCase):
@@ -36,23 +63,32 @@ class TestCodexCi(unittest.TestCase):
         self.assertNotIn("go:naming", smoke)
 
     def test_codex_pilot_skills_do_not_require_claude_runtime(self):
-        forbidden_literals = ("${CLAUDE_PLUGIN_ROOT}", "AskUserQuestion")
-        slash_invocation = re.compile(r"(?<![A-Za-z0-9])/[a-z0-9][a-z0-9-]*:[a-z0-9]")
+        self.assertEqual(list(claude_runtime_dependencies(REPO)), [])
 
-        for bundle_path in sorted((REPO / "registry" / "bundles").glob("*.yaml")):
-            bundle = yaml.safe_load(bundle_path.read_text()) or {}
-            codex = ((bundle.get("targets") or {}).get("codex") or {})
-            if not codex.get("enabled"):
-                continue
-
-            for member in bundle.get("skills") or []:
-                source, _leaf = normalize_member(member)
-                skill_path = REPO / "skills" / source / "SKILL.md"
-                content = skill_path.read_text()
-                with self.subTest(bundle=bundle_path.stem, skill=source):
-                    for marker in forbidden_literals:
-                        self.assertNotIn(marker, content)
-                    self.assertIsNone(slash_invocation.search(content))
+    def test_host_neutrality_scans_both_bundle_extensions_and_supporting_files(self):
+        for extension in ("yaml", "yml"):
+            for filename, content in (
+                ("SKILL.md", "${CLAUDE_PLUGIN_ROOT}"),
+                ("references/usage.rst", "AskUserQuestion"),
+                ("scripts/run.sh", "/go:naming"),
+                ("assets/example.json", "${CLAUDE_PLUGIN_ROOT}"),
+            ):
+                with self.subTest(extension=extension, filename=filename), tempfile.TemporaryDirectory() as tmp:
+                    repo = Path(tmp)
+                    bundles = repo / "registry" / "bundles"
+                    bundles.mkdir(parents=True)
+                    (bundles / f"sample.{extension}").write_text(
+                        "targets:\n  codex:\n    enabled: true\nskills: [sample]\n"
+                    )
+                    path = repo / "skills" / "sample" / filename
+                    path.parent.mkdir(parents=True)
+                    path.write_text(content)
+                    self.assertEqual(list(claude_runtime_dependencies(repo)), [str(path.relative_to(repo))])
+                    path.write_text("Portable content")
+                    self.assertEqual(list(claude_runtime_dependencies(repo)), [])
+                    for binary in (b"\x00AskUserQuestion", b"\xffAskUserQuestion"):
+                        path.write_bytes(binary)
+                        self.assertEqual(list(claude_runtime_dependencies(repo)), [])
 
 
 if __name__ == "__main__":
