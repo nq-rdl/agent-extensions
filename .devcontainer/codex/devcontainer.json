@@ -11,5 +11,5 @@
   "remoteUser": "node",
   "updateRemoteUserUID": false,
   "runArgs": ["--network=none"],
-  "postCreateCommand": "bash scripts/smoke-codex-marketplace.sh"
+  "postCreateCommand": "bash scripts/smoke-codex-marketplace.sh && python3 scripts/check_codex_runtime.py ."
 }

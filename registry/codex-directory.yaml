@@ -1,0 +1,5 @@
+# Publisher-controlled submission facts. Do not invent legal URLs or attestations.
+# Package generation and local installation do not depend on public submission.
+supportURL: https://github.com/nq-rdl/agent-extensions/issues
+identityVerified: false
+behavioralEvidence: {}

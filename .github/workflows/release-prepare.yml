@@ -138,7 +138,10 @@ jobs:
 
           # VERSION is the single version source — write it before generating.
           echo "$VERSION" > VERSION
+          bash scripts/sync-plugins.sh
           python3 scripts/generate_manifests.py .
+          python3 scripts/generate_bundles_doc.py .
+          python3 scripts/codex_directory.py . --write-report
 
           if [ -f pyproject.toml ]; then
             sed -i "s/^version = \".*\"/version = \"${VERSION}\"/" pyproject.toml

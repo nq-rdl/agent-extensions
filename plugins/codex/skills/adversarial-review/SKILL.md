@@ -83,3 +83,9 @@ Bash({
 ```
 - Do not call `BashOutput` or wait for completion in this turn.
 - After launching the command, tell the user: "Codex adversarial review started in the background. Check `/codex:status` for progress."
+
+## Codex packaging
+
+For execution in a native Codex package, use the host-specific entrypoint in
+[references/codex.rst](references/codex.rst). The registry selects it during packaging;
+the Claude entrypoint above remains the Claude workflow.

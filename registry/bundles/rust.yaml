@@ -17,6 +17,7 @@ targets:
     enabled: true
     pluginName: rust
     marketplaceName: rdl-agent-extensions
+
   codex:
     enabled: true
     pluginName: rust
@@ -28,4 +29,6 @@ targets:
       hooks: false
       apps: false
     interface:
-      shortDescription: Read and navigate Rust, explain constructs, and sanity-check correctness
+      shortDescription: Rust tools and workflows
+      defaultPrompt:
+      - Use Rust to help with my task.

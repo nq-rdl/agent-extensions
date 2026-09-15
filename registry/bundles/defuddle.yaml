@@ -17,3 +17,18 @@ targets:
     enabled: true
     pluginName: defuddle
     marketplaceName: rdl-agent-extensions
+
+  codex:
+    enabled: true
+    pluginName: defuddle
+    marketplaceName: rdl-agent-extensions
+    category: Developer Tools
+    components:
+      skills: true
+      mcp: false
+      hooks: false
+      apps: false
+    interface:
+      shortDescription: Defuddle — extract clean Markdown from cluttered web pages
+      defaultPrompt:
+      - Use Defuddle to help with my task.

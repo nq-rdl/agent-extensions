@@ -1,0 +1,16 @@
+{
+  "description": "Native Codex command hooks for speckit-dev; review and trust before execution.",
+  "hooks": {
+    "UserPromptSubmit": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash \"${PLUGIN_ROOT}/hooks/adapter.sh\" speckit-publish-target",
+            "timeout": 10
+          }
+        ]
+      }
+    ]
+  }
+}

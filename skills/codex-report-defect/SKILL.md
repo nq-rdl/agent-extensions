@@ -76,3 +76,9 @@ If the user declines to file, `mark-reported` without `--url` still silences the
 ## Where the report lives
 
 The `show` payload's `defectsDir` is where an optional `<id>.md` write-up may be written alongside the marker.
+
+## Codex packaging
+
+For execution in a native Codex package, use the host-specific entrypoint in
+[references/codex.rst](references/codex.rst). The registry selects it during packaging;
+the Claude entrypoint above remains the Claude workflow.

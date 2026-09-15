@@ -1,0 +1,30 @@
+{
+  "name": "pixi",
+  "version": "0.29.0",
+  "description": "Pixi — manage Python projects, environments, and dependencies",
+  "author": {
+    "name": "nq-rdl"
+  },
+  "repository": "https://github.com/nq-rdl/agent-extensions",
+  "license": "MIT",
+  "keywords": [
+    "pixi",
+    "python",
+    "environments"
+  ],
+  "skills": "./skills/",
+  "interface": {
+    "displayName": "Pixi",
+    "shortDescription": "Pixi — manage Python projects, environments, and dependencies",
+    "longDescription": "Pixi — manage Python projects, environments, and dependencies",
+    "developerName": "nq-rdl",
+    "category": "Developer Tools",
+    "capabilities": [
+      "Skills"
+    ],
+    "defaultPrompt": [
+      "Use Pixi to help with my task."
+    ],
+    "websiteURL": "https://github.com/nq-rdl/agent-extensions"
+  }
+}

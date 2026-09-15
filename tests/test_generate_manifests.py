@@ -191,7 +191,7 @@ class TestGenerate(unittest.TestCase):
                     "plugins": [
                         {
                             "name": "swe",
-                            "source": {"source": "local", "path": "./plugins/swe"},
+                            "source": {"source": "local", "path": "./dist/codex/plugins/swe"},
                             "policy": {
                                 "installation": "AVAILABLE",
                                 "authentication": "ON_INSTALL",
@@ -212,7 +212,7 @@ class TestGenerate(unittest.TestCase):
                 for path, _content in generate_manifests._targets(repo, generated)
             ]
             self.assertIn(Path(".agents/plugins/marketplace.json"), targets)
-            self.assertIn(Path("plugins/swe/.codex-plugin/plugin.json"), targets)
+            self.assertIn(Path("dist/codex/plugins/swe/.codex-plugin/plugin.json"), targets)
 
     def test_codex_interface_override(self):
         with tempfile.TemporaryDirectory() as t:
@@ -330,13 +330,13 @@ class TestGenerate(unittest.TestCase):
             with self.assertRaisesRegex(ValueError, "used by both"):
                 generate_manifests.generate(repo)
 
-    def test_unsupported_codex_component_rejected(self):
+    def test_codex_hooks_require_explicit_native_config(self):
         with tempfile.TemporaryDirectory() as t:
             repo = make_repo(t)
             enable_codex(repo)
             bundle = repo / "registry" / "bundles" / "swe.yaml"
             bundle.write_text(bundle.read_text() + "      hooks: true\n")
-            with self.assertRaisesRegex(ValueError, "does not support.*hooks"):
+            with self.assertRaisesRegex(ValueError, "hooks requires.*hookConfig"):
                 generate_manifests.generate(repo)
 
     def test_malformed_codex_components_rejected(self):
@@ -406,7 +406,7 @@ class TestGenerate(unittest.TestCase):
             generate_manifests.write(repo)
 
             codex_marketplace = repo / ".agents" / "plugins" / "marketplace.json"
-            codex_manifest = repo / "plugins" / "swe" / ".codex-plugin" / "plugin.json"
+            codex_manifest = repo / "dist/codex/plugins" / "swe" / ".codex-plugin" / "plugin.json"
             self.assertTrue(codex_marketplace.is_file())
             self.assertTrue(codex_manifest.is_file())
 

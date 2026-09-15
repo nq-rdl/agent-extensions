@@ -17,3 +17,19 @@ targets:
     enabled: true
     pluginName: bitwarden
     marketplaceName: rdl-agent-extensions
+
+  codex:
+    enabled: true
+    pluginName: bitwarden
+    marketplaceName: rdl-agent-extensions
+    category: Developer Tools
+    components:
+      skills: true
+      mcp: false
+      hooks: false
+      apps: false
+    interface:
+      shortDescription: Bitwarden — manage .env files and secrets via the Bitwarden
+        CLI
+      defaultPrompt:
+      - Use Bitwarden to help with my task.

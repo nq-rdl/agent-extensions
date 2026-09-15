@@ -26,3 +26,22 @@ targets:
     enabled: true
     pluginName: claude-code
     marketplaceName: rdl-agent-extensions
+
+  codex:
+    enabled: true
+    pluginName: claude-code
+    marketplaceName: rdl-agent-extensions
+    category: Developer Tools
+    components:
+      skills: true
+      mcp: false
+      hooks: true
+      apps: false
+    interface:
+      shortDescription: Author Claude Code workflows and audit reusable skills
+      defaultPrompt:
+      - Use Claude Code to help with my task.
+    hookConfig: hooks/codex/claude-code/hooks.json
+    notes:
+      sharedHooks:
+      - skill-audit-nudge

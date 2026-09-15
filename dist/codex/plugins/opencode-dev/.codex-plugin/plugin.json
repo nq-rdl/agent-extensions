@@ -1,0 +1,35 @@
+{
+  "name": "opencode-dev",
+  "version": "0.29.0",
+  "description": "OpenCode development toolkit — author plugins, agents, the SDK, custom tools, skills, governance policies, and delegation harnesses",
+  "author": {
+    "name": "nq-rdl"
+  },
+  "repository": "https://github.com/nq-rdl/agent-extensions",
+  "license": "MIT",
+  "keywords": [
+    "opencode",
+    "plugins",
+    "sdk",
+    "agents",
+    "mcp",
+    "policies",
+    "acp"
+  ],
+  "skills": "./skills/",
+  "interface": {
+    "displayName": "OpenCode Dev",
+    "shortDescription": "OpenCode Dev tools and workflows",
+    "longDescription": "OpenCode development toolkit — author plugins, agents, the SDK, custom tools, skills, governance policies, and delegation harnesses",
+    "developerName": "nq-rdl",
+    "category": "Developer Tools",
+    "capabilities": [
+      "Skills",
+      "Hooks"
+    ],
+    "defaultPrompt": [
+      "Use OpenCode Dev to help with my task."
+    ],
+    "websiteURL": "https://github.com/nq-rdl/agent-extensions"
+  }
+}

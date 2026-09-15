@@ -18,6 +18,7 @@ targets:
     enabled: true
     pluginName: shiny
     marketplaceName: rdl-agent-extensions
+
   codex:
     enabled: true
     pluginName: shiny
@@ -28,3 +29,7 @@ targets:
       mcp: false
       hooks: false
       apps: false
+    interface:
+      shortDescription: Shiny — modern dashboards with bslib and Bootstrap 5 theming
+      defaultPrompt:
+      - Use Shiny to help with my task.

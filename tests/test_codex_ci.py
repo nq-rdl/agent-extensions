@@ -73,12 +73,13 @@ class TestCodexCi(unittest.TestCase):
 
         self.assertIn('expected_skills+=("$plugin:$(basename "$skill_dir")")', smoke)
         self.assertIn('for qualified in "${expected_skills[@]}"', smoke)
-        self.assertIn('diff -r "$REPO_ROOT/plugins/$plugin/skills"', smoke)
+        self.assertIn('diff -r "$REPO_ROOT/${source_path#./}"', smoke)
         self.assertNotIn("mapfile", smoke)
         self.assertNotIn("go:naming", smoke)
 
     def test_codex_pilot_skills_do_not_require_claude_runtime(self):
-        self.assertEqual(list(claude_runtime_dependencies(REPO)), [])
+        from scripts.codex_package import validate
+        self.assertEqual(validate(REPO), [])
 
     def test_host_neutrality_scans_both_bundle_extensions_and_supporting_files(self):
         for extension in ("yaml", "yml"):

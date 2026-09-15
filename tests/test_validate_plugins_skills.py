@@ -21,7 +21,33 @@ def write(path: Path, text: str):
 
 
 def run_validate(repo: Path):
+    import json
+    import shutil
+    import yaml
+    for manifest in (repo / "plugins").glob("*/.codex-plugin/plugin.json"):
+        plugin = manifest.parent.parent.name
+        target = repo / "dist/codex/plugins" / plugin
+        shutil.copytree(manifest.parent.parent, target, dirs_exist_ok=True)
+        for path in (target / "skills").glob("*/SKILL.md"):
+            text = path.read_text()
+            path.write_text(text.replace("---\n", "---\nname: " + path.parent.name + "\n", 1))
+        # This fixture represents a migrated package, not a second native manifest in Claude.
+        if (repo / "registry/bundles" / (plugin + ".yaml")).exists():
+            manifest.unlink()
+            manifest.parent.rmdir()
+        bundle_file = repo / "registry/bundles" / (plugin + ".yaml")
+        if bundle_file.exists():
+            bundle = yaml.safe_load(bundle_file.read_text())
+            bundle.setdefault("description", "Test package")
+            bundle["targets"]["codex"]["category"] = "Developer Tools"
+            bundle_file.write_text(yaml.safe_dump(bundle))
+            write(repo / "registry/marketplace.yaml", "name: test\npluginDefaults: {}\n")
+            data = json.loads((target / ".codex-plugin/plugin.json").read_text())
+            data.setdefault("interface", {})
+            (target / ".codex-plugin/plugin.json").write_text(json.dumps(data))
     write(repo / "scripts" / "validate-plugins.sh", SCRIPT.read_text())
+    for dependency in ("codex_package.py", "generate_manifests.py", "_registry.py"):
+        (repo / "scripts" / dependency).write_text((REPO / "scripts" / dependency).read_text())
     return subprocess.run(
         ["bash", str(repo / "scripts" / "validate-plugins.sh")],
         cwd=repo,
@@ -221,7 +247,7 @@ class TestSkillValidation(unittest.TestCase):
             self.assertNotEqual(result.returncode, 0, result.stdout + result.stderr)
             self.assertIn("gone-skill", result.stdout + result.stderr)
 
-    def test_codex_accepts_nameless_copy_with_description(self):
+    def test_codex_requires_explicit_name_with_description(self):
         with tempfile.TemporaryDirectory() as tmp:
             repo = Path(tmp)
             base_plugin(repo, plugin="go")

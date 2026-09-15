@@ -1,0 +1,35 @@
+{
+  "name": "redhat",
+  "version": "0.29.0",
+  "description": "Red Hat — fetch product documentation and Customer Portal (KCS) content with your own credentials via curl, on macOS and Linux",
+  "author": {
+    "name": "nq-rdl"
+  },
+  "repository": "https://github.com/nq-rdl/agent-extensions",
+  "license": "MIT",
+  "keywords": [
+    "redhat",
+    "documentation",
+    "customer-portal",
+    "kcs",
+    "curl",
+    "openshift",
+    "ansible"
+  ],
+  "skills": "./skills/",
+  "interface": {
+    "displayName": "Red Hat",
+    "shortDescription": "Red Hat tools and workflows",
+    "longDescription": "Red Hat — fetch product documentation and Customer Portal (KCS) content with your own credentials via curl, on macOS and Linux",
+    "developerName": "nq-rdl",
+    "category": "Developer Tools",
+    "capabilities": [
+      "Skills",
+      "Hooks"
+    ],
+    "defaultPrompt": [
+      "Use Red Hat to help with my task."
+    ],
+    "websiteURL": "https://github.com/nq-rdl/agent-extensions"
+  }
+}

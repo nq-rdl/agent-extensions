@@ -1,0 +1,30 @@
+{
+  "name": "postgres",
+  "version": "0.29.0",
+  "description": "PostgreSQL administration — schema design, query optimisation, backups, and tuning",
+  "author": {
+    "name": "nq-rdl"
+  },
+  "repository": "https://github.com/nq-rdl/agent-extensions",
+  "license": "MIT",
+  "keywords": [
+    "postgresql",
+    "database",
+    "dba"
+  ],
+  "skills": "./skills/",
+  "interface": {
+    "displayName": "Postgres",
+    "shortDescription": "Postgres tools and workflows",
+    "longDescription": "PostgreSQL administration — schema design, query optimisation, backups, and tuning",
+    "developerName": "nq-rdl",
+    "category": "Developer Tools",
+    "capabilities": [
+      "Skills"
+    ],
+    "defaultPrompt": [
+      "Use Postgres to help with my task."
+    ],
+    "websiteURL": "https://github.com/nq-rdl/agent-extensions"
+  }
+}

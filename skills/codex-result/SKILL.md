@@ -37,3 +37,9 @@ Present the full command output to the user. Do not summarize or condense it. Pr
 - File paths and line numbers exactly as reported
 - Any error messages or parse errors
 - Follow-up commands such as `/codex:status <id>` and `/codex:review`
+
+## Codex packaging
+
+For execution in a native Codex package, use the host-specific entrypoint in
+[references/codex.rst](references/codex.rst). The registry selects it during packaging;
+the Claude entrypoint above remains the Claude workflow.

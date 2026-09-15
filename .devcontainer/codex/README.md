@@ -39,3 +39,12 @@ docker run --rm --network none \
 The repository is mounted at test time, so uncommitted plugin changes are tested.
 The image contains only tools, not a baked-in copy of the catalog. The existing
 host-run CI checks still cover Codex `0.152.0` and `0.154.0`.
+
+The same container also validates native hook discovery and version replacement:
+
+```bash
+python3 scripts/check_codex_runtime.py .
+```
+
+The package root uses `.codex-plugin/plugin.json`; a portable root manifest would
+suppress hooks on the pinned runtime. Hook trust is never bypassed by these tests.

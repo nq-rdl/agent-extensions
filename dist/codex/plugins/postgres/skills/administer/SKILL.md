@@ -1,0 +1,25 @@
+---
+name: administer
+description: 'Use when administering PostgreSQL: schema design, query optimization,
+  backup/restore, tuning, or security. Inspect the database with an available client
+  or MCP tool.'
+license: MIT
+metadata:
+  upstream: https://github.com/github/awesome-copilot/blob/main/agents/postgresql-dba.agent.md
+  repo: https://github.com/nq-rdl/agent-extensions
+---
+
+## Codex execution
+
+Delegation is optional. Read references/subagent.rst only when delegation is useful or requested. It does not install a named agent or grant permissions.
+
+# Administer
+
+Use an available PostgreSQL client or MCP tool to inspect the target database directly. Establish the database, requested operation, and allowed mutations before execution. Base schema, tuning, backup, and security recommendations on observed state and report verification.
+
+## Optional delegation
+
+[references/subagent.rst](references/subagent.rst) contains the subagent outline,
+handoff inputs, execution boundaries, and expected result. Read it when delegating
+would help or the user asks to “create a subagent to execute this.” Otherwise,
+work directly from this skill; the reference does not need to be loaded.

@@ -1,0 +1,16 @@
+{
+  "description": "Continue the turn until checks pass. Stop hooks use top-level decision:block to keep working; reason becomes Claude's next instruction. Respects the stop_hook_active block cap.",
+  "hooks": {
+    "Stop": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash -c 'input=$(cat); if [ \"$(echo \"$input\" | jq -r .stop_hook_active)\" = \"true\" ]; then exit 0; fi; jq -nc \"{decision:\\\"block\\\",reason:\\\"Before finishing: (1) tests passing? (2) linter clean? (3) changes committed? Verify, then stop.\\\"}\"'",
+            "timeout": 10
+          }
+        ]
+      }
+    ]
+  }
+}

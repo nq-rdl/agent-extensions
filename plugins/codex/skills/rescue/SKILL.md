@@ -75,3 +75,9 @@ Operating rules:
 handoff inputs, execution boundaries, and expected result. Read it when delegating
 would help or the user asks to “create a subagent to execute this.” Otherwise,
 work directly from this skill; the reference does not need to be loaded.
+
+## Codex packaging
+
+For execution in a native Codex package, use the host-specific entrypoint in
+[references/codex.rst](references/codex.rst). The registry selects it during packaging;
+the Claude entrypoint above remains the Claude workflow.
