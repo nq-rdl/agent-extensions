@@ -25,7 +25,7 @@ function frontmatter(text) {
 
 // One skill per deprecated upstream slash command (1:1 command -> skill mapping).
 // Value is the companion subcommand the body must forward to; `rescue` is the
-// exception — it routes to the codex-rescue subagent instead.
+// exception — it reads the shared runtime contract for direct or delegated execution.
 const ACTION_SKILLS = {
   setup: "setup",
   review: "review",
@@ -45,8 +45,12 @@ for (const [name, sub] of Object.entries(ACTION_SKILLS)) {
     assert.match(fm, /^user-invocable:\s*true\s*$/m, "must be user-invocable");
 
     if (name === "rescue") {
-      // rescue delegates to the subagent (agent id unchanged across the fork).
-      assert.match(src, /subagent_type:\s*"codex:codex-rescue"/, "rescue must route to the subagent");
+      // The referenced worker contract must be packaged with the action skill.
+      assert.match(src, /codex:cli-runtime/);
+      assert.doesNotMatch(src, /subagent_type:\s*"codex:codex-rescue"/);
+      const outline = path.join(SKILLS_DIR, "codex-rescue", "references", "subagent.rst");
+      assert.ok(fs.existsSync(outline));
+      assert.match(src, /references\/subagent\.rst/);
     } else {
       assert.ok(
         src.includes(`codex-companion.mjs" ${sub} `),

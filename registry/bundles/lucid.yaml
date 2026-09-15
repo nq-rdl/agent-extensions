@@ -8,7 +8,6 @@ owners:
 channels:
   - stable
 skills: []
-agents: []
 hooks: []
 prompts: []
 mcp:

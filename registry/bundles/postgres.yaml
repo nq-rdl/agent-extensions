@@ -7,9 +7,8 @@ owners:
   - rdl
 channels:
   - stable
-skills: []
-agents:
-  - postgresql-dba
+skills:
+  - {source: postgresql-dba, leaf: administer}
 hooks: []
 prompts: []
 mcp: []

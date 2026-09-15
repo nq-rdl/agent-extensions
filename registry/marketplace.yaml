@@ -5,6 +5,7 @@
 # Do NOT hand-edit the generated manifests — CI (generate_manifests.py --check)
 # fails if they drift. This is the structural fix for #100's metadata rot.
 name: rdl-agent-extensions
+displayName: RDL Agent Extensions
 owner:
   name: nq-rdl
   email: tsv-datalab@health.qld.gov.au

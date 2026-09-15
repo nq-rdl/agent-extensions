@@ -16,7 +16,6 @@ skills:
   - {source: r-lib-mirai, leaf: lib-mirai}
   - {source: r-lib-package-dev, leaf: lib-package-dev}
   - {source: r-lib-testing, leaf: lib-testing}
-agents: []
 hooks: []
 prompts: []
 mcp: []

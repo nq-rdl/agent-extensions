@@ -1,0 +1,17 @@
+---
+name: <name>
+description: Use when <specific task and trigger>.
+license: <source license>
+metadata:
+  repo: https://github.com/nq-rdl/agent-extensions
+---
+
+# <Task>
+
+<Direct workflow, essential constraints, and expected result.>
+
+## Optional delegation
+
+[references/subagent.rst](references/subagent.rst) contains the worker outline.
+Read it when delegation helps or the user asks to create a subagent to execute
+this task. Otherwise execute directly without loading the outline.

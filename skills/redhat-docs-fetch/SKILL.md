@@ -105,3 +105,10 @@ line. For API behaviour, Red Hat's own page is
 | [scripts/rh-token.sh](scripts/rh-token.sh) | Offline token → cached access token; `--check`, `--curl-config`, `--clear` |
 | [scripts/rh-fetch.sh](scripts/rh-fetch.sh) | Route + fetch: docs URL, solution/article/`kcs:` id, `search:`, `docs-text:` |
 | [scripts/rh-lib.sh](scripts/rh-lib.sh) | Shared helpers (credential resolution, curl/wget abstraction) |
+
+## Optional delegation
+
+[references/subagent.rst](references/subagent.rst) contains the subagent outline,
+handoff inputs, execution boundaries, and expected result. Read it when delegating
+would help or the user asks to “create a subagent to execute this.” Otherwise,
+work directly from this skill; the reference does not need to be loaded.

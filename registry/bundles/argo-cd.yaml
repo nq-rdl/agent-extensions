@@ -9,8 +9,7 @@ channels:
   - stable
 skills:
   - {source: argo-cd, leaf: manage}
-agents:
-  - se-gitops-ci-specialist
+  - {source: se-gitops-ci-specialist, leaf: debug-delivery}
 hooks: []
 prompts: []
 mcp: []

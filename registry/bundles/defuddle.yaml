@@ -9,7 +9,6 @@ channels:
   - stable
 skills:
   - {source: defuddle, leaf: extract}
-agents: []
 hooks: []
 prompts: []
 mcp: []

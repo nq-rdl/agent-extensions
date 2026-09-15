@@ -13,7 +13,7 @@ Derived from openai/codex-plugin-cc v1.0.6 (db52e28), Apache-2.0. Modified for r
 
 # Codex Model Guide
 
-The delegation decision guide used by Claude Code and the `codex:codex-rescue` subagent when picking a Codex model and effort. A process spawned by Codex cannot load Claude Code skills, so this guidance applies on the Claude Code side, before invoking the companion.
+The delegation decision guide used by Claude Code and the `codex:rescue` executor when picking a Codex model and effort. A process spawned by Codex cannot load Claude Code skills, so this guidance applies on the Claude Code side, before invoking the companion.
 
 ## Verify against the live catalog first
 

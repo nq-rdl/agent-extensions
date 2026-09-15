@@ -1,7 +1,7 @@
 # Technical-writing completion review
 
 The `tech-writing` plugin runs a blocking review of documentation produced with
-`/tech-writing:copyedit` or `se-technical-writer`. Its simplified STE profile
+`/tech-writing:copyedit` or `tech-writing:author`. Its simplified STE profile
 adds concrete checks for sentence length, instructions, conditions, terminology,
 and meaning. It does not establish full ASD-STE100 compliance.
 
@@ -26,8 +26,10 @@ Bash and jq pattern; the review gate does not depend on that reminder succeeding
 
 ## Hook behaviour
 
-`Stop` reviews the current task when it uses the copyedit skill.
-`SubagentStop` targets the technical writer agent and reads its own transcript.
+`Stop` reviews the current task when it uses copyedit or author.
+`SubagentStop` reads the completed worker’s own transcript and applies the same
+task scope, including workers given the author delegation outline. It skips
+unrelated work; no retired agent-name matcher is used.
 The reviewer inspects the document files or conversation draft, then returns
 `ok: false` with actionable findings, or `ok: true` when the applicable checks
 pass. It does not accept an assertion that the check passed instead of reading

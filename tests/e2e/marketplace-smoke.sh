@@ -33,7 +33,7 @@ if jq -e '.plugins[]|select(.name=="zod")' "$MP" >/dev/null 2>&1; then
 [ -d skills/skill-audit ] && pass "B: skills/skill-audit/ exists" || bad "B: skills/skill-audit/ missing"
 [ -d plugins/claude-code/skills/skill-audit ] && pass "B: plugins/claude-code/skills/skill-audit/ synced" || bad "B: skill-audit leaf not synced"
 grep -q 'leaf: skill-audit' registry/bundles/claude-code.yaml 2>/dev/null && pass "B: claude-code bundle maps skill-audit" || bad "B: claude-code bundle missing skill-audit"
-[ -f agents/skill-auditor/agent.md ] && pass "B: skill-auditor agent exists" || bad "B: skill-auditor agent missing"
+[ -f skills/skill-audit/references/subagent.rst ] && pass "B: skill audit delegation outline exists" || bad "B: skill audit delegation outline missing"
 [ -f plugins/claude-code/hooks/hooks.json ] && pass "B: skill-audit hook present" || bad "B: skill-audit hook missing"
 
 # (C) known plugin still loads

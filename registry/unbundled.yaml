@@ -1,5 +1,5 @@
 # Allowlist for scripts/check_exposure.py — the reverse-reference check that
-# fails CI when a canonical skill/agent/hook/mcp is authored but no
+# fails CI when a canonical skill/hook/mcp is authored but no
 # registry/bundles/*.yaml exposes it to an install.
 #
 # An entry here suppresses that check for content that is intentionally NOT

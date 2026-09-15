@@ -9,7 +9,6 @@ channels:
   - stable
 skills:
   - {source: rust-explain, leaf: explain}
-agents: []
 hooks: []
 prompts: []
 mcp: []
@@ -18,3 +17,15 @@ targets:
     enabled: true
     pluginName: rust
     marketplaceName: rdl-agent-extensions
+  codex:
+    enabled: true
+    pluginName: rust
+    marketplaceName: rdl-agent-extensions
+    category: Developer Tools
+    components:
+      skills: true
+      mcp: false
+      hooks: false
+      apps: false
+    interface:
+      shortDescription: Read and navigate Rust, explain constructs, and sanity-check correctness

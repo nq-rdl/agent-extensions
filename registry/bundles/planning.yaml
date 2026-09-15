@@ -7,13 +7,12 @@ owners:
   - rdl
 channels:
   - stable
-skills: []
-agents:
-  - plan
-  - context-architect
-  - hlbpa
-  - adr-generator
-  - research-technical-spike
+skills:
+  - {source: plan, leaf: strategy}
+  - {source: context-architect, leaf: sequence}
+  - {source: hlbpa, leaf: architecture}
+  - {source: adr-generator, leaf: record-decision}
+  - {source: research-technical-spike, leaf: research}
 hooks: []
 prompts: []
 mcp: []

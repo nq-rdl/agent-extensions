@@ -7,9 +7,8 @@ owners:
   - rdl
 channels:
   - stable
-skills: []
-agents:
-  - mongodb-performance-advisor
+skills:
+  - {source: mongodb-performance-advisor, leaf: analyse}
 hooks: []
 prompts: []
 mcp: []

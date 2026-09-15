@@ -10,8 +10,6 @@ channels:
 skills:
   - {source: redhat-docs-fetch, leaf: fetch-docs}   # → /redhat:fetch-docs
   - {source: redhat-setup, leaf: setup}             # → /redhat:setup
-agents:
-  - redhat-docs-fetcher
 hooks: [redhat-docs-preflight, redhat-docs-guard]
 prompts: []
 mcp: []

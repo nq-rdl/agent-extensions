@@ -10,7 +10,6 @@ channels:
 skills:
   - {source: quarto-authoring, leaf: authoring}
   - {source: quarto-alt-text, leaf: alt-text}
-agents: []
 hooks: []
 prompts: []
 mcp: []
@@ -19,3 +18,13 @@ targets:
     enabled: true
     pluginName: quarto
     marketplaceName: rdl-agent-extensions
+  codex:
+    enabled: true
+    pluginName: quarto
+    marketplaceName: rdl-agent-extensions
+    category: Productivity
+    components:
+      skills: true
+      mcp: false
+      hooks: false
+      apps: false

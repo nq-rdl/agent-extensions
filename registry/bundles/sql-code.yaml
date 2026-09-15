@@ -16,7 +16,6 @@ skills:
   - {source: sql-code-map, leaf: map}
   - {source: sql-code-draft, leaf: draft}
   - {source: sql-code-validate, leaf: validate}
-agents: []
 hooks: [sql-code-preflight, sql-code-guard]
 prompts: []
 mcp: []

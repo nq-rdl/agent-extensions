@@ -7,9 +7,8 @@ owners:
   - rdl
 channels:
   - stable
-skills: []
-agents:
-  - playwright-tester
+skills:
+  - {source: playwright-tester, leaf: test}
 hooks: []
 prompts: []
 mcp:

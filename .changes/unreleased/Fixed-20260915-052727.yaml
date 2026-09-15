@@ -1,0 +1,3 @@
+kind: Fixed
+body: Scan both YAML bundle extensions and all UTF-8 skill files for Claude runtime dependencies in the Codex pilot.
+time: 2026-09-15T05:27:27.339876905Z

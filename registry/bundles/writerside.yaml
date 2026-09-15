@@ -9,7 +9,6 @@ channels:
   - stable
 skills:
   - {source: writerside, leaf: authoring}
-agents: []
 hooks: []
 prompts: []
 mcp: []

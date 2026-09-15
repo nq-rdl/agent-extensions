@@ -16,7 +16,8 @@ skills:
   - {source: skill-audit, leaf: skill-audit}
   - {source: skill-review, leaf: skill-review}
   - {source: report-skill-issue, leaf: skill-report-issue}
-agents: [marketplace-scout, skill-auditor, prompt-builder]
+  - {source: marketplace-scout, leaf: discover-plugins}
+  - {source: prompt-builder, leaf: engineer-prompts}
 hooks: [skill-audit-nudge]
 prompts: []
 mcp: []
