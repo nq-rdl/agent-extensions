@@ -1,0 +1,10 @@
+{
+  "name": "sql-review",
+  "version": "0.29.0",
+  "description": "SQL Review — scope, analyse and explain SQL with standardised, human-confirmed assumption and limitation reports",
+  "author": {
+    "name": "nq-rdl"
+  },
+  "repository": "https://github.com/nq-rdl/agent-extensions",
+  "license": "MIT"
+}

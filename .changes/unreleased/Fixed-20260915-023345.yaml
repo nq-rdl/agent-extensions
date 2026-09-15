@@ -1,0 +1,3 @@
+kind: Fixed
+body: Preserve SQL Review revision snapshots for resumed explanations; keep interrupted updates and moved SQL stale until reassessed.
+time: 2026-09-15T02:33:45.427191477Z

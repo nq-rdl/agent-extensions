@@ -182,6 +182,7 @@ Agents derived from external sources (e.g. `github/awesome-copilot`, MIT) carry 
 |---|---|---|
 | New first-party CLI helper or MCP server | Go (`CGO_ENABLED=0`, `GOOS`/`GOARCH` matrix) | Zero-install prebuilt binaries; no runtime dep on Node |
 | Vendored/forked plugin runtime | May retain its upstream language | Full-fidelity forks must not be rewritten; allowed when the design documents runtime availability and distribution |
+| Skill helper script (small, shared by a plugin's skills and hooks; `skills/<name>/scripts/`) | Bash 3.2-compatible + `jq` | File/JSON/git plumbing only — no compiled artefact to distribute; `rh-*.sh` and `sqlreview.sh` are the reference shape |
 | File-format or ML skill | Python + `ensure-deps.sh` | Direct library access; bootstrapping handled by the script |
 | Documentation-only skill | Markdown | No execution needed |
 | Plugin wiring | JSON/YAML/shell | Manifests and glue only |

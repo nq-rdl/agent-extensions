@@ -426,6 +426,20 @@
         "pandas",
         "polars"
       ]
+    },
+    {
+      "name": "sql-review",
+      "source": "./plugins/sql-review",
+      "description": "SQL Review — scope, analyse and explain SQL with standardised, human-confirmed assumption and limitation reports",
+      "version": "0.29.0",
+      "keywords": [
+        "sql",
+        "review",
+        "data-engineering",
+        "assumptions",
+        "limitations",
+        "handoff"
+      ]
     }
   ]
 }
