@@ -24,7 +24,7 @@ client, not a named agent. Verify Node.js >=18.18.0 before calling it. Resolve
 ``PLUGIN_ROOT`` from the installed skill path, not the working directory. Pass
 user arguments literally; ``ARGUMENTS`` below is notation, not an injected shell
 variable. Use the host shell tool and its background-session support. Never call
-Claude's Bash, BashOutput, Agent, or the host user-question tool tools from Codex.
+Claude's Bash, BashOutput, Agent, or AskUserQuestion tools from Codex.
 
 Run an independent adversarial review; do not fix the findings. Inspect git
 status including untracked files, preserve the user's target and focus. Honor

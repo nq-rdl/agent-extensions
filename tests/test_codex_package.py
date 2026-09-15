@@ -7,6 +7,7 @@ import shutil
 import subprocess
 import tempfile
 import unittest
+from unittest.mock import patch
 import zipfile
 import yaml
 
@@ -86,6 +87,51 @@ def fixture(root, *, mcp=False, hooks=False):
 
 
 class StrictPackaging(unittest.TestCase):
+    def test_native_override_preserves_tool_negation(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            repo = Path(tmp)
+            data = fixture(repo)
+            native = (
+                "Never call Claude's Bash, BashOutput, Agent, or AskUserQuestion tools from Codex.\n"
+                "Use the host user-question tool to choose foreground or background.\n"
+                "Read references/subagent.rst only when delegation helps.\n"
+            )
+            (repo / "skills/sample-task/references/codex.rst").write_text(native)
+            data["targets"]["codex"]["skillOverrides"] = {"sample-task": "references/codex.rst"}
+            (repo / "registry/bundles/sample.yaml").write_text(yaml.safe_dump(data))
+            package.sync(repo)
+            body = (repo / package.ROOT / "sample/skills/task/SKILL.md").read_text()
+            self.assertIn(native, body)
+            self.assertNotIn("tool tools", body)
+
+    def test_legacy_user_question_phrases_are_grammatical(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            repo = Path(tmp)
+            fixture(repo)
+            source = repo / "skills/sample-task/SKILL.md"
+            with source.open("a") as out:
+                for phrase in ("AskUserQuestion", "AskUserQuestion tool", "AskUserQuestion tools"):
+                    out.write(f"Use {phrase} to ask.\n")
+            package.sync(repo)
+            body = (repo / package.ROOT / "sample/skills/task/SKILL.md").read_text()
+            self.assertEqual(body.count("Use the host user-question tool to ask."), 3)
+            self.assertNotIn("tool tools", body)
+
+    def test_reference_only_invocations_receive_native_guidance(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            repo = Path(tmp)
+            fixture(repo)
+            reference = repo / "skills/sample-task/references/publishing.rst"
+            reference.write_text("Then invoke /sample:task.\n")
+            package.sync(repo)
+            root = repo / package.ROOT / "sample/skills/task"
+            body = (root / "SKILL.md").read_text()
+            self.assertIn("use $subject:facet in Codex", body)
+            self.assertEqual((root / "references/publishing.rst").read_text(), reference.read_text())
+            reference.write_text("See https://example.com/sample:task for an upstream example.\n")
+            package.sync(repo)
+            self.assertNotIn("use $subject:facet in Codex", (root / "SKILL.md").read_text())
+
     def test_independent_names_preserve_sources_and_delegation(self):
         with tempfile.TemporaryDirectory() as tmp:
             repo = Path(tmp)
@@ -357,6 +403,74 @@ class NativeHookBehavior(unittest.TestCase):
 
 
 class DirectoryArtifacts(unittest.TestCase):
+    def test_rebuilding_archives_removes_only_previous_generated_files(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            repo = Path(tmp)
+            fixture(repo)
+            package.sync(repo)
+            data = directory.report(repo)
+            destination = repo / "archives"
+            directory.write_archives(repo, destination, data)
+            unrelated = destination / "unrelated.zip"
+            unrelated.write_bytes(b"keep")
+            old = destination / "sample-1.0.0.zip"
+            self.assertTrue(old.exists())
+            (repo / "VERSION").write_text("2.0.0\n")
+            package.sync(repo)
+            data = directory.report(repo)
+            directory.write_archives(repo, destination, data)
+            self.assertFalse(old.exists())
+            self.assertTrue((destination / "sample-2.0.0.zip").exists())
+            self.assertEqual(unrelated.read_bytes(), b"keep")
+            self.assertNotIn("1.0.0", (destination / "SHA256SUMS").read_text())
+            # A removed bundle must also disappear from the output set.
+            directory.write_archives(repo, destination, {**data, "plugins": []})
+            self.assertEqual(list(destination.glob("*.zip")), [unrelated])
+            directory.write_archives(repo, destination, data)
+            self.assertTrue((destination / "sample-2.0.0.zip").exists())
+
+    def test_archive_build_failure_preserves_previous_set(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            repo = Path(tmp)
+            fixture(repo)
+            package.sync(repo)
+            destination = repo / "archives"
+            data = directory.report(repo)
+            directory.write_archives(repo, destination, data)
+            before = {p.name: p.read_bytes() for p in destination.iterdir()}
+            with patch.object(directory, "archive", side_effect=OSError("build failed")):
+                with self.assertRaisesRegex(OSError, "build failed"):
+                    directory.write_archives(repo, destination, data)
+            self.assertEqual({p.name: p.read_bytes() for p in destination.iterdir()}, before)
+
+    def test_readiness_attestations_require_actual_booleans(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            repo = Path(tmp)
+            fixture(repo)
+            package.sync(repo)
+            manifest_path = repo / package.ROOT / "sample/.codex-plugin/plugin.json"
+            manifest = json.loads(manifest_path.read_text())
+            manifest["interface"].update(
+                logo="logo.png", privacyPolicyURL="https://example.com/privacy",
+                termsOfServiceURL="https://example.com/terms",
+            )
+            manifest_path.write_text(json.dumps(manifest))
+            publisher = {
+                "supportURL": "https://example.com/support", "identityVerified": True,
+                "availabilityRegions": ["AU"], "behavioralEvidence": {"sample": True},
+            }
+            path = repo / "registry/codex-directory.yaml"
+            path.write_text(yaml.safe_dump(publisher))
+            self.assertTrue(directory.report(repo)["plugins"][0]["submissionReady"])
+            for key in ("identityVerified", "behavioralEvidence"):
+                for value in (False, "false", "true", 1, [], {"verified": True}, None):
+                    with self.subTest(key=key, value=value):
+                        malformed = {**publisher, key: {"sample": value} if key == "behavioralEvidence" else value}
+                        path.write_text(yaml.safe_dump(malformed))
+                        result = directory.report(repo)["plugins"][0]
+                        self.assertFalse(result["submissionReady"])
+                        self.assertEqual(len(result["blockers"]), 1)
+
     def test_archives_are_reproducible_and_keep_executable_modes(self):
         with tempfile.TemporaryDirectory() as tmp:
             repo = Path(tmp)

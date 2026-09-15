@@ -187,7 +187,7 @@ CI runs `validate.yml` on every PR/push to main. It checks:
 - Registry bundles, `marketplace.json`, and `plugins/` dirs stay in lockstep (`scripts/check_consistency.py`)
 - Every canonical skill/hook/mcp is exposed by >=1 bundle (`scripts/check_exposure.py`); intentional exclusions live in `registry/unbundled.yaml`
 - Plugin manifests, hooks, skills, and `.mcp.json` wiring are valid (`scripts/validate-plugins.sh`)
-- Codex `0.152.0` installs every native marketplace entry and discovers the shared nameless skill copies (`scripts/smoke-codex-marketplace.sh`)
+- Codex `0.152.0` and `0.154.0` install every native marketplace entry and discover the enabled native skill copies with explicit leaf names (`scripts/smoke-codex-marketplace.sh`)
 - Any symlink under `plugins/` resolves (`validate-symlinks` — plugin trees are real-file copies, so this guards against accidental links)
 - The pipeline scripts' unit tests pass (`tests/`)
 - Skills validate against the agentskills.io spec **and the directory-structure standard** (`asctl repo-check`, built from `tools/asctl/`)
@@ -273,7 +273,16 @@ targets:
       apps: false
 ```
 
-The bundle's metadata and target settings (plus `registry/marketplace.yaml` and `VERSION`) generate target marketplace entries and plugin manifests — do not hand-edit them (`generate_manifests.py --check` enforces this). Phase-one Codex bundles must share the enabled Claude `pluginName`, expose skills, and leave MCP, hooks, and apps disabled.
+The bundle's metadata and target settings (plus `registry/marketplace.yaml` and `VERSION`) generate target marketplace entries and plugin manifests — do not hand-edit them (`generate_manifests.py --check` enforces this).
+
+The skills-only Codex pilot is complete. Codex targets now select native skills,
+MCP, and command hooks independently through `components`; every enabled bundle
+must expose at least one supported component. MCP and hooks require explicit
+`mcpConfig` and `hookConfig` sources. Apps remain disabled until a registered
+integration is supported. Claude and Codex plugin names are target-specific;
+the catalog currently uses matching subject names. Codex copies live separately
+under `dist/codex/plugins/`. See `docs/codex.md` for runtime limitations and
+`CONTRIBUTING.md` for the packaging contract.
 
 When adding a skill to a bundle: (1) add it to the YAML (flat `<name>`, or a `{source, leaf}` map to repackage a flat upstream skill under a new leaf), (2) run `pixi run bash scripts/sync-plugins.sh <bundle>` to copy `skills/<source>/` into `plugins/<bundle>/skills/<leaf>/`.
 

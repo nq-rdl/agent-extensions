@@ -11,6 +11,10 @@ metadata:
   repo: https://github.com/nq-rdl/agent-extensions
 ---
 
+## Codex execution
+
+When supporting references invoke a catalog skill as /subject:facet, use $subject:facet in Codex. Preserve slash syntax inside examples that configure or document another host.
+
 # Publish a spec-kit extension
 
 > **Verify-canonical guard.** Publishing/catalog pinned to spec-kit v0.12.x /

@@ -2,4 +2,6 @@
 # Package generation and local installation do not depend on public submission.
 supportURL: https://github.com/nq-rdl/agent-extensions/issues
 identityVerified: false
+# Verification and each plugin's behavioralEvidence attestation require YAML
+# boolean true; quoted strings and other truthy values do not satisfy the gates.
 behavioralEvidence: {}

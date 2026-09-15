@@ -1,0 +1,3 @@
+kind: Fixed
+body: Remove stale generated Codex archives on rebuild and require boolean readiness attestations.
+time: 2026-09-15T23:05:16.070848049Z

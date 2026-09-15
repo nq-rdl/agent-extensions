@@ -41,6 +41,30 @@ def claude_runtime_dependencies(repo):
 
 
 class TestCodexCi(unittest.TestCase):
+    def test_release_preparation_uses_locked_pixi_for_pipeline(self):
+        workflow = yaml.safe_load((REPO / ".github/workflows/release-prepare.yml").read_text())
+        steps = workflow["jobs"]["prepare"]["steps"]
+        setup = next(s for s in steps if s.get("uses", "").startswith("prefix-dev/setup-pixi@"))
+        self.assertTrue(setup["with"]["locked"])
+        self.assertRegex(setup["with"]["pixi-version"], r"^v\d+\.\d+\.\d+$")
+        generation = next(s for s in steps if s.get("name", "").startswith("Batch changelog"))
+        self.assertLess(steps.index(setup), steps.index(generation))
+        pipeline = [line.strip() for line in generation["run"].splitlines() if "scripts/" in line]
+        self.assertEqual(len(pipeline), 4)
+        self.assertTrue(all(line.startswith("pixi run --locked ") for line in pipeline))
+        self.assertNotIn("pip install", generation["run"])
+
+    def test_finalized_reruns_skip_codex_setup_and_remote_smoke(self):
+        workflow = yaml.safe_load((REPO / ".github/workflows/release-finalize.yml").read_text())
+        steps = workflow["jobs"]["finalize"]["steps"]
+        setup = next(s for s in steps if s.get("uses", "").startswith("actions/setup-node@"))
+        smoke = next(s for s in steps if "scripts/smoke-codex-marketplace.sh" in s.get("run", ""))
+        for step in (setup, smoke):
+            self.assertEqual(
+                step.get("if"),
+                "steps.v.outputs.do_tag == 'true' || steps.v.outputs.do_release == 'true'",
+            )
+
     def test_required_plugin_job_runs_pinned_codex_smoke(self):
         workflow = (REPO / ".github" / "workflows" / "validate.yml").read_text()
 

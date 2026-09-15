@@ -221,10 +221,12 @@ jobs:
 
       # Prove the exact remote commit is installable before publishing its tag.
       - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        if: steps.v.outputs.do_tag == 'true' || steps.v.outputs.do_release == 'true'
         with:
           node-version: '20'
 
       - name: Verify remote Codex marketplace before publication
+        if: steps.v.outputs.do_tag == 'true' || steps.v.outputs.do_release == 'true'
         env:
           CODEX_MARKETPLACE_SOURCE: ${{ github.repository }}
           CODEX_MARKETPLACE_REF: ${{ github.event.pull_request.merge_commit_sha }}

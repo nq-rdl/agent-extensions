@@ -11,6 +11,8 @@ metadata:
 
 ## Codex execution
 
+When supporting references invoke a catalog skill as /subject:facet, use $subject:facet in Codex. Preserve slash syntax inside examples that configure or document another host.
+
 Delegation is optional. Read references/subagent.rst only when delegation is useful or requested. It does not install a named agent or grant permissions.
 
 # Author

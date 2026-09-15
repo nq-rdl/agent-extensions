@@ -9,7 +9,9 @@ from __future__ import annotations
 import argparse
 import hashlib
 import json
+import re
 import stat
+import tempfile
 import zipfile
 from pathlib import Path
 import yaml
@@ -38,7 +40,7 @@ def report(repo):
                 blockers.append(f"Publisher must supply {key}")
         if not publisher.get("supportURL"):
             blockers.append("Publisher must supply supportURL")
-        if not publisher.get("identityVerified"):
+        if publisher.get("identityVerified") is not True:
             blockers.append(
                 "Publisher identity and organization submission access are not recorded as verified"
             )
@@ -66,7 +68,7 @@ def report(repo):
                     "Remote MCP submission requires server-owner authorization, domain verification and authenticated connection evidence"
                 )
         evidence = (publisher.get("behavioralEvidence") or {}).get(name)
-        if not evidence:
+        if evidence is not True:
             blockers.append(
                 "Record authenticated execution evidence for five positive and three negative task cases"
             )
@@ -147,6 +149,36 @@ def archive(root, destination):
     return hashlib.sha256(destination.read_bytes()).hexdigest()
 
 
+def write_archives(repo, destination, data):
+    destination.mkdir(parents=True, exist_ok=True)
+    previous = set()
+    checksum_path = destination / "SHA256SUMS"
+    if checksum_path.exists():
+        for line in checksum_path.read_text().splitlines():
+            match = re.fullmatch(r"[0-9a-f]{64}  ([a-z0-9][a-z0-9.-]*\.zip)", line)
+            if not match:
+                raise ValueError(f"invalid generated archive checksum entry: {line!r}")
+            previous.add(match[1])
+    # Finish the entire build before replacing the previous submission set.
+    # Only files tracked by our prior checksum manifest may be removed.
+    with tempfile.TemporaryDirectory(prefix=".codex-archives-", dir=destination) as tmp:
+        staging = Path(tmp)
+        sums = []
+        current = set()
+        for entry in data["plugins"]:
+            dest = staging / f"{entry['plugin']}-{entry['version']}.zip"
+            sums.append(f"{archive(repo / entry['package'], dest)}  {dest.name}")
+            current.add(dest.name)
+        (staging / "SHA256SUMS").write_text("\n".join(sums) + ("\n" if sums else ""))
+        (staging / "readiness.json").write_text(json.dumps(data, indent=2) + "\n")
+        for name in sorted(current):
+            (staging / name).replace(destination / name)
+        for name in previous - current:
+            (destination / name).unlink(missing_ok=True)
+        for name in ("SHA256SUMS", "readiness.json"):
+            (staging / name).replace(destination / name)
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("repo", nargs="?", default=".")
@@ -172,13 +204,7 @@ def main():
         )
         return 1
     if args.archives:
-        args.archives.mkdir(parents=True, exist_ok=True)
-        sums = []
-        for entry in data["plugins"]:
-            dest = args.archives / f"{entry['plugin']}-{entry['version']}.zip"
-            sums.append(f"{archive(repo / entry['package'], dest)}  {dest.name}")
-        (args.archives / "SHA256SUMS").write_text("\n".join(sums) + "\n")
-        (args.archives / "readiness.json").write_text(json.dumps(data, indent=2) + "\n")
+        write_archives(repo, args.archives, data)
     if not (args.write_report or args.check or args.archives):
         print(json.dumps(data, indent=2))
     return int(

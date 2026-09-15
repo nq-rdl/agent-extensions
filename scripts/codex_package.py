@@ -132,7 +132,8 @@ def skill_copy(repo, source, leaf, dest, config, names):
     src = contained(repo / "skills", source)
     copy_source(src, dest)
     data, body = frontmatter((src / "SKILL.md").read_text())
-    if source in config.get("skillOverrides", {}):
+    native_override = source in config.get("skillOverrides", {})
+    if native_override:
         body = contained(src, config["skillOverrides"][source]).read_text()
     data = {key: value for key, value in data.items() if key in SKILL_KEYS}
     data["name"] = leaf
@@ -141,7 +142,12 @@ def skill_copy(repo, source, leaf, dest, config, names):
     if source not in SUBJECT_SKILLS:
         body = invocation_text(body, names)
         data["description"] = invocation_text(data.get("description", ""), names)
-        body = body.replace("AskUserQuestion", "the host user-question tool")
+        # Native overrides may explicitly forbid Claude's tools. Replacing a
+        # tool name there would invert the instruction's intended host scope.
+        if not native_override:
+            body = re.sub(
+                r"\bAskUserQuestion(?: tools?)?\b", "the host user-question tool", body
+            )
         body = body.replace("${CLAUDE_PLUGIN_ROOT}", "${PLUGIN_ROOT}")
     prelude = []
     legacy_terms = (
@@ -159,6 +165,15 @@ def skill_copy(repo, source, leaf, dest, config, names):
             "Legacy tool names and slash-qualified skill references in supporting references "
             "describe capabilities; they do not install those tools. Keep code/configuration "
             "examples for another host unchanged when authoring that host’s artifacts."
+        )
+    if any(
+        invocation_text(text, names) != text
+        for text in (p.read_text() for p in (src / "references").rglob("*.rst"))
+    ):
+        prelude.append(
+            "When supporting references invoke a catalog skill as /subject:facet, "
+            "use $subject:facet in Codex. Preserve slash syntax inside examples "
+            "that configure or document another host."
         )
     if source in SUBJECT_SKILLS:
         prelude.append(
