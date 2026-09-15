@@ -21,6 +21,25 @@ These are the *decisions* a fresh writer makes inconsistently, not a grammar
 lesson – your default grammar is fine. Long form, tables, and examples live in
 `references/house-style.rst`.
 
+## Mandatory STE review
+
+Before delivering documentation, apply the simplified STE profile in
+`references/ste-review.rst` and correct its findings. The plugin’s completion
+hook independently reviews the deliverable and blocks completion on findings.
+The profile takes precedence over the general house rules for sentence
+limits, contractions, and semicolons. It does not change project spelling or
+normative requirements. Blog posts and status-only replies are outside scope.
+
+ASD-STE100 includes both writing rules and a controlled dictionary. This
+profile is a practical subset, not a full compliance check. For a full
+compliance request, obtain the official standard and verify vocabulary,
+meaning, word forms, and technical terminology against it. Do not label the
+subset check as ASD-STE100 compliance.
+
+- [ASD-STE100](https://www.asd-ste100.org/)
+- [How STE works](https://www.asd-ste100.org/about_STE.html)
+- [Official copy](https://www.asd-ste100.org/STE_downloads.html)
+
 ## Stylepedia topic index
 
 At the start of a writing or copyedit task, scan this index for relevant
@@ -106,15 +125,15 @@ ADRs, requirements, or safety notes. Never strengthen or weaken that meaning.
 ## Punctuation and word decisions
 
 - Oxford comma in lists of three or more.
-- Use a semicolon between related independent clauses without a conjunction;
-  never join them with a comma alone.
+- In documentation, split related independent clauses into separate
+  sentences; the STE profile excludes semicolons. Never use a comma splice.
 - A slash means a combination (TCP/IP, client/server). **Never use a slash for
   "or"** – write "product or service".
 - Hyphenate compound modifiers before a noun: *read-only access*,
   *well-defined behaviour*, *5-point scale*, *command-line tool* (but
   *the command line*). Write *e-book* and *e-commerce*, but *email*.
-- Contractions are fine (*it's*, *don't*); never contract a noun
-  ("Proxmox's the leading …").
+- Expand contractions in documentation under the STE profile. Preserve
+  possessives and quoted text; do not expand a possessive as a contraction.
 - No *approx.* (write "about"), no *etc.*, no *e.g.* or *i.e.* – write
   "for example" and "that is". If a template forces them, it is "e.g.," and
   "i.e.," with the comma.
@@ -145,7 +164,7 @@ ADRs, requirements, or safety notes. Never strengthen or weaken that meaning.
 4. Fix words: abbreviations, acronyms, one term per concept, en-AU spelling.
 5. Fix punctuation: Oxford comma, semicolon, slash, compound-modifier hyphen,
    spaced en dash; heading case.
-6. Report each change as *before → after* with the rule that drove it.
+6. Apply the mandatory STE review before delivery. Report each change as *before → after* with the rule that drove it.
 
 Do not change meaning, code, commands, file paths, UI labels, or quoted
 program output. Leave a project's existing locale alone.

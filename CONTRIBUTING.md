@@ -259,3 +259,8 @@ network requests and does not change tool permissions. Claude versions without
 `UserPromptExpansion` still have the lookup instruction in the skill itself;
 agent preloads likewise rely on that instruction. Hook event details:
 https://code.claude.com/docs/en/hooks#userpromptexpansion
+
+The plugin also registers a native agent review on `Stop` and a targeted
+`SubagentStop`. These hooks block on findings in the simplified STE profile;
+see [Technical-writing completion review](docs/tech-writing-ste-review.md)
+for scope, source review, and harness limitations.

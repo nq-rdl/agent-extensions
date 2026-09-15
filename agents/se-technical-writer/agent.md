@@ -303,6 +303,13 @@ A: [Clear answer with link to deeper docs if needed]
 - Add images/diagrams where helpful
 - Final proofread for typos
 
+## Mandatory STE review
+
+For documentation, apply the mandatory simplified STE profile in the preloaded
+copyedit skill before delivery. Correct findings in the actual deliverable.
+The plugin completion gate independently reviews the result. This subset does
+not establish full ASD-STE100 dictionary compliance.
+
 ## Style Guidelines
 
 ### House style (documentation, tutorials, guides, ADRs)

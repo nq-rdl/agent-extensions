@@ -12,7 +12,7 @@
 #     5. hooks.json is valid JSON
 #     6. Each event maps to an array of rule groups
 #     7. Each rule group has a "hooks" array (not bare hook objects)
-#     8. Each hook entry has required "type" and "command" fields
+#     8. Each hook has a type and its command or model prompt
 #     9. Event names are from the known set
 #    10. Scripts referenced via ${CLAUDE_PLUGIN_ROOT} exist relative to plugin root
 #
@@ -208,8 +208,18 @@ for plugin_rel in "${plugins[@]}"; do
 
         [ -z "$hook_type" ] && \
           error "$hooks_json" "Event '$event' group[$i] hook[$j]: missing 'type' field"
-        [ -z "$hook_cmd" ] && \
-          error "$hooks_json" "Event '$event' group[$i] hook[$j]: missing 'command' field"
+        case "$hook_type" in
+          prompt|agent)
+            hook_prompt=$(jq -r --arg e "$event" --argjson i "$i" --argjson j "$j" \
+              '.hooks[$e][$i].hooks[$j].prompt // empty' "$hooks_json")
+            [ -z "$hook_prompt" ] && \
+              error "$hooks_json" "Event '$event' group[$i] hook[$j]: missing 'prompt' field"
+            ;;
+          *)
+            [ -z "$hook_cmd" ] && \
+              error "$hooks_json" "Event '$event' group[$i] hook[$j]: missing 'command' field"
+            ;;
+        esac
 
         if [[ "$hook_cmd" == *'${CLAUDE_PLUGIN_ROOT}'* ]]; then
           rel_script="${hook_cmd/\$\{CLAUDE_PLUGIN_ROOT\}/}"
