@@ -225,8 +225,9 @@ upstream's language.
   marker. This is original nq-rdl code, not an upstream derivation — see
   **Licensing** below.
 
-Beyond the entrypoint patch noted above, the vendored internals — broker, job
-store, socket protocol, app-server wiring — are untouched.
+The job store also uses atomic file replacement for state and job JSON, so status
+readers cannot observe a background worker's partially written record. The remaining
+vendored internals — broker, socket protocol, app-server wiring — are untouched.
 
 **Licensing.** Provenance is preserved with a split-license treatment:
 
