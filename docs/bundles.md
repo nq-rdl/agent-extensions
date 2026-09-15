@@ -48,7 +48,7 @@ subagents (auto-routed by their description).
 | [`tech-writing`](#tech-writing) | Technical writing — developer docs, tutorials, ADRs, and guides |
 | [`lucid`](#lucid) | Lucid — visual collaboration boards and diagrams (Lucidchart / Lucidspark) via the hosted Lucid MCP server |
 | [`pandera`](#pandera) | Pandera — dataframe schema validation and debugging for pandas and Polars |
-| [`sql-review`](#sql-review) | SQL Review — scope, analyse and explain SQL with standardised, human-confirmed assumption and limitation reports |
+| [`sql-code`](#sql-code) | SQL Code — scope, map, draft and validate cohort SQL with shared RDL guardrails and human-confirmed review handoffs |
 
 ## Install
 
@@ -514,15 +514,19 @@ Pandera — dataframe schema validation and debugging for pandas and Polars.
 
 ---
 
-## sql-review
+## sql-code
 
-SQL Review — scope, analyse and explain SQL with standardised, human-confirmed assumption and limitation reports.
+SQL Code — scope, map, draft and validate cohort SQL with shared RDL guardrails and human-confirmed review handoffs.
 
 **Skills**
 
-- `/sql-review:setup`
-- `/sql-review:bootstrap`
-- `/sql-review:analyse`
-- `/sql-review:explain`
+- `/sql-code:setup`
+- `/sql-code:bootstrap`
+- `/sql-code:analyse`
+- `/sql-code:explain`
+- `/sql-code:guardrails`
+- `/sql-code:map`
+- `/sql-code:draft`
+- `/sql-code:validate`
 
-**Hooks:** `sql-review-preflight`, `sql-review-guard`
+**Hooks:** `sql-code-preflight`, `sql-code-guard`

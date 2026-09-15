@@ -55,7 +55,7 @@ order:
   - tech-writing
   - lucid
   - pandera
-  - sql-review
+  - sql-code
 
 # External plugins are NOT re-hosted in this marketplace. Users install them from
 # their own upstream marketplaces via user-level Claude Code configuration. See
