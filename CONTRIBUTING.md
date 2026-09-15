@@ -39,7 +39,10 @@ If you're tempted to file something under two subjects, you've applied the wrong
 > `document-release` all invoke as `/gh:*`. `go-gh` ("GitHub Actions CI/CD **for Go**") is grouped
 > there too, as `/gh:actions-go`, even though its primary subject is **Go** — the one sanctioned
 > exception to "file by primary subject," not a precedent. The bare `actions` leaf is reserved for
-> a future generic GitHub Actions skill. File everything else by what it is *about*.
+> a future generic GitHub Actions skill. The `/git:pr-comments` entrypoint
+> is a separate packaging exception under `git`; existing GitHub workflow skills
+> remain in `gh` without duplication.
+> File everything else by what it is *about*.
 
 ### 3. The facet is always an action or stage
 
@@ -188,27 +191,27 @@ A new skill authored under `skills/<name>/` is **not installable until you map i
 — authoring the `SKILL.md` only adds it to the flat library; the registry decides which plugin
 (subject) it belongs to. CI enforces this: `scripts/check_exposure.py` fails if a canonical
 skill/agent/hook isn't referenced by any `registry/bundles/*.yaml` (or explicitly allowlisted in
-`registry/unbundled.yaml`). Here is the full loop, using a hypothetical `sql-review-analyse` skill
-that should become `sql-review:analyse`:
+`registry/unbundled.yaml`). Here is the full loop, using a hypothetical `sql-code-analyse` skill
+that should become `sql-code:analyse`:
 
-1. **Pick the subject and facet** (the rules above). Subject → the plugin (`sql-review`); facet →
+1. **Pick the subject and facet** (the rules above). Subject → the plugin (`sql-code`); facet →
    the action/stage leaf (`analyse`). Never repeat the subject in the facet.
-2. **Choose or create the bundle.** If `registry/bundles/sql-review.yaml` exists, add to it;
+2. **Choose or create the bundle.** If `registry/bundles/sql-code.yaml` exists, add to it;
    otherwise copy an existing single-subject bundle (e.g. `registry/bundles/sops.yaml`) and set
    `id`, `displayName`, `description` (no trailing period), `keywords`, and
-   `targets.claude.pluginName: sql-review`.
+   `targets.claude.pluginName: sql-code`.
 3. **Add the skill member.** Under `skills:`, write either a flat string (when the skill's
    directory name already equals the leaf you want) or a `{source, leaf}` mapping to rename:
    ```yaml
    skills:
-     - {source: sql-review-analyse, leaf: analyse}   # → /sql-review:analyse
+     - {source: sql-code-analyse, leaf: analyse}   # → /sql-code:analyse
    ```
-4. **If it is a brand-new subject, add it to the marketplace order.** Append `sql-review` to the
+4. **If it is a brand-new subject, add it to the marketplace order.** Append `sql-code` to the
    `order:` list in `registry/marketplace.yaml` (otherwise it is appended alphabetically with a
    CI `::warning::`).
 5. **Build the plugin tree and manifests:**
    ```bash
-   pixi run bash scripts/sync-plugins.sh sql-review     # copies skills/<source>/ → plugins/sql-review/skills/<leaf>/
+   pixi run bash scripts/sync-plugins.sh sql-code     # copies skills/<source>/ → plugins/sql-code/skills/<leaf>/
    pixi run python3 scripts/generate_manifests.py .     # writes plugin.json + marketplace.json
    pixi run python3 scripts/generate_bundles_doc.py .   # refreshes docs/bundles.md
    ```
@@ -243,3 +246,26 @@ Releases are dispatched from the Actions tab (**"Release — Prepare PR"**) and 
 reviewable `release/v<version>` PR — reviewing and squash-merging that PR is the release gate.
 Version rules (`X.Y.Z`, no leading `v`, no zero-padded components) and the recovery steps for a
 failed Prepare or Finalize run are in [`AGENTS.md`](AGENTS.md) under **"Release"**.
+
+## Bundled hooks
+
+A bundle can opt into generated hook packaging with a canonical
+`hooks/<pluginName>/hooks.json`. List its shell hooks by stem in the bundle’s
+`hooks:` array; `sync-plugins.sh` copies the config and `hooks/<name>.sh` files
+into `plugins/<pluginName>/hooks/`, removes stale copies, and checks drift with
+`--check`. This directory is generated once the canonical config exists.
+Commands use `bash "${CLAUDE_PLUGIN_ROOT}/hooks/<name>.sh"` for portable installs.
+Existing bundles without a canonical config retain their current packaging.
+
+The `tech-writing` reminder uses `jq` (silently skips if unavailable) and
+adds advisory context for `PreToolUse` on the `Skill` tool and
+`UserPromptExpansion` on a typed `/tech-writing:copyedit` command. It makes no
+network requests and does not change tool permissions. Claude versions without
+`UserPromptExpansion` still have the lookup instruction in the skill itself;
+agent preloads likewise rely on that instruction. Hook event details:
+https://code.claude.com/docs/en/hooks#userpromptexpansion
+
+The plugin also registers a native agent review on `Stop` and a targeted
+`SubagentStop`. These hooks block on findings in the simplified STE profile;
+see [Technical-writing completion review](docs/tech-writing-ste-review.md)
+for scope, source review, and harness limitations.

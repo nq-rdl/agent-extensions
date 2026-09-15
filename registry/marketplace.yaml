@@ -30,6 +30,7 @@ order:
   - writerside
   - defuddle
   - gh
+  - git
   - terraform
   - kubernetes
   - argo-cd
@@ -54,6 +55,8 @@ order:
   - debug
   - tech-writing
   - lucid
+  - pandera
+  - sql-code
 
 # External plugins are NOT re-hosted in this marketplace. Users install them from
 # their own upstream marketplaces via user-level Claude Code configuration. See

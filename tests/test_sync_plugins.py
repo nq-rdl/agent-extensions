@@ -391,3 +391,28 @@ class TestAgentSkillRewrite(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class TestCanonicalHookPackaging(unittest.TestCase):
+    def test_hook_install_is_self_contained_and_detects_drift(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            repo = Path(tmp)
+            write(repo / "registry/bundles/demo.yaml",
+                  "id: demo\nhooks: [reminder]\ntargets:\n  claude:\n    enabled: true\n")
+            write(repo / "hooks/demo/hooks.json", '{"hooks": {}}\n')
+            write(repo / "hooks/reminder.sh", "#!/bin/bash\nexit 0\n")
+            self.assertEqual(run_sync(repo).returncode, 0)
+            packaged = repo / "plugins/demo/hooks/reminder.sh"
+            self.assertFalse(packaged.is_symlink())
+            self.assertEqual(packaged.read_bytes(), (repo / "hooks/reminder.sh").read_bytes())
+            packaged.write_text("stale")
+            check = subprocess.run(["bash", str(repo / "scripts/sync-plugins.sh"), "--check"],
+                                   cwd=repo, capture_output=True, text=True)
+            self.assertNotEqual(check.returncode, 0)
+            self.assertEqual(packaged.read_text(), "stale")
+            self.assertEqual(run_sync(repo).returncode, 0)
+            self.assertEqual(packaged.read_bytes(), (repo / "hooks/reminder.sh").read_bytes())
+            write(repo / "registry/bundles/demo.yaml",
+                  "id: demo\nhooks: []\ntargets:\n  claude:\n    enabled: true\n")
+            self.assertEqual(run_sync(repo).returncode, 0)
+            self.assertFalse(packaged.exists())

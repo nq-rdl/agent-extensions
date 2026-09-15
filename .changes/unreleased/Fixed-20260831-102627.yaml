@@ -1,0 +1,3 @@
+kind: Fixed
+body: '/redhat:setup Bitwarden block: stops on a failed unlock/sync and refuses when another note''s name contains redhat-credentials (bw matches by substring), instead of creating a duplicate.'
+time: 2026-08-31T10:26:27.000000+00:00

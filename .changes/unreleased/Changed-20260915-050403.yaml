@@ -1,0 +1,3 @@
+kind: Changed
+body: Rename sql-review to sql-code for the full SQL workflow; preserve existing .sqlreview records and review helpers.
+time: 2026-09-15T05:04:03.789434058Z

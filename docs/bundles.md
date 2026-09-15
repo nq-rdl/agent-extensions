@@ -23,6 +23,7 @@ subagents (auto-routed by their description).
 | [`writerside`](#writerside) | Writerside — author and build JetBrains Writerside documentation |
 | [`defuddle`](#defuddle) | Defuddle — extract clean Markdown from cluttered web pages |
 | [`gh`](#gh) | GitHub workflow — git hooks, changelogs, conventional commits, pull requests, releases, Go CI/CD, and secure GitHub Actions (SHA pinning, OIDC, GitOps delivery) |
+| [`git`](#git) | Git PR feedback — review all comments, push fixes to the same PR, and resolve handled threads |
 | [`terraform`](#terraform) | Terraform — generate compliant HCL, review IaC for state safety, and author Terratest suites |
 | [`kubernetes`](#kubernetes) | Kubernetes — SRE-grade rollouts, HA design, and incident response |
 | [`argo-cd`](#argo-cd) | Argo CD — GitOps application management and sync for Kubernetes |
@@ -47,6 +48,8 @@ subagents (auto-routed by their description).
 | [`debug`](#debug) | Debugging and cleanup — systematic diagnosis and tech-debt removal |
 | [`tech-writing`](#tech-writing) | Technical writing — developer docs, tutorials, ADRs, and guides |
 | [`lucid`](#lucid) | Lucid — visual collaboration boards and diagrams (Lucidchart / Lucidspark) via the hosted Lucid MCP server |
+| [`pandera`](#pandera) | Pandera — dataframe schema validation and debugging for pandas and Polars |
+| [`sql-code`](#sql-code) | SQL Code — scope, map, draft and validate cohort SQL with shared RDL guardrails and human-confirmed review handoffs |
 
 ## Install
 
@@ -184,6 +187,16 @@ GitHub workflow — git hooks, changelogs, conventional commits, pull requests, 
 - `repo-architect` (subagent)
 - `github-actions-expert` (subagent)
 - `se-gitops-ci-specialist` (subagent)
+
+---
+
+## git
+
+Git PR feedback — review all comments, push fixes to the same PR, and resolve handled threads.
+
+**Skills**
+
+- `/git:pr-comments`
 
 ---
 
@@ -482,9 +495,15 @@ Debugging and cleanup — systematic diagnosis and tech-debt removal.
 
 Technical writing — developer docs, tutorials, ADRs, and guides.
 
+**Skills**
+
+- `/tech-writing:copyedit`
+
 **Agents**
 
 - `se-technical-writer` (subagent)
+
+**Hooks:** `stylepedia-reminder`
 
 ---
 
@@ -493,3 +512,32 @@ Technical writing — developer docs, tutorials, ADRs, and guides.
 Lucid — visual collaboration boards and diagrams (Lucidchart / Lucidspark) via the hosted Lucid MCP server.
 
 **MCP server(s):** `lucid`
+
+---
+
+## pandera
+
+Pandera — dataframe schema validation and debugging for pandas and Polars.
+
+**Skills**
+
+- `/pandera:validate`
+
+---
+
+## sql-code
+
+SQL Code — scope, map, draft and validate cohort SQL with shared RDL guardrails and human-confirmed review handoffs.
+
+**Skills**
+
+- `/sql-code:setup`
+- `/sql-code:bootstrap`
+- `/sql-code:analyse`
+- `/sql-code:explain`
+- `/sql-code:guardrails`
+- `/sql-code:map`
+- `/sql-code:draft`
+- `/sql-code:validate`
+
+**Hooks:** `sql-code-preflight`, `sql-code-guard`

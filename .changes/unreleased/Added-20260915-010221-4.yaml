@@ -1,0 +1,3 @@
+kind: Added
+body: '/sql-review:analyse (#130) reviews SQL against its scope into review.json/review.md; each rerun diffs the snapshot, walks through changes and reassesses every item.'
+time: 2026-09-15T01:02:21.000000+00:00

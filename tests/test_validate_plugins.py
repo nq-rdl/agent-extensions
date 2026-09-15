@@ -71,3 +71,22 @@ class TestSkillCopyResolvesByLeaf(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class TestReviewHookValidation(unittest.TestCase):
+    def test_model_hooks_require_prompt_and_command_hooks_require_command(self):
+        import json
+        for hook, valid in [
+            ({"type": "agent", "prompt": "Inspect the draft."}, True),
+            ({"type": "prompt", "prompt": "Review the reply."}, True),
+            ({"type": "agent"}, False),
+            ({"type": "prompt"}, False),
+            ({"type": "command"}, False),
+        ]:
+            with self.subTest(hook=hook), tempfile.TemporaryDirectory() as tmp:
+                repo = Path(tmp)
+                mapped_bundle_fixture(repo, "plugins/go/skills/gh")
+                write(repo / "plugins/go/hooks/hooks.json",
+                      json.dumps({"hooks": {"Stop": [{"hooks": [hook]}]}}))
+                result = run_validate(repo)
+                self.assertEqual(result.returncode == 0, valid, result.stderr)
