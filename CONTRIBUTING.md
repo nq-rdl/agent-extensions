@@ -39,7 +39,10 @@ If you're tempted to file something under two subjects, you've applied the wrong
 > `document-release` all invoke as `/gh:*`. `go-gh` ("GitHub Actions CI/CD **for Go**") is grouped
 > there too, as `/gh:actions-go`, even though its primary subject is **Go** — the one sanctioned
 > exception to "file by primary subject," not a precedent. The bare `actions` leaf is reserved for
-> a future generic GitHub Actions skill. File everything else by what it is *about*.
+> a future generic GitHub Actions skill. The `/git:pr-comments` entrypoint
+> is a separate packaging exception under `git`; existing GitHub workflow skills
+> remain in `gh` without duplication.
+> File everything else by what it is *about*.
 
 ### 3. The facet is always an action or stage
 
@@ -189,20 +192,20 @@ A new skill authored under `skills/<name>/` is **not installable until you map i
 — authoring the `SKILL.md` only adds it to the flat library; the registry decides which plugin
 (subject) it belongs to. CI enforces this: `scripts/check_exposure.py` fails if a canonical
 skill/hook isn't referenced by any `registry/bundles/*.yaml` (or explicitly allowlisted in
-`registry/unbundled.yaml`). Here is the full loop, using a hypothetical `sql-review-analyse` skill
-that should become `sql-review:analyse`:
+`registry/unbundled.yaml`). Here is the full loop, using a hypothetical `sql-code-analyse` skill
+that should become `sql-code:analyse`:
 
-1. **Pick the subject and facet** (the rules above). Subject → the plugin (`sql-review`); facet →
+1. **Pick the subject and facet** (the rules above). Subject → the plugin (`sql-code`); facet →
    the action/stage leaf (`analyse`). Never repeat the subject in the facet.
-2. **Choose or create the bundle.** If `registry/bundles/sql-review.yaml` exists, add to it;
+2. **Choose or create the bundle.** If `registry/bundles/sql-code.yaml` exists, add to it;
    otherwise copy an existing single-subject bundle (e.g. `registry/bundles/sops.yaml`) and set
    `id`, `displayName`, `description` (no trailing period), `keywords`, and
-   `targets.claude.pluginName: sql-review`.
+   `targets.claude.pluginName: sql-code`.
 3. **Add the skill member.** Under `skills:`, write either a flat string (when the skill's
    directory name already equals the leaf you want) or a `{source, leaf}` mapping to rename:
    ```yaml
    skills:
-     - {source: sql-review-analyse, leaf: analyse}   # → /sql-review:analyse
+     - {source: sql-code-analyse, leaf: analyse}   # → /sql-code:analyse
    ```
    To include a portable skill bundle in the current Codex pilot, add an explicit target. Keep
    non-skill components disabled until their Codex runtime validation exists:
@@ -210,7 +213,7 @@ that should become `sql-review:analyse`:
    targets:
      codex:
        enabled: true
-       pluginName: sql-review
+       pluginName: sql-code
        marketplaceName: rdl-agent-extensions
        category: Developer Tools
        components:
@@ -222,12 +225,12 @@ that should become `sql-review:analyse`:
    Codex-enabled skills must be usable by Codex itself. The pipeline unit tests reject
    `${CLAUDE_PLUGIN_ROOT}`, `AskUserQuestion`, and Claude-style `/plugin:skill` invocations in
    their canonical content. Convert those dependencies or leave the Codex target disabled.
-4. **If it is a brand-new subject, add it to the marketplace order.** Append `sql-review` to the
+4. **If it is a brand-new subject, add it to the marketplace order.** Append `sql-code` to the
    `order:` list in `registry/marketplace.yaml` (otherwise it is appended alphabetically with a
    CI `::warning::`).
 5. **Build the plugin tree and manifests:**
    ```bash
-   pixi run bash scripts/sync-plugins.sh sql-review     # copies skills/<source>/ → plugins/sql-review/skills/<leaf>/
+   pixi run bash scripts/sync-plugins.sh sql-code     # copies skills/<source>/ → plugins/sql-code/skills/<leaf>/
    pixi run python3 scripts/generate_manifests.py .     # writes Claude + Codex manifests
    pixi run python3 scripts/generate_bundles_doc.py .   # refreshes docs/bundles.md
    ```

@@ -24,6 +24,7 @@ Delegation outlines are optional skill references, not registered agent types.
 | [`writerside`](#writerside) | Yes | - | Writerside — author and build JetBrains Writerside documentation |
 | [`defuddle`](#defuddle) | Yes | - | Defuddle — extract clean Markdown from cluttered web pages |
 | [`gh`](#gh) | Yes | - | GitHub workflow — git hooks, changelogs, conventional commits, pull requests, releases, Go CI/CD, and secure GitHub Actions (SHA pinning, OIDC, GitOps delivery) |
+| [`git`](#git) | Yes | - | Git PR feedback — review all comments, push fixes to the same PR, and resolve handled threads |
 | [`terraform`](#terraform) | Yes | - | Terraform — generate compliant HCL, review IaC for state safety, and author Terratest suites |
 | [`kubernetes`](#kubernetes) | Yes | - | Kubernetes — SRE-grade rollouts, HA design, and incident response |
 | [`argo-cd`](#argo-cd) | Yes | - | Argo CD — GitOps application management and sync for Kubernetes |
@@ -49,7 +50,7 @@ Delegation outlines are optional skill references, not registered agent types.
 | [`tech-writing`](#tech-writing) | Yes | - | Technical writing — developer docs, tutorials, ADRs, and guides |
 | [`lucid`](#lucid) | Yes | - | Lucid — visual collaboration boards and diagrams (Lucidchart / Lucidspark) via the hosted Lucid MCP server |
 | [`pandera`](#pandera) | Yes | - | Pandera — dataframe schema validation and debugging for pandas and Polars |
-| [`sql-review`](#sql-review) | Yes | - | SQL Review — scope, analyse and explain SQL with standardised, human-confirmed assumption and limitation reports |
+| [`sql-code`](#sql-code) | Yes | - | SQL Code — scope, map, draft and validate cohort SQL with shared RDL guardrails and human-confirmed review handoffs |
 
 ## Install
 
@@ -222,6 +223,16 @@ GitHub workflow — git hooks, changelogs, conventional commits, pull requests, 
 - `/gh:configure-repo`
 - `/gh:actions`
 - `/gh:debug-delivery`
+
+---
+
+## git
+
+Git PR feedback — review all comments, push fixes to the same PR, and resolve handled threads.
+
+**Claude Code skills**
+
+- `/git:pr-comments`
 
 ---
 
@@ -529,15 +540,19 @@ Pandera — dataframe schema validation and debugging for pandas and Polars.
 
 ---
 
-## sql-review
+## sql-code
 
-SQL Review — scope, analyse and explain SQL with standardised, human-confirmed assumption and limitation reports.
+SQL Code — scope, map, draft and validate cohort SQL with shared RDL guardrails and human-confirmed review handoffs.
 
 **Claude Code skills**
 
-- `/sql-review:setup`
-- `/sql-review:bootstrap`
-- `/sql-review:analyse`
-- `/sql-review:explain`
+- `/sql-code:setup`
+- `/sql-code:bootstrap`
+- `/sql-code:analyse`
+- `/sql-code:explain`
+- `/sql-code:guardrails`
+- `/sql-code:map`
+- `/sql-code:draft`
+- `/sql-code:validate`
 
-**Claude Code hooks:** `sql-review-preflight`, `sql-review-guard`
+**Claude Code hooks:** `sql-code-preflight`, `sql-code-guard`

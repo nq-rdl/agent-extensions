@@ -1,0 +1,26 @@
+schemaVersion: v1
+id: sql-code
+displayName: SQL Code
+description: SQL Code — scope, map, draft and validate cohort SQL with shared RDL guardrails and human-confirmed review handoffs
+keywords: [sql, cohort, guardrails, mapping, drafting, validation, review, handoff]
+owners:
+  - rdl
+channels:
+  - stable
+skills:
+  - {source: sql-code-setup, leaf: setup}          # → /sql-code:setup
+  - {source: sql-code-bootstrap, leaf: bootstrap}  # → /sql-code:bootstrap
+  - {source: sql-code-analyse, leaf: analyse}      # → /sql-code:analyse
+  - {source: sql-code-explain, leaf: explain}      # → /sql-code:explain
+  - {source: sql-code-guardrails, leaf: guardrails}
+  - {source: sql-code-map, leaf: map}
+  - {source: sql-code-draft, leaf: draft}
+  - {source: sql-code-validate, leaf: validate}
+hooks: [sql-code-preflight, sql-code-guard]
+prompts: []
+mcp: []
+targets:
+  claude:
+    enabled: true
+    pluginName: sql-code
+    marketplaceName: rdl-agent-extensions

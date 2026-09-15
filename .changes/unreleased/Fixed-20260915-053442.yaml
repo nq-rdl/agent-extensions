@@ -1,0 +1,3 @@
+kind: Fixed
+body: Document SQL discovery during setup and require template invocation migration and affected report rerendering when replacing SQL Review.
+time: 2026-09-15T05:34:42.112967743Z

@@ -1,0 +1,17 @@
+schemaVersion: v1
+id: git
+displayName: Git
+description: Git PR feedback — review all comments, push fixes to the same PR, and resolve handled threads
+keywords: [git, github, pull-request, review, comments]
+owners: [rdl]
+channels: [stable]
+skills:
+  - pr-comments
+hooks: []
+prompts: []
+mcp: []
+targets:
+  claude:
+    enabled: true
+    pluginName: git
+    marketplaceName: rdl-agent-extensions

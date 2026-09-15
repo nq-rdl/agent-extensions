@@ -1,0 +1,10 @@
+{
+  "name": "sql-code",
+  "version": "0.29.0",
+  "description": "SQL Code — scope, map, draft and validate cohort SQL with shared RDL guardrails and human-confirmed review handoffs",
+  "author": {
+    "name": "nq-rdl"
+  },
+  "repository": "https://github.com/nq-rdl/agent-extensions",
+  "license": "MIT"
+}

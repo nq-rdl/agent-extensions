@@ -12,16 +12,16 @@ Devcontainer run from the host:
 
 The Claude live test is a local acceptance gate; it is not currently wired into CI.
 
-# SQL Review plugin smoke E2E
+# SQL Code plugin smoke E2E
 
-`sql-review-smoke.sh` asserts the `sql-review` plugin end-state (#131) and drives its helper and
+`sql-code-smoke.sh` asserts the `sql-code` plugin end-state (#131) and drives its helper and
 hooks; `--live` additionally installs the plugin with the `claude` CLI, exercises the **installed**
-copies, and runs the first-run acceptance test (`claude -p '/sql-review:setup --default --yes'`
+copies, and runs the first-run acceptance test (`claude -p '/sql-code:setup --default --yes'`
 must create `.sqlreview/config.json`). Without credentials that last step is reported `SKIP` and
 the run is RED — it is required, not optional.
 
-- Static: `bash tests/e2e/sql-review-smoke.sh`
-- Live (inside the sandbox container): `bash tests/e2e/sql-review-smoke.sh --live`
+- Static: `bash tests/e2e/sql-code-smoke.sh`
+- Live (inside the sandbox container): `bash tests/e2e/sql-code-smoke.sh --live`
 
 Without the `devcontainer` CLI, build and run the sandbox with Docker directly. Mount the repo at
 its host path (a git worktree's `.git` file points at the main checkout, so mount that too), run
@@ -34,7 +34,7 @@ as the host uid, and give Claude a throwaway home seeded with your own OAuth cre
     docker run --rm --user "$(id -u):$(id -g)" -e HOME=/tmp/home -e CLAUDE_CONFIG_DIR=/tmp/home/.claude \
       -e WORKSPACE_DIR="$W" -e PATH=/usr/local/share/npm-global/bin:/home/node/.pixi/bin:/usr/local/bin:/usr/bin:/bin \
       -v "$H":/tmp/home -v "$W":"$W" -v "$G":"$G" -w "$W" rdl-plugin-sandbox \
-      bash -c 'git config --global --add safe.directory "*"; pixi run python3 -m unittest discover -s tests -p "test_sql_review_*.py"; bash tests/e2e/sql-review-smoke.sh --live'
+      bash -c 'git config --global --add safe.directory "*"; pixi run python3 -m unittest discover -s tests -p "test_sql_*.py"; bash tests/e2e/sql-code-smoke.sh --live'
 
 # Codex plugin smoke E2E
 
@@ -46,4 +46,4 @@ same smoke test with a read-only checkout and networking disabled.
 Coverage includes all enabled marketplace plugins, qualified skill discovery,
 complete cached skill trees (including delegation references), removal, and
 reinstallation. It needs no API key and makes no model requests. The Claude SQL
-Review first-run model test above remains a separate authenticated acceptance test.
+Code first-run model test above remains a separate authenticated acceptance test.
