@@ -208,8 +208,9 @@ scan_standalone_skills() {
 # Output: "plugin-name|install-path" lines
 # ---------------------------------------------------------------------------
 get_plugin_paths() {
-  jq -r '
+  jq -r --arg mode "$catalog_mode" '
     .plugins | to_entries[] |
+    select($mode != "sql" or .key == "sql-code@rdl-agent-extensions") |
     (.key | split("@")[0]) as $name |
     .value[0].installPath as $path |
     "\($name)|\($path)"
@@ -324,31 +325,31 @@ main() {
   trap 'rm -f "$SEEN_NAMES_FILE"' EXIT
 
   # Scan standalone skills
-  local skill_data
-  skill_data=$(scan_standalone_skills | sort)
+  local skill_data=""
+  if [[ "$catalog_mode" == all ]]; then
+    skill_data=$(scan_standalone_skills | sort)
+  fi
 
   # Scan plugin skills and commands (requires jq)
   local cmd_data=""
   if command -v jq >/dev/null 2>&1 && [[ -f "$PLUGINS_JSON" ]]; then
     local ps pc
     ps=$(scan_plugin_skills | sort)
-    pc=$(scan_plugin_commands | sort)
+    pc=""
+    if [[ "$catalog_mode" == all ]]; then
+      pc=$(scan_plugin_commands | sort)
+    fi
     if [[ -n "$ps" ]]; then
       skill_data=$(printf '%s\n%s\n' "$skill_data" "$ps" | grep -v '^$' | sort)
     fi
     cmd_data="$pc"
-  else
+  elif [[ "$catalog_mode" == all ]]; then
     printf 'forced-eval-hook: jq not found or %s missing — plugin skills skipped\n' \
       "$PLUGINS_JSON" >&2
   fi
 
-  # SQL prompts get fresh, installed SQL Code entries only. Never reuse/write the
-  # full-catalogue cache here: installation changes must be visible immediately,
-  # and a SQL-specific result must not poison later explicit skill-use discovery.
-  if [[ "$catalog_mode" == sql ]]; then
-    skill_data=$(printf '%s\n' "$skill_data" | grep -E '^sql-code(:|-)' || true)
-    cmd_data=""
-  fi
+  # SQL mode selects the exact installation before parsing skills, skips
+  # standalone skills and commands, and never reads or writes the full cache.
 
   # Format skill list. `|| true` keeps an empty skill_data from tripping
   # `set -o pipefail` — grep -v exits 1 when it filters every line away.

@@ -68,6 +68,28 @@ bash "$S/sqlreview.sh" init --apply templates/review.md     # only the files the
 A `new` file (added by a newer plugin version) is applied after a single confirmation. `same`
 files need nothing. Report what changed and what was kept.
 
+### Migrating from SQL Review
+
+Before removing the old plugin, inspect both project templates for `/sql-review:`
+invocations. For unchanged defaults, confirm and apply each replacement with
+`init --apply templates/scope.md templates/review.md`. For customised templates,
+show a targeted diff changing only `/sql-review:` to `/sql-code:` and apply the
+confirmed edits, preserving custom sections and placeholders. `--check` reports
+these pending changes without writing. Keeping an old invocation leaves migration
+incomplete; report that explicitly.
+
+For each existing `reviews/<slug>/scope.md` or `review.md` containing an old
+invocation, rerender from its corresponding JSON after updating the template:
+
+```bash
+bash "$S/sqlreview.sh" render "<slug>" scope    # or review, for each affected report
+```
+
+Inspect any report customisations before rerendering and preserve them with the
+user's chosen template edits. Verify no `/sql-review:` invocations remain in the
+active templates and reports. Do not rewrite JSON, snapshots or history; report
+missing source JSON or any retained old invocations as incomplete migration.
+
 ## 3. Verify and hand over
 
 ```bash

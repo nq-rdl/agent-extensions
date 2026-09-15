@@ -66,6 +66,44 @@ class SqlDiscovery(unittest.TestCase):
         self.install(sql=False)
         self.assertEqual(self.run_hook("Draft cohort SQL"), "")
 
+    def test_standalone_sql_names_do_not_trigger_sql_discovery(self):
+        self.install(sql=False)
+        for name in ("sql-code-custom", "sql-code"):
+            skill = self.home / ".claude/skills" / name / "SKILL.md"
+            skill.parent.mkdir(parents=True)
+            skill.write_text("---\nname: custom\ndescription: Standalone SQL\n---\n")
+        self.assertEqual(self.run_hook("Draft cohort SQL"), "")
+        self.assertIn("Standalone SQL", self.run_hook("Use a skill"))
+
+    def test_same_plugin_name_from_another_marketplace_is_excluded(self):
+        self.manifest.write_text(json.dumps({"plugins": {
+            "sql-code@another-marketplace": [
+                {"installPath": str(REPO / "plugins/sql-code")}]
+        }}))
+        self.assertEqual(self.run_hook("Draft cohort SQL"), "")
+        self.assertIn("sql-code:guardrails", self.run_hook("Use a skill"))
+
+    def test_sql_mode_does_not_parse_unrelated_files_or_commands(self):
+        standalone = self.home / ".claude/skills/sql-code-custom/SKILL.md"
+        standalone.parent.mkdir(parents=True)
+        standalone.write_text("---\ndescription: Unrelated standalone\n---\n")
+        plugin = self.home / "unrelated-plugin"
+        for rel in ("skills/unrelated/SKILL.md", "commands/unrelated.md"):
+            path = plugin / rel
+            path.parent.mkdir(parents=True, exist_ok=True)
+            path.write_text("---\ndescription: Unrelated plugin entry\n---\n")
+        plugins = json.loads(self.manifest.read_text())
+        plugins["plugins"]["unrelated@example"] = [{"installPath": str(plugin)}]
+        self.manifest.write_text(json.dumps(plugins))
+        result = subprocess.run(
+            ["bash", "-x", str(HOOK)], input=json.dumps({"prompt": "Draft SQL"}),
+            text=True, capture_output=True, env=self.env, check=True)
+        self.assertIn("sql-code:guardrails", result.stdout)
+        self.assertNotIn(str(standalone), result.stderr)
+        self.assertNotIn(str(plugin), result.stderr)
+        self.assertNotIn("scan_plugin_commands", result.stderr)
+        self.assertNotIn(str(REPO / "plugins/go/skills"), result.stderr)
+
     def test_installation_is_visible_after_cache_was_built_without_sql(self):
         self.install(sql=False)
         self.assertNotIn("sql-code:guardrails", self.run_hook("Use a skill"))

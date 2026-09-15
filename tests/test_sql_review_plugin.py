@@ -1,6 +1,6 @@
 """Structural tests for the sql-code plugin: registry, skills, hooks wiring, policy note.
 
-These pin the packaging contract (docs/specs/2026-09-15-sql-review-plugin-design.md §1, §5) that
+These pin the packaging contract (docs/specs/2026-09-15-sql-code-plugin-design.md) that
 the generic validators do not know about: eight action facets, both hooks wired, every skill
 user-invocable with AskUserQuestion available, the consumer skills pointing at /sql-code:setup,
 setup exempt from the initialisation gate, and the language-policy row that sanctions the shell helper.
@@ -16,7 +16,9 @@ import yaml
 REPO = Path(__file__).resolve().parent.parent
 BUNDLE = REPO / "registry" / "bundles" / "sql-code.yaml"
 PLUGIN = REPO / "plugins" / "sql-code"
-SKILLS = {leaf: REPO / "skills" / f"sql-code-{leaf}" for leaf in ("setup", "bootstrap", "analyse", "explain")}
+RECORD_STAGES = ("setup", "bootstrap", "analyse", "explain")
+SKILLS = {leaf: REPO / "skills" / f"sql-code-{leaf}"
+          for leaf in (*RECORD_STAGES, "guardrails", "map", "draft", "validate")}
 
 
 def frontmatter(skill_md: Path) -> dict:
@@ -29,7 +31,7 @@ class Registry(unittest.TestCase):
         data = yaml.safe_load(BUNDLE.read_text())
         self.assertEqual(data["targets"]["claude"]["pluginName"], "sql-code")
         members = {m["source"]: m["leaf"] for m in data["skills"]}
-        self.assertEqual(members, {f"sql-code-{leaf}": leaf for leaf in (*SKILLS, "guardrails", "map", "draft", "validate")})
+        self.assertEqual(members, {f"sql-code-{leaf}": leaf for leaf in SKILLS})
         self.assertEqual(sorted(data["hooks"]), ["sql-code-guard", "sql-code-preflight"])
         self.assertFalse(data["description"].endswith("."))
 
@@ -47,7 +49,9 @@ class Skills(unittest.TestCase):
                 self.assertTrue(fm.get("user-invocable"))
                 self.assertIn("AskUserQuestion", fm.get("allowed-tools", ""))
                 self.assertIn("argument-hint", fm)
-                self.assertIn("schema", str(fm.get("compatibility", "")))
+                self.assertTrue(fm.get("compatibility"))
+                if leaf in RECORD_STAGES:
+                    self.assertIn("schema", fm["compatibility"])
                 self.assertEqual(fm["metadata"]["repo"], "https://github.com/nq-rdl/agent-extensions")
 
     def test_consumer_skills_point_at_setup_and_setup_is_exempt(self):

@@ -34,4 +34,4 @@ as the host uid, and give Claude a throwaway home seeded with your own OAuth cre
     docker run --rm --user "$(id -u):$(id -g)" -e HOME=/tmp/home -e CLAUDE_CONFIG_DIR=/tmp/home/.claude \
       -e WORKSPACE_DIR="$W" -e PATH=/usr/local/share/npm-global/bin:/home/node/.pixi/bin:/usr/local/bin:/usr/bin:/bin \
       -v "$H":/tmp/home -v "$W":"$W" -v "$G":"$G" -w "$W" rdl-plugin-sandbox \
-      bash -c 'git config --global --add safe.directory "*"; pixi run python3 -m unittest discover -s tests -p "test_sql_review_*.py"; bash tests/e2e/sql-code-smoke.sh --live'
+      bash -c 'git config --global --add safe.directory "*"; pixi run python3 -m unittest discover -s tests -p "test_sql_*.py"; bash tests/e2e/sql-code-smoke.sh --live'

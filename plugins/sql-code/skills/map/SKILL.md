@@ -18,7 +18,9 @@ hierarchy. This action proposes mappings; it requires no `.sqlreview/` setup.
 Arguments: `$ARGUMENTS`.
 
 Read the request and any supplied scope. Identify population, output grain, anchor,
-window and requested concepts; use existing confirmed decisions without asking again.
+window and requested concepts. Reuse a confirmed decision only when the supplied
+request or scope records the human answer and it applies to this mapping; otherwise
+label it unresolved. Autonomous mode never supplies business decisions or confirmations.
 Inspect actual column specs, their dataops `CREATE TABLE` comments, resolver code and
 tests. Verify the checked-out resolver API from that source before proposing an API change.
 

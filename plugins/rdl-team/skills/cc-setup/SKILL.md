@@ -199,8 +199,9 @@ tree's own copy. This install has no automatic self-exclusion, so you must exclu
 
 Tell the user, concisely:
 - The scope chosen, the script path installed, and the settings file touched.
-- That the hook only fires when a prompt expresses intent to use a skill — it is a
-  silent no-op otherwise.
+- That explicit skill-use prompts surface the full catalogue; ordinary SQL/cohort
+  prompts surface skills from `sql-code@rdl-agent-extensions` when installed.
+  Other prompts, and SQL prompts without that plugin, are silent no-ops.
 - For **project** scope: commit `.claude/hooks/forced-eval-hook.sh` and the settings
   change so the team picks them up (or note it is personal if they chose
   `settings.local.json`).

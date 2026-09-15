@@ -45,7 +45,8 @@ The team's `forced-eval-hook.sh` now has two advisory paths:
 
 - Explicit requests to use a skill retain the full catalogue.
 - Prompts mentioning SQL, cohorts, `CLINICAL_EVENT`, or query-builder resolvers scan
-  installed skills fresh and surface only SQL Code entries, including guardrails.
+  only the exact `sql-code@rdl-agent-extensions` installation fresh and surface its
+  skills, including guardrails. Standalone skills and other plugins are not scanned.
 
 SQL-specific discovery neither consumes nor overwrites the full-catalogue cache and
 stays quiet when SQL Code is absent. Other prompts remain silent. This prompt gate is
@@ -55,12 +56,22 @@ through the task. The hook is advisory and cannot guarantee model compliance.
 
 ## Migration
 
-Install `sql-code@rdl-agent-extensions` in place of `sql-review@rdl-agent-extensions`;
-remove the old plugin installation so its hooks do not run twice. Existing calls change
-from `/sql-review:<action>` to `/sql-code:<action>`. No compatibility alias is shipped.
+1. Install `sql-code@rdl-agent-extensions`.
+2. In every initialized project, run `/sql-code:setup` and complete its SQL Review
+   migration: confirm replacement of both default templates, or update only
+   `/sql-review:` invocations in customised templates while preserving custom content.
+   Plain `init` does not replace existing templates.
+3. Rerender affected scope/review Markdown reports from their existing JSON using
+   `sqlreview.sh render <slug> scope|review`. Verify active templates and reports
+   contain no old invocations; resolve missing JSON or retained old links before
+   declaring migration complete.
+4. Change saved calls to `/sql-code:<action>`, then remove
+   `sql-review@rdl-agent-extensions` so its hooks do not run twice.
+   No compatibility alias is shipped.
 
-Keep existing `.sqlreview/` directories, config schema 1, templates, scope/review JSON,
-snapshots and history. The `sqlreview.sh` helper name and persisted format stay stable.
+Keep existing `.sqlreview/` directories, config schema 1, scope/review JSON, snapshots
+and history. Preserve template customisations while migrating their invocations.
+The `sqlreview.sh` helper name and persisted format stay stable.
 Canonical hook names become `sql-code-preflight` and `sql-code-guard`; their configuration
 lives in `hooks/sql-code/hooks.json`, and the existing sync script generates all packaged
 hook files under `plugins/sql-code/hooks/`.
