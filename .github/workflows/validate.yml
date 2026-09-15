@@ -99,6 +99,12 @@ jobs:
       - name: Smoke test native Codex marketplace installation and skill discovery
         run: scripts/smoke-codex-marketplace.sh
 
+      - name: Install Codex CLI 0.154.0
+        run: npm install --global @openai/codex@0.154.0
+
+      - name: Smoke test Codex 0.154.0 compatibility
+        run: scripts/smoke-codex-marketplace.sh
+
   unit-tests:
     name: Unit tests (pipeline scripts)
     runs-on: ubuntu-latest

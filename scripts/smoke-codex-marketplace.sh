@@ -79,20 +79,47 @@ for qualified in "${expected_skills[@]}"; do
   fi
 done
 
-sample_skill="${expected_skills[0]}"
-sample_plugin="${sample_skill%%:*}"
-sample_leaf="${sample_skill#*:}"
-sample_source="$REPO_ROOT/plugins/$sample_plugin/skills/$sample_leaf/SKILL.md"
-sample_paths=(
-  "$CODEX_HOME/plugins/cache/$MARKETPLACE_NAME/$sample_plugin"/*/skills/"$sample_leaf"/SKILL.md
-)
-if [ "${#sample_paths[@]}" -ne 1 ]; then
-  echo "FATAL: discovered plugin skill $sample_skill has no unique cached copy" >&2
-  exit 1
-fi
-if ! cmp -s "$sample_source" "${sample_paths[0]}"; then
-  echo "FATAL: discovered plugin skill $sample_skill does not match its packaged body" >&2
-  exit 1
-fi
+# Compare whole installed skill trees, including references, scripts, and assets.
+# Discovery alone would miss a package whose SKILL.md survives but helpers do not.
+for plugin in "${expected_plugins[@]}"; do
+  cached_skills=("$CODEX_HOME/plugins/cache/$MARKETPLACE_NAME/$plugin"/*/skills)
+  if [ "${#cached_skills[@]}" -ne 1 ]; then
+    echo "FATAL: $plugin has no unique cached skills directory" >&2
+    exit 1
+  fi
+  diff -r "$REPO_ROOT/plugins/$plugin/skills" "${cached_skills[0]}"
+done
 
-echo "Codex marketplace smoke test passed: ${#expected_plugins[@]} plugins installed; ${#expected_skills[@]} skills available."
+for plugin in "${expected_plugins[@]}"; do
+  "$CODEX_BIN" plugin remove "$plugin@$MARKETPLACE_NAME" --json >/dev/null
+  cached_skills=("$CODEX_HOME/plugins/cache/$MARKETPLACE_NAME/$plugin"/*/skills)
+  if [ "${#cached_skills[@]}" -ne 0 ]; then
+    echo "FATAL: removed plugin $plugin still has cached skills" >&2
+    exit 1
+  fi
+done
+removed_input="$($CODEX_BIN debug prompt-input "List available skills.")"
+for qualified in "${expected_skills[@]}"; do
+  if jq -e --arg prefix "- $qualified:" \
+    '.. | strings | split("\n")[] | select(startswith($prefix))' \
+    <<<"$removed_input" >/dev/null; then
+    echo "FATAL: removed skill $qualified is still discovered" >&2
+    exit 1
+  fi
+done
+
+# Reinstall from the still-registered marketplace to catch stale removal state.
+for plugin in "${expected_plugins[@]}"; do
+  "$CODEX_BIN" plugin add "$plugin@$MARKETPLACE_NAME" --json >/dev/null
+done
+reinstalled_input="$($CODEX_BIN debug prompt-input "List available skills.")"
+for qualified in "${expected_skills[@]}"; do
+  jq -e --arg prefix "- $qualified:" \
+    '.. | strings | split("\n")[] | select(startswith($prefix))' \
+    <<<"$reinstalled_input" >/dev/null || {
+    echo "FATAL: reinstalled skill $qualified was not discovered" >&2
+    exit 1
+  }
+done
+
+echo "Codex marketplace smoke test passed: ${#expected_plugins[@]} plugins; ${#expected_skills[@]} skills; cache contents, removal, and reinstallation verified."

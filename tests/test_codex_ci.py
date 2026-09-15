@@ -18,6 +18,7 @@ class TestCodexCi(unittest.TestCase):
 
         self.assertIn("name: Validate Claude plugin structure, hooks, and agents", workflow)
         self.assertIn("@openai/codex@0.152.0", workflow)
+        self.assertIn("@openai/codex@0.154.0", workflow)
         self.assertIn("scripts/smoke-codex-marketplace.sh", workflow)
 
     def test_local_generated_drift_hook_includes_codex_marketplace(self):
@@ -30,7 +31,7 @@ class TestCodexCi(unittest.TestCase):
 
         self.assertIn('expected_skills+=("$plugin:$(basename "$skill_dir")")', smoke)
         self.assertIn('for qualified in "${expected_skills[@]}"', smoke)
-        self.assertIn("cmp -s", smoke)
+        self.assertIn('diff -r "$REPO_ROOT/plugins/$plugin/skills"', smoke)
         self.assertNotIn("mapfile", smoke)
         self.assertNotIn("go:naming", smoke)
 

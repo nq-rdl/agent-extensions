@@ -48,11 +48,21 @@ Contributors can run the isolated local smoke test with:
 scripts/smoke-codex-marketplace.sh
 ```
 
-CI installs the pinned `@openai/codex@0.152.0` CLI and runs the same test. The
+CI runs the same test with pinned Codex CLI versions `0.152.0` and `0.154.0`. The
 test installs every generated marketplace entry into an isolated `CODEX_HOME`,
 then verifies that all 10 pilot skills contribute their qualified names to a
-clean session's structured skill input and that a discovered installed copy has
-its packaged body.
+clean session's structured skill input. It compares every installed skill tree,
+including references, scripts, and assets, against the package, then verifies
+that removal clears the cache and discovery and reinstallation restores discovery.
+
+These checks run without an API key and do not execute model requests. For a
+manual execution check, install from the branch, start a new authenticated Codex
+session, and ask `$go:naming` to review a small Go naming example. Confirm Codex
+reads the installed skill and applies its guidance. For a skill with references,
+also confirm Codex can read the relevant reference from the installed cache.
+
+Use Codex CLI or the desktop app for plugins. The IDE extension does not currently
+support plugin installation; see the [supported surfaces](https://learn.chatgpt.com/docs/plugins).
 
 ## Scope
 
