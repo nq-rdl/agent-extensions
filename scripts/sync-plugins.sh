@@ -314,6 +314,33 @@ def sync_agent(plugin: str, agent: str, bundle_file: Path, skill_leaf_map: dict)
     print(f"  ✓ agent {agent}")
 
 
+def sync_hooks(plugin, hook_names):
+    # Opt-in: canonical bundle config owns the entire packaged hooks directory.
+    # Existing bundles without this source keep their current hook packaging.
+    config = repo / "hooks" / plugin / "hooks.json"
+    if not config.is_file():
+        return
+    with tempfile.TemporaryDirectory() as tmp:
+        expected = Path(tmp) / "hooks"
+        expected.mkdir()
+        shutil.copy2(config, expected / "hooks.json")
+        for name in hook_names:
+            source = repo / "hooks" / f"{name}.sh"
+            if not source.is_file():
+                sys.exit(f"::error::Missing canonical hook: {source}")
+            shutil.copy2(source, expected / source.name)
+        dst = repo / "plugins" / plugin / "hooks"
+        if check:
+            for difference in compare_trees(expected, dst):
+                drift.append(f"plugins/{plugin}/hooks: {difference}")
+        else:
+            if dst.is_symlink():
+                dst.unlink()
+            elif dst.exists():
+                shutil.rmtree(dst)
+            shutil.copytree(expected, dst)
+
+
 for bundle_file in bundle_files:
     with bundle_file.open() as f:
         data = yaml.safe_load(f) or {}
@@ -324,6 +351,8 @@ for bundle_file in bundle_files:
         continue
     plugin = claude.get("pluginName") or data.get("id") or bundle
     print(f"{'Checking' if check else 'Syncing'} {bundle} -> plugins/{plugin}")
+
+    sync_hooks(plugin, list(data.get("hooks") or []))
 
     skills = list(data.get("skills") or [])
     agents = list(data.get("agents") or [])

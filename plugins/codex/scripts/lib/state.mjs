@@ -1,4 +1,7 @@
-import { createHash } from "node:crypto";
+// SPDX-License-Identifier: Apache-2.0
+// Derived from openai/codex-plugin-cc v1.0.6 (db52e28). Modified for atomic state writes.
+
+import { createHash, randomUUID } from "node:crypto";
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
@@ -89,6 +92,18 @@ function removeFileIfExists(filePath) {
   }
 }
 
+// Background workers update these files while status/result reads them. Publish a
+// complete sibling file with rename so readers never see truncated or partial JSON.
+function writeJsonAtomic(file, payload) {
+  const temp = `${file}.${randomUUID()}.tmp`;
+  try {
+    fs.writeFileSync(temp, `${JSON.stringify(payload, null, 2)}\n`, { encoding: "utf8", flag: "wx" });
+    fs.renameSync(temp, file);
+  } finally {
+    fs.rmSync(temp, { force: true });
+  }
+}
+
 export function saveState(cwd, state) {
   const previousJobs = loadState(cwd).jobs;
   ensureStateDir(cwd);
@@ -111,7 +126,7 @@ export function saveState(cwd, state) {
     removeFileIfExists(job.logFile);
   }
 
-  fs.writeFileSync(resolveStateFile(cwd), `${JSON.stringify(nextState, null, 2)}\n`, "utf8");
+  writeJsonAtomic(resolveStateFile(cwd), nextState);
   return nextState;
 }
 
@@ -166,7 +181,7 @@ export function getConfig(cwd) {
 export function writeJobFile(cwd, jobId, payload) {
   ensureStateDir(cwd);
   const jobFile = resolveJobFile(cwd, jobId);
-  fs.writeFileSync(jobFile, `${JSON.stringify(payload, null, 2)}\n`, "utf8");
+  writeJsonAtomic(jobFile, payload);
   return jobFile;
 }
 

@@ -1,3 +1,0 @@
-kind: Added
-body: 'redhat hooks: SessionStart preflight context and a PreToolUse guard (curl/wget only, no token leakage, credential required for subscriber-only Portal content).'
-time: 2026-08-27T09:14:44.000000+00:00

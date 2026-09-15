@@ -47,6 +47,8 @@ skill-only pilot shown below.
 | [`debug`](#debug) | Yes | - | Debugging and cleanup — systematic diagnosis and tech-debt removal |
 | [`tech-writing`](#tech-writing) | Yes | - | Technical writing — developer docs, tutorials, ADRs, and guides |
 | [`lucid`](#lucid) | Yes | - | Lucid — visual collaboration boards and diagrams (Lucidchart / Lucidspark) via the hosted Lucid MCP server |
+| [`pandera`](#pandera) | Yes | - | Pandera — dataframe schema validation and debugging for pandas and Polars |
+| [`sql-review`](#sql-review) | Yes | - | SQL Review — scope, analyse and explain SQL with standardised, human-confirmed assumption and limitation reports |
 
 ## Install
 
@@ -520,9 +522,15 @@ Debugging and cleanup — systematic diagnosis and tech-debt removal.
 
 Technical writing — developer docs, tutorials, ADRs, and guides.
 
+**Claude Code skills**
+
+- `/tech-writing:copyedit`
+
 **Claude Code agents**
 
 - `se-technical-writer` (subagent)
+
+**Claude Code hooks:** `stylepedia-reminder`
 
 ---
 
@@ -531,3 +539,28 @@ Technical writing — developer docs, tutorials, ADRs, and guides.
 Lucid — visual collaboration boards and diagrams (Lucidchart / Lucidspark) via the hosted Lucid MCP server.
 
 **Claude Code MCP server(s):** `lucid`
+
+---
+
+## pandera
+
+Pandera — dataframe schema validation and debugging for pandas and Polars.
+
+**Claude Code skills**
+
+- `/pandera:validate`
+
+---
+
+## sql-review
+
+SQL Review — scope, analyse and explain SQL with standardised, human-confirmed assumption and limitation reports.
+
+**Claude Code skills**
+
+- `/sql-review:setup`
+- `/sql-review:bootstrap`
+- `/sql-review:analyse`
+- `/sql-review:explain`
+
+**Claude Code hooks:** `sql-review-preflight`, `sql-review-guard`
