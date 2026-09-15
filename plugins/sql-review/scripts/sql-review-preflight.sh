@@ -16,7 +16,7 @@ for k in sys.argv[1].strip(".").split("."):
 sys.stdout.write(d if isinstance(d, str) else "")' "$1" 2>/dev/null
   fi
 }
-cwd="$(field .cwd)"; [ -n "$cwd" ] || cwd="$(pwd -P 2>/dev/null)"
+cwd="$(field .cwd)"; [ -n "$cwd" ] || exit 0
 [ -d "$cwd" ] || exit 0
 command -v jq >/dev/null 2>&1 || exit 0
 
@@ -32,7 +32,7 @@ done
 status="$(cd "$cwd" && bash "$helper" status --json 2>/dev/null)"; rc=$?
 ctx=""
 if [ "$rc" -eq 3 ]; then
-  has_sql="$(cd "$cwd" && { git ls-files -- '*.sql' '**/*.sql' 2>/dev/null; find . -maxdepth 3 -name '*.sql' -not -path './.git/*' 2>/dev/null; } | head -1)"
+  has_sql="$(cd "$cwd" && { git ls-files -- '*.sql' '**/*.sql' 2>/dev/null; find . -name .git -prune -o -type f -name '*.sql' -print 2>/dev/null; } | head -1)"
   [ -n "$has_sql" ] || exit 0
   ctx="SQL Review: this project contains SQL files but has no .sqlreview/ directory. /sql-review:setup initialises it (once per project); then /sql-review:bootstrap, :analyse and :explain use it."
 elif [ "$rc" -eq 0 ] && [ -n "$status" ]; then
@@ -44,7 +44,9 @@ elif [ "$rc" -eq 0 ] && [ -n "$status" ]; then
         "SQL Review: .sqlreview/ is initialised (schema \(.schemaVersion)) with no reviews yet — /sql-review:bootstrap scopes a new SQL file, /sql-review:analyse reviews an existing one."
       else
         "SQL Review: .sqlreview/ is initialised (schema \(.schemaVersion)), \($n) review\(if $n == 1 then "" else "s" end): "
-        + ([ (.counts.current // 0 | select(. > 0) | "\(.) current"),
+        + ([ (.counts.draft // 0 | select(. > 0) | "\(.) drafts (resume /sql-review:bootstrap or :analyse: \(names("draft")))"),
+             (.counts.invalid // 0 | select(. > 0) | "\(.) invalid (repair documents: \(names("invalid")))"),
+             (.counts.current // 0 | select(. > 0) | "\(.) current"),
              (.counts.scoped // 0 | select(. > 0) | "\(.) scoped (bootstrap only)"),
              (.counts.stale // 0 | select(. > 0) | "\(.) stale (\(names("stale")))"),
              (.counts["no-baseline"] // 0 | select(. > 0) | "\(.) without a baseline (\(names("no-baseline")))"),

@@ -7,11 +7,5 @@
   "roles": {
     "engineer": "Data Engineer (RDL)",
     "analyst": "Data Analyst"
-  },
-  "sql_globs": ["**/*.sql"],
-  "sections": {
-    "logic": true,
-    "open_questions": true,
-    "changes": true
   }
 }

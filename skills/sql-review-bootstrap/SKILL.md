@@ -36,10 +36,13 @@ tell the engineer what counts as an assumption or a limitation. Do not paraphras
 If `.sqlreview/reviews/$SLUG/scope.json` exists (or `--update`):
 
 1. Show how the scope itself moved: `git log -p --follow -- .sqlreview/reviews/$SLUG/scope.json`
-   when it is tracked (skip silently otherwise).
-2. If the SQL now exists, Read it and lay it against the scope's intent, inputs and outputs —
+   when it is tracked (skip silently otherwise). Also inspect `git diff -- <scope path>` and
+   `git diff --cached -- <scope path>` for unstaged and staged scope edits.
+2. If the SQL now exists, use `git diff --no-index -- ".sqlreview/reviews/$SLUG/scope.source.sql" "<sql path>"`
+   to show changes since the previous bootstrap (exit 1 means changes). If the baseline is absent,
+   explicitly say a historical delta is unavailable and do a full reassessment. Read the SQL and compare it with the scope's intent, inputs and outputs —
    name each place the SQL does something the scope did not foresee.
-3. **Re-put every existing assumption** to the engineer (confirm / reword / drop) and ask for new
+3. **Re-put every existing assumption and limitation** to the engineer (confirm / reword / drop) and ask for new
    ones. No item keeps a confirmation from an earlier revision — the guard rejects it.
 4. Continue at *Write* with `revision` incremented.
 
@@ -82,9 +85,16 @@ an Edit is refused):
 }
 ```
 
+After the guarded scope Write succeeds, if SQL exists, copy its reviewed bytes to
+`.sqlreview/reviews/$SLUG/scope.source.sql` (separate from analyse’s `source.sql`). Check copy success;
+if it fails, remove any old scope baseline and report that the next bootstrap needs a full reassessment.
+Preserve the previous revision and increment it on updates.
+
+
 ```bash
 bash "$S/sqlreview.sh" render "$SLUG" scope      # → reviews/<slug>/scope.md (never hand-write it)
 rm -f ".sqlreview/reviews/$SLUG/scope.draft.json"
 ```
+
 
 Show the rendered `scope.md`. Next stage, once the SQL exists: `/sql-review:analyse <sql path>`.

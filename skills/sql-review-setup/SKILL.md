@@ -39,11 +39,9 @@ and the other stages all resolve the same `.sqlreview/` by walking up from the c
 (AskUserQuestion), options in this order:
 
 - **Default (Recommended)** — the bundled template as-is: the shared definitions
-  (`references/definitions.rst`), roles "Data Engineer (RDL)" / "Data Analyst", `**/*.sql`, all
+  (`references/definitions.rst`), roles "Data Engineer (RDL)" / "Data Analyst", all
   report sections.
-- **Custom** — ask, in one AskUserQuestion call: the two role names as the team calls them; the
-  SQL globs to treat as reviewable; which optional sections (`logic`, `open_questions`, `changes`)
-  to keep. **The definitions are not customised here** — they are the workflow's shared vocabulary;
+- **Custom** — ask, in one AskUserQuestion call: the two role names as the team calls them. **The definitions are not customised here** — they are the workflow's shared vocabulary;
   point at `references/definitions.rst` if asked, and say a change belongs in that file.
 
 Then confirm before writing (AskUserQuestion, skipped only with `--yes`): the target path and
@@ -53,8 +51,7 @@ the file list — `config.json`, `templates/scope.md`, `templates/review.md`, `r
 bash "$S/sqlreview.sh" init                # copies the bundled default; never touches existing files
 ```
 
-Custom answers: after `init`, Write `.sqlreview/config.json` with the edited `roles`, `sql_globs`
-and `sections` (keep `schemaVersion` and `definitions` untouched). The guard asks for permission
+Custom answers: after `init`, Write `.sqlreview/config.json` with the edited `roles` (keep `schemaVersion` and `definitions` untouched). The guard asks for permission
 on that Write — that prompt *is* the confirmation for this path.
 
 ## 2. Already initialised (re-run — #126 §2)
@@ -79,3 +76,6 @@ bash "$S/sqlreview.sh" status          # exit 0 now; lists reviews (none yet on 
 Tell the user the next stage: `/sql-review:bootstrap <intended sql path>` before the SQL is
 written, or `/sql-review:analyse <sql path>` for SQL that already exists. Suggest committing
 `.sqlreview/` — the reviews inside it are the handoff record.
+
+SQL paths are supplied explicitly to bootstrap/analyse. To customise report sections, edit the
+project templates; SQL glob filtering and section flags are not configuration options.

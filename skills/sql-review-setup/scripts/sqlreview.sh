@@ -9,7 +9,7 @@
 #   slug PATH                                  slug for a project path; exit 5 on a conflicting binding
 #   check FILE | check --stdin                 validate a review/scope JSON; exit 4 with one violation per line
 #   fingerprint SQL                            {sql_path, sql_sha256, git_commit, git_dirty}
-#   snapshot SLUG SQL                          store the reviewed bytes as reviews/SLUG/source.sql
+#   snapshot SLUG SQL                          verify final review SHA, retain history, advance source.sql
 #   delta SLUG                                 diff source.sql vs the current SQL; exit 10 when changed, 6 no baseline
 #   impact SLUG                                heuristic: identifiers in the diff traced into unchanged lines
 #   move OLDPATH NEWPATH                       rebind a review directory after the SQL moved
@@ -43,15 +43,18 @@ cmd_init() {
   [ -d "$SR_ASSETS" ] || sr_die 2 "bundled default not found at $SR_ASSETS (plugin install incomplete)"
   root="$(sr_init_root)"
   target="$root/$SR_DIR"
+  sr_no_symlinks "$target" || exit 2
   local files
   files="$(cd "$SR_ASSETS" && find . -type f | sed 's|^\./||' | sort)"
 
   if [ "$mode" = "apply" ]; then
     [ "${#apply[@]}" -gt 0 ] || sr_die 1 "--apply needs at least one path (relative to $SR_DIR/)"
     for f in "${apply[@]}"; do
-      [ -f "$SR_ASSETS/$f" ] || sr_die 2 "no such file in the bundled default: $f"
-      mkdir -p "$target/$(dirname "$f")"
-      cp "$SR_ASSETS/$f" "$target/$f"
+      case "$f" in config.json|templates/scope.md|templates/review.md) ;; *) sr_die 2 "unknown bundled path: $f" ;; esac
+      printf '%s\n' "$files" | grep -Fxq -- "$f" || sr_die 2 "no such file in the bundled default: $f"
+      sr_no_symlinks "$target/$f" || exit 2
+      mkdir -p "$target/$(dirname "$f")" || sr_die 2 "cannot create target directory"
+      cp "$SR_ASSETS/$f" "$target/$f" || sr_die 2 "cannot copy $f"
       printf 'applied\t%s\n' "$f"
     done
     return 0
@@ -59,10 +62,11 @@ cmd_init() {
 
   if [ "$mode" = "create" ] && [ ! -d "$target" ]; then
     for f in $files; do
-      mkdir -p "$target/$(dirname "$f")"
-      cp "$SR_ASSETS/$f" "$target/$f"
+      sr_no_symlinks "$target/$f" || exit 2
+      mkdir -p "$target/$(dirname "$f")" || sr_die 2 "cannot create target directory"
+      cp "$SR_ASSETS/$f" "$target/$f" || sr_die 2 "cannot copy $f"
     done
-    mkdir -p "$target/reviews"
+    mkdir -p "$target/reviews" || sr_die 2 "cannot create reviews"
     if [ "$json" = 1 ]; then
       jq -n --arg root "$root" --arg files "$files" '{root: $root, created: true, files: ($files | split("\n"))}'
     else
@@ -131,8 +135,10 @@ cmd_slug() {
   sr_need_jq
   sr_require_root
   local rel slug doc bound
-  rel="$(sr_relpath "$1")"
-  slug="$(sr_slug "$rel")"
+  rel="$(sr_relpath "$1")" || exit $?
+  sr_safe_sql "$rel"
+  slug="$(sr_slug "$rel")" || exit $?
+  sr_safe_slug "$slug"
   if doc="$(sr_doc_for "$slug")"; then
     bound="$(jq -r '.sql_path // ""' "$doc")"
     if [ -n "$bound" ] && [ "$bound" != "$rel" ]; then
@@ -148,12 +154,12 @@ cmd_check() {
   sr_need_jq
   local src="$1" tmp out rc
   tmp="$(mktemp)" || sr_die 2 "mktemp failed"
-  trap 'rm -f "$tmp"' RETURN 2>/dev/null || true
+
   if [ "$src" = "--stdin" ]; then cat > "$tmp"; else
     [ -f "$src" ] || { rm -f "$tmp"; sr_die 2 "no such file: $src"; }
     cat "$src" > "$tmp"
   fi
-  if ! jq -e . "$tmp" >/dev/null 2>&1; then
+  if ! jq -se 'length == 1 and (.[0] | type == "object")' "$tmp" >/dev/null 2>&1; then
     rm -f "$tmp"; printf 'invalid JSON: the document does not parse\n'; return 4
   fi
   out="$(jq -r -f "$SR_SCRIPT_DIR/sqlreview-check.jq" "$tmp" 2>&1)"; rc=$?
@@ -170,7 +176,8 @@ cmd_fingerprint() {
   sr_need_jq
   sr_require_root
   local rel abs sha commit="" dirty=false
-  rel="$(sr_relpath "$1")"
+  rel="$(sr_relpath "$1")" || exit $?
+  sr_safe_sql "$rel"
   abs="$SR_ROOT/$rel"
   [ -f "$abs" ] || sr_die 2 "no such file: $rel"
   sha="$(sr_sha256 "$abs")"
@@ -187,12 +194,32 @@ cmd_snapshot() {
   [ $# -eq 2 ] || usage
   sr_require_root
   local slug="$1" rel abs
-  rel="$(sr_relpath "$2")"
+  rel="$(sr_relpath "$2")" || exit $?
+  sr_safe_sql "$rel"
   abs="$SR_ROOT/$rel"
   [ -f "$abs" ] || sr_die 2 "no such file: $rel"
-  mkdir -p "$SR_REVIEWS/$slug"
-  cp "$abs" "$SR_REVIEWS/$slug/source.sql"
-  printf 'snapshot\t%s\t%s\n' "$slug" "$(sr_sha256 "$abs")"
+  sr_need_jq
+  sr_safe_slug "$slug"
+  [ "$slug" = "$(sr_slug "$rel")" ] || sr_die 2 "slug/path mismatch"
+  local doc tmp sha revision
+  doc="$SR_REVIEWS/$slug/review.json"
+  cmd_check "$doc" >/dev/null || sr_die 4 "write a validated review before snapshot"
+  [ "$(jq -r .sql_path "$doc")" = "$rel" ] || sr_die 2 "review/path mismatch"
+  tmp="$(mktemp "$SR_REVIEWS/$slug/.snapshot.XXXXXX")" || sr_die 2 "mktemp failed"
+  cp "$abs" "$tmp" || { rm -f "$tmp"; sr_die 2 "snapshot copy failed"; }
+  sha="$(sr_sha256 "$tmp")"
+  [ "$sha" = "$(jq -r .sql_sha256 "$doc")" ] || { rm -f "$tmp"; sr_die 2 "SQL changed since fingerprint; reassess before snapshot"; }
+  revision="$(jq -r .revision "$doc")"
+  mkdir -p "$SR_REVIEWS/$slug/history" || sr_die 2 "cannot create history"
+  sr_no_symlinks "$SR_REVIEWS/$slug/history/$revision.sql" || exit 2
+  if [ -e "$SR_REVIEWS/$slug/history/$revision.sql" ]; then
+    cmp -s "$tmp" "$SR_REVIEWS/$slug/history/$revision.sql" || { rm -f "$tmp"; sr_die 2 "revision history conflict"; }
+  else
+    cp "$tmp" "$SR_REVIEWS/$slug/history/$revision.sql" || { rm -f "$tmp"; sr_die 2 "history copy failed"; }
+  fi
+  mv "$tmp" "$SR_REVIEWS/$slug/source.sql" || sr_die 2 "snapshot replacement failed"
+  rm -f "$SR_REVIEWS/$slug/rebind-required" || sr_die 2 "cannot clear rebind marker"
+  printf 'snapshot\t%s\t%s\n' "$slug" "$sha"
 }
 
 # ---------------------------------------------------------------------------------------------
@@ -201,13 +228,19 @@ _delta_prepare() {
   local slug="$1" doc
   sr_need_jq
   sr_require_root
+  sr_safe_slug "$slug"
   [ -d "$SR_REVIEWS/$slug" ] || sr_die 2 "no review directory for slug '$slug'"
   doc="$(sr_doc_for "$slug")" || sr_die 2 "reviews/$slug/ has no review.json or scope.json"
+  cmd_check "$doc" >/dev/null || sr_die 4 "invalid document"
   SR_SQL_PATH="$(jq -r '.sql_path // ""' "$doc")"
+  sr_safe_sql "$SR_SQL_PATH"
   SR_BASE="$SR_REVIEWS/$slug/source.sql"
   SR_CUR="$SR_ROOT/$SR_SQL_PATH"
+  sr_no_symlinks "$SR_BASE" || exit 2
   [ -f "$SR_BASE" ] || sr_die 6 "no baseline: reviews/$slug/source.sql is missing, so there is nothing to diff against — run a full /sql-review:analyse (it records the snapshot)"
   [ -f "$SR_CUR" ] || sr_die 2 "the reviewed SQL no longer exists: $SR_SQL_PATH (moved? see: sqlreview.sh move)"
+  [ ! -f "$SR_REVIEWS/$slug/rebind-required" ] || return 10
+  [ "$(sr_sha256 "$SR_BASE")" = "$(jq -r .sql_sha256 "$doc")" ] || return 10
   cmp -s "$SR_BASE" "$SR_CUR" && return 0
   return 10
 }
@@ -257,15 +290,21 @@ cmd_move() {
   sr_need_jq
   sr_require_root
   local oldrel newrel oldslug newslug f tmp
-  oldrel="$(sr_relpath "$1")"; newrel="$(sr_relpath "$2")"
+  oldrel="$(sr_relpath "$1")" || exit $?; newrel="$(sr_relpath "$2")" || exit $?
+  sr_safe_sql "$oldrel"
+  sr_safe_sql "$newrel"
   oldslug="$(sr_slug "$oldrel")"; newslug="$(sr_slug "$newrel")"
   [ -d "$SR_REVIEWS/$oldslug" ] || sr_die 2 "no review directory for '$oldrel' (slug $oldslug)"
   [ "$oldslug" = "$newslug" ] || [ ! -e "$SR_REVIEWS/$newslug" ] || sr_die 2 "reviews/$newslug/ already exists"
-  [ "$oldslug" = "$newslug" ] || mv "$SR_REVIEWS/$oldslug" "$SR_REVIEWS/$newslug"
+  sr_safe_slug "$oldslug"
+  sr_safe_slug "$newslug"
+  [ "$oldslug" = "$newslug" ] || mv "$SR_REVIEWS/$oldslug" "$SR_REVIEWS/$newslug" || sr_die 2 "move failed"
+  touch "$SR_REVIEWS/$newslug/rebind-required" || sr_die 2 "cannot mark stale"
+  rm -f "$SR_REVIEWS/$newslug/review.md" "$SR_REVIEWS/$newslug/scope.md" || sr_die 2 "cannot remove stale renders"
   for f in review.json scope.json; do
     [ -f "$SR_REVIEWS/$newslug/$f" ] || continue
-    tmp="$(mktemp)"
-    jq --arg p "$newrel" --arg s "$newslug" '.sql_path = $p | .slug = $s' "$SR_REVIEWS/$newslug/$f" > "$tmp" && mv "$tmp" "$SR_REVIEWS/$newslug/$f"
+    tmp="$(mktemp "$SR_REVIEWS/$newslug/.move.XXXXXX")" || sr_die 2 "mktemp failed"
+    jq --arg p "$newrel" --arg s "$newslug" '.sql_path = $p | .slug = $s' "$SR_REVIEWS/$newslug/$f" > "$tmp" && mv "$tmp" "$SR_REVIEWS/$newslug/$f" || { rm -f "$tmp"; sr_die 2 "rebind failed; review needs repair"; }
   done
   printf 'moved\t%s\t%s\t%s\n' "$oldslug" "$newslug" "$newrel"
 }
@@ -277,18 +316,22 @@ cmd_render() {
   sr_require_root
   local slug="$1" kind="$2" doc tpl cfg out rendered unknown
   case "$kind" in scope|review) ;; *) sr_die 2 "kind must be scope or review (got '$kind')" ;; esac
+  sr_safe_slug "$slug"
   doc="$SR_REVIEWS/$slug/$kind.json"
   [ -f "$doc" ] || sr_die 2 "no such document: reviews/$slug/$kind.json"
   tpl="$SR_ROOT/$SR_DIR/templates/$kind.md"
   [ -f "$tpl" ] || sr_die 2 "template missing: $SR_DIR/templates/$kind.md ($SR_SETUP_HINT)"
   cfg="$SR_ROOT/$SR_DIR/config.json"
   [ -f "$cfg" ] || sr_die 2 "config missing: $SR_DIR/config.json ($SR_SETUP_HINT)"
+  sr_no_symlinks "$doc" || exit 2
+  cmd_check "$doc" >/dev/null || sr_die 4 "invalid document"
   out="$SR_REVIEWS/$slug/$kind.md"
+  sr_no_symlinks "$out" || exit 2
   local vars
   vars="$(jq -c --slurpfile cfgs "$cfg" -f "$SR_SCRIPT_DIR/sqlreview-render.jq" "$doc")" || sr_die 2 "render failed for reviews/$slug/$kind.json"
   rendered="$(jq -r -n --rawfile tpl "$tpl" --argjson vars "$vars" \
     'reduce ($vars | keys[]) as $k ($tpl; gsub("\\{\\{\($k)\\}\\}"; $vars[$k]))')" || sr_die 2 "render failed for reviews/$slug/$kind.json"
-  printf '%s\n' "$rendered" > "$out"
+  printf '%s\n' "$rendered" > "$out" || sr_die 2 "cannot write rendered report"
   unknown="$(grep -o '{{[A-Za-z0-9_]*}}' "$out" | sort -u || true)"
   if [ -n "$unknown" ]; then
     printf 'sqlreview: unknown placeholder(s) left in place: %s\n' "$(printf '%s' "$unknown" | tr '\n' ' ')" >&2

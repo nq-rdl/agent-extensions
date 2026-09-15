@@ -164,7 +164,7 @@ class GuardHook(unittest.TestCase):
         hook = bare / "sql-review-guard.sh"
         hook.write_bytes(GUARD.read_bytes())
         env = env_for(plugin_root=bare / "nowhere")
-        r = run_hook(hook, write_event(self.reviews / "s" / "review.json", json.dumps(review_doc()), self.root), env)
+        r = run_hook(hook, write_event(self.reviews / "reports__monthly" / "review.json", json.dumps(review_doc()), self.root), env)
         d = decision(r)
         self.assertEqual(d["permissionDecision"], "deny")
         self.assertIn("sqlreview.sh", d["permissionDecisionReason"])
@@ -175,7 +175,7 @@ class GuardHook(unittest.TestCase):
                      write_event(self.reviews / "s" / "review.json", json.dumps(review_doc(assumptions=[item("A1", "x", status="pending")])), self.root), env)
         self.assertEqual(decision(r)["permissionDecision"], "deny")
         r = run_hook(PLUGIN / "scripts" / "sql-review-guard.sh",
-                     write_event(self.reviews / "s" / "review.json", json.dumps(review_doc()), self.root), env)
+                     write_event(self.reviews / "reports__monthly" / "review.json", json.dumps(review_doc()), self.root), env)
         self.assert_passthrough(r)
 
     def test_without_jq_the_guard_falls_back_to_python3(self):

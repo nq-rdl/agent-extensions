@@ -103,6 +103,9 @@ class Project:
 
     def write_json(self, slug, name, doc):
         d = self.review_dir(slug)
+        sql = self.root / doc.get("sql_path", "missing")
+        if name == "review.json" and sql.is_file():
+            doc = dict(doc, sql_sha256=hashlib.sha256(sql.read_bytes()).hexdigest())
         (d / name).write_text(json.dumps(doc, indent=2))
         return d / name
 
@@ -213,7 +216,7 @@ class Slug(unittest.TestCase):
             self.assertEqual(b, "audits__monthly")
             self.assertEqual(run(["slug", str(p.root / "reports" / "monthly.sql")], p.root).stdout.strip(), a)
             self.assertEqual(run(["slug", "monthly.sql"], p.root).stdout.strip(), "monthly")
-            self.assertEqual(run(["slug", "odd name (1).sql"], p.root).stdout.strip(), "odd-name--1-")
+            self.assertEqual(run(["slug", "odd name (1).sql"], p.root).stdout.strip(), "odd%20name%20%281%29")
 
     def test_conflicting_binding_exits_5(self):
         with tempfile.TemporaryDirectory() as tmp:
@@ -402,7 +405,7 @@ class Move(unittest.TestCase):
             for name in ("review.json", "scope.json"):
                 j = json.loads((d / name).read_text())
                 self.assertEqual((j["sql_path"], j["slug"]), ("archive/monthly.sql", "archive__monthly"))
-            self.assertEqual(run(["delta", "archive__monthly"], p.root).returncode, 0)
+            self.assertEqual(run(["delta", "archive__monthly"], p.root).returncode, 10)
             self.assertEqual(run(["move", "nope.sql", "x.sql"], p.root).returncode, 2)
 
 

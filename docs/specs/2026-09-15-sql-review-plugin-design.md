@@ -46,12 +46,14 @@ Nothing about the location is customisable.
   reviews/<slug>/
     scope.json  scope.md      # bootstrap: authoritative JSON + rendered doc
     review.json review.md     # analyse:   authoritative JSON + rendered doc
+    history/<revision>.sql    # immutable SQL bytes for resumed explanations
+    scope.source.sql          # bootstrap SQL baseline
     source.sql                # analyse:   exact bytes of the SQL as last reviewed (diff baseline)
     review.draft.json         # analyse work-in-progress before human confirmation (guard-exempt)
     explain.json              # explain: state marker only (last walked-through fingerprint)
 ```
 
-- **Slug = project-relative path identity**: separators → `__`, extension dropped
+- **Slug = project-relative path identity**: encoded stem components joined with `__`, `.sql` extension dropped
   (`reports/monthly.sql` → `reports__monthly`, `audits/monthly.sql` → `audits__monthly`). Every
   JSON also records `sql_path`; `sqlreview.sh slug` refuses a directory whose stored `sql_path`
   differs from the one requested. A renamed SQL file is a new slug; `status` lists the old one as
@@ -65,7 +67,7 @@ Nothing about the location is customisable.
 - **Baseline is a snapshot, not a commit.** `source.sql` holds the exact reviewed bytes; `delta`
   diffs those bytes against the current file, so dirty, untracked, reverted and rebased histories
   all behave identically. `git_commit` / `git_dirty` are recorded as provenance only. A review
-  directory without `source.sql` has no baseline: update mode is refused and a full analyse runs.
+  directory without `source.sql` has no baseline: a full analyse rebuild retains the previous revision history, increments the revision and reconfirms all items.
 - **Revisions**: `review.json.revision` (int) increments on every update; `changes[]` records
   `{revision, at, by, summary}`. `scope.json` carries its own `revision`.
 - **Shared definitions live once**: authored in `skills/sql-review-setup/assets/sqlreview/config.json`
@@ -130,11 +132,11 @@ scripts across a plugin's skills).
 | Subcommand | Does | Exit |
 |---|---|---|
 | `init [--diff] [--apply PATH...]` | Create `.sqlreview/` from the bundled default at the resolved root (cwd's git top-level when nothing exists yet). Never overwrites: `--diff` reports each template file as `new` / `same` / `differs` (with a unified diff); `--apply` replaces only the named files after the human confirmed. | 0 ok · 10 differences · 2 error |
-| `status [--json]` | Lists reviews with `slug, sql_path, revision, state ∈ {current, stale, missing, no-baseline}`. Exit 3 when not initialised — **setup is the one caller that treats 3 as "proceed to init"**; every other skill stops and points at `/sql-review:setup`. | 0 · 3 |
+| `status [--json]` | Lists reviews with `slug, sql_path, revision, state ∈ {current, stale, missing, no-baseline, scoped, draft, invalid}`. Exit 3 when not initialised — **setup is the one caller that treats 3 as "proceed to init"**; every other skill stops and points at `/sql-review:setup`. | 0 · 3 |
 | `slug PATH` | Prints the slug for a project-relative path; exit 5 if `reviews/<slug>/` exists bound to a different `sql_path`. | 0 · 5 |
 | `check FILE [--stdin]` | Validates a scope/review JSON: required keys, item shape, every item `confirmed` with `confirmed_by`/`confirmed_at`/`confirmed_revision == revision`. One line per violation. | 0 valid · 4 invalid |
 | `fingerprint SQL` | `{sql_path, sql_sha256, git_commit, git_dirty}` for the skill to embed. | 0 · 2 |
-| `snapshot SLUG SQL` | Copies the current SQL bytes to `reviews/<slug>/source.sql` (called by analyse right before writing the final JSON). | 0 · 2 |
+| `snapshot SLUG SQL` | Copies the current SQL bytes to `reviews/<slug>/source.sql` (called by analyse after the guarded final JSON Write succeeds, verifying its SHA256 and preserving history/<revision>.sql). | 0 · 2 |
 | `delta SLUG` | Unified diff of `source.sql` vs the current file; header lines report both sha256s. | 0 unchanged · 10 changed · 6 no baseline · 2 |
 | `impact SLUG` | **Hints only.** Identifiers introduced/altered inside the diff hunks (CTE names, aliases, columns) and the non-diff lines referencing them. Printed under a "heuristic — does not prove anything unaffected" banner. | 0 · 6 · 2 |
 | `move OLD NEW` | Rename a review directory when the SQL moved; rewrites `sql_path`, invalidates the baseline state to `stale`. | 0 · 2 |
@@ -154,8 +156,8 @@ cannot be asked, leave the draft on disk and write nothing final; say so.
 **setup** (`[--default|--custom] [--check] [--yes]`) — exempt from the init gate.
 1. `init --diff` → nothing exists / exists with per-file delta.
 2. Not initialised: AskUserQuestion once — **Default (Recommended)** / **Custom** (unless a flag
-   was given). Custom asks only about things that do not move files: team names for the two roles,
-   SQL globs, which optional report sections to include; then shows the resulting `config.json`
+   was given). Custom asks only about things that do not move files: team names for the two roles
+   (report sections are edited in the project templates); then shows the resulting `config.json`
    for confirmation.
 3. Confirm the target location and the file list before writing (AskUserQuestion; `--yes` skips
    only this confirmation and exists for scripted/e2e runs).
@@ -186,7 +188,7 @@ cannot be asked, leave the draft on disk and write nothing final; say so.
    AskUserQuestion (confirm / reword / reject). Only confirmed items are written to `review.json`,
    `confirmed_by` = the user, `confirmed_revision` = the new revision; the guard enforces the
    record. The skill never fills these fields from anything but an answered question.
-5. `snapshot`, write `review.json`, `render`, delete the draft; point at `/sql-review:explain`.
+5. Write `review.json`, `snapshot` (verify SHA256 and retain revision history), `render`, delete the draft; point at `/sql-review:explain`.
 
 **explain** (`<sql path | slug>`) — interactive, no report artefact.
 1. Load `review.json`, `review.md`, `scope.*`, the SQL. **Always** compare the review baseline
@@ -274,3 +276,29 @@ with the host's OAuth credentials, and execute: `pixi install`, the unit tests,
 | Init gate blocks first-run setup | Setup exempt; exit 3 semantics defined; first-run acceptance test required in the container. |
 | Custom output dir escapes discovery/guard | Removed; root is fixed and resolved by one shared function; nested-cwd tests. |
 | Bash CLI conflicts with Language Policy | Explicit policy amendment (AGENTS.md + ARCHITECTURE.md) shipped in the same change; flagged for the reviewer. |
+
+
+## 11. PR #297 review corrections
+
+- Slugs encode each path stem component, including underscores, percent signs and dots, before
+  joining with `__`. SQL paths end in `.sql`; empty stems encode as `%00`. This distinguishes
+  `a/b.sql`, `a__b.sql`, whitespace/punctuation variants and dot-only filenames. Relative command
+  paths resolve from the project root. Helpers reject unsafe slugs, traversal and symlink paths.
+- The final guarded review Write precedes snapshot. Snapshot checks its bytes against the final
+  SHA256, retains `history/<revision>.sql`, then replaces `source.sql`. Status/delta also compare
+  the baseline hash with final JSON, so an interrupted update cannot appear current.
+- Explain compares retained revision snapshots when resuming; missing history requires an explicit
+  full walkthrough. Missing current SQL stops explanation. Missing baseline requires analyse.
+- Move marks a review stale even when bytes are unchanged and removes obsolete rendered reports.
+  Failed file mutations return errors. Draft-only directories are reported as resumable drafts.
+- Bootstrap inspects staged and unstaged scope diffs, keeps its own `scope.source.sql` baseline,
+  and reconfirms limitations alongside assumptions.
+- Validation checks one JSON object, normalized binding, integer revisions, collection/item shapes,
+  rationale and line ranges. Markdown table cells escape pipes and line breaks. Guard denial
+  messages name the correct authoritative/draft file; absence of both parsers denies writes.
+- Custom setup supports roles and editable templates. Unimplemented `sql_globs` and `sections`
+  settings were removed before release; no filtering or section-flag behavior is promised.
+- SkillSpector notes 519–522 provide only generic category labels, without exploit details.
+  Setup already requires confirmation (or explicit `--yes`), draft cleanup follows successful
+  finalization, and temporary validation input is local. These are reviewed as informational;
+  path containment and persistence checks above cover the concrete tool-parameter concerns.

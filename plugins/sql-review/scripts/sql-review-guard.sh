@@ -15,9 +15,12 @@
 # The checker is resolved via CLAUDE_PLUGIN_ROOT, then relative to this hook's own plugin copy,
 # then the canonical skills/ tree; when none is found the guard DENIES — a missing guardrail must
 # not silently pass. JSON in/out via jq, falling back to python3 for the event; neither present,
-# or malformed stdin → no-op.
+# or malformed stdin → no-op when a parser is available.
 set -u
-command -v jq >/dev/null 2>&1 || command -v python3 >/dev/null 2>&1 || exit 0
+command -v jq >/dev/null 2>&1 || command -v python3 >/dev/null 2>&1 || {
+  printf '%s\n' '{"hookSpecificOutput":{"hookEventName":"PreToolUse","permissionDecision":"deny","permissionDecisionReason":"SQL Review guard requires jq; no event parser is available. Install jq before writing."}}'
+  exit 0
+}
 input="$(cat 2>/dev/null)" || exit 0
 [ -n "$input" ] || exit 0
 
@@ -58,7 +61,7 @@ case "$rel" in
   config.json)
     decide ask "Editing .sqlreview/config.json directly bypasses the setup flow. Use /sql-review:setup — on an initialised project it shows the per-file delta and applies only what the human confirms." ;;
   reviews/*/review.md|reviews/*/scope.md)
-    decide deny "$rel is rendered markdown — never hand-write it. Update reviews/<slug>/${rel##*/}.json (whole-file Write, so the guard can validate it) and re-render: S=\${CLAUDE_PLUGIN_ROOT}/skills/setup/scripts; bash \"\$S/sqlreview.sh\" render <slug> $(basename "${rel%.md}")" ;;
+    decide deny "$rel is rendered markdown — never hand-write it. Update reviews/<slug>/$(basename "${rel%.md}").json (whole-file Write, so the guard can validate it) and re-render: S=\${CLAUDE_PLUGIN_ROOT}/skills/setup/scripts; bash \"\$S/sqlreview.sh\" render <slug> $(basename "${rel%.md}")" ;;
   reviews/*/review.json|reviews/*/scope.json)
     ;;  # validated below
   *) exit 0 ;;
@@ -80,5 +83,10 @@ command -v jq >/dev/null 2>&1 || decide deny "SQL Review documents are validated
 
 content="$(field .tool_input.content)"
 out="$(printf '%s' "$content" | bash "$checker" check --stdin 2>&1)"; rc=$?
-[ "$rc" -eq 0 ] && exit 0
-decide deny "$rel rejected by sqlreview.sh check: $(printf '%s' "$out" | tr '\n' ';' | sed 's/;$//'). Every assumption and limitation must be put to the human via AskUserQuestion and written with status=confirmed, confirmed_by, confirmed_at and confirmed_revision equal to the document revision. Keep unconfirmed candidates in reviews/<slug>/review.draft.json instead."
+if [ "$rc" -eq 0 ]; then
+  expected_slug="${rel#reviews/}"; expected_slug="${expected_slug%/*}"
+  expected_kind="$(basename "${rel%.json}")"
+  printf '%s' "$content" | jq -e --arg s "$expected_slug" --arg k "$expected_kind" '.slug == $s and .kind == $k' >/dev/null || decide deny "Document slug/kind must match its destination."
+  exit 0
+fi
+decide deny "$rel rejected by sqlreview.sh check: $(printf '%s' "$out" | tr '\n' ';' | sed 's/;$//'). Every assumption and limitation must be put to the human via AskUserQuestion and written with status=confirmed, confirmed_by, confirmed_at and confirmed_revision equal to the document revision. Keep unconfirmed candidates in reviews/<slug>/$(basename "${rel%.json}").draft.json instead."

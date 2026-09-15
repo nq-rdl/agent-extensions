@@ -3,10 +3,11 @@
 def lines(l): if l == null then "—" elif (l | type) == "array" then (l | map(tostring) | join("-")) else (l | tostring) end;
 def named_list(a): if (a | length) == 0 then "_none_" else (a | map("- **\(.name // "?")** — \(.description // "")") | join("\n")) end;
 def str_list(a): if (a | length) == 0 then "_none_" else (a | map("- " + (if type == "object" then (.question // .text // tostring) else tostring end)) | join("\n")) end;
+def cell: tostring | gsub("\\|"; "&#124;") | gsub("[\r\n]+"; "<br>");
 def table(a; heading):
   if (a | length) == 0 then "_none recorded_"
   else "| ID | \(heading) | Rationale | Lines | Confirmed by | Revision |\n|---|---|---|---|---|---|\n"
-       + (a | map("| \(.id) | \(.text) | \(.rationale // "") | \(lines(.location.lines)) | \(.confirmed_by // "") | \(.confirmed_revision // "") |") | join("\n"))
+       + (a | map("| \(.id | cell) | \(.text | cell) | \(.rationale // "" | cell) | \(lines(.location.lines) | cell) | \(.confirmed_by // "" | cell) | \(.confirmed_revision // "" | cell) |") | join("\n"))
   end;
 def steps(a): if (a | length) == 0 then "_none_" else (a | map("\(.step). **\(.title // "")** (lines \(lines(.lines))) — \(.description // "")") | join("\n")) end;
 def changes(a): if (a | length) == 0 then "_none_" else (a | map("- r\(.revision) — \(.at // "") — \(.by // ""): \(.summary // "")") | join("\n")) end;

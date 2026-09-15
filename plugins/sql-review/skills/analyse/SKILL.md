@@ -37,7 +37,7 @@ not, offer `/sql-review:bootstrap` retroactively once, then continue without it 
 If `reviews/$SLUG/review.json` exists (or `--update`):
 
 ```bash
-bash "$S/sqlreview.sh" delta "$SLUG"     # exit 0 unchanged (say so, stop) · 10 changed · 6 no baseline → full review below
+bash "$S/sqlreview.sh" delta "$SLUG"     # exit 0 unchanged (say so, stop) · 10 changed · 6 no baseline → full review below (retain revision history) · 2 missing SQL → stop/rebind
 bash "$S/sqlreview.sh" impact "$SLUG"    # HINTS ONLY: identifiers from the changed lines traced into unchanged lines
 ```
 
@@ -51,6 +51,9 @@ bash "$S/sqlreview.sh" impact "$SLUG"    # HINTS ONLY: identifiers from the chan
    carries over; the guard rejects `confirmed_revision < revision`.
 4. Set `revision` to the previous value + 1, append to `changes[]` `{revision, at, by, summary}`.
    Then *Confirm, write, render* below.
+
+A missing baseline is still an update: preserve the existing `changes[]`, increment the previous
+revision, and reassess every assumption and limitation. Never reset an existing review to revision 1.
 
 ## Full review
 
@@ -77,17 +80,14 @@ leave the draft and write nothing final — say so.
 question**: `confirmed_by` is the user (`git config user.name` / `user.email`, else ask),
 `confirmed_at` is now (UTC ISO), `confirmed_revision` equals the document `revision`.
 
-```bash
-bash "$S/sqlreview.sh" snapshot "$SLUG" "<sql path>"     # the exact reviewed bytes → source.sql (delta baseline)
-```
-
-Then Write the whole `reviews/$SLUG/review.json` (the guard validates it; Edit is refused):
+Re-run fingerprint and compare its SHA with the bytes you reviewed; if different, reassess the
+change before continuing. Write the whole `reviews/$SLUG/review.json` (the guard validates it; Edit is refused):
 
 ```json
 {
   "schemaVersion": 1, "kind": "review", "slug": "<SLUG>", "sql_path": "<sql path>", "title": "…",
   "revision": 1, "recorded_at": "<UTC ISO>", "recorded_by": "<user>",
-  "sql_sha256": "<from fingerprint>", "git_commit": "<from fingerprint>", "git_dirty": false,
+  "sql_sha256": "<from fingerprint>", "git_commit": "<from fingerprint>", "git_dirty": "<boolean from fingerprint; preserve its JSON type>",
   "purpose": "…", "grain": "one row per …",
   "inputs":  [{"name": "schema.table", "description": "one row per …"}],
   "outputs": [{"name": "column", "description": "…"}],
@@ -102,8 +102,13 @@ Then Write the whole `reviews/$SLUG/review.json` (the guard validates it; Edit i
 ```
 
 ```bash
+bash "$S/sqlreview.sh" snapshot "$SLUG" "<sql path>"  # only AFTER the guarded Write succeeds
 bash "$S/sqlreview.sh" render "$SLUG" review      # → reviews/<slug>/review.md (never hand-write it)
 rm -f ".sqlreview/reviews/$SLUG/review.draft.json"
 ```
 
 Show `review.md`. Hand over: the analyst runs `/sql-review:explain <sql path>`.
+
+Snapshot verifies the final review hash before advancing `source.sql` and preserves
+`history/<revision>.sql` for resumed explanations. Stop on any failure and keep the draft. A failed
+or interrupted Write must never advance the baseline; a failed snapshot leaves the review stale.

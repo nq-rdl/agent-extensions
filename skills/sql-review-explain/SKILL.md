@@ -37,7 +37,9 @@ the analyst asks what an assumption or limitation is.
 bash "$S/sqlreview.sh" delta "$SLUG"      # 0 current · 10 the SQL changed since it was reviewed · 6 no baseline
 ```
 
-Exit 10 or 6: the review no longer describes the file. Ask (AskUserQuestion): **Ask the engineer
+Exit 2: stop and resolve the missing/moved SQL with the engineer before any walkthrough.
+Exit 6: stop for a full analyse rebuild; do not offer a missing snapshot.
+Exit 10: the review no longer describes the file. Ask (AskUserQuestion): **Ask the engineer
 to run /sql-review:analyse --update first (Recommended)** / **Explain the reviewed snapshot** — the
 second explains `reviews/$SLUG/source.sql`, and every step is labelled as describing the
 snapshot, not the current file.
@@ -48,15 +50,19 @@ If `reviews/$SLUG/explain.json` exists and its `sql_sha256` or `review_revision`
 now, walk the change first:
 
 ```bash
-bash "$S/sqlreview.sh" delta "$SLUG"      # the hunks (when the SQL changed)
-bash "$S/sqlreview.sh" impact "$SLUG"     # HINTS: identifiers from the hunks traced into unchanged lines
+git diff --no-index -- ".sqlreview/reviews/$SLUG/history/<previous review_revision>.sql" \
+  ".sqlreview/reviews/$SLUG/history/<current review_revision>.sql"   # exit 1 means changes
 ```
 
 1. Explain each hunk in the analyst's terms; pause after each.
-2. Then the indirect consequences (#128 §2.1): the hinted lines *and* your own check of the
+2. Then the indirect consequences (#128 §2.1): trace identifiers in those hunks and check the
    unchanged code for grain, filter or join effects the hints cannot see.
 3. Then the review items whose `confirmed_revision` is newer than `explain.json.review_revision`
    — what changed in the assumptions and limitations and why.
+
+If either historical snapshot is absent, say the historical delta is unavailable and offer a full
+walkthrough; never substitute `delta` against the current baseline. Validate revision values as
+positive integers before constructing history paths.
 
 Offer to continue with the full walkthrough or stop.
 
@@ -82,7 +88,7 @@ change the SQL or the review; if the analyst disagrees with an item, note it for
 Write `reviews/$SLUG/explain.json` (state marker only — not a report):
 
 ```json
-{"sql_sha256": "<current sha from fingerprint>", "review_revision": <review.json revision>,
+{"sql_sha256": "<SHA of the snapshot actually explained>", "review_revision": <review.json revision>,
  "at": "<UTC ISO>", "by": "<analyst>", "completed": true, "last_step": "outputs"}
 ```
 

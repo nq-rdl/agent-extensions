@@ -45,7 +45,7 @@ drive_helper() { # <sqlreview.sh path> <label>
     slug="$(bash "$S" slug reports/monthly.sql)" && [ "$slug" = "reports__monthly" ] || exit 2
     fp="$(bash "$S" fingerprint reports/monthly.sql)" || exit 3
     sha="$(printf '%s' "$fp" | jq -r .sql_sha256)"
-    bash "$S" snapshot "$slug" reports/monthly.sql >/dev/null || exit 4
+    mkdir -p ".sqlreview/reviews/$slug" || exit 4
     now="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
     jq -n --arg slug "$slug" --arg sha "$sha" --arg now "$now" '{
       schemaVersion:1, kind:"review", slug:$slug, sql_path:"reports/monthly.sql", title:"Monthly", revision:1,
@@ -56,6 +56,7 @@ drive_helper() { # <sqlreview.sh path> <label>
       assumptions:[{id:"A1",text:"All stays count",rationale:"request",location:{lines:[1,1]},status:"confirmed",confirmed_by:"smoke",confirmed_at:$now,confirmed_revision:1}],
       limitations:[], open_questions:[], changes:[{revision:1,at:$now,by:"smoke",summary:"initial"}]}' > ".sqlreview/reviews/$slug/review.json"
     bash "$S" check ".sqlreview/reviews/$slug/review.json" >/dev/null || exit 5
+    bash "$S" snapshot "$slug" reports/monthly.sql >/dev/null || exit 4
     bash "$S" render "$slug" review >/dev/null || exit 6
     grep -q '| A1 |' ".sqlreview/reviews/$slug/review.md" || exit 7
     bash "$S" delta "$slug" >/dev/null || exit 8                         # unchanged → 0
