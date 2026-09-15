@@ -137,6 +137,8 @@ def skill_copy(repo, source, leaf, dest, config, names):
         body = contained(src, config["skillOverrides"][source]).read_text()
     data = {key: value for key, value in data.items() if key in SKILL_KEYS}
     data["name"] = leaf
+    if source in config.get("skillDescriptions", {}):
+        data["description"] = config["skillDescriptions"][source]
     # Runtime policy is preserved. Directory readiness reports explicit-only
     # entrypoints separately rather than silently enabling automatic invocation.
     if source not in SUBJECT_SKILLS:

@@ -27,5 +27,5 @@ variable. Use the host shell tool and its background-session support. Never call
 Claude's Bash, BashOutput, Agent, or AskUserQuestion tools from Codex.
 
 Run ``node "${PLUGIN_ROOT}/scripts/codex-companion.mjs" status ARGUMENTS``.
-Return the actual job status. Do not continuously poll or claim completion when
+Return stdout verbatim, without summarizing or condensing it. Do not continuously poll or claim completion when
 the job is still running. Use $codex:result for requested completed output.

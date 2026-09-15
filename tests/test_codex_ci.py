@@ -41,6 +41,24 @@ def claude_runtime_dependencies(repo):
 
 
 class TestCodexCi(unittest.TestCase):
+    def test_ci_python_commands_use_locked_pixi(self):
+        for name in ("validate.yml", "codex-acceptance.yml", "changelog-check.yml"):
+            workflow = yaml.safe_load((REPO / ".github/workflows" / name).read_text())
+            for job_name, job in workflow["jobs"].items():
+                setup_index = None
+                for i, step in enumerate(job["steps"]):
+                    if step.get("uses", "").startswith("prefix-dev/setup-pixi@"):
+                        setup_index = i
+                        self.assertTrue(step["with"]["locked"])
+                    run = step.get("run", "")
+                    if re.search(r"python3|scripts/(?:sync|validate)-plugins.sh", run):
+                        with self.subTest(workflow=name, job=job_name, step=step.get("name")):
+                            self.assertIsNotNone(setup_index)
+                            self.assertLess(setup_index, i)
+                            self.assertNotIn("pip install", run)
+                            self.assertIn("pixi run --locked", run)
+                            self.assertNotRegex(run, r"(?:^|\n)\s*(?:python3|bash scripts/(?:sync|validate)-plugins.sh)")
+
     def test_release_preparation_uses_locked_pixi_for_pipeline(self):
         workflow = yaml.safe_load((REPO / ".github/workflows/release-prepare.yml").read_text())
         steps = workflow["jobs"]["prepare"]["steps"]

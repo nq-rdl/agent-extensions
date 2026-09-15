@@ -12,8 +12,6 @@ metadata:
 
 Use the host’s available file, search, shell, and user-question tools for this workflow. Legacy tool names and slash-qualified skill references in supporting references describe capabilities; they do not install those tools. Keep code/configuration examples for another host unchanged when authoring that host’s artifacts.
 
-Before shell examples, set PLUGIN_ROOT to the absolute installed plugin directory: two parent directories above this SKILL.md’s containing skill directory. Derive it from the loaded file path, never the working directory. This variable is not automatically supplied to ordinary shell tools. Quote it in commands.
-
 Execute this workflow only on an explicit user request; preserve its review-only or mutation scope and existing authorization checks.
 
 Codex host execution
@@ -26,13 +24,8 @@ user arguments literally; ``ARGUMENTS`` below is notation, not an injected shell
 variable. Use the host shell tool and its background-session support. Never call
 Claude's Bash, BashOutput, Agent, or AskUserQuestion tools from Codex.
 
-Inspect ``node "${PLUGIN_ROOT}/scripts/codex-defects.mjs" show --latest`` or
-``list`` to find the runtime failure. Read the canonical reporting procedure in
-this skill's source references only if needed. Prepare a minimal sanitized report
-with expected/actual behavior and reproduction. Never include tokens, credentials,
-private prompts, or full transcripts. Check existing issues before filing.
-
-File through gh only when the user explicitly requested reporting or approved the
-concrete report. After successful publication, mark the defect using
-``node "${PLUGIN_ROOT}/scripts/codex-defects.mjs" mark-reported DEFECT_ID --url ISSUE_URL``.
-Do not mark a failed or unpublished report as sent.
+Read and follow [references/reporting.rst](references/reporting.rst) before
+inspecting, drafting, filing, or marking a defect. It is included in this installed
+skill and owns the marker-selection, verdict, privacy, draft-approval, and outcome
+gates. Use the host user-question tool for required confirmations. Pass a supplied
+defect ID literally; use the latest marker only when the user supplied no ID.

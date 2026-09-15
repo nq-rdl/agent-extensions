@@ -1,0 +1,3 @@
+kind: Fixed
+body: Run CI, acceptance, changelog checks, and offline Codex container Python through the locked Pixi toolchain.
+time: 2026-09-15T23:36:48.759103081Z

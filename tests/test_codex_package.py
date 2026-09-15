@@ -87,6 +87,41 @@ def fixture(root, *, mcp=False, hooks=False):
 
 
 class StrictPackaging(unittest.TestCase):
+    def test_native_description_override_preserves_canonical_source(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            repo = Path(tmp)
+            data = fixture(repo)
+            source = repo / "skills/sample-task/SKILL.md"
+            original = source.read_bytes()
+            cfg = data["targets"]["codex"]
+            cfg["skillDescriptions"] = {"sample-task": "Check native readiness"}
+            (repo / "registry/bundles/sample.yaml").write_text(yaml.safe_dump(data))
+            package.sync(repo)
+            native = repo / package.ROOT / "sample/skills/task/SKILL.md"
+            self.assertEqual(package.frontmatter(native.read_text())[0]["description"], "Check native readiness")
+            self.assertEqual(source.read_bytes(), original)
+            self.assertEqual(package.validate(repo), [])
+            for invalid in ([], {"missing": "Description"}, {"sample-task": False}, {"sample-task": " "}, {"sample-task": "x" * 1025}):
+                with self.subTest(invalid=invalid):
+                    cfg["skillDescriptions"] = invalid
+                    (repo / "registry/bundles/sample.yaml").write_text(yaml.safe_dump(data))
+                    with self.assertRaisesRegex(ValueError, "skillDescriptions"):
+                        package.sync(repo)
+
+    def test_defect_reporting_procedure_is_available_in_both_installed_targets(self):
+        source = REPO / "skills/codex-report-defect"
+        relative = "references/reporting.rst"
+        procedure = (source / relative).read_bytes()
+        self.assertIn(relative, (source / "SKILL.md").read_text())
+        for root in (REPO / "plugins/codex/skills/report-defect", REPO / package.ROOT / "codex/skills/report-defect"):
+            with self.subTest(root=root):
+                with tempfile.TemporaryDirectory() as tmp:
+                    cached = Path(tmp) / "report-defect"
+                    shutil.copytree(root, cached)
+                    # The canonical source is not present in this isolated copy.
+                    self.assertIn(relative, (cached / "SKILL.md").read_text())
+                    self.assertEqual((cached / relative).read_bytes(), procedure)
+
     def test_native_override_preserves_tool_negation(self):
         with tempfile.TemporaryDirectory() as tmp:
             repo = Path(tmp)

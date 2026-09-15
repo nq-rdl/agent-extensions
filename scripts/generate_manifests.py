@@ -48,7 +48,7 @@ _KNOWN_MARKETPLACE_KEYS = frozenset(
 )
 
 _CODEX_TARGET_KEYS = frozenset(
-    {"enabled", "pluginName", "marketplaceName", "category", "components", "interface", "excludeSkills", "skillOverrides", "resources", "hookConfig", "mcpConfig", "notes"}
+    {"enabled", "pluginName", "marketplaceName", "category", "components", "interface", "excludeSkills", "skillOverrides", "skillDescriptions", "resources", "hookConfig", "mcpConfig", "notes"}
 )
 _CODEX_COMPONENT_KEYS = frozenset({"skills", "mcp", "hooks", "apps"})
 _CODEX_INTERFACE_KEYS = frozenset(
@@ -313,6 +313,13 @@ def _codex_enabled_bundles(repo: Path, marketplace_name: str) -> dict[str, dict]
         for source, path in overrides.items():
             if not isinstance(path, str) or not path.startswith("references/") or ".." in Path(path).parts or not path.endswith(".rst"):
                 raise ValueError(f"{bf.name}: invalid skill override path for {source}")
+        descriptions = codex.get("skillDescriptions", {})
+        if not isinstance(descriptions, dict) or any(
+            source not in sources or not isinstance(value, str)
+            or not value.strip() or len(value) > 1024
+            for source, value in descriptions.items()
+        ):
+            raise ValueError(f"{bf.name}: skillDescriptions must map canonical bundle skills to nonempty descriptions of at most 1024 characters")
         for component, field in (("mcp", "mcpConfig"), ("hooks", "hookConfig")):
             path = codex.get(field)
             if components.get(component, False):

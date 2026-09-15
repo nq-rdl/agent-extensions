@@ -65,3 +65,5 @@ targets:
       codex-transfer: references/codex.rst
       codex-cancel: references/codex.rst
       codex-report-defect: references/codex.rst
+    skillDescriptions:
+      codex-setup: Check installation and authentication readiness of the independent Codex CLI client

@@ -100,6 +100,10 @@ records with the installed `sqlreview.sh check` before publishing them, then use
 `sqlreview.sh render`. Hooks are workflow guardrails, not a security boundary.
 Native adapters never translate an unsupported decision into automatic approval.
 
+`$codex:setup` checks the independent CLI's installation and authentication.
+Its native description reflects that scope. Review-gate flags are rejected before
+the companion runs: the automatic stop-review hook belongs to Claude Code.
+
 See the [Codex hook contract](https://developers.openai.com/codex/hooks) for
 supported events, payloads, trust, and tool-coverage limits.
 

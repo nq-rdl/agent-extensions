@@ -226,6 +226,8 @@ that should become `sql-code:analyse`:
    Native execution uses the host's available tools. Codex packaging adapts entrypoint
    names and host calls; target-host configuration examples retain their original meaning.
    Use `skillOverrides: {source-name: references/codex.rst}` for a different host workflow.
+   Use `skillDescriptions: {source-name: "Native capability description"}` when that
+   workflow supports different capabilities; omitted descriptions stay canonical.
    `excludeSkills` names canonical sources. MCP and hooks require `mcpConfig` and
    `hookConfig` repository-relative sources; `resources` copies declared runtime assets.
    Run `pixi run python3 scripts/codex_package.py . --validate` and native smoke tests.

@@ -1,0 +1,3 @@
+kind: Fixed
+body: Limit native Codex setup to CLI readiness and preserve verbatim status output; support target-specific skill descriptions.
+time: 2026-09-15T23:36:26.285295483Z
