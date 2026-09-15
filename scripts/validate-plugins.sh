@@ -44,6 +44,7 @@ REPO_ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 KNOWN_EVENTS=(
   SessionStart
   UserPromptSubmit
+  UserPromptExpansion
   PreToolUse
   PostToolUse
   PostToolUseFailure

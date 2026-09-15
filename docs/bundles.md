@@ -471,6 +471,8 @@ Technical writing — developer docs, tutorials, ADRs, and guides.
 
 - `se-technical-writer` (subagent)
 
+**Hooks:** `stylepedia-reminder`
+
 ---
 
 ## lucid

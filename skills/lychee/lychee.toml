@@ -61,3 +61,8 @@ accept = ["100..=103", "200..=299"]
 
 # File extensions to check
 extensions = ["md", "mdx", "txt", "rst", "html", "yaml", "yml", "toml", "json"]
+
+# Stylepedia returns 403 to requests without these content-negotiation headers.
+# Keep HTTP status and fragment checking enabled; do not exclude the guide.
+[hosts."stylepedia.net"]
+headers = { "Accept" = "text/html", "Accept-Language" = "en-US,en;q=0.9" }

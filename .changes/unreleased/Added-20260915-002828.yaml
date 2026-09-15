@@ -1,0 +1,3 @@
+kind: Added
+body: Remind Claude to consult relevant Stylepedia sections when the copyedit skill is invoked, through an advisory plugin hook.
+time: 2026-09-15T00:28:28.641102583Z

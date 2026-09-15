@@ -241,3 +241,21 @@ itself.
 
 Releases are dispatched from the Actions tab (**"Release — Prepare PR"**) and land as a
 reviewable `release/v<version>` PR — reviewing and squash-merging that PR is the release gate.
+
+### Bundled advisory hooks
+
+A bundle can opt into generated hook packaging with a canonical
+`hooks/<pluginName>/hooks.json`. List its shell hooks by stem in the bundle’s
+`hooks:` array; `sync-plugins.sh` copies the config and `hooks/<name>.sh` files
+into `plugins/<pluginName>/hooks/`, removes stale copies, and checks drift with
+`--check`. This directory is generated once the canonical config exists.
+Commands use `bash "${CLAUDE_PLUGIN_ROOT}/hooks/<name>.sh"` for portable installs.
+Existing bundles without a canonical config retain their current packaging.
+
+The `tech-writing` reminder uses `jq` (silently skips if unavailable) and
+adds advisory context for `PreToolUse` on the `Skill` tool and
+`UserPromptExpansion` on a typed `/tech-writing:copyedit` command. It makes no
+network requests and does not change tool permissions. Claude versions without
+`UserPromptExpansion` still have the lookup instruction in the skill itself;
+agent preloads likewise rely on that instruction. Hook event details:
+https://code.claude.com/docs/en/hooks#userpromptexpansion

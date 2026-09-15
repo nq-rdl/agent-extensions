@@ -306,7 +306,7 @@ A: [Clear answer with link to deeper docs if needed]
 ## Style Guidelines
 
 ### House style (documentation, tutorials, guides, ADRs)
-Apply the preloaded `/tech-writing:copyedit` skill to every content type except blog posts, and run its copyedit pass before the Quality Checklist. Preserve the project’s established locale; default to en-AU. Use spaced en dashes, sentence-case headings, and purpose before action. Remove incidental modals in procedural instructions, but preserve normative requirements, permissions, and recommendations. Documentation uses no first person except "We recommend …".
+For each documentation task, scan the Stylepedia topic index in the preloaded `/tech-writing:copyedit` skill and consult relevant sections. Apply the skill to every content type except blog posts, and run its copyedit pass before the Quality Checklist. Preserve the project’s established locale; default to en-AU. Use spaced en dashes, sentence-case headings, and purpose before action. Remove incidental modals in procedural instructions, but preserve normative requirements, permissions, and recommendations. Documentation uses no first person except "We recommend …".
 
 ### Voice and Tone (blog posts only)
 - **Active voice**: "The function processes data" not "Data is processed by the function"

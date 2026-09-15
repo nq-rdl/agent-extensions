@@ -11,7 +11,7 @@ skills:
   - {source: tech-writing-copyedit, leaf: copyedit}   # → /tech-writing:copyedit
 agents:
   - se-technical-writer
-hooks: []
+hooks: [stylepedia-reminder]
 prompts: []
 mcp: []
 targets:

@@ -22,6 +22,30 @@ These are the *decisions* a fresh writer makes inconsistently, not a grammar
 lesson – your default grammar is fine. Long form, tables, and examples live in
 `references/house-style.rst`.
 
+## Stylepedia topic index
+
+At the start of a writing or copyedit task, scan this index for relevant
+content and read the matching sections before drafting. Skip unrelated
+sections. If the site is unavailable, use the house rules and report any
+unverified guidance rather than inventing it.
+
+[Stylepedia](https://stylepedia.net/style/) hosts Red Hat’s technical writing
+guide. This compact index routes into its
+[writing-style ToC](https://stylepedia.net/style/#part-Writing_Style_Guide);
+it supplements the house rules rather than overriding them. Preserve the
+project’s locale, normative modals, and the “We recommend …” exception.
+
+| Content to check | Source section |
+|---|---|
+| Audience and purpose | [Objectives](https://stylepedia.net/style/#objectives) |
+| Grammar, punctuation, and hyphens | [Grammar](https://stylepedia.net/style/#grammar) |
+| Headings, interface labels, commands, and notices | [Document design](https://stylepedia.net/style/#design) |
+| Ambiguity, inclusive wording, dates, and numbers | [Language choices](https://stylepedia.net/style/#appropriate-language) |
+| Lists, markup, and code examples | [Clear writing](https://stylepedia.net/style/#writing_clearly_and_succinctly) |
+| Links and repeated information | [Cross-references](https://stylepedia.net/style/#using-xrefs) |
+| Further authorities | [Resources](https://stylepedia.net/style/#resources) |
+| Individual technical terms | [Usage dictionary](https://stylepedia.net/style/#part-Usage_Dictionary) |
+
 ## Locale: en-AU, spaced en dash, sentence-case headings
 
 - Spell in **Australian English** (organise, colour, catalogue, *licence* noun
