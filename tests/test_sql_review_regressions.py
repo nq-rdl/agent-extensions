@@ -154,3 +154,33 @@ class ReviewRegressions(unittest.TestCase):
         self.assertIn('scope.draft.json', decision(result)['permissionDecisionReason'])
         result = run_hook(GUARD, write_event(self.d / 'review.json', json.dumps(review_doc()), self.p.root), env_for())
         self.assertEqual(decision(result)['permissionDecision'], 'deny')
+
+    def test_snapshot_rejects_destination_directory(self):
+        self.p.write_json('q', 'review.json', review_doc('q', 'q.sql'))
+        (self.d / 'source.sql').mkdir()
+        result = run(['snapshot', 'q', 'q.sql'], self.p.root)
+        self.assertEqual(result.returncode, 2)
+        self.assertEqual(list((self.d / 'source.sql').iterdir()), [])
+
+    def test_move_refuses_symlink_marker_before_mutation(self):
+        self.reviewed()
+        with tempfile.TemporaryDirectory() as outside:
+            target = Path(outside) / 'marker'
+            target.write_text('unchanged')
+            (self.d / 'rebind-required').symlink_to(target)
+            before = target.stat().st_mtime_ns
+            result = run(['move', 'q.sql', 'renamed.sql'], self.p.root)
+            self.assertEqual(result.returncode, 2)
+            self.assertTrue(self.d.is_dir())
+            self.assertFalse((self.d.parent / 'renamed').exists())
+            self.assertEqual(target.stat().st_mtime_ns, before)
+
+    def test_snapshot_refuses_symlink_history(self):
+        self.p.write_json('q', 'review.json', review_doc('q', 'q.sql'))
+        with tempfile.TemporaryDirectory() as outside:
+            (self.d / 'history').symlink_to(outside)
+            result = run(['snapshot', 'q', 'q.sql'], self.p.root)
+            self.assertEqual(result.returncode, 2)
+            self.assertEqual(list(Path(outside).iterdir()), [])
+            self.assertFalse((self.d / 'source.sql').exists())
+            self.assertEqual(list(self.d.glob('.snapshot.*')), [])

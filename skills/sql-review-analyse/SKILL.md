@@ -103,8 +103,8 @@ change before continuing. Write the whole `reviews/$SLUG/review.json` (the guard
 ```
 
 ```bash
-bash "$S/sqlreview.sh" snapshot "$SLUG" "<sql path>"  # only AFTER the guarded Write succeeds
-bash "$S/sqlreview.sh" render "$SLUG" review      # → reviews/<slug>/review.md (never hand-write it)
+bash "$S/sqlreview.sh" snapshot "$SLUG" "<sql path>" || exit $?  # only AFTER the guarded Write succeeds
+bash "$S/sqlreview.sh" render "$SLUG" review || exit $?  # → reviews/<slug>/review.md (never hand-write it)
 rm -f ".sqlreview/reviews/$SLUG/review.draft.json"
 ```
 

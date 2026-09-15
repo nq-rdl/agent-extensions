@@ -203,6 +203,10 @@ cmd_snapshot() {
   [ "$slug" = "$(sr_slug "$rel")" ] || sr_die 2 "slug/path mismatch"
   local doc tmp sha revision
   doc="$SR_REVIEWS/$slug/review.json"
+  sr_no_symlinks "$doc" || exit 2
+  sr_no_symlinks "$SR_REVIEWS/$slug/source.sql" || exit 2
+  [ ! -d "$SR_REVIEWS/$slug/source.sql" ] || sr_die 2 "snapshot destination is a directory"
+  sr_no_symlinks "$SR_REVIEWS/$slug/rebind-required" || exit 2
   cmd_check "$doc" >/dev/null || sr_die 4 "write a validated review before snapshot"
   [ "$(jq -r .sql_path "$doc")" = "$rel" ] || sr_die 2 "review/path mismatch"
   tmp="$(mktemp "$SR_REVIEWS/$slug/.snapshot.XXXXXX")" || sr_die 2 "mktemp failed"
@@ -210,8 +214,8 @@ cmd_snapshot() {
   sha="$(sr_sha256 "$tmp")"
   [ "$sha" = "$(jq -r .sql_sha256 "$doc")" ] || { rm -f "$tmp"; sr_die 2 "SQL changed since fingerprint; reassess before snapshot"; }
   revision="$(jq -r .revision "$doc")"
-  mkdir -p "$SR_REVIEWS/$slug/history" || sr_die 2 "cannot create history"
-  sr_no_symlinks "$SR_REVIEWS/$slug/history/$revision.sql" || exit 2
+  sr_no_symlinks "$SR_REVIEWS/$slug/history/$revision.sql" || { rm -f "$tmp"; exit 2; }
+  mkdir -p "$SR_REVIEWS/$slug/history" || { rm -f "$tmp"; sr_die 2 "cannot create history"; }
   if [ -e "$SR_REVIEWS/$slug/history/$revision.sql" ]; then
     cmp -s "$tmp" "$SR_REVIEWS/$slug/history/$revision.sql" || { rm -f "$tmp"; sr_die 2 "revision history conflict"; }
   else
@@ -298,6 +302,10 @@ cmd_move() {
   [ "$oldslug" = "$newslug" ] || [ ! -e "$SR_REVIEWS/$newslug" ] || sr_die 2 "reviews/$newslug/ already exists"
   sr_safe_slug "$oldslug"
   sr_safe_slug "$newslug"
+  for f in review.json scope.json rebind-required; do
+    sr_no_symlinks "$SR_REVIEWS/$oldslug/$f" || exit 2
+    [ ! -d "$SR_REVIEWS/$oldslug/$f" ] || sr_die 2 "unexpected directory: $f"
+  done
   [ "$oldslug" = "$newslug" ] || mv "$SR_REVIEWS/$oldslug" "$SR_REVIEWS/$newslug" || sr_die 2 "move failed"
   touch "$SR_REVIEWS/$newslug/rebind-required" || sr_die 2 "cannot mark stale"
   rm -f "$SR_REVIEWS/$newslug/review.md" "$SR_REVIEWS/$newslug/scope.md" || sr_die 2 "cannot remove stale renders"

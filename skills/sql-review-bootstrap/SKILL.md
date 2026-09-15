@@ -92,7 +92,7 @@ Preserve the previous revision and increment it on updates.
 
 
 ```bash
-bash "$S/sqlreview.sh" render "$SLUG" scope      # → reviews/<slug>/scope.md (never hand-write it)
+bash "$S/sqlreview.sh" render "$SLUG" scope || exit $?  # → reviews/<slug>/scope.md (never hand-write it)
 rm -f ".sqlreview/reviews/$SLUG/scope.draft.json"
 ```
 
