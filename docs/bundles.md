@@ -483,9 +483,15 @@ Debugging and cleanup — systematic diagnosis and tech-debt removal.
 
 Technical writing — developer docs, tutorials, ADRs, and guides.
 
+**Skills**
+
+- `/tech-writing:copyedit`
+
 **Agents**
 
 - `se-technical-writer` (subagent)
+
+**Hooks:** `stylepedia-reminder`
 
 ---
 

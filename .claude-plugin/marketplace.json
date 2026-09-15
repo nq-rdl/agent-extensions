@@ -395,7 +395,9 @@
       "version": "0.29.0",
       "keywords": [
         "docs",
-        "technical-writing"
+        "technical-writing",
+        "style-guide",
+        "copyedit"
       ]
     },
     {
