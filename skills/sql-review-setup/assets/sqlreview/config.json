@@ -1,0 +1,17 @@
+{
+  "schemaVersion": 1,
+  "definitions": {
+    "assumption": "Decision points made by the RDL: a choice the RDL made where the request, the data, or the business rule left room for more than one reasonable reading. Each one is put to the human and recorded with who confirmed it.",
+    "limitation": "A constraint on what the output can be relied on for that arises from the data, the source system, or the request rather than from an RDL decision. Recorded so the analyst knows where the result must not be over-read."
+  },
+  "roles": {
+    "engineer": "Data Engineer (RDL)",
+    "analyst": "Data Analyst"
+  },
+  "sql_globs": ["**/*.sql"],
+  "sections": {
+    "logic": true,
+    "open_questions": true,
+    "changes": true
+  }
+}

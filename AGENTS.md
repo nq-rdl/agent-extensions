@@ -101,6 +101,7 @@ These skills call Python directly (no CLI wrapper). Each has a `requirements.txt
 |---|---|
 | New first-party CLI helper or MCP server | Go (`CGO_ENABLED=0`, prebuilt binaries) |
 | Vendored/forked plugin runtime | May retain its upstream language when full fidelity requires it and the design documents runtime availability and distribution |
+| Skill helper script — small, portable shell shared by a plugin's skills and hooks, shipped under `skills/<name>/scripts/` (e.g. `rh-*.sh`, `sqlreview.sh`) | Bash 3.2-compatible + `jq`; no compiled artefact, no Python. Anything larger than file/JSON/git plumbing is a CLI helper (Go, row above) |
 | File-format or ML skills | Python + `ensure-deps.sh` |
 | Documentation-only skill | Markdown |
 | New TypeScript | Not permitted |

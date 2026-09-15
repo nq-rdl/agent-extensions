@@ -48,6 +48,7 @@ subagents (auto-routed by their description).
 | [`tech-writing`](#tech-writing) | Technical writing — developer docs, tutorials, ADRs, and guides |
 | [`lucid`](#lucid) | Lucid — visual collaboration boards and diagrams (Lucidchart / Lucidspark) via the hosted Lucid MCP server |
 | [`pandera`](#pandera) | Pandera — dataframe schema validation and debugging for pandas and Polars |
+| [`sql-review`](#sql-review) | SQL Review — scope, analyse and explain SQL with standardised, human-confirmed assumption and limitation reports |
 
 ## Install
 
@@ -504,3 +505,18 @@ Pandera — dataframe schema validation and debugging for pandas and Polars.
 **Skills**
 
 - `/pandera:validate`
+
+---
+
+## sql-review
+
+SQL Review — scope, analyse and explain SQL with standardised, human-confirmed assumption and limitation reports.
+
+**Skills**
+
+- `/sql-review:setup`
+- `/sql-review:bootstrap`
+- `/sql-review:analyse`
+- `/sql-review:explain`
+
+**Hooks:** `sql-review-preflight`, `sql-review-guard`
