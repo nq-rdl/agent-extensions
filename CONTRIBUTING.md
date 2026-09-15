@@ -241,8 +241,10 @@ itself.
 
 Releases are dispatched from the Actions tab (**"Release — Prepare PR"**) and land as a
 reviewable `release/v<version>` PR — reviewing and squash-merging that PR is the release gate.
+Version rules (`X.Y.Z`, no leading `v`, no zero-padded components) and the recovery steps for a
+failed Prepare or Finalize run are in [`AGENTS.md`](AGENTS.md) under **"Release"**.
 
-### Bundled advisory hooks
+## Bundled hooks
 
 A bundle can opt into generated hook packaging with a canonical
 `hooks/<pluginName>/hooks.json`. List its shell hooks by stem in the bundle’s

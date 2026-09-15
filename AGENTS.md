@@ -277,16 +277,37 @@ sync with `.changie.yaml`).
 
 Releases are cut from the GitHub UI, not a local tag push. Run the **"Release — Prepare PR"**
 workflow (Actions tab, `workflow_dispatch`) with an explicit `version` input (`X.Y.Z`, no leading
-`v`). It batches the changie changelog, stamps `VERSION` (and `pyproject.toml`), regenerates all
-manifests from the registry, and opens a `release/v<version>` PR labelled `skip-changelog` — all
-via the GitHub App token (`RELEASE_APP_ID` / `RELEASE_APP_PRIVATE_KEY`) so the PR's own CI runs on
-it. Reviewing and squash-merging that PR **is** the release gate (branch protection controls who
-can merge). A pre-merge **"Release — PR guard"** check runs on every `release/v*` PR and fails
-closed if the PR's version doesn't match its branch name or isn't strictly newer than `main`'s
-current `VERSION`, catching a stale release PR before it can merge. On merge, **"Release —
-Finalize on merge"** tags `v<version>` on the squash-merge commit and publishes the GitHub release
-from `.changes/<version>.md` — it never pushes to `main`, and it is idempotent (safe to re-run;
-recovers a tag-pushed-but-release-missing partial failure).
+`v`, no zero-padded components — `1.0.00` is rejected). It batches the changie changelog, stamps
+`VERSION` (and `pyproject.toml`), regenerates all manifests from the registry, and opens a
+`release/v<version>` PR labelled `skip-changelog` — all via the GitHub App token (`RELEASE_APP_ID`
+/ `RELEASE_APP_PRIVATE_KEY`) so the PR's own CI runs on it. Reviewing and squash-merging that PR
+**is** the release gate (branch protection controls who can merge). A pre-merge **"Release — PR
+guard"** check runs on every `release/v*` PR and fails closed if the PR's version doesn't match its
+branch name or isn't strictly newer than `main`'s current `VERSION`, catching a stale release PR
+before it can merge. On merge, **"Release — Finalize on merge"** tags `v<version>` on the
+squash-merge commit and publishes the GitHub release from `.changes/<version>.md` — it never pushes
+to `main`, and it is idempotent (safe to re-run; recovers a tag-pushed-but-release-missing partial
+failure).
+
+Prepare runs a pinned Changie (`version:` on the `changie-action` step in `release-prepare.yml`),
+so an unchanged workflow batches the same changelog; bump the pin deliberately on a normal PR. A
+weekly **Changie pin check** workflow (`changie-pin-check.yml`) opens a `changie-pin` tracking issue
+when that pin falls behind upstream's latest release — it only notifies; the bump stays a reviewed PR.
+
+**Recovery.** Finalize fails closed rather than guessing: in every state an existing `v<version>`
+tag must point at the PR's merge commit, and a remote lookup error is an error, not "absent".
+
+- *Prepare failed after pushing the branch* (e.g. an API error while opening the PR): the run
+  deletes `release/v<version>` itself — lease-protected, so only while the branch still points at
+  the commit it pushed — and you simply re-dispatch. If the log says the branch was not deleted,
+  inspect it and delete it by hand first; Prepare refuses to start while the branch exists.
+- *Finalize failed part-way*: re-run it from the Actions tab; it is idempotent.
+- *Finalize refuses to run*: a foreign `v<version>` tag, a release without its tag (a draft, or one
+  cut by hand), or a remote lookup error — all hard failures. Resolve the cause, then re-run.
+- *Two release PRs merged close together*: finalize runs share one FIFO queue, so whichever runs
+  second sees the first's tag — newer-after-older publishes both in order; older-after-newer fails
+  closed (no tag, no release). Recover by cutting a corrective release with a higher version, or,
+  if the out-of-order merge was intentional, tag and release by hand as the run's error says.
 
 `marketplace.json` sources are relative paths (`./plugins/<bundle>`) — installs read directly from `main` (or whatever ref the user pinned), no separate release branch involved.
 

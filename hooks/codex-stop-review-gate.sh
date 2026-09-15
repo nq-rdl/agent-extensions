@@ -11,8 +11,20 @@ codex_require_node() {
     printf '%s\n' 'Codex plugin requires Node.js >=18.18.0; install or upgrade Node: https://nodejs.org/en/download' >&2
     exit 1
   fi
-  major="$(node -p 'process.versions.node.split(".")[0]')"
-  minor="$(node -p 'process.versions.node.split(".")[1]')"
+  # One `node -p`, not two. This preflight runs on every hook invocation,
+  # PostToolUse included, and a second Node start-up costs ~40ms to fetch a
+  # value the first process already had.
+  version="$(node -p 'process.versions.node.split(".").slice(0, 2).join(" ")' 2>/dev/null || true)"
+  major="${version%% *}"
+  minor="${version##* }"
+  # An unparseable probe must take the same exit as an old Node, not die inside
+  # the arithmetic test below with `set -e` and no message.
+  case "${major}.${minor}" in
+    *[!0-9.]*|.*|*.)
+      printf '%s\n' 'Codex plugin requires Node.js >=18.18.0; install or upgrade Node: https://nodejs.org/en/download' >&2
+      exit 1
+      ;;
+  esac
   if [ "$major" -lt 18 ] || { [ "$major" -eq 18 ] && [ "$minor" -lt 18 ]; }; then
     printf '%s\n' 'Codex plugin requires Node.js >=18.18.0; install or upgrade Node: https://nodejs.org/en/download' >&2
     exit 1

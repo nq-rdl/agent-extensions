@@ -34,6 +34,7 @@ order:
   - kubernetes
   - argo-cd
   - ansible
+  - redhat
   - arch-linux
   - starrocks
   - postgres

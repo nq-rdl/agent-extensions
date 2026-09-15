@@ -50,12 +50,10 @@ test("default branch names with special characters are passed to git literally",
   fs.writeFileSync(path.join(cwd, "app.js"), "console.log('base');\n");
   run("git", ["add", "app.js", "branch-helper.cmd"], { cwd });
   run("git", ["commit", "-m", "base"], { cwd });
-  run("git", ["branch", "-m", branchName], { cwd, shell: false });
-  run("git", ["update-ref", `refs/remotes/origin/${branchName}`, branchName], { cwd, shell: false });
-  run("git", ["symbolic-ref", "refs/remotes/origin/HEAD", `refs/remotes/origin/${branchName}`], {
-    cwd,
-    shell: false
-  });
+  // `run` never uses a shell, so the `&` in branchName reaches git verbatim.
+  run("git", ["branch", "-m", branchName], { cwd });
+  run("git", ["update-ref", `refs/remotes/origin/${branchName}`, branchName], { cwd });
+  run("git", ["symbolic-ref", "refs/remotes/origin/HEAD", `refs/remotes/origin/${branchName}`], { cwd });
   run("git", ["checkout", "-b", "feature/test"], { cwd });
   fs.writeFileSync(path.join(cwd, "app.js"), "console.log('feature');\n");
   run("git", ["add", "app.js"], { cwd });

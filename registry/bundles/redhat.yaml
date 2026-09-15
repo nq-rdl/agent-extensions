@@ -1,0 +1,22 @@
+schemaVersion: v1
+id: redhat
+displayName: Red Hat
+description: Red Hat — fetch product documentation and Customer Portal (KCS) content with your own credentials via curl, on macOS and Linux
+keywords: [redhat, documentation, customer-portal, kcs, curl, openshift, ansible]
+owners:
+  - rdl
+channels:
+  - stable
+skills:
+  - {source: redhat-docs-fetch, leaf: fetch-docs}   # → /redhat:fetch-docs
+  - {source: redhat-setup, leaf: setup}             # → /redhat:setup
+agents:
+  - redhat-docs-fetcher
+hooks: [redhat-docs-preflight, redhat-docs-guard]
+prompts: []
+mcp: []
+targets:
+  claude:
+    enabled: true
+    pluginName: redhat
+    marketplaceName: rdl-agent-extensions

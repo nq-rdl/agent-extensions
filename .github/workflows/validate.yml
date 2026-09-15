@@ -14,7 +14,7 @@ jobs:
     name: Validate bundle references + registry consistency
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
       - name: Install PyYAML
         run: python3 -m pip install --user pyyaml
@@ -50,7 +50,7 @@ jobs:
     name: Validate skill + agent symlinks
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
       - name: Check all symlinks resolve
         run: |
@@ -78,7 +78,7 @@ jobs:
     name: Validate Claude plugin structure, hooks, and agents
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
       - name: Install PyYAML for agent frontmatter validation
         run: python3 -m pip install --user pyyaml
@@ -90,7 +90,7 @@ jobs:
     name: Unit tests (pipeline scripts)
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
       - name: Install PyYAML
         run: python3 -m pip install --user pyyaml
@@ -98,7 +98,7 @@ jobs:
       - name: Run pipeline-script unit tests
         run: python3 -m unittest discover -s tests -p 'test_*.py' -v
 
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
         with:
           node-version: '20'
 
@@ -109,12 +109,12 @@ jobs:
     name: Validate skills against the agentskills.io spec (asctl)
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
       # asctl is the spec validator for skills/ (imported from the former
       # nq-rdl/agent-skills repo when it was merged here). It replaces the
       # upstream-side validation that the old vendoring sync relied on.
-      - uses: actions/setup-go@v6
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
         with:
           go-version-file: tools/asctl/go.mod
           cache: true

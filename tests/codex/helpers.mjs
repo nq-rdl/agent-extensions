@@ -4,7 +4,6 @@
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
-import process from "node:process";
 import { spawnSync } from "node:child_process";
 
 export function makeTempDir(prefix = "codex-plugin-test-") {
@@ -15,13 +14,19 @@ export function writeExecutable(filePath, source) {
   fs.writeFileSync(filePath, source, { encoding: "utf8", mode: 0o755 });
 }
 
+// Never spawns through a shell. Callers hand this helper environment-derived
+// absolute paths -- the repo root off import.meta.url, process.execPath, mkdtemp
+// dirs -- and a shell would re-parse those on spaces and metacharacters. The
+// commands used here (node, git, bash, process.execPath) are all directly
+// executable, so there is nothing to gain from a shell and no `shell` option to
+// override: shell interpretation is not a per-call decision.
 export function run(command, args, options = {}) {
   return spawnSync(command, args, {
     cwd: options.cwd,
     env: options.env,
     encoding: "utf8",
     input: options.input,
-    shell: options.shell ?? (process.platform === "win32" && !path.isAbsolute(command)),
+    shell: false,
     windowsHide: true
   });
 }
