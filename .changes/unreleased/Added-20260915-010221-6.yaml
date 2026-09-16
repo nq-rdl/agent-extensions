@@ -1,3 +1,0 @@
-kind: Added
-body: 'sql-review hooks: a SessionStart preflight reporting stale reviews, and a PreToolUse guard that only lets review/scope JSON be written with complete confirmation records.'
-time: 2026-09-15T01:02:21.000000+00:00

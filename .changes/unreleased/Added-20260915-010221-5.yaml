@@ -1,3 +1,0 @@
-kind: Added
-body: '/sql-review:explain (#128) walks the Data Analyst through reviewed SQL step by step, cross-referencing assumptions and limitations by id, and resumes from what changed.'
-time: 2026-09-15T01:02:21.000000+00:00

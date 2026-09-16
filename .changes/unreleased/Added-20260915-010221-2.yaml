@@ -1,3 +1,0 @@
-kind: Added
-body: '/sql-review:setup (#126) initialises .sqlreview/ from a bundled default or custom answers; re-runs diff file by file and never overwrites without confirmation.'
-time: 2026-09-15T01:02:21.000000+00:00

@@ -1,3 +1,0 @@
-kind: Fixed
-body: Use locked Pixi dependencies for release preparation and skip remote Codex smoke checks on finalized reruns.
-time: 2026-09-15T23:04:28.491439333Z

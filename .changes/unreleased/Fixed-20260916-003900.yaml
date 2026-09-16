@@ -1,3 +1,0 @@
-kind: Fixed
-body: Apply confirmed custom SQL role names through an atomic helper, preserving definitions and other settings without relying on unsupported native hook approval prompts.
-time: 2026-09-16T00:39:00.700605054Z
