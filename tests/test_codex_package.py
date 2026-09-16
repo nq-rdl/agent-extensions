@@ -276,6 +276,16 @@ class StrictPackaging(unittest.TestCase):
             self.assertFalse((repo / package.ROOT / "sample/skills/task/references/codex.rst").exists())
             self.assertEqual(package.validate(repo), [])
 
+            templates = repo / "skills/sample-task/references/templates/native"
+            templates.mkdir(parents=True)
+            (repo / "skills/sample-task/references/codex.rst").rename(templates / "codex.rst")
+            data["targets"]["codex"]["skillOverrides"]["sample-task"] = "references/templates/native/codex.rst"
+            (repo / "registry/bundles/sample.yaml").write_text(yaml.safe_dump(data))
+            package.sync(repo)
+            self.assertFalse((repo / package.ROOT / "sample/skills/task/references/templates").exists())
+            self.assertTrue((repo / package.ROOT / "sample/skills/task/references/subagent.rst").exists())
+            self.assertEqual(package.validate(repo), [])
+
     def test_installed_issue_reporting_retains_shared_publication_checks(self):
         native = REPO / package.ROOT / "claude-code/skills/skill-report-issue"
         source = REPO / "skills/report-skill-issue"

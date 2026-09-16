@@ -274,7 +274,14 @@ def skill_copy(repo, source, leaf, dest, config, names):
         body = contained(src, config["skillOverrides"][source]).read_text()
         # This is a build template for SKILL.md, not a supporting reference.
         # Its links resolve from the rendered entrypoint's directory.
-        contained(dest, config["skillOverrides"][source]).unlink()
+        template = contained(dest, config["skillOverrides"][source])
+        template.unlink()
+        # Git does not preserve empty directories; keep generated and installed
+        # trees identical after removing a template that was their only file.
+        parent = template.parent
+        while parent != dest and not any(parent.iterdir()):
+            parent.rmdir()
+            parent = parent.parent
     data = {key: value for key, value in data.items() if key in SKILL_KEYS}
     data["name"] = leaf
     if source in config.get("skillDescriptions", {}):
