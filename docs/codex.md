@@ -79,6 +79,12 @@ require a separate integration.
 
 ## Hooks
 
+Companion job state uses `$CLAUDE_PLUGIN_DATA/state` when supplied by Claude.
+Otherwise it uses `$XDG_STATE_HOME/codex-companion` (absolute paths only), or
+`~/.local/state/codex-companion`. State directories are user-owned and private
+(`0700`); state and defect JSON files are created with `0600` permissions.
+Legacy shared `/tmp/codex-companion` data is not loaded or migrated automatically.
+
 Codex uses explicit native command-hook definitions under
 `hooks/codex/<subject>/hooks.json`, copied into each selected package. Shared
 implementations remain under `hooks/`; `hooks/codex/adapter.sh` translates native

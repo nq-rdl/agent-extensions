@@ -8,7 +8,7 @@ import process from "node:process";
 import { spawnSync } from "node:child_process";
 import { fileURLToPath, pathToFileURL } from "node:url";
 
-import { resolveStateDir } from "./state.mjs";
+import { ensureStateDir, resolveStateDir, resolveStateRoot } from "./state.mjs";
 import { resolveWorkspaceRoot } from "./workspace.mjs";
 
 const DEFECTS_DIR_NAME = "defects";
@@ -78,14 +78,15 @@ export function resolveDefectsDir(cwd) {
     try {
       return path.join(resolveStateDir(process.cwd()), DEFECTS_DIR_NAME);
     } catch {
-      return path.join(os.tmpdir(), "codex-companion", DEFECTS_DIR_NAME);
+      return path.join(resolveStateRoot(), DEFECTS_DIR_NAME);
     }
   }
 }
 
 function ensureDefectsDir(cwd) {
+  ensureStateDir(cwd);
   const dir = resolveDefectsDir(cwd);
-  fs.mkdirSync(dir, { recursive: true });
+  fs.mkdirSync(dir, { recursive: true, mode: 0o700 });
   return dir;
 }
 
@@ -101,7 +102,7 @@ function ensureDefectsDir(cwd) {
 function writeFileAtomic(file, contents) {
   const temp = `${file}.${process.pid}.tmp`;
   try {
-    fs.writeFileSync(temp, contents, "utf8");
+    fs.writeFileSync(temp, contents, { encoding: "utf8", mode: 0o600 });
     fs.renameSync(temp, file);
   } catch (error) {
     try {
@@ -279,18 +280,16 @@ function probeVersion(command, args) {
 // Read the plugin's own shipped manifest rather than the repo VERSION file, so
 // this resolves in an installed plugin cache as well as in-repo.
 function readPluginVersion() {
-  try {
-    const manifest = path.resolve(
-      path.dirname(fileURLToPath(import.meta.url)),
-      "..",
-      "..",
-      ".claude-plugin",
-      "plugin.json"
-    );
-    return JSON.parse(fs.readFileSync(manifest, "utf8")).version ?? null;
-  } catch {
-    return null;
+  const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..", "..");
+  for (const target of [".claude-plugin", ".codex-plugin"]) {
+    try {
+      const version = JSON.parse(fs.readFileSync(path.join(root, target, "plugin.json"), "utf8")).version;
+      if (typeof version === "string" && version.trim()) return version;
+    } catch {
+      // The installed package may contain only the other target's manifest.
+    }
   }
+  return null;
 }
 
 function collectEnvironment(cwd) {

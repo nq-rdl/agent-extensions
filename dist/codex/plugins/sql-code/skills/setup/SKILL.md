@@ -58,8 +58,15 @@ the file list — `config.json`, `templates/scope.md`, `templates/review.md`, `r
 bash "$S/sqlreview.sh" init                # copies the bundled default; never touches existing files
 ```
 
-Custom answers: after `init`, Write `.sqlreview/config.json` with the edited `roles` (keep `schemaVersion` and `definitions` untouched). The guard asks for permission
-on that Write — that prompt *is* the confirmation for this path.
+Custom answers: after `init`, show the two role names and confirm them with the host user-question tool
+(skipped only with `--yes`). Then run the helper with those answers as shell-quoted arguments:
+
+```bash
+bash "$S/sqlreview.sh" roles "<confirmed engineer role>" "<confirmed analyst role>"
+```
+
+The helper atomically updates only the two role names. It preserves `schemaVersion`, `definitions`
+and all other settings. Stop on failure; do not patch or overwrite `config.json` directly.
 
 ## 2. Already initialised (re-run — #126 §2)
 

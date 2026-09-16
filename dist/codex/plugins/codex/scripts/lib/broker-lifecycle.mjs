@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: Apache-2.0
+// Derived from openai/codex-plugin-cc v1.0.6 (db52e28). Modified to use private state directories.
+
 import fs from "node:fs";
 import net from "node:net";
 import os from "node:os";
@@ -6,7 +9,7 @@ import process from "node:process";
 import { spawn } from "node:child_process";
 import { fileURLToPath } from "node:url";
 import { createBrokerEndpoint, parseBrokerEndpoint } from "./broker-endpoint.mjs";
-import { resolveStateDir } from "./state.mjs";
+import { ensureStateDir, resolveStateDir } from "./state.mjs";
 
 export const PID_FILE_ENV = "CODEX_COMPANION_APP_SERVER_PID_FILE";
 export const LOG_FILE_ENV = "CODEX_COMPANION_APP_SERVER_LOG_FILE";
@@ -87,9 +90,8 @@ export function loadBrokerSession(cwd) {
 }
 
 export function saveBrokerSession(cwd, session) {
-  const stateDir = resolveStateDir(cwd);
-  fs.mkdirSync(stateDir, { recursive: true });
-  fs.writeFileSync(resolveBrokerStateFile(cwd), `${JSON.stringify(session, null, 2)}\n`, "utf8");
+  ensureStateDir(cwd);
+  fs.writeFileSync(resolveBrokerStateFile(cwd), `${JSON.stringify(session, null, 2)}\n`, { encoding: "utf8", mode: 0o600 });
 }
 
 export function clearBrokerSession(cwd) {

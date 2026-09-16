@@ -23,7 +23,9 @@ Modifications by nq-rdl (rdl-agent-extensions): converted slash-commands to
 skills; updated the model/effort catalog to GPT-5.6 (Sol/Terra/Luna); added a
 model-selection guide; adapted hooks to Claude Code exec form with a Node.js
 preflight; patched `scripts/codex-companion.mjs`'s top-level `main().catch`
-handler to record a defect marker. See docs/ARCHITECTURE.md for the fork
+handler to record a defect marker; made state writes atomic and moved the
+non-Claude fallback into private user storage, including broker session state.
+See docs/ARCHITECTURE.md for the fork
 rationale and modernization boundary.
 
 First-party additions. The defect-logging and reporting subsystem shipped in this

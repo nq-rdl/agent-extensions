@@ -86,3 +86,24 @@ class Publish(unittest.TestCase):
         (self.final / "scope.json").symlink_to(outside)
         self.assertNotEqual(self.publish(scope_doc("q", "q.sql")).returncode, 0)
         self.assertEqual(outside.read_text(), "keep")
+
+    def test_custom_roles_preserve_configuration_and_quote_user_answers(self):
+        config = self.workspace / ".sqlreview/config.json"
+        original = json.loads(config.read_text())
+        original["custom"] = {"keep": True}
+        original["roles"]["other"] = "Reviewer"
+        config.write_text(json.dumps(original))
+        names = ["Engineer's \"team\"", "Analyst $(touch unexpected)"]
+        result = self.run_helper("roles", *names)
+        self.assertEqual(result.returncode, 0, result.stderr)
+        expected = json.loads(json.dumps(original))
+        expected["roles"].update(engineer=names[0], analyst=names[1])
+        self.assertEqual(json.loads(config.read_text()), expected)
+        self.assertFalse((self.workspace / "unexpected").exists())
+        self.assertNotEqual(self.run_helper("roles", "", names[1]).returncode, 0)
+        self.assertEqual(json.loads(config.read_text()), expected)
+        for invalid in ("{}", "not JSON", "{}\n{}"):
+            config.write_text(invalid)
+            self.assertNotEqual(self.run_helper("roles", *names).returncode, 0)
+            self.assertEqual(config.read_text(), invalid)
+        self.assertEqual(list(config.parent.glob(".roles.*")), [])

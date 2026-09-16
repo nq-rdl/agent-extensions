@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: Apache-2.0
-// Derived from openai/codex-plugin-cc v1.0.6 (db52e28). Modified for atomic state writes.
+// Derived from openai/codex-plugin-cc v1.0.6 (db52e28). Modified for atomic writes and private user state.
 
 import { createHash, randomUUID } from "node:crypto";
 import fs from "node:fs";
@@ -10,7 +10,6 @@ import { resolveWorkspaceRoot } from "./workspace.mjs";
 
 const STATE_VERSION = 1;
 const PLUGIN_DATA_ENV = "CLAUDE_PLUGIN_DATA";
-const FALLBACK_STATE_ROOT_DIR = path.join(os.tmpdir(), "codex-companion");
 const STATE_FILE_NAME = "state.json";
 const JOBS_DIR_NAME = "jobs";
 const MAX_JOBS = 50;
@@ -29,6 +28,24 @@ function defaultState() {
   };
 }
 
+export function resolveStateRoot() {
+  const pluginDataDir = process.env[PLUGIN_DATA_ENV];
+  if (pluginDataDir) return path.join(pluginDataDir, "state");
+  const xdgState = process.env.XDG_STATE_HOME;
+  const userState = xdgState && path.isAbsolute(xdgState)
+    ? xdgState : path.join(os.homedir(), ".local", "state");
+  return path.join(userState, "codex-companion");
+}
+
+function ensurePrivateDirectory(dir) {
+  fs.mkdirSync(dir, { recursive: true, mode: 0o700 });
+  const stat = fs.lstatSync(dir);
+  if (!stat.isDirectory() || (process.getuid && stat.uid !== process.getuid())) {
+    throw new Error(`Refusing non-owned or linked state directory: ${dir}`);
+  }
+  fs.chmodSync(dir, 0o700);
+}
+
 export function resolveStateDir(cwd) {
   const workspaceRoot = resolveWorkspaceRoot(cwd);
   let canonicalWorkspaceRoot = workspaceRoot;
@@ -41,9 +58,7 @@ export function resolveStateDir(cwd) {
   const slugSource = path.basename(workspaceRoot) || "workspace";
   const slug = slugSource.replace(/[^a-zA-Z0-9._-]+/g, "-").replace(/^-+|-+$/g, "") || "workspace";
   const hash = createHash("sha256").update(canonicalWorkspaceRoot).digest("hex").slice(0, 16);
-  const pluginDataDir = process.env[PLUGIN_DATA_ENV];
-  const stateRoot = pluginDataDir ? path.join(pluginDataDir, "state") : FALLBACK_STATE_ROOT_DIR;
-  return path.join(stateRoot, `${slug}-${hash}`);
+  return path.join(resolveStateRoot(), `${slug}-${hash}`);
 }
 
 export function resolveStateFile(cwd) {
@@ -55,7 +70,9 @@ export function resolveJobsDir(cwd) {
 }
 
 export function ensureStateDir(cwd) {
-  fs.mkdirSync(resolveJobsDir(cwd), { recursive: true });
+  ensurePrivateDirectory(resolveStateRoot());
+  ensurePrivateDirectory(resolveStateDir(cwd));
+  ensurePrivateDirectory(resolveJobsDir(cwd));
 }
 
 export function loadState(cwd) {
@@ -97,7 +114,7 @@ function removeFileIfExists(filePath) {
 function writeJsonAtomic(file, payload) {
   const temp = `${file}.${randomUUID()}.tmp`;
   try {
-    fs.writeFileSync(temp, `${JSON.stringify(payload, null, 2)}\n`, { encoding: "utf8", flag: "wx" });
+    fs.writeFileSync(temp, `${JSON.stringify(payload, null, 2)}\n`, { encoding: "utf8", flag: "wx", mode: 0o600 });
     fs.renameSync(temp, file);
   } finally {
     fs.rmSync(temp, { force: true });

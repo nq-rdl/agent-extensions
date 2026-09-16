@@ -9,6 +9,7 @@
 #   slug PATH                                  slug for a project path; exit 5 on a conflicting binding
 #   check FILE | check --stdin                 validate a review/scope JSON; exit 4 with one violation per line
 #   publish SLUG scope|review DRAFT             validate a staged copy, then atomically replace the final JSON
+#   roles ENGINEER ANALYST                     update only the two confirmed role names in config.json
 #   fingerprint SQL                            {sql_path, sql_sha256, git_commit, git_dirty}
 #   snapshot SLUG SQL                          verify final review SHA, retain history, advance source.sql
 #   delta SLUG                                 diff source.sql vs the current SQL; exit 10 when changed, 6 no baseline
@@ -170,6 +171,27 @@ cmd_check() {
   printf 'ok\n'
   return 0
 }
+
+# ---------------------------------------------------------------------------------------------
+cmd_roles() (
+  [ $# -eq 2 ] || usage
+  sr_need_jq
+  sr_require_root
+  local config="$SR_ROOT/$SR_DIR/config.json" tmp
+  sr_no_symlinks "$config" || exit 2
+  [ -f "$config" ] || sr_die 2 "config.json is missing"
+  [ -n "$1" ] && [ -n "$2" ] || sr_die 4 "role names must not be empty"
+  tmp="$(mktemp "$SR_ROOT/$SR_DIR/.roles.XXXXXX")" || sr_die 2 "mktemp failed"
+  trap 'rm -f "$tmp"' EXIT
+  trap 'exit 2' HUP INT TERM
+  jq -se --arg engineer "$1" --arg analyst "$2" '
+    if length == 1 and (.[0] | type == "object" and .schemaVersion == 1 and (.roles | type == "object"))
+    then .[0] | .roles.engineer = $engineer | .roles.analyst = $analyst
+    else error("expected one schema-1 configuration with a roles object") end
+  ' "$config" > "$tmp" || sr_die 4 "invalid configuration; original preserved"
+  mv "$tmp" "$config" || sr_die 2 "cannot update roles"
+  printf 'updated\tconfig.json roles\n'
+)
 
 # ---------------------------------------------------------------------------------------------
 cmd_publish() (
@@ -396,6 +418,7 @@ case "$cmd" in
   slug) cmd_slug "$@" ;;
   check) cmd_check "$@" ;;
   publish) cmd_publish "$@" ;;
+  roles) cmd_roles "$@" ;;
   fingerprint) cmd_fingerprint "$@" ;;
   snapshot) cmd_snapshot "$@" ;;
   delta) cmd_delta "$@" ;;
