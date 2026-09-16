@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Inspect native Codex hook/MCP registration without making model requests.
+"""Inspect native Codex skill/hook/MCP registration without making model requests.
 
 Uses an isolated CODEX_HOME and real installed plugin caches. --live-mcp also
 initializes the pinned stdio server and probes the remote authentication boundary.
@@ -72,12 +72,35 @@ class RPC:
         self.proc.stdout.close()
 
 
+def check_skill_inventory(result, expected):
+    """Check client-visible names, enabled state, ownership, and cached entrypoints.
+
+    Include explicit-only skills: the automatic prompt smoke test skips them,
+    but clients must still receive them for manual selection.
+    """
+    errors = [error for entry in result["data"] for error in entry["errors"]]
+    if errors:
+        raise RuntimeError(f"Codex rejected skill configuration: {errors}")
+    skills = [skill for entry in result["data"] for skill in entry["skills"]]
+    for name, path in expected.items():
+        matches = [skill for skill in skills if skill["name"] == name]
+        if len(matches) != 1:
+            raise RuntimeError(f"expected one client-visible skill {name}; got {len(matches)}")
+        skill = matches[0]
+        plugin_id = name.split(":", 1)[0] + "@rdl-agent-extensions"
+        if not skill["enabled"] or skill.get("pluginId") != plugin_id:
+            raise RuntimeError(f"skill {name} is disabled or has incorrect plugin ownership: {skill}")
+        if Path(skill["path"]) != path:
+            raise RuntimeError(f"skill {name} has unexpected cached path: {skill['path']}")
+
+
 def check(repo, live=False):
     cli = os.environ.get("CODEX_BIN", "codex")
     entries = json.loads((repo / ".agents/plugins/marketplace.json").read_text())[
         "plugins"
     ]
     expected_hooks = 0
+    expected_skills = {}
     cache = Path(os.environ.get("XDG_CACHE_HOME", str(Path.home() / ".cache")))
     cache.mkdir(parents=True, exist_ok=True)
     with tempfile.TemporaryDirectory(prefix="rdl-native-codex-", dir=cache) as tmp:
@@ -108,7 +131,7 @@ def check(repo, live=False):
                     for groups in json.loads(hook.read_text())["hooks"].values()
                     for g in groups
                 )
-            subprocess.run(
+            installed = subprocess.run(
                 [
                     cli,
                     "plugin",
@@ -118,8 +141,13 @@ def check(repo, live=False):
                 ],
                 env=env,
                 check=True,
-                stdout=subprocess.DEVNULL,
+                capture_output=True,
+                text=True,
             )
+            installed_root = Path(json.loads(installed.stdout)["installedPath"])
+            for skill in sorted((root / "skills").glob("*/SKILL.md")):
+                name = entry["name"] + ":" + skill.parent.name
+                expected_skills[name] = installed_root / skill.relative_to(root)
         with (Path(tmp) / "config.toml").open("a") as config:
             config.write("\n[features]\nhooks = true\nplugins = true\n")
         rpc = RPC([cli, "app-server"], env=env, cwd=workspace)
@@ -135,6 +163,13 @@ def check(repo, live=False):
                 },
             )
             rpc.send("initialized", notification=True)
+            result = rpc.send("skills/list", {"cwds": [str(workspace)], "forceReload": True})
+            check_skill_inventory(result, expected_skills)
+            print(
+                f"Codex app-server exposed {len(expected_skills)} enabled plugin skills, "
+                "including explicit-only skills, with qualified names and cached paths; "
+                "client menu rendering was not tested."
+            )
             result = rpc.send("hooks/list", {"cwds": [str(workspace)]})
             hooks = [hook for entry in result["data"] for hook in entry["hooks"]]
             errors = [error for entry in result["data"] for error in entry["errors"]]

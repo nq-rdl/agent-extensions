@@ -78,6 +78,9 @@ codex plugin marketplace add nq-rdl/agent-extensions
 codex plugin add <subject>@rdl-agent-extensions
 ```
 
+To invoke a Codex skill, type `$` in the composer and select it. The CLI also provides `/skills`.
+The `$subject:facet` entries below are Codex skill mentions. Refer to [Invoking skills](codex.md#invoking-skills) for client menu behaviour.
+
 See [Codex support](codex.md) for verification commands, native hook coverage, and directory readiness.
 
 ---

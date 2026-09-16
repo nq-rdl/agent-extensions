@@ -16,7 +16,7 @@ codex plugin list --marketplace rdl-agent-extensions --available --json
 codex plugin add go@rdl-agent-extensions --json
 ```
 
-Until the integration reaches `main`, select a pushed branch or commit explicitly:
+To test a pushed branch or commit, select it explicitly:
 
 ```bash
 codex plugin marketplace add nq-rdl/agent-extensions --ref <branch-or-sha> --json
@@ -26,6 +26,51 @@ Start a new session. Skills use qualified names such as `$go:naming`. Existing
 explicit-only invocation settings remain intact; those skills are installed but
 omitted from automatic skill selection. [Bundle listings](bundles.md) show the
 available entrypoints.
+
+## Invoking skills
+
+Codex uses skills as its reusable workflow entrypoints. To install the Git PR
+comments workflow, run:
+
+```bash
+codex plugin add git@rdl-agent-extensions --json
+```
+
+Start a new Codex session. In the composer, type `$` to select the Git plugin's `pr-comments` skill.
+Add the PR URL to your request. The qualified text form is:
+
+```text
+$git:pr-comments <PR URL>
+```
+
+| Client | Explicit invocation |
+|---|---|
+| Claude Code | Use `/git:pr-comments <PR URL>`. |
+| Codex CLI or IDE extension | Type `$` to select the skill, or open `/skills`. |
+| Codex desktop app | Type `$` to select the skill. Current desktop documentation also lists enabled skills in the `/` menu. |
+
+Refer to OpenAI's [skill invocation guidance](https://learn.chatgpt.com/docs/build-skills#how-codex-uses-skills)
+and [desktop slash commands](https://learn.chatgpt.com/docs/reference/slash-commands).
+The picker can display `pr-comments (git)` while the backend identifies the skill
+as `git:pr-comments`. The plugin name supplies the namespace.
+
+The [Codex plugin manifest](https://developers.openai.com/plugins/build/plugins)
+has no documented field for registering separate `/git:pr-comments` command aliases.
+Menu presentation belongs to the client. Adding a Claude-style `commands/` directory
+does not provide a documented Codex command registration mechanism.
+Native command hooks run at lifecycle events. They do not register composer commands.
+
+### Troubleshooting missing menu entries
+
+If a skill appears in the skill picker but is absent from the slash menu, select
+it through `$`. Check that the plugin and skill are enabled. Start a new session.
+If the slash entry remains absent, report the menu behaviour to OpenAI with the client version.
+Backend discovery alone does not verify desktop menu rendering.
+
+The repository's runtime check queries `skills/list` in an isolated installation.
+It verifies qualified names, enabled state, plugin ownership, and installed paths.
+This includes explicit-only skills such as `git:pr-comments`, which the automatic
+prompt-discovery smoke test excludes. Keep their explicit invocation policy intact.
 
 ## Strict packaging
 
@@ -135,6 +180,9 @@ reinstalls. A separate fixture verifies version replacement updates fresh-sessio
 Native hook tests use copied caches with spaces in their paths and verify actual
 allow/deny/context outputs. No test installs this catalog into the contributor's
 active session.
+
+The runtime check also verifies client-visible skill metadata through `skills/list`.
+It does not exercise a desktop or IDE menu, or execute a model-driven skill workflow.
 
 Use the optional network check for actual MCP initialization and endpoint probing:
 
