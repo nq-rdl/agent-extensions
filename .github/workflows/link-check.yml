@@ -19,11 +19,11 @@ jobs:
         uses: lycheeverse/lychee-action@e7477775783ea5526144ba13e8db5eec57747ce8 # v2.9.0
         with:
           args: --version
-          installOnly: true
+          lycheeVersion: v0.24.2
 
       - name: Check skill links
         # .md is checked repo-wide; .rst is scoped to the speckit-dev skills so we
         # monitor their doc-grounding links without failing on pre-existing
         # placeholder/rotted URLs in other skills' .rst (a separate hygiene pass
         # can widen this to skills/**/*.rst once those are cleaned/excluded).
-        run: bash skills/lychee/scripts/check-links.sh 'skills/**/*.md' 'skills/speckit-*/**/*.rst'
+        run: bash skills/lychee/scripts/check-links.sh --config lychee.toml --cache=false 'skills/**/*.md' 'skills/speckit-*/**/*.rst'

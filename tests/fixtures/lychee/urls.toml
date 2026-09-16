@@ -1,0 +1,198 @@
+# URL policy fixtures. Root expectations preserve the legacy policy, including
+# its known broad matches; narrowing root policy belongs to #300.
+
+[[cases]]
+url = "https://example.com/"
+shipped = true
+repository = true
+
+[[cases]]
+url = "http://example.org/guide"
+shipped = true
+repository = true
+
+[[cases]]
+url = "http://localhost:8000/"
+shipped = true
+repository = true
+
+[[cases]]
+url = "http://0.0.0.0:3000/"
+shipped = true
+repository = true
+
+[[cases]]
+url = "https://example.net/"
+shipped = true
+repository = false
+# Also excluded by lychee 0.24.2 itself, independently of the private-IP flag.
+builtin = true
+
+[[cases]]
+url = "https://docs.example.com/guide"
+shipped = true
+repository = false
+# Also excluded by lychee 0.24.2 itself, independently of the private-IP flag.
+builtin = true
+
+[[cases]]
+url = "https://api.example.org:8443/path"
+shipped = true
+repository = false
+# Also excluded by lychee 0.24.2 itself, independently of the private-IP flag.
+builtin = true
+
+[[cases]]
+url = "https://docs.example.net/"
+shipped = true
+repository = false
+# Also excluded by lychee 0.24.2 itself, independently of the private-IP flag.
+builtin = true
+
+[[cases]]
+url = "https://service.test/"
+shipped = true
+repository = false
+# Also excluded by lychee 0.24.2 itself, independently of the private-IP flag.
+builtin = true
+
+[[cases]]
+url = "https://api.example/"
+shipped = true
+repository = false
+# Also excluded by lychee 0.24.2 itself, independently of the private-IP flag.
+builtin = true
+
+[[cases]]
+url = "https://missing.invalid/"
+shipped = true
+repository = false
+# Also excluded by lychee 0.24.2 itself, independently of the private-IP flag.
+builtin = true
+
+[[cases]]
+url = "http://app.localhost:8080/"
+shipped = true
+repository = false
+# Also excluded by lychee 0.24.2 itself, independently of the private-IP flag.
+builtin = true
+
+[[cases]]
+url = "https://quarto.org/docs/guide"
+shipped = false
+repository = true
+
+[[cases]]
+url = "https://quarto.org/docs"
+shipped = false
+repository = true
+
+[[cases]]
+url = "https://github.com/nq-rdl/spec-kit-extensions"
+shipped = false
+repository = true
+
+[[cases]]
+url = "https://raw.githubusercontent.com/nq-rdl/spec-kit-extensions/main/README.md"
+shipped = false
+repository = true
+
+[[cases]]
+url = "https://github.com/rdl-service-desk/service-desk"
+shipped = false
+repository = true
+
+[[cases]]
+url = "https://docs.redhat.com/en/documentation/"
+shipped = false
+repository = true
+
+[[cases]]
+url = "https://access.redhat.com/management/api"
+shipped = false
+repository = true
+
+[[cases]]
+url = "https://www.conventionalcommits.org/en/v1.0.0/"
+shipped = false
+repository = true
+
+[[cases]]
+url = "https://www.stylemanual.gov.au/"
+shipped = false
+repository = true
+
+[[cases]]
+url = "https://icons.getbootstrap.com/icons/"
+shipped = false
+repository = true
+
+[[cases]]
+url = "https://your-business.com/"
+shipped = false
+repository = true
+
+[[cases]]
+url = "https://example.commercial.org/"
+shipped = false
+repository = true
+
+[[cases]]
+url = "http://localhost.company.org/"
+shipped = false
+repository = true
+
+[[cases]]
+url = "https://example.com.real.org/"
+shipped = false
+repository = true
+
+[[cases]]
+url = "https://github.com/lycheeverse/lychee"
+shipped = false
+repository = false
+
+[[cases]]
+url = "https://quarto.org/about"
+shipped = false
+repository = false
+
+[[cases]]
+url = "https://redhat.com/"
+shipped = false
+repository = false
+
+[[cases]]
+url = "https://stylepedia.net/"
+shipped = false
+repository = false
+
+[[cases]]
+url = "https://www.stylemanual.gov.au.real.org/"
+shipped = false
+repository = false
+
+[[cases]]
+url = "https://icons.getbootstrap.org/"
+shipped = false
+repository = false
+
+[[cases]]
+url = "https://myexample.com/"
+shipped = false
+repository = false
+
+[[cases]]
+url = "https://example.net.real.org/"
+shipped = false
+repository = false
+
+[[cases]]
+url = "https://service.test.real.org/"
+shipped = false
+repository = false
+
+[[cases]]
+url = "https://real.org/example.com/"
+shipped = false
+repository = false

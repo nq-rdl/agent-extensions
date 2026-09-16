@@ -84,7 +84,7 @@ pre-commit:
       glob: "skills/**/*.md"
       run: |
         if command -v lychee >/dev/null 2>&1; then
-          skills/lychee/scripts/check-links.sh {staged_files}
+          skills/lychee/scripts/check-links.sh --config lychee.toml --cache=false {staged_files}
         else
           echo "lychee not installed; skipping link check (CI still enforces it)."
         fi
