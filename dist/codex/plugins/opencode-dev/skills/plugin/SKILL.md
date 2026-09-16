@@ -121,7 +121,7 @@ plugin tool whose name matches a built-in **takes precedence**.
 
 > This is the *programmatic* route. Filesystem-discovered custom tools in
 > `.opencode/tools/*.ts` and the full `tool()` API are the **tools** facet
-> (`/opencode-dev:tools`) — cross-reference, don't duplicate.
+> (`$opencode-dev:tools`) — cross-reference, don't duplicate.
 
 ---
 

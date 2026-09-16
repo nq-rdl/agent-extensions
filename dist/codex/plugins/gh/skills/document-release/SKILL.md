@@ -56,7 +56,7 @@ subjective decisions.
 **NEVER do:**
 - Overwrite, replace, or regenerate CHANGELOG entries — polish wording only, preserve all content
 - Bump VERSION without asking — always use the host user-question tool for version changes
-- Use `Write` tool on CHANGELOG.md — always use `Edit` with exact `old_string` matches
+- Overwrite CHANGELOG.md as a whole file — use the host's context-matched editing tool (for example, `apply_patch`) with exact current text as context
 
 ---
 
@@ -138,7 +138,7 @@ For each file, classify needed updates as:
 
 ## Step 3: Apply Auto-Updates
 
-Make all clear, factual updates directly using the Edit tool.
+Make all clear, factual updates directly using the host's context-matched editing tool.
 
 For each file modified, output a one-line summary describing **what specifically changed** — not
 just "Updated README.md" but "README.md: added /new-skill to skills table, updated skill count
@@ -179,7 +179,7 @@ preserved them. This skill must NEVER do that.
 3. Never regenerate a CHANGELOG entry from scratch. The entry was written from the actual diff
    and commit history. It is the source of truth. You are polishing prose, not rewriting history.
 4. If an entry looks wrong or incomplete, use the host user-question tool — do NOT silently fix it.
-5. Use Edit tool with exact `old_string` matches — never use Write to overwrite CHANGELOG.md.
+5. Apply a narrow patch with exact current text as context. If the context does not match uniquely, reread the file and revise the patch. Never overwrite CHANGELOG.md as a whole file. Inspect the diff to confirm that only intended wording changed.
 
 **Changie projects (`.changie.yaml` exists):**
 If the repo uses Changie (`.changie.yaml` is present), do NOT edit CHANGELOG.md directly.

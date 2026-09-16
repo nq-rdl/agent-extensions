@@ -14,6 +14,7 @@ import shutil
 import stat
 import tempfile
 from pathlib import Path
+from urllib.parse import unquote
 
 import yaml
 
@@ -141,6 +142,123 @@ def helper_invocations(text, src, source, leaf):
     return text
 
 
+def prose_blocks(text, suffix=".md"):
+    """Yield (is_prose, text) blocks without confusing RST headings with fences."""
+    rst = suffix == ".rst"
+    fence = None
+    literal_indent = None
+    previous_blank = True
+    indented_code = False
+    list_indents = []
+    blocks = []
+    for line in text.splitlines(keepends=True):
+        expanded = line.expandtabs(4)
+        indent = len(expanded) - len(expanded.lstrip())
+        blank = not line.strip()
+        context_indent = 0
+        marker_end = None
+        if not rst and fence is None:
+            marker = re.match(r"^([ \t]*)(?:[-+*]|[0-9]{1,9}[.)])([ \t]+)(?=\S)", expanded)
+            # A marker indented four spaces beyond its list content is code,
+            # not a nested list. Track content columns for loose-list prose.
+            if marker and indent < (list_indents[-1] if list_indents else 0) + 4:
+                while list_indents and indent < list_indents[-1]:
+                    list_indents.pop()
+                list_indents.append(marker.end())
+                marker_end = marker.end()
+            elif not blank:
+                while list_indents and indent < list_indents[-1]:
+                    list_indents.pop()
+            context_indent = list_indents[-1] if list_indents else 0
+        elif not rst and list_indents:
+            context_indent = list_indents[-1]
+        if marker_end is not None:
+            contextual_line = expanded[marker_end:]
+        else:
+            contextual_line = expanded[context_indent:] if indent >= context_indent else expanded
+        code = False
+        if fence is not None:
+            code = True
+            char, length = fence
+            if re.fullmatch(r"[ \t]{0,3}" + re.escape(char) + "{" + str(length) + r",}[ \t]*", contextual_line.rstrip("\r\n")):
+                fence = None
+        elif literal_indent is not None:
+            if blank or indent > literal_indent:
+                code = True
+            else:
+                literal_indent = None
+        if not code and fence is None:
+            opening = re.match(r"^[ \t]{0,3}(`{3,}|~{3,})([^\r\n]*)", contextual_line)
+            if opening and (not rst or opening[1][0] == "`") and not (
+                opening[1][0] == "`" and "`" in opening[2]
+            ):
+                fence = (opening[1][0], len(opening[1]))
+                code = True
+            elif not rst and (indented_code or previous_blank) and (blank or indent >= context_indent + 4):
+                indented_code = True
+                code = True
+            else:
+                indented_code = False
+        if not code and rst and (
+            (line.rstrip().endswith("::") and not re.match(r"\s*\.\.\s", line))
+            or re.match(r"\s*\.\. (?:code|code-block|sourcecode)::", line)
+        ):
+            literal_indent = indent
+        if blocks and blocks[-1][0] == (not code):
+            blocks[-1][1] += line
+        else:
+            blocks.append([not code, line])
+        previous_blank = blank
+    return blocks
+
+
+INLINE_CODE = re.compile(r"(?<!`)(`+)(?!`)(.*?)(?<!`)\1(?!`)", re.DOTALL)
+
+
+def prose_invocations(text, names):
+    """Adapt prose and bare skill references; preserve target-host code examples."""
+    result = []
+    for prose, block in prose_blocks(text):
+        if not prose:
+            result.append(block)
+            continue
+        position = 0
+        for match in INLINE_CODE.finditer(block):
+            result.append(invocation_text(block[position:match.start()], names))
+            code = match[0]
+            if re.fullmatch(r"/[a-z0-9-]+:[a-z0-9-]+", match[2].strip()):
+                code = invocation_text(code, names)
+            result.append(code)
+            position = match.end()
+        result.append(invocation_text(block[position:], names))
+    return "".join(result)
+
+
+def local_links(text, suffix=".md"):
+    """Extract local Markdown/RST link destinations, excluding code examples."""
+    prose = "\n".join(block for is_prose, block in prose_blocks(text, suffix) if is_prose)
+    links = []
+    if suffix == ".rst":
+        links += re.findall(r"(?<!`)`[^`]*<([^>\n]+)>`__?", prose)
+        # Empty targets introduce internal anchors; an indirect target ending
+        # in '_' names another anchor rather than a file.
+        for target in re.findall(r"(?m)^[ \t]*\.\. _[^:\n]+:[ \t]*(\S+)", prose):
+            if not target.endswith("_"):
+                links.append(target)
+    prose = INLINE_CODE.sub("", prose)
+    destination = r"(<[^>\n]+>|(?:\\.|[^\s()<>]|\([^()\n]*\))+)"
+    links += re.findall(r"(?<!\\)!?\[[^\]\n]*\]\([ \t]*" + destination + r"(?:[ \t]+[\"'][^\n]*?[\"'])?[ \t]*\)", prose)
+    links += re.findall(r"(?m)^[ \t]{0,3}\[(?!\^)[^\]\n]+\]:[ \t]*(?:\n[ \t]*)?" + destination, prose)
+    for link in links:
+        link = link.removeprefix("<").removesuffix(">").strip()
+        if re.match(r"^[A-Za-z][A-Za-z0-9+.-]*:", link) or link.startswith(("#", "/")):
+            continue
+        link = unquote(re.split(r"[?#]", link, maxsplit=1)[0])
+        link = re.sub(r"\\([!\"#$%&'()*+,\-./:;<=>?@\[\]\\^_`{|}~])", r"\1", link)
+        if link and not any(char in link for char in ("<", "$", "{", "*")):
+            yield link
+
+
 def skill_copy(repo, source, leaf, dest, config, names):
     if (
         not re.fullmatch(r"[a-z0-9]+(?:-[a-z0-9]+)*", source)
@@ -154,6 +272,9 @@ def skill_copy(repo, source, leaf, dest, config, names):
     native_override = source in config.get("skillOverrides", {})
     if native_override:
         body = contained(src, config["skillOverrides"][source]).read_text()
+        # This is a build template for SKILL.md, not a supporting reference.
+        # Its links resolve from the rendered entrypoint's directory.
+        contained(dest, config["skillOverrides"][source]).unlink()
     data = {key: value for key, value in data.items() if key in SKILL_KEYS}
     data["name"] = leaf
     if source in config.get("skillDescriptions", {}):
@@ -170,6 +291,9 @@ def skill_copy(repo, source, leaf, dest, config, names):
                 r"\bAskUserQuestion(?: tools?)?\b", "the host user-question tool", body
             )
         body = body.replace("${CLAUDE_PLUGIN_ROOT}", "${PLUGIN_ROOT}")
+    else:
+        body = prose_invocations(body, names)
+        data["description"] = prose_invocations(data.get("description", ""), names)
     body = helper_invocations(body, src, source, leaf)
     reference_helpers = False
     for path in (dest / "references").rglob("*.rst"):
@@ -542,21 +666,13 @@ def validate(repo):
                     path.parent / "references/subagent.rst"
                 ).exists() and "references/subagent.rst" not in body:
                     raise ValueError(f"{path}: delegation outline must remain linked")
-                # Markdown relative links: scripts/templates may contain example links,
-                # but SKILL.md links are part of the installed entrypoint contract.
-                prose = re.sub(r"(?ms)^(```|~~~).*?^\1[^\n]*$", "", body)
-                prose = re.sub(r"`[^`\n]+`", "", prose)
-                for link in re.findall(r"\]\(([^\s)]+)\)", prose):
-                    if "://" in link or link.startswith(("#", "mailto:")):
+                for document in sorted(path.parent.rglob("*")):
+                    if document.suffix not in (".md", ".rst"):
                         continue
-                    link = link.split("#")[0]
-                    if "<" in link or "$" in link:
-                        continue
-                    target = contained(
-                        root, str((path.parent / link).relative_to(root))
-                    )
-                    if not target.exists():
-                        raise ValueError(f"{path}: missing relative reference {link}")
+                    for link in local_links(document.read_text(), document.suffix):
+                        target = contained(root, str((document.parent / link).relative_to(root)))
+                        if not target.exists():
+                            raise ValueError(f"{document}: missing relative reference {link}")
             actual = (
                 {p.name for p in (root / "skills").iterdir() if p.is_dir()}
                 if (root / "skills").exists()

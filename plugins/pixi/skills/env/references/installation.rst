@@ -156,7 +156,7 @@ releases <https://github.com/prefix-dev/pixi/releases>`__, unpack it and
 then use it as is. If you want ``pixi`` itself or the executables
 installed via ``pixi global`` to be available in your ``PATH``, you have
 to add them manually. The executables are located in
-`PIXI_HOME <../reference/environment_variables/>`__/bin.
+`PIXI_HOME <https://pixi.prefix.dev/latest/reference/environment_variables/>`__/bin.
 
 Install From Source\ `# <#install-from-source>`__
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~

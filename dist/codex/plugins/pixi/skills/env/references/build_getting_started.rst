@@ -34,7 +34,7 @@ feature.
 
 A more in-depth overview of what is available in the ``[package]`` part
 of the manifest can be found in the `Manifest
-Reference <../../reference/pixi_manifest/#the-package-section>`__.
+Reference <https://pixi.prefix.dev/latest/reference/pixi_manifest/#the-package-section>`__.
 
 .. container:: language-toml highlight
 
@@ -101,7 +101,7 @@ Packages are built by using build backends. By specifying
 ``package.build.backend`` and ``package.build.channels`` you determine
 which backend is used and from which channel it will be downloaded.
 
-There are `different build backends available <../backends/>`__.
+There are `different build backends available <backends.rst>`__.
 
 Pixi backends describe how to build a conda package, for a certain
 language or build tool. In this example, we are using
@@ -133,7 +133,7 @@ package. So ``hatchling`` creates a Python package, and
 ``pixi-build-python`` turns the Python package into a conda package.
 
 Read up on host-dependencies in the `dependency types
-chapter <../dependency_types/#host-dependencies>`__
+chapter <https://pixi.prefix.dev/latest/build/dependency_types/#host-dependencies>`__
 
 .. container:: language-toml highlight
 
@@ -145,7 +145,7 @@ chapter <../dependency_types/#host-dependencies>`__
 We add ``rich`` as a run dependency to the package. This is necessary
 because the package uses ``rich`` during runtime. You can read up on
 run-dependencies in the `dependency types
-chapter <../dependency_types/#dependencies-run-dependencies>`__
+chapter <https://pixi.prefix.dev/latest/build/dependency_types/#dependencies-run-dependencies>`__
 
 .. container:: language-toml highlight
 

@@ -18,19 +18,19 @@ Available Backends\ `# <#available-backends>`__
 
    * - Backend
      - Use Case
-   * - `pixi-build-cmake <pixi-build-cmake/>`__
+   * - `pixi-build-cmake <pixi-build-cmake.rst>`__
      - Projects using CMake
-   * - `pixi-build-python <pixi-build-python/>`__
+   * - `pixi-build-python <pixi-build-python.rst>`__
      - Building Python packages
-   * - `pixi-build-rattler-build <pixi-build-rattler-build/>`__
+   * - `pixi-build-rattler-build <pixi-build-rattler-build.rst>`__
      - Direct ``recipe.yaml`` builds with full control
-   * - `pixi-build-ros <pixi-build-ros/>`__
+   * - `pixi-build-ros <https://pixi.prefix.dev/latest/build/backends/pixi-build-ros/>`__
      - ROS (Robot Operating System) packages
-   * - `pixi-build-r <pixi-build-r/>`__
+   * - `pixi-build-r <pixi-build-r.rst>`__
      - R packages using ``R CMD INSTALL``
-   * - `pixi-build-rust <pixi-build-rust/>`__
+   * - `pixi-build-rust <pixi-build-rust.rst>`__
      - Cargo-based Rust applications and libraries
-   * - `pixi-build-mojo <pixi-build-mojo/>`__
+   * - `pixi-build-mojo <https://pixi.prefix.dev/latest/build/backends/pixi-build-mojo/>`__
      - Mojo applications and packages
 
 All backends are available through the
@@ -43,7 +43,7 @@ conda channel.
 Key Concepts\ `# <#key-concepts>`__
 -----------------------------------
 
--  `Compilers <../key_concepts/compilers/>`__ - How pixi-build
+-  `Compilers <compilers.rst>`__ - How pixi-build
    integrates with conda-forge's compiler infrastructure
 
 Installation\ `# <#installation>`__
@@ -77,7 +77,7 @@ Overriding the Build Backend\ `# <#overriding-the-build-backend>`__
 
 Sometimes you want to override the build backend that is used by pixi.
 Meaning overriding the backend that is specified in the
-`[package.build] <../../reference/pixi_manifest/#build-table>`__. We
+`[package.build] <https://pixi.prefix.dev/latest/reference/pixi_manifest/#build-table>`__. We
 currently have two environment variables that allow for this:
 
 #. ``PIXI_BUILD_BACKEND_OVERRIDE``: This environment variable allows for

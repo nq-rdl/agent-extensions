@@ -4,12 +4,12 @@ Advanced Building Using rattler-build
 =====================================
 
 In this tutorial, we will show you how to build the same C++ package as
-from `Building a C++ Package <../cpp/>`__ tutorial using
+from `Building a C++ Package <cpp.rst>`__ tutorial using
 `rattler-build <https://rattler.build>`__. In this tutorial we
-assume that you've read the `Building a C++ Package <../cpp/>`__
+assume that you've read the `Building a C++ Package <cpp.rst>`__
 tutorial. If you haven't read it yet, we recommend you to do so before
 continuing. You might also want to check out the
-`documentation <../backends/pixi-build-rattler-build/>`__ for the
+`documentation <pixi-build-rattler-build.rst>`__ for the
 ``pixi-build-rattler-build`` backend. The project structure and the
 source code will be the same as in the previous tutorial, so we may skip
 explicit explanations of some parts.
@@ -42,7 +42,7 @@ Workspace structure\ `# <#workspace-structure>`__
 -------------------------------------------------
 
 To get started, please recreate the structure of the workspace from the
-previous tutorial `Building a C++ Package <../cpp/>`__.
+previous tutorial `Building a C++ Package <cpp.rst>`__.
 
 .. _the-pixitoml-file:
 

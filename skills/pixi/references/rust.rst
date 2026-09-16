@@ -18,7 +18,7 @@ Prerequisites\ `# <#prerequisites>`__
 
 -  You need to have ``pixi`` installed. If you haven't installed it yet,
    you can follow the instructions in the `installation
-   guide <../../>`__. The crux of this tutorial is to show you only need
+   guide <https://pixi.prefix.dev/latest/>`__. The crux of this tutorial is to show you only need
    pixi!
 
 Create a Pixi workspace\ `# <#create-a-pixi-workspace>`__
@@ -102,7 +102,7 @@ your ``pixi`` workspace.
 ``pixi run`` is Pixi's way to run commands in an environment. It will
 make sure that the environment is activated for the command to run. It
 runs its own cross-platform shell, if you want more information checkout
-the `tasks documentation <../../workspace/advanced_tasks/>`__. You
+the `tasks documentation <https://pixi.prefix.dev/latest/workspace/advanced_tasks/>`__. You
 can also activate the environment in a shell by running ``pixi shell``,
 after that you don't need ``pixi run`` anymore.
 

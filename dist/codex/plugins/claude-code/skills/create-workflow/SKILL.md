@@ -29,7 +29,7 @@ Here $ARGUMENTS means the user’s supplied skill arguments. Codex does not popu
 $ARGUMENTS
 ```
 
-When the user invokes `/claude-code:create-workflow`, help them produce a saved,
+When the user invokes `$claude-code:create-workflow`, help them produce a saved,
 reusable workflow for the task in `$ARGUMENTS`. If empty, ask what repeatable
 multi-agent task they want to codify.
 
@@ -61,7 +61,7 @@ Pick a **workflow** only when *all* of these hold:
   context holding only the final answer.
 
 If the user just needs collaboration between a handful of agents, that's an
-**agent team** (`/claude-code:agent-teams`). If they want reusable instructions,
+**agent team** (`$claude-code:agent-teams`). If they want reusable instructions,
 that's a **skill** (`/claude-code:...` via the skill catalog). If it's a single
 delegated lookup, that's a **subagent**. Say so and stop.
 

@@ -30,10 +30,18 @@ requested model and effort; leave both unset otherwise. Default to foreground.
 Honor --background with the host shell's background support; strip --wait and
 --background before calling ``task``. Keep --resume or --fresh if supplied.
 
+Select the task's write scope from the user's request. Add ``--write`` for an
+authorized fix, implementation, or other edit request: the runtime defaults to a
+read-only sandbox without it. Omit ``--write`` for review, diagnosis, research,
+or an explicit read-only request. Continuing a prior thread does not authorize
+edits by itself; apply the current request's scope to resumed work too.
+
 Without an explicit choice, run
 ``node "${PLUGIN_ROOT}/scripts/codex-companion.mjs" task-resume-candidate --json``.
-If a candidate exists, ask whether to continue it or start fresh. Never silently
-attach an unrelated job. Then run
+Forward a supplied ``--cwd`` to this candidate lookup as well as the task call.
+If a candidate exists, ask whether to continue it or start fresh, then add
+``--resume`` or ``--fresh`` for the selected answer. Never silently attach an
+unrelated job. Then run
 ``node "${PLUGIN_ROOT}/scripts/codex-companion.mjs" task ARGUMENTS`` and return its
 stdout verbatim. Do not monitor, edit, or add follow-up work to the forwarding step.
 

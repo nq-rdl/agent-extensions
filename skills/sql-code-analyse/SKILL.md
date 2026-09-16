@@ -42,7 +42,33 @@ not, offer `/sql-code:bootstrap` retroactively once, then continue without it if
 If `reviews/$SLUG/review.json` exists (or `--update`):
 
 ```bash
-bash "$S/sqlreview.sh" delta "$SLUG"     # exit 0 unchanged (say so, stop) · 10 changed · 6 no baseline → full review below (retain revision history) · 2 missing SQL → stop/rebind
+bash "$S/sqlreview.sh" delta "$SLUG"     # exit 0 → complete publication below · 10 changed · 6 no baseline → full review below (retain revision history) · 2 missing SQL → stop/rebind
+```
+
+### Unchanged SQL: complete publication before stopping
+
+On exit 0, finish rendering the authoritative review before reporting it unchanged.
+A previous run may have published and snapshotted successfully but failed or stopped
+before rendering. This recovery uses the existing confirmed revision; do not increment
+it or ask for its confirmations again. Run from the project root:
+
+```bash
+bash "$S/sqlreview.sh" render "$SLUG" review || exit $?
+if cmp -s ".sqlreview/reviews/$SLUG/review.draft.json" ".sqlreview/reviews/$SLUG/review.json"; then
+  rm -f ".sqlreview/reviews/$SLUG/review.draft.json"
+fi
+```
+
+Show `review.md` and stop. Keep any differing draft and tell the user it contains
+unpublished work; do not discard or publish it automatically. If rendering fails,
+retain the draft and report the failure; retry this completion step once the cause
+is fixed.
+
+### Changed SQL: reassess the review
+
+On exit 10, continue with impact hints and the update below:
+
+```bash
 bash "$S/sqlreview.sh" impact "$SLUG"    # HINTS ONLY: identifiers from the changed lines traced into unchanged lines
 ```
 

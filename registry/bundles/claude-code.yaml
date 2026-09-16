@@ -44,6 +44,7 @@ targets:
     hookConfig: hooks/codex/claude-code/hooks.json
     skillOverrides:
       skill-review: references/codex.rst
+      report-skill-issue: references/codex.rst
     notes:
       sharedHooks:
       - skill-audit-nudge

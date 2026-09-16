@@ -30,9 +30,9 @@ Let's Get Started\ `# <#lets-get-started>`__
 
 In this tutorial we will showcase how to develop two packages in one
 workspace. For that we will use the ``python_rich`` Python package
-developed in chapter `Building a Python package <../python/>`__ and let
+developed in chapter `Building a Python package <python.rst>`__ and let
 it depend on the ``cpp_math`` C++ package developed in chapter `Building
-a C++ package <../cpp/>`__.
+a C++ package <cpp.rst>`__.
 
 We will start with the original setup of ``python_rich`` and copy
 ``cpp_math`` into a folder called ``packages``. The source directory
@@ -59,7 +59,7 @@ structure now looks like this:
 Within a Pixi manifest, you can manage a workspace and/or describe a
 package. In the case of ``python_rich`` we choose to do both, so the
 only thing we have to add ``cpp_math`` as a `run
-dependency <../../reference/pixi_manifest/#run-dependencies>`__ of
+dependency <https://pixi.prefix.dev/latest/reference/pixi_manifest/#run-dependencies>`__ of
 ``python_rich``.
 
 .. container:: language-py highlight

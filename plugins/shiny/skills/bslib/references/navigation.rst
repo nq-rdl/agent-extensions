@@ -244,7 +244,7 @@ Multi-Page Apps
 ---------------
 
 Use ``page_navbar()`` to create full multi-page applications. This is
-covered in detail in `page-layouts.md <page-layouts.md>`__, but here’s
+covered in detail in `page-layouts.md <page-layouts.rst>`__, but here’s
 the navigation pattern:
 
 .. code:: r

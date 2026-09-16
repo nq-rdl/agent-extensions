@@ -5,8 +5,8 @@ Building a Python Package
 
 In this tutorial, we will show you how to create a simple Python package
 with pixi. To read more about how building packages work with Pixi see
-the `Getting Started <../getting_started/>`__ guide. You might also want
-to check out the `documentation <../backends/pixi-build-python/>`__ for
+the `Getting Started <build_getting_started.rst>`__ guide. You might also want
+to check out the `documentation <pixi-build-python.rst>`__ for
 the ``pixi-build-python`` backend.
 
 .. admonition::
@@ -198,7 +198,7 @@ This is the content of the ``pixi.toml``:
    ``package``
 #. We define a task that runs the ``rich-example-main`` executable we
    defined earlier. You can learn more about tasks in this
-   `section <../../workspace/advanced_tasks/>`__
+   `section <https://pixi.prefix.dev/latest/workspace/advanced_tasks/>`__
 #. In ``package`` we define the actual Pixi package. This information
    will be used when other Pixi packages or workspaces depend on our
    package or when we upload it to a conda channel.

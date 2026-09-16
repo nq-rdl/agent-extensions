@@ -336,7 +336,7 @@ Localization
      tbl-title: "Tabelle"
 
 For bookdown migration details, see
-`conversion-bookdown.md <conversion-bookdown.md>`__.
+`conversion-bookdown.md <conversion-bookdown.rst>`__.
 
 Resources
 ---------

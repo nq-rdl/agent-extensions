@@ -92,14 +92,15 @@ def report(repo):
         transport = "skills+hooks" if has_hooks else "skills-only"
         if bundle["components"].get("mcp"):
             servers = json.loads((root / ".mcp.json").read_text())["mcpServers"]
-            if any("command" in cfg for cfg in servers.values()):
-                transport = "local-mcp"
+            local = any("command" in cfg for cfg in servers.values())
+            remote = any("url" in cfg for cfg in servers.values())
+            transport = "mixed-mcp" if local and remote else "local-mcp" if local else "remote-mcp"
+            if local:
                 if not attested("localMcpApproved", name):
                     blockers.append(
                         "Local MCP requires an approved local-runtime submission path or a publisher-owned public HTTPS deployment"
                     )
-            else:
-                transport = "remote-mcp"
+            if remote:
                 if not attested("remoteMcpAuthorized", name):
                     blockers.append(
                         "Remote MCP submission requires server-owner authorization, domain verification and authenticated connection evidence"

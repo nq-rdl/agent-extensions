@@ -261,7 +261,7 @@ the base configuration:
 
    For detailed information about available compilers, platform-specific
    behavior, and how conda-forge compilers work, see the `Compilers
-   Documentation <../../key_concepts/compilers/>`__.
+   Documentation <compilers.rst>`__.
 
 ``channels``\ `# <#channels>`__
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -337,9 +337,9 @@ Limitations\ `# <#limitations>`__
 See Also\ `# <#see-also>`__
 ---------------------------
 
--  `Build Backends Overview <../>`__ - Overview of all available build
+-  `Build Backends Overview <backends.rst>`__ - Overview of all available build
    backends
--  `Compilers <../../key_concepts/compilers/>`__ - How pixi-build
+-  `Compilers <compilers.rst>`__ - How pixi-build
    integrates with conda-forge's compiler infrastructure
 -  `CRAN <https://cran.r-project.org/>`__ - The Comprehensive R Archive
    Network

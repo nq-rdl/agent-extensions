@@ -30,7 +30,7 @@ Here $ARGUMENTS means the user’s supplied skill arguments. Codex does not popu
 $ARGUMENTS
 ```
 
-When the user invokes `/claude-code:pipeline`, help them structure a repeatable
+When the user invokes `$claude-code:pipeline`, help them structure a repeatable
 multi-step process for the task in `$ARGUMENTS`. If empty, ask what procedure
 they want to make reproducible and whether step order must be *enforced* or just
 *documented*.
@@ -108,7 +108,7 @@ There is **no built-in prerequisite graph** — hooks give you the *mechanism*
    (`UserPromptSubmit`, `PostToolUse`, `Stop`, …).
 
 > For the full hook I/O contract (exit codes, per-event JSON shapes, the
-> prompt-injection trap), use **`/claude-code:hook`** — don't re-derive it here.
+> prompt-injection trap), use **`$claude-code:hook`** — don't re-derive it here.
 
 ## Step 4 — Decide how each step fans out
 
@@ -118,8 +118,8 @@ skill body, and choose the primitive by how much determinism you need:
 | Per-step need | Use | Bake into the skill? |
 |---------------|-----|----------------------|
 | Offload one noisy side-task; only the summary matters | **Subagent** | ✅ Fully — link a `references/subagent.rst` outline from the skill; read it when delegating and pass it to a host-supported worker |
-| A few workers that must talk/challenge each other | **Agent team** | ✅ Guidance only — the skill designs the team + spawn prompt (see `/claude-code:agent-teams`) |
-| **Deterministic, large-scale** fan-out (same orchestration every run) | **Workflow** | ⚠️ Point at it — the skill tells the user to create/run it via `/claude-code:create-workflow`; the JS can't ship in the plugin |
+| A few workers that must talk/challenge each other | **Agent team** | ✅ Guidance only — the skill designs the team + spawn prompt (see `$claude-code:agent-teams`) |
+| **Deterministic, large-scale** fan-out (same orchestration every run) | **Workflow** | ⚠️ Point at it — the skill tells the user to create/run it via `$claude-code:create-workflow`; the JS can't ship in the plugin |
 
 The determinism ladder, in one line:
 

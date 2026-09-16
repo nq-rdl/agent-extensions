@@ -41,7 +41,7 @@ advantages:
    Pixi fully supports PyPI packages alongside conda packages, powered
    by uv under the hood. Use ``pixi add --pypi <package>`` to add PyPI
    dependencies, or define them in ``[project.dependencies]`` when using
-   ``pyproject.toml``. See `Conda & PyPI <../../concepts/conda_pypi/>`__
+   ``pyproject.toml``. See `Conda & PyPI <https://pixi.prefix.dev/latest/concepts/conda_pypi/>`__
    for how the two ecosystems work together.
 
 Quick look at the differences\ `# <#quick-look-at-the-differences>`__
@@ -73,7 +73,7 @@ Quick look at the differences\ `# <#quick-look-at-the-differences>`__
    * - Running a standalone script
      - ``uv run script.py`` (PEP 723)
      - ``pixi exec`` via
-       `shebang <../../advanced/shebang/>`__
+       `shebang <https://pixi.prefix.dev/latest/advanced/shebang/>`__
    * - Running a task
      - *(no built-in task runner)*
      - ``pixi run my_task``
@@ -93,11 +93,11 @@ Quick look at the differences\ `# <#quick-look-at-the-differences>`__
    * - Building a package
      - ``uv build``
      - Supported via
-       `pixi-build backends <../../build/getting_started/>`__
+       `pixi-build backends <build_getting_started.rst>`__
    * - Publishing a package
      - ``uv publish``
      - Upload to a
-       `prefix.dev channel <../../deployment/prefix/>`__
+       `prefix.dev channel <prefix.rst>`__
    * - Exporting a lockfile
      - ``uv export``
      - ``pixi workspace export conda-environment``
@@ -120,7 +120,7 @@ Project configuration\ `# <#project-configuration>`__
 uv uses ``pyproject.toml`` for project configuration and ``uv.toml`` for
 tool-level settings. Pixi supports both ``pixi.toml`` (its native
 format) and ``pyproject.toml`` for project configuration, and uses a
-separate `configuration file <../../reference/pixi_configuration/>`__
+separate `configuration file <https://pixi.prefix.dev/latest/reference/pixi_configuration/>`__
 for tool-level settings.
 
 .. container:: tabbed-set tabbed-alternate
@@ -200,7 +200,7 @@ for tool-level settings.
 
 With ``pyproject.toml``, Pixi reads ``[project.dependencies]`` as PyPI
 dependencies and ``[tool.pixi.dependencies]`` as conda dependencies. See
-the `pyproject.toml guide <../../python/pyproject_toml/>`__ for details.
+the `pyproject.toml guide <pyproject_toml.rst>`__ for details.
 
 Concepts mapping\ `# <#concepts-mapping>`__
 -------------------------------------------
@@ -248,7 +248,7 @@ via ``tool.uv.conflicts``, but it still uses a single ``.venv/`` that
 you swap between with ``uv sync --group <name>``. Pixi environments are
 independent directories, so switching is instant.
 
-See `Multi Environment <../../workspace/multi_environment/>`__.
+See `Multi Environment <https://pixi.prefix.dev/latest/workspace/multi_environment/>`__.
 
 Dependency groups and extras\ `# <#dependency-groups-and-extras>`__
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -309,7 +309,7 @@ in this way:
       my_lib = { path = "packages/my_lib" }
 
 Both tools share a single lockfile across the workspace. See `Building
-Multiple Packages <../../build/workspace/>`__.
+Multiple Packages <workspace.rst>`__.
 
 Standalone scripts\ `# <#standalone-scripts>`__
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -331,7 +331,7 @@ that declare their own dependencies:
       print(requests.get("https://example.com").status_code)
 
 Pixi has a similar capability via `shebang
-scripts <../../advanced/shebang/>`__ using ``pixi exec``, which creates
+scripts <https://pixi.prefix.dev/latest/advanced/shebang/>`__ using ``pixi exec``, which creates
 a temporary environment with the specified dependencies:
 
 .. container:: language-python highlight
@@ -373,7 +373,7 @@ uv has no built-in task runner. Pixi does:
 
 Tasks support inter-task dependencies, environment variables, working
 directory configuration, and cross-platform commands. See
-`Tasks <../../workspace/advanced_tasks/>`__.
+`Tasks <https://pixi.prefix.dev/latest/workspace/advanced_tasks/>`__.
 
 Ephemeral tool execution (``uvx`` vs ``pixi exec``)\ `# <#ephemeral-tool-execution-uvx-vs-pixi-exec>`__
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -417,7 +417,7 @@ non-Python tools too:
 
       pixi global install git bat ripgrep starship
 
-See `Global Tools <../../global_tools/introduction/>`__.
+See `Global Tools <global_tools_introduction.rst>`__.
 
 Package indexes and channels\ `# <#package-indexes-and-channels>`__
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -441,14 +441,14 @@ community-maintained channel:
 
 For private packages, you can host your own channel on
 `prefix.dev <https://prefix.dev/>`__, S3, or JFrog Artifactory. See
-`Authentication <../../deployment/authentication/>`__.
+`Authentication <https://pixi.prefix.dev/latest/deployment/authentication/>`__.
 
 Resolution cutoffs (``exclude-newer``)\ `# <#resolution-cutoffs-exclude-newer>`__
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 If you use uv's ``exclude-newer`` setting to ignore packages uploaded
 after a given date, the Pixi equivalent is
-`[workspace].exclude-newer <../../reference/pixi_manifest/#exclude-newer-optional>`__:
+`[workspace].exclude-newer <https://pixi.prefix.dev/latest/reference/pixi_manifest/#exclude-newer-optional>`__:
 
 .. container:: tabbed-set tabbed-alternate
 
@@ -495,9 +495,9 @@ In Pixi, the equivalent depends on which ecosystem the package comes
 from:
 
 -  For a conda package, set it in
-   `[exclude-newer] <../../reference/pixi_manifest/#exclude-newer-optional>`__.
+   `[exclude-newer] <https://pixi.prefix.dev/latest/reference/pixi_manifest/#exclude-newer-optional>`__.
 -  For a PyPI package, set it in
-   `[pypi-exclude-newer] <../../reference/pixi_manifest/#exclude-newer-optional>`__.
+   `[pypi-exclude-newer] <https://pixi.prefix.dev/latest/reference/pixi_manifest/#exclude-newer-optional>`__.
 
 For example, a conda package can combine a channel pin with a
 package-specific ``exclude-newer`` override:
@@ -648,7 +648,7 @@ Both tools generate lockfiles for reproducibility.
 |                   |                      | ``pixi install``)     |
 +-------------------+----------------------+-----------------------+
 
-See `Lock File <../../workspace/lockfile/>`__.
+See `Lock File <https://pixi.prefix.dev/latest/workspace/lock_file/>`__.
 
 Building and publishing\ `# <#building-and-publishing>`__
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -656,9 +656,9 @@ Building and publishing\ `# <#building-and-publishing>`__
 uv builds Python packages with ``uv build`` (PEP 517 backends) and
 publishes to PyPI with ``uv publish``.
 
-Pixi builds packages via `pixi-build <../../build/getting_started/>`__,
+Pixi builds packages via `pixi-build <build_getting_started.rst>`__,
 which produces conda packages from Python, C++, Rust, ROS, and more. You
-can publish them to a `prefix.dev channel <../../deployment/prefix/>`__
+can publish them to a `prefix.dev channel <prefix.rst>`__
 or any conda channel.
 
 CI with GitHub Actions\ `# <#ci-with-github-actions>`__
@@ -677,7 +677,7 @@ workflow:
 
       - uses: prefix-dev/setup-pixi@v0.8.8
 
-See `GitHub Actions <../../integration/ci/github_actions/>`__ for more
+See `GitHub Actions <https://pixi.prefix.dev/latest/integration/ci/github_actions/>`__ for more
 details.
 
 The ``uv pip`` interface\ `# <#the-uv-pip-interface>`__

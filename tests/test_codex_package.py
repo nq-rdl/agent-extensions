@@ -273,6 +273,35 @@ class StrictPackaging(unittest.TestCase):
             body = (repo / package.ROOT / "sample/skills/task/SKILL.md").read_text()
             self.assertIn(native, body)
             self.assertNotIn("tool tools", body)
+            self.assertFalse((repo / package.ROOT / "sample/skills/task/references/codex.rst").exists())
+            self.assertEqual(package.validate(repo), [])
+
+    def test_installed_issue_reporting_retains_shared_publication_checks(self):
+        native = REPO / package.ROOT / "claude-code/skills/skill-report-issue"
+        source = REPO / "skills/report-skill-issue"
+        claude = REPO / "plugins/claude-code/skills/skill-report-issue"
+        with tempfile.TemporaryDirectory() as tmp:
+            cache = Path(tmp) / "installed cache"
+            shutil.copytree(native, cache)
+            entrypoint = (cache / "SKILL.md").read_text()
+            self.assertIn("resolved `SKILL.md` path", entrypoint)
+            self.assertIn("discovered", entrypoint)
+            self.assertIn("reporting skill's own metadata", entrypoint)
+            self.assertIn("references/reporting.rst", entrypoint)
+            procedure = (cache / "references/reporting.rst").read_text()
+            self.assertIn("Do not proceed to step 6 until the user explicitly confirms", procedure)
+            self.assertIn("--body-file", procedure)
+            self.assertNotIn("mcp__plugin_github_github__", procedure)
+            self.assertIn("Do NOT tell the user the issue was filed", procedure)
+            self.assertEqual(procedure, (source / "references/reporting.rst").read_text())
+            self.assertEqual(procedure, (claude / "references/reporting.rst").read_text())
+
+    def test_release_documentation_uses_context_matched_host_edits(self):
+        body = (REPO / package.ROOT / "gh/skills/document-release/SKILL.md").read_text()
+        self.assertNotIn("old_string", body)
+        self.assertNotIn("Edit tool", body)
+        self.assertIn("exact current text as context", body)
+        self.assertIn("Never overwrite CHANGELOG.md as a whole file", body)
 
     def test_legacy_user_question_phrases_are_grammatical(self):
         with tempfile.TemporaryDirectory() as tmp:

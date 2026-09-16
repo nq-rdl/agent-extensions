@@ -39,14 +39,14 @@ pages) for drift.
 **Pin:** the load-bearing package is `@opencode-ai/plugin@1.17.11` (frontmatter
 `compatibility:`; source of `tool` / `tool.schema`). Re-check the installed
 version (`npm view @opencode-ai/plugin version`) against the API recital below
-before relying on it. (Go SDK `v0.19.2` / Go 1.22+ belong to `/opencode-dev:sdk`,
+before relying on it. (Go SDK `v0.19.2` / Go 1.22+ belong to `$opencode-dev:sdk`,
 not this facet.)
 
 **Facet boundary:** this skill covers **filesystem-discovered** standalone tools.
 Registering a tool **programmatically from inside a plugin** (the `tool` map hook)
-is `/opencode-dev:plugin` — both import `tool` from `@opencode-ai/plugin`, but
+is `$opencode-dev:plugin` — both import `tool` from `@opencode-ai/plugin`, but
 don't duplicate the plugin route here. Permission `allow|ask|deny` *semantics* are
-owned by `/opencode-dev:policies`; this skill only shows the `tools` enable/disable
+owned by `$opencode-dev:policies`; this skill only shows the `tools` enable/disable
 gate and points there.
 
 ## 1. Custom tools — the filename/override traps
@@ -105,7 +105,7 @@ Two separate mechanisms, do not conflate:
   `"tools": { "sentry_*": false }`. Re-enable per agent:
   `"agent": { "my-agent": { "tools": { "sentry_*": true } } }`.
 - **`permission`** = `allow|ask|deny` over actions (owned by
-  `/opencode-dev:policies`). Different axis.
+  `$opencode-dev:policies`). Different axis.
 
 ## 3. LSP servers — `lsp` key is boolean-or-object
 

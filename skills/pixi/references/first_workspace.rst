@@ -72,7 +72,7 @@ uses the ``pixi add`` command to add dependencies to a workspace. This
 command will, by default, add the
 `conda <https://prefix.dev/blog/what-is-a-conda-package>`__ dependency
 to the ``pixi.toml``, solve the dependencies, write the `lock
-file <../workspace/lockfile/>`__, and install the package into an
+file <https://pixi.prefix.dev/latest/workspace/lock_file/>`__, and install the package into an
 environment. For example, let's add ``numpy`` and ``pytest`` to the
 workspace.
 
@@ -129,7 +129,7 @@ This will add the ``httpx`` package from PyPI to the workspace:
       httpx = ">=0.28.1,<0.29"
 
 To learn more about the differences between ``conda`` and PyPI, see `our
-Conda & PyPI concept documentation <../concepts/conda_pypi/>`__.
+Conda & PyPI concept documentation <https://pixi.prefix.dev/latest/concepts/conda_pypi/>`__.
 
 Lock file\ `# <#lock-file>`__
 -----------------------------
@@ -142,7 +142,7 @@ deployment.
 
 The lockfile is called ``pixi.lock`` and it is created in the root of
 the workspace. To learn more about lock files, see `our detailed lock
-file documentation <../workspace/lockfile/>`__.
+file documentation <https://pixi.prefix.dev/latest/workspace/lock_file/>`__.
 
 .. container:: language-yaml highlight
 
@@ -244,7 +244,7 @@ Tasks can be much more powerful, for example:
       env = { MY_ENV_VAR = "value" }
 
 More information about tasks can be found in the
-`Tasks <../workspace/advanced_tasks/>`__ section of the documentation.
+`Tasks <https://pixi.prefix.dev/latest/workspace/advanced_tasks/>`__ section of the documentation.
 
 Environments\ `# <#environments>`__
 -----------------------------------
@@ -252,9 +252,9 @@ Environments\ `# <#environments>`__
 Pixi always creates an environment for your workspace (the "default"
 environment), which contains your ``dependencies`` and in which your
 tasks are run. You can also include `multiple
-environments <../workspace/multi_environment/>`__ in one workspace.
+environments <https://pixi.prefix.dev/latest/workspace/multi_environment/>`__ in one workspace.
 These environments are
-`located <../reference/pixi_configuration/#detached-environments>`__ in
+`located <https://pixi.prefix.dev/latest/reference/pixi_configuration/#detached-environments>`__ in
 the ``.pixi/envs`` directory in the root of your workspace.
 
 Using these environments is as simple as running the ``pixi run`` or
@@ -263,7 +263,7 @@ a command (or a task if the input matches the name of a defined task) in
 the environment, while ``pixi shell`` will spawn a new shell session in
 the environment. Both commands "activate" the environment — learn more
 at `our environment activation
-documentation <../workspace/environment/#activation>`__.
+documentation <https://pixi.prefix.dev/latest/workspace/environment/#activation>`__.
 
 .. container:: language-shell highlight
 
@@ -277,7 +277,7 @@ documentation <../workspace/environment/#activation>`__.
 
 Want to understand the concepts behind what you just did — packages,
 channels, platforms? Continue to `The Conda
-Ecosystem <../conda_ecosystem/>`__.
+Ecosystem <https://pixi.prefix.dev/latest/conda_ecosystem/>`__.
 
 .. |image1| image:: data:image/svg+xml;base64,PHN2ZyB2aWV3Ym94PSIwIDAgMjQgMjQiIHhtbG5zPSJodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2ZyI+PHBhdGggZD0iTTIwLjcxIDcuMDRjLjM5LS4zOS4zOS0xLjA0IDAtMS40MWwtMi4zNC0yLjM0Yy0uMzctLjM5LTEuMDItLjM5LTEuNDEgMGwtMS44NCAxLjgzIDMuNzUgMy43NU0zIDE3LjI1VjIxaDMuNzVMMTcuODEgOS45M2wtMy43NS0zLjc1eiI+PC9wYXRoPjwvc3ZnPg==
    :target: https://github.com/prefix-dev/pixi/edit/main/docs/first_workspace.md

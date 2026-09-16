@@ -5,9 +5,9 @@ Building a C++ Package
 
 This example shows how to build a C++ package with CMake and use it
 together with ``pixi-build``. To read more about how building packages
-work with Pixi see the `Getting Started <../getting_started/>`__ guide.
+work with Pixi see the `Getting Started <build_getting_started.rst>`__ guide.
 You might also want to check out the
-`documentation <../backends/pixi-build-cmake/>`__ for the
+`documentation <pixi-build-cmake.rst>`__ for the
 ``pixi-build-cmake`` backend.
 
 We'll start off by creating a workspace that use
