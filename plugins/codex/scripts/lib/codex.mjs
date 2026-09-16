@@ -1190,7 +1190,7 @@ export function parseStructuredOutput(rawOutput, fallback = {}) {
     return {
       parsed: null,
       parseError: fallback.failureMessage ?? "Codex did not return a final structured message.",
-      rawOutput: rawOutput ?? "",
+      rawOutput: "",
       ...fallback
     };
   }

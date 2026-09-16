@@ -38,7 +38,8 @@ class RPC:
                 try:
                     self.messages.put(json.loads(line))
                 except json.JSONDecodeError:
-                    pass
+                    # Ignore non-JSON startup/log lines; only RPC messages belong in the queue.
+                    continue
 
         self.reader = threading.Thread(target=read, daemon=True)
         self.reader.start()

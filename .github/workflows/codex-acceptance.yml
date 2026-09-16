@@ -3,10 +3,6 @@ name: Codex remote and platform acceptance
 on:
   workflow_dispatch:
     inputs:
-      ref:
-        description: Pushed branch, commit, or tag to install and verify
-        required: true
-        type: string
       live_mcp:
         description: Also initialize Playwright and probe Lucid without credentials
         default: false
@@ -26,7 +22,9 @@ jobs:
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
-          ref: ${{ inputs.ref }}
+          # Keep tested code in the dispatch ref's cache scope, pinned to this run.
+          ref: ${{ github.sha }}
+          persist-credentials: false
       - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
         with:
           node-version: '20'
@@ -40,7 +38,7 @@ jobs:
       - name: Verify remote installation and lifecycle
         env:
           CODEX_MARKETPLACE_SOURCE: ${{ github.repository }}
-          CODEX_MARKETPLACE_REF: ${{ inputs.ref }}
+          CODEX_MARKETPLACE_REF: ${{ github.sha }}
         run: bash scripts/smoke-codex-marketplace.sh
       - name: Verify native hook registration
         run: pixi run --locked python3 scripts/check_codex_runtime.py .

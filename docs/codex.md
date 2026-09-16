@@ -150,6 +150,12 @@ CODEX_MARKETPLACE_REF=<commit-or-tag> \
   bash scripts/smoke-codex-marketplace.sh
 ```
 
+For Linux and macOS CI acceptance, dispatch **Codex remote and platform acceptance**
+using GitHub's **Use workflow from** selector or
+`gh workflow run codex-acceptance.yml --ref <branch-or-tag>`. The workflow checks out
+and remotely installs the dispatch run's exact commit. It does not accept a separate
+checkout ref, keeping executed code in the selected branch's cache scope.
+
 Packaging, parser discovery and connection probes do not establish model task
 quality. Record authenticated execution against representative positive and
 negative cases before claiming behavioral acceptance or public submission readiness.

@@ -14,7 +14,6 @@ import yaml
 
 from scripts import codex_package as package
 from scripts import codex_directory as directory
-from scripts import generate_manifests as manifests
 
 REPO = Path(__file__).resolve().parents[1]
 

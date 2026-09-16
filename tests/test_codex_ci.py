@@ -41,6 +41,18 @@ def claude_runtime_dependencies(repo):
 
 
 class TestCodexCi(unittest.TestCase):
+    def test_acceptance_executes_only_the_dispatch_commit(self):
+        workflow = yaml.safe_load((REPO / ".github/workflows/codex-acceptance.yml").read_text())
+        # PyYAML's YAML 1.1 loader treats the unquoted `on` key as True.
+        dispatch = workflow[True]["workflow_dispatch"]
+        self.assertNotIn("ref", dispatch["inputs"])
+        steps = workflow["jobs"]["acceptance"]["steps"]
+        checkout = next(s for s in steps if s.get("uses", "").startswith("actions/checkout@"))
+        self.assertEqual(checkout["with"]["ref"], "${{ github.sha }}")
+        self.assertFalse(checkout["with"]["persist-credentials"])
+        smoke = next(s for s in steps if "scripts/smoke-codex-marketplace.sh" in s.get("run", ""))
+        self.assertEqual(smoke["env"]["CODEX_MARKETPLACE_REF"], checkout["with"]["ref"])
+
     def test_ci_python_commands_use_locked_pixi(self):
         for name in ("validate.yml", "codex-acceptance.yml", "changelog-check.yml"):
             workflow = yaml.safe_load((REPO / ".github/workflows" / name).read_text())
