@@ -177,6 +177,9 @@ pixi run python3 -m unittest discover -s tests -p 'test_*.py'
 # Build + run the skills spec validator (Go), and its unit tests
 go -C tools/asctl build -o /tmp/asctl ./cmd/asctl/ && /tmp/asctl repo-check
 go -C tools/asctl test ./...
+
+# Review body lines, approximate tokens, and reference counts before content pilots
+/tmp/asctl repo-check --size-report
 ```
 
 CI runs `validate.yml` on every PR/push to main. It checks:
@@ -190,7 +193,7 @@ CI runs `validate.yml` on every PR/push to main. It checks:
 - Codex `0.152.0` and `0.154.0` install every native marketplace entry and discover the enabled native skill copies with explicit leaf names (`scripts/smoke-codex-marketplace.sh`)
 - Any symlink under `plugins/` resolves (`validate-symlinks` — plugin trees are real-file copies, so this guards against accidental links)
 - The pipeline scripts' unit tests pass (`tests/`)
-- Skills validate against the agentskills.io spec **and the directory-structure standard** (`asctl repo-check`, built from `tools/asctl/`)
+- Skills validate against the agentskills.io spec, the directory-structure standard, and the repository's 500-body-line limit (`asctl repo-check`, built from `tools/asctl/`)
 
 Three more workflows run on PRs alongside `validate.yml`:
 - `changelog-check.yml` — fails if no changie fragment was added (bypass with the `skip-changelog` label), and lints each *added* fragment's body against the 200-char per-fragment cap (`scripts/check_changie_length.py`)

@@ -169,6 +169,12 @@ jobs:
           cache: true
           cache-dependency-path: tools/asctl/go.sum
 
+      - name: Test and lint asctl
+        run: |
+          test -z "$(gofmt -l tools/asctl)"
+          go -C tools/asctl vet ./...
+          go -C tools/asctl test ./...
+
       - name: Build asctl
         run: CGO_ENABLED=0 go -C tools/asctl build -o "$RUNNER_TEMP/asctl" ./cmd/asctl/
 
