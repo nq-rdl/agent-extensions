@@ -15,7 +15,6 @@ skills:
   - {source: opencode-skill, leaf: skill}
   - {source: opencode-policies, leaf: policies}
   - {source: opencode-delegate, leaf: delegate}
-agents: []
 hooks: [opencode-doc-review]
 prompts: []
 mcp: []
@@ -24,3 +23,22 @@ targets:
     enabled: true
     pluginName: opencode-dev
     marketplaceName: rdl-agent-extensions
+
+  codex:
+    enabled: true
+    pluginName: opencode-dev
+    marketplaceName: rdl-agent-extensions
+    category: Developer Tools
+    components:
+      skills: true
+      mcp: false
+      hooks: true
+      apps: false
+    interface:
+      shortDescription: OpenCode Dev tools and workflows
+      defaultPrompt:
+      - Use OpenCode Dev to help with my task.
+    hookConfig: hooks/codex/opencode-dev/hooks.json
+    notes:
+      sharedHooks:
+      - opencode-doc-review

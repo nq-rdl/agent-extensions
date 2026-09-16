@@ -1,0 +1,32 @@
+{
+  "name": "tech-writing",
+  "version": "0.29.0",
+  "description": "Technical writing — developer docs, tutorials, ADRs, and guides",
+  "author": {
+    "name": "nq-rdl"
+  },
+  "repository": "https://github.com/nq-rdl/agent-extensions",
+  "license": "MIT",
+  "keywords": [
+    "docs",
+    "technical-writing",
+    "style-guide",
+    "copyedit"
+  ],
+  "skills": "./skills/",
+  "interface": {
+    "displayName": "Technical Writing",
+    "shortDescription": "Technical writing — developer docs, tutorials, ADRs, and guides",
+    "longDescription": "Technical writing — developer docs, tutorials, ADRs, and guides",
+    "developerName": "nq-rdl",
+    "category": "Developer Tools",
+    "capabilities": [
+      "Skills",
+      "Hooks"
+    ],
+    "defaultPrompt": [
+      "Use Technical Writing to help with my task."
+    ],
+    "websiteURL": "https://github.com/nq-rdl/agent-extensions"
+  }
+}

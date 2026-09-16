@@ -8,15 +8,82 @@ import test from "node:test";
 import assert from "node:assert/strict";
 
 import { makeTempDir } from "./helpers.mjs";
-import { resolveJobFile, resolveJobLogFile, resolveStateDir, resolveStateFile, saveState } from "../../plugins/codex/scripts/lib/state.mjs";
+import { ensureStateDir, loadState, readJobFile, resolveJobFile, resolveJobLogFile, resolveStateDir, resolveStateFile, resolveStateRoot, saveState, writeJobFile } from "../../plugins/codex/scripts/lib/state.mjs";
 
-test("resolveStateDir uses a temp-backed per-workspace directory", () => {
+for (const kind of ["state", "job"]) {
+  test(`${kind} readers see the previous complete record while an update is being written`, (t) => {
+    const workspace = makeTempDir();
+    const queued = { id: "task-test", status: "queued" };
+    const running = { ...queued, status: "running" };
+    const write = (job) => kind === "state"
+      ? saveState(workspace, { jobs: [job] })
+      : writeJobFile(workspace, job.id, job);
+    const read = () => kind === "state"
+      ? loadState(workspace).jobs[0]
+      : readJobFile(resolveJobFile(workspace, queued.id));
+    write(queued);
+
+    // Pause at the actual truncation boundary, making the CI reader/writer race deterministic.
+    const originalWrite = fs.writeFileSync;
+    let duringWrite;
+    t.mock.method(fs, "writeFileSync", (file, data, options) => {
+      const fd = fs.openSync(file, "w");
+      try {
+        duringWrite = read();
+        originalWrite(fd, data, options);
+      } finally {
+        fs.closeSync(fd);
+      }
+    });
+
+    write(running);
+    assert.deepEqual(duringWrite, queued);
+    assert.deepEqual(read(), running);
+  });
+}
+
+test("resolveStateDir uses private per-user storage without Claude plugin data", (t) => {
+  const previous = { CLAUDE_PLUGIN_DATA: process.env.CLAUDE_PLUGIN_DATA, XDG_STATE_HOME: process.env.XDG_STATE_HOME };
+  t.after(() => {
+    for (const [key, value] of Object.entries(previous)) {
+      if (value === undefined) delete process.env[key]; else process.env[key] = value;
+    }
+  });
+  delete process.env.CLAUDE_PLUGIN_DATA;
+  delete process.env.XDG_STATE_HOME;
+  assert.equal(resolveStateRoot(), path.join(os.homedir(), ".local/state/codex-companion"));
+  process.env.XDG_STATE_HOME = "relative-state";
+  assert.equal(resolveStateRoot(), path.join(os.homedir(), ".local/state/codex-companion"));
+  for (const home of ["", "/", "relative-home"]) {
+    const mock = t.mock.method(os, "homedir", () => home);
+    assert.equal(resolveStateRoot(), path.join(os.userInfo().homedir, ".local/state/codex-companion"));
+    mock.mock.restore();
+  }
+  process.env.XDG_STATE_HOME = makeTempDir();
   const workspace = makeTempDir();
   const stateDir = resolveStateDir(workspace);
-
-  assert.equal(stateDir.startsWith(os.tmpdir()), true);
+  const stateRoot = path.join(process.env.XDG_STATE_HOME, "codex-companion");
+  assert.equal(path.dirname(stateDir), stateRoot);
   assert.match(path.basename(stateDir), /.+-[a-f0-9]{16}$/);
-  assert.match(stateDir, new RegExp(`^${os.tmpdir().replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}`));
+  const oldMask = process.umask(0o022);
+  t.after(() => process.umask(oldMask));
+  saveState(workspace, { jobs: [{ id: "private", prompt: "private input" }] });
+  const jobFile = writeJobFile(workspace, "private", { output: "private output" });
+  for (const dir of [stateRoot, stateDir, path.dirname(jobFile)]) {
+    assert.equal(fs.statSync(dir).mode & 0o777, 0o700);
+    assert.equal(fs.statSync(dir).uid, process.getuid());
+  }
+  for (const file of [resolveStateFile(workspace), jobFile]) {
+    assert.equal(fs.statSync(file).mode & 0o777, 0o600);
+  }
+  fs.chmodSync(stateRoot, 0o755);
+  ensureStateDir(workspace);
+  assert.equal(fs.statSync(stateRoot).mode & 0o777, 0o700);
+  fs.rmSync(stateRoot, { recursive: true });
+  const outside = makeTempDir();
+  fs.symlinkSync(outside, stateRoot);
+  assert.throws(() => ensureStateDir(workspace), /Refusing/);
+  assert.deepEqual(fs.readdirSync(outside), []);
 });
 
 test("resolveStateDir uses CLAUDE_PLUGIN_DATA when it is provided", () => {

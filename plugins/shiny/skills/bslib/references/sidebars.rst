@@ -285,7 +285,7 @@ render flush for clean organization:
 **Gotcha:** Accordion must be an immediate child of ``sidebar()`` for
 flush rendering. Wrapping in another element adds extra padding.
 
-See `accordions.md <accordions.md>`__ for more.
+See `accordions.md <accordions.rst>`__ for more.
 
 Nested Sidebars
 ---------------

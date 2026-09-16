@@ -4,11 +4,10 @@ Agent guidance for this repository. Use this alongside the README for project co
 
 ## What this repo is
 
-This repo is **a Claude Code marketplace** — the published product. It *is* the `rdl-agent-extensions`
-marketplace: it authors reusable skills and agents (canonical content under
-`skills/` and `agents/`) and publishes them as self-contained plugins through the
-repo-root marketplace manifest (`.claude-plugin/marketplace.json`). This is what
-users install.
+This repo is **the `rdl-agent-extensions` marketplace** — the published product. It authors reusable
+skills (canonical content under `skills/`) and publishes self-contained
+plugins through generated Claude Code and native Codex marketplace manifests. Claude Code exposes
+the complete catalog through separate, explicitly gated target packages.
 
 > **`.claude/` contributor tooling was removed.** This repo previously carried a
 > `.claude/` folder — *not* part of the published product — that configured Claude
@@ -26,7 +25,7 @@ by users from their own upstream marketplaces via user-level Claude Code config)
 
 ## Project overview
 
-This repo is a Claude Code agent extension catalog. It maintains a single source of truth for reusable agent skills and agents, and publishes them as self-contained Claude Code plugins through a repo-root marketplace manifest. Canonical content lives once (under `skills/` and `agents/`); each bundle is packaged into `plugins/<bundle>/` as real-file copies so installs are self-contained.
+This repo is a multi-target agent extension catalog. It maintains a single source of truth for reusable agent skills, then publishes target-specific manifests over self-contained `plugins/<bundle>/` trees. Canonical content lives once under `skills/`.
 
 ## Setup commands
 
@@ -54,16 +53,13 @@ non-blocking SkillSpector scan, and a hard changie-fragment gate. Prereqs:
 
 ```
 skills/           ← canonical skills (authored here; validated by tools/asctl)
-agents/           ← canonical agents (authored here)
-  <name>/
-    agent.md
-plugins/          ← Claude Code plugins, one per bundle (SELF-CONTAINED — real files)
+plugins/          ← self-contained plugin trees (real files)
   <bundle>/
     .claude-plugin/plugin.json  ← GENERATED (scripts/generate_manifests.py)
     skills/<leaf>/       ← real-file copy of skills/<source>/ (renamed to <leaf> per the registry map)
-    agents/<name>.md     ← real-file copy of agents/<name>/agent.md
+dist/codex/plugins/<bundle>/ ← GENERATED strict Codex copies, native manifests
 registry/
-  bundles/*.yaml   ← single source of truth: skills/agents/keywords per bundle
+  bundles/*.yaml   ← single source of truth: skills/keywords per bundle
   marketplace.yaml ← marketplace metadata, plugin defaults, and display order
 VERSION           ← single version source; stamped into every generated manifest
 mcp/
@@ -73,23 +69,43 @@ tools/
 hooks/            ← Claude Code hook shell scripts + JSON config
 .claude-plugin/
   marketplace.json ← GENERATED Claude Code marketplace manifest (repo root)
+.agents/plugins/
+  marketplace.json ← GENERATED native Codex marketplace manifest (repo root)
 ```
 
-### How skills and agents flow into plugins
+### How skills flow into plugins
 
 Claude Code installs a plugin by `cp -R`-ing its source directory into a per-user cache. Symlinks survive that copy verbatim, so any link whose target sits *outside* the copied subtree dangles in the cache (this was the cause of issue #83).
 
-To make installs self-contained, `plugins/<bundle>/skills/<name>/` and `plugins/<bundle>/agents/<name>.md` hold **real-file copies** of the canonical content under `skills/` and `agents/`. The canonical source remains the single edit point — the plugin trees are derivative.
+To make installs self-contained, `plugins/<bundle>/skills/<name>/` holds **real-file copies** of the canonical content under `skills/`. The canonical source remains the single edit point — the plugin trees are derivative.
 
-- **Edit canonical content** under `skills/<name>/` or `agents/<name>/agent.md` (both authored here).
-- **Refresh plugin trees** by running `pixi run bash scripts/sync-plugins.sh` (or pass a bundle name to scope it). The script reads `registry/bundles/<b>.yaml`, removes any stale copies, and rewrites `plugins/<b>/skills/<name>/` and `plugins/<b>/agents/<name>.md` from the canonical sources.
+- **Edit canonical content** under `skills/<name>/` (authored here).
+- **Refresh plugin trees** by running `pixi run bash scripts/sync-plugins.sh` (or pass a bundle name to scope it). The script reads `registry/bundles/<b>.yaml`, removes any stale copies, and rewrites `plugins/<b>/skills/<name>/` from the canonical sources.
 - **CI** validates that every bundle YAML reference resolves and that every plugin manifest is well-formed. See `scripts/validate-plugins.sh`.
 
 **Grouped skills.** A bundle skill member is either a flat string (`changie` → `leaf == changie`) or an explicit `{source, leaf}` mapping (`{source: go-gh, leaf: actions-go}` in the `gh` bundle → `/gh:actions-go`). `sync-plugins.sh` copies the flat canonical `skills/<source>/` → `plugins/<pluginName>/skills/<leaf>/`, **renaming to the leaf**, so the plugin tree stays one level deep and Claude Code invokes `<pluginName>:<leaf>` (the leaf folder drives invocation). Claude Code labels a skill in `/`-autocomplete as `frontmatter.name || <pluginName>:<leaf>` — so a present `name:` (the canonical `go-gh` **or** the leaf `actions-go`) overrides the namespaced id with a bare, un-prefixed label, and `/gh` lists `go-gh`/`actions-go` instead of `gh:actions-go`. To get the namespaced label, sync **strips the copy's `name:` entirely** so the label falls back to `<pluginName>:<leaf>`. The canonical `skills/` tree is never touched; grouping is owned **here** in the registry and stays flat. See `CONTRIBUTING.md` §6 for the rules, `scripts/check_grouping.py` for the contract, and `scripts/validate-plugins.sh` for the no-name guard.
 
-Skills and agents are authored directly under `skills/` and `agents/`. After editing one, run `pixi run bash scripts/sync-plugins.sh` to refresh the plugin trees; CI's `validate-skills` job runs `asctl repo-check` to validate `skills/` against the agentskills.io spec.
+Codex packages live separately under `dist/codex/plugins/<subject>/`, with explicit
+`name: <leaf>` frontmatter, native `.codex-plugin/plugin.json`,
+and only enabled target components. `scripts/codex_package.py` derives these from
+canonical skills and registry-selected resources; `sync-plugins.sh` invokes it for
+both write and check modes. Never hand-edit either generated tree. Delegation stays
+in `skills/*/references/subagent.rst`; do not recreate `agents/` in any target.
+See `docs/codex.md` for native hook coverage, MCP prerequisites, and directory readiness.
+
+Skills are authored directly under `skills/`. After editing one, run `pixi run bash scripts/sync-plugins.sh` to refresh the plugin trees; CI's `validate-skills` job runs `asctl repo-check` to validate `skills/` against the agentskills.io spec.
 
 When authoring or compressing a skill, follow **CONTRIBUTING.md → "Skill content conventions"** (non-inferable delta, version pins, verify-canonical guard). The `/claude-code:skill-audit` skill checks these.
+
+### Optional subagent execution
+
+Keep the main workflow in `SKILL.md`. Put optional worker instructions in
+`references/subagent.rst`, link them from the skill, and explain when to read them.
+The main agent may run the workflow directly or read the outline when the user
+requests a subagent or delegation would help. Outlines specify handoff inputs,
+allowed scope, required capabilities, and expected results. They are ordinary
+references, not registered Claude or Codex agent definitions. The catalog has no
+canonical or packaged `agents/` tree. See `docs/delegation.md` for migrated names.
 
 ### Python skills (csv, pdf, xlsx, docx)
 
@@ -101,6 +117,7 @@ These skills call Python directly (no CLI wrapper). Each has a `requirements.txt
 |---|---|
 | New first-party CLI helper or MCP server | Go (`CGO_ENABLED=0`, prebuilt binaries) |
 | Vendored/forked plugin runtime | May retain its upstream language when full fidelity requires it and the design documents runtime availability and distribution |
+| Skill helper script — small, portable shell shared by a plugin's skills and hooks, shipped under `skills/<name>/scripts/` (e.g. `rh-*.sh`, `sqlreview.sh`) | Bash 3.2-compatible + `jq`; no compiled artefact, no Python. Anything larger than file/JSON/git plumbing is a CLI helper (Go, row above) |
 | File-format or ML skills | Python + `ensure-deps.sh` |
 | Documentation-only skill | Markdown |
 | New TypeScript | Not permitted |
@@ -127,18 +144,18 @@ All Python (including the `python3` heredocs inside the shell scripts) runs thro
 the pixi environment — hence the `pixi run` prefix on every command below.
 
 ```bash
-# Validate all plugin hooks.json, plugin.json, and agents
+# Validate all Claude/Codex plugin manifests, hooks, skills
 pixi run bash scripts/validate-plugins.sh
 
 # Validate only plugins touched by changed files
 pixi run bash scripts/validate-plugins.sh plugins/claude-code/hooks/hooks.json
 
-# Refresh plugin trees from canonical skills/ and agents/. Run after
-# editing a skill or agent.
+# Refresh plugin trees from canonical skills/. Run after
+# editing a skill.
 pixi run bash scripts/sync-plugins.sh           # all bundles
 pixi run bash scripts/sync-plugins.sh go        # one bundle
 
-# Regenerate plugin.json + marketplace.json from the registry. These manifests
+# Regenerate Claude + Codex plugin.json and marketplace.json files. These manifests
 # are GENERATED — never hand-edit them. Run after changing a bundle's
 # description/keywords, marketplace.yaml, or VERSION.
 pixi run python3 scripts/generate_manifests.py .          # write manifests
@@ -149,10 +166,10 @@ pixi run python3 scripts/generate_bundles_doc.py .          # write
 pixi run python3 scripts/generate_bundles_doc.py . --check  # CI gate: fail on drift
 
 # Bundle reference + grouping + three-way consistency checks (also run by validate.yml)
-pixi run python3 scripts/check_bundle_refs.py .   # registry refs resolve to skills/ & agents/
-pixi run python3 scripts/check_exposure.py .      # every canonical skill/agent/hook/mcp is exposed by >=1 bundle (strict); add --warn for a non-blocking reminder
+pixi run python3 scripts/check_bundle_refs.py .   # registry refs resolve to skills/
+pixi run python3 scripts/check_exposure.py .      # every canonical skill/hook/mcp is exposed by >=1 bundle (strict); add --warn for a non-blocking reminder
 pixi run python3 scripts/check_grouping.py .      # grouping contract: valid member shape, unique leaf + pluginName
-pixi run python3 scripts/check_consistency.py .   # bundle <-> marketplace.json <-> plugins/ agree
+pixi run python3 scripts/check_consistency.py .   # each target's bundle <-> marketplace <-> plugin tree agrees
 
 # Unit tests for the pipeline scripts (deps come from the pixi env)
 pixi run python3 -m unittest discover -s tests -p 'test_*.py'
@@ -164,15 +181,14 @@ go -C tools/asctl test ./...
 
 CI runs `validate.yml` on every PR/push to main. It checks:
 - Bundle YAML skill references resolve to `skills/<name>/` (`scripts/check_bundle_refs.py`)
-- Bundle YAML agent references resolve to `agents/<name>/agent.md`
 - The skill-grouping contract holds (`scripts/check_grouping.py`)
-- Generated `plugin.json` + `marketplace.json` match the registry (`scripts/generate_manifests.py --check`)
+- Generated Claude and Codex `plugin.json` + `marketplace.json` files match the registry (`scripts/generate_manifests.py --check`)
 - Generated `docs/bundles.md` matches the registry (`scripts/generate_bundles_doc.py --check`)
 - Registry bundles, `marketplace.json`, and `plugins/` dirs stay in lockstep (`scripts/check_consistency.py`)
-- Every canonical skill/agent/hook/mcp is exposed by >=1 bundle (`scripts/check_exposure.py`); intentional exclusions live in `registry/unbundled.yaml`
+- Every canonical skill/hook/mcp is exposed by >=1 bundle (`scripts/check_exposure.py`); intentional exclusions live in `registry/unbundled.yaml`
 - Plugin manifests, hooks, skills, and `.mcp.json` wiring are valid (`scripts/validate-plugins.sh`)
+- Codex `0.152.0` and `0.154.0` install every native marketplace entry and discover the enabled native skill copies with explicit leaf names (`scripts/smoke-codex-marketplace.sh`)
 - Any symlink under `plugins/` resolves (`validate-symlinks` — plugin trees are real-file copies, so this guards against accidental links)
-- Every `agents/<name>/agent.md` has frontmatter `name` + `description`
 - The pipeline scripts' unit tests pass (`tests/`)
 - Skills validate against the agentskills.io spec **and the directory-structure standard** (`asctl repo-check`, built from `tools/asctl/`)
 
@@ -210,6 +226,16 @@ claude plugin install go@rdl-agent-extensions
 claude plugin install rdl-team@rdl-agent-extensions
 ```
 
+For the isolated native Codex install/discovery smoke test (requires `codex` and `jq`):
+
+```bash
+scripts/smoke-codex-marketplace.sh
+```
+
+The existing required plugin-validation job also runs this test in the dedicated
+`.devcontainer/codex` image (CLI 0.154.0, no network or credentials, read-only
+checkout). See `.devcontainer/codex/README.md` for local Docker/devcontainer commands.
+
 ## Registry Bundles
 
 `registry/bundles/*.yaml` defines what each **subject** plugin contains and which targets are
@@ -227,10 +253,6 @@ channels: [stable]
 skills:                                    # flat <name> (leaf == name), or {source, leaf} to rename
   - {source: go-naming, leaf: naming}      #   → invokes as /go:naming
   - {source: go-secure, leaf: secure}      #   → /go:secure
-agents:                                    # must exist as agents/<name>/agent.md (subagent)
-  - go-mcp-expert
-  - wg-code-sentinel
-  - github-actions-expert  # guest — home: gh (cross-listing: CONTRIBUTING §5)
 hooks: []
 prompts: []
 mcp: []                                    # wired in plugins/<pluginName>/.mcp.json
@@ -239,13 +261,32 @@ targets:
     enabled: true
     pluginName: go
     marketplaceName: rdl-agent-extensions
+  codex:
+    enabled: true
+    pluginName: go
+    marketplaceName: rdl-agent-extensions
+    category: Developer Tools
+    components:
+      skills: true
+      mcp: false
+      hooks: false
+      apps: false
 ```
 
-The bundle's `description` + `keywords` (plus `registry/marketplace.yaml` and `VERSION`) **generate** `plugins/<bundle>/.claude-plugin/plugin.json` and the bundle's `marketplace.json` entry — do not hand-edit those (CI `generate_manifests.py --check` enforces it). After editing a bundle's `description`/`keywords`, run `pixi run python3 scripts/generate_manifests.py .`.
+The bundle's metadata and target settings (plus `registry/marketplace.yaml` and `VERSION`) generate target marketplace entries and plugin manifests — do not hand-edit them (`generate_manifests.py --check` enforces this).
+
+The skills-only Codex pilot is complete. Codex targets now select native skills,
+MCP, and command hooks independently through `components`; every enabled bundle
+must expose at least one supported component. MCP and hooks require explicit
+`mcpConfig` and `hookConfig` sources. Apps remain disabled until a registered
+integration is supported. Claude and Codex plugin names are target-specific;
+the catalog currently uses matching subject names. Codex copies live separately
+under `dist/codex/plugins/`. See `docs/codex.md` for runtime limitations and
+`CONTRIBUTING.md` for the packaging contract.
 
 When adding a skill to a bundle: (1) add it to the YAML (flat `<name>`, or a `{source, leaf}` map to repackage a flat upstream skill under a new leaf), (2) run `pixi run bash scripts/sync-plugins.sh <bundle>` to copy `skills/<source>/` into `plugins/<bundle>/skills/<leaf>/`.
 
-When adding an agent to a bundle: (1) create `agents/<name>/agent.md`, (2) add it to the YAML `agents:` list, (3) run `pixi run bash scripts/sync-plugins.sh <bundle>` to copy it into `plugins/<bundle>/agents/<name>.md`.
+When adding a delegation outline, put it in `skills/<name>/references/subagent.rst` and link it from `SKILL.md`. The main agent reads it only when delegation is useful or requested. No named agent type is installed.
 
 ## PR instructions
 
@@ -297,6 +338,21 @@ when that pin falls behind upstream's latest release — it only notifies; the b
 **Recovery.** Finalize fails closed rather than guessing: in every state an existing `v<version>`
 tag must point at the PR's merge commit, and a remote lookup error is an error, not "absent".
 
+To deliberately exercise both idempotency paths, dispatch **"Release — Verify Finalize recovery"**
+from `main` for the current Latest release and enter the exact confirmation string shown by the
+workflow. The drill first proves the tag-plus-release no-op, then queues another Finalize attempt
+before temporarily deleting only the GitHub release. Its mutation jobs share Finalize's FIFO
+concurrency group, preventing a newer release from publishing in that window. A baseline artifact
+is stored before deletion; an independent **"Release — Recovery watchdog"** run verifies or restores
+the supported metadata after success, failure, timeout, or cancellation. The drill refuses older,
+immutable, draft, prerelease, asset-bearing, discussion-linked, or body-drifted releases.
+
+Deletion/recreation necessarily changes the release database ID, creation/publication timestamps,
+and release-event/webhook history; those cannot be restored. The title, body, tag target,
+`target_commitish`, author identity, and safe Latest state are verified. If the watchdog itself
+fails (for example during a GitHub outage), restore `.changes/<version>.md` manually before any
+new release. This is a verification drill, not the routine recovery path.
+
 - *Prepare failed after pushing the branch* (e.g. an API error while opening the PR): the run
   deletes `release/v<version>` itself — lease-protected, so only while the branch still points at
   the commit it pushed — and you simply re-dispatch. If the log says the branch was not deleted,
@@ -327,4 +383,4 @@ The task forwards any subcommand and flags to Zensical (`pixi run zensical <cmd>
 ## Platform Notes
 
 - macOS and Linux only — the build scripts require POSIX shell tooling (WSL2 for Windows)
-- Generated outputs (`plugins/` trees, `plugins/*/.claude-plugin/plugin.json`, `.claude-plugin/marketplace.json`, `docs/bundles.md`) are produced by the generator scripts — do not hand-edit.
+- Generated outputs (`plugins/` trees, target plugin/marketplace manifests, `docs/bundles.md`) are produced by the generator scripts — do not hand-edit.

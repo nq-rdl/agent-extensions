@@ -1,32 +1,9 @@
 #!/bin/bash
-# Re-sync plugins/<plugin>/{skills,agents}/ from the canonical skills/ and
-# agents/ trees, driven by registry/bundles/<bundle>.yaml.
-#
-# Why this exists: Claude Code installs a plugin by `cp -R`-ing its source
-# into a per-user cache. Symlinks are preserved verbatim, so any link whose
-# target sits *outside* the copied subtree dangles after install (issue #83).
-# The fix is to vendor real copies of every skill and agent into each
-# plugin's tree on `main` so the install is self-contained.
-#
-# This script is the canonical way to refresh those copies after the
-# canonical skills/ or agents/ trees change. Run it whenever you add or edit
-# a skill or agent.
-#
-# Resilience: a bundle that references a skill/agent with no source (e.g. a
-# rename or removal that landed before the registry was updated) is reported
-# as a ::warning:: and skipped — this script never aborts. The authoritative
-# gate is validate.yml's `validate-bundles` job, which fails the PR so a human
-# reconciles the registry in the same change (see issue #83). Stale plugin
-# copies — skills/agents no longer named by the registry — are pruned so
-# renamed or dropped entries do not linger in the installed plugin tree.
-#
-# Usage:
-#   scripts/sync-plugins.sh           # sync every bundle in registry/
-#   scripts/sync-plugins.sh swe       # sync only the named bundle(s)
-#   scripts/sync-plugins.sh --check   # report (don't fix) any plugin copy
-#                                     # that has drifted from its canonical
-#                                     # source; exits non-zero on drift (CI /
-#                                     # hook gate)
+# Refresh self-contained plugin skill and hook copies from the registry.
+# Skills include optional references/subagent.rst delegation outlines.
+# Missing sources warn; reference validation is the authoritative failure gate.
+# Stale skill copies and retired generated agents/ trees are pruned.
+# Usage: sync-plugins.sh [--check] [bundle ...]
 
 set -euo pipefail
 
@@ -99,7 +76,7 @@ def warn(bundle_file: Path, message: str) -> None:
 
 def prune_entries(parent: Path, keep: set) -> None:
     # The registry is the source of truth. Remove derivative plugin copies for
-    # skills/agents that were renamed or dropped upstream so they do not linger
+    # skills that were renamed or dropped upstream so they do not linger
     # in the installed plugin tree.
     if not parent.exists():
         return
@@ -191,69 +168,6 @@ def strip_skill_name(dst: Path) -> None:
         skill_md.write_text("---\n".join(parts))
 
 
-def rewrite_agent_skills(text: str, skill_leaf_map: dict) -> str:
-    """Rewrite a copied agent's frontmatter ``skills:`` preload for one plugin.
-
-    A canonical agent lists the skills it preloads by their flat
-    ``skills/<source>/`` name (the single source of truth). Inside a plugin,
-    though, a grouped skill is packaged under its LEAF (``{source, leaf}``) and
-    invoked as ``<plugin>:<leaf>`` — and a skill the plugin does not ship cannot
-    be preloaded at all. So every plugin copy must translate each preload entry
-    to that plugin's leaf and drop the entries the plugin does not carry, or the
-    preload silently no-ops (Claude Code skips skills it can't resolve). A
-    cross-listed agent therefore needs a *different* list per plugin, which only
-    the derivative copy can hold — the canonical agents/ tree is never touched.
-
-    ``skill_leaf_map`` is {source -> leaf} for the skills actually shipped in the
-    target bundle. Order is preserved; an entry whose source is absent from the
-    map is dropped; an emptied list renders as ``skills: []``. Everything else in
-    the frontmatter and the whole body are preserved byte-for-byte. A no-op when
-    the agent has no ``skills:`` key, and idempotent when every preload is already
-    a shipped leaf (the common ``skills: []`` case). Mirrors the leaf grouping in
-    sync_skill / scripts/_registry.py::normalize_member.
-    """
-    parts = text.split("---\n", 2)
-    if len(parts) < 3 or parts[0].strip():
-        return text  # no leading YAML frontmatter block — nothing to rewrite
-    lines = parts[1].splitlines(keepends=True)
-    out, i, changed = [], 0, False
-    while i < len(lines):
-        if re.match(r"^skills:", lines[i]):
-            inline = lines[i].split(":", 1)[1].strip()
-            entries, consumed_end = [], i + 1
-            if inline:
-                # Flow form: `skills: []` or `skills: [a, b]`.
-                inner = inline[1:-1] if inline.startswith("[") and inline.endswith("]") else inline
-                entries = [e.strip() for e in inner.split(",") if e.strip()]
-            else:
-                # Block form: consume the following `  - <name>` list items.
-                j = i + 1
-                while j < len(lines):
-                    m = re.match(r"^[ \t]+-\s*([^\s#]+)", lines[j])
-                    if not m:
-                        break
-                    entries.append(m.group(1))
-                    j += 1
-                consumed_end = j
-            mapped = [skill_leaf_map[e] for e in entries if e in skill_leaf_map]
-            block = (
-                "skills:\n" + "".join(f"  - {leaf}\n" for leaf in mapped)
-                if mapped
-                else "skills: []\n"
-            )
-            if block != "".join(lines[i:consumed_end]):
-                changed = True
-            out.append(block)
-            i = consumed_end
-            continue
-        out.append(lines[i])
-        i += 1
-    if not changed:
-        return text
-    parts[1] = "".join(out)
-    return "---\n".join(parts)
-
-
 def sync_skill(plugin: str, source: str, leaf: str, bundle_file: Path) -> None:
     src = repo / "skills" / source
     dst = repo / "plugins" / plugin / "skills" / leaf
@@ -284,34 +198,31 @@ def sync_skill(plugin: str, source: str, leaf: str, bundle_file: Path) -> None:
     print(f"  ✓ skill {source} -> {leaf}" if source != leaf else f"  ✓ skill {source}")
 
 
-def sync_agent(plugin: str, agent: str, bundle_file: Path, skill_leaf_map: dict) -> None:
-    src = repo / "agents" / agent / "agent.md"
-    dst = repo / "plugins" / plugin / "agents" / f"{agent}.md"
-    if not src.is_file():
-        warn(
-            bundle_file,
-            f"Agent '{agent}' has no source agents/{agent}/agent.md — skipped.",
-        )
+def sync_hooks(plugin, hook_names):
+    # Opt-in: canonical bundle config owns the entire packaged hooks directory.
+    # Existing bundles without this source keep their current hook packaging.
+    config = repo / "hooks" / plugin / "hooks.json"
+    if not config.is_file():
         return
-    # The copy is canonical byte-for-byte except its frontmatter skills: preload,
-    # which is rewritten to this plugin's leaves (dropping skills it does not
-    # ship) so a cross-listed agent references what each plugin actually carries.
-    expected = rewrite_agent_skills(src.read_text(), skill_leaf_map)
-    if check:
-        if not dst.is_file():
-            drift.append(f"plugins/{plugin}/agents/{agent}.md: missing — run sync-plugins.sh")
-        elif dst.read_text() != expected:
-            drift.append(
-                f"plugins/{plugin}/agents/{agent}.md: out of sync with "
-                f"agents/{agent}/agent.md (skills: preload not rewritten to this "
-                "plugin's leaves) — run sync-plugins.sh"
-            )
-        return
-    dst.parent.mkdir(parents=True, exist_ok=True)
-    if dst.is_symlink() or dst.exists():
-        dst.unlink()
-    dst.write_text(expected)
-    print(f"  ✓ agent {agent}")
+    with tempfile.TemporaryDirectory() as tmp:
+        expected = Path(tmp) / "hooks"
+        expected.mkdir()
+        shutil.copy2(config, expected / "hooks.json")
+        for name in hook_names:
+            source = repo / "hooks" / f"{name}.sh"
+            if not source.is_file():
+                sys.exit(f"::error::Missing canonical hook: {source}")
+            shutil.copy2(source, expected / source.name)
+        dst = repo / "plugins" / plugin / "hooks"
+        if check:
+            for difference in compare_trees(expected, dst):
+                drift.append(f"plugins/{plugin}/hooks: {difference}")
+        else:
+            if dst.is_symlink():
+                dst.unlink()
+            elif dst.exists():
+                shutil.rmtree(dst)
+            shutil.copytree(expected, dst)
 
 
 for bundle_file in bundle_files:
@@ -325,8 +236,11 @@ for bundle_file in bundle_files:
     plugin = claude.get("pluginName") or data.get("id") or bundle
     print(f"{'Checking' if check else 'Syncing'} {bundle} -> plugins/{plugin}")
 
+    sync_hooks(plugin, list(data.get("hooks") or []))
+
     skills = list(data.get("skills") or [])
-    agents = list(data.get("agents") or [])
+    if data.get("agents"):
+        sys.exit(f"::error::{bundle_file}: agents are retired; use skills with references/subagent.rst")
 
     # Normalize each member to (source, leaf); a malformed member is warned about
     # and dropped so the sync stays resilient. validate.yml's check_grouping is
@@ -344,46 +258,37 @@ for bundle_file in bundle_files:
         norm_skills.append(sl)
 
     # Keep set = registry entries that still have a canonical source, keyed by
-    # LEAF (the plugin tree is keyed by leaf). A skill or agent removed upstream
+    # LEAF (the plugin tree is keyed by leaf). A skill removed upstream
     # but still listed in the bundle has no source, so its stale plugin copy is
-    # pruned here (and sync_skill/sync_agent below warns about the dangling
+    # pruned here (and sync_skill below warns about the dangling
     # registry reference). Building `keep` from the raw registry list instead
     # would preserve orphaned copies forever — the issue #100 failure mode
     # (audit finding #2).
     present_skill_leaves = {
         leaf for (source, leaf) in norm_skills if (repo / "skills" / source).is_dir()
     }
-    # source -> leaf for skills this plugin actually ships; an agent copy's
-    # skills: preload is rewritten through this map and entries absent from it are
-    # dropped, so each plugin references only the skills it carries (by leaf).
-    skill_leaf_map = {
-        source: leaf
-        for (source, leaf) in norm_skills
-        if (repo / "skills" / source).is_dir()
-    }
-    present_agents = [
-        a for a in agents if (repo / "agents" / a / "agent.md").is_file()
-    ]
-
     prune_entries(repo / "plugins" / plugin / "skills", present_skill_leaves)
-    prune_entries(
-        repo / "plugins" / plugin / "agents", {f"{a}.md" for a in present_agents}
-    )
+    # Remove the retired generated agent tree, including empty directories.
+    legacy = repo / "plugins" / plugin / "agents"
+    if legacy.exists() or legacy.is_symlink():
+        if check:
+            drift.append(f"{legacy.relative_to(repo)}: retired agent tree — run sync-plugins.sh")
+        elif legacy.is_symlink() or legacy.is_file():
+            legacy.unlink()
+        else:
+            shutil.rmtree(legacy)
 
     for source, leaf in norm_skills:
         sync_skill(plugin, source, leaf, bundle_file)
-    for agent in agents:
-        sync_agent(plugin, agent, bundle_file, skill_leaf_map)
 
 if check:
     if drift:
         print(
-            "::error::plugin trees are out of sync with canonical skills/ and "
-            "agents/.",
+            "::error::plugin trees are out of sync with canonical skills/.",
             file=sys.stderr,
         )
         print(
-            "The plugins/ copies are derived from skills/ and agents/; refresh "
+            "The plugins/ copies are derived from skills/; refresh "
             "them with:",
             file=sys.stderr,
         )
@@ -394,7 +299,7 @@ if check:
         for d in drift:
             print(f"  - {d}", file=sys.stderr)
         sys.exit(1)
-    print("plugin trees are in sync with canonical skills/ and agents/.")
+    print("plugin trees are in sync with canonical skills/.")
     sys.exit(0)
 
 if warnings:
@@ -406,3 +311,8 @@ if warnings:
     )
 print("Done.")
 PY
+
+codex_args=()
+[ "$check" = 1 ] && codex_args+=(--check)
+if [ "${#args[@]}" -gt 0 ]; then codex_args+=(--bundles "${args[@]}"); fi
+python3 "$REPO_ROOT/scripts/codex_package.py" "$REPO_ROOT" "${codex_args[@]}"

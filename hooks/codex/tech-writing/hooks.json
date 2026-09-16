@@ -1,0 +1,16 @@
+{
+  "description": "Native Codex command hooks for tech-writing; review and trust before execution.",
+  "hooks": {
+    "UserPromptSubmit": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash \"${PLUGIN_ROOT}/hooks/adapter.sh\" stylepedia-reminder",
+            "timeout": 10
+          }
+        ]
+      }
+    ]
+  }
+}

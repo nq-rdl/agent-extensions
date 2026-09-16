@@ -7,9 +7,8 @@ owners:
   - rdl
 channels:
   - stable
-skills: []
-agents:
-  - playwright-tester
+skills:
+  - {source: playwright-tester, leaf: test}
 hooks: []
 prompts: []
 mcp:
@@ -19,3 +18,19 @@ targets:
     enabled: true
     pluginName: playwright
     marketplaceName: rdl-agent-extensions
+
+  codex:
+    enabled: true
+    pluginName: playwright
+    marketplaceName: rdl-agent-extensions
+    category: Developer Tools
+    components:
+      skills: true
+      mcp: true
+      hooks: false
+      apps: false
+    interface:
+      shortDescription: Playwright — generate and debug end-to-end browser tests
+      defaultPrompt:
+      - Use Playwright to help with my task.
+    mcpConfig: plugins/playwright/.mcp.json

@@ -1,0 +1,31 @@
+{
+  "name": "sops",
+  "version": "0.29.0",
+  "description": "SOPS — encrypt and decrypt secrets with Age and Vault transit",
+  "author": {
+    "name": "nq-rdl"
+  },
+  "repository": "https://github.com/nq-rdl/agent-extensions",
+  "license": "MIT",
+  "keywords": [
+    "sops",
+    "secrets",
+    "encryption",
+    "age"
+  ],
+  "skills": "./skills/",
+  "interface": {
+    "displayName": "SOPS",
+    "shortDescription": "SOPS — encrypt and decrypt secrets with Age and Vault transit",
+    "longDescription": "SOPS — encrypt and decrypt secrets with Age and Vault transit",
+    "developerName": "nq-rdl",
+    "category": "Developer Tools",
+    "capabilities": [
+      "Skills"
+    ],
+    "defaultPrompt": [
+      "Use SOPS to help with my task."
+    ],
+    "websiteURL": "https://github.com/nq-rdl/agent-extensions"
+  }
+}

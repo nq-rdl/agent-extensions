@@ -9,7 +9,6 @@ channels:
   - stable
 skills:
   - {source: charm-tui, leaf: build}
-agents: []
 hooks: []
 prompts: []
 mcp: []
@@ -18,3 +17,18 @@ targets:
     enabled: true
     pluginName: charm-tui
     marketplaceName: rdl-agent-extensions
+
+  codex:
+    enabled: true
+    pluginName: charm-tui
+    marketplaceName: rdl-agent-extensions
+    category: Developer Tools
+    components:
+      skills: true
+      mcp: false
+      hooks: false
+      apps: false
+    interface:
+      shortDescription: Charm — build terminal UIs with Bubbletea, Lip Gloss, and Fang
+      defaultPrompt:
+      - Use Charm to help with my task.

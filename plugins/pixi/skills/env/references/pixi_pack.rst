@@ -244,7 +244,7 @@ Mirror and S3 middleware\ `# <#mirror-and-s3-middleware>`__
 
 You can use mirror middleware by creating a configuration file as
 described in the `pixi
-documentation <../../reference/pixi_configuration/#mirror-configuration>`__
+documentation <https://pixi.prefix.dev/latest/reference/pixi_configuration/#mirror-configuration>`__
 and referencing it using ``--config``.
 
 .. container:: language-toml highlight
@@ -255,7 +255,7 @@ and referencing it using ``--config``.
       [mirrors]
       "https://conda.anaconda.org/conda-forge" = ["https://my.artifactory/conda-forge"]
 
-If you are using `S3 in pixi <../s3/>`__, you can also add the
+If you are using `S3 in pixi <https://pixi.prefix.dev/latest/deployment/s3/>`__, you can also add the
 appropriate S3 config in your config file and reference it.
 
 .. container:: language-toml highlight
@@ -280,7 +280,7 @@ Setting maximum number of parallel downloads\ `# <#setting-maximum-number-of-par
 
 Use ``pixi-pack --config config.toml`` to use the custom configuration
 file. See `pixi
-docs <../../reference/pixi_configuration/#concurrency>`__ for more
+docs <https://pixi.prefix.dev/latest/reference/pixi_configuration/#concurrency>`__ for more
 information.
 
 Cache Downloaded Packages\ `# <#cache-downloaded-packages>`__

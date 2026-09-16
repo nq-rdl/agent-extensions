@@ -21,8 +21,8 @@
 #   3. Ensure this script is executable: chmod +x forced-eval-hook.sh
 #
 # How it works:
-#   - Fires only when the prompt expresses intent to use a skill (an action
-#     verb appears near "skill"/"skills"); silent no-op otherwise.
+#   - Data-request/SQL/cohort prompts surface the installed Data Request skills, including guardrails.
+#   - Explicit skill-use prompts surface the full catalogue; silent no-op otherwise.
 #   - Emits the discovered skill/command catalogue as advisory context via the
 #     UserPromptSubmit additionalContext channel (plain stdout when jq absent).
 #   - The framing is descriptive: it invites the model to consider the skills,
@@ -31,10 +31,8 @@
 set -euo pipefail
 
 # ---------------------------------------------------------------------------
-# Intent gate — fire only when an action verb sits near "skill"/"skills",
-# signalling intent to use one. Metalinguistic mentions ("skills should
-# always be reviewed") no longer trigger a catalogue dump. Silent no-op
-# otherwise.
+# Intent gate — explicit skill use gets the full catalogue; Data-request/SQL/cohort work
+# gets only Data Request guidance. This is advisory discovery, not SQL enforcement.
 # ---------------------------------------------------------------------------
 input=$(cat)
 
@@ -52,8 +50,13 @@ else
 fi
 
 intent='use|using|invoke|invoking|run|running|apply|applying|activate|activating|load|loading|call|calling|trigger|triggering'
+catalog_mode=all
 if ! printf '%s' "$prompt" | grep -qiE "\b(${intent})\b.{0,40}\bskills?\b|\bskills?\b.{0,40}\b(${intent})\b"; then
-  exit 0
+  if printf '%s' "$prompt" | grep -qiE '\b(data[- ]requests?|sql|cohorts?|clinical_event)\b|query[- ]builder.{0,60}resolvers?|resolvers?.{0,60}query[- ]builder'; then
+    catalog_mode=sql
+  else
+    exit 0
+  fi
 fi
 
 SKILLS_DIR="${HOME}/.claude/skills"
@@ -205,8 +208,9 @@ scan_standalone_skills() {
 # Output: "plugin-name|install-path" lines
 # ---------------------------------------------------------------------------
 get_plugin_paths() {
-  jq -r '
+  jq -r --arg mode "$catalog_mode" '
     .plugins | to_entries[] |
+    select($mode != "sql" or .key == "data-request@rdl-agent-extensions") |
     (.key | split("@")[0]) as $name |
     .value[0].installPath as $path |
     "\($name)|\($path)"
@@ -311,7 +315,7 @@ emit() {
 # ---------------------------------------------------------------------------
 main() {
   # Return cached output if still fresh
-  if check_cache; then
+  if [[ "$catalog_mode" == all ]] && check_cache; then
     emit "$(cat "$CACHE_FILE")"
     return 0
   fi
@@ -321,23 +325,31 @@ main() {
   trap 'rm -f "$SEEN_NAMES_FILE"' EXIT
 
   # Scan standalone skills
-  local skill_data
-  skill_data=$(scan_standalone_skills | sort)
+  local skill_data=""
+  if [[ "$catalog_mode" == all ]]; then
+    skill_data=$(scan_standalone_skills | sort)
+  fi
 
   # Scan plugin skills and commands (requires jq)
   local cmd_data=""
   if command -v jq >/dev/null 2>&1 && [[ -f "$PLUGINS_JSON" ]]; then
     local ps pc
     ps=$(scan_plugin_skills | sort)
-    pc=$(scan_plugin_commands | sort)
+    pc=""
+    if [[ "$catalog_mode" == all ]]; then
+      pc=$(scan_plugin_commands | sort)
+    fi
     if [[ -n "$ps" ]]; then
       skill_data=$(printf '%s\n%s\n' "$skill_data" "$ps" | grep -v '^$' | sort)
     fi
     cmd_data="$pc"
-  else
+  elif [[ "$catalog_mode" == all ]]; then
     printf 'forced-eval-hook: jq not found or %s missing — plugin skills skipped\n' \
       "$PLUGINS_JSON" >&2
   fi
+
+  # SQL mode selects the exact installation before parsing skills, skips
+  # standalone skills and commands, and never reads or writes the full cache.
 
   # Format skill list. `|| true` keeps an empty skill_data from tripping
   # `set -o pipefail` — grep -v exits 1 when it filters every line away.
@@ -359,7 +371,7 @@ main() {
   # Build, cache, and emit the prompt
   local output
   output=$(build_prompt "$skills_block" "$commands_block")
-  write_cache "$output"
+  if [[ "$catalog_mode" == all ]]; then write_cache "$output"; fi
   emit "$output"
 }
 

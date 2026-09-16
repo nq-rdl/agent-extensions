@@ -1,0 +1,214 @@
+---
+name: cc-setup
+license: CC-BY-4.0
+description: Onboard a user onto the RDL team's Claude Code setup. Use when the user
+  wants to "set up Claude Code", "set up my .claude", "onboard onto the RDL Claude
+  Code setup", "install the forced-eval hook", or "configure Claude Code for the team".
+  Asks whether to configure a project-local `.claude/` or the user's global `~/.claude/`,
+  then installs the team's `forced-eval-hook.sh` (a UserPromptSubmit hook that surfaces
+  available skills as advisory context) and wires it into the chosen scope's `settings.json`
+  idempotently. The minimal first step of RDL Claude Code onboarding — later passes
+  will guide the wider settings surface.
+metadata:
+  repo: https://github.com/nq-rdl/agent-extensions
+---
+
+## Codex execution
+
+This skill describes another host. Claude Code/OpenCode commands, configuration, and hook examples below are artifacts for that host, not tools available in Codex. Use Codex tools to inspect or author them; launch the target host only when the user requests execution and it is installed. Do not configure Codex as Claude Code.
+
+# RDL team Claude Code setup
+
+Your job is to onboard the user onto the RDL team's Claude Code configuration. This
+first pass does one concrete thing: install the team's **`forced-eval-hook.sh`** and
+wire it as a `UserPromptSubmit` hook in the scope the user chooses. The hook script
+ships in this skill's `assets/` directory; you copy it into the target `.claude/` and
+merge the settings idempotently.
+
+> **Scope.** The forced-eval hook is the floor, not the ceiling. Do not configure model,
+> permissions, MCP servers, or other settings here unless the user explicitly asks. The one
+> addition beyond the hook is an **optional** plugin-discovery pass (Phase 4) that reviews
+> the RDL marketplace and the team's extra marketplaces and *suggests* a plugin set — it
+> only recommends and installs on confirmation. A future pass will turn this into a fuller
+> guided tour of the Claude Code settings surface.
+
+## What the hook does
+
+`forced-eval-hook.sh` is a `UserPromptSubmit` hook. When a prompt expresses intent to
+*use* a skill (an action verb sits near "skill"/"skills"), it discovers the available
+skills and slash commands — standalone (`~/.claude/skills/*/SKILL.md`) and plugin
+(`~/.claude/plugins/installed_plugins.json`) — and emits them as **advisory context**
+so the model considers them. Data-request/SQL/cohort prompts also surface the installed `data-request`
+skills (including `guardrails`) without requiring a request to use a skill. This
+SQL-specific path scans fresh and emits nothing when Data Request is unavailable. Other
+prompts are a silent no-op. The framing is
+descriptive; it does not coerce a fixed activation sequence. It uses `jq` when present
+and degrades gracefully without it.
+
+## Phase 0 — Choose the scope
+
+Ask the user **where** to install (unless they already said in the invocation):
+
+| Scope | Install the script to | Wire the hook in | Use when |
+|---|---|---|---|
+| **project** | `<repo>/.claude/hooks/forced-eval-hook.sh` | `<repo>/.claude/settings.json` | configuring one repo; the setting can be committed and shared with the team |
+| **global** | `~/.claude/hooks/forced-eval-hook.sh` | `~/.claude/settings.json` | the user wants the hook on every project they open |
+
+Notes:
+- For **project** scope, default to `.claude/settings.json` (committed, team-shared).
+  If the user wants it personal/uncommitted, use `.claude/settings.local.json` instead
+  (same `hooks` block; gitignored).
+- Confirm the project root has a `.git` directory before treating it as the project
+  scope target.
+
+## Phase 1 — Install the hook script
+
+Copy `assets/forced-eval-hook.sh` from this skill into the chosen `hooks/` directory,
+creating it if absent, and make it executable:
+
+```bash
+# project scope
+mkdir -p .claude/hooks
+cp <this skill's assets>/forced-eval-hook.sh .claude/hooks/forced-eval-hook.sh
+chmod +x .claude/hooks/forced-eval-hook.sh
+```
+
+```bash
+# global scope
+mkdir -p "$HOME/.claude/hooks"
+cp <this skill's assets>/forced-eval-hook.sh "$HOME/.claude/hooks/forced-eval-hook.sh"
+chmod +x "$HOME/.claude/hooks/forced-eval-hook.sh"
+```
+
+Resolve `<this skill's assets>` to this skill's own `assets/` directory. On an
+installed plugin the skill lives in the plugin cache — locate it rather than guessing:
+
+```bash
+SRC="$(find "$HOME/.claude/plugins" -path '*/cc-setup/assets/forced-eval-hook.sh' 2>/dev/null | head -1)"
+# Fallback: the absolute path of the assets/ directory beside this SKILL.md.
+SRC="${SRC:-<absolute path to this skill>/assets/forced-eval-hook.sh}"
+```
+
+If the target file already exists and differs, show the diff and ask before overwriting.
+
+## Phase 2 — Wire the `UserPromptSubmit` hook
+
+Merge this block into the chosen `settings.json` (`command` path matches Phase 1's
+install location). **Show the diff before writing**, and merge idempotently — never
+clobber existing keys, and dedupe by exact `command` string so re-running is a no-op.
+
+Shell-form hook commands run via `sh -c`, so keep the variable **double-quoted inside
+the JSON string** (`"$CLAUDE_PROJECT_DIR"` / `"$HOME"`) — an unquoted path that contains
+spaces would word-split and the hook would fail to launch.
+
+Project scope (`.claude/settings.json`) — use `$CLAUDE_PROJECT_DIR` so the path is
+portable:
+
+```json
+{
+  "hooks": {
+    "UserPromptSubmit": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "\"$CLAUDE_PROJECT_DIR\"/.claude/hooks/forced-eval-hook.sh",
+            "timeout": 10
+          }
+        ]
+      }
+    ]
+  }
+}
+```
+
+Global scope (`~/.claude/settings.json`) — use `$HOME`:
+
+```json
+{
+  "hooks": {
+    "UserPromptSubmit": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "\"$HOME\"/.claude/hooks/forced-eval-hook.sh",
+            "timeout": 10
+          }
+        ]
+      }
+    ]
+  }
+}
+```
+
+Merge rules when the file already exists:
+- Parse the existing JSON. If `hooks.UserPromptSubmit` exists, append this rule group
+  to it **only if** no group already references `forced-eval-hook.sh`.
+- If `hooks` or `hooks.UserPromptSubmit` is absent, create it.
+- Leave every other key untouched.
+
+## Phase 3 — Verify
+
+- `jq . <settings file>` parses without error.
+- The installed script is executable (`test -x <path>` succeeds).
+- Optional smoke test — the hook is a no-op unless intent is detected:
+  ```bash
+  printf '{"prompt":"please use a skill"}' | <installed forced-eval-hook.sh>
+  ```
+  expect it to emit the skill catalogue (or exit 0 quietly if no skills are installed);
+  `printf '{"prompt":"hello"}' | <script>` should exit 0 with no output.
+
+## Phase 4 — Review and suggest team plugins (optional)
+
+Offer — don't force — to review what plugins are available across the RDL marketplace and
+the team's extra marketplaces and suggest a set for this repo. Run this on first setup **and
+whenever the user re-runs setup** (it is idempotent: it drops anything already enabled). If
+the user declines, skip straight to Phase 5.
+
+Use the `discover-plugins` skill shipped alongside this setup skill (canonical
+`marketplace-scout`). Its `references/subagent.rst` contains an optional worker
+outline for delegated discovery; read it when delegation is useful or requested.
+Pass the resolved marketplace-list path and repository path. The workflow locates the
+team's tracked-marketplace list (`marketplaces.json` — shipped in this skill's own `assets/`),
+enumerates the *live* plugin catalog of every tracked
+marketplace, inspects this repo's languages/tooling, and returns a ranked suggestion list:
+
+- **Baseline (always-useful)** — `pr-review-toolkit@claude-plugins-official`, `gh@rdl-agent-extensions`,
+  `worktrunk@worktrunk`, plus the applicable LSP (`gopls-lsp@claude-plugins-official` for Go;
+  the official marketplace ships more `*-lsp` plugins the scout matches by language).
+- **Language/stack-matched** — RDL subject plugins and team externals whose subject matches a
+  detected language/tool (`go@rdl-agent-extensions`, `terraform@rdl-agent-extensions`, `astral@astral-sh`, …).
+
+The marketplace list lives in `assets/marketplaces.json` beside this skill (resolve it the
+same way as the hook script in Phase 1: prefer the installed plugin-cache copy, fall back to
+the path beside this `SKILL.md`). Pass that path to the discovery workflow.
+
+Present the scout's menu and let the user pick. For each marketplace a chosen plugin needs,
+register it and install **only the confirmed plugins** (this skill installs them directly):
+
+```bash
+# Register each marketplace the chosen plugins need (idempotent), then install.
+claude plugin marketplace add <owner>/<repo>      # e.g. nq-rdl/agent-extensions for @rdl-agent-extensions
+claude plugin install <plugin>@<marketplace>      # only the ones the user confirmed
+```
+
+Never install without confirmation. **Self-marketplace guard:** if the target repo is
+itself the `rdl-agent-extensions` marketplace (a `.claude-plugin/marketplace.json` with `name: rdl-agent-extensions` — e.g.
+`agent-extensions` itself), skip **every** `@rdl-agent-extensions` plugin. Installing the
+published copy of *any* `@rdl-agent-extensions` id (including the baseline's `gh@rdl-agent-extensions`) shadows the working
+tree's own copy. This install has no automatic self-exclusion, so you must exclude
+`@rdl-agent-extensions` ids yourself here — the working tree already provides those skills.
+
+## Phase 5 — Summarize
+
+Tell the user, concisely:
+- The scope chosen, the script path installed, and the settings file touched.
+- That explicit skill-use prompts surface the full catalogue; ordinary SQL/cohort
+  prompts surface skills from `data-request@rdl-agent-extensions` when installed.
+  Other prompts, and SQL prompts without that plugin, are silent no-ops.
+- For **project** scope: commit `.claude/hooks/forced-eval-hook.sh` and the settings
+  change so the team picks them up (or note it is personal if they chose
+  `settings.local.json`).
+- Any plugins suggested/installed in Phase 4 (or that the step was skipped).
+- That this is the first onboarding step; more RDL Claude Code configuration can follow.

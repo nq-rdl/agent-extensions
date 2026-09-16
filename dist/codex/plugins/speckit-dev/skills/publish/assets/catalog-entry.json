@@ -1,0 +1,16 @@
+{
+  "name": "My Extension",
+  "id": "my-extension",
+  "description": "Brief description (under 200 characters)",
+  "author": "nq-rdl",
+  "version": "1.0.0",
+  "download_url": "https://github.com/nq-rdl/spec-kit-my-extension/archive/refs/tags/v1.0.0.zip",
+  "sha256": "",
+  "repository": "https://github.com/nq-rdl/spec-kit-my-extension",
+  "license": "MIT",
+  "category": "process",
+  "effect": "read-write",
+  "requires": { "speckit_version": ">=0.12.0" },
+  "provides": { "commands": 1, "hooks": 0 },
+  "tags": ["example", "team"]
+}

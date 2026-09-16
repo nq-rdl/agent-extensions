@@ -1,0 +1,30 @@
+{
+  "name": "mongodb",
+  "version": "0.29.0",
+  "description": "MongoDB — query and index performance analysis against a live cluster",
+  "author": {
+    "name": "nq-rdl"
+  },
+  "repository": "https://github.com/nq-rdl/agent-extensions",
+  "license": "MIT",
+  "keywords": [
+    "mongodb",
+    "performance",
+    "database"
+  ],
+  "skills": "./skills/",
+  "interface": {
+    "displayName": "MongoDB",
+    "shortDescription": "MongoDB — query and index performance analysis against a live cluster",
+    "longDescription": "MongoDB — query and index performance analysis against a live cluster",
+    "developerName": "nq-rdl",
+    "category": "Developer Tools",
+    "capabilities": [
+      "Skills"
+    ],
+    "defaultPrompt": [
+      "Use MongoDB to help with my task."
+    ],
+    "websiteURL": "https://github.com/nq-rdl/agent-extensions"
+  }
+}

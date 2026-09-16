@@ -7,9 +7,8 @@ owners:
   - rdl
 channels:
   - stable
-skills: []
-agents:
-  - mongodb-performance-advisor
+skills:
+  - {source: mongodb-performance-advisor, leaf: analyse}
 hooks: []
 prompts: []
 mcp: []
@@ -18,3 +17,19 @@ targets:
     enabled: true
     pluginName: mongodb
     marketplaceName: rdl-agent-extensions
+
+  codex:
+    enabled: true
+    pluginName: mongodb
+    marketplaceName: rdl-agent-extensions
+    category: Developer Tools
+    components:
+      skills: true
+      mcp: false
+      hooks: false
+      apps: false
+    interface:
+      shortDescription: MongoDB — query and index performance analysis against a live
+        cluster
+      defaultPrompt:
+      - Use MongoDB to help with my task.

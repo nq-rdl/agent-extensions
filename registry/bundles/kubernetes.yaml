@@ -7,9 +7,8 @@ owners:
   - rdl
 channels:
   - stable
-skills: []
-agents:
-  - platform-sre-kubernetes
+skills:
+  - {source: platform-sre-kubernetes, leaf: operate}
 hooks: []
 prompts: []
 mcp: []
@@ -18,3 +17,18 @@ targets:
     enabled: true
     pluginName: kubernetes
     marketplaceName: rdl-agent-extensions
+
+  codex:
+    enabled: true
+    pluginName: kubernetes
+    marketplaceName: rdl-agent-extensions
+    category: Developer Tools
+    components:
+      skills: true
+      mcp: false
+      hooks: false
+      apps: false
+    interface:
+      shortDescription: Kubernetes — SRE-grade rollouts, HA design, and incident response
+      defaultPrompt:
+      - Use Kubernetes to help with my task.

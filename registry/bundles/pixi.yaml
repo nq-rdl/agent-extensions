@@ -9,7 +9,6 @@ channels:
   - stable
 skills:
   - {source: pixi, leaf: env}
-agents: []
 hooks: []
 prompts: []
 mcp: []
@@ -18,3 +17,18 @@ targets:
     enabled: true
     pluginName: pixi
     marketplaceName: rdl-agent-extensions
+
+  codex:
+    enabled: true
+    pluginName: pixi
+    marketplaceName: rdl-agent-extensions
+    category: Developer Tools
+    components:
+      skills: true
+      mcp: false
+      hooks: false
+      apps: false
+    interface:
+      shortDescription: Pixi — manage Python projects, environments, and dependencies
+      defaultPrompt:
+      - Use Pixi to help with my task.

@@ -16,35 +16,41 @@ jobs:
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
-      - name: Install PyYAML
-        run: python3 -m pip install --user pyyaml
+      - name: Install locked Python toolchain
+        uses: prefix-dev/setup-pixi@a09b6247153796b190642a2b53fac4241043cf6f # v0.10.0
+        with:
+          pixi-version: v0.78.0
+          locked: true
 
       # Logic lives in tested, importable scripts (tests/test_check_*.py) rather
       # than inline here, so it is unit-tested and reusable.
       - name: Check bundle references resolve
-        run: python3 scripts/check_bundle_refs.py .
+        run: pixi run --locked python3 scripts/check_bundle_refs.py .
 
       - name: Check every canonical artifact is exposed in a bundle
-        run: python3 scripts/check_exposure.py .
+        run: pixi run --locked python3 scripts/check_exposure.py .
 
       - name: Check skill grouping contract
-        run: python3 scripts/check_grouping.py .
+        run: pixi run --locked python3 scripts/check_grouping.py .
 
       - name: Check generated manifests are in sync
-        run: python3 scripts/generate_manifests.py . --check
+        run: pixi run --locked python3 scripts/generate_manifests.py . --check
 
       - name: Check generated bundles doc is in sync
-        run: python3 scripts/generate_bundles_doc.py . --check
+        run: pixi run --locked python3 scripts/generate_bundles_doc.py . --check
 
       - name: Check registry / marketplace / plugins consistency
-        run: python3 scripts/check_consistency.py .
+        run: pixi run --locked python3 scripts/check_consistency.py .
 
       # Content-level drift gate: the plugins/ trees are real-file copies of the
-      # canonical skills/ and agents/. The checks above only compare dir sets and
+      # canonical skills/. The checks above only compare dir sets and
       # manifests, so editing a canonical skill without running sync-plugins.sh
       # would ship stale plugin content undetected. --check compares the bytes.
-      - name: Check plugin trees match canonical skills/ and agents/
-        run: bash scripts/sync-plugins.sh --check
+      - name: Check directory readiness report drift
+        run: pixi run --locked python3 scripts/codex_directory.py . --check
+
+      - name: Check plugin trees match canonical skills/
+        run: pixi run --locked bash scripts/sync-plugins.sh --check
 
   validate-symlinks:
     name: Validate skill + agent symlinks
@@ -75,16 +81,55 @@ jobs:
           exit $exit_code
 
   validate-plugins:
+    # Keep this legacy job name: main branch protection requires this exact status.
     name: Validate Claude plugin structure, hooks, and agents
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
-      - name: Install PyYAML for agent frontmatter validation
-        run: python3 -m pip install --user pyyaml
+      - name: Install locked Python toolchain
+        uses: prefix-dev/setup-pixi@a09b6247153796b190642a2b53fac4241043cf6f # v0.10.0
+        with:
+          pixi-version: v0.78.0
+          locked: true
 
-      - name: Validate plugin manifests, hooks, and agents
-        run: scripts/validate-plugins.sh
+      - name: Validate Claude and Codex plugin manifests, hooks, and skills
+        run: pixi run --locked scripts/validate-plugins.sh
+
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: '20'
+
+      # Both target trees are strict and self-contained; retain a pinned runtime matrix.
+      - name: Install Codex CLI 0.152.0
+        run: npm install --global @openai/codex@0.152.0
+
+      - name: Smoke test native Codex marketplace installation and skill discovery
+        run: scripts/smoke-codex-marketplace.sh
+
+      - name: Install Codex CLI 0.154.0
+        run: npm install --global @openai/codex@0.154.0
+
+      - name: Smoke test Codex 0.154.0 compatibility
+        run: scripts/smoke-codex-marketplace.sh
+
+      - name: Verify native hook registration in the installed Codex cache
+        run: pixi run --locked python3 scripts/check_codex_runtime.py .
+
+      # Same image and command as .devcontainer/codex; no API key or model call.
+      # Keep this in the existing required job so container failures block merges.
+      - name: Build Codex smoke devcontainer
+        timeout-minutes: 10
+        run: >-
+          docker build --build-arg CODEX_VERSION=0.154.0
+          -t rdl-codex-smoke -f .devcontainer/codex/Dockerfile .
+
+      - name: Test Codex plugins in the devcontainer image
+        timeout-minutes: 3
+        run: |
+          docker run --rm --network none \
+            --mount "type=bind,source=$GITHUB_WORKSPACE,target=/workspace,readonly" \
+            rdl-codex-smoke bash -c 'bash scripts/smoke-codex-marketplace.sh && pixi run --locked --manifest-path /opt/codex-python/pyproject.toml python3 /workspace/scripts/check_codex_runtime.py /workspace'
 
   unit-tests:
     name: Unit tests (pipeline scripts)
@@ -92,11 +137,14 @@ jobs:
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
-      - name: Install PyYAML
-        run: python3 -m pip install --user pyyaml
+      - name: Install locked Python toolchain
+        uses: prefix-dev/setup-pixi@a09b6247153796b190642a2b53fac4241043cf6f # v0.10.0
+        with:
+          pixi-version: v0.78.0
+          locked: true
 
       - name: Run pipeline-script unit tests
-        run: python3 -m unittest discover -s tests -p 'test_*.py' -v
+        run: pixi run --locked python3 -m unittest discover -s tests -p 'test_*.py' -v
 
       - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
         with:

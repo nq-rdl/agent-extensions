@@ -1,0 +1,30 @@
+{
+  "name": "lychee",
+  "version": "0.29.0",
+  "description": "Lychee — fast link checking for docs and Markdown",
+  "author": {
+    "name": "nq-rdl"
+  },
+  "repository": "https://github.com/nq-rdl/agent-extensions",
+  "license": "MIT",
+  "keywords": [
+    "lychee",
+    "links",
+    "docs"
+  ],
+  "skills": "./skills/",
+  "interface": {
+    "displayName": "Lychee",
+    "shortDescription": "Lychee — fast link checking for docs and Markdown",
+    "longDescription": "Lychee — fast link checking for docs and Markdown",
+    "developerName": "nq-rdl",
+    "category": "Developer Tools",
+    "capabilities": [
+      "Skills"
+    ],
+    "defaultPrompt": [
+      "Use Lychee to help with my task."
+    ],
+    "websiteURL": "https://github.com/nq-rdl/agent-extensions"
+  }
+}

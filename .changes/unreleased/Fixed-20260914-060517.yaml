@@ -1,0 +1,3 @@
+kind: Fixed
+body: Stop Red Hat setup before prompting or writing when Bitwarden lookup or JSON validation fails; clarify the file-store HOME fallback.
+time: 2026-09-14T06:05:17.544372518Z

@@ -1,0 +1,16 @@
+{
+  "name": "Codex Marketplace Smoke",
+  "build": {
+    "dockerfile": "Dockerfile",
+    "context": "../..",
+    "args": {
+      "CODEX_VERSION": "0.154.0"
+    }
+  },
+  "workspaceMount": "source=${localWorkspaceFolder},target=/workspace,type=bind,readonly",
+  "workspaceFolder": "/workspace",
+  "remoteUser": "node",
+  "updateRemoteUserUID": false,
+  "runArgs": ["--network=none"],
+  "postCreateCommand": "bash scripts/smoke-codex-marketplace.sh && pixi run --locked --manifest-path /opt/codex-python/pyproject.toml python3 /workspace/scripts/check_codex_runtime.py /workspace"
+}

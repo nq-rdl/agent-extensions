@@ -27,6 +27,8 @@ def write(path: Path, text: str):
 def run_validate(repo: Path):
     (repo / "scripts").mkdir(parents=True, exist_ok=True)
     shutil.copy(SCRIPT, repo / "scripts" / "validate-plugins.sh")
+    for dependency in ("codex_package.py", "generate_manifests.py", "_registry.py"):
+        (repo / "scripts" / dependency).write_text((REPO / "scripts" / dependency).read_text())
     return subprocess.run(
         ["bash", str(repo / "scripts" / "validate-plugins.sh")],
         cwd=repo,
@@ -71,3 +73,22 @@ class TestSkillCopyResolvesByLeaf(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class TestReviewHookValidation(unittest.TestCase):
+    def test_model_hooks_require_prompt_and_command_hooks_require_command(self):
+        import json
+        for hook, valid in [
+            ({"type": "agent", "prompt": "Inspect the draft."}, True),
+            ({"type": "prompt", "prompt": "Review the reply."}, True),
+            ({"type": "agent"}, False),
+            ({"type": "prompt"}, False),
+            ({"type": "command"}, False),
+        ]:
+            with self.subTest(hook=hook), tempfile.TemporaryDirectory() as tmp:
+                repo = Path(tmp)
+                mapped_bundle_fixture(repo, "plugins/go/skills/gh")
+                write(repo / "plugins/go/hooks/hooks.json",
+                      json.dumps({"hooks": {"Stop": [{"hooks": [hook]}]}}))
+                result = run_validate(repo)
+                self.assertEqual(result.returncode == 0, valid, result.stderr)

@@ -37,7 +37,10 @@ merge the settings idempotently.
 *use* a skill (an action verb sits near "skill"/"skills"), it discovers the available
 skills and slash commands — standalone (`~/.claude/skills/*/SKILL.md`) and plugin
 (`~/.claude/plugins/installed_plugins.json`) — and emits them as **advisory context**
-so the model considers them. It is a silent no-op otherwise. The framing is
+so the model considers them. Data-request/SQL/cohort prompts also surface the installed `data-request`
+skills (including `guardrails`) without requiring a request to use a skill. This
+SQL-specific path scans fresh and emits nothing when Data Request is unavailable. Other
+prompts are a silent no-op. The framing is
 descriptive; it does not coerce a fixed activation sequence. It uses `jq` when present
 and degrades gracefully without it.
 
@@ -162,7 +165,10 @@ the team's extra marketplaces and suggest a set for this repo. Run this on first
 whenever the user re-runs setup** (it is idempotent: it drops anything already enabled). If
 the user declines, skip straight to Phase 5.
 
-**Delegate the discovery to the `marketplace-scout` agent** (Task tool). It locates the
+Use the `discover-plugins` skill shipped alongside this setup skill (canonical
+`marketplace-scout`). Its `references/subagent.rst` contains an optional worker
+outline for delegated discovery; read it when delegation is useful or requested.
+Pass the resolved marketplace-list path and repository path. The workflow locates the
 team's tracked-marketplace list (`marketplaces.json` — shipped in this skill's own `assets/`),
 enumerates the *live* plugin catalog of every tracked
 marketplace, inspects this repo's languages/tooling, and returns a ranked suggestion list:
@@ -175,7 +181,7 @@ marketplace, inspects this repo's languages/tooling, and returns a ranked sugges
 
 The marketplace list lives in `assets/marketplaces.json` beside this skill (resolve it the
 same way as the hook script in Phase 1: prefer the installed plugin-cache copy, fall back to
-the path beside this `SKILL.md`). The agent reads it; you don't have to.
+the path beside this `SKILL.md`). Pass that path to the discovery workflow.
 
 Present the scout's menu and let the user pick. For each marketplace a chosen plugin needs,
 register it and install **only the confirmed plugins** (this skill installs them directly):
@@ -197,8 +203,9 @@ tree's own copy. This install has no automatic self-exclusion, so you must exclu
 
 Tell the user, concisely:
 - The scope chosen, the script path installed, and the settings file touched.
-- That the hook only fires when a prompt expresses intent to use a skill — it is a
-  silent no-op otherwise.
+- That explicit skill-use prompts surface the full catalogue; ordinary SQL/cohort
+  prompts surface skills from `data-request@rdl-agent-extensions` when installed.
+  Other prompts, and SQL prompts without that plugin, are silent no-ops.
 - For **project** scope: commit `.claude/hooks/forced-eval-hook.sh` and the settings
   change so the team picks them up (or note it is personal if they chose
   `settings.local.json`).

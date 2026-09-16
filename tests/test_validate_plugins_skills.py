@@ -21,7 +21,33 @@ def write(path: Path, text: str):
 
 
 def run_validate(repo: Path):
+    import json
+    import shutil
+    import yaml
+    for manifest in (repo / "plugins").glob("*/.codex-plugin/plugin.json"):
+        plugin = manifest.parent.parent.name
+        target = repo / "dist/codex/plugins" / plugin
+        shutil.copytree(manifest.parent.parent, target, dirs_exist_ok=True)
+        for path in (target / "skills").glob("*/SKILL.md"):
+            text = path.read_text()
+            path.write_text(text.replace("---\n", "---\nname: " + path.parent.name + "\n", 1))
+        # This fixture represents a migrated package, not a second native manifest in Claude.
+        if (repo / "registry/bundles" / (plugin + ".yaml")).exists():
+            manifest.unlink()
+            manifest.parent.rmdir()
+        bundle_file = repo / "registry/bundles" / (plugin + ".yaml")
+        if bundle_file.exists():
+            bundle = yaml.safe_load(bundle_file.read_text())
+            bundle.setdefault("description", "Test package")
+            bundle["targets"]["codex"]["category"] = "Developer Tools"
+            bundle_file.write_text(yaml.safe_dump(bundle))
+            write(repo / "registry/marketplace.yaml", "name: test\npluginDefaults: {}\n")
+            data = json.loads((target / ".codex-plugin/plugin.json").read_text())
+            data.setdefault("interface", {})
+            (target / ".codex-plugin/plugin.json").write_text(json.dumps(data))
     write(repo / "scripts" / "validate-plugins.sh", SCRIPT.read_text())
+    for dependency in ("codex_package.py", "generate_manifests.py", "_registry.py"):
+        (repo / "scripts" / dependency).write_text((REPO / "scripts" / dependency).read_text())
     return subprocess.run(
         ["bash", str(repo / "scripts" / "validate-plugins.sh")],
         cwd=repo,
@@ -35,7 +61,6 @@ def base_plugin(repo: Path, plugin="test"):
         repo / "plugins" / plugin / ".claude-plugin" / "plugin.json",
         '{"name": "%s", "description": "x"}' % plugin,
     )
-    (repo / "agents").mkdir(parents=True, exist_ok=True)
     (repo / "skills").mkdir(parents=True, exist_ok=True)
 
 
@@ -222,6 +247,208 @@ class TestSkillValidation(unittest.TestCase):
             self.assertNotEqual(result.returncode, 0, result.stdout + result.stderr)
             self.assertIn("gone-skill", result.stdout + result.stderr)
 
+    def test_codex_requires_explicit_name_with_description(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            repo = Path(tmp)
+            base_plugin(repo, plugin="go")
+            write(
+                repo / "plugins" / "go" / ".codex-plugin" / "plugin.json",
+                '{"name":"go","version":"1.0.0","description":"Go",'
+                '"skills":"./skills/"}',
+            )
+            write(
+                repo / "skills" / "go-secure" / "SKILL.md",
+                "---\nname: go-secure\ndescription: Secure Go\n---\n",
+            )
+            write(
+                repo / "plugins" / "go" / "skills" / "secure" / "SKILL.md",
+                "---\ndescription: Secure Go\n---\n",
+            )
+            write(
+                repo / "registry" / "bundles" / "go.yaml",
+                "id: go\nskills:\n  - {source: go-secure, leaf: secure}\n"
+                "targets:\n  claude:\n    enabled: true\n    pluginName: go\n"
+                "  codex:\n    enabled: true\n    pluginName: go\n",
+            )
+            result = run_validate(repo)
+            self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+
+    def test_codex_copy_requires_description(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            repo = Path(tmp)
+            base_plugin(repo, plugin="go")
+            write(
+                repo / "plugins" / "go" / ".codex-plugin" / "plugin.json",
+                '{"name":"go","version":"1.0.0","description":"Go",'
+                '"skills":"./skills/"}',
+            )
+            write(repo / "skills" / "go-secure" / "SKILL.md", "---\nname: go-secure\n---\n")
+            write(
+                repo / "plugins" / "go" / "skills" / "secure" / "SKILL.md",
+                "---\nlicense: MIT\n---\n",
+            )
+            write(
+                repo / "registry" / "bundles" / "go.yaml",
+                "id: go\nskills:\n  - {source: go-secure, leaf: secure}\n"
+                "targets:\n  claude:\n    enabled: true\n    pluginName: go\n"
+                "  codex:\n    enabled: true\n    pluginName: go\n",
+            )
+            result = run_validate(repo)
+            combined = result.stdout + result.stderr
+            self.assertNotEqual(result.returncode, 0, combined)
+            self.assertIn("missing required 'description'", combined)
+
+    def test_codex_copy_requires_string_description(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            repo = Path(tmp)
+            base_plugin(repo, plugin="go")
+            write(
+                repo / "plugins" / "go" / ".codex-plugin" / "plugin.json",
+                '{"name":"go","version":"1.0.0","description":"Go",'
+                '"skills":"./skills/"}',
+            )
+            write(
+                repo / "skills" / "go-secure" / "SKILL.md",
+                "---\nname: go-secure\ndescription: Secure Go\n---\n",
+            )
+            write(
+                repo / "plugins" / "go" / "skills" / "secure" / "SKILL.md",
+                "---\ndescription: 123\n---\n",
+            )
+            write(
+                repo / "registry" / "bundles" / "go.yaml",
+                "id: go\nskills:\n  - {source: go-secure, leaf: secure}\n"
+                "targets:\n  claude:\n    enabled: true\n    pluginName: go\n"
+                "  codex:\n    enabled: true\n    pluginName: go\n",
+            )
+            result = run_validate(repo)
+            combined = result.stdout + result.stderr
+            self.assertNotEqual(result.returncode, 0, combined)
+            self.assertIn("description must be a non-empty string", combined)
+
+    def test_codex_rejects_leaf_name_over_64_characters(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            repo = Path(tmp)
+            leaf = "s" * 65
+            base_plugin(repo, plugin="go")
+            write(
+                repo / "plugins" / "go" / ".codex-plugin" / "plugin.json",
+                '{"name":"go","version":"1.0.0","description":"Go",'
+                '"skills":"./skills/"}',
+            )
+            write(
+                repo / "skills" / leaf / "SKILL.md",
+                f"---\nname: {leaf}\ndescription: Test skill\n---\n",
+            )
+            write(
+                repo / "plugins" / "go" / "skills" / leaf / "SKILL.md",
+                "---\ndescription: Test skill\n---\n",
+            )
+            write(
+                repo / "registry" / "bundles" / "go.yaml",
+                f"id: go\nskills:\n  - {leaf}\n"
+                "targets:\n  claude:\n    enabled: true\n    pluginName: go\n"
+                "  codex:\n    enabled: true\n    pluginName: go\n",
+            )
+            result = run_validate(repo)
+            combined = result.stdout + result.stderr
+            self.assertNotEqual(result.returncode, 0, combined)
+            self.assertIn("base skill name", combined)
+
+    def test_codex_accepts_129_character_qualified_skill_name(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            repo = Path(tmp)
+            plugin = "p" * 64
+            leaf = "s" * 64
+            base_plugin(repo, plugin=plugin)
+            write(
+                repo / "plugins" / plugin / ".codex-plugin" / "plugin.json",
+                '{"name":"%s","version":"1.0.0","description":"Test",'
+                '"skills":"./skills/"}' % plugin,
+            )
+            write(
+                repo / "skills" / leaf / "SKILL.md",
+                f"---\nname: {leaf}\ndescription: Test skill\n---\n",
+            )
+            write(
+                repo / "plugins" / plugin / "skills" / leaf / "SKILL.md",
+                "---\ndescription: Test skill\n---\n",
+            )
+            write(
+                repo / "registry" / "bundles" / f"{plugin}.yaml",
+                f"id: {plugin}\nskills:\n  - {leaf}\n"
+                "targets:\n  claude:\n    enabled: true\n"
+                f"    pluginName: {plugin}\n"
+                "  codex:\n    enabled: true\n"
+                f"    pluginName: {plugin}\n",
+            )
+            result = run_validate(repo)
+            self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+
+    def test_codex_manifest_rejects_nonstandard_skills_path(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            repo = Path(tmp)
+            base_plugin(repo, plugin="go")
+            write(
+                repo / "plugins" / "go" / ".codex-plugin" / "plugin.json",
+                '{"name":"go","version":"1.0.0","description":"Go",'
+                '"skills":"./other-skills/"}',
+            )
+            result = run_validate(repo)
+            combined = result.stdout + result.stderr
+            self.assertNotEqual(result.returncode, 0, combined)
+            self.assertIn("must be declared as './skills/'", combined)
+
+    def test_codex_manifest_requires_string_metadata(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            repo = Path(tmp)
+            base_plugin(repo, plugin="go")
+            write(
+                repo / "plugins" / "go" / ".codex-plugin" / "plugin.json",
+                '{"name":"go","version":"1.0.0","description":123,'
+                '"keywords":["go"],"skills":"./skills/"}',
+            )
+            (repo / "plugins" / "go" / "skills").mkdir()
+            result = run_validate(repo)
+            combined = result.stdout + result.stderr
+            self.assertNotEqual(result.returncode, 0, combined)
+            self.assertIn("description must be a non-empty string", combined)
+
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class TestDelegationReferences(unittest.TestCase):
+    def test_outline_link_must_resolve_and_existing_outline_must_be_linked(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            repo = Path(tmp)
+            base_plugin(repo)
+            skill = repo / "skills/review/SKILL.md"
+            outline = repo / "skills/review/references/subagent.rst"
+            linked = "---\nname: review\n---\n[Worker](references/subagent.rst)\n"
+            write(skill, linked)
+            result = run_validate(repo)
+            self.assertNotEqual(result.returncode, 0)
+            self.assertIn("does not exist", result.stderr)
+            write(outline, "Worker\n======\n\nRead only; return evidence.\n")
+            self.assertEqual(run_validate(repo).returncode, 0)
+            skill.write_text("---\nname: review\n---\nReview directly.\n")
+            result = run_validate(repo)
+            self.assertNotEqual(result.returncode, 0)
+            self.assertIn("does not link", result.stderr)
+
+    def test_rejects_retired_agent_trees_and_registry_declarations(self):
+        for location in ("agents/old/agent.md", "plugins/test/agents/old.md"):
+            with self.subTest(location=location), tempfile.TemporaryDirectory() as tmp:
+                repo = Path(tmp)
+                base_plugin(repo)
+                write(repo / location, "old agent")
+                self.assertNotEqual(run_validate(repo).returncode, 0)
+        with tempfile.TemporaryDirectory() as tmp:
+            repo = Path(tmp)
+            base_plugin(repo)
+            write(repo / "registry/bundles/test.yaml", "id: test\nagents: [old]\n")
+            result = run_validate(repo)
+            self.assertNotEqual(result.returncode, 0)
+            self.assertIn("Standalone agents are retired", result.stderr)

@@ -344,7 +344,7 @@ R Markdown uses dots (``.``), Quarto uses dashes (``-``): ``fig.cap`` →
 ``fig-cap``, ``fig.width`` → ``fig-width``. Options move from chunk
 header to ``#|`` lines. ``results="asis"`` becomes ``output: asis``.
 Setup chunks with ``knitr::opts_chunk$set(...)`` become ``execute:`` in
-YAML. See `conversion-rmarkdown.md <conversion-rmarkdown.md>`__ for full
+YAML. See `conversion-rmarkdown.md <conversion-rmarkdown.rst>`__ for full
 details.
 
 Resources

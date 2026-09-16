@@ -1,0 +1,17 @@
+{
+  "description": "Auto-approve the ExitPlanMode permission prompt. PermissionRequest hooks answer the dialog via hookSpecificOutput.decision.behavior. Keep the matcher narrow — an empty matcher would auto-approve everything. Does not fire in non-interactive -p mode (use PreToolUse there).",
+  "hooks": {
+    "PermissionRequest": [
+      {
+        "matcher": "ExitPlanMode",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "echo '{\"hookSpecificOutput\": {\"hookEventName\": \"PermissionRequest\", \"decision\": {\"behavior\": \"allow\"}}}'",
+            "timeout": 5
+          }
+        ]
+      }
+    ]
+  }
+}

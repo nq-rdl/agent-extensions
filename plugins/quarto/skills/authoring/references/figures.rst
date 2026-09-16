@@ -176,7 +176,7 @@ Figure Layouts
 --------------
 
 For arranging multiple figures, use layout divs. See
-`layout.md <layout.md>`__ for full layout options.
+`layout.md <layout.rst>`__ for full layout options.
 
 Basic Layout
 ~~~~~~~~~~~~

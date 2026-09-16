@@ -22,7 +22,6 @@ skills:
   - {source: gpt-5-6-prompting, leaf: prompting}
   - {source: codex-model-guide, leaf: model-guide}
   - {source: codex-report-defect, leaf: report-defect}
-agents: [codex-rescue]
 hooks: [codex-session-lifecycle, codex-stop-review-gate, codex-defect-report]
 prompts: []
 mcp: []
@@ -31,3 +30,40 @@ targets:
     enabled: true
     pluginName: codex
     marketplaceName: rdl-agent-extensions
+
+  codex:
+    enabled: true
+    pluginName: codex
+    marketplaceName: rdl-agent-extensions
+    category: Developer Tools
+    components:
+      skills: true
+      mcp: false
+      hooks: true
+      apps: false
+    interface:
+      shortDescription: Codex CLI reviews, background tasks, session transfer and recovery
+      defaultPrompt:
+      - Use Codex to help with my task.
+    hookConfig: hooks/codex/codex/hooks.json
+    notes:
+      sharedHooks: []
+    resources:
+    - source: plugins/codex/scripts
+      destination: scripts
+    - source: plugins/codex/schemas
+      destination: schemas
+    - source: plugins/codex/prompts
+      destination: prompts
+    skillOverrides:
+      codex-setup: references/codex.rst
+      codex-review: references/codex.rst
+      codex-adversarial-review: references/codex.rst
+      codex-rescue: references/codex.rst
+      codex-result: references/codex.rst
+      codex-status: references/codex.rst
+      codex-transfer: references/codex.rst
+      codex-cancel: references/codex.rst
+      codex-report-defect: references/codex.rst
+    skillDescriptions:
+      codex-setup: Check installation and authentication readiness of the independent Codex CLI client

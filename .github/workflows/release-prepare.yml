@@ -123,12 +123,17 @@ jobs:
         with:
           version: v1.26.0
 
+      - name: Install locked Python toolchain
+        uses: prefix-dev/setup-pixi@a09b6247153796b190642a2b53fac4241043cf6f # v0.10.0
+        with:
+          pixi-version: v0.78.0
+          locked: true
+
       - name: Batch changelog, stamp version, regenerate manifests
         env:
           VERSION: ${{ inputs.version }}
         run: |
           set -euo pipefail
-          python3 -m pip install --user pyyaml
 
           # Batch the explicit version (same semantics as the old tag flow's
           # `changie batch "$version"`), then rebuild CHANGELOG.md from the
@@ -138,7 +143,10 @@ jobs:
 
           # VERSION is the single version source — write it before generating.
           echo "$VERSION" > VERSION
-          python3 scripts/generate_manifests.py .
+          pixi run --locked bash scripts/sync-plugins.sh
+          pixi run --locked python3 scripts/generate_manifests.py .
+          pixi run --locked python3 scripts/generate_bundles_doc.py .
+          pixi run --locked python3 scripts/codex_directory.py . --write-report
 
           if [ -f pyproject.toml ]; then
             sed -i "s/^version = \".*\"/version = \"${VERSION}\"/" pyproject.toml

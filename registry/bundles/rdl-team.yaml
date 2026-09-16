@@ -10,7 +10,7 @@ channels:
 skills:
   - {source: cc-setup, leaf: cc-setup}
   - new-service-request
-agents: [marketplace-scout]  # guest — home: claude-code
+  - {source: marketplace-scout, leaf: discover-plugins}  # guest — home: claude-code
 hooks: []
 prompts: []
 mcp: []
@@ -19,3 +19,18 @@ targets:
     enabled: true
     pluginName: rdl-team
     marketplaceName: rdl-agent-extensions
+
+  codex:
+    enabled: true
+    pluginName: rdl-team
+    marketplaceName: rdl-agent-extensions
+    category: Developer Tools
+    components:
+      skills: true
+      mcp: false
+      hooks: false
+      apps: false
+    interface:
+      shortDescription: RDL service requests and Claude Code onboarding
+      defaultPrompt:
+      - Use RDL Team to help with my task.

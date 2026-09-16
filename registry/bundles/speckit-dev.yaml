@@ -12,7 +12,6 @@ skills:
   - {source: speckit-validate, leaf: validate}
   - {source: speckit-manage,   leaf: manage}
   - {source: speckit-publish,  leaf: publish}
-agents: []
 hooks: [speckit-publish-target]
 prompts: []
 mcp: []
@@ -21,3 +20,22 @@ targets:
     enabled: true
     pluginName: speckit-dev
     marketplaceName: rdl-agent-extensions
+
+  codex:
+    enabled: true
+    pluginName: speckit-dev
+    marketplaceName: rdl-agent-extensions
+    category: Developer Tools
+    components:
+      skills: true
+      mcp: false
+      hooks: true
+      apps: false
+    interface:
+      shortDescription: SpecKit Dev tools and workflows
+      defaultPrompt:
+      - Use SpecKit Dev to help with my task.
+    hookConfig: hooks/codex/speckit-dev/hooks.json
+    notes:
+      sharedHooks:
+      - speckit-publish-target

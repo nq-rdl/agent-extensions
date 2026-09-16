@@ -1,0 +1,3 @@
+kind: Added
+body: Surface installed Data Request skills for ordinary data-request and cohort-SQL prompts through the team discovery hook, without requiring explicit skill invocation.
+time: 2026-09-15T05:04:03.795830621Z

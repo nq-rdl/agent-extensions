@@ -55,3 +55,9 @@ Output rules:
 - Present the final setup output to the user.
 - If installation was skipped, present the original setup output.
 - If Codex is installed but not authenticated, preserve the guidance to run `!codex login`.
+
+## Codex packaging
+
+For execution in a native Codex package, use the host-specific entrypoint in
+[references/codex.rst](references/codex.rst). The registry selects it during packaging;
+the Claude entrypoint above remains the Claude workflow.

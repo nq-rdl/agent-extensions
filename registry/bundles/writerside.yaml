@@ -9,7 +9,6 @@ channels:
   - stable
 skills:
   - {source: writerside, leaf: authoring}
-agents: []
 hooks: []
 prompts: []
 mcp: []
@@ -18,3 +17,18 @@ targets:
     enabled: true
     pluginName: writerside
     marketplaceName: rdl-agent-extensions
+
+  codex:
+    enabled: true
+    pluginName: writerside
+    marketplaceName: rdl-agent-extensions
+    category: Developer Tools
+    components:
+      skills: true
+      mcp: false
+      hooks: false
+      apps: false
+    interface:
+      shortDescription: Writerside — author and build JetBrains Writerside documentation
+      defaultPrompt:
+      - Use Writerside to help with my task.

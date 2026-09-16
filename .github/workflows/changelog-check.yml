@@ -19,8 +19,11 @@ jobs:
         with:
           fetch-depth: 0
 
-      - name: Install pyyaml (changie length linter)
-        run: python3 -m pip install --user pyyaml
+      - name: Install locked Python toolchain
+        uses: prefix-dev/setup-pixi@a09b6247153796b190642a2b53fac4241043cf6f # v0.10.0
+        with:
+          pixi-version: v0.78.0
+          locked: true
 
       - name: Check for unreleased changie fragment
         env:
@@ -44,4 +47,4 @@ jobs:
           # unreleased fragments are never retroactively flagged. Mirrors the
           # local pre-commit `changie-length` job (lefthook.yml). Override with
           # CHANGIE_MAX_BODY_LENGTH; keep it in sync with .changie.yaml body.maxLength.
-          echo "$FRAGMENTS" | xargs python3 scripts/check_changie_length.py
+          echo "$FRAGMENTS" | xargs pixi run --locked python3 scripts/check_changie_length.py

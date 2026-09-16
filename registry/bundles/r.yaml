@@ -16,7 +16,6 @@ skills:
   - {source: r-lib-mirai, leaf: lib-mirai}
   - {source: r-lib-package-dev, leaf: lib-package-dev}
   - {source: r-lib-testing, leaf: lib-testing}
-agents: []
 hooks: []
 prompts: []
 mcp: []
@@ -25,3 +24,18 @@ targets:
     enabled: true
     pluginName: r
     marketplaceName: rdl-agent-extensions
+
+  codex:
+    enabled: true
+    pluginName: r
+    marketplaceName: rdl-agent-extensions
+    category: Developer Tools
+    components:
+      skills: true
+      mcp: false
+      hooks: false
+      apps: false
+    interface:
+      shortDescription: R tools and workflows
+      defaultPrompt:
+      - Use R to help with my task.

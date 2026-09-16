@@ -1,0 +1,3 @@
+kind: Fixed
+body: '/redhat:setup: step 1 reports bw and pins jq >= 1.6 (--rawfile); rh-token.sh exit 3 now has a next step, and step 5 tells "not found" (store not visible) from "empty token".'
+time: 2026-08-31T10:26:27.000000+00:00

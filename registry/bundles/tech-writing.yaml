@@ -2,15 +2,15 @@ schemaVersion: v1
 id: tech-writing
 displayName: Technical Writing
 description: Technical writing — developer docs, tutorials, ADRs, and guides
-keywords: [docs, technical-writing]
+keywords: [docs, technical-writing, style-guide, copyedit]
 owners:
   - rdl
 channels:
   - stable
-skills: []
-agents:
-  - se-technical-writer
-hooks: []
+skills:
+  - {source: tech-writing-copyedit, leaf: copyedit}   # → /tech-writing:copyedit
+  - {source: se-technical-writer, leaf: author}
+hooks: [stylepedia-reminder]
 prompts: []
 mcp: []
 targets:
@@ -18,3 +18,22 @@ targets:
     enabled: true
     pluginName: tech-writing
     marketplaceName: rdl-agent-extensions
+
+  codex:
+    enabled: true
+    pluginName: tech-writing
+    marketplaceName: rdl-agent-extensions
+    category: Developer Tools
+    components:
+      skills: true
+      mcp: false
+      hooks: true
+      apps: false
+    interface:
+      shortDescription: Technical writing — developer docs, tutorials, ADRs, and guides
+      defaultPrompt:
+      - Use Technical Writing to help with my task.
+    hookConfig: hooks/codex/tech-writing/hooks.json
+    notes:
+      sharedHooks:
+      - stylepedia-reminder

@@ -1,0 +1,3 @@
+kind: Security
+body: 'rh-lib.sh disables xtrace on load, so bash -x on a redhat script or an exported SHELLOPTS=xtrace can no longer trace the offline or access token into the transcript.'
+time: 2026-08-31T10:26:27.000000+00:00

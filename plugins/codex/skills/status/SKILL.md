@@ -38,3 +38,9 @@ If the user did not pass a job ID:
 If the user did pass a job ID:
 - Present the full command output to the user.
 - Do not summarize or condense it.
+
+## Codex packaging
+
+For execution in a native Codex package, use the host-specific entrypoint in
+[references/codex.rst](references/codex.rst). The registry selects it during packaging;
+the Claude entrypoint above remains the Claude workflow.

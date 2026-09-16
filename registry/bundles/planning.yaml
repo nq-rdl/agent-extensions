@@ -7,13 +7,12 @@ owners:
   - rdl
 channels:
   - stable
-skills: []
-agents:
-  - plan
-  - context-architect
-  - hlbpa
-  - adr-generator
-  - research-technical-spike
+skills:
+  - {source: plan, leaf: strategy}
+  - {source: context-architect, leaf: sequence}
+  - {source: hlbpa, leaf: architecture}
+  - {source: adr-generator, leaf: record-decision}
+  - {source: research-technical-spike, leaf: research}
 hooks: []
 prompts: []
 mcp: []
@@ -22,3 +21,18 @@ targets:
     enabled: true
     pluginName: planning
     marketplaceName: rdl-agent-extensions
+
+  codex:
+    enabled: true
+    pluginName: planning
+    marketplaceName: rdl-agent-extensions
+    category: Developer Tools
+    components:
+      skills: true
+      mcp: false
+      hooks: false
+      apps: false
+    interface:
+      shortDescription: Planning tools and workflows
+      defaultPrompt:
+      - Use Planning to help with my task.
