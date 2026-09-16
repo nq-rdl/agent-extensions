@@ -15,6 +15,13 @@ import (
 // horizontal rules or YAML block scalars containing "---" inside the body do
 // not prematurely terminate the frontmatter.
 func Parse(content string) (map[string]any, string, error) {
+	metadata, body, err := ParseRaw(content)
+	return metadata, strings.TrimSpace(body), err
+}
+
+// ParseRaw is Parse without trimming body whitespace. The body starts after the
+// closing delimiter's newline; its original bytes and line endings are retained.
+func ParseRaw(content string) (map[string]any, string, error) {
 	lines := strings.Split(content, "\n")
 	if len(lines) == 0 || strings.TrimRight(lines[0], "\r") != "---" {
 		return nil, "", fmt.Errorf("SKILL.md must start with YAML frontmatter (---)")
@@ -32,7 +39,7 @@ func Parse(content string) (map[string]any, string, error) {
 	}
 
 	yamlPart := strings.Join(lines[1:closeIdx], "\n")
-	body := strings.TrimSpace(strings.Join(lines[closeIdx+1:], "\n"))
+	body := strings.Join(lines[closeIdx+1:], "\n")
 
 	var metadata map[string]any
 	if err := yaml.Unmarshal([]byte(yamlPart), &metadata); err != nil {

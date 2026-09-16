@@ -100,3 +100,38 @@ func TestParse_metadataSubmap(t *testing.T) {
 		t.Errorf("repo = %q, want %q", m["repo"], "https://example.com")
 	}
 }
+
+func TestParseRawPreservesBody(t *testing.T) {
+	for _, body := range []string{"", "\n", "\n# Body\n\n", "\r\n# Body\r\n\r\n", "é界😀", " \t"} {
+		t.Run(body, func(t *testing.T) {
+			for _, newline := range []string{"\n", "\r\n"} {
+				content := strings.Join([]string{"---", "name: sample", "description: Test", "---", ""}, newline) + body
+				_, got, err := frontmatter.ParseRaw(content)
+				if err != nil || got != body {
+					t.Fatalf("raw body = %q, err = %v; want %q", got, err, body)
+				}
+				_, trimmed, err := frontmatter.Parse(content)
+				if err != nil || trimmed != strings.TrimSpace(body) {
+					t.Fatalf("trimmed Parse contract changed: %q, %v", trimmed, err)
+				}
+			}
+		})
+	}
+	_, body, err := frontmatter.ParseRaw("---\nname: sample\n---")
+	if err != nil || body != "" {
+		t.Fatalf("closing fence at EOF: body = %q, err = %v", body, err)
+	}
+}
+
+func TestParseRawPreservesParseFailures(t *testing.T) {
+	for _, content := range []string{
+		"no frontmatter\n", "---\nname: sample\n", "---\n: invalid: yaml:\n---\n",
+		"---\n---\n", "---\n- sequence\n---\n",
+	} {
+		_, _, original := frontmatter.Parse(content)
+		_, _, raw := frontmatter.ParseRaw(content)
+		if original == nil || raw == nil || original.Error() != raw.Error() {
+			t.Fatalf("parse errors for %q: Parse=%v, ParseRaw=%v", content, original, raw)
+		}
+	}
+}

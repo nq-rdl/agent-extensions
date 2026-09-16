@@ -39,6 +39,10 @@ for desktop menu behaviour and differences from Claude Code slash commands.
 
 See [Delegation](docs/delegation.md) for optional subagent execution and migrated agent names.
 
+Contributor validation and the skill-size report are documented in
+[asctl](tools/asctl/README.md); authoring policy is in
+[CONTRIBUTING.md](CONTRIBUTING.md#skill-content-conventions).
+
 ## Agent File Management
 
 This repo keeps a single source of truth for top-level agent context files:

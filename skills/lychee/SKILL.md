@@ -10,7 +10,7 @@ description: >-
   Use this skill even if the user just says "are there any broken links?" or
   "check the docs" in the context of link health.
 compatibility: >-
-  Requires lychee binary on PATH (Rust-based link checker)
+  Requires lychee >=0.24.0 on PATH (string fragment modes and --cache=false)
 metadata:
   repo: https://github.com/nq-rdl/agent-extensions
 ---
@@ -43,11 +43,18 @@ conda install -c conda-forge lychee
 
 The wrapper script checks for `lychee` on PATH and exits with install instructions if missing.
 
+Tested with **lychee 0.24.2 on 2026-09-16**; this is separate from the minimum
+version above. Verify changed options against `lychee --help` and the
+[canonical configuration](https://lychee.cli.rs/guides/config/); if the installed
+version rejects an option, report the mismatch before claiming a completed scan.
+When offline, use local help and report external links as unverified.
+
 ## Commands
 
 ### Check links in specific files or directories
 
 ```bash
+# Resolve scripts/ relative to this installed skill directory, not the project cwd.
 bash scripts/check-links.sh /path/to/README.md
 bash scripts/check-links.sh '/path/to/docs/**/*.md'
 bash scripts/check-links.sh /path/to/project/
@@ -67,8 +74,8 @@ The wrapper forwards all arguments to lychee, so any lychee flag works:
 # Offline mode — only check local file references, no network requests
 bash scripts/check-links.sh --offline /path/to/docs/
 
-# Check a single URL
-bash scripts/check-links.sh 'https://example.com'
+# Check a remote page (reserved example.com URLs are excluded by default)
+bash scripts/check-links.sh 'https://lychee.cli.rs/'
 
 # Exclude a pattern
 bash scripts/check-links.sh --exclude 'github\.com/.*?/issues' /path/to/docs/
@@ -90,24 +97,36 @@ bash scripts/check-links.sh --format markdown -o report.md /path/to/docs/
 
 The skill ships a `lychee.toml` with opinionated defaults for documentation repos:
 
-- **Caching** enabled (`.lycheecache`) — repeated runs skip already-checked URLs
+- **Caching** enabled (`.lycheecache` in the working directory), bounded to one hour
 - **Fragment checking** on — verifies `#section-name` anchors resolve
 - **Concurrency** capped at 32 — avoids triggering rate limits
-- **Common exclusions** — localhost, example.com, placeholder URLs, mailto links
+- **Common exclusions** — RFC 2606 reserved names and subdomains, localhost, mailto
 - **Private IPs excluded** — skips 10.x, 192.168.x, link-local ranges
 
-To override, either pass `--config /path/to/your/lychee.toml` or place a
-`lychee.toml` in the project root and point to it.
+Pass `--config "/path with spaces/lychee.toml"` to replace the bundled defaults.
+The wrapper also recognizes `--config=path`, `-c path`, and `-cpath`; it forwards
+arguments unchanged and adds `--no-progress`. A project-root config is selected
+only when explicitly passed. Repository-specific exceptions and per-host headers
+belong in that config, not the shipped defaults.
+
+Use `--cache=false` for audits and verification, even if a cache already exists.
+A cached success does not establish current health. This catalog's CI and local
+hooks explicitly select root `lychee.toml` and disable caching; consumers need
+neither that file nor its exclusions.
 
 ## Typical Agent Workflows
 
 ### Pre-release doc audit
 
 ```bash
-bash scripts/check-links.sh --format json '/path/to/project/**/*.md' > /tmp/link-report.json
+bash scripts/check-links.sh --cache=false --format json '/path/to/project/**/*.md' > /tmp/link-report.json
 ```
 
-Read the JSON output to summarize broken links, then fix or flag them.
+Read the JSON output and exit status to summarize failed URLs and their source
+files. Keep authentication/rate-limit/timeout failures distinct from confirmed
+missing pages; report incomplete scans honestly. Use `--format markdown -o
+report.md` for a shareable report. Lychee's plain-text RST extraction does not
+validate every relative RST reference; an offline pass is not proof they resolve.
 
 ### Skill quality check
 
@@ -146,5 +165,7 @@ or add the affected domain to the exclude list.
 
 **False positives behind auth:** Exclude the domain pattern with `--exclude 'private\.example\.com'`.
 
-**GitHub API rate limits:** Set `GITHUB_TOKEN` in the environment — lychee
-uses it automatically for authenticated GitHub API requests.
+**GitHub API rate limits:** Lychee reads an available `GITHUB_TOKEN` from the
+environment for GitHub API requests. Use only a token authorized for the task;
+do not print it or write it into config/reports. Without one, report rate-limit or
+access failures rather than assuming a private URL is broken.

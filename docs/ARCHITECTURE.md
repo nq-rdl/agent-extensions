@@ -78,11 +78,17 @@ and checks both content and executable modes for drift. No agents tree is restor
 
 ### `asctl` — the skills spec validator
 
-`tools/asctl/` is a Go CLI imported from the former agent-skills repo. `asctl repo-check` validates every skill directory under `skills/` (frontmatter, structure, and prompt generation) against the [agentskills.io](https://agentskills.io) spec. It runs in CI as the `validate-skills` job, and locally:
+`tools/asctl/` is a Go CLI imported from the former agent-skills repo. `asctl repo-check` checks every canonical skill's frontmatter against the [agentskills.io](https://agentskills.io) spec, plus repository structure rules, the 500-body-line house limit, and prompt generation. It runs in CI as the `validate-skills` job, and locally:
 
 ```bash
 go -C tools/asctl build -o /tmp/asctl ./cmd/asctl/ && /tmp/asctl repo-check
+/tmp/asctl repo-check --size-report
 ```
+
+The size report lists body lines, estimated tokens (raw UTF-8 body bytes / 4),
+and reference file counts. It leaves validation results unchanged and does not
+measure task quality or actual model usage. CONTRIBUTING.md defines the house
+limit and the separate 300-line editorial target.
 
 **Registry resilience:** the registry names skills by directory name, so a rename or removal can leave a stale reference. `scripts/sync-plugins.sh` reports it as a `::warning::` and skips it (it never aborts); the authoritative gate is `validate.yml`'s `validate-bundles` job, which fails the PR until a human reconciles the registry in the same change.
 
@@ -92,7 +98,7 @@ go -C tools/asctl build -o /tmp/asctl ./cmd/asctl/ && /tmp/asctl repo-check
 - `validate-symlinks`: any symlink under `plugins/` resolves (plugin trees are real-file copies, so this is a guardrail against accidental links).
 - `validate-plugins`: plugin manifests (`plugin.json`), hooks, and `.mcp.json` wiring are well-formed (`scripts/validate-plugins.sh`); a pinned Codex CLI then installs every native marketplace entry and verifies installed skill discovery (`scripts/smoke-codex-marketplace.sh`).
 - `unit-tests`: the pipeline scripts' unit tests pass (`python3 -m unittest discover -s tests`).
-- `validate-skills`: every skill under `skills/` passes `asctl repo-check` (agentskills.io spec + prompt generation), built from `tools/asctl/`.
+- `validate-skills`: every skill under `skills/` passes `asctl repo-check` (frontmatter spec, repository structure/body-size rules, and prompt generation), built from `tools/asctl/`.
 
 ## Registry schema
 
@@ -261,6 +267,23 @@ tractable.
 
 `validate.yml` validates the bundle registry, resolves skill references, and checks plugin manifests/hooks/`.mcp.json`. `docs.yml` builds the docs site.
 
+Workflow results and enforced merge requirements are separate. On **2026-09-16**,
+the `main` protection API omitted `required_status_checks`, and the branch rules
+API returned `[]`: no required status checks were configured. Protection required
+one PR approval and resolved conversations, with administrator enforcement
+disabled. This is a dated observation, not a claim about earlier settings.
+[AGENTS.md](https://github.com/nq-rdl/agent-extensions/blob/main/AGENTS.md#build-test-lint) records the API endpoints, intended
+always-run check inventory, and responsibility for keeping check names aligned
+if maintainers enable enforcement. See [GitHub's protected-branch documentation](https://docs.github.com/en/repositories/configuring-branches-and-merges-in-your-repository/managing-protected-branches/about-protected-branches).
+
+External `check-links` remains advisory for merging and uses root `lychee.toml`
+without caching. Its current scan covers skill Markdown and Spec Kit RST when
+those paths change. The deterministic local Markdown/RST reference check and
+broader external coverage in [#300](https://github.com/nq-rdl/agent-extensions/issues/300)
+and advisory weekly monitoring in [#301](https://github.com/nq-rdl/agent-extensions/issues/301)
+are planned, not implemented. Local lefthook checks can still reject a commit;
+that behavior does not establish GitHub merge enforcement.
+
 ### Release
 
 Releases are cut through a reviewable PR, not a local tag push, so that **merge authorization
@@ -324,7 +347,7 @@ macOS and Linux only — the build and sync scripts require POSIX shell tooling 
 
 - One canonical source per skill; generated plugin trees over hand-maintained copies.
 - Self-contained installs (real-file copies, not cross-subtree symlinks).
-- Registry resilience: plugin generation continues even when a registry reference is momentarily stale (warn-and-skip); correctness is enforced as a PR gate.
+- Registry resilience: plugin generation continues even when a registry reference is momentarily stale (warn-and-skip); PR validation reports unresolved references. Merge enforcement depends on configured protection settings.
 - Install documentation is part of the product.
 
 ## Non-goals

@@ -1,0 +1,74 @@
+# Catalog CI/local-hook policy, selected explicitly with --config lychee.toml.
+# Exclusions moved unchanged from skills/lychee/lychee.toml for #299.
+# Historical broad patterns remain here pending evidence-based review in #300;
+# they are not consumer defaults or evidence of current URL health.
+
+# Verification must make fresh requests, even if .lycheecache already exists.
+cache = false
+
+# Check intra-document anchor fragments (#section-name); v0.24 needs a string mode, not a boolean
+include_fragments = "anchor-only"
+
+# Max concurrent requests — throttle to avoid rate limiting
+max_concurrency = 32
+
+# Timeout per request (seconds)
+timeout = 30
+
+# Max retries for transient failures
+max_retries = 3
+
+# Exclude common false-positive patterns
+exclude = [
+  # Quarto documentation: historical CI failures; preserve scope pending #300.
+  "^https?://quarto\\.org/docs/",
+  "^https?://quarto\\.org/docs/faq/rmarkdown\\.html#quarto-vs.-r-markdown",
+
+  # Localhost/example URLs
+  "^https?://localhost",
+  "^https?://127\\.0\\.0\\.",
+  "^https?://0\\.0\\.0\\.0",
+  "^https?://example\\.com",
+  "^https?://example\\.org",
+  # Legacy catalog placeholders; retain their existing breadth until #300.
+  "^https?://your-",
+  "^https?://\\$",
+  "^https?://\\{\\{",
+  # Email addresses (often not real in docs)
+  "^mailto:",
+  # Private GitHub repositories
+  # "^https://github\\.com/your-org/"  # add org-specific exclusions here
+  # Team spec-kit catalog (may be private) — referenced by speckit-dev skills/hook
+  "^https://github\\.com/nq-rdl/spec-kit-extensions",
+  "^https://raw\\.githubusercontent\\.com/nq-rdl/spec-kit-extensions",
+  # RDL Service Desk (access-controlled) — referenced by the new-service-request skill
+  "^https://github\\.com/rdl-service-desk/service-desk",
+  # Red Hat: docs.redhat.com bot-blocks non-browser clients (Akamai 403 — see redhat plugin,
+  # nq-rdl/agent-extensions#261) and the API-token page is login-gated — referenced by the redhat skills
+  "^https?://docs\\.redhat\\.com/",
+  "^https://access\\.redhat\\.com/management/api",
+  # Exclude conventional commits due to rate limiting / connection reset in CI
+  "^https://www\\.conventionalcommits\\.org/",
+  # Australian Government Style Manual — referenced by tech-writing-copyedit. lychee on the
+  # GitHub runner fails with "HTTP/2 protocol error" against this host (curl/browsers are fine).
+  "^https?://www\\.stylemanual\\.gov\\.au/",
+  # Bootstrap icons: historical CI failure exclusion; cause needs review in #300.
+  "^https?://icons\\.getbootstrap\\.com",
+  # Quarto documentation root: preserve both historical root spellings.
+  "^https?://quarto\\.org/docs$",
+  "^https?://quarto\\.org/docs/$",
+]
+
+# Exclude private/loopback IPs
+exclude_all_private = true
+
+# Accept common redirect status codes
+accept = ["100..=103", "200..=299"]
+
+# File extensions to check
+extensions = ["md", "mdx", "txt", "rst", "html", "yaml", "yml", "toml", "json"]
+
+# Stylepedia returns 403 to requests without these content-negotiation headers.
+# Keep HTTP status and fragment checking enabled; do not exclude the guide.
+[hosts."stylepedia.net"]
+headers = { "Accept" = "text/html", "Accept-Language" = "en-US,en;q=0.9" }

@@ -81,7 +81,8 @@ jobs:
           exit $exit_code
 
   validate-plugins:
-    # Keep this legacy job name: main branch protection requires this exact status.
+    # Keep this legacy name stable for the intended required-check inventory.
+    # Current enforcement and settings responsibilities are documented in AGENTS.md.
     name: Validate Claude plugin structure, hooks, and agents
     runs-on: ubuntu-latest
     steps:
@@ -117,7 +118,7 @@ jobs:
         run: pixi run --locked python3 scripts/check_codex_runtime.py .
 
       # Same image and command as .devcontainer/codex; no API key or model call.
-      # Keep this in the existing required job so container failures block merges.
+      # Keep container failures in the existing plugin-validation check result.
       - name: Build Codex smoke devcontainer
         timeout-minutes: 10
         run: >-
@@ -167,6 +168,12 @@ jobs:
           go-version-file: tools/asctl/go.mod
           cache: true
           cache-dependency-path: tools/asctl/go.sum
+
+      - name: Test and lint asctl
+        run: |
+          test -z "$(gofmt -l tools/asctl)"
+          go -C tools/asctl vet ./...
+          go -C tools/asctl test ./...
 
       - name: Build asctl
         run: CGO_ENABLED=0 go -C tools/asctl build -o "$RUNNER_TEMP/asctl" ./cmd/asctl/
