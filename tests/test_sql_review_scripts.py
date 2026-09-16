@@ -1,7 +1,7 @@
-"""Behavioural tests for the sql-code plugin's shared helper, sqlreview.sh.
+"""Behavioural tests for the data-request plugin's shared helper, sqlreview.sh.
 
-The helper lives at skills/sql-code-setup/scripts/sqlreview.sh (shared by all four
-/sql-code:* skills via ${CLAUDE_PLUGIN_ROOT}/skills/setup/scripts/). Every test runs it
+The helper lives at skills/data-request-setup/scripts/sqlreview.sh (shared by all four
+/data-request:* skills via ${CLAUDE_PLUGIN_ROOT}/skills/setup/scripts/). Every test runs it
 against a throwaway project directory; git is used only where the subcommand's contract
 mentions it. Exit codes are part of the contract (docs/specs/2026-09-15-sql-review-plugin-design.md §4).
 """
@@ -15,8 +15,8 @@ import unittest
 from pathlib import Path
 
 REPO = Path(__file__).resolve().parent.parent
-SCRIPT = REPO / "skills" / "sql-code-setup" / "scripts" / "sqlreview.sh"
-ASSETS = REPO / "skills" / "sql-code-setup" / "assets" / "sqlreview"
+SCRIPT = REPO / "skills" / "data-request-setup" / "scripts" / "sqlreview.sh"
+ASSETS = REPO / "skills" / "data-request-setup" / "assets" / "sqlreview"
 
 
 def run(args, cwd, env=None, stdin=None):
@@ -177,7 +177,7 @@ class Status(unittest.TestCase):
         with tempfile.TemporaryDirectory() as tmp:
             r = run(["status"], Project(tmp, init=False).root)
             self.assertEqual(r.returncode, 3)
-            self.assertIn("/sql-code:setup", r.stderr)
+            self.assertIn("/data-request:setup", r.stderr)
 
     def test_states(self):
         with tempfile.TemporaryDirectory() as tmp:

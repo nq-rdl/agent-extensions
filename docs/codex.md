@@ -95,7 +95,7 @@ payloads where needed. Users must enable hooks and review/trust them in Codex's
 |---|---|---|
 | `claude-code` | Skill-audit reminder after `apply_patch` | Reads changed-file headers; advisory |
 | `redhat` | Session preflight and shell credential/fetch guard | Native shell payloads; legacy `ask` becomes a supported denial with a recovery path |
-| `sql-code` | Session status and protection of authoritative review/config patch paths | Draft patches pass; authoritative documents require whole-document checking and sanctioned rendering |
+| `data-request` | Session status and protection of authoritative review/config patch paths | Draft patches pass; authoritative documents require whole-document checking and sanctioned rendering |
 | `opencode-dev` | Documentation-verification context on matching prompts | Advisory |
 | `speckit-dev` | Publishing-target context on matching prompts | Advisory |
 | `tech-writing` | House-style/Stylepedia reminder for explicit writing skills | Advisory; Claude agent-based Stop/SubagentStop review is not executable in Codex |

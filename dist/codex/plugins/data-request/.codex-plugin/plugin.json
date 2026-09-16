@@ -1,0 +1,39 @@
+{
+  "name": "data-request",
+  "version": "0.29.0",
+  "description": "Data Request — scope, map, draft, validate and fix request SQL and Python with shared RDL guardrails and human-confirmed review handoffs",
+  "author": {
+    "name": "nq-rdl"
+  },
+  "repository": "https://github.com/nq-rdl/agent-extensions",
+  "license": "MIT",
+  "keywords": [
+    "data-request",
+    "sql",
+    "python",
+    "cohort",
+    "guardrails",
+    "mapping",
+    "drafting",
+    "validation",
+    "fixes",
+    "review",
+    "handoff"
+  ],
+  "skills": "./skills/",
+  "interface": {
+    "displayName": "Data Request",
+    "shortDescription": "Develop and review SQL; fix request SQL and Python",
+    "longDescription": "Data Request — scope, map, draft, validate and fix request SQL and Python with shared RDL guardrails and human-confirmed review handoffs",
+    "developerName": "nq-rdl",
+    "category": "Developer Tools",
+    "capabilities": [
+      "Skills",
+      "Hooks"
+    ],
+    "defaultPrompt": [
+      "Use Data Request to help with my task."
+    ],
+    "websiteURL": "https://github.com/nq-rdl/agent-extensions"
+  }
+}

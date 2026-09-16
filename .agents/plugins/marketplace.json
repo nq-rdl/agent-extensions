@@ -425,10 +425,10 @@
       "category": "Developer Tools"
     },
     {
-      "name": "sql-code",
+      "name": "data-request",
       "source": {
         "source": "local",
-        "path": "./dist/codex/plugins/sql-code"
+        "path": "./dist/codex/plugins/data-request"
       },
       "policy": {
         "installation": "AVAILABLE",

@@ -21,7 +21,7 @@ class Publish(unittest.TestCase):
         self.workspace.mkdir()
         self.project = Project(self.workspace)
         self.cache = root / "plugin cache"
-        shutil.copytree(REPO / "dist/codex/plugins/sql-code", self.cache)
+        shutil.copytree(REPO / "dist/codex/plugins/data-request", self.cache)
         self.script = self.cache / "skills/setup/scripts/sqlreview.sh"
         self.draft = root / "confirmed draft.json"
         self.final = self.workspace / ".sqlreview/reviews/q"

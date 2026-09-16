@@ -545,12 +545,14 @@ class NativeHookBehavior(unittest.TestCase):
             (".sqlreview/reviews/a/review.json", True),
             (".sqlreview/reviews/a/../a/scope.md", True),
             (".sqlreview/reviews/a/review.draft.json", False),
+            ("requests/cohort.sql", False),
+            ("requests/export.py", False),
             ("src/main.go", False),
         ]:
             with self.subTest(path=path):
                 result = self.run_hook(
-                    "sql-code",
-                    "sql-code-guard",
+                    "data-request",
+                    "data-request-guard",
                     {
                         "hook_event_name": "PreToolUse",
                         "tool_name": "apply_patch",
@@ -564,6 +566,10 @@ class NativeHookBehavior(unittest.TestCase):
                     == "deny",
                     blocked,
                 )
+                if blocked:
+                    reason = result["hookSpecificOutput"]["permissionDecisionReason"]
+                    self.assertIn("$data-request:setup", reason)
+                    self.assertNotIn("sql-code:", reason)
 
     def test_skill_nudge_reads_native_patch_headers(self):
         result = self.run_hook(

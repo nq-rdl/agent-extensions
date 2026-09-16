@@ -7,7 +7,7 @@ root="${PLUGIN_ROOT:-$(cd "$(dirname "$0")/.." && pwd -P)}"
 export CLAUDE_PLUGIN_ROOT="$root"
 if ! command -v jq >/dev/null 2>&1; then
   case "$mode" in
-    redhat-docs-guard|sql-code-guard)
+    redhat-docs-guard|data-request-guard)
       printf '%s\n' '{"hookSpecificOutput":{"hookEventName":"PreToolUse","permissionDecision":"deny","permissionDecisionReason":"This guard requires jq >=1.6. Install jq before retrying."}}' ;;
   esac
   exit 0
@@ -45,7 +45,7 @@ case "$mode" in
       fi
       exit 0
     fi ;;
-  sql-code-guard)
+  data-request-guard)
     if [ "$tool" = apply_patch ]; then
       patch="$(jq -r '.tool_input.command // .tool_input.patch // ""' <<<"$input")"
       # Only paths in patch headers count: prose/content mentioning .sqlreview is inert.
@@ -55,7 +55,7 @@ case "$mode" in
         path="$(printf '%s\n' "$path" | awk -F/ '{n=0; for(i=1;i<=NF;i++){if($i==""||$i==".")continue;if($i==".."){if(n>0)n--;continue}p[++n]=$i}for(i=1;i<=n;i++)printf "%s%s",(i>1?"/":""),p[i];print ""}')"
         case "/$path" in
           */.sqlreview/config.json|*/.sqlreview/reviews/*/review.json|*/.sqlreview/reviews/*/scope.json|*/.sqlreview/reviews/*/review.md|*/.sqlreview/reviews/*/scope.md)
-            deny 'Authoritative SQL review files require whole-document validation. Write a confirmed draft, then run bash "${PLUGIN_ROOT}/skills/setup/scripts/sqlreview.sh" publish <slug> <scope|review> <draft-path>; this validates a staged copy before atomic replacement. Run the same helper with render <slug> <scope|review> for Markdown. Config changes use $sql-code:setup. This patch guard does not intercept shell writes.'
+            deny 'Authoritative SQL review files require whole-document validation. Write a confirmed draft, then run bash "${PLUGIN_ROOT}/skills/setup/scripts/sqlreview.sh" publish <slug> <scope|review> <draft-path>; this validates a staged copy before atomic replacement. Run the same helper with render <slug> <scope|review> for Markdown. Config changes use $data-request:setup. This patch guard does not intercept shell writes.'
             exit 0 ;;
         esac
       done <<<"$paths"
@@ -63,7 +63,7 @@ case "$mode" in
     fi ;;
 esac
 case "$mode" in
-  redhat-docs-preflight|redhat-docs-guard|sql-code-preflight|sql-code-guard|skill-audit-nudge|opencode-doc-review|speckit-publish-target) ;;
+  redhat-docs-preflight|redhat-docs-guard|data-request-preflight|data-request-guard|skill-audit-nudge|opencode-doc-review|speckit-publish-target) ;;
   *) printf 'Unknown Codex hook mode: %s\n' "$mode" >&2; exit 1 ;;
 esac
 output="$(printf '%s' "$input" | bash "$root/hooks/$mode.sh")"
@@ -74,7 +74,7 @@ if printf '%s' "$output" | jq -e 'type=="object"' >/dev/null 2>&1; then
   printf '%s' "$output" | jq '
     if .hookSpecificOutput.permissionDecision == "ask" then .hookSpecificOutput.permissionDecision="deny" else . end
     | walk(if type=="string" then
-        gsub("/(?<plugin>redhat|sql-code|claude-code|opencode-dev|speckit-dev):"; "$" + .plugin + ":")
+        gsub("/(?<plugin>redhat|data-request|claude-code|opencode-dev|speckit-dev):"; "$" + .plugin + ":")
         | gsub("AskUserQuestion"; "the host user-question tool")
       else . end)' 
 else

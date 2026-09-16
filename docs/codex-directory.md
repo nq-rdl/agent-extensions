@@ -14,6 +14,7 @@ This report records missing evidence; it does not attest to publisher identity, 
 | charm-tui | 1 | skills-only | No |
 | claude-code | 10 | skills+hooks | No |
 | codex | 13 | skills+hooks | No |
+| data-request | 9 | skills+hooks | No |
 | debug | 2 | skills-only | No |
 | defuddle | 1 | skills-only | No |
 | gh | 12 | skills-only | No |
@@ -38,7 +39,6 @@ This report records missing evidence; it does not attest to publisher identity, 
 | shiny | 2 | skills-only | No |
 | sops | 1 | skills-only | No |
 | speckit-dev | 4 | skills+hooks | No |
-| sql-code | 8 | skills+hooks | No |
 | starrocks | 1 | skills-only | No |
 | tech-writing | 2 | skills+hooks | No |
 | terraform | 3 | skills-only | No |
@@ -105,6 +105,15 @@ This report records missing evidence; it does not attest to publisher identity, 
 - Publisher must supply termsOfServiceURL
 - Publisher identity and organization submission access are not recorded as verified
 - Explicit-only invocation policy needs a directory-compatible decision; preserved for: adversarial-review, cancel, report-defect, result, review, status, transfer
+- Record authenticated execution evidence for five positive and three negative task cases
+- Publisher must select supported availability regions
+
+## data-request
+
+- Publisher must supply logo
+- Publisher must supply privacyPolicyURL
+- Publisher must supply termsOfServiceURL
+- Publisher identity and organization submission access are not recorded as verified
 - Record authenticated execution evidence for five positive and three negative task cases
 - Publisher must select supported availability regions
 
@@ -320,15 +329,6 @@ This report records missing evidence; it does not attest to publisher identity, 
 - Publisher must select supported availability regions
 
 ## speckit-dev
-
-- Publisher must supply logo
-- Publisher must supply privacyPolicyURL
-- Publisher must supply termsOfServiceURL
-- Publisher identity and organization submission access are not recorded as verified
-- Record authenticated execution evidence for five positive and three negative task cases
-- Publisher must select supported availability regions
-
-## sql-code
 
 - Publisher must supply logo
 - Publisher must supply privacyPolicyURL

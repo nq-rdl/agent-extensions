@@ -22,7 +22,7 @@ class CompletePublication(unittest.TestCase):
         self.workspace.mkdir()
         project = Project(self.workspace)
         self.scripts = root / "installed cache" / "skills" / "setup" / "scripts"
-        shutil.copytree(REPO / "skills/sql-code-setup", self.scripts.parent)
+        shutil.copytree(REPO / "skills/data-request-setup", self.scripts.parent)
         self.env = {k: v for k, v in os.environ.items() if not k.startswith("SQLREVIEW_")}
         self.env.update(S=str(self.scripts), SLUG="q")
         project.sql("q.sql", "select 1;\n")
@@ -34,7 +34,7 @@ class CompletePublication(unittest.TestCase):
         self.assertEqual(self.helper("publish", "q", "review", str(self.draft)).returncode, 0)
         self.assertEqual(self.helper("snapshot", "q", "q.sql").returncode, 0)
         self.final_bytes = (self.directory / "review.json").read_bytes()
-        skill = (REPO / "skills/sql-code-analyse/SKILL.md").read_text()
+        skill = (REPO / "skills/data-request-analyse/SKILL.md").read_text()
         section = skill.split("### Unchanged SQL: complete publication before stopping", 1)[1]
         self.recovery = re.search(r"```bash\n(.*?)\n```", section, re.S).group(1)
 
