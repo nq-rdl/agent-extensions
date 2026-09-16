@@ -1,6 +1,6 @@
 {
   "name": "quarto",
-  "version": "0.30.0",
+  "version": "0.30.1",
   "description": "Quarto — document authoring and accessible figure alt text",
   "author": {
     "name": "nq-rdl"
