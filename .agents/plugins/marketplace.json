@@ -8,7 +8,7 @@
       "name": "go",
       "source": {
         "source": "local",
-        "path": "./plugins/go"
+        "path": "./dist/codex/plugins/go"
       },
       "policy": {
         "installation": "AVAILABLE",
@@ -20,7 +20,19 @@
       "name": "rust",
       "source": {
         "source": "local",
-        "path": "./plugins/rust"
+        "path": "./dist/codex/plugins/rust"
+      },
+      "policy": {
+        "installation": "AVAILABLE",
+        "authentication": "ON_INSTALL"
+      },
+      "category": "Developer Tools"
+    },
+    {
+      "name": "r",
+      "source": {
+        "source": "local",
+        "path": "./dist/codex/plugins/r"
       },
       "policy": {
         "installation": "AVAILABLE",
@@ -32,7 +44,7 @@
       "name": "shiny",
       "source": {
         "source": "local",
-        "path": "./plugins/shiny"
+        "path": "./dist/codex/plugins/shiny"
       },
       "policy": {
         "installation": "AVAILABLE",
@@ -44,25 +56,385 @@
       "name": "quarto",
       "source": {
         "source": "local",
-        "path": "./plugins/quarto"
+        "path": "./dist/codex/plugins/quarto"
       },
       "policy": {
         "installation": "AVAILABLE",
         "authentication": "ON_INSTALL"
       },
-      "category": "Productivity"
+      "category": "Developer Tools"
     },
     {
       "name": "obsidian",
       "source": {
         "source": "local",
-        "path": "./plugins/obsidian"
+        "path": "./dist/codex/plugins/obsidian"
       },
       "policy": {
         "installation": "AVAILABLE",
         "authentication": "ON_INSTALL"
       },
-      "category": "Productivity"
+      "category": "Developer Tools"
+    },
+    {
+      "name": "writerside",
+      "source": {
+        "source": "local",
+        "path": "./dist/codex/plugins/writerside"
+      },
+      "policy": {
+        "installation": "AVAILABLE",
+        "authentication": "ON_INSTALL"
+      },
+      "category": "Developer Tools"
+    },
+    {
+      "name": "defuddle",
+      "source": {
+        "source": "local",
+        "path": "./dist/codex/plugins/defuddle"
+      },
+      "policy": {
+        "installation": "AVAILABLE",
+        "authentication": "ON_INSTALL"
+      },
+      "category": "Developer Tools"
+    },
+    {
+      "name": "gh",
+      "source": {
+        "source": "local",
+        "path": "./dist/codex/plugins/gh"
+      },
+      "policy": {
+        "installation": "AVAILABLE",
+        "authentication": "ON_INSTALL"
+      },
+      "category": "Developer Tools"
+    },
+    {
+      "name": "git",
+      "source": {
+        "source": "local",
+        "path": "./dist/codex/plugins/git"
+      },
+      "policy": {
+        "installation": "AVAILABLE",
+        "authentication": "ON_INSTALL"
+      },
+      "category": "Developer Tools"
+    },
+    {
+      "name": "terraform",
+      "source": {
+        "source": "local",
+        "path": "./dist/codex/plugins/terraform"
+      },
+      "policy": {
+        "installation": "AVAILABLE",
+        "authentication": "ON_INSTALL"
+      },
+      "category": "Developer Tools"
+    },
+    {
+      "name": "kubernetes",
+      "source": {
+        "source": "local",
+        "path": "./dist/codex/plugins/kubernetes"
+      },
+      "policy": {
+        "installation": "AVAILABLE",
+        "authentication": "ON_INSTALL"
+      },
+      "category": "Developer Tools"
+    },
+    {
+      "name": "argo-cd",
+      "source": {
+        "source": "local",
+        "path": "./dist/codex/plugins/argo-cd"
+      },
+      "policy": {
+        "installation": "AVAILABLE",
+        "authentication": "ON_INSTALL"
+      },
+      "category": "Developer Tools"
+    },
+    {
+      "name": "ansible",
+      "source": {
+        "source": "local",
+        "path": "./dist/codex/plugins/ansible"
+      },
+      "policy": {
+        "installation": "AVAILABLE",
+        "authentication": "ON_INSTALL"
+      },
+      "category": "Developer Tools"
+    },
+    {
+      "name": "redhat",
+      "source": {
+        "source": "local",
+        "path": "./dist/codex/plugins/redhat"
+      },
+      "policy": {
+        "installation": "AVAILABLE",
+        "authentication": "ON_INSTALL"
+      },
+      "category": "Developer Tools"
+    },
+    {
+      "name": "arch-linux",
+      "source": {
+        "source": "local",
+        "path": "./dist/codex/plugins/arch-linux"
+      },
+      "policy": {
+        "installation": "AVAILABLE",
+        "authentication": "ON_INSTALL"
+      },
+      "category": "Developer Tools"
+    },
+    {
+      "name": "starrocks",
+      "source": {
+        "source": "local",
+        "path": "./dist/codex/plugins/starrocks"
+      },
+      "policy": {
+        "installation": "AVAILABLE",
+        "authentication": "ON_INSTALL"
+      },
+      "category": "Developer Tools"
+    },
+    {
+      "name": "postgres",
+      "source": {
+        "source": "local",
+        "path": "./dist/codex/plugins/postgres"
+      },
+      "policy": {
+        "installation": "AVAILABLE",
+        "authentication": "ON_INSTALL"
+      },
+      "category": "Developer Tools"
+    },
+    {
+      "name": "mongodb",
+      "source": {
+        "source": "local",
+        "path": "./dist/codex/plugins/mongodb"
+      },
+      "policy": {
+        "installation": "AVAILABLE",
+        "authentication": "ON_INSTALL"
+      },
+      "category": "Developer Tools"
+    },
+    {
+      "name": "sops",
+      "source": {
+        "source": "local",
+        "path": "./dist/codex/plugins/sops"
+      },
+      "policy": {
+        "installation": "AVAILABLE",
+        "authentication": "ON_INSTALL"
+      },
+      "category": "Developer Tools"
+    },
+    {
+      "name": "bitwarden",
+      "source": {
+        "source": "local",
+        "path": "./dist/codex/plugins/bitwarden"
+      },
+      "policy": {
+        "installation": "AVAILABLE",
+        "authentication": "ON_INSTALL"
+      },
+      "category": "Developer Tools"
+    },
+    {
+      "name": "pixi",
+      "source": {
+        "source": "local",
+        "path": "./dist/codex/plugins/pixi"
+      },
+      "policy": {
+        "installation": "AVAILABLE",
+        "authentication": "ON_INSTALL"
+      },
+      "category": "Developer Tools"
+    },
+    {
+      "name": "lychee",
+      "source": {
+        "source": "local",
+        "path": "./dist/codex/plugins/lychee"
+      },
+      "policy": {
+        "installation": "AVAILABLE",
+        "authentication": "ON_INSTALL"
+      },
+      "category": "Developer Tools"
+    },
+    {
+      "name": "charm-tui",
+      "source": {
+        "source": "local",
+        "path": "./dist/codex/plugins/charm-tui"
+      },
+      "policy": {
+        "installation": "AVAILABLE",
+        "authentication": "ON_INSTALL"
+      },
+      "category": "Developer Tools"
+    },
+    {
+      "name": "claude-code",
+      "source": {
+        "source": "local",
+        "path": "./dist/codex/plugins/claude-code"
+      },
+      "policy": {
+        "installation": "AVAILABLE",
+        "authentication": "ON_INSTALL"
+      },
+      "category": "Developer Tools"
+    },
+    {
+      "name": "codex",
+      "source": {
+        "source": "local",
+        "path": "./dist/codex/plugins/codex"
+      },
+      "policy": {
+        "installation": "AVAILABLE",
+        "authentication": "ON_INSTALL"
+      },
+      "category": "Developer Tools"
+    },
+    {
+      "name": "opencode-dev",
+      "source": {
+        "source": "local",
+        "path": "./dist/codex/plugins/opencode-dev"
+      },
+      "policy": {
+        "installation": "AVAILABLE",
+        "authentication": "ON_INSTALL"
+      },
+      "category": "Developer Tools"
+    },
+    {
+      "name": "speckit-dev",
+      "source": {
+        "source": "local",
+        "path": "./dist/codex/plugins/speckit-dev"
+      },
+      "policy": {
+        "installation": "AVAILABLE",
+        "authentication": "ON_INSTALL"
+      },
+      "category": "Developer Tools"
+    },
+    {
+      "name": "rdl-team",
+      "source": {
+        "source": "local",
+        "path": "./dist/codex/plugins/rdl-team"
+      },
+      "policy": {
+        "installation": "AVAILABLE",
+        "authentication": "ON_INSTALL"
+      },
+      "category": "Developer Tools"
+    },
+    {
+      "name": "playwright",
+      "source": {
+        "source": "local",
+        "path": "./dist/codex/plugins/playwright"
+      },
+      "policy": {
+        "installation": "AVAILABLE",
+        "authentication": "ON_INSTALL"
+      },
+      "category": "Developer Tools"
+    },
+    {
+      "name": "planning",
+      "source": {
+        "source": "local",
+        "path": "./dist/codex/plugins/planning"
+      },
+      "policy": {
+        "installation": "AVAILABLE",
+        "authentication": "ON_INSTALL"
+      },
+      "category": "Developer Tools"
+    },
+    {
+      "name": "debug",
+      "source": {
+        "source": "local",
+        "path": "./dist/codex/plugins/debug"
+      },
+      "policy": {
+        "installation": "AVAILABLE",
+        "authentication": "ON_INSTALL"
+      },
+      "category": "Developer Tools"
+    },
+    {
+      "name": "tech-writing",
+      "source": {
+        "source": "local",
+        "path": "./dist/codex/plugins/tech-writing"
+      },
+      "policy": {
+        "installation": "AVAILABLE",
+        "authentication": "ON_INSTALL"
+      },
+      "category": "Developer Tools"
+    },
+    {
+      "name": "lucid",
+      "source": {
+        "source": "local",
+        "path": "./dist/codex/plugins/lucid"
+      },
+      "policy": {
+        "installation": "AVAILABLE",
+        "authentication": "ON_INSTALL"
+      },
+      "category": "Developer Tools"
+    },
+    {
+      "name": "pandera",
+      "source": {
+        "source": "local",
+        "path": "./dist/codex/plugins/pandera"
+      },
+      "policy": {
+        "installation": "AVAILABLE",
+        "authentication": "ON_INSTALL"
+      },
+      "category": "Developer Tools"
+    },
+    {
+      "name": "data-request",
+      "source": {
+        "source": "local",
+        "path": "./dist/codex/plugins/data-request"
+      },
+      "policy": {
+        "installation": "AVAILABLE",
+        "authentication": "ON_INSTALL"
+      },
+      "category": "Developer Tools"
     }
   ]
 }

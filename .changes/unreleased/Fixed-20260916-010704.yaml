@@ -1,0 +1,3 @@
+kind: Fixed
+body: Allow publishers to record typed per-plugin decisions for explicit invocation and MCP submission gates while leaving unapproved packages blocked.
+time: 2026-09-16T01:07:04.86777216Z

@@ -18,3 +18,23 @@ targets:
     enabled: true
     pluginName: redhat
     marketplaceName: rdl-agent-extensions
+
+  codex:
+    enabled: true
+    pluginName: redhat
+    marketplaceName: rdl-agent-extensions
+    category: Developer Tools
+    components:
+      skills: true
+      mcp: false
+      hooks: true
+      apps: false
+    interface:
+      shortDescription: Red Hat tools and workflows
+      defaultPrompt:
+      - Use Red Hat to help with my task.
+    hookConfig: hooks/codex/redhat/hooks.json
+    notes:
+      sharedHooks:
+      - redhat-docs-preflight
+      - redhat-docs-guard

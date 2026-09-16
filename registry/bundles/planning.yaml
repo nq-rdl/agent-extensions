@@ -21,3 +21,18 @@ targets:
     enabled: true
     pluginName: planning
     marketplaceName: rdl-agent-extensions
+
+  codex:
+    enabled: true
+    pluginName: planning
+    marketplaceName: rdl-agent-extensions
+    category: Developer Tools
+    components:
+      skills: true
+      mcp: false
+      hooks: false
+      apps: false
+    interface:
+      shortDescription: Planning tools and workflows
+      defaultPrompt:
+      - Use Planning to help with my task.

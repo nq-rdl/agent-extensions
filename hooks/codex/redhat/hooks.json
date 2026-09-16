@@ -1,0 +1,28 @@
+{
+  "description": "Native Codex command hooks for redhat; review and trust before execution.",
+  "hooks": {
+    "SessionStart": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash \"${PLUGIN_ROOT}/hooks/adapter.sh\" redhat-docs-preflight",
+            "timeout": 10
+          }
+        ]
+      }
+    ],
+    "PreToolUse": [
+      {
+        "matcher": "^(Bash|exec_command|shell_command|shell|WebFetch)$",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash \"${PLUGIN_ROOT}/hooks/adapter.sh\" redhat-docs-guard",
+            "timeout": 10
+          }
+        ]
+      }
+    ]
+  }
+}

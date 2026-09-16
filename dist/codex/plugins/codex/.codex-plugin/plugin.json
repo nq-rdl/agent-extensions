@@ -1,0 +1,33 @@
+{
+  "name": "codex",
+  "version": "0.29.0",
+  "description": "Delegate work to the OpenAI Codex CLI — reviews, background tasks, and rescue sessions",
+  "author": {
+    "name": "nq-rdl"
+  },
+  "repository": "https://github.com/nq-rdl/agent-extensions",
+  "license": "Apache-2.0",
+  "keywords": [
+    "codex",
+    "openai",
+    "delegation",
+    "review",
+    "gpt-5-6"
+  ],
+  "skills": "./skills/",
+  "interface": {
+    "displayName": "Codex",
+    "shortDescription": "Codex CLI reviews, background tasks, session transfer and recovery",
+    "longDescription": "Delegate work to the OpenAI Codex CLI — reviews, background tasks, and rescue sessions",
+    "developerName": "nq-rdl",
+    "category": "Developer Tools",
+    "capabilities": [
+      "Skills",
+      "Hooks"
+    ],
+    "defaultPrompt": [
+      "Use Codex to help with my task."
+    ],
+    "websiteURL": "https://github.com/nq-rdl/agent-extensions"
+  }
+}

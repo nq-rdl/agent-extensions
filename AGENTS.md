@@ -7,7 +7,7 @@ Agent guidance for this repository. Use this alongside the README for project co
 This repo is **the `rdl-agent-extensions` marketplace** — the published product. It authors reusable
 skills (canonical content under `skills/`) and publishes self-contained
 plugins through generated Claude Code and native Codex marketplace manifests. Claude Code exposes
-the complete catalog; Codex currently exposes an explicitly gated skill-only pilot.
+the complete catalog through separate, explicitly gated target packages.
 
 > **`.claude/` contributor tooling was removed.** This repo previously carried a
 > `.claude/` folder — *not* part of the published product — that configured Claude
@@ -56,8 +56,8 @@ skills/           ← canonical skills (authored here; validated by tools/asctl)
 plugins/          ← self-contained plugin trees (real files)
   <bundle>/
     .claude-plugin/plugin.json  ← GENERATED (scripts/generate_manifests.py)
-    .codex-plugin/plugin.json   ← GENERATED for Codex-enabled bundles
     skills/<leaf>/       ← real-file copy of skills/<source>/ (renamed to <leaf> per the registry map)
+dist/codex/plugins/<bundle>/ ← GENERATED strict Codex copies, native manifests
 registry/
   bundles/*.yaml   ← single source of truth: skills/keywords per bundle
   marketplace.yaml ← marketplace metadata, plugin defaults, and display order
@@ -85,9 +85,13 @@ To make installs self-contained, `plugins/<bundle>/skills/<name>/` holds **real-
 
 **Grouped skills.** A bundle skill member is either a flat string (`changie` → `leaf == changie`) or an explicit `{source, leaf}` mapping (`{source: go-gh, leaf: actions-go}` in the `gh` bundle → `/gh:actions-go`). `sync-plugins.sh` copies the flat canonical `skills/<source>/` → `plugins/<pluginName>/skills/<leaf>/`, **renaming to the leaf**, so the plugin tree stays one level deep and Claude Code invokes `<pluginName>:<leaf>` (the leaf folder drives invocation). Claude Code labels a skill in `/`-autocomplete as `frontmatter.name || <pluginName>:<leaf>` — so a present `name:` (the canonical `go-gh` **or** the leaf `actions-go`) overrides the namespaced id with a bare, un-prefixed label, and `/gh` lists `go-gh`/`actions-go` instead of `gh:actions-go`. To get the namespaced label, sync **strips the copy's `name:` entirely** so the label falls back to `<pluginName>:<leaf>`. The canonical `skills/` tree is never touched; grouping is owned **here** in the registry and stays flat. See `CONTRIBUTING.md` §6 for the rules, `scripts/check_grouping.py` for the contract, and `scripts/validate-plugins.sh` for the no-name guard.
 
-The phase-one Codex target shares those nameless derivative copies. Codex 0.152.0 derives the name
-from the leaf directory and exposes `<plugin>:<leaf>`; `scripts/smoke-codex-marketplace.sh` guards
-that behavior. This is runtime compatibility, not strict public-directory compliance.
+Codex packages live separately under `dist/codex/plugins/<subject>/`, with explicit
+`name: <leaf>` frontmatter, native `.codex-plugin/plugin.json`,
+and only enabled target components. `scripts/codex_package.py` derives these from
+canonical skills and registry-selected resources; `sync-plugins.sh` invokes it for
+both write and check modes. Never hand-edit either generated tree. Delegation stays
+in `skills/*/references/subagent.rst`; do not recreate `agents/` in any target.
+See `docs/codex.md` for native hook coverage, MCP prerequisites, and directory readiness.
 
 Skills are authored directly under `skills/`. After editing one, run `pixi run bash scripts/sync-plugins.sh` to refresh the plugin trees; CI's `validate-skills` job runs `asctl repo-check` to validate `skills/` against the agentskills.io spec.
 
@@ -183,7 +187,7 @@ CI runs `validate.yml` on every PR/push to main. It checks:
 - Registry bundles, `marketplace.json`, and `plugins/` dirs stay in lockstep (`scripts/check_consistency.py`)
 - Every canonical skill/hook/mcp is exposed by >=1 bundle (`scripts/check_exposure.py`); intentional exclusions live in `registry/unbundled.yaml`
 - Plugin manifests, hooks, skills, and `.mcp.json` wiring are valid (`scripts/validate-plugins.sh`)
-- Codex `0.152.0` installs every native marketplace entry and discovers the shared nameless skill copies (`scripts/smoke-codex-marketplace.sh`)
+- Codex `0.152.0` and `0.154.0` install every native marketplace entry and discover the enabled native skill copies with explicit leaf names (`scripts/smoke-codex-marketplace.sh`)
 - Any symlink under `plugins/` resolves (`validate-symlinks` — plugin trees are real-file copies, so this guards against accidental links)
 - The pipeline scripts' unit tests pass (`tests/`)
 - Skills validate against the agentskills.io spec **and the directory-structure standard** (`asctl repo-check`, built from `tools/asctl/`)
@@ -269,7 +273,16 @@ targets:
       apps: false
 ```
 
-The bundle's metadata and target settings (plus `registry/marketplace.yaml` and `VERSION`) generate target marketplace entries and plugin manifests — do not hand-edit them (`generate_manifests.py --check` enforces this). Phase-one Codex bundles must share the enabled Claude `pluginName`, expose skills, and leave MCP, hooks, and apps disabled.
+The bundle's metadata and target settings (plus `registry/marketplace.yaml` and `VERSION`) generate target marketplace entries and plugin manifests — do not hand-edit them (`generate_manifests.py --check` enforces this).
+
+The skills-only Codex pilot is complete. Codex targets now select native skills,
+MCP, and command hooks independently through `components`; every enabled bundle
+must expose at least one supported component. MCP and hooks require explicit
+`mcpConfig` and `hookConfig` sources. Apps remain disabled until a registered
+integration is supported. Claude and Codex plugin names are target-specific;
+the catalog currently uses matching subject names. Codex copies live separately
+under `dist/codex/plugins/`. See `docs/codex.md` for runtime limitations and
+`CONTRIBUTING.md` for the packaging contract.
 
 When adding a skill to a bundle: (1) add it to the YAML (flat `<name>`, or a `{source, leaf}` map to repackage a flat upstream skill under a new leaf), (2) run `pixi run bash scripts/sync-plugins.sh <bundle>` to copy `skills/<source>/` into `plugins/<bundle>/skills/<leaf>/`.
 

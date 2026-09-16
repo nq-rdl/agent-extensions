@@ -1,6 +1,6 @@
 #!/bin/bash
 # Install the local native Codex marketplace in an isolated CODEX_HOME and
-# verify every phase-one plugin and its directory-derived skill names.
+# verify every published plugin and its directory-derived skill names.
 
 set -euo pipefail
 
@@ -24,7 +24,10 @@ CODEX_HOME="$(mktemp -d "$smoke_tmp_root/rdl-codex-smoke.XXXXXX")"
 export CODEX_HOME
 trap 'rm -rf "$CODEX_HOME"' EXIT
 
-"$CODEX_BIN" plugin marketplace add "$REPO_ROOT" --json >/dev/null
+marketplace_source="${CODEX_MARKETPLACE_SOURCE:-$REPO_ROOT}"
+marketplace_args=()
+[ -n "${CODEX_MARKETPLACE_REF:-}" ] && marketplace_args+=(--ref "$CODEX_MARKETPLACE_REF")
+"$CODEX_BIN" plugin marketplace add "$marketplace_source" "${marketplace_args[@]}" --json >/dev/null
 
 expected_plugins=()
 while IFS= read -r plugin; do
@@ -54,14 +57,15 @@ for plugin in "${expected_plugins[@]}"; do
   }
   "$CODEX_BIN" plugin add "$plugin@$MARKETPLACE_NAME" --json >/dev/null
 
-  skill_dirs=("$REPO_ROOT/plugins/$plugin/skills"/*)
-  if [ "${#skill_dirs[@]}" -eq 0 ]; then
-    echo "FATAL: $plugin contains no skills to verify" >&2
-    exit 1
-  fi
+  source_path="$(jq -r --arg p "$plugin" '.plugins[] | select(.name==$p) | .source.path' "$MARKETPLACE_MANIFEST")"
+  package_root="$REPO_ROOT/${source_path#./}"
+  skill_dirs=("$package_root/skills"/*)
   for skill_dir in "${skill_dirs[@]}"; do
     [ -d "$skill_dir" ] || continue
-    expected_skills+=("$plugin:$(basename "$skill_dir")")
+    # Explicit-only skills remain installed, but are omitted from automatic prompt input.
+    if ! grep -Eq '^disable-model-invocation: true$' "$skill_dir/SKILL.md"; then
+      expected_skills+=("$plugin:$(basename "$skill_dir")")
+    fi
   done
 done
 
@@ -82,17 +86,18 @@ done
 # Compare whole installed skill trees, including references, scripts, and assets.
 # Discovery alone would miss a package whose SKILL.md survives but helpers do not.
 for plugin in "${expected_plugins[@]}"; do
-  cached_skills=("$CODEX_HOME/plugins/cache/$MARKETPLACE_NAME/$plugin"/*/skills)
+  cached_skills=("$CODEX_HOME/plugins/cache/$MARKETPLACE_NAME/$plugin"/*)
   if [ "${#cached_skills[@]}" -ne 1 ]; then
     echo "FATAL: $plugin has no unique cached skills directory" >&2
     exit 1
   fi
-  diff -r "$REPO_ROOT/plugins/$plugin/skills" "${cached_skills[0]}"
+  source_path="$(jq -r --arg p "$plugin" '.plugins[] | select(.name==$p) | .source.path' "$MARKETPLACE_MANIFEST")"
+  diff -r "$REPO_ROOT/${source_path#./}" "${cached_skills[0]}"
 done
 
 for plugin in "${expected_plugins[@]}"; do
   "$CODEX_BIN" plugin remove "$plugin@$MARKETPLACE_NAME" --json >/dev/null
-  cached_skills=("$CODEX_HOME/plugins/cache/$MARKETPLACE_NAME/$plugin"/*/skills)
+  cached_skills=("$CODEX_HOME/plugins/cache/$MARKETPLACE_NAME/$plugin"/*)
   if [ "${#cached_skills[@]}" -ne 0 ]; then
     echo "FATAL: removed plugin $plugin still has cached skills" >&2
     exit 1
@@ -122,4 +127,4 @@ for qualified in "${expected_skills[@]}"; do
   }
 done
 
-echo "Codex marketplace smoke test passed: ${#expected_plugins[@]} plugins; ${#expected_skills[@]} skills; cache contents, removal, and reinstallation verified."
+echo "Codex marketplace smoke test passed: ${#expected_plugins[@]} plugins; ${#expected_skills[@]} skills; full package cache, removal, and reinstallation verified."

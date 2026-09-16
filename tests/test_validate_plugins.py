@@ -27,6 +27,8 @@ def write(path: Path, text: str):
 def run_validate(repo: Path):
     (repo / "scripts").mkdir(parents=True, exist_ok=True)
     shutil.copy(SCRIPT, repo / "scripts" / "validate-plugins.sh")
+    for dependency in ("codex_package.py", "generate_manifests.py", "_registry.py"):
+        (repo / "scripts" / dependency).write_text((REPO / "scripts" / dependency).read_text())
     return subprocess.run(
         ["bash", str(repo / "scripts" / "validate-plugins.sh")],
         cwd=repo,

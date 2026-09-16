@@ -1,0 +1,34 @@
+{
+  "name": "claude-code",
+  "version": "0.29.0",
+  "description": "Claude Code — agent-team coordination, hook authoring, skill-quality auditing, and prompt engineering",
+  "author": {
+    "name": "nq-rdl"
+  },
+  "repository": "https://github.com/nq-rdl/agent-extensions",
+  "license": "MIT",
+  "keywords": [
+    "claude-code",
+    "agents",
+    "hooks",
+    "skills",
+    "audit",
+    "prompts"
+  ],
+  "skills": "./skills/",
+  "interface": {
+    "displayName": "Claude Code",
+    "shortDescription": "Author Claude Code workflows and audit reusable skills",
+    "longDescription": "Claude Code — agent-team coordination, hook authoring, skill-quality auditing, and prompt engineering",
+    "developerName": "nq-rdl",
+    "category": "Developer Tools",
+    "capabilities": [
+      "Skills",
+      "Hooks"
+    ],
+    "defaultPrompt": [
+      "Use Claude Code to help with my task."
+    ],
+    "websiteURL": "https://github.com/nq-rdl/agent-extensions"
+  }
+}

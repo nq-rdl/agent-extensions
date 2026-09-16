@@ -107,7 +107,7 @@ bar. Each page is defined with ``nav_panel()``.
 **Important caveat:** ``page_navbar()``\ ’s ``sidebar`` argument puts
 the same sidebar on every page. If you need different sidebars per page
 or conditional sidebar contents, see the `sidebars
-reference <sidebars.md>`__ for strategies.
+reference <sidebars.rst>`__ for strategies.
 
 **Key parameters:** - ``title``: App title in the navbar - ``sidebar``:
 Optional ``sidebar()`` shown on all pages - ``id``: ID for tracking the
@@ -243,7 +243,7 @@ Theming
 ~~~~~~~
 
 Pass a ``bs_theme()`` object to the ``theme`` parameter of any page
-function to customize appearance. See `theming.md <theming.md>`__ for
+function to customize appearance. See `theming.md <theming.rst>`__ for
 comprehensive theming guidance.
 
 Plot Styling

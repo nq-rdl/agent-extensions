@@ -21,6 +21,7 @@ targets:
     enabled: true
     pluginName: go
     marketplaceName: rdl-agent-extensions
+
   codex:
     enabled: true
     pluginName: go
@@ -31,3 +32,7 @@ targets:
       mcp: false
       hooks: false
       apps: false
+    interface:
+      shortDescription: Go — idiomatic naming and secure error handling
+      defaultPrompt:
+      - Use Go to help with my task.

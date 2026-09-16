@@ -1,0 +1,14 @@
+{
+  "$schema": "https://opencode.ai/config.json",
+  "lsp": {
+    "typescript": { "disabled": true },
+    "rust": {
+      "command": ["rust-analyzer"],
+      "env": { "RUST_LOG": "debug" }
+    },
+    "custom-lsp": {
+      "command": ["custom-lsp-server", "--stdio"],
+      "extensions": [".custom"]
+    }
+  }
+}

@@ -36,7 +36,7 @@ def _local_source(entry: dict) -> str | None:
         isinstance(source, dict)
         and source.get("source") == "local"
         and isinstance(source.get("path"), str)
-        and source["path"].startswith(LOCAL_PREFIX)
+        and source["path"].startswith("./")
     ):
         return source["path"]
     return None
@@ -57,8 +57,9 @@ def find_consistency_issues(repo) -> list[str]:
                 bundle_plugins[target][plugin] = bf.stem
 
     issues: list[str] = []
-    plugins_root = repo / "plugins"
     for target, (marketplace_rel, manifest_dir) in TARGETS.items():
+        prefix = "./dist/codex/plugins/" if target == "codex" else LOCAL_PREFIX
+        plugins_root = repo / prefix[2:]
         local_marketplace: dict[str, str] = {}
         mkt_path = repo / marketplace_rel
         if mkt_path.is_file():
@@ -67,7 +68,7 @@ def find_consistency_issues(repo) -> list[str]:
                 source = _local_source(entry)
                 if source:
                     name = entry["name"]
-                    expected_source = f"{LOCAL_PREFIX}{name}"
+                    expected_source = f"{prefix}{name}"
                     if source != expected_source:
                         issues.append(
                             f"{target} marketplace plugin '{name}' source is '{source}', "

@@ -17,3 +17,18 @@ targets:
     enabled: true
     pluginName: sops
     marketplaceName: rdl-agent-extensions
+
+  codex:
+    enabled: true
+    pluginName: sops
+    marketplaceName: rdl-agent-extensions
+    category: Developer Tools
+    components:
+      skills: true
+      mcp: false
+      hooks: false
+      apps: false
+    interface:
+      shortDescription: SOPS — encrypt and decrypt secrets with Age and Vault transit
+      defaultPrompt:
+      - Use SOPS to help with my task.

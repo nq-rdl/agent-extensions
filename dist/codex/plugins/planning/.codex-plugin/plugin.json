@@ -1,0 +1,31 @@
+{
+  "name": "planning",
+  "version": "0.29.0",
+  "description": "Planning — implementation strategy, technical-spike validation, file-level sequencing, API/repo architecture, and ADRs",
+  "author": {
+    "name": "nq-rdl"
+  },
+  "repository": "https://github.com/nq-rdl/agent-extensions",
+  "license": "MIT",
+  "keywords": [
+    "planning",
+    "architecture",
+    "adr",
+    "spike"
+  ],
+  "skills": "./skills/",
+  "interface": {
+    "displayName": "Planning",
+    "shortDescription": "Planning tools and workflows",
+    "longDescription": "Planning — implementation strategy, technical-spike validation, file-level sequencing, API/repo architecture, and ADRs",
+    "developerName": "nq-rdl",
+    "category": "Developer Tools",
+    "capabilities": [
+      "Skills"
+    ],
+    "defaultPrompt": [
+      "Use Planning to help with my task."
+    ],
+    "websiteURL": "https://github.com/nq-rdl/agent-extensions"
+  }
+}

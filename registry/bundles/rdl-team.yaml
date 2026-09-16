@@ -19,3 +19,18 @@ targets:
     enabled: true
     pluginName: rdl-team
     marketplaceName: rdl-agent-extensions
+
+  codex:
+    enabled: true
+    pluginName: rdl-team
+    marketplaceName: rdl-agent-extensions
+    category: Developer Tools
+    components:
+      skills: true
+      mcp: false
+      hooks: false
+      apps: false
+    interface:
+      shortDescription: RDL service requests and Claude Code onboarding
+      defaultPrompt:
+      - Use RDL Team to help with my task.

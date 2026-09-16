@@ -441,17 +441,20 @@
       ]
     },
     {
-      "name": "sql-code",
-      "source": "./plugins/sql-code",
-      "description": "SQL Code — scope, map, draft and validate cohort SQL with shared RDL guardrails and human-confirmed review handoffs",
+      "name": "data-request",
+      "source": "./plugins/data-request",
+      "description": "Data Request — scope, map, draft, validate and fix request SQL and Python with shared RDL guardrails and human-confirmed review handoffs",
       "version": "0.29.0",
       "keywords": [
+        "data-request",
         "sql",
+        "python",
         "cohort",
         "guardrails",
         "mapping",
         "drafting",
         "validation",
+        "fixes",
         "review",
         "handoff"
       ]

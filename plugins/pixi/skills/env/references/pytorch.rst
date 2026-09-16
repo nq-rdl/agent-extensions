@@ -21,7 +21,7 @@ System requirements\ `# <#system-requirements>`__
 -------------------------------------------------
 
 In the context of PyTorch, `system
-requirements <../../workspace/system_requirements/>`__ help Pixi
+requirements <https://pixi.prefix.dev/latest/workspace/system_requirements/>`__ help Pixi
 understand whether it can install and use CUDA-related packages. These
 requirements ensure compatibility during dependency resolution.
 
@@ -43,7 +43,7 @@ default to installing the **CPU-only** versions of PyTorch and its
 dependencies.
 
 A more in-depth explanation of system requirements can be found
-`here <../../workspace/system_requirements/>`__.
+`here <https://pixi.prefix.dev/latest/workspace/system_requirements/>`__.
 
 Installing from Conda-forge\ `# <#installing-from-conda-forge>`__
 -----------------------------------------------------------------

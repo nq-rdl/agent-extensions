@@ -3,7 +3,10 @@
 !.pixi/config.toml
 
 # generated output
-dist/
+dist/*
+!dist/codex/
+dist/codex/*
+!dist/codex/plugins/
 
 # Zensical local build output (`pixi run zensical build`)
 site/

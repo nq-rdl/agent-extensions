@@ -285,7 +285,7 @@ Full-screen support works with tabbed cards - Each ``nav_panel()``
 behaves like a card body — do **not** wrap panel content in ``card()``;
 the navset already provides the card container
 
-See `navigation.md <navigation.md>`__ for more details on navset
+See `navigation.md <navigation.rst>`__ for more details on navset
 functions.
 
 Sidebar Integration
@@ -312,7 +312,7 @@ fill behavior for outputs.
      )
    )
 
-See `sidebars.md <sidebars.md>`__ for more sidebar patterns.
+See `sidebars.md <sidebars.rst>`__ for more sidebar patterns.
 
 Static Images
 -------------

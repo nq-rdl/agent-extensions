@@ -4,7 +4,8 @@ This container runs the native Codex plugin acceptance test using CLI `0.154.0`.
 It installs the local marketplace, verifies every enabled plugin and skill,
 compares cached references/scripts/assets, and checks removal and reinstallation.
 
-The build downloads the pinned CLI. The test runs as a non-root user with no
+The build downloads the pinned CLI and installs Python from the repository's
+Pixi lockfile under `/opt/codex-python`. The test runs as a non-root user with no
 network, no credentials, and a read-only repository mount. Its temporary Codex
 configuration and cache live inside the container and are cleaned after the test.
 This verifies packaging and discovery; it does not execute model requests or
@@ -30,12 +31,22 @@ The required plugin-validation job runs these same image and test commands:
 
 ```bash
 docker build --build-arg CODEX_VERSION=0.154.0 \
-  -t rdl-codex-smoke -f .devcontainer/codex/Dockerfile .devcontainer/codex
+  -t rdl-codex-smoke -f .devcontainer/codex/Dockerfile .
 docker run --rm --network none \
   --mount "type=bind,source=$PWD,target=/workspace,readonly" \
   rdl-codex-smoke bash scripts/smoke-codex-marketplace.sh
 ```
 
 The repository is mounted at test time, so uncommitted plugin changes are tested.
-The image contains only tools, not a baked-in copy of the catalog. The existing
+The image contains tools and the locked environment, not a copy of the catalog. The existing
 host-run CI checks still cover Codex `0.152.0` and `0.154.0`.
+
+The same container also validates native hook discovery and version replacement:
+
+```bash
+pixi run --locked --manifest-path /opt/codex-python/pyproject.toml \
+  python3 /workspace/scripts/check_codex_runtime.py /workspace
+```
+
+The package root uses `.codex-plugin/plugin.json`; a portable root manifest would
+suppress hooks on the pinned runtime. Hook trust is never bypassed by these tests.

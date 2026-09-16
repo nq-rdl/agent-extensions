@@ -1,8 +1,8 @@
-"""Structural tests for the sql-code plugin: registry, skills, hooks wiring, policy note.
+"""Structural tests for the data-request plugin: registry, skills, hooks wiring, policy note.
 
-These pin the packaging contract (docs/specs/2026-09-15-sql-code-plugin-design.md) that
-the generic validators do not know about: eight action facets, both hooks wired, every skill
-user-invocable with AskUserQuestion available, the consumer skills pointing at /sql-code:setup,
+These pin the packaging contract (docs/specs/2026-09-15-data-request-plugin-design.md) that
+the generic validators do not know about: nine action facets, both hooks wired, every skill
+user-invocable with AskUserQuestion available, the consumer skills pointing at /data-request:setup,
 setup exempt from the initialisation gate, and the language-policy row that sanctions the shell helper.
 """
 
@@ -13,11 +13,11 @@ from pathlib import Path
 import yaml
 
 REPO = Path(__file__).resolve().parent.parent
-BUNDLE = REPO / "registry" / "bundles" / "sql-code.yaml"
-PLUGIN = REPO / "plugins" / "sql-code"
+BUNDLE = REPO / "registry" / "bundles" / "data-request.yaml"
+PLUGIN = REPO / "plugins" / "data-request"
 RECORD_STAGES = ("setup", "bootstrap", "analyse", "explain")
-SKILLS = {leaf: REPO / "skills" / f"sql-code-{leaf}"
-          for leaf in (*RECORD_STAGES, "guardrails", "map", "draft", "validate")}
+SKILLS = {leaf: REPO / "skills" / f"data-request-{leaf}"
+          for leaf in (*RECORD_STAGES, "guardrails", "map", "draft", "validate", "fix")}
 
 
 def frontmatter(skill_md: Path) -> dict:
@@ -26,17 +26,17 @@ def frontmatter(skill_md: Path) -> dict:
 
 
 class Registry(unittest.TestCase):
-    def test_bundle_maps_eight_facets_and_two_hooks(self):
+    def test_bundle_maps_nine_facets_and_two_hooks(self):
         data = yaml.safe_load(BUNDLE.read_text())
-        self.assertEqual(data["targets"]["claude"]["pluginName"], "sql-code")
+        self.assertEqual(data["targets"]["claude"]["pluginName"], "data-request")
         members = {m["source"]: m["leaf"] for m in data["skills"]}
-        self.assertEqual(members, {f"sql-code-{leaf}": leaf for leaf in SKILLS})
-        self.assertEqual(sorted(data["hooks"]), ["sql-code-guard", "sql-code-preflight"])
+        self.assertEqual(members, {f"data-request-{leaf}": leaf for leaf in SKILLS})
+        self.assertEqual(sorted(data["hooks"]), ["data-request-guard", "data-request-preflight"])
         self.assertFalse(data["description"].endswith("."))
 
     def test_marketplace_order_lists_the_subject(self):
         order = yaml.safe_load((REPO / "registry" / "marketplace.yaml").read_text())["order"]
-        self.assertIn("sql-code", order)
+        self.assertIn("data-request", order)
 
 
 class Skills(unittest.TestCase):
@@ -44,7 +44,7 @@ class Skills(unittest.TestCase):
         for leaf, d in SKILLS.items():
             with self.subTest(leaf):
                 fm = frontmatter(d / "SKILL.md")
-                self.assertEqual(fm["name"], f"sql-code-{leaf}")
+                self.assertEqual(fm["name"], f"data-request-{leaf}")
                 self.assertTrue(fm.get("user-invocable"))
                 self.assertIn("AskUserQuestion", fm.get("allowed-tools", ""))
                 self.assertIn("argument-hint", fm)
@@ -57,7 +57,7 @@ class Skills(unittest.TestCase):
         for leaf in ("bootstrap", "analyse", "explain"):
             body = (SKILLS[leaf] / "SKILL.md").read_text()
             with self.subTest(leaf):
-                self.assertIn("/sql-code:setup", body)
+                self.assertIn("/data-request:setup", body)
                 self.assertIn("exit 3", body)            # the status gate is explicit
                 self.assertIn("sqlreview.sh", body)
                 self.assertIn("skills/setup/scripts", body)   # shared helper path inside the plugin
@@ -66,7 +66,7 @@ class Skills(unittest.TestCase):
         self.assertNotIn("stop and point", setup.lower())
 
     def test_stage_pointers(self):
-        chain = {"setup": "/sql-code:bootstrap", "bootstrap": "/sql-code:analyse", "analyse": "/sql-code:explain"}
+        chain = {"setup": "/data-request:bootstrap", "bootstrap": "/data-request:analyse", "analyse": "/data-request:explain"}
         for leaf, nxt in chain.items():
             with self.subTest(leaf):
                 self.assertIn(nxt, (SKILLS[leaf] / "SKILL.md").read_text())
@@ -101,9 +101,9 @@ class Hooks(unittest.TestCase):
     def test_hooks_json_wires_both_scripts(self):
         hooks = json.loads((PLUGIN / "hooks" / "hooks.json").read_text())["hooks"]
         cmds = {h["command"] for groups in hooks.values() for g in groups for h in g["hooks"]}
-        self.assertEqual(cmds, {"${CLAUDE_PLUGIN_ROOT}/hooks/sql-code-preflight.sh", "${CLAUDE_PLUGIN_ROOT}/hooks/sql-code-guard.sh"})
+        self.assertEqual(cmds, {"${CLAUDE_PLUGIN_ROOT}/hooks/data-request-preflight.sh", "${CLAUDE_PLUGIN_ROOT}/hooks/data-request-guard.sh"})
         self.assertEqual(hooks["PreToolUse"][0]["matcher"], "Write|Edit")
-        for name in ("sql-code-preflight.sh", "sql-code-guard.sh"):
+        for name in ("data-request-preflight.sh", "data-request-guard.sh"):
             self.assertTrue((PLUGIN / "hooks" / name).is_file())
             self.assertTrue((REPO / "hooks" / name).is_file())
 

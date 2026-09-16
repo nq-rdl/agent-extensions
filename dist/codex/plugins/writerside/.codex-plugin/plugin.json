@@ -1,0 +1,30 @@
+{
+  "name": "writerside",
+  "version": "0.29.0",
+  "description": "Writerside — author and build JetBrains Writerside documentation",
+  "author": {
+    "name": "nq-rdl"
+  },
+  "repository": "https://github.com/nq-rdl/agent-extensions",
+  "license": "MIT",
+  "keywords": [
+    "writerside",
+    "docs",
+    "authoring"
+  ],
+  "skills": "./skills/",
+  "interface": {
+    "displayName": "Writerside",
+    "shortDescription": "Writerside — author and build JetBrains Writerside documentation",
+    "longDescription": "Writerside — author and build JetBrains Writerside documentation",
+    "developerName": "nq-rdl",
+    "category": "Developer Tools",
+    "capabilities": [
+      "Skills"
+    ],
+    "defaultPrompt": [
+      "Use Writerside to help with my task."
+    ],
+    "websiteURL": "https://github.com/nq-rdl/agent-extensions"
+  }
+}

@@ -1,0 +1,282 @@
+|image1|
+
+Rattler-Build Backend\ `# <#rattler-build-backend>`__
+=====================================================
+
+The ``pixi-build-rattler-build`` backend enables building conda packages
+using rattler-build recipes. This backend is designed for projects that
+either have existing recipe.yaml files or where customization is
+necessary that isn't possible with the currently available backends.
+
+.. admonition::
+
+   Warning
+
+   ``pixi-build`` is a preview feature, and will change until it is
+   stabilized. This is why we require users to opt in to that feature by
+   adding "pixi-build" to ``workspace.preview``.
+
+   .. container:: language-toml highlight
+
+      ::
+
+         [workspace]
+         preview = ["pixi-build"]
+
+Overview\ `# <#overview>`__
+---------------------------
+
+The rattler-build backend:
+
+-  Uses existing ``recipe.yaml`` files as build manifests
+-  Supports all standard rattler-build recipe features and selectors
+-  Handles dependency resolution and virtual package detection
+   automatically
+-  Can build multiple outputs from a single recipe
+
+Usage\ `# <#usage>`__
+---------------------
+
+To use the rattler-build backend in your ``pixi.toml``, specify it in
+your build system configuration:
+
+.. container:: language-toml highlight
+
+   ::
+
+      [package]
+      name = "rattler_build_package"
+      version = "0.1.0"
+
+      [package.build]
+      backend = { name = "pixi-build-rattler-build", version = "*" }
+      channels = ["https://prefix.dev/conda-forge"]
+
+The backend expects a rattler-build recipe file in one of these
+locations (searched in order):
+
+#. ``package.build.config.recipe`` if given.
+#. ``recipe.yaml`` or ``recipe.yml`` in the same directory as the
+   package manifest
+#. ``recipe/recipe.yaml`` or ``recipe/recipe.yml`` in a subdirectory of
+   the package manifest
+
+If the package is defined in the same location as the workspace, it is
+heavily encouraged to place the recipe file in its own directory
+``recipe``. Learn more about the ``rattler-build``, and its recipe
+format in its `high level
+overview <https://rattler.build/latest/highlevel>`__.
+
+.. admonition::
+
+   Warning
+
+   If you expect your build script to be compatible with incremental
+   compilation (re-using files from previous builds to speed-up future
+   builds), you must ensure that the build directory for these files is
+   set outside of the root directory in order to enable the incremental
+   compilation. This is because we use a clean root directory for each
+   build, to ensure compatibility with recipes which make that
+   assumption.
+
+   In practice, this may look like changing directory to
+   ``../build_dir`` in your build script before commencing the build, or
+   passing ``../build_dir`` as an argument to your build system.
+
+Specifying dependencies\ `# <#specifying-dependencies>`__
+---------------------------------------------------------
+
+We only allow source dependencies (workspace packages) in project
+manifest. Binary dependencies are not allowed in the project manifest
+when using ``pixi-build-rattler-build``. This is intentional because:
+
+#. The rattler-build recipe is the source of truth for binary
+   dependencies. It already specifies exact versions, build variants,
+   and whether dependencies go in build/host/run.
+
+#. Allowing binary dependencies in both places would create duplication
+   and potential conflicts (e.g., recipe says "python >=3.10" but
+   project model says "python >=3.9").
+
+#. Source dependencies are different - they represent workspace packages
+   built from local source. The recipe can reference them by name, but
+   can't know their workspace paths. The project model provides this
+   mapping.
+
+This way, the recipe maintains full control over binary dependencies
+while the project model only provides the workspace structure
+information that the recipe cannot know.
+
+To specify source dependencies, add them to ``build-dependencies``,
+``host-dependencies`` or ``run-dependencies`` in the package manifest:
+
+.. container:: language-toml highlight
+
+   pixi.toml
+   ::
+
+      [package.build-dependencies]
+      a = { path = "../a" }
+
+Configuration Options\ `# <#configuration-options>`__
+-----------------------------------------------------
+
+The rattler-build backend supports the following TOML configuration
+options:
+
+``experimental``\ `# <#experimental>`__
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+-  **Type**: ``Boolean``
+-  **Default**: ``false``
+-  **Target Merge Behavior**: Not allowed - must be set at root level
+   only
+
+Enables experimental features in rattler-build. This is required for
+certain advanced features like the ``cache:`` functionality for
+multi-output recipes.
+
+.. container:: language-toml highlight
+
+   ::
+
+      [package.build.config]
+      experimental = true
+
+Note: This option cannot be set in target-specific configurations. It
+must be set at the root ``[package.build.config]`` level only.
+
+``recipe``\ `# <#recipe>`__
+~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+-  **Type**: ``String`` (path)
+-  **Default**: checks for ``recipe.yaml``, ``recipe.yml``,
+   ``recipe/recipe.yaml``, ``recipe/recipe.yml`` in order.
+-  **Target Merge Behavior**: Not allowed - must be set at root level
+   only
+
+Path to the recipe YAML file.
+
+.. container:: language-toml highlight
+
+   ::
+
+      [package.build.config]
+      recipe = "../template/recipe.yaml"
+
+Note: This option cannot be set in target-specific configurations. It
+must be set at the root ``[package.build.config]`` level only.
+
+``debug-dir``\ `# <#debug-dir>`__
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+The backend always writes JSON-RPC request/response logs and the
+generated intermediate recipe to the ``debug`` subdirectory inside the
+work directory (for example ``<work_directory>/debug``). The deprecated
+``debug-dir`` configuration option is ignored; if it is still set in a
+manifest the backend emits a warning to make the change explicit.
+
+``extra-input-globs``\ `# <#extra-input-globs>`__
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+-  **Type**: ``Array<String>``
+-  **Default**: ``[]``
+-  **Target Merge Behavior**: ``Overwrite`` - Platform-specific globs
+   completely replace base globs
+
+Additional glob patterns to include as input files for the build
+process. These patterns are added to the default input globs that are
+determined from the recipe sources and package directory structure.
+
+.. container:: language-toml highlight
+
+   ::
+
+      [package.build.config]
+      extra-input-globs = [
+          "patches/**/*",
+          "scripts/*.sh",
+          "*.md"
+      ]
+
+For target-specific configuration, platform-specific globs completely
+replace the base:
+
+.. container:: language-toml highlight
+
+   ::
+
+      [package.build.config]
+      extra-input-globs = ["*.yaml", "*.md"]
+
+      [package.build.target.linux-64.config]
+      extra-input-globs = ["*.yaml", "*.md", "*.sh", "patches-linux/**/*"]
+      # Result for linux-64: ["*.yaml", "*.md", "*.sh", "patches-linux/**/*"]
+
+Build Process\ `# <#build-process>`__
+-------------------------------------
+
+The rattler-build backend follows this build process:
+
+#. **Recipe Discovery**: Locates the ``recipe.yaml`` file in standard
+   locations
+#. **Dependency Resolution**: Resolves build, host, and run dependencies
+   from conda channels and workspace
+#. **Virtual Package Detection**: Automatically detects system virtual
+   packages
+#. **Build Execution**: Runs the build script specified in the recipe
+#. **Package Creation**: Creates conda packages according to the recipe
+   specification
+
+Custom Build Variants as Environment Variables\ `# <#custom-build-variants-as-environment-variables>`__
+-------------------------------------------------------------------------------------------------------
+
+When using ``[workspace.build-variants]``, any variant key that is not a
+recognized language key (like ``python``, ``numpy``, ``r``, etc.) is
+automatically exported as an environment variable during the build.
+
+This is useful for passing configuration to build scripts without
+modifying the recipe. For example, to override the macOS sysroot used
+during compilation:
+
+.. container:: language-toml highlight
+
+   pixi.toml
+   ::
+
+      [workspace.target.osx.build-variants]
+      CONDA_BUILD_SYSROOT = ["/Library/Developer/CommandLineTools/SDKs/MacOSX15.4.sdk"]
+
+During the build, ``CONDA_BUILD_SYSROOT`` will be set as an environment
+variable available to the build script. Custom variant keys can also be
+used in recipe templates via Jinja:
+
+.. container:: language-yaml highlight
+
+   recipe.yaml
+   ::
+
+      build:
+        script:
+          env:
+            MY_FLAG: ${{ my_custom_flag }}
+
+.. container:: language-toml highlight
+
+   pixi.toml
+   ::
+
+      [workspace.build-variants]
+      my_custom_flag = ["enabled"]
+
+Limitations\ `# <#limitations>`__
+---------------------------------
+
+-  Requires an existing rattler-build recipe file - cannot infer build
+   instructions automatically
+-  Build configuration is primarily controlled through the recipe file
+   rather than ``pixi.toml``
+-  Cannot specify binary dependencies in the manifest
+
+.. |image1| image:: data:image/svg+xml;base64,PHN2ZyB2aWV3Ym94PSIwIDAgMjQgMjQiIHhtbG5zPSJodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2ZyI+PHBhdGggZD0iTTIwLjcxIDcuMDRjLjM5LS4zOS4zOS0xLjA0IDAtMS40MWwtMi4zNC0yLjM0Yy0uMzctLjM5LTEuMDItLjM5LTEuNDEgMGwtMS44NCAxLjgzIDMuNzUgMy43NU0zIDE3LjI1VjIxaDMuNzVMMTcuODEgOS45M2wtMy43NS0zLjc1eiI+PC9wYXRoPjwvc3ZnPg==
+   :target: https://github.com/prefix-dev/pixi/edit/main/docs/build/backends/pixi-build-rattler-build.md

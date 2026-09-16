@@ -56,13 +56,13 @@ def enable_codex(repo, name="swe"):
                 "plugins": [
                     {
                         "name": name,
-                        "source": {"source": "local", "path": f"./plugins/{name}"},
+                        "source": {"source": "local", "path": f"./dist/codex/plugins/{name}"},
                     }
                 ]
             }
         )
     )
-    codex_manifest = repo / "plugins" / name / ".codex-plugin" / "plugin.json"
+    codex_manifest = repo / "dist/codex/plugins" / name / ".codex-plugin" / "plugin.json"
     codex_manifest.parent.mkdir(parents=True)
     codex_manifest.write_text("{}")
 
@@ -147,7 +147,7 @@ class TestConsistency(unittest.TestCase):
     def test_flags_codex_manifest_without_enabled_bundle(self):
         with tempfile.TemporaryDirectory() as tmp:
             repo = make_repo(tmp, bundles={}, marketplace_plugins=[], plugin_dirs=[])
-            manifest = repo / "plugins" / "ghost" / ".codex-plugin" / "plugin.json"
+            manifest = repo / "dist/codex/plugins" / "ghost" / ".codex-plugin" / "plugin.json"
             manifest.parent.mkdir(parents=True)
             manifest.write_text("{}")
             issues = check_consistency.find_consistency_issues(repo)
@@ -164,10 +164,10 @@ class TestConsistency(unittest.TestCase):
             enable_codex(repo)
             marketplace = repo / ".agents" / "plugins" / "marketplace.json"
             data = json.loads(marketplace.read_text())
-            data["plugins"][0]["source"]["path"] = "./plugins/other"
+            data["plugins"][0]["source"]["path"] = "./dist/codex/plugins/other"
             marketplace.write_text(json.dumps(data))
             issues = check_consistency.find_consistency_issues(repo)
-            self.assertTrue(any("source" in issue and "./plugins/swe" in issue for issue in issues), issues)
+            self.assertTrue(any("source" in issue and "./dist/codex/plugins/swe" in issue for issue in issues), issues)
 
     def test_flags_missing_codex_manifest_file(self):
         with tempfile.TemporaryDirectory() as tmp:
@@ -178,7 +178,7 @@ class TestConsistency(unittest.TestCase):
                 plugin_dirs=["swe"],
             )
             enable_codex(repo)
-            (repo / "plugins" / "swe" / ".codex-plugin" / "plugin.json").unlink()
+            (repo / "dist/codex/plugins" / "swe" / ".codex-plugin" / "plugin.json").unlink()
             issues = check_consistency.find_consistency_issues(repo)
             self.assertTrue(any("plugin.json" in issue and "swe" in issue for issue in issues), issues)
 

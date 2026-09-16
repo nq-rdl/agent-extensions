@@ -108,10 +108,11 @@ group folders. **Grouping is a packaging decision** expressed in the bundle regi
   `pluginName` unique across bundles (`scripts/check_grouping.py`) · each plugin skill copy carries
   **no** frontmatter `name:` (`scripts/validate-plugins.sh`).
 
-The phase-one Codex target intentionally shares these Claude-oriented copies. Codex 0.152.0 derives
-a missing skill name from the leaf directory, then qualifies it as `<plugin>:<leaf>`. This is a
-tested runtime compatibility path, not the stricter Agent Skills/public-directory contract; strict
-Codex publication will require target-specific copies with explicit `name: <leaf>` frontmatter.
+Codex gets a separate generated copy under `dist/codex/plugins/<subject>/skills/<leaf>/`
+with explicit `name: <leaf>`. The packager selects canonical `references/codex.rst`
+entrypoints only when `targets.codex.skillOverrides` declares them. Supporting
+resources and optional delegation outlines remain inside the installed skill.
+Do not introduce `agents/` directories for either runtime.
 
 So to add `obsidian:bases`, the canonical skill stays flat `skills/obsidian-bases/`; the registry
 maps `{source: obsidian-bases, leaf: bases}` under `pluginName: obsidian`. Delegation outlines are authored inside the owning skill’s `references/`. See [`AGENTS.md`](AGENTS.md)
@@ -192,28 +193,28 @@ A new skill authored under `skills/<name>/` is **not installable until you map i
 — authoring the `SKILL.md` only adds it to the flat library; the registry decides which plugin
 (subject) it belongs to. CI enforces this: `scripts/check_exposure.py` fails if a canonical
 skill/hook isn't referenced by any `registry/bundles/*.yaml` (or explicitly allowlisted in
-`registry/unbundled.yaml`). Here is the full loop, using a hypothetical `sql-code-analyse` skill
-that should become `sql-code:analyse`:
+`registry/unbundled.yaml`). Here is the full loop, using a hypothetical `data-request-analyse` skill
+that should become `data-request:analyse`:
 
-1. **Pick the subject and facet** (the rules above). Subject → the plugin (`sql-code`); facet →
+1. **Pick the subject and facet** (the rules above). Subject → the plugin (`data-request`); facet →
    the action/stage leaf (`analyse`). Never repeat the subject in the facet.
-2. **Choose or create the bundle.** If `registry/bundles/sql-code.yaml` exists, add to it;
+2. **Choose or create the bundle.** If `registry/bundles/data-request.yaml` exists, add to it;
    otherwise copy an existing single-subject bundle (e.g. `registry/bundles/sops.yaml`) and set
    `id`, `displayName`, `description` (no trailing period), `keywords`, and
-   `targets.claude.pluginName: sql-code`.
+   `targets.claude.pluginName: data-request`.
 3. **Add the skill member.** Under `skills:`, write either a flat string (when the skill's
    directory name already equals the leaf you want) or a `{source, leaf}` mapping to rename:
    ```yaml
    skills:
-     - {source: sql-code-analyse, leaf: analyse}   # → /sql-code:analyse
+     - {source: data-request-analyse, leaf: analyse}   # → /data-request:analyse
    ```
-   To include a portable skill bundle in the current Codex pilot, add an explicit target. Keep
-   non-skill components disabled until their Codex runtime validation exists:
+   To include a portable skill bundle in the Codex catalog, add an explicit target. Select
+   components explicitly and supply native configuration for MCP and hooks:
    ```yaml
    targets:
      codex:
        enabled: true
-       pluginName: sql-code
+       pluginName: data-request
        marketplaceName: rdl-agent-extensions
        category: Developer Tools
        components:
@@ -222,15 +223,21 @@ that should become `sql-code:analyse`:
          hooks: false
          apps: false
    ```
-   Codex-enabled skills must be usable by Codex itself. The pipeline unit tests reject
-   `${CLAUDE_PLUGIN_ROOT}`, `AskUserQuestion`, and Claude-style `/plugin:skill` invocations in
-   their canonical content. Convert those dependencies or leave the Codex target disabled.
-4. **If it is a brand-new subject, add it to the marketplace order.** Append `sql-code` to the
+   Native execution uses the host's available tools. Codex packaging adapts entrypoint
+   names and host calls; target-host configuration examples retain their original meaning.
+   Use `skillOverrides: {source-name: references/codex.rst}` for a different host workflow.
+   Use `skillDescriptions: {source-name: "Native capability description"}` when that
+   workflow supports different capabilities; omitted descriptions stay canonical.
+   `excludeSkills` names canonical sources. MCP and hooks require `mcpConfig` and
+   `hookConfig` repository-relative sources; `resources` copies declared runtime assets.
+   Run `pixi run python3 scripts/codex_package.py . --validate` and native smoke tests.
+   Directory archives and external submission gates are documented in `docs/codex.md`.
+4. **If it is a brand-new subject, add it to the marketplace order.** Append `data-request` to the
    `order:` list in `registry/marketplace.yaml` (otherwise it is appended alphabetically with a
    CI `::warning::`).
 5. **Build the plugin tree and manifests:**
    ```bash
-   pixi run bash scripts/sync-plugins.sh sql-code     # copies skills/<source>/ → plugins/sql-code/skills/<leaf>/
+   pixi run bash scripts/sync-plugins.sh data-request     # copies skills/<source>/ → plugins/data-request/skills/<leaf>/
    pixi run python3 scripts/generate_manifests.py .     # writes Claude + Codex manifests
    pixi run python3 scripts/generate_bundles_doc.py .   # refreshes docs/bundles.md
    ```

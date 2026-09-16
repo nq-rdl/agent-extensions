@@ -1,0 +1,16 @@
+{
+  "description": "Native Codex command hooks for codex; review and trust before execution.",
+  "hooks": {
+    "SessionStart": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash \"${PLUGIN_ROOT}/hooks/adapter.sh\" codex-context",
+            "timeout": 10
+          }
+        ]
+      }
+    ]
+  }
+}

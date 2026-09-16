@@ -15,3 +15,18 @@ targets:
     enabled: true
     pluginName: git
     marketplaceName: rdl-agent-extensions
+
+  codex:
+    enabled: true
+    pluginName: git
+    marketplaceName: rdl-agent-extensions
+    category: Developer Tools
+    components:
+      skills: true
+      mcp: false
+      hooks: false
+      apps: false
+    interface:
+      shortDescription: Git tools and workflows
+      defaultPrompt:
+      - Use Git to help with my task.

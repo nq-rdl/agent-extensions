@@ -1,0 +1,17 @@
+{
+  "description": "Native Codex command hooks for claude-code; review and trust before execution.",
+  "hooks": {
+    "PostToolUse": [
+      {
+        "matcher": "^(apply_patch|Write|Edit)$",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash \"${PLUGIN_ROOT}/hooks/adapter.sh\" skill-audit-nudge",
+            "timeout": 10
+          }
+        ]
+      }
+    ]
+  }
+}

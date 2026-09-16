@@ -1,0 +1,15 @@
+{
+  "description": "Model-judged completion check. type:prompt sends the prompt + event data to a Claude model (Haiku by default) which returns {\"ok\":bool,\"reason\":...}. ok:false on Stop keeps Claude working with reason as the next instruction.",
+  "hooks": {
+    "Stop": [
+      {
+        "hooks": [
+          {
+            "type": "prompt",
+            "prompt": "Check if all tasks the user requested are complete. If not, respond with {\"ok\": false, \"reason\": \"what remains to be done\"}."
+          }
+        ]
+      }
+    ]
+  }
+}

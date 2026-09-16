@@ -4,9 +4,9 @@ icon: lucide/network
 
 # Architecture
 
-This repository is an **agent extension catalog**. It keeps a single source of truth for reusable agent behavior — *skills* with optional delegation outlines — and publishes self-contained plugins for Claude Code plus a skill-only native Codex pilot.
+This repository is an **agent extension catalog**. It keeps a single source of truth for reusable agent behavior — *skills* with optional delegation outlines — and publishes self-contained plugins for Claude Code and Codex.
 
-Claude Code remains the complete publication target. Codex support is explicitly gated per bundle and currently exposes only portable skills; other runtimes remain out of scope until they have a generated target and validation.
+Both targets publish all bundles. Codex component flags select skills, native command hooks and MCP independently. Oh My Pi is out of scope.
 
 ## Problem statement
 
@@ -52,7 +52,6 @@ registry/
 plugins/                   ← Claude Code plugins, one per bundle (SELF-CONTAINED — real files)
   <bundle>/
     .claude-plugin/plugin.json
-    .codex-plugin/plugin.json  ← present only for Codex-enabled bundles
     skills/<name>/         ← real-file copy of skills/<name>/
     bin/mcp/               ← prebuilt MCP server binaries
     .mcp.json              ← MCP server wiring
@@ -71,10 +70,11 @@ To make installs self-contained, `plugins/<bundle>/skills/<name>/` holds **real-
 
 `skills/` is canonical content authored in this repo. It was formerly vendored from `nq-rdl/agent-skills` through a `repository_dispatch` + clone-and-overwrite sync; that repo has been merged here and the sync removed (it was the single biggest source of operational brittleness — a non-atomic cross-repo handoff that could push a branch but then fail to open the PR). Skills are now authored directly, validated by `asctl`, and packaged into plugin trees by `scripts/sync-plugins.sh`.
 
-The phase-one Codex target shares the Claude-generated plugin copies, whose frontmatter omits
-`name:` to preserve Claude's namespaced autocomplete labels. Current Codex derives the missing name
-from the leaf directory and qualifies it with the plugin name. This runtime fallback is smoke-tested;
-strict public Codex packaging will require target-specific copies with explicit names.
+Codex copies are generated separately under `dist/codex/plugins/<subject>/`.
+They carry explicit leaf names and native manifests with OpenAI metadata. Skills and optional delegation outlines
+still originate in `skills/`. `scripts/codex_package.py` validates and copies
+selected MCP, native command hooks, and runtime resources, rejects symlinks,
+and checks both content and executable modes for drift. No agents tree is restored.
 
 ### `asctl` — the skills spec validator
 
@@ -135,8 +135,8 @@ targets:
 Required behavior:
 
 - A bundle maps to one Claude Code plugin. `targets.claude.enabled: false` disables a bundle without deleting it.
-- A phase-one Codex bundle must share its enabled Claude `pluginName`, expose skills, and leave MCP, hooks, and apps disabled.
-- Codex-enabled skill content must not depend on Claude-only plugin-root variables, tools, or slash-qualified invocations.
+- A Codex bundle needs at least one selected capability. MCP and hooks require explicit native config paths; apps require registered integration work. Codex names and skill exclusions can differ from Claude.
+- Native entrypoints use explicit skill names and host-aware execution instructions. Claude/OpenCode authoring examples remain artifacts for their target host, not native Codex API calls.
 - Skills are referenced by name and resolved from `skills/`. Hooks, prompts, and MCP integrations resolve from their respective root-level directories.
 
 ## Optional delegation

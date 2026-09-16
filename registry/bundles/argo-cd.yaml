@@ -18,3 +18,18 @@ targets:
     enabled: true
     pluginName: argo-cd
     marketplaceName: rdl-agent-extensions
+
+  codex:
+    enabled: true
+    pluginName: argo-cd
+    marketplaceName: rdl-agent-extensions
+    category: Developer Tools
+    components:
+      skills: true
+      mcp: false
+      hooks: false
+      apps: false
+    interface:
+      shortDescription: Argo CD — GitOps application management and sync for Kubernetes
+      defaultPrompt:
+      - Use Argo CD to help with my task.

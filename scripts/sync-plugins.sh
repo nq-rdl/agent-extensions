@@ -311,3 +311,8 @@ if warnings:
     )
 print("Done.")
 PY
+
+codex_args=()
+[ "$check" = 1 ] && codex_args+=(--check)
+if [ "${#args[@]}" -gt 0 ]; then codex_args+=(--bundles "${args[@]}"); fi
+python3 "$REPO_ROOT/scripts/codex_package.py" "$REPO_ROOT" "${codex_args[@]}"

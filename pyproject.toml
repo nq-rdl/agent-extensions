@@ -12,7 +12,7 @@ requires = ["hatchling"]
 # pixi manages ALL repo-local Python: the default environment carries
 # python + pyyaml for the registry/pipeline scripts (invoke them via
 # `pixi run`), and the `docs` environment adds zensical (linux-64 only).
-# CI installs pyyaml with pip on its runners; end-user skill execution
+# CI uses the same locked environment; end-user skill execution
 # needs neither (Python skills bootstrap their own deps via ensure-deps.sh).
 [tool.pixi.workspace]
 channels = ["conda-forge"]

@@ -18,13 +18,18 @@ targets:
     enabled: true
     pluginName: quarto
     marketplaceName: rdl-agent-extensions
+
   codex:
     enabled: true
     pluginName: quarto
     marketplaceName: rdl-agent-extensions
-    category: Productivity
+    category: Developer Tools
     components:
       skills: true
       mcp: false
       hooks: false
       apps: false
+    interface:
+      shortDescription: Quarto — document authoring and accessible figure alt text
+      defaultPrompt:
+      - Use Quarto to help with my task.

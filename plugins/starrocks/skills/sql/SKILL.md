@@ -253,12 +253,12 @@ WITH (cpu_weight = 8, mem_limit = '30%', concurrency_limit = 50);
 ## References
 
 - [StarRocks Introduction](https://docs.starrocks.io/docs/introduction/StarRocks_intro/)
-- [Best Practices](https://docs.starrocks.io/docs/category/best-practices/)
-- [Table Design](https://docs.starrocks.io/docs/category/table-design/)
+- [Best Practices](https://docs.starrocks.io/docs/best_practices/)
+- [Table Design](https://docs.starrocks.io/docs/table_design/)
 - [Data Loading](https://docs.starrocks.io/docs/loading/)
 - [Data Unloading](https://docs.starrocks.io/docs/unloading/)
 - [Information Schema](https://docs.starrocks.io/docs/sql-reference/information_schema/)
-- [Query Acceleration](https://docs.starrocks.io/docs/category/query-acceleration/)
+- [Query Acceleration](https://docs.starrocks.io/docs/using_starrocks/)
 - `references/table-design.rst` — Table types, partitioning, bucketing, indexing quick-ref
 - `references/data-loading.rst` — Loading methods comparison and patterns
 - `references/query-acceleration.rst` — Materialized views, CBO, join strategies, caching

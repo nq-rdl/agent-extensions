@@ -330,11 +330,11 @@ for bundle in sorted(list(_bundles_dir.glob("*.yaml")) + list(_bundles_dir.glob(
     codex_plugin_name = codex.get("pluginName") or bundle_id
 
     if codex_enabled:
-        codex_manifest = repo / "plugins" / codex_plugin_name / ".codex-plugin" / "plugin.json"
+        codex_manifest = repo / "dist/codex/plugins" / codex_plugin_name / ".codex-plugin" / "plugin.json"
         if not codex_manifest.is_file():
             err(
                 bundle,
-                f"Codex target is enabled but missing plugins/{codex_plugin_name}/"
+                f"Codex target is enabled but missing dist/codex/plugins/{codex_plugin_name}/"
                 ".codex-plugin/plugin.json",
             )
 
@@ -389,8 +389,8 @@ for bundle in sorted(list(_bundles_dir.glob("*.yaml")) + list(_bundles_dir.glob(
                         f"re-run scripts/sync-plugins.sh {bundle_id}",
                     )
 
-        if codex_enabled:
-            copy = repo / "plugins" / codex_plugin_name / "skills" / leaf
+        if codex_enabled and (source not in codex.get("excludeSkills", []) and (codex.get("components") or {}).get("skills", True)):
+            copy = repo / "dist/codex/plugins" / codex_plugin_name / "skills" / leaf
             skill_md = copy / "SKILL.md"
             if not skill_md.is_file():
                 err(
@@ -409,6 +409,8 @@ for bundle in sorted(list(_bundles_dir.glob("*.yaml")) + list(_bundles_dir.glob(
                 except (ValueError, yaml.YAMLError) as exc:
                     err(skill_md, f"invalid Codex skill frontmatter: {exc}")
                     frontmatter = {}
+                if frontmatter.get("name") != leaf:
+                    err(skill_md, "Codex skill name must match its leaf directory")
                 description = frontmatter.get("description")
                 if "description" not in frontmatter:
                     err(skill_md, "Codex skill frontmatter missing required 'description'")
@@ -452,4 +454,5 @@ if [ $errors -gt 0 ]; then
 fi
 
 echo ""
+python3 "$REPO_ROOT/scripts/codex_package.py" "$REPO_ROOT" --validate
 echo "All plugins and skills valid"

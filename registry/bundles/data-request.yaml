@@ -1,0 +1,47 @@
+schemaVersion: v1
+id: data-request
+displayName: Data Request
+description: Data Request — scope, map, draft, validate and fix request SQL and Python with shared RDL guardrails and human-confirmed review handoffs
+keywords: [data-request, sql, python, cohort, guardrails, mapping, drafting, validation, fixes, review, handoff]
+owners:
+  - rdl
+channels:
+  - stable
+skills:
+  - {source: data-request-setup, leaf: setup}          # → /data-request:setup
+  - {source: data-request-bootstrap, leaf: bootstrap}  # → /data-request:bootstrap
+  - {source: data-request-analyse, leaf: analyse}      # → /data-request:analyse
+  - {source: data-request-explain, leaf: explain}      # → /data-request:explain
+  - {source: data-request-guardrails, leaf: guardrails}
+  - {source: data-request-map, leaf: map}
+  - {source: data-request-draft, leaf: draft}
+  - {source: data-request-validate, leaf: validate}
+  - {source: data-request-fix, leaf: fix}
+hooks: [data-request-preflight, data-request-guard]
+prompts: []
+mcp: []
+targets:
+  claude:
+    enabled: true
+    pluginName: data-request
+    marketplaceName: rdl-agent-extensions
+
+  codex:
+    enabled: true
+    pluginName: data-request
+    marketplaceName: rdl-agent-extensions
+    category: Developer Tools
+    components:
+      skills: true
+      mcp: false
+      hooks: true
+      apps: false
+    interface:
+      shortDescription: Develop and review SQL; fix request SQL and Python
+      defaultPrompt:
+      - Use Data Request to help with my task.
+    hookConfig: hooks/codex/data-request/hooks.json
+    notes:
+      sharedHooks:
+      - data-request-preflight
+      - data-request-guard
