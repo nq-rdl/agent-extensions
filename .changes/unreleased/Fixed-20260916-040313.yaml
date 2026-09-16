@@ -1,0 +1,3 @@
+kind: Fixed
+body: Repair remaining StarRocks documentation links in table-design and query-acceleration references, verify the Markdown links, and refresh the Claude and Codex plugin copies.
+time: 2026-09-16T04:03:13.842629092Z

@@ -2,7 +2,7 @@ StarRocks Query Acceleration Quick Reference
 ============================================
 
 Condensed from the `Query
-Acceleration <https://docs.starrocks.io/docs/category/query-acceleration/>`__
+Acceleration <https://docs.starrocks.io/docs/using_starrocks/>`__
 docs.
 
 Acceleration Toolkit Overview

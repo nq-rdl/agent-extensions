@@ -252,6 +252,9 @@ WITH (cpu_weight = 8, mem_limit = '30%', concurrency_limit = 50);
 
 ## References
 
+Documentation URLs here and in the local references were verified against the
+official StarRocks site on 2026-09-16.
+
 - [StarRocks Introduction](https://docs.starrocks.io/docs/introduction/StarRocks_intro/)
 - [Best Practices](https://docs.starrocks.io/docs/best_practices/)
 - [Table Design](https://docs.starrocks.io/docs/table_design/)

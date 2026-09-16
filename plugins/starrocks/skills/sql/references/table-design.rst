@@ -2,9 +2,9 @@ StarRocks Table Design Quick Reference
 ======================================
 
 Condensed from the `Table
-Design <https://docs.starrocks.io/docs/category/table-design/>`__ and
+Design <https://docs.starrocks.io/docs/table_design/>`__ and
 `Best
-Practices <https://docs.starrocks.io/docs/category/best-practices/>`__
+Practices <https://docs.starrocks.io/docs/best_practices/>`__
 docs.
 
 Table Types
