@@ -261,6 +261,23 @@ tractable.
 
 `validate.yml` validates the bundle registry, resolves skill references, and checks plugin manifests/hooks/`.mcp.json`. `docs.yml` builds the docs site.
 
+Workflow results and enforced merge requirements are separate. On **2026-09-16**,
+the `main` protection API omitted `required_status_checks`, and the branch rules
+API returned `[]`: no required status checks were configured. Protection required
+one PR approval and resolved conversations, with administrator enforcement
+disabled. This is a dated observation, not a claim about earlier settings.
+[AGENTS.md](https://github.com/nq-rdl/agent-extensions/blob/main/AGENTS.md#build-test-lint) records the API endpoints, intended
+always-run check inventory, and responsibility for keeping check names aligned
+if maintainers enable enforcement. See [GitHub's protected-branch documentation](https://docs.github.com/en/repositories/configuring-branches-and-merges-in-your-repository/managing-protected-branches/about-protected-branches).
+
+External `check-links` remains advisory for merging and uses root `lychee.toml`
+without caching. Its current scan covers skill Markdown and Spec Kit RST when
+those paths change. The deterministic local Markdown/RST reference check and
+broader external coverage in [#300](https://github.com/nq-rdl/agent-extensions/issues/300)
+and advisory weekly monitoring in [#301](https://github.com/nq-rdl/agent-extensions/issues/301)
+are planned, not implemented. Local lefthook checks can still reject a commit;
+that behavior does not establish GitHub merge enforcement.
+
 ### Release
 
 Releases are cut through a reviewable PR, not a local tag push, so that **merge authorization
@@ -324,7 +341,7 @@ macOS and Linux only — the build and sync scripts require POSIX shell tooling 
 
 - One canonical source per skill; generated plugin trees over hand-maintained copies.
 - Self-contained installs (real-file copies, not cross-subtree symlinks).
-- Registry resilience: plugin generation continues even when a registry reference is momentarily stale (warn-and-skip); correctness is enforced as a PR gate.
+- Registry resilience: plugin generation continues even when a registry reference is momentarily stale (warn-and-skip); PR validation reports unresolved references. Merge enforcement depends on configured protection settings.
 - Install documentation is part of the product.
 
 ## Non-goals
