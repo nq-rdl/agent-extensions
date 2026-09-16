@@ -1,3 +1,0 @@
-kind: Security
-body: Keep Codex acceptance execution on the workflow dispatch commit to prevent cross-branch cache poisoning.
-time: 2026-09-16T03:08:44.144771483Z

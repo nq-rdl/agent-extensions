@@ -1,3 +1,0 @@
-kind: Added
-body: 'Language Policy row: small shell+jq helper scripts shared by a plugin''s skills and hooks (skills/<name>/scripts/) are sanctioned explicitly, alongside the Go rule for CLI helpers.'
-time: 2026-09-15T01:02:21.000000+00:00

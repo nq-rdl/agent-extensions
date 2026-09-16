@@ -1,3 +1,0 @@
-kind: Fixed
-body: Pin Red Hat setup to the verified Bitwarden 2026.8.0 search contract, guard matches in note contents, and retry failed storage before diagnosing session visibility.
-time: 2026-09-14T06:10:54.91154369Z

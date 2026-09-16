@@ -1,3 +1,0 @@
-kind: Fixed
-body: Harden SQL Review path containment, slug identity, document validation and file-operation error handling.
-time: 2026-09-15T02:33:55.995845301Z

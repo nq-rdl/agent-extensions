@@ -1,3 +1,0 @@
-kind: Fixed
-body: Complete interrupted SQL review rendering before stopping on unchanged SQL, preserving unpublished drafts.
-time: 2026-09-16T01:38:58.121493576Z

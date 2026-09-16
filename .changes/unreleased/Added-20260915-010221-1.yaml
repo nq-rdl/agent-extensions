@@ -1,3 +1,0 @@
-kind: Added
-body: 'Add the sql-review plugin (#131): a four-stage SQL Review workflow — /sql-review:setup, :bootstrap, :analyse, :explain — with a shared .sqlreview/ project contract.'
-time: 2026-09-15T01:02:21.000000+00:00

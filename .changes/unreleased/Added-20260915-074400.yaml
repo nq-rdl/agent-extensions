@@ -1,3 +1,0 @@
-kind: Added
-body: Add a pinned Codex devcontainer and run plugin installation, skill/reference discovery, removal, and reinstallation tests in the required CI job without network access or credentials.
-time: 2026-09-15T07:44:00.91053366Z

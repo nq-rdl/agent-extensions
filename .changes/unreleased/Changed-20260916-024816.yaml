@@ -1,3 +1,0 @@
-kind: Changed
-body: Publish all nine data-request actions for Claude and Codex, preserving native review hooks, atomic publishing, role updates and interrupted-render recovery.
-time: 2026-09-16T02:48:16.821690894Z

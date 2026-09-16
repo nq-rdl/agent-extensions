@@ -1,3 +1,0 @@
-kind: Fixed
-body: Print an absolute, shell-quoted agent-teams enable command so follow-up instructions work from installed caches and unrelated workspaces.
-time: 2026-09-16T00:29:14.529603868Z
