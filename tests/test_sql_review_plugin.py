@@ -7,7 +7,6 @@ setup exempt from the initialisation gate, and the language-policy row that sanc
 """
 
 import json
-import re
 import unittest
 from pathlib import Path
 
