@@ -11,6 +11,7 @@
 # reports status, and optionally toggles the feature flag.
 
 set -euo pipefail
+SCRIPT_PATH="$(cd "$(dirname "$0")" && pwd -P)/$(basename "$0")"
 
 RED='\033[0;31m'
 GREEN='\033[0;32m'
@@ -47,12 +48,14 @@ while [[ $# -gt 0 ]]; do
 done
 
 # ── Settings file locations ──────────────────────────────────────────────────
-declare -A LOCATIONS=(
-  ["Project"]="$(pwd)/.claude/settings.json"
-  ["Project local"]="$(pwd)/.claude/settings.local.json"
-  ["User"]="$HOME/.claude/settings.json"
-  ["User local"]="$HOME/.claude/settings.local.json"
-)
+settings_path() {
+  case "$1" in
+    Project) printf '%s/.claude/settings.json\n' "$PWD" ;;
+    'Project local') printf '%s/.claude/settings.local.json\n' "$PWD" ;;
+    User) printf '%s/.claude/settings.json\n' "$HOME" ;;
+    'User local') printf '%s/.claude/settings.local.json\n' "$HOME" ;;
+  esac
+}
 
 # ── Enable / Disable ────────────────────────────────────────────────────────
 if [[ "$ACTION" != "check" ]]; then
@@ -118,7 +121,7 @@ echo "================================"
 echo ""
 
 for label in "Project" "Project local" "User" "User local"; do
-  file="${LOCATIONS[$label]}"
+  file="$(settings_path "$label")"
 
   if [[ ! -f "$file" ]]; then
     echo -e "  ${YELLOW}SKIP${NC}  $label — file not found"
@@ -205,7 +208,7 @@ else
   echo -e "${RED}${BOLD}Agent teams are NOT ENABLED${NC}"
   echo ""
   echo "To enable, run:"
-  echo "  bash scripts/check-config.sh --enable"
+  printf '  bash %q --enable\n' "$SCRIPT_PATH"
   echo ""
   echo "Or add manually to settings.json:"
   echo '  {'

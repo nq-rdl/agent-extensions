@@ -88,6 +88,45 @@ def fixture(root, *, mcp=False, hooks=False):
 
 
 class StrictPackaging(unittest.TestCase):
+    def test_skill_licenses_are_in_installed_package_and_archive(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            repo = Path(tmp)
+            fixture(repo)
+            skill = repo / "skills/sample-task/SKILL.md"
+            skill.write_text(skill.read_text().replace("name: sample-task", "name: sample-task\nlicense: CC-BY-4.0"))
+            for name in ("LICENSE", "LICENSE-CC-BY-4.0", "NOTICE"):
+                shutil.copy(REPO / name, repo / name)
+            package.sync(repo)
+            installed = repo / package.ROOT / "sample"
+            archive = repo / "package.zip"
+            directory.archive(installed, archive)
+            shutil.rmtree(repo / "skills")
+            with zipfile.ZipFile(archive) as contents:
+                for name in ("LICENSE", "LICENSE-CC-BY-4.0", "NOTICE"):
+                    self.assertEqual((installed / name).read_bytes(), (REPO / name).read_bytes())
+                    self.assertEqual(contents.read(name), (REPO / name).read_bytes())
+
+    def test_agent_teams_printed_enable_command_works_from_installed_cache(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            cache = root / "cache with spaces and 'quotes'"
+            shutil.copytree(REPO / "dist/codex/plugins/claude-code/skills/agent-teams", cache)
+            workspace = root / "unrelated workspace"
+            workspace.mkdir()
+            home = root / "isolated home"
+            home.mkdir()
+            env = {**os.environ, "HOME": str(home), "CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS": ""}
+            result = subprocess.run(["bash", str(cache / "scripts/check-config.sh")],
+                                    cwd=workspace, env=env, capture_output=True, text=True)
+            self.assertEqual(result.returncode, 0, result.stderr)
+            command = next(line.strip() for line in result.stdout.splitlines() if line.startswith("  bash "))
+            result = subprocess.run(["bash", "-c", command], cwd=workspace, env=env,
+                                    capture_output=True, text=True)
+            self.assertEqual(result.returncode, 0, result.stderr)
+            settings = json.loads((home / ".claude/settings.json").read_text())
+            self.assertEqual(settings["env"]["CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS"], "1")
+            self.assertFalse((workspace / ".claude/settings.json").exists())
+
     def test_bundled_helper_commands_run_from_an_unrelated_workspace(self):
         with tempfile.TemporaryDirectory() as tmp:
             repo = Path(tmp)

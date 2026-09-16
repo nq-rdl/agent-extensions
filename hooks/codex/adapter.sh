@@ -55,7 +55,7 @@ case "$mode" in
         path="$(printf '%s\n' "$path" | awk -F/ '{n=0; for(i=1;i<=NF;i++){if($i==""||$i==".")continue;if($i==".."){if(n>0)n--;continue}p[++n]=$i}for(i=1;i<=n;i++)printf "%s%s",(i>1?"/":""),p[i];print ""}')"
         case "/$path" in
           */.sqlreview/config.json|*/.sqlreview/reviews/*/review.json|*/.sqlreview/reviews/*/scope.json|*/.sqlreview/reviews/*/review.md|*/.sqlreview/reviews/*/scope.md)
-            deny 'Authoritative SQL review files require whole-document validation. Write a draft, run the installed sqlreview.sh check, then publish the validated document and render it with sqlreview.sh. Config changes use $sql-code:setup. This patch guard does not intercept shell writes.'
+            deny 'Authoritative SQL review files require whole-document validation. Write a confirmed draft, then run bash "${PLUGIN_ROOT}/skills/setup/scripts/sqlreview.sh" publish <slug> <scope|review> <draft-path>; this validates a staged copy before atomic replacement. Run the same helper with render <slug> <scope|review> for Markdown. Config changes use $sql-code:setup. This patch guard does not intercept shell writes.'
             exit 0 ;;
         esac
       done <<<"$paths"

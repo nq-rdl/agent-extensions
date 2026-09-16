@@ -89,7 +89,8 @@ question**: `confirmed_by` is the user (`git config user.name` / `user.email`, e
 `confirmed_at` is now (UTC ISO), `confirmed_revision` equals the document `revision`.
 
 Re-run fingerprint and compare its SHA with the bytes you reviewed; if different, reassess the
-change before continuing. Write the whole `reviews/$SLUG/review.json` (the guard validates it; Edit is refused):
+change before continuing. Write the complete confirmed document to
+`.sqlreview/reviews/$SLUG/review.draft.json`, then publish it with the command below:
 
 ```json
 {
@@ -110,13 +111,16 @@ change before continuing. Write the whole `reviews/$SLUG/review.json` (the guard
 ```
 
 ```bash
-bash "$S/sqlreview.sh" snapshot "$SLUG" "<sql path>" || exit $?  # only AFTER the guarded Write succeeds
+bash "$S/sqlreview.sh" publish "$SLUG" review ".sqlreview/reviews/$SLUG/review.draft.json" || exit $?
+bash "$S/sqlreview.sh" snapshot "$SLUG" "<sql path>" || exit $?  # only AFTER publish succeeds
 bash "$S/sqlreview.sh" render "$SLUG" review || exit $?  # → reviews/<slug>/review.md (never hand-write it)
 rm -f ".sqlreview/reviews/$SLUG/review.draft.json"
 ```
 
 Show `review.md`. Hand over: the analyst runs `$sql-code:explain <sql path>`.
 
+Publish validates a staged copy, confirmations, next revision and current SQL fingerprint before
+atomically replacing `review.json`. Never copy or patch the draft directly into the final path.
 Snapshot verifies the final review hash before advancing `source.sql` and preserves
 `history/<revision>.sql` for resumed explanations. Stop on any failure and keep the draft. A failed
-or interrupted Write must never advance the baseline; a failed snapshot leaves the review stale.
+or interrupted publish must never advance the baseline; a failed snapshot leaves the review stale.

@@ -45,5 +45,8 @@ Copyright in these files is held by nq-rdl; the OpenAI copyright statement in
 `plugins/codex/NOTICE` does not extend to them.
 
 All of the paths above are governed by `plugins/codex/LICENSE` and
-`plugins/codex/NOTICE`; every other file in the repository remains under the MIT
-License.
+`plugins/codex/NOTICE`. Skills declaring `license: CC-BY-4.0` in their SKILL.md
+frontmatter, including their generated copies, are governed by LICENSE-CC-BY-4.0.
+The package manifest license describes the package default; individual skill
+license declarations take precedence for that skill. All other files remain
+under the MIT License.

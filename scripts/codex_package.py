@@ -354,7 +354,7 @@ def build_package(repo, plugin, bundle, dest, names):
             contained(repo, resource["source"]),
             contained(dest, resource["destination"]),
         )
-    for filename in ("LICENSE", "NOTICE"):
+    for filename in sorted({"NOTICE", *(p.name for p in repo.glob("LICENSE*"))}):
         if (repo / filename).is_file():
             copy_source(
                 (repo / "plugins" / plugin / filename)

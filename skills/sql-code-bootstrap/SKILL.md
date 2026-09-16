@@ -71,8 +71,8 @@ engineer stops, leave the draft and write nothing final — say so.
 Only confirmed items go into `scope.json`. **Never fill `confirmed_by`, `confirmed_at` or
 `confirmed_revision` from anything but an answered question** — `confirmed_by` is the user (name
 or email from `git config user.name` / `user.email`, else ask), `confirmed_at` is now (UTC ISO),
-`confirmed_revision` equals the document `revision`. Write the whole file (the guard validates it;
-an Edit is refused):
+`confirmed_revision` equals the document `revision`. Write the complete confirmed document to
+`.sqlreview/reviews/$SLUG/scope.draft.json`, then publish it with the command below:
 
 ```json
 {
@@ -89,7 +89,13 @@ an Edit is refused):
 }
 ```
 
-After the guarded scope Write succeeds, if SQL exists, copy its reviewed bytes to
+```bash
+bash "$S/sqlreview.sh" publish "$SLUG" scope ".sqlreview/reviews/$SLUG/scope.draft.json" || exit $?
+```
+
+Publish validates a staged copy, including confirmations and the next revision, before atomically
+replacing `scope.json`. Never copy or patch the draft directly into the final path.
+After publish succeeds, if SQL exists, copy its reviewed bytes to
 `.sqlreview/reviews/$SLUG/scope.source.sql` (separate from analyse’s `source.sql`). Check copy success;
 if it fails, remove any old scope baseline and report that the next bootstrap needs a full reassessment.
 Preserve the previous revision and increment it on updates.

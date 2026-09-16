@@ -95,8 +95,9 @@ payloads where needed. Users must enable hooks and review/trust them in Codex's
 | `tech-writing` | House-style/Stylepedia reminder for explicit writing skills | Advisory; Claude agent-based Stop/SubagentStop review is not executable in Codex |
 | `codex` | Session guidance for companion jobs and transcript import | Claude session lifecycle and automatic stop-review hooks are not installed |
 
-The SQL patch guard does not intercept shell writes. Validate complete review
-records with the installed `sqlreview.sh check` before publishing them, then use
+The SQL patch guard does not intercept shell writes. Publish confirmed drafts with
+the installed `sqlreview.sh publish <slug> <scope|review> <draft-path>`; it validates
+a staged copy before atomically replacing the authoritative JSON. Then use
 `sqlreview.sh render`. Hooks are workflow guardrails, not a security boundary.
 Native adapters never translate an unsupported decision into automatic approval.
 
