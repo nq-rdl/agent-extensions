@@ -163,6 +163,47 @@ If a file is neither runnable nor `.rst` prose, it belongs in `assets/`.
 
 ## Skill content conventions
 
+### Body size and disclosure
+
+This repository limits each `SKILL.md` to **500 body lines**, enforced by both
+`asctl validate` and `asctl repo-check`. The body starts after the closing YAML
+frontmatter fence. Leading and trailing blank lines count. LF and CRLF each end
+one line; a final newline does not add an extra line, and an unterminated final
+line still counts. An empty body has zero lines. Malformed frontmatter remains
+a parse error, not a body-size result.
+
+This is **house policy**, distinct from the [Agent Skills recommendation](https://agentskills.io/specification#progressive-disclosure)
+to keep the main file under 500 lines and its instruction body below roughly
+5,000 tokens. Neither line count nor an approximate token count measures task
+quality or actual model context usage.
+
+Aim for **300 body lines** during review. This is an editorial target, not an
+additional gate: crossing it does not require an otherwise unnecessary reference
+file. Keep task-specific references focused and directly reachable from
+`SKILL.md`; a table of contents can help navigate a long reference. Preserve
+useful examples, failure handling, and critical constraints when task evidence
+supports them.
+
+Run `asctl repo-check --size-report` before a content pilot. It adds body lines,
+approximate tokens (**raw UTF-8 body bytes / 4**, including whitespace and line
+endings), and visible regular file counts recursively under `references/`.
+Hidden entries and symlinks are excluded from reference counts. Rows sort by
+descending body lines, then skill path; unavailable metrics show `n/a` with a
+reason. The report does not suppress validation errors or add validation rules.
+Measure actual loading, correctness, and task completion separately during pilots.
+
+### Discovery descriptions
+
+Make invocation conditions clear in `description`. Aim for **400 characters for
+skill descriptions** and **300 for agent descriptions where applicable**, with
+justified exceptions under the existing schema limits (skill descriptions allow
+1,024 characters). These are editorial defaults, not automated shape/length
+gates. A three-part description template is optional. Keep identifiers and
+negative triggers when they improve routing; verify ambiguous sibling routing
+with representative requests. No new metadata field or agent body cap is required.
+
+### Content value
+
 A skill must encode a **gap the fresh model cannot see** — not restate public
 knowledge. Before writing or accepting skill content, apply these:
 
