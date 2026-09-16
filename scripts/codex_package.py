@@ -175,6 +175,10 @@ def skill_copy(repo, source, leaf, dest, config, names):
     for path in (dest / "references").rglob("*.rst"):
         original = path.read_text()
         adapted = helper_invocations(original, src, source, leaf)
+        # Delegation outlines execute this workflow; authoring references for
+        # another host retain that host's variables and configuration examples.
+        if path.name == "subagent.rst" and source not in SUBJECT_SKILLS:
+            adapted = adapted.replace("${CLAUDE_PLUGIN_ROOT}", "${PLUGIN_ROOT}")
         if adapted != original:
             path.write_text(adapted)
             reference_helpers = True

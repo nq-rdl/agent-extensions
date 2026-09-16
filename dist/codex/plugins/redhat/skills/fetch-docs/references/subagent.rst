@@ -49,7 +49,7 @@ Procedure
 
 .. code:: bash
 
-   S="${CLAUDE_PLUGIN_ROOT}/skills/fetch-docs/scripts"   # in-repo: skills/redhat-docs-fetch/scripts
+   S="${PLUGIN_ROOT}/skills/fetch-docs/scripts"   # in-repo: skills/redhat-docs-fetch/scripts
 
 1. **Preflight** — ``bash "$S/rh-preflight.sh"``. Note the fetcher and
    the credential source.

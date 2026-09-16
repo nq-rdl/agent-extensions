@@ -40,7 +40,7 @@ companion script. Do not do anything else.
 Forwarding rules:
 
 - After reading the provided runtime and prompting instructions, use exactly one ``Bash`` call to invoke
-  ``node "${CLAUDE_PLUGIN_ROOT}/scripts/codex-companion.mjs" task ...``.
+  ``node "${PLUGIN_ROOT}/scripts/codex-companion.mjs" task ...``.
 - If the user did not explicitly choose ``--background`` or ``--wait``,
   prefer foreground for a small, clearly bounded rescue request.
 - If the user did not explicitly choose ``--background`` or ``--wait``

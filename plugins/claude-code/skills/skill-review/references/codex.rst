@@ -1,18 +1,3 @@
----
-name: skill-review
-license: CC-BY-4.0
-description: Review skills changed during a development session for actionable bugs
-  and improvements. Use after creating, editing, or debugging a skill to capture user
-  corrections and close the feedback loop; optionally delegate a second opinion using
-  the referenced worker outline.
-metadata:
-  repo: https://github.com/nq-rdl/agent-extensions
----
-
-## Codex execution
-
-Delegation is optional. Read references/subagent.rst only when delegation is useful or requested. It does not install a named agent or grant permissions.
-
 # Skill Review
 
 Review the skills touched in this session against the repository's contributor

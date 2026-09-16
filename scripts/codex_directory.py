@@ -55,6 +55,10 @@ def report(repo):
         yaml.safe_load(publisher_path.read_text()) if publisher_path.exists() else {}
     )
     publisher = publisher or {}
+    def attested(key, plugin):
+        values = publisher.get(key)
+        return isinstance(values, dict) and values.get(plugin) is True
+
     results = []
     for name, bundle in enabled.items():
         root = repo / ROOT / name
@@ -79,26 +83,30 @@ def report(repo):
             fm, _ = frontmatter(path.read_text())
             if fm.get("disable-model-invocation"):
                 explicit.append(path.parent.name)
-        if explicit:
+        if explicit and not attested("explicitInvocationApproved", name):
             blockers.append(
                 "Explicit-only invocation policy needs a directory-compatible decision; preserved for: "
                 + ", ".join(explicit)
             )
-        transport = "skills-only"
+        has_hooks = bool(bundle["components"].get("hooks"))
+        transport = "skills+hooks" if has_hooks else "skills-only"
         if bundle["components"].get("mcp"):
             servers = json.loads((root / ".mcp.json").read_text())["mcpServers"]
             if any("command" in cfg for cfg in servers.values()):
                 transport = "local-mcp"
-                blockers.append(
-                    "Local MCP requires an approved local-runtime submission path or a publisher-owned public HTTPS deployment"
-                )
+                if not attested("localMcpApproved", name):
+                    blockers.append(
+                        "Local MCP requires an approved local-runtime submission path or a publisher-owned public HTTPS deployment"
+                    )
             else:
                 transport = "remote-mcp"
-                blockers.append(
-                    "Remote MCP submission requires server-owner authorization, domain verification and authenticated connection evidence"
-                )
-        evidence = (publisher.get("behavioralEvidence") or {}).get(name)
-        if evidence is not True:
+                if not attested("remoteMcpAuthorized", name):
+                    blockers.append(
+                        "Remote MCP submission requires server-owner authorization, domain verification and authenticated connection evidence"
+                    )
+            if has_hooks:
+                transport += "+hooks"
+        if not attested("behavioralEvidence", name):
             blockers.append(
                 "Record authenticated execution evidence for five positive and three negative task cases"
             )
@@ -114,7 +122,7 @@ def report(repo):
                 "route": transport,
                 "package": str(ROOT / name),
                 "skills": len(bundle["skills"]),
-                "hooks": bool(bundle["components"].get("hooks")),
+                "hooks": has_hooks,
                 "packageReady": True,
                 "submissionReady": not blockers,
                 "blockers": blockers,

@@ -12,8 +12,8 @@ This report records missing evidence; it does not attest to publisher identity, 
 | argo-cd | 2 | skills-only | No |
 | bitwarden | 1 | skills-only | No |
 | charm-tui | 1 | skills-only | No |
-| claude-code | 10 | skills-only | No |
-| codex | 13 | skills-only | No |
+| claude-code | 10 | skills+hooks | No |
+| codex | 13 | skills+hooks | No |
 | debug | 2 | skills-only | No |
 | defuddle | 1 | skills-only | No |
 | gh | 12 | skills-only | No |
@@ -24,7 +24,7 @@ This report records missing evidence; it does not attest to publisher identity, 
 | lychee | 1 | skills-only | No |
 | mongodb | 1 | skills-only | No |
 | obsidian | 3 | skills-only | No |
-| opencode-dev | 7 | skills-only | No |
+| opencode-dev | 7 | skills+hooks | No |
 | pandera | 1 | skills-only | No |
 | pixi | 1 | skills-only | No |
 | planning | 5 | skills-only | No |
@@ -33,14 +33,14 @@ This report records missing evidence; it does not attest to publisher identity, 
 | quarto | 2 | skills-only | No |
 | r | 8 | skills-only | No |
 | rdl-team | 3 | skills-only | No |
-| redhat | 2 | skills-only | No |
+| redhat | 2 | skills+hooks | No |
 | rust | 1 | skills-only | No |
 | shiny | 2 | skills-only | No |
 | sops | 1 | skills-only | No |
-| speckit-dev | 4 | skills-only | No |
-| sql-code | 8 | skills-only | No |
+| speckit-dev | 4 | skills+hooks | No |
+| sql-code | 8 | skills+hooks | No |
 | starrocks | 1 | skills-only | No |
-| tech-writing | 2 | skills-only | No |
+| tech-writing | 2 | skills+hooks | No |
 | terraform | 3 | skills-only | No |
 | writerside | 1 | skills-only | No |
 

@@ -88,6 +88,47 @@ def fixture(root, *, mcp=False, hooks=False):
 
 
 class StrictPackaging(unittest.TestCase):
+    def test_native_delegation_roots_execute_from_cache_and_host_examples_survive(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            repo = Path(tmp)
+            data = fixture(repo)
+            source = repo / "skills/sample-task"
+            commands = 'S="${CLAUDE_PLUGIN_ROOT}/skills/task/scripts"\nbash "$S/run.sh"\n'
+            outline = source / "references/subagent.rst"
+            outline.write_text(commands)
+            example = source / "references/claude-config.rst"
+            example.write_text('Claude hook example: "${CLAUDE_PLUGIN_ROOT}/hooks/check.sh"\n')
+            package.sync(repo)
+            cached = repo / "installed cache/sample"
+            shutil.copytree(repo / package.ROOT / "sample", cached)
+            workspace = repo / "unrelated workspace"
+            workspace.mkdir()
+            native = (cached / "skills/task/references/subagent.rst").read_text()
+            env = {**os.environ, "PLUGIN_ROOT": str(cached)}
+            env.pop("CLAUDE_PLUGIN_ROOT", None)
+            result = subprocess.run(["bash", "-c", native], cwd=workspace, env=env,
+                                    capture_output=True, text=True)
+            self.assertEqual(result.returncode, 0, result.stderr)
+            self.assertIn("done", result.stdout)
+            self.assertEqual((cached / "skills/task/references/claude-config.rst").read_bytes(), example.read_bytes())
+            self.assertIn("set PLUGIN_ROOT", (cached / "skills/task/SKILL.md").read_text())
+            # Outlines about authoring another host keep its executable examples.
+            source.rename(repo / "skills/cc-hook")
+            data["skills"] = [{"source": "cc-hook", "leaf": "task"}]
+            (repo / "registry/bundles/sample.yaml").write_text(yaml.safe_dump(data))
+            package.sync(repo)
+            self.assertEqual((repo / package.ROOT / "sample/skills/task/references/subagent.rst").read_text(), commands)
+
+    def test_skill_review_shares_procedure_but_keeps_host_output_defaults(self):
+        native = REPO / package.ROOT / "claude-code/skills/skill-review"
+        claude = REPO / "plugins/claude-code/skills/skill-review"
+        self.assertIn("${CODEX_HOME}/skill-reviews", (native / "SKILL.md").read_text())
+        self.assertNotIn("~/.claude/skill-reviews", (native / "SKILL.md").read_text())
+        self.assertIn("~/.claude/skill-reviews", (claude / "SKILL.md").read_text())
+        for root in (native, claude):
+            self.assertIn("references/review.rst", (root / "SKILL.md").read_text())
+            self.assertEqual((root / "references/review.rst").read_bytes(), (REPO / "skills/skill-review/references/review.rst").read_bytes())
+
     def test_skill_licenses_are_in_installed_package_and_archive(self):
         with tempfile.TemporaryDirectory() as tmp:
             repo = Path(tmp)
@@ -532,6 +573,52 @@ class NativeHookBehavior(unittest.TestCase):
 
 
 class DirectoryArtifacts(unittest.TestCase):
+    def test_displayed_routes_include_every_enabled_component(self):
+        for mcp, hooks, remote, expected in (
+            (False, False, False, "skills-only"), (False, True, False, "skills+hooks"),
+            (True, False, True, "remote-mcp"), (True, True, True, "remote-mcp+hooks"),
+            (True, False, False, "local-mcp"), (True, True, False, "local-mcp+hooks"),
+        ):
+            with self.subTest(route=expected), tempfile.TemporaryDirectory() as tmp:
+                repo = Path(tmp)
+                fixture(repo, mcp=mcp, hooks=hooks)
+                if mcp and not remote:
+                    (repo / "mcp/source.json").write_text(json.dumps({"mcpServers": {"example": {"command": "example"}}}))
+                package.sync(repo)
+                result = directory.report(repo)
+                self.assertEqual(result["plugins"][0]["route"], expected)
+                self.assertIn(f"| {expected} |", directory.markdown(result))
+
+    def test_external_gates_clear_only_for_typed_plugin_specific_approvals(self):
+        for remote, gate in ((True, "remoteMcpAuthorized"), (False, "localMcpApproved")):
+            with self.subTest(gate=gate), tempfile.TemporaryDirectory() as tmp:
+                repo = Path(tmp)
+                fixture(repo, mcp=True)
+                source = repo / "skills/sample-task/SKILL.md"
+                source.write_text(source.read_text().replace("name: sample-task", "name: sample-task\ndisable-model-invocation: true"))
+                if not remote:
+                    (repo / "mcp/source.json").write_text(json.dumps({"mcpServers": {"example": {"command": "example"}}}))
+                package.sync(repo)
+                manifest_path = repo / package.ROOT / "sample/.codex-plugin/plugin.json"
+                manifest = json.loads(manifest_path.read_text())
+                manifest["interface"].update(logo="logo.png", privacyPolicyURL="https://example.com/privacy", termsOfServiceURL="https://example.com/terms")
+                manifest_path.write_text(json.dumps(manifest))
+                publisher = {
+                    "supportURL": "https://example.com/support", "identityVerified": True,
+                    "availabilityRegions": ["AU"], "behavioralEvidence": {"sample": True},
+                    "explicitInvocationApproved": {"sample": True}, gate: {"sample": True},
+                }
+                settings = repo / "registry/codex-directory.yaml"
+                settings.write_text(yaml.safe_dump(publisher))
+                self.assertTrue(directory.report(repo)["plugins"][0]["submissionReady"])
+                for key in ("explicitInvocationApproved", gate):
+                    for value in ({}, {"other": True}, {"sample": False}, {"sample": "true"}, {"sample": 1}, True, []):
+                        with self.subTest(key=key, value=value):
+                            settings.write_text(yaml.safe_dump({**publisher, key: value}))
+                            result = directory.report(repo)["plugins"][0]
+                            self.assertFalse(result["submissionReady"])
+                            self.assertEqual(len(result["blockers"]), 1)
+
     def test_submission_urls_require_absolute_https_urls(self):
         with tempfile.TemporaryDirectory() as tmp:
             repo = Path(tmp)

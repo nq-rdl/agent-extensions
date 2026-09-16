@@ -169,6 +169,13 @@ Publisher-approved branding, privacy/terms URLs, verified publisher identity,
 behavioral evidence, and MCP ownership/authentication cannot be inferred from a
 successful local package test. Existing explicit-only skills retain their policy;
 the directory's invocation-policy constraint requires a deliberate publisher decision.
+Record external decisions per plugin in `registry/codex-directory.yaml`:
+`explicitInvocationApproved` for approval of the preserved explicit-only policy,
+`localMcpApproved` for the shipped local-runtime submission route, and
+`remoteMcpAuthorized` for server-owner authorization, domain verification and
+authenticated connection evidence. Each is a map such as `{plugin-name: true}`;
+only literal YAML `true` clears its gate. These declarations record publisher
+decisions; package generation does not supply approvals or change invocation policy.
 
 Public submission is separate from repository distribution. Local Playwright MCP
 needs an approved local-runtime submission route or a public deployment; Lucid

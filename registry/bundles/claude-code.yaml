@@ -42,6 +42,8 @@ targets:
       defaultPrompt:
       - Use Claude Code to help with my task.
     hookConfig: hooks/codex/claude-code/hooks.json
+    skillOverrides:
+      skill-review: references/codex.rst
     notes:
       sharedHooks:
       - skill-audit-nudge
