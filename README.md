@@ -32,6 +32,11 @@ codex plugin add go@rdl-agent-extensions --json
 
 The Codex catalog includes all 36 bundles, with strict skill names, MCP integrations, and native command hooks. See [`docs/codex.md`](docs/codex.md) for verification commands and current limitations.
 
+To invoke an installed skill in Codex, type `$` to select it. Add your request after the skill mention.
+For example, the installed `git` plugin provides `$git:pr-comments <PR URL>` in the Codex composer.
+The CLI also provides `/skills`. Refer to [Invoking skills](docs/codex.md#invoking-skills)
+for desktop menu behaviour and differences from Claude Code slash commands.
+
 See [Delegation](docs/delegation.md) for optional subagent execution and migrated agent names.
 
 ## Agent File Management
