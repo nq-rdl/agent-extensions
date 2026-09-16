@@ -1,0 +1,16 @@
+{
+  "description": "Native Codex command hooks for opencode-dev; review and trust before execution.",
+  "hooks": {
+    "UserPromptSubmit": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash \"${PLUGIN_ROOT}/hooks/adapter.sh\" opencode-doc-review",
+            "timeout": 10
+          }
+        ]
+      }
+    ]
+  }
+}

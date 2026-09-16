@@ -23,6 +23,12 @@ install and avoids cross-plugin helper paths. The registry maps flat canonical
 | `analyse` | Human-confirmed handoff report | Yes |
 | `explain` | Analyst walkthrough of reviewed SQL | Yes |
 
+Both Claude Code and Codex ship all nine actions. Claude invokes
+`/data-request:<action>` from `plugins/data-request/`; Codex invokes
+`$data-request:<action>` from `dist/codex/plugins/data-request/`. The registry
+enables native skills and the two review hooks. The Codex packager adapts host
+tool references and installed resource paths, preserving canonical procedures.
+
 The new development actions support autonomous and co-development modes. Autonomous
 work proceeds on explicit requirements and verified facts; missing business decisions
 remain questions. Neither mode fabricates human confirmations. Technical validation
@@ -83,9 +89,15 @@ through the task. The hook is advisory and cannot guarantee model compliance.
 Keep existing `.sqlreview/` directories, config schema 1, scope/review JSON, snapshots
 and history. Preserve template customisations while migrating their invocations.
 The `sqlreview.sh` helper name and persisted format stay stable.
+The helpers retain validated atomic publishing, confirmed role updates and
+interrupted-render recovery from the native Codex integration. Codex's patch guard
+protects authoritative review records while permitting SQL, Python and draft
+edits; it does not intercept shell writes.
 Canonical hook names become `data-request-preflight` and `data-request-guard`; their configuration
 lives in `hooks/data-request/hooks.json`, and the existing sync script generates all packaged
 hook files under `plugins/data-request/hooks/`.
+Native hook configuration lives in `hooks/codex/data-request/hooks.json` and is
+packaged with the shared adapter under `dist/codex/plugins/data-request/hooks/`.
 
 For users with an installed copy of the team's forced-eval hook, rerun
 `/rdl-team:cc-setup` to refresh it. Updating Data Request alone does not replace a copied

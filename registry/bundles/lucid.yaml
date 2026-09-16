@@ -17,3 +17,19 @@ targets:
     enabled: true
     pluginName: lucid
     marketplaceName: rdl-agent-extensions
+
+  codex:
+    enabled: true
+    pluginName: lucid
+    marketplaceName: rdl-agent-extensions
+    category: Developer Tools
+    components:
+      skills: false
+      mcp: true
+      hooks: false
+      apps: false
+    interface:
+      shortDescription: Lucidchart and Lucidspark through the hosted Lucid MCP server
+      defaultPrompt:
+      - Use Lucid to help with my task.
+    mcpConfig: plugins/lucid/.mcp.json

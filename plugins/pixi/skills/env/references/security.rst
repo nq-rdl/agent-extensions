@@ -63,9 +63,9 @@ reduces the risk of silent dependency drift and gives you a stable
 review surface: if a dependency changes, the lock file changes too.
 
 To review lock file changes between commits in a human-readable way, you
-can use `pixi-diff <../integration/extensions/pixi_diff/>`__
+can use `pixi-diff <https://pixi.prefix.dev/latest/integration/extensions/pixi_diff/>`__
 directly or integrate the output into CI with
-`pixi-diff-to-markdown <../integration/ci/updates_github_actions/>`__.
+`pixi-diff-to-markdown <https://pixi.prefix.dev/latest/integration/ci/updates_github_actions/>`__.
 
 For example:
 
@@ -85,7 +85,7 @@ For example:
 ------------------------------------------------------------------------------------------------
 
 Use
-`exclude-newer <../reference/pixi_manifest/#exclude-newer-optional>`__
+`exclude-newer <https://pixi.prefix.dev/latest/reference/pixi_manifest/#exclude-newer-optional>`__
 to put a short delay on packages from public channels by default, then
 carve out exceptions only for artifacts you control or urgent security
 fixes that you have explicitly reviewed. This is a practical defense
@@ -157,7 +157,7 @@ When an advisory lands, update to the fixed version first. If the fix is
 fresh, that can also mean temporarily relaxing ``exclude-newer`` so you
 can adopt the security release immediately. If another dependency
 prevents the solver from reaching the non-vulnerable version, Pixi
-supports `dependency-overrides <../advanced/override/>`__ for PyPI
+supports `dependency-overrides <https://pixi.prefix.dev/latest/advanced/override/>`__ for PyPI
 packages.
 
 This is how you respond when a vulnerable version is already known,
@@ -205,9 +205,9 @@ automation around them as code execution boundaries, not just
 environment setup commands. Conda packages can carry executable hooks in
 addition to files and metadata. Two especially relevant cases are:
 
--  `post-link scripts <../reference/pixi_configuration/#run-post-link-scripts>`__,
+-  `post-link scripts <https://pixi.prefix.dev/latest/reference/pixi_configuration/#run-post-link-scripts>`__,
    which run during installation if explicitly enabled;
--  `activation scripts <../workspace/environment/#activation>`__, which
+-  `activation scripts <https://pixi.prefix.dev/latest/workspace/environment/#activation>`__, which
    are run during environment activation.
 
 This is a different class of supply-chain risk from "is this version
@@ -228,7 +228,7 @@ malicious package can execute code at activation time.
    allow JSON-style activations only. Track progress in
    `pixi#4889 <https://github.com/prefix-dev/pixi/issues/4889>`__.
 
-This also affects ``direnv`` integrations. The documented `direnv setup <../integration/third_party/direnv/>`__ uses
+This also affects ``direnv`` integrations. The documented `direnv setup <https://pixi.prefix.dev/latest/integration/third_party/direnv/>`__ uses
 ``watch_file pixi.lock``, which means a lock file change causes
 ``direnv`` to re-run ``pixi shell-hook``. If the new lock file
 introduces a package with a malicious activation script, switching to

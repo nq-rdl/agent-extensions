@@ -331,7 +331,7 @@ the base configuration:
 
    For detailed information about available compilers, platform-specific
    behavior, and how conda-forge compilers work, see the `Compilers
-   Documentation <../../key_concepts/compilers/>`__.
+   Documentation <compilers.rst>`__.
 
 ``binaries``\ `# <#binaries>`__
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~

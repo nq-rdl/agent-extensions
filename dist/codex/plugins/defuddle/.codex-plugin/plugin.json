@@ -1,0 +1,30 @@
+{
+  "name": "defuddle",
+  "version": "0.29.0",
+  "description": "Defuddle — extract clean Markdown from cluttered web pages",
+  "author": {
+    "name": "nq-rdl"
+  },
+  "repository": "https://github.com/nq-rdl/agent-extensions",
+  "license": "MIT",
+  "keywords": [
+    "defuddle",
+    "extraction",
+    "web"
+  ],
+  "skills": "./skills/",
+  "interface": {
+    "displayName": "Defuddle",
+    "shortDescription": "Defuddle — extract clean Markdown from cluttered web pages",
+    "longDescription": "Defuddle — extract clean Markdown from cluttered web pages",
+    "developerName": "nq-rdl",
+    "category": "Developer Tools",
+    "capabilities": [
+      "Skills"
+    ],
+    "defaultPrompt": [
+      "Use Defuddle to help with my task."
+    ],
+    "websiteURL": "https://github.com/nq-rdl/agent-extensions"
+  }
+}

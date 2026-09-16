@@ -19,6 +19,7 @@ CLI:
 from __future__ import annotations
 
 import json
+import re
 import sys
 from pathlib import Path
 
@@ -47,7 +48,7 @@ _KNOWN_MARKETPLACE_KEYS = frozenset(
 )
 
 _CODEX_TARGET_KEYS = frozenset(
-    {"enabled", "pluginName", "marketplaceName", "category", "components", "interface"}
+    {"enabled", "pluginName", "marketplaceName", "category", "components", "interface", "excludeSkills", "skillOverrides", "skillDescriptions", "resources", "hookConfig", "mcpConfig", "notes"}
 )
 _CODEX_COMPONENT_KEYS = frozenset({"skills", "mcp", "hooks", "apps"})
 _CODEX_INTERFACE_KEYS = frozenset(
@@ -128,7 +129,7 @@ def _validate_codex_interface(bundle_file: Path, interface: dict) -> None:
 
 def _validate_codex_identifier(value: object, kind: str) -> None:
     allow_dots = kind == "plugin name"
-    valid = isinstance(value, str) and bool(value)
+    valid = isinstance(value, str) and bool(value) and len(value) <= 64
     if valid:
         valid = all(
             char.isascii()
@@ -216,12 +217,7 @@ def _enabled_bundles(repo: Path) -> dict[str, dict]:
 
 
 def _codex_enabled_bundles(repo: Path, marketplace_name: str) -> dict[str, dict]:
-    """Return validated phase-one Codex bundles keyed by target plugin name.
-
-    Phase one deliberately publishes only skills from the existing shared plugin
-    trees. MCP, hooks, and apps remain disabled until they have
-    target-specific runtime validation.
-    """
+    """Return validated Codex bundles with explicitly selected native components."""
     out: dict[str, dict] = {}
     bundles_dir = repo / "registry" / "bundles"
     for bf in sorted(list(bundles_dir.glob("*.yaml")) + list(bundles_dir.glob("*.yml"))):
@@ -267,17 +263,6 @@ def _codex_enabled_bundles(repo: Path, marketplace_name: str) -> dict[str, dict]
                 f"does not match registry marketplace '{marketplace_name}'"
             )
 
-        # The phase-one Codex target reuses the Claude-generated plugin tree.
-        claude = targets.get("claude")
-        if not isinstance(claude, dict):
-            raise ValueError(f"{bf.name}: targets.claude must be a mapping")
-        claude_plugin = claude.get("pluginName") or data.get("id") or bf.stem
-        if not claude.get("enabled") or claude_plugin != plugin:
-            raise ValueError(
-                f"{bf.name}: phase-one Codex pluginName must match an enabled Claude "
-                "pluginName because both targets share plugins/<name>/"
-            )
-
         components = codex.get("components")
         if components is None:
             components = {}
@@ -301,20 +286,67 @@ def _codex_enabled_bundles(repo: Path, marketplace_name: str) -> dict[str, dict]
         else:
             skills = list(raw_skills)
         skills_enabled = components.get("skills", bool(skills))
-        unsupported = [
-            component
-            for component in ("mcp", "hooks", "apps")
-            if components.get(component, False)
-        ]
-        if unsupported:
-            raise ValueError(
-                f"{bf.name}: phase-one Codex generation does not support enabled "
-                f"component(s): {', '.join(unsupported)}"
-            )
-        if not skills_enabled:
+        if components.get("apps", False):
+            raise ValueError(f"{bf.name}: apps require a registered integration; unsupported component: apps")
+        excludes = codex.get("excludeSkills", [])
+        leaves = []
+        sources = []
+        for member in skills:
+            if isinstance(member, str):
+                source = leaf = member
+            elif isinstance(member, dict) and set(member) == {"source", "leaf"}:
+                source, leaf = member["source"], member["leaf"]
+            else:
+                raise ValueError(f"{bf.name}: invalid skill member: {member!r}")
+            if any(not isinstance(value, str) or not re.fullmatch(r"[a-z0-9]+(?:-[a-z0-9]+)*", value) for value in (source, leaf)):
+                raise ValueError(f"{bf.name}: invalid skill source/leaf: {member!r}")
+            if leaf in leaves:
+                raise ValueError(f"{bf.name}: duplicate Codex skill leaf: {leaf}")
+            leaves.append(leaf)
+            sources.append(source)
+        if not isinstance(excludes, list) or any(not isinstance(x, str) or x not in sources for x in excludes):
+            raise ValueError(f"{bf.name}: excludeSkills must name canonical bundle skills")
+        skills = [m for m in skills if (m if isinstance(m, str) else m["source"]) not in excludes] if skills_enabled else []
+        overrides = codex.get("skillOverrides", {})
+        if not isinstance(overrides, dict) or any(k not in sources for k in overrides):
+            raise ValueError(f"{bf.name}: skillOverrides must map canonical bundle skills to reference paths")
+        for source, path in overrides.items():
+            if not isinstance(path, str) or not path.startswith("references/") or ".." in Path(path).parts or not path.endswith(".rst"):
+                raise ValueError(f"{bf.name}: invalid skill override path for {source}")
+        descriptions = codex.get("skillDescriptions", {})
+        if not isinstance(descriptions, dict) or any(
+            source not in sources or not isinstance(value, str)
+            or not value.strip() or len(value) > 1024
+            for source, value in descriptions.items()
+        ):
+            raise ValueError(f"{bf.name}: skillDescriptions must map canonical bundle skills to nonempty descriptions of at most 1024 characters")
+        for component, field in (("mcp", "mcpConfig"), ("hooks", "hookConfig")):
+            path = codex.get(field)
+            if components.get(component, False):
+                if not isinstance(path, str) or not path or Path(path).is_absolute() or ".." in Path(path).parts:
+                    raise ValueError(f"{bf.name}: enabled {component} requires a repository-relative {field}")
+                if not (repo / path).is_file():
+                    raise ValueError(f"{bf.name}: missing {field}: {path}")
+            elif path is not None:
+                raise ValueError(f"{bf.name}: {field} requires components.{component}: true")
+        notes = codex.get("notes", {})
+        if not isinstance(notes, dict) or set(notes) - {"sharedHooks"}:
+            raise ValueError(f"{bf.name}: notes supports only sharedHooks")
+        if not isinstance(notes.get("sharedHooks", []), list) or any(not isinstance(x, str) for x in notes.get("sharedHooks", [])):
+            raise ValueError(f"{bf.name}: sharedHooks must be a list of canonical hook names")
+        resources = codex.get("resources", [])
+        if not isinstance(resources, list):
+            raise ValueError(f"{bf.name}: resources must be a list")
+        for resource in resources:
+            if not isinstance(resource, dict) or set(resource) != {"source", "destination"}:
+                raise ValueError(f"{bf.name}: resources require source and destination")
+            for field, path in resource.items():
+                if not isinstance(path, str) or not path or Path(path).is_absolute() or ".." in Path(path).parts:
+                    raise ValueError(f"{bf.name}: unsafe resource {field}: {path}")
+            if resource["destination"].split("/")[0] not in {"scripts", "schemas", "assets", "prompts"}:
+                raise ValueError(f"{bf.name}: resource destination must be scripts/, schemas/, or assets/")
+        if not skills and not components.get("mcp", False) and not components.get("hooks", False):
             raise ValueError(f"{bf.name}: enabled Codex bundle exposes no supported components")
-        if not skills:
-            raise ValueError(f"{bf.name}: Codex skills component is enabled but skills is empty")
 
         category = codex.get("category")
         if not isinstance(category, str) or not category:
@@ -363,6 +395,9 @@ def _codex_enabled_bundles(repo: Path, marketplace_name: str) -> dict[str, dict]
             "keywords": list(keywords),
             "license": data.get("license"),
             "skills": skills,
+            "mcp": list(data.get("mcp") or []),
+            "components": components,
+            "config": codex,
             "category": category,
             "interface": interface,
         }
@@ -396,6 +431,8 @@ def _ordered_local(order: list[str], enabled: dict[str, dict]) -> list[str]:
 def generate(repo) -> dict:
     repo = Path(repo)
     version = (repo / "VERSION").read_text().strip()
+    if not re.fullmatch(r"(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)", version):
+        raise ValueError("VERSION must be canonical X.Y.Z")
     mkt = _read_yaml(repo / "registry" / "marketplace.yaml")
     _warn_unknown_marketplace_keys(mkt)
     defaults = mkt.get("pluginDefaults") or {}
@@ -453,7 +490,7 @@ def generate(repo) -> dict:
         codex_marketplace_plugins.append(
             {
                 "name": p,
-                "source": {"source": "local", "path": f"./plugins/{p}"},
+                "source": {"source": "local", "path": f"./dist/codex/plugins/{p}"},
                 "policy": {
                     "installation": "AVAILABLE",
                     "authentication": "ON_INSTALL",
@@ -468,7 +505,8 @@ def generate(repo) -> dict:
             "longDescription": bundle["description"],
             "developerName": codex_developer_name,
             "category": bundle["category"],
-            "capabilities": ["Skills"],
+            "capabilities": (["Skills"] if bundle["skills"] else []) + (["MCP"] if bundle["components"].get("mcp") else []) + (["Hooks"] if bundle["components"].get("hooks") else []),
+            "defaultPrompt": [f"Use {bundle['displayName']} to help with my task."],
             "websiteURL": codex_repository,
         }
         interface.update(bundle["interface"])
@@ -481,7 +519,8 @@ def generate(repo) -> dict:
             "repository": defaults.get("repository"),
             "license": bundle.get("license") or defaults.get("license"),
             "keywords": bundle["keywords"],
-            "skills": "./skills/",
+            **({"skills": "./skills/"} if bundle["skills"] else {}),
+            **({"mcpServers": "./.mcp.json"} if bundle["components"].get("mcp") else {}),
             "interface": interface,
         }
 
@@ -521,7 +560,8 @@ def _targets(repo: Path, gen: dict) -> list[tuple[Path, str]]:
             )
         )
     for name, pj in gen["codex_plugins"].items():
-        out.append((repo / "plugins" / name / ".codex-plugin" / "plugin.json", _dumps(pj)))
+        root = repo / "dist" / "codex" / "plugins" / name
+        out.append((root / ".codex-plugin" / "plugin.json", _dumps(pj)))
     return out
 
 
@@ -535,11 +575,14 @@ def _obsolete_codex_targets(repo: Path, gen: dict) -> list[Path]:
             obsolete.append(marketplace)
 
     enabled = set(gen["codex_plugins"])
-    plugins_root = repo / "plugins"
-    if plugins_root.is_dir():
-        for manifest in sorted(plugins_root.glob("*/.codex-plugin/plugin.json")):
-            if manifest.parent.parent.name not in enabled:
-                obsolete.append(manifest)
+    # Retire all shared-tree native manifests; Codex now has its own packages.
+    obsolete.extend(sorted((repo / "plugins").glob("*/.codex-plugin/plugin.json")))
+    for manifest in sorted((repo / "dist/codex/plugins").glob("*/.codex-plugin/plugin.json")):
+        if manifest.parent.parent.name not in enabled:
+            obsolete.append(manifest)
+            portable = manifest.parent.parent / "plugin.json"
+            if portable.is_file():
+                obsolete.append(portable)
     return obsolete
 
 

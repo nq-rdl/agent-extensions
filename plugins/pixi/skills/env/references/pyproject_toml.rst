@@ -149,7 +149,7 @@ Optional dependencies\ `# <#optional-dependencies>`__
 
 If your python project includes groups of optional dependencies, Pixi
 will automatically interpret them as `Pixi
-features <../../reference/pixi_manifest/#the-feature-table>`__ of the
+features <https://pixi.prefix.dev/latest/reference/pixi_manifest/#the-feature-table>`__ of the
 same name with the associated ``pypi-dependencies``.
 
 You can add them to Pixi environments manually, or use ``pixi init`` to
@@ -214,7 +214,7 @@ Dependency groups\ `# <#dependency-groups>`__
 
 If your python project includes dependency groups, Pixi will
 automatically interpret them as `Pixi
-features <../../reference/pixi_manifest/#the-feature-table>`__ of the
+features <https://pixi.prefix.dev/latest/reference/pixi_manifest/#the-feature-table>`__ of the
 same name with the associated ``pypi-dependencies``.
 
 You can add them to Pixi environments manually, or use ``pixi init`` to

@@ -8,6 +8,8 @@
 #   status [--json]                            reviews and their state; exit 3 when not initialised
 #   slug PATH                                  slug for a project path; exit 5 on a conflicting binding
 #   check FILE | check --stdin                 validate a review/scope JSON; exit 4 with one violation per line
+#   publish SLUG scope|review DRAFT             validate a staged copy, then atomically replace the final JSON
+#   roles ENGINEER ANALYST                     update only the two confirmed role names in config.json
 #   fingerprint SQL                            {sql_path, sql_sha256, git_commit, git_dirty}
 #   snapshot SLUG SQL                          verify final review SHA, retain history, advance source.sql
 #   delta SLUG                                 diff source.sql vs the current SQL; exit 10 when changed, 6 no baseline
@@ -169,6 +171,66 @@ cmd_check() {
   printf 'ok\n'
   return 0
 }
+
+# ---------------------------------------------------------------------------------------------
+cmd_roles() (
+  [ $# -eq 2 ] || usage
+  sr_need_jq
+  sr_require_root
+  local config="$SR_ROOT/$SR_DIR/config.json" tmp
+  sr_no_symlinks "$config" || exit 2
+  [ -f "$config" ] || sr_die 2 "config.json is missing"
+  [ -n "$1" ] && [ -n "$2" ] || sr_die 4 "role names must not be empty"
+  tmp="$(mktemp "$SR_ROOT/$SR_DIR/.roles.XXXXXX")" || sr_die 2 "mktemp failed"
+  trap 'rm -f "$tmp"' EXIT
+  trap 'exit 2' HUP INT TERM
+  jq -se --arg engineer "$1" --arg analyst "$2" '
+    if length == 1 and (.[0] | type == "object" and .schemaVersion == 1 and (.roles | type == "object"))
+    then .[0] | .roles.engineer = $engineer | .roles.analyst = $analyst
+    else error("expected one schema-1 configuration with a roles object") end
+  ' "$config" > "$tmp" || sr_die 4 "invalid configuration; original preserved"
+  mv "$tmp" "$config" || sr_die 2 "cannot update roles"
+  printf 'updated\tconfig.json roles\n'
+)
+
+# ---------------------------------------------------------------------------------------------
+cmd_publish() (
+  [ $# -eq 3 ] || usage
+  sr_need_jq
+  sr_require_root
+  local slug="$1" kind="$2" draft="$3" dest tmp rel previous
+  sr_safe_slug "$slug"
+  case "$kind" in scope|review) ;; *) usage ;; esac
+  dest="$SR_REVIEWS/$slug/$kind.json"
+  sr_no_symlinks "$dest" || exit 2
+  [ ! -d "$dest" ] || sr_die 2 "publish destination is a directory"
+  [ -f "$draft" ] || sr_die 2 "no such draft: $draft"
+  mkdir -p "$SR_REVIEWS/$slug" || sr_die 2 "cannot create review directory"
+  tmp="$(mktemp "$SR_REVIEWS/$slug/.publish.XXXXXX")" || sr_die 2 "mktemp failed"
+  trap 'rm -f "$tmp"' EXIT
+  trap 'exit 2' HUP INT TERM
+  cp "$draft" "$tmp" || sr_die 2 "cannot stage draft"
+  cmd_check "$tmp" || exit 4
+  jq -e --arg s "$slug" --arg k "$kind" '.slug == $s and .kind == $k' "$tmp" >/dev/null || sr_die 4 "document slug/kind must match destination"
+  rel="$(jq -r .sql_path "$tmp")"
+  sr_safe_sql "$rel"
+  previous=0
+  if [ -f "$dest" ]; then
+    cmd_check "$dest" >/dev/null || sr_die 4 "existing document is invalid"
+    previous="$(jq -r .revision "$dest")"
+  fi
+  if [ "$kind" = review ]; then
+    [ -f "$SR_ROOT/$rel" ] || sr_die 2 "no such SQL: $rel"
+    [ "$(sr_sha256 "$SR_ROOT/$rel")" = "$(jq -r .sql_sha256 "$tmp")" ] || sr_die 2 "SQL changed since fingerprint; reassess before publishing"
+  fi
+  if [ -f "$dest" ] && cmp -s "$tmp" "$dest"; then
+    printf 'already published\t%s\n' "${dest#"$SR_ROOT"/}"
+    exit 0
+  fi
+  jq -e --argjson previous "$previous" '.revision == ($previous + 1)' "$tmp" >/dev/null || sr_die 4 "revision must follow the existing document (first revision is 1)"
+  mv "$tmp" "$dest" || sr_die 2 "cannot publish document"
+  printf 'published\t%s\n' "${dest#"$SR_ROOT"/}"
+)
 
 # ---------------------------------------------------------------------------------------------
 cmd_fingerprint() {
@@ -355,6 +417,8 @@ case "$cmd" in
   status) cmd_status "$@" ;;
   slug) cmd_slug "$@" ;;
   check) cmd_check "$@" ;;
+  publish) cmd_publish "$@" ;;
+  roles) cmd_roles "$@" ;;
   fingerprint) cmd_fingerprint "$@" ;;
   snapshot) cmd_snapshot "$@" ;;
   delta) cmd_delta "$@" ;;

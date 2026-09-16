@@ -340,7 +340,7 @@ following the `PEP 735 <https://peps.python.org/pep-0735/>`__.
 
 After we have added the ``dependency-groups`` to the ``pyproject.toml``,
 Pixi sees these as a
-`feature <../../reference/pixi_manifest/#the-feature-and-environments-tables>`__,
+`feature <https://pixi.prefix.dev/latest/reference/pixi_manifest/#the-feature-and-environments-tables>`__,
 which can contain a collection of ``dependencies``, ``tasks``,
 ``channels``, and more.
 
@@ -499,7 +499,7 @@ So Pixi has a task system to make it easy to run commands. Similar to
 
    Tasks are a cool Pixi feature that is powerful and runs in a
    cross-platform shell. You can do caching, dependencies and more. Read
-   more about tasks in the `tasks <../../workspace/advanced_tasks/>`__
+   more about tasks in the `tasks <https://pixi.prefix.dev/latest/workspace/advanced_tasks/>`__
    section.
 
 .. container:: language-shell highlight

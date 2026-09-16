@@ -17,3 +17,19 @@ targets:
     enabled: true
     pluginName: starrocks
     marketplaceName: rdl-agent-extensions
+
+  codex:
+    enabled: true
+    pluginName: starrocks
+    marketplaceName: rdl-agent-extensions
+    category: Developer Tools
+    components:
+      skills: true
+      mcp: false
+      hooks: false
+      apps: false
+    interface:
+      shortDescription: StarRocks — analytical SQL, table design, data loading, and
+        query tuning
+      defaultPrompt:
+      - Use StarRocks to help with my task.

@@ -1,0 +1,3 @@
+kind: Fixed
+body: Require both local and remote authorizations for packages that contain mixed MCP transports.
+time: 2026-09-16T01:38:59.268892648Z

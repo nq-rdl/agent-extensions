@@ -17,3 +17,19 @@ targets:
     enabled: true
     pluginName: ansible
     marketplaceName: rdl-agent-extensions
+
+  codex:
+    enabled: true
+    pluginName: ansible
+    marketplaceName: rdl-agent-extensions
+    category: Developer Tools
+    components:
+      skills: true
+      mcp: false
+      hooks: false
+      apps: false
+    interface:
+      shortDescription: Ansible — author, debug, and optimise playbooks, roles, and
+        inventories
+      defaultPrompt:
+      - Use Ansible to help with my task.

@@ -1,0 +1,31 @@
+{
+  "name": "bitwarden",
+  "version": "0.29.0",
+  "description": "Bitwarden — manage .env files and secrets via the Bitwarden CLI",
+  "author": {
+    "name": "nq-rdl"
+  },
+  "repository": "https://github.com/nq-rdl/agent-extensions",
+  "license": "MIT",
+  "keywords": [
+    "bitwarden",
+    "secrets",
+    "cli",
+    "env"
+  ],
+  "skills": "./skills/",
+  "interface": {
+    "displayName": "Bitwarden",
+    "shortDescription": "Bitwarden — manage .env files and secrets via the Bitwarden CLI",
+    "longDescription": "Bitwarden — manage .env files and secrets via the Bitwarden CLI",
+    "developerName": "nq-rdl",
+    "category": "Developer Tools",
+    "capabilities": [
+      "Skills"
+    ],
+    "defaultPrompt": [
+      "Use Bitwarden to help with my task."
+    ],
+    "websiteURL": "https://github.com/nq-rdl/agent-extensions"
+  }
+}

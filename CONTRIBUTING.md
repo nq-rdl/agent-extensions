@@ -108,10 +108,11 @@ group folders. **Grouping is a packaging decision** expressed in the bundle regi
   `pluginName` unique across bundles (`scripts/check_grouping.py`) · each plugin skill copy carries
   **no** frontmatter `name:` (`scripts/validate-plugins.sh`).
 
-The phase-one Codex target intentionally shares these Claude-oriented copies. Codex 0.152.0 derives
-a missing skill name from the leaf directory, then qualifies it as `<plugin>:<leaf>`. This is a
-tested runtime compatibility path, not the stricter Agent Skills/public-directory contract; strict
-Codex publication will require target-specific copies with explicit `name: <leaf>` frontmatter.
+Codex gets a separate generated copy under `dist/codex/plugins/<subject>/skills/<leaf>/`
+with explicit `name: <leaf>`. The packager selects canonical `references/codex.rst`
+entrypoints only when `targets.codex.skillOverrides` declares them. Supporting
+resources and optional delegation outlines remain inside the installed skill.
+Do not introduce `agents/` directories for either runtime.
 
 So to add `obsidian:bases`, the canonical skill stays flat `skills/obsidian-bases/`; the registry
 maps `{source: obsidian-bases, leaf: bases}` under `pluginName: obsidian`. Delegation outlines are authored inside the owning skill’s `references/`. See [`AGENTS.md`](AGENTS.md)
@@ -207,8 +208,8 @@ that should become `data-request:analyse`:
    skills:
      - {source: data-request-analyse, leaf: analyse}   # → /data-request:analyse
    ```
-   To include a portable skill bundle in the current Codex pilot, add an explicit target. Keep
-   non-skill components disabled until their Codex runtime validation exists:
+   To include a portable skill bundle in the Codex catalog, add an explicit target. Select
+   components explicitly and supply native configuration for MCP and hooks:
    ```yaml
    targets:
      codex:
@@ -222,9 +223,15 @@ that should become `data-request:analyse`:
          hooks: false
          apps: false
    ```
-   Codex-enabled skills must be usable by Codex itself. The pipeline unit tests reject
-   `${CLAUDE_PLUGIN_ROOT}`, `AskUserQuestion`, and Claude-style `/plugin:skill` invocations in
-   their canonical content. Convert those dependencies or leave the Codex target disabled.
+   Native execution uses the host's available tools. Codex packaging adapts entrypoint
+   names and host calls; target-host configuration examples retain their original meaning.
+   Use `skillOverrides: {source-name: references/codex.rst}` for a different host workflow.
+   Use `skillDescriptions: {source-name: "Native capability description"}` when that
+   workflow supports different capabilities; omitted descriptions stay canonical.
+   `excludeSkills` names canonical sources. MCP and hooks require `mcpConfig` and
+   `hookConfig` repository-relative sources; `resources` copies declared runtime assets.
+   Run `pixi run python3 scripts/codex_package.py . --validate` and native smoke tests.
+   Directory archives and external submission gates are documented in `docs/codex.md`.
 4. **If it is a brand-new subject, add it to the marketplace order.** Append `data-request` to the
    `order:` list in `registry/marketplace.yaml` (otherwise it is appended alphabetically with a
    CI `::warning::`).

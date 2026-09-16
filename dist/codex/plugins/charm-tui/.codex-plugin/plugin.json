@@ -1,0 +1,31 @@
+{
+  "name": "charm-tui",
+  "version": "0.29.0",
+  "description": "Charm — build terminal UIs with Bubbletea, Lip Gloss, and Fang",
+  "author": {
+    "name": "nq-rdl"
+  },
+  "repository": "https://github.com/nq-rdl/agent-extensions",
+  "license": "MIT",
+  "keywords": [
+    "charm",
+    "tui",
+    "bubbletea",
+    "go"
+  ],
+  "skills": "./skills/",
+  "interface": {
+    "displayName": "Charm",
+    "shortDescription": "Charm — build terminal UIs with Bubbletea, Lip Gloss, and Fang",
+    "longDescription": "Charm — build terminal UIs with Bubbletea, Lip Gloss, and Fang",
+    "developerName": "nq-rdl",
+    "category": "Developer Tools",
+    "capabilities": [
+      "Skills"
+    ],
+    "defaultPrompt": [
+      "Use Charm to help with my task."
+    ],
+    "websiteURL": "https://github.com/nq-rdl/agent-extensions"
+  }
+}

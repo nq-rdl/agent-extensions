@@ -1,0 +1,5 @@
+# .specify/extensions.yml — commit this.
+installed: []
+settings:
+  auto_execute_hooks: true
+hooks: {}

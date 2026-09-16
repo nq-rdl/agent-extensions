@@ -1,0 +1,16 @@
+# Publisher-controlled submission facts. Do not invent legal URLs or attestations.
+# Package generation and local installation do not depend on public submission.
+supportURL: https://github.com/nq-rdl/agent-extensions/issues
+identityVerified: false
+# Verification and each plugin's behavioralEvidence attestation require YAML
+# boolean true; quoted strings and other truthy values do not satisfy the gates.
+behavioralEvidence: {}
+# Per-plugin external decisions, recorded only after publisher review. Each map
+# requires literal boolean true for the named plugin; other values remain blocked.
+# Approval for the preserved explicit-only invocation policy in the directory.
+explicitInvocationApproved: {}
+# Approval of the shipped local MCP runtime's submission route.
+localMcpApproved: {}
+# Server-owner authorization, domain verification and authenticated connection evidence.
+remoteMcpAuthorized: {}
+# availabilityRegions, when supplied, must be a nonempty list of region names/codes.

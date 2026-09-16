@@ -25,6 +25,8 @@ SCRIPT = REPO / "scripts" / "sync-plugins.sh"
 def run_sync(repo: Path):
     (repo / "scripts").mkdir(parents=True, exist_ok=True)
     shutil.copy(SCRIPT, repo / "scripts" / "sync-plugins.sh")
+    for dependency in ("codex_package.py", "generate_manifests.py", "_registry.py"):
+        (repo / "scripts" / dependency).write_text((REPO / "scripts" / dependency).read_text())
     return subprocess.run(
         ["bash", str(repo / "scripts" / "sync-plugins.sh")],
         cwd=repo,

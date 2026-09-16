@@ -1,0 +1,49 @@
+name: Codex remote and platform acceptance
+
+on:
+  workflow_dispatch:
+    inputs:
+      ref:
+        description: Pushed branch, commit, or tag to install and verify
+        required: true
+        type: string
+      live_mcp:
+        description: Also initialize Playwright and probe Lucid without credentials
+        default: false
+        type: boolean
+
+permissions:
+  contents: read
+
+jobs:
+  acceptance:
+    name: Codex acceptance (${{ matrix.os }})
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ inputs.ref }}
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: '20'
+      - name: Install locked Python toolchain
+        uses: prefix-dev/setup-pixi@a09b6247153796b190642a2b53fac4241043cf6f # v0.10.0
+        with:
+          pixi-version: v0.78.0
+          locked: true
+      - name: Install pinned Codex runtime
+        run: npm install --global @openai/codex@0.154.0
+      - name: Verify remote installation and lifecycle
+        env:
+          CODEX_MARKETPLACE_SOURCE: ${{ github.repository }}
+          CODEX_MARKETPLACE_REF: ${{ inputs.ref }}
+        run: bash scripts/smoke-codex-marketplace.sh
+      - name: Verify native hook registration
+        run: pixi run --locked python3 scripts/check_codex_runtime.py .
+      - name: Probe live MCP transports
+        if: inputs.live_mcp
+        run: pixi run --locked python3 scripts/check_codex_runtime.py . --live-mcp

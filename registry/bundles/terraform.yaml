@@ -19,3 +19,18 @@ targets:
     enabled: true
     pluginName: terraform
     marketplaceName: rdl-agent-extensions
+
+  codex:
+    enabled: true
+    pluginName: terraform
+    marketplaceName: rdl-agent-extensions
+    category: Developer Tools
+    components:
+      skills: true
+      mcp: false
+      hooks: false
+      apps: false
+    interface:
+      shortDescription: Terraform tools and workflows
+      defaultPrompt:
+      - Use Terraform to help with my task.

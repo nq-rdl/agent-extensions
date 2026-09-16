@@ -87,7 +87,7 @@ Install Dependencies From Source\ `# <#install-dependencies-from-source>`__
 ---------------------------------------------------------------------------
 
 Pixi global also allows you to install `Pixi
-packages <../../build/getting_started/>`__. Let's assume there's a C++
+packages <build_getting_started.rst>`__. Let's assume there's a C++
 package we'd like to install globally from source. First, it needs to
 have a package manifest:
 
@@ -191,7 +191,7 @@ First install a tool with ``pixi global``:
       pixi global install git
 
 The completions can be found under
-`$PIXI_HOME <../../reference/environment_variables/>`__\ ``/completions``.
+`$PIXI_HOME <https://pixi.prefix.dev/latest/reference/environment_variables/>`__\ ``/completions``.
 
 You can then load the completions in the startup script of your shell:
 

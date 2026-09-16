@@ -42,7 +42,33 @@ not, offer `/data-request:bootstrap` retroactively once, then continue without i
 If `reviews/$SLUG/review.json` exists (or `--update`):
 
 ```bash
-bash "$S/sqlreview.sh" delta "$SLUG"     # exit 0 unchanged (say so, stop) · 10 changed · 6 no baseline → full review below (retain revision history) · 2 missing SQL → stop/rebind
+bash "$S/sqlreview.sh" delta "$SLUG"     # exit 0 → complete publication below · 10 changed · 6 no baseline → full review below (retain revision history) · 2 missing SQL → stop/rebind
+```
+
+### Unchanged SQL: complete publication before stopping
+
+On exit 0, finish rendering the authoritative review before reporting it unchanged.
+A previous run may have published and snapshotted successfully but failed or stopped
+before rendering. This recovery uses the existing confirmed revision; do not increment
+it or ask for its confirmations again. Run from the project root:
+
+```bash
+bash "$S/sqlreview.sh" render "$SLUG" review || exit $?
+if cmp -s ".sqlreview/reviews/$SLUG/review.draft.json" ".sqlreview/reviews/$SLUG/review.json"; then
+  rm -f ".sqlreview/reviews/$SLUG/review.draft.json"
+fi
+```
+
+Show `review.md` and stop. Keep any differing draft and tell the user it contains
+unpublished work; do not discard or publish it automatically. If rendering fails,
+retain the draft and report the failure; retry this completion step once the cause
+is fixed.
+
+### Changed SQL: reassess the review
+
+On exit 10, continue with impact hints and the update below:
+
+```bash
 bash "$S/sqlreview.sh" impact "$SLUG"    # HINTS ONLY: identifiers from the changed lines traced into unchanged lines
 ```
 
@@ -86,7 +112,8 @@ question**: `confirmed_by` is the user (`git config user.name` / `user.email`, e
 `confirmed_at` is now (UTC ISO), `confirmed_revision` equals the document `revision`.
 
 Re-run fingerprint and compare its SHA with the bytes you reviewed; if different, reassess the
-change before continuing. Write the whole `reviews/$SLUG/review.json` (the guard validates it; Edit is refused):
+change before continuing. Write the complete confirmed document to
+`.sqlreview/reviews/$SLUG/review.draft.json`, then publish it with the command below:
 
 ```json
 {
@@ -107,13 +134,16 @@ change before continuing. Write the whole `reviews/$SLUG/review.json` (the guard
 ```
 
 ```bash
-bash "$S/sqlreview.sh" snapshot "$SLUG" "<sql path>" || exit $?  # only AFTER the guarded Write succeeds
+bash "$S/sqlreview.sh" publish "$SLUG" review ".sqlreview/reviews/$SLUG/review.draft.json" || exit $?
+bash "$S/sqlreview.sh" snapshot "$SLUG" "<sql path>" || exit $?  # only AFTER publish succeeds
 bash "$S/sqlreview.sh" render "$SLUG" review || exit $?  # → reviews/<slug>/review.md (never hand-write it)
 rm -f ".sqlreview/reviews/$SLUG/review.draft.json"
 ```
 
 Show `review.md`. Hand over: the analyst runs `/data-request:explain <sql path>`.
 
+Publish validates a staged copy, confirmations, next revision and current SQL fingerprint before
+atomically replacing `review.json`. Never copy or patch the draft directly into the final path.
 Snapshot verifies the final review hash before advancing `source.sql` and preserves
 `history/<revision>.sql` for resumed explanations. Stop on any failure and keep the draft. A failed
-or interrupted Write must never advance the baseline; a failed snapshot leaves the review stale.
+or interrupted publish must never advance the baseline; a failed snapshot leaves the review stale.

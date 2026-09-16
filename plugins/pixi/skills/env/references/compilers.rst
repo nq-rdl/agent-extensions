@@ -116,7 +116,7 @@ your platform.
    If you specified the compiler in the configuration, it will use that.
    If the configuration has this entry ``compilers = ["c"]``, the C
    compiler will be requested. If there's no compiler configuration, the
-   `default <./#backend-specific-defaults>`__ of the backend will be
+   `default <#backend-specific-defaults>`__ of the backend will be
    used.
 
 #. **For each compiler, determine the variants to take into account**
@@ -220,19 +220,19 @@ based on the typical requirements for that language ecosystem:
      - Compiler Support
      - Default Compilers
      - Rationale
-   * - `pixi-build-cmake <../backends/pixi-build-cmake/#compilers>`__
+   * - `pixi-build-cmake <pixi-build-cmake.rst#compilers>`__
      - **Supported**
      - ``["cxx"]``
      - Most CMake projects are C++.
-   * - `pixi-build-rust <../backends/pixi-build-rust/#compilers>`__
+   * - `pixi-build-rust <pixi-build-rust.rst#compilers>`__
      - **Supported**
      - ``["rust"]``
      - Rust projects need the Rust compiler.
-   * - `pixi-build-python <../backends/pixi-build-python/#compilers>`__
+   * - `pixi-build-python <pixi-build-python.rst#compilers>`__
      - **Supported**
      - ``[]``
      - Pure Python packages typically don't need compilers.
-   * - `pixi-build-mojo <../backends/pixi-build-mojo/#compilers>`__
+   * - `pixi-build-mojo <https://pixi.prefix.dev/latest/build/backends/pixi-build-mojo/#compilers>`__
      - **Supported**
      - ``[]``
      - ``mojo-compiler`` must be specified in the

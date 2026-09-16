@@ -8,7 +8,7 @@ In this tutorial, we will show you how to set up a
 that supports **cross-compilation**: we will demonstrate how to compile
 for the ``linux-aarch64`` platform on a ``linux-64`` host. In this
 tutorial we assume that you've read the `Building a C++
-Package <../cpp/>`__ tutorial. If you haven't read it yet, we recommend
+Package <cpp.rst>`__ tutorial. If you haven't read it yet, we recommend
 you to do so before continuing, as the project structure and the source
 code will be the same as in the previous tutorial, so we may skip
 explicit explanations of some parts.
@@ -26,7 +26,7 @@ process of a package supports it, building a package for a platform
 be done simply with ``pixi build --target-platform linux-aarch64``.
 However, a typical `nanobind <https://github.com/wjakob/nanobind>`__
 project, as described in the `Building a C++ Package
-tutorial <../cpp/>`__, doesn't cross-compile out of the box. There are a
+tutorial <cpp.rst>`__, doesn't cross-compile out of the box. There are a
 couple of issues:
 
 .. _1-finding-python-and-nanobind:
@@ -74,7 +74,7 @@ independent! Therefore, it is possible to use the stubs for the host
 platform (no cross-compilation) for any target platform.
 
 This can be conveniently done using the `pixi-build-rattler-build
-backend <../backends/pixi-build-rattler-build/>`__, which is able to
+backend <pixi-build-rattler-build.rst>`__, which is able to
 build multiple outputs from a single recipe. We will use it to build
 **two packages**: a platform-specific (supporting cross-compilation)
 library package, and a ``noarch`` stub package.
@@ -90,7 +90,7 @@ Workspace structure\ `# <#workspace-structure>`__
 -------------------------------------------------
 
 We use the same directory structure than the `Building a C++ Package
-tutorial <../cpp/>`__:
+tutorial <cpp.rst>`__:
 
 .. container:: language-bash highlight
 

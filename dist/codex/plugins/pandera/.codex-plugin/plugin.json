@@ -1,0 +1,33 @@
+{
+  "name": "pandera",
+  "version": "0.29.0",
+  "description": "Pandera — dataframe schema validation and debugging for pandas and Polars",
+  "author": {
+    "name": "nq-rdl"
+  },
+  "repository": "https://github.com/nq-rdl/agent-extensions",
+  "license": "MIT",
+  "keywords": [
+    "pandera",
+    "validation",
+    "dataframe",
+    "schema",
+    "pandas",
+    "polars"
+  ],
+  "skills": "./skills/",
+  "interface": {
+    "displayName": "Pandera",
+    "shortDescription": "Pandera — dataframe schema validation and debugging for pandas and Polars",
+    "longDescription": "Pandera — dataframe schema validation and debugging for pandas and Polars",
+    "developerName": "nq-rdl",
+    "category": "Developer Tools",
+    "capabilities": [
+      "Skills"
+    ],
+    "defaultPrompt": [
+      "Use Pandera to help with my task."
+    ],
+    "websiteURL": "https://github.com/nq-rdl/agent-extensions"
+  }
+}

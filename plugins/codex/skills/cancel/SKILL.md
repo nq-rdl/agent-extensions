@@ -31,3 +31,9 @@ node "${CLAUDE_PLUGIN_ROOT}/scripts/codex-companion.mjs" cancel "$ARGUMENTS"
 ```
 
 Present the command output to the user exactly as returned, including the cancelled job ID and status.
+
+## Codex packaging
+
+For execution in a native Codex package, use the host-specific entrypoint in
+[references/codex.rst](references/codex.rst). The registry selects it during packaging;
+the Claude entrypoint above remains the Claude workflow.
