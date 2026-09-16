@@ -32,9 +32,12 @@ export function resolveStateRoot() {
   const pluginDataDir = process.env[PLUGIN_DATA_ENV];
   if (pluginDataDir) return path.join(pluginDataDir, "state");
   const xdgState = process.env.XDG_STATE_HOME;
-  const userState = xdgState && path.isAbsolute(xdgState)
-    ? xdgState : path.join(os.homedir(), ".local", "state");
-  return path.join(userState, "codex-companion");
+  if (xdgState && path.isAbsolute(xdgState)) return path.join(xdgState, "codex-companion");
+  const usableHome = (home) => typeof home === "string" && path.isAbsolute(home) && path.resolve(home) !== path.parse(home).root;
+  let home = os.homedir();
+  if (!usableHome(home)) home = os.userInfo().homedir;
+  if (!usableHome(home)) throw new Error("Cannot resolve a private user home for companion state");
+  return path.join(home, ".local", "state", "codex-companion");
 }
 
 function ensurePrivateDirectory(dir) {

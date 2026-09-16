@@ -54,6 +54,11 @@ test("resolveStateDir uses private per-user storage without Claude plugin data",
   assert.equal(resolveStateRoot(), path.join(os.homedir(), ".local/state/codex-companion"));
   process.env.XDG_STATE_HOME = "relative-state";
   assert.equal(resolveStateRoot(), path.join(os.homedir(), ".local/state/codex-companion"));
+  for (const home of ["", "/", "relative-home"]) {
+    const mock = t.mock.method(os, "homedir", () => home);
+    assert.equal(resolveStateRoot(), path.join(os.userInfo().homedir, ".local/state/codex-companion"));
+    mock.mock.restore();
+  }
   process.env.XDG_STATE_HOME = makeTempDir();
   const workspace = makeTempDir();
   const stateDir = resolveStateDir(workspace);
