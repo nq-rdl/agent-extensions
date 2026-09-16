@@ -192,20 +192,20 @@ A new skill authored under `skills/<name>/` is **not installable until you map i
 — authoring the `SKILL.md` only adds it to the flat library; the registry decides which plugin
 (subject) it belongs to. CI enforces this: `scripts/check_exposure.py` fails if a canonical
 skill/hook isn't referenced by any `registry/bundles/*.yaml` (or explicitly allowlisted in
-`registry/unbundled.yaml`). Here is the full loop, using a hypothetical `sql-code-analyse` skill
-that should become `sql-code:analyse`:
+`registry/unbundled.yaml`). Here is the full loop, using a hypothetical `data-request-analyse` skill
+that should become `data-request:analyse`:
 
-1. **Pick the subject and facet** (the rules above). Subject → the plugin (`sql-code`); facet →
+1. **Pick the subject and facet** (the rules above). Subject → the plugin (`data-request`); facet →
    the action/stage leaf (`analyse`). Never repeat the subject in the facet.
-2. **Choose or create the bundle.** If `registry/bundles/sql-code.yaml` exists, add to it;
+2. **Choose or create the bundle.** If `registry/bundles/data-request.yaml` exists, add to it;
    otherwise copy an existing single-subject bundle (e.g. `registry/bundles/sops.yaml`) and set
    `id`, `displayName`, `description` (no trailing period), `keywords`, and
-   `targets.claude.pluginName: sql-code`.
+   `targets.claude.pluginName: data-request`.
 3. **Add the skill member.** Under `skills:`, write either a flat string (when the skill's
    directory name already equals the leaf you want) or a `{source, leaf}` mapping to rename:
    ```yaml
    skills:
-     - {source: sql-code-analyse, leaf: analyse}   # → /sql-code:analyse
+     - {source: data-request-analyse, leaf: analyse}   # → /data-request:analyse
    ```
    To include a portable skill bundle in the current Codex pilot, add an explicit target. Keep
    non-skill components disabled until their Codex runtime validation exists:
@@ -213,7 +213,7 @@ that should become `sql-code:analyse`:
    targets:
      codex:
        enabled: true
-       pluginName: sql-code
+       pluginName: data-request
        marketplaceName: rdl-agent-extensions
        category: Developer Tools
        components:
@@ -225,12 +225,12 @@ that should become `sql-code:analyse`:
    Codex-enabled skills must be usable by Codex itself. The pipeline unit tests reject
    `${CLAUDE_PLUGIN_ROOT}`, `AskUserQuestion`, and Claude-style `/plugin:skill` invocations in
    their canonical content. Convert those dependencies or leave the Codex target disabled.
-4. **If it is a brand-new subject, add it to the marketplace order.** Append `sql-code` to the
+4. **If it is a brand-new subject, add it to the marketplace order.** Append `data-request` to the
    `order:` list in `registry/marketplace.yaml` (otherwise it is appended alphabetically with a
    CI `::warning::`).
 5. **Build the plugin tree and manifests:**
    ```bash
-   pixi run bash scripts/sync-plugins.sh sql-code     # copies skills/<source>/ → plugins/sql-code/skills/<leaf>/
+   pixi run bash scripts/sync-plugins.sh data-request     # copies skills/<source>/ → plugins/data-request/skills/<leaf>/
    pixi run python3 scripts/generate_manifests.py .     # writes Claude + Codex manifests
    pixi run python3 scripts/generate_bundles_doc.py .   # refreshes docs/bundles.md
    ```

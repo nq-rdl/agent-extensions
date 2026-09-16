@@ -50,7 +50,7 @@ Delegation outlines are optional skill references, not registered agent types.
 | [`tech-writing`](#tech-writing) | Yes | - | Technical writing — developer docs, tutorials, ADRs, and guides |
 | [`lucid`](#lucid) | Yes | - | Lucid — visual collaboration boards and diagrams (Lucidchart / Lucidspark) via the hosted Lucid MCP server |
 | [`pandera`](#pandera) | Yes | - | Pandera — dataframe schema validation and debugging for pandas and Polars |
-| [`sql-code`](#sql-code) | Yes | - | SQL Code — scope, map, draft and validate cohort SQL with shared RDL guardrails and human-confirmed review handoffs |
+| [`data-request`](#data-request) | Yes | - | Data Request — scope, map, draft, validate and fix request SQL and Python with shared RDL guardrails and human-confirmed review handoffs |
 
 ## Install
 
@@ -540,19 +540,20 @@ Pandera — dataframe schema validation and debugging for pandas and Polars.
 
 ---
 
-## sql-code
+## data-request
 
-SQL Code — scope, map, draft and validate cohort SQL with shared RDL guardrails and human-confirmed review handoffs.
+Data Request — scope, map, draft, validate and fix request SQL and Python with shared RDL guardrails and human-confirmed review handoffs.
 
 **Claude Code skills**
 
-- `/sql-code:setup`
-- `/sql-code:bootstrap`
-- `/sql-code:analyse`
-- `/sql-code:explain`
-- `/sql-code:guardrails`
-- `/sql-code:map`
-- `/sql-code:draft`
-- `/sql-code:validate`
+- `/data-request:setup`
+- `/data-request:bootstrap`
+- `/data-request:analyse`
+- `/data-request:explain`
+- `/data-request:guardrails`
+- `/data-request:map`
+- `/data-request:draft`
+- `/data-request:validate`
+- `/data-request:fix`
 
-**Claude Code hooks:** `sql-code-preflight`, `sql-code-guard`
+**Claude Code hooks:** `data-request-preflight`, `data-request-guard`

@@ -21,7 +21,7 @@
 #   3. Ensure this script is executable: chmod +x forced-eval-hook.sh
 #
 # How it works:
-#   - SQL/cohort prompts surface the installed SQL Code skills, including guardrails.
+#   - Data-request/SQL/cohort prompts surface the installed Data Request skills, including guardrails.
 #   - Explicit skill-use prompts surface the full catalogue; silent no-op otherwise.
 #   - Emits the discovered skill/command catalogue as advisory context via the
 #     UserPromptSubmit additionalContext channel (plain stdout when jq absent).
@@ -31,8 +31,8 @@
 set -euo pipefail
 
 # ---------------------------------------------------------------------------
-# Intent gate — explicit skill use gets the full catalogue; SQL/cohort work
-# gets only SQL Code guidance. This is advisory discovery, not SQL enforcement.
+# Intent gate — explicit skill use gets the full catalogue; Data-request/SQL/cohort work
+# gets only Data Request guidance. This is advisory discovery, not SQL enforcement.
 # ---------------------------------------------------------------------------
 input=$(cat)
 
@@ -52,7 +52,7 @@ fi
 intent='use|using|invoke|invoking|run|running|apply|applying|activate|activating|load|loading|call|calling|trigger|triggering'
 catalog_mode=all
 if ! printf '%s' "$prompt" | grep -qiE "\b(${intent})\b.{0,40}\bskills?\b|\bskills?\b.{0,40}\b(${intent})\b"; then
-  if printf '%s' "$prompt" | grep -qiE '\b(sql|cohorts?|clinical_event)\b|query[- ]builder.{0,60}resolvers?|resolvers?.{0,60}query[- ]builder'; then
+  if printf '%s' "$prompt" | grep -qiE '\b(data[- ]requests?|sql|cohorts?|clinical_event)\b|query[- ]builder.{0,60}resolvers?|resolvers?.{0,60}query[- ]builder'; then
     catalog_mode=sql
   else
     exit 0
@@ -210,7 +210,7 @@ scan_standalone_skills() {
 get_plugin_paths() {
   jq -r --arg mode "$catalog_mode" '
     .plugins | to_entries[] |
-    select($mode != "sql" or .key == "sql-code@rdl-agent-extensions") |
+    select($mode != "sql" or .key == "data-request@rdl-agent-extensions") |
     (.key | split("@")[0]) as $name |
     .value[0].installPath as $path |
     "\($name)|\($path)"

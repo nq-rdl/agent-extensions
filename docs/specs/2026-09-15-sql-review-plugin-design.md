@@ -1,7 +1,7 @@
 # SQL Review plugin — implementation plan
 
-> Historical review/schema design. The plugin is now `sql-code`; see the
-> [SQL Code extension and migration](2026-09-15-sql-code-plugin-design.md) for current
+> Historical review/schema design. The plugin is now `data-request`; see the
+> [Data Request extension and migration](2026-09-15-data-request-plugin-design.md) for current
 > invocation names, canonical paths, hook packaging and development actions.
 
 Epic #131; sub-issues #126 (setup), #127 (bootstrap), #130 (analyse), #128 (explain).

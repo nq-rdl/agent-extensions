@@ -1,0 +1,28 @@
+{
+  "description": "Data Request review records: a SessionStart preflight that reports whether the project is initialised (.sqlreview/) and which reviews are stale, and a PreToolUse guard that only lets review/scope JSON be written when every assumption and limitation carries a complete human-confirmation record, and keeps rendered markdown and config edits on the sanctioned path.",
+  "hooks": {
+    "SessionStart": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "${CLAUDE_PLUGIN_ROOT}/hooks/data-request-preflight.sh",
+            "timeout": 5
+          }
+        ]
+      }
+    ],
+    "PreToolUse": [
+      {
+        "matcher": "Write|Edit",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "${CLAUDE_PLUGIN_ROOT}/hooks/data-request-guard.sh",
+            "timeout": 10
+          }
+        ]
+      }
+    ]
+  }
+}

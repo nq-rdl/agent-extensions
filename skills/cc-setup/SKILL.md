@@ -37,9 +37,9 @@ merge the settings idempotently.
 *use* a skill (an action verb sits near "skill"/"skills"), it discovers the available
 skills and slash commands — standalone (`~/.claude/skills/*/SKILL.md`) and plugin
 (`~/.claude/plugins/installed_plugins.json`) — and emits them as **advisory context**
-so the model considers them. SQL/cohort prompts also surface the installed `sql-code`
+so the model considers them. Data-request/SQL/cohort prompts also surface the installed `data-request`
 skills (including `guardrails`) without requiring a request to use a skill. This
-SQL-specific path scans fresh and emits nothing when SQL Code is unavailable. Other
+SQL-specific path scans fresh and emits nothing when Data Request is unavailable. Other
 prompts are a silent no-op. The framing is
 descriptive; it does not coerce a fixed activation sequence. It uses `jq` when present
 and degrades gracefully without it.
@@ -204,7 +204,7 @@ tree's own copy. This install has no automatic self-exclusion, so you must exclu
 Tell the user, concisely:
 - The scope chosen, the script path installed, and the settings file touched.
 - That explicit skill-use prompts surface the full catalogue; ordinary SQL/cohort
-  prompts surface skills from `sql-code@rdl-agent-extensions` when installed.
+  prompts surface skills from `data-request@rdl-agent-extensions` when installed.
   Other prompts, and SQL prompts without that plugin, are silent no-ops.
 - For **project** scope: commit `.claude/hooks/forced-eval-hook.sh` and the settings
   change so the team picks them up (or note it is personal if they chose
