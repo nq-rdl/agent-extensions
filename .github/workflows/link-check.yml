@@ -20,6 +20,7 @@ jobs:
         uses: lycheeverse/lychee-action@e7477775783ea5526144ba13e8db5eec57747ce8 # v2.9.0
         with:
           args: --version
+          lycheeVersion: v0.24.2
 
       - name: Check skill links
         # .md is checked repo-wide; .rst is scoped to the speckit-dev skills so we
@@ -32,5 +33,6 @@ jobs:
         # the bundled lychee config continues checking it for local users.
         run: >-
           bash skills/lychee/scripts/check-links.sh
+          --config lychee.toml --cache=false
           --exclude '^https://stylepedia\.net/style/(#.*)?$'
           'skills/**/*.md' 'skills/speckit-*/**/*.rst'

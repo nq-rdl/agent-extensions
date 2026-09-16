@@ -26,12 +26,20 @@ fi
 
 ARGS=()
 
-# Use skill-bundled config if no --config flag was passed
-if [[ ! " $* " =~ " --config " ]] && [[ -f "$CONFIG_FILE" ]]; then
+# Inspect individual arguments so a path containing " --config " is not a flag.
+# Stop at --, after which even option-looking inputs are positional.
+HAS_CONFIG=false
+for arg in "$@"; do
+  case "$arg" in
+    --) break ;;
+    --config|--config=*|-c|-c?*) HAS_CONFIG=true; break ;;
+  esac
+done
+if [[ "$HAS_CONFIG" == false ]] && [[ -f "$CONFIG_FILE" ]]; then
   ARGS+=(--config "$CONFIG_FILE")
 fi
 
-# Non-interactive defaults (no progress bar, no color codes in captured output)
+# Non-interactive default (no progress bar).
 ARGS+=(--no-progress)
 
 # Forward all user-provided arguments

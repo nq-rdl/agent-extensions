@@ -1,0 +1,3 @@
+kind: Fixed
+body: Separate consumer Lychee defaults from catalog CI exclusions; verify configuration forwarding and fresh link checks.
+time: 2026-09-16T03:50:11.17345397Z
