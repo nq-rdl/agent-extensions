@@ -122,6 +122,25 @@ def invocation_text(text, names):
     )
 
 
+def helper_invocations(text, src, source, leaf):
+    """Resolve commands for helpers actually shipped by this skill, preserving cwd."""
+    for helper in sorted((src / "scripts").rglob("*")):
+        if not helper.is_file():
+            continue
+        relative = helper.relative_to(src).as_posix()
+        pattern = (
+            r"\b(bash|sh|python3?|node|source)([ \t]+)([\"']?)"
+            + r"(?:\./)?(?:skills/" + re.escape(source) + r"/)?"
+            + re.escape(relative) + r"\3(?=[\s`;|&)]|$)"
+        )
+        text = re.sub(
+            pattern,
+            lambda m: f'{m[1]}{m[2]}"${{PLUGIN_ROOT}}/skills/{leaf}/{relative}"',
+            text,
+        )
+    return text
+
+
 def skill_copy(repo, source, leaf, dest, config, names):
     if (
         not re.fullmatch(r"[a-z0-9]+(?:-[a-z0-9]+)*", source)
@@ -151,6 +170,14 @@ def skill_copy(repo, source, leaf, dest, config, names):
                 r"\bAskUserQuestion(?: tools?)?\b", "the host user-question tool", body
             )
         body = body.replace("${CLAUDE_PLUGIN_ROOT}", "${PLUGIN_ROOT}")
+    body = helper_invocations(body, src, source, leaf)
+    reference_helpers = False
+    for path in (dest / "references").rglob("*.rst"):
+        original = path.read_text()
+        adapted = helper_invocations(original, src, source, leaf)
+        if adapted != original:
+            path.write_text(adapted)
+            reference_helpers = True
     prelude = []
     legacy_terms = (
         "AskUserQuestion",
@@ -184,7 +211,7 @@ def skill_copy(repo, source, leaf, dest, config, names):
             "Use Codex tools to inspect or author them; launch the target host only when the "
             "user requests execution and it is installed. Do not configure Codex as Claude Code."
         )
-    if "${PLUGIN_ROOT}" in body:
+    if "${PLUGIN_ROOT}" in body or reference_helpers:
         prelude.append(
             "Before shell examples, set PLUGIN_ROOT to the absolute installed plugin directory: "
             "two parent directories above this SKILL.md’s containing skill directory. "
@@ -202,7 +229,9 @@ def skill_copy(repo, source, leaf, dest, config, names):
             "Execute this workflow only on an explicit user request; preserve its review-only "
             "or mutation scope and existing authorization checks."
         )
-    if "references/subagent.rst" in body:
+    if (dest / "references/subagent.rst").is_file() and re.search(
+        r"\]\(references/subagent\.rst(?:#[^)]*)?\)", body
+    ):
         prelude.append(
             "Delegation is optional. Read references/subagent.rst only when delegation is useful "
             "or requested. It does not install a named agent or grant permissions."

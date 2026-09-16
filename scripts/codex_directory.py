@@ -13,13 +13,39 @@ import re
 import stat
 import tempfile
 import zipfile
+from ipaddress import ip_address
 from pathlib import Path
+from urllib.parse import urlsplit
 import yaml
 
 try:
     from .codex_package import ROOT, bundles, validate, sync, frontmatter
 except ImportError:
     from codex_package import ROOT, bundles, validate, sync, frontmatter
+
+
+def absolute_https_url(value):
+    if not isinstance(value, str) or any(c.isspace() or ord(c) < 32 or ord(c) == 127 for c in value):
+        return False
+    try:
+        url = urlsplit(value)
+        host = url.hostname or ""
+        if ":" in host or re.fullmatch(r"[0-9.]+", host):
+            ip_address(host)
+        elif not all(
+            re.fullmatch(r"[A-Za-z0-9](?:[A-Za-z0-9-]{0,61}[A-Za-z0-9])?", label)
+            for label in host.encode("idna").decode("ascii").rstrip(".").split(".")
+        ):
+            return False
+        # Accessing port also validates its syntax and range.
+        return (
+            url.scheme == "https" and bool(url.hostname)
+            and url.username is None and url.password is None
+            and (url.port is None or 0 < url.port <= 65535)
+            and "\\" not in value
+        )
+    except (ValueError, UnicodeError):
+        return False
 
 
 def report(repo):
@@ -38,8 +64,12 @@ def report(repo):
         for key in ("logo", "privacyPolicyURL", "termsOfServiceURL"):
             if not interface.get(key):
                 blockers.append(f"Publisher must supply {key}")
+            elif key != "logo" and not absolute_https_url(interface[key]):
+                blockers.append(f"Publisher must supply a valid absolute HTTPS {key}")
         if not publisher.get("supportURL"):
             blockers.append("Publisher must supply supportURL")
+        elif not absolute_https_url(publisher["supportURL"]):
+            blockers.append("Publisher must supply a valid absolute HTTPS supportURL")
         if publisher.get("identityVerified") is not True:
             blockers.append(
                 "Publisher identity and organization submission access are not recorded as verified"
@@ -72,7 +102,10 @@ def report(repo):
             blockers.append(
                 "Record authenticated execution evidence for five positive and three negative task cases"
             )
-        if not publisher.get("availabilityRegions"):
+        regions = publisher.get("availabilityRegions")
+        if not isinstance(regions, list) or not regions or any(
+            not isinstance(region, str) or not region.strip() for region in regions
+        ):
             blockers.append("Publisher must select supported availability regions")
         results.append(
             {

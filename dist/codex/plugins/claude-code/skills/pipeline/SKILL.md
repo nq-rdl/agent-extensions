@@ -24,8 +24,6 @@ This skill describes another host. Claude Code/OpenCode commands, configuration,
 
 Here $ARGUMENTS means the user’s supplied skill arguments. Codex does not populate a shell variable for them. Pass arguments with shell quoting that preserves literal text; never evaluate user text as shell code.
 
-Delegation is optional. Read references/subagent.rst only when delegation is useful or requested. It does not install a named agent or grant permissions.
-
 ## User Input
 
 ```text

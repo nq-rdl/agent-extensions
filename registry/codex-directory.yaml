@@ -5,3 +5,4 @@ identityVerified: false
 # Verification and each plugin's behavioralEvidence attestation require YAML
 # boolean true; quoted strings and other truthy values do not satisfy the gates.
 behavioralEvidence: {}
+# availabilityRegions, when supplied, must be a nonempty list of region names/codes.

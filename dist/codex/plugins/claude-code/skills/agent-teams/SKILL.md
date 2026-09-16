@@ -17,6 +17,8 @@ metadata:
 
 This skill describes another host. Claude Code/OpenCode commands, configuration, and hook examples below are artifacts for that host, not tools available in Codex. Use Codex tools to inspect or author them; launch the target host only when the user requests execution and it is installed. Do not configure Codex as Claude Code.
 
+Before shell examples, set PLUGIN_ROOT to the absolute installed plugin directory: two parent directories above this SKILL.md’s containing skill directory. Derive it from the loaded file path, never the working directory. This variable is not automatically supplied to ordinary shell tools. Quote it in commands.
+
 Here $ARGUMENTS means the user’s supplied skill arguments. Codex does not populate a shell variable for them. Pass arguments with shell quoting that preserves literal text; never evaluate user text as shell code.
 
 ## User Input
@@ -121,13 +123,13 @@ Run the bundled config script:
 
 ```bash
 # Check current status
-bash scripts/check-config.sh
+bash "${PLUGIN_ROOT}/skills/agent-teams/scripts/check-config.sh"
 
 # Enable agent teams (writes to user settings)
-bash scripts/check-config.sh --enable
+bash "${PLUGIN_ROOT}/skills/agent-teams/scripts/check-config.sh" --enable
 
 # Disable agent teams
-bash scripts/check-config.sh --disable
+bash "${PLUGIN_ROOT}/skills/agent-teams/scripts/check-config.sh" --disable
 ```
 
 ## When to Use Teams (Not Subagents)
@@ -344,6 +346,6 @@ worthwhile. For routine tasks, a single session is more cost-effective.
 
 | Command | Description |
 |---------|-------------|
-| `bash scripts/check-config.sh` | Check if agent teams are enabled |
-| `bash scripts/check-config.sh --enable` | Enable agent teams in user settings |
-| `bash scripts/check-config.sh --disable` | Disable agent teams in user settings |
+| `bash "${PLUGIN_ROOT}/skills/agent-teams/scripts/check-config.sh"` | Check if agent teams are enabled |
+| `bash "${PLUGIN_ROOT}/skills/agent-teams/scripts/check-config.sh" --enable` | Enable agent teams in user settings |
+| `bash "${PLUGIN_ROOT}/skills/agent-teams/scripts/check-config.sh" --disable` | Disable agent teams in user settings |

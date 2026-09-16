@@ -2,6 +2,7 @@
 
 import json
 import os
+import re
 from pathlib import Path
 import shutil
 import subprocess
@@ -87,6 +88,60 @@ def fixture(root, *, mcp=False, hooks=False):
 
 
 class StrictPackaging(unittest.TestCase):
+    def test_bundled_helper_commands_run_from_an_unrelated_workspace(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            repo = Path(tmp)
+            fixture(repo)
+            source = repo / "skills/sample-task"
+            (source / "scripts/run.sh").write_text('#!/bin/sh\ncat "$1"\n')
+            with (source / "SKILL.md").open("a") as out:
+                out.write('\n[Helper](scripts/run.sh)\n')
+                for command in ('bash scripts/run.sh', 'bash skills/sample-task/scripts/run.sh', 'bash "./scripts/run.sh"'):
+                    out.write(f'```bash\n{command} "input file.txt"\n```\n')
+                out.write('`bash scripts/project-only.sh`\n')
+            (source / "references/helper.rst").write_text('bash scripts/run.sh "input file.txt"\n')
+            package.sync(repo)
+            cached = repo / "plugin cache with spaces/sample"
+            shutil.copytree(repo / package.ROOT / "sample", cached)
+            workspace = repo / "unrelated workspace"
+            workspace.mkdir()
+            (workspace / "input file.txt").write_text("workspace data")
+            shutil.rmtree(repo / "skills")
+            entrypoint = (cached / "skills/task/SKILL.md").read_text()
+            self.assertIn('[Helper](scripts/run.sh)', entrypoint)
+            self.assertIn('`bash scripts/project-only.sh`', entrypoint)
+            commands = re.findall(r'```bash\n(.*?)\n```', entrypoint)
+            commands.append((cached / "skills/task/references/helper.rst").read_text())
+            self.assertEqual(len(commands), 4)
+            for command in commands:
+                with self.subTest(command=command):
+                    result = subprocess.run(
+                        ["bash", "-c", command], cwd=workspace,
+                        env={**os.environ, "PLUGIN_ROOT": str(cached)},
+                        capture_output=True, text=True,
+                    )
+                    self.assertEqual(result.returncode, 0, result.stderr)
+                    self.assertEqual(result.stdout, "workspace data")
+
+    def test_delegation_guidance_requires_a_real_linked_local_outline(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            repo = Path(tmp)
+            fixture(repo)
+            outline = repo / "skills/sample-task/references/subagent.rst"
+            package.sync(repo)
+            installed = repo / package.ROOT / "sample/skills/task/SKILL.md"
+            self.assertIn("Delegation is optional.", installed.read_text())
+            outline.unlink()
+            package.sync(repo)
+            self.assertNotIn("Delegation is optional.", installed.read_text())
+            outline.write_text("Worker instructions")
+            source = repo / "skills/sample-task/SKILL.md"
+            source.write_text(source.read_text().replace(
+                "[outline](references/subagent.rst)", "the sibling skill's `references/subagent.rst`"
+            ))
+            package.sync(repo)
+            self.assertNotIn("Delegation is optional.", installed.read_text())
+
     def test_native_description_override_preserves_canonical_source(self):
         with tempfile.TemporaryDirectory() as tmp:
             repo = Path(tmp)
@@ -438,6 +493,48 @@ class NativeHookBehavior(unittest.TestCase):
 
 
 class DirectoryArtifacts(unittest.TestCase):
+    def test_submission_urls_require_absolute_https_urls(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            repo = Path(tmp)
+            fixture(repo)
+            package.sync(repo)
+            manifest_path = repo / package.ROOT / "sample/.codex-plugin/plugin.json"
+            manifest = json.loads(manifest_path.read_text())
+            manifest["interface"].update(
+                logo="logo.png", privacyPolicyURL="https://example.com/privacy",
+                termsOfServiceURL="https://example.com/terms",
+            )
+            publisher = {
+                "supportURL": "https://example.com/support", "identityVerified": True,
+                "availabilityRegions": ["AU"], "behavioralEvidence": {"sample": True},
+            }
+            publisher_path = repo / "registry/codex-directory.yaml"
+            manifest_path.write_text(json.dumps(manifest))
+            publisher_path.write_text(yaml.safe_dump(publisher))
+            self.assertTrue(directory.report(repo)["plugins"][0]["submissionReady"])
+            for key in ("privacyPolicyURL", "termsOfServiceURL", "supportURL"):
+                target = publisher if key == "supportURL" else manifest["interface"]
+                original = target[key]
+                for value in ("pending", "/privacy", "http://example.com/privacy", True, 1, [],
+                              "https://", "https://example.com:bad", "https://bad host/path",
+                              "https://bad|host/path", "https://a..b/path", "https://127.0.0.999",
+                              "https://user:secret@example.com", "https://example.com/\x7f"):
+                    with self.subTest(key=key, value=value):
+                        target[key] = value
+                        manifest_path.write_text(json.dumps(manifest))
+                        publisher_path.write_text(yaml.safe_dump(publisher))
+                        entry = directory.report(repo)["plugins"][0]
+                        self.assertFalse(entry["submissionReady"])
+                        self.assertEqual(len(entry["blockers"]), 1)
+                target[key] = original
+                manifest_path.write_text(json.dumps(manifest))
+                publisher_path.write_text(yaml.safe_dump(publisher))
+            for regions in ("AU", True, 1, {}, [], [""], [False]):
+                with self.subTest(regions=regions):
+                    publisher["availabilityRegions"] = regions
+                    publisher_path.write_text(yaml.safe_dump(publisher))
+                    self.assertFalse(directory.report(repo)["plugins"][0]["submissionReady"])
+
     def test_rebuilding_archives_removes_only_previous_generated_files(self):
         with tempfile.TemporaryDirectory() as tmp:
             repo = Path(tmp)

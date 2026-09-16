@@ -17,8 +17,6 @@ metadata:
 
 This skill describes another host. Claude Code/OpenCode commands, configuration, and hook examples below are artifacts for that host, not tools available in Codex. Use Codex tools to inspect or author them; launch the target host only when the user requests execution and it is installed. Do not configure Codex as Claude Code.
 
-Delegation is optional. Read references/subagent.rst only when delegation is useful or requested. It does not install a named agent or grant permissions.
-
 # RDL team Claude Code setup
 
 Your job is to onboard the user onto the RDL team's Claude Code configuration. This

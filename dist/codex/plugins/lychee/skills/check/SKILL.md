@@ -13,6 +13,10 @@ metadata:
   repo: https://github.com/nq-rdl/agent-extensions
 ---
 
+## Codex execution
+
+Before shell examples, set PLUGIN_ROOT to the absolute installed plugin directory: two parent directories above this SKILL.md’s containing skill directory. Derive it from the loaded file path, never the working directory. This variable is not automatically supplied to ordinary shell tools. Quote it in commands.
+
 # Lychee — Fast Link Checker
 
 ## Overview
@@ -46,15 +50,15 @@ The wrapper script checks for `lychee` on PATH and exits with install instructio
 ### Check links in specific files or directories
 
 ```bash
-bash scripts/check-links.sh /path/to/README.md
-bash scripts/check-links.sh '/path/to/docs/**/*.md'
-bash scripts/check-links.sh /path/to/project/
+bash "${PLUGIN_ROOT}/skills/check/scripts/check-links.sh" /path/to/README.md
+bash "${PLUGIN_ROOT}/skills/check/scripts/check-links.sh" '/path/to/docs/**/*.md'
+bash "${PLUGIN_ROOT}/skills/check/scripts/check-links.sh" /path/to/project/
 ```
 
 ### JSON output (for programmatic analysis)
 
 ```bash
-bash scripts/check-links.sh --format json '/path/to/docs/**/*.md'
+bash "${PLUGIN_ROOT}/skills/check/scripts/check-links.sh" --format json '/path/to/docs/**/*.md'
 ```
 
 ### Pass additional lychee flags
@@ -63,25 +67,25 @@ The wrapper forwards all arguments to lychee, so any lychee flag works:
 
 ```bash
 # Offline mode — only check local file references, no network requests
-bash scripts/check-links.sh --offline /path/to/docs/
+bash "${PLUGIN_ROOT}/skills/check/scripts/check-links.sh" --offline /path/to/docs/
 
 # Check a single URL
-bash scripts/check-links.sh 'https://example.com'
+bash "${PLUGIN_ROOT}/skills/check/scripts/check-links.sh" 'https://example.com'
 
 # Exclude a pattern
-bash scripts/check-links.sh --exclude 'github\.com/.*?/issues' /path/to/docs/
+bash "${PLUGIN_ROOT}/skills/check/scripts/check-links.sh" --exclude 'github\.com/.*?/issues' /path/to/docs/
 
 # Verbose output for debugging
-bash scripts/check-links.sh -v /path/to/docs/
+bash "${PLUGIN_ROOT}/skills/check/scripts/check-links.sh" -v /path/to/docs/
 
 # Use project-specific config instead of bundled defaults
-bash scripts/check-links.sh --config /path/to/project/lychee.toml /path/to/docs/
+bash "${PLUGIN_ROOT}/skills/check/scripts/check-links.sh" --config /path/to/project/lychee.toml /path/to/docs/
 
 # Detailed output format (shows each link's status)
-bash scripts/check-links.sh --format detailed /path/to/docs/
+bash "${PLUGIN_ROOT}/skills/check/scripts/check-links.sh" --format detailed /path/to/docs/
 
 # Markdown report saved to file
-bash scripts/check-links.sh --format markdown -o report.md /path/to/docs/
+bash "${PLUGIN_ROOT}/skills/check/scripts/check-links.sh" --format markdown -o report.md /path/to/docs/
 ```
 
 ## Bundled Defaults
@@ -102,7 +106,7 @@ To override, either pass `--config /path/to/your/lychee.toml` or place a
 ### Pre-release doc audit
 
 ```bash
-bash scripts/check-links.sh --format json '/path/to/project/**/*.md' > /tmp/link-report.json
+bash "${PLUGIN_ROOT}/skills/check/scripts/check-links.sh" --format json '/path/to/project/**/*.md' > /tmp/link-report.json
 ```
 
 Read the JSON output to summarize broken links, then fix or flag them.
@@ -110,7 +114,7 @@ Read the JSON output to summarize broken links, then fix or flag them.
 ### Skill quality check
 
 ```bash
-bash scripts/check-links.sh '/path/to/skills/*/SKILL.md' '/path/to/skills/*/references/*.md'
+bash "${PLUGIN_ROOT}/skills/check/scripts/check-links.sh" '/path/to/skills/*/SKILL.md' '/path/to/skills/*/references/*.md'
 ```
 
 ### CI-style check (exit code reflects broken links)

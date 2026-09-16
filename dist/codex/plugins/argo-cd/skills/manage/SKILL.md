@@ -9,6 +9,10 @@ metadata:
   repo: https://github.com/nq-rdl/agent-extensions
 ---
 
+## Codex execution
+
+Before shell examples, set PLUGIN_ROOT to the absolute installed plugin directory: two parent directories above this SKILL.md’s containing skill directory. Derive it from the loaded file path, never the working directory. This variable is not automatically supplied to ordinary shell tools. Quote it in commands.
+
 # ArgoCD Skill
 
 This skill allows the agent to interact with ArgoCD using the `argocd` CLI tool,
@@ -19,7 +23,7 @@ as well as create Declarative GitOps configurations.
 The `argocd` CLI might need to be downloaded if not present. Run the installation script:
 
 ```bash
-bash skills/argo-cd/scripts/install-cli.sh
+bash "${PLUGIN_ROOT}/skills/manage/scripts/install-cli.sh"
 sudo mv argocd /usr/local/bin/
 ```
 

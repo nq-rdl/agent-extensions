@@ -9,10 +9,6 @@ metadata:
   repo: https://github.com/nq-rdl/agent-extensions
 ---
 
-## Codex execution
-
-Delegation is optional. Read references/subagent.rst only when delegation is useful or requested. It does not install a named agent or grant permissions.
-
 # Create a delegatable catalog workflow
 
 The `agent-create` invocation is retained for contributors importing agent
