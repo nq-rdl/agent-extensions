@@ -14,14 +14,22 @@ staging=$(mktemp)
 trap 'rm -f "$staging"' EXIT
 awk '
 function fail(message) { print message > "/dev/stderr"; failed=1; exit 2 }
-FNR==NR {
+FILENAME==ARGV[1] {
   sub(/\r$/, "")
   lines[++total]=$0
-  if ($0 ~ /^[[:space:]]*(```|~~~)/) { fenced=!fenced; next }
+  fence=$0; sub(/^ */,"",fence)
+  if (match(fence, /^(```+|~~~+)/)) {
+    delimiter=substr(fence,1,1); width=RLENGTH
+    suffix=substr(fence,width+1)
+    if (!fenced) { fenced=delimiter; fencewidth=width }
+    else if (delimiter==fenced && width>=fencewidth && suffix ~ /^[[:space:]]*$/) fenced=""
+    next
+  }
   if (fenced) next
   if ($0 ~ /^##+ /) phase=$0
   if ($0 ~ /^- \[[ xX]\] T[0-9]+([[:space:]]|$)/) {
     text=$0; sub(/^- \[[ xX]\] /,"",text)
+    sub(/[[:space:]]+$/, "", text)
     id=text; sub(/[[:space:]].*$/, "", id)
     if (seen[id]++) fail("duplicate task ID: " id)
     if (text==id) fail("task has no description: " id)

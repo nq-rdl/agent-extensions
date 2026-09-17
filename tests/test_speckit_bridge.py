@@ -44,6 +44,26 @@ T009 depends on T001.
         self.assertEqual(result.returncode, 0, result.stderr)
         self.assertEqual(len(re.findall(r'^## Task ', result.stdout, re.M)), 1)
 
+    def test_empty_tasks_cannot_import_plan_checklist(self):
+        result = self.bridge('', '- [ ] T001 Plan checklist\n')
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn('no spec-kit tasks found', result.stderr)
+        self.assertEqual(result.stdout, '')
+
+    def test_fences_require_matching_delimiter_length_and_empty_suffix(self):
+        for opening, false_close, closing in [
+            ('````md', '```', '````'),
+            ('~~~md', '```', '~~~'),
+            ('```md', '~~~', '```'),
+            ('```md', '```not-a-close', '````'),
+            ('~~~~md', '~~~', '~~~~~'),
+        ]:
+            with self.subTest(opening=opening, false_close=false_close):
+                result = self.bridge(
+                    f'{opening}\n{false_close}\n- [ ] T099 Example\n{closing}\n- [ ] T001 Real\n')
+                self.assertEqual(result.returncode, 0, result.stderr)
+                self.assertEqual(re.findall(r'^## Task \d+: (T\d+)', result.stdout, re.M), ['T001'])
+
     def test_source_plan_task_headings_cannot_pollute_extraction(self):
         result = self.bridge('- [ ] T001 Actual\n', '## Task 99: example\n')
         self.assertEqual(re.findall(r'^## Task (\d+)', result.stdout, re.M), ['1'])
@@ -55,7 +75,7 @@ T009 depends on T001.
 
     def test_invalid_input_has_no_partial_output(self):
         for tasks in ['', '# no tasks\n', '- [ ] T001 One\n- [ ] T001 Duplicate\n',
-                      '- [ ] Tbad Invalid\n', '- [ ] T001\n']:
+                      '- [ ] Tbad Invalid\n', '- [ ] T001\n', '- [ ] T001   \n', '- [ ] T001\t \t\n']:
             with self.subTest(tasks=tasks):
                 result = self.bridge(tasks)
                 self.assertNotEqual(result.returncode, 0)

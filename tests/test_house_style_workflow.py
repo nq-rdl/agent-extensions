@@ -40,7 +40,7 @@ class WorkflowTest(unittest.TestCase):
     @staticmethod
     def unit(name):
         return {'id': name, 'repo': '/repo/' + name, 'checkpoint': '/repo/' + name + '/state.json',
-                'branch': 'main', 'base': 'origin/main', 'request': 'Implement feature'}
+                'physicalWorktree': '/repo/' + name, 'branch': 'main', 'base': 'origin/main', 'request': 'Implement feature'}
 
     @staticmethod
     def response(status):
@@ -74,6 +74,24 @@ class WorkflowTest(unittest.TestCase):
         data = self.run_workflow(units=[self.unit('one'), other])
         self.assertIn('separate worktrees', data['error'])
         self.assertEqual(data['calls'], [])
+
+    def test_worktree_aliases_rejected_before_dispatch(self):
+        for alias in ['/repo/one/.', '/repo/one/', '/repo/link-to-one']:
+            with self.subTest(alias=alias):
+                other = self.unit('two')
+                other.update(repo=alias, checkpoint=alias + '/two.json', physicalWorktree='/repo/one')
+                data = self.run_workflow(units=[self.unit('one'), other])
+                self.assertIn('separate worktrees', data['error'])
+                self.assertEqual(data['calls'], [])
+
+    def test_missing_or_noncanonical_identity_rejected_before_dispatch(self):
+        for identity in [None, '', 'relative', '/repo/one/.', '/repo//one', '/repo/one/']:
+            with self.subTest(identity=identity):
+                one = self.unit('one')
+                one['physicalWorktree'] = identity
+                data = self.run_workflow(units=[one])
+                self.assertIn('canonical physicalWorktree', data['error'])
+                self.assertEqual(data['calls'], [])
 
     def test_duplicate_ids_rejected(self):
         one = self.unit('one'); other = self.unit('two'); other['id'] = 'one'

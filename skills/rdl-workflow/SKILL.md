@@ -34,6 +34,7 @@ actual object as `args` (not a JSON-encoded string):
   "units": [{
     "id": "feature-name",
     "repo": "/absolute/target-worktree",
+    "physicalWorktree": "/absolute/target-worktree",
     "branch": "main",
     "base": "origin/main",
     "checkpoint": "/absolute/target-worktree/.superpowers/rdl-workflow/feature-name.json",
@@ -56,7 +57,13 @@ uses `parallel()` to run them and collects results for one human decision round.
 Dependent units wait for their required parent artifact/commit. For specify,
 start each checkout on its intended base and let spec-kit create the feature
 branch; never pre-create an unused feature branch. Validate physical worktree
-paths (including symlinks) are distinct before launch.
+paths (including symlinks) before every launch: for each repo, obtain its Git
+top-level directory with `git -C "$repo" rev-parse --show-toplevel`, then resolve
+that directory with `cd -- "$root" && pwd -P`. Supply the result as
+`physicalWorktree`; do not derive it by trimming the input path. The script
+requires these identities and rejects duplicates before dispatching any agent.
+Preflight rechecks the identity before writing even a checkpoint. If it changed,
+refresh every unit's identity in the main session before retrying.
 
 Brainstorm/write-plan/analyze use opus; specify/plan/tasks/execute use sonnet.
 Effort intent is in prompts. SDD retains its internal task/reviewer model choices.
