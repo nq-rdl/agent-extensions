@@ -2,13 +2,16 @@
 license: CC-BY-4.0
 description: >-
   Apply advisory RDL cohort-SQL guardrails when drafting, changing, mapping, validating
-  or reviewing request SQL and query-builder resolvers. Covers indexed filters,
-  source timezones and encounter-mediated clinical-event joins, with evidence pointers.
+  or reviewing request pipelines, SQL and query-builder resolvers. Covers spec
+  composition, indexed filters, source timezones, join evidence and researcher
+  modelling choices, with pointers to authoritative sources.
 argument-hint: '[request, SQL path or resolver]'
 user-invocable: true
 compatibility: >-
   RDL cohort SQL; DATEADD example targets SQL Server 2022 (16.x).
-  Source patterns from issue 313 (2026-09-15); verify deployed engine and current metadata.
+  Source patterns from issues 313 and 325 (2026-09-15 to 2026-09-17).
+  Composition examples are schematic; verify pinned library APIs, deployed engine
+  and current metadata.
 allowed-tools: Read, Glob, Grep, AskUserQuestion
 metadata:
   repo: https://github.com/nq-rdl/agent-extensions
@@ -17,18 +20,20 @@ metadata:
 # Data Request — guardrails
 
 The shared advisory spine for RDL request repos and query-builder. Apply it to the
-SQL being worked on, including work outside a formal review. It requires no
-`.sqlreview/` setup and adds no SQL lint gate or approval record.
+request composition and SQL being worked on, including work outside a formal review.
+It requires no `.sqlreview/` setup and adds no SQL lint gate or approval record.
 
 ## Confirm sources before using a fact
 
 Locate the relevant sources in the supplied workspace or connected repositories:
 
 - **dataops `CREATE TABLE` definitions and their comments** are authoritative for
-  schema, field timezone and units. Record the file/table/column and revision read.
+  schema, field timezone and units; inspect DDL/index comments for join rationale.
+  Record the file/table/column and revision read.
 - **query-builder column-spec metadata** is the consumer-facing pointer to each
   field's meaning, timezone and units. Follow its provenance to the dataops DDL;
-  read the existing resolver and its tests for the implemented mapping.
+  read the existing resolver's docstring and tests for the implemented mapping,
+  required joins and their performance or correctness rationale.
 - **Current index definitions** establish key order and usable join/filter paths.
   Use an existing plan or authorised read-only plan inspection to check performance.
 - **Request and confirmed scope** establish population, grain, anchor, time window
@@ -36,13 +41,48 @@ Locate the relevant sources in the supplied workspace or connected repositories:
 
 Search by the actual table/column/resolver names; do not invent a column-spec path,
 metadata key, missing sibling implementation or database access. When sources conflict,
-show both locations and use dataops as ground truth; flag stale consumer metadata.
+show both locations and use dataops as ground truth for storage facts; flag stale
+consumer metadata. Library behaviour comes from the pinned implementation and tests.
 When evidence is unavailable, label the affected decision unverified and ask only
 for the missing source/decision needed to proceed. Never fill gaps from a field name.
 
 Verify correctness-critical syntax against the deployed engine's canonical docs
 ([SQL Server documentation](https://learn.microsoft.com/en-us/sql/t-sql/language-reference))
 and storage facts against the current dataops DDL before presenting a result as verified.
+
+## Compose library units in requests
+
+Atomic, testable Layer-1 `Spec`s, `@resolves` resolver handlers and reusable helpers
+belong in `query-builder` / `query-builder-plugins`. Request pipelines compose those
+units: `CohortQuery(Resolver).add(SpecA).add(SpecB)`. If a unit is missing or incorrect,
+identify the library enhancement and its tests; do not work around it with hand-rolled
+SQL in request code. Check the request's dependency pin before using an enhancement.
+
+Confirm the applicable rules in the current `.specify/memory/constitution.md`:
+
+- `nq-rdl/query-builder` Constitution:
+  core packages must not construct SQL with f-strings or string concatenation.
+  Its narrow exception for commented resolver SQL that PyPika cannot express does
+  not authorise raw SQL in a request pipeline.
+- `nq-rdl/data-analysis-scaffold` Constitution:
+  raw f-string SQL construction is prohibited outside template scripts.
+
+The `falls_service_cohort.py` Indigenous-status lookup in
+[#325](https://github.com/nq-rdl/agent-extensions/issues/325) illustrates the change:
+
+```python
+# Before: _build_indigenous_status_sql(...) hand-builds an SQL f-string.
+# After: compose verified library units (schematic; check pinned signatures).
+query = (
+    CohortQuery(IEMRResolver)
+    .add(EncounterIdAnchor(...))
+    .add(WithIndigenousStatus(...))
+)
+```
+
+`nq-rdl/query-builder-plugins` issue #26 tracks the active-current and
+display-resolution enhancement behind this example.
+The issue is a discovery pointer, not proof that a request's installed version has it.
 
 ## Performance: shift the anchor
 
@@ -73,6 +113,13 @@ source and conversion in the task output, rather than copying field facts into t
 
 ## Join and index patterns
 
+For any spec/resolver that requires a join, make the requirement and its rationale
+discoverable in the resolver's docstring/tests, column-spec metadata and dataops
+DDL/index comments. Inspect those sources for the actual tables and pinned resolver;
+cite which locations and revisions you checked, what each establishes, and any
+missing evidence. When changing a resolver, document and test its join requirement
+and flag missing or stale metadata/comments for the owning repository.
+
 For person-level clinical-event selection, start with the known RDL pattern
 **`CLINICAL_EVENT → ENCOUNTER → person`**: the seed environment has no person-leading
 index on `CLINICAL_EVENT`. Confirm current key order, encounter/person keys and
@@ -83,6 +130,29 @@ Check whether multiple encounters/events multiply the intended output grain. Cho
 joins or existence checks from the requested population and verified relationships;
 do not conceal an incorrect join with `DISTINCT`. If current indexes justify a
 different path, explain the evidence rather than treating the seed as timeless.
+
+## Leave modelling choices to the researcher
+
+The library supplies atomic, verified facts and flags known intrinsic data-quality
+caveats. The researcher chooses how those facts define an outcome or exposure;
+encode that choice in the request's spec composition, not an implicit resolver default.
+
+- **Mortality:** supply date of death with its source limitation.
+  `nq-rdl/query-builder` issue #79 describes an ieMR source that undercounts deaths
+  outside hospital and over longer follow-up
+  without death-registry linkage. Verify the current source and limitation; do not
+  assume the proposed automatic annotation mechanism is installed. Carry the caveat
+  into the task output even if it must be recorded manually. Turning that date into
+  **30-day mortality**, including the anchor and window boundaries, is the researcher's
+  modelling choice, expressed in the request's own spec composition.
+- **Suburb/postcode:** latest address and address at the time of an encounter answer
+  different questions. Leave that choice and its temporal anchor to the researcher/spec;
+  verify whether the source supports it rather than silently substituting latest data.
+
+When request logic crosses this boundary, flag the modelling decision and its effect.
+Use an already-confirmed scope choice where available; otherwise ask the researcher
+to settle the affected choice and continue work that does not depend on it. Do not
+treat source limitations as permission to choose a model or promise unavailable facts.
 
 ## Carry evidence into the task
 

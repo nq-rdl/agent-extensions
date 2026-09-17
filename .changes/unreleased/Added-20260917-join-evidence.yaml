@@ -1,0 +1,3 @@
+kind: Added
+body: Adds join-evidence guidance to `data-request:guardrails` — verify requirements against resolver tests, metadata and DDL (#325)
+time: 2026-09-17T00:50:13.423271265Z
