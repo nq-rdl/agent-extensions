@@ -12,8 +12,8 @@ include_fragments = "anchor-only"
 # Max concurrent requests — throttle to avoid rate limiting
 max_concurrency = 32
 
-# Timeout per request (seconds)
-timeout = 30
+# Timeout per request (seconds) — allow slow documentation hosts time to respond
+timeout = 60
 
 # Max retries for transient failures
 max_retries = 3
