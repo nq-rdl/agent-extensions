@@ -1,0 +1,3 @@
+kind: Added
+body: New `rdl-team:switch-repo` loads and verifies sibling repository skill context (#326)
+time: 2026-09-17T04:50:20.064750955Z

@@ -84,6 +84,24 @@ def make_repo(tmp):
 
 
 class TestGenerate(unittest.TestCase):
+    def test_claude_workflow_paths_are_validated_and_emitted(self):
+        with tempfile.TemporaryDirectory() as t:
+            repo = make_repo(t)
+            bundle = repo / "registry/bundles/swe.yaml"
+            base = bundle.read_text()
+            source = repo / "skills/skill/scripts/run.js"
+            source.parent.mkdir(parents=True)
+            source.write_text("export const meta = {name: 'run', description: 'Run'};\n")
+            bundle.write_text(base + "    workflows: [./skills/skill/scripts/run.js]\n")
+            result = generate_manifests.generate(repo)
+            self.assertEqual(result["plugins"]["swe"]["workflows"], ["./skills/skill/scripts/run.js"])
+            for invalid in ["../outside.js", "./skills/skill/scripts/../outside.js",
+                            "./skills/missing/scripts/run.js", "./skills/skill/scripts/missing.js"]:
+                with self.subTest(invalid=invalid):
+                    bundle.write_text(base + f"    workflows: [{invalid}]\n")
+                    with self.assertRaises(ValueError):
+                        generate_manifests.generate(repo)
+
     def test_marketplace_top_level(self):
         with tempfile.TemporaryDirectory() as t:
             m = generate_manifests.generate(make_repo(t))["marketplace"]

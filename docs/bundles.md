@@ -43,7 +43,7 @@ Delegation outlines are optional skill references, not registered agent types.
 | [`codex`](#codex) | Yes | Yes | Delegate work to the OpenAI Codex CLI — reviews, background tasks, and rescue sessions |
 | [`opencode-dev`](#opencode-dev) | Yes | Yes | OpenCode development toolkit — author plugins, agents, the SDK, custom tools, skills, governance policies, and delegation harnesses |
 | [`speckit-dev`](#speckit-dev) | Yes | Yes | SpecKit extension toolkit — scaffold, validate, manage, and publish spec-kit extensions |
-| [`rdl-team`](#rdl-team) | Yes | Yes | RDL team workflows — Claude Code onboarding, setup, and config management |
+| [`rdl-team`](#rdl-team) | Yes | Yes | RDL team workflows — repository context, spec-kit delivery, and onboarding |
 | [`playwright`](#playwright) | Yes | Yes | Playwright — generate and debug end-to-end browser tests |
 | [`planning`](#planning) | Yes | Yes | Planning — implementation strategy, technical-spike validation, file-level sequencing, API/repo architecture, and ADRs |
 | [`debug`](#debug) | Yes | Yes | Debugging and cleanup — systematic diagnosis and tech-debt removal |
@@ -619,17 +619,21 @@ SpecKit extension toolkit — scaffold, validate, manage, and publish spec-kit e
 
 ## rdl-team
 
-RDL team workflows — Claude Code onboarding, setup, and config management.
+RDL team workflows — repository context, spec-kit delivery, and onboarding.
 
 **Claude Code skills**
 
 - `/rdl-team:cc-setup`
+- `/rdl-team:switch-repo`
+- `/rdl-team:task-bridge`
+- `/rdl-team:workflow`
 - `/rdl-team:new-service-request`
 - `/rdl-team:discover-plugins`
 
 **Codex skills**
 
 - `$rdl-team:cc-setup`
+- `$rdl-team:task-bridge`
 - `$rdl-team:new-service-request`
 - `$rdl-team:discover-plugins`
 

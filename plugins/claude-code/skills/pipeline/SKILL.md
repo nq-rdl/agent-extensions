@@ -15,7 +15,7 @@ compatibility: >-
   Reflects the Claude Code skills/commands unification (custom commands are
   skills) and the hooks I/O contract as of v2.1.x. The hook `if` field requires
   v2.1.85+. Agent-team task dependencies require the experimental
-  CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS flag. Dynamic workflows require v2.1.154+.
+  CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS flag. Dynamic workflows require v2.1.154+; plugin workflow distribution verified on v2.1.274.
 user-invocable: true
 metadata:
   repo: https://github.com/nq-rdl/agent-extensions
@@ -116,7 +116,7 @@ skill body, and choose the primitive by how much determinism you need:
 |---------------|-----|----------------------|
 | Offload one noisy side-task; only the summary matters | **Subagent** | ✅ Fully — link a `references/subagent.rst` outline from the skill; read it when delegating and pass it to a host-supported worker |
 | A few workers that must talk/challenge each other | **Agent team** | ✅ Guidance only — the skill designs the team + spawn prompt (see `/claude-code:agent-teams`) |
-| **Deterministic, large-scale** fan-out (same orchestration every run) | **Workflow** | ⚠️ Point at it — the skill tells the user to create/run it via `/claude-code:create-workflow`; the JS can't ship in the plugin |
+| **Deterministic, large-scale** fan-out (same orchestration every run) | **Workflow** | Ship the JavaScript through the plugin manifest's `workflows` field; use `/claude-code:create-workflow` for authoring guidance |
 
 The determinism ladder, in one line:
 
@@ -133,8 +133,11 @@ The determinism ladder, in one line:
 - **Relying on a skill for *guaranteed* orchestration.** Skills are followed
   probabilistically; if a step *must* fan out identically every time, that step
   is a workflow.
-- **Trying to ship a workflow in the plugin.** Workflows live only in
-  `.claude/workflows/`; package the *authoring guidance*, not the workflow.
+- **Shipping an unregistered workflow script.** Claude Code 2.1.274 supports
+  plugin `workflows/` discovery or explicit manifest `workflows` paths, alongside
+  project/personal `.claude/workflows/`. In this catalog, keep JavaScript in the
+  canonical skill's `scripts/` directory and register its installed path in
+  `targets.claude.workflows`. Exclude Claude-only entrypoints from Codex.
 
 ---
 

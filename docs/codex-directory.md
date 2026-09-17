@@ -33,7 +33,7 @@ This report records missing evidence; it does not attest to publisher identity, 
 | postgres | 1 | skills-only | No |
 | quarto | 2 | skills-only | No |
 | r | 8 | skills-only | No |
-| rdl-team | 3 | skills-only | No |
+| rdl-team | 4 | skills-only | No |
 | redhat | 2 | skills+hooks | No |
 | rust | 1 | skills-only | No |
 | shiny | 2 | skills-only | No |

@@ -1,7 +1,7 @@
 {
   "name": "rdl-team",
   "version": "0.31.0",
-  "description": "RDL team workflows — Claude Code onboarding, setup, and config management",
+  "description": "RDL team workflows — repository context, spec-kit delivery, and onboarding",
   "author": {
     "name": "nq-rdl"
   },
@@ -12,13 +12,14 @@
     "team",
     "onboarding",
     "claude-code",
-    "setup"
+    "spec-kit",
+    "workflow"
   ],
   "skills": "./skills/",
   "interface": {
     "displayName": "RDL Team",
-    "shortDescription": "RDL service requests and Claude Code onboarding",
-    "longDescription": "RDL team workflows — Claude Code onboarding, setup, and config management",
+    "shortDescription": "RDL task bridging, service requests, and onboarding",
+    "longDescription": "RDL team workflows — repository context, spec-kit delivery, and onboarding",
     "developerName": "nq-rdl",
     "category": "Developer Tools",
     "capabilities": [
