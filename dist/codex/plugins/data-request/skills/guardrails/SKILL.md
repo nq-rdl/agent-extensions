@@ -5,9 +5,10 @@ description: Apply advisory RDL cohort-SQL guardrails when drafting, changing, m
   validating or reviewing request pipelines, SQL and query-builder resolvers. Covers
   spec composition, indexed filters, source timezones, join evidence and researcher
   modelling choices, with pointers to authoritative sources.
-compatibility: RDL cohort SQL; DATEADD example targets SQL Server 2022 (16.x). Source
-  patterns from issues 313 and 325 (2026-09-15 to 2026-09-17). Composition examples
-  are schematic; verify pinned library APIs, deployed engine and current metadata.
+compatibility: 'RDL cohort SQL; DATEADD example targets SQL Server 2022 (16.x). Composition
+  API baseline: query-builder 0.4.0 and query-builder-plugins 0.3.0. Source patterns
+  from issues 313 and 325 (2026-09-15 to 2026-09-17). Composition examples are schematic;
+  verify pinned library APIs, deployed engine and current metadata.'
 metadata:
   repo: https://github.com/nq-rdl/agent-extensions
 ---
@@ -49,9 +50,16 @@ and storage facts against the current dataops DDL before presenting a result as 
 
 Atomic, testable Layer-1 `Spec`s, `@resolves` resolver handlers and reusable helpers
 belong in `query-builder` / `query-builder-plugins`. Request pipelines compose those
-units: `CohortQuery(Resolver).add(SpecA).add(SpecB)`. If a unit is missing or incorrect,
+units: `CohortQuery(resolver).add(spec_a).add(spec_b)` with resolver/spec instances.
+If a unit is missing or incorrect,
 identify the library enhancement and its tests; do not work around it with hand-rolled
 SQL in request code. Check the request's dependency pin before using an enhancement.
+
+The API baseline is `nq-rdl/query-builder` tag `v0.4.0`
+(`clinical/specifications.py`, `clinical/resolver.py`, `clinical/query.py`) and
+`nq-rdl/query-builder-plugins` tag `v0.3.0` (`qb_plugins/iemr/resolver.py`).
+For a different installed revision, re-check those implementations and their tests
+before adapting the examples; the baseline does not establish enhancement availability.
 
 Confirm the applicable rules in the current `.specify/memory/constitution.md`:
 
@@ -68,8 +76,9 @@ The `falls_service_cohort.py` Indigenous-status lookup in
 ```python
 # Before: _build_indigenous_status_sql(...) hand-builds an SQL f-string.
 # After: compose verified library units (schematic; check pinned signatures).
+# resolver is a configured IEMRResolver instance.
 query = (
-    CohortQuery(IEMRResolver)
+    CohortQuery(resolver)
     .add(EncounterIdAnchor(...))
     .add(WithIndigenousStatus(...))
 )
