@@ -9,12 +9,16 @@ SCRIPT = Path(__file__).resolve().parents[1] / 'skills/rdl-task-bridge/scripts/b
 
 
 class BridgeTest(unittest.TestCase):
-    def bridge(self, tasks, plan='# Design\nKeep transactions atomic.\n'):
+    def bridge(self, tasks, plan='# Design\nKeep transactions atomic.\n', spec='Acceptance: reject stale tokens.', constitution='All writes require tests.', analysis='Approved: preserve token expiry semantics.'):
         with tempfile.TemporaryDirectory(prefix='bridge space ') as directory:
             root = Path(directory)
             (root / 'tasks.md').write_text(tasks)
             (root / 'plan.md').write_text(plan)
-            return subprocess.run(['bash', str(SCRIPT), str(root / 'tasks.md'), str(root / 'plan.md')],
+            (root / 'spec.md').write_text(spec)
+            (root / 'constitution.md').write_text(constitution)
+            (root / 'analysis.md').write_text(analysis)
+            return subprocess.run(['bash', str(SCRIPT), str(root / 'tasks.md'), str(root / 'plan.md'),
+                                   str(root / 'spec.md'), str(root / 'constitution.md'), str(root / 'analysis.md')],
                                   text=True, capture_output=True)
 
     def test_metadata_context_and_extractable_boundaries(self):
@@ -64,6 +68,45 @@ T009 depends on T001.
                 self.assertEqual(result.returncode, 0, result.stderr)
                 self.assertEqual(re.findall(r'^## Task \d+: (T\d+)', result.stdout, re.M), ['T001'])
 
+    def test_indented_fence_literal_cannot_close_outer_example(self):
+        for spaces in [4, 5, 8]:
+            for fence in ['~~~', '```']:
+                with self.subTest(spaces=spaces, fence=fence):
+                    result = self.bridge(f'{fence}md\n{" " * spaces}{fence}\n- [ ] T099 Example\n{fence}\n- [ ] T001 Real\n')
+                    self.assertEqual(result.returncode, 0, result.stderr)
+                    self.assertEqual(re.findall(r'^## Task \d+: (T\d+)', result.stdout, re.M), ['T001'])
+
+    def test_up_to_three_spaces_are_valid_fence_indentation(self):
+        for spaces in range(4):
+            result = self.bridge(f'{" " * spaces}~~~md\n- [ ] T099 Example\n{" " * spaces}~~~\n- [ ] T001 Real\n')
+            self.assertEqual(result.returncode, 0, result.stderr)
+            self.assertEqual(re.findall(r'^## Task \d+: (T\d+)', result.stdout, re.M), ['T001'])
+
+    def test_metadata_only_tasks_fail(self):
+        for tags in ['[P]', '[US1]', '[P] [US1]', '[US1] [P]', '[P]\t[US12]   ']:
+            with self.subTest(tags=tags):
+                result = self.bridge(f'- [ ] T001 {tags}\n')
+                self.assertNotEqual(result.returncode, 0)
+                self.assertIn('no description', result.stderr)
+                self.assertEqual(result.stdout, '')
+
+    def test_all_context_sources_are_required_and_nonempty(self):
+        for source in ['plan', 'spec', 'constitution', 'analysis']:
+            for content in ['', ' \t\r\n  \n']:
+                with self.subTest(source=source, content=content):
+                    result = self.bridge('- [ ] T001 Real\n', **{source: content})
+                    self.assertNotEqual(result.returncode, 0)
+                    self.assertIn('empty source context', result.stderr)
+                    self.assertEqual(result.stdout, '')
+
+    def test_worker_constraints_include_acceptance_and_approved_decisions(self):
+        result = self.bridge('- [ ] T001 Add handler\n- [ ] T002 Test handler\n')
+        self.assertEqual(result.returncode, 0, result.stderr)
+        constraints = result.stdout.split('## Task 1:')[0]
+        for required in ['Acceptance: reject stale tokens.', 'All writes require tests.',
+                         'Approved: preserve token expiry semantics.', 'Every task worker must read all Global Constraints']:
+            self.assertIn(required, constraints)
+
     def test_source_plan_task_headings_cannot_pollute_extraction(self):
         result = self.bridge('- [ ] T001 Actual\n', '## Task 99: example\n')
         self.assertEqual(re.findall(r'^## Task (\d+)', result.stdout, re.M), ['1'])
@@ -82,7 +125,8 @@ T009 depends on T001.
                 self.assertEqual(result.stdout, '')
 
     def test_missing_sources_fail(self):
-        result = subprocess.run(['bash', str(SCRIPT), '/missing/tasks.md', '/missing/plan.md'],
+        result = subprocess.run(['bash', str(SCRIPT), '/missing/tasks.md', '/missing/plan.md',
+                                 '/missing/spec.md', '/missing/constitution.md', '/missing/analysis.md'],
                                 text=True, capture_output=True)
         self.assertNotEqual(result.returncode, 0)
         self.assertEqual(result.stdout, '')

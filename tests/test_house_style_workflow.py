@@ -70,7 +70,7 @@ class WorkflowTest(unittest.TestCase):
             self.assertIn('/repo/' + name, call['prompt'])
 
     def test_shared_worktree_rejected_before_dispatch(self):
-        other = self.unit('two'); other['repo'] = '/repo/one'; other['checkpoint'] = '/repo/one/two.json'
+        other = self.unit('two'); other['repo'] = '/repo/one'; other['checkpoint'] = '/repo/one/two.json'; other['physicalWorktree'] = '/repo/one'
         data = self.run_workflow(units=[self.unit('one'), other])
         self.assertIn('separate worktrees', data['error'])
         self.assertEqual(data['calls'], [])
@@ -79,7 +79,7 @@ class WorkflowTest(unittest.TestCase):
         for alias in ['/repo/one/.', '/repo/one/', '/repo/link-to-one']:
             with self.subTest(alias=alias):
                 other = self.unit('two')
-                other.update(repo=alias, checkpoint=alias + '/two.json', physicalWorktree='/repo/one')
+                other.update(repo=alias, checkpoint='/repo/one/two.json', physicalWorktree='/repo/one')
                 data = self.run_workflow(units=[self.unit('one'), other])
                 self.assertIn('separate worktrees', data['error'])
                 self.assertEqual(data['calls'], [])

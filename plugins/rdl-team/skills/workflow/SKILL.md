@@ -64,6 +64,20 @@ requires these identities and rejects duplicates before dispatching any agent.
 Preflight rechecks the identity before writing even a checkpoint. If it changed,
 refresh every unit's identity in the main session before retrying.
 
+Use a canonical checkpoint path beneath `physicalWorktree`. Before launch, ensure
+the exact checkpoint path is ignored and untracked. If needed, add its root-relative
+pattern to the local exclusion file reported by `git rev-parse --git-path info/exclude`;
+escape Git pattern metacharacters in the filename. Do not edit the project's
+tracked `.gitignore` or silently relocate an existing checkpoint. Run
+`bash <this-skill>/scripts/checkpoint.sh "$repo" "$checkpoint"` before creating
+state, and before every subsequent write. The [validator](scripts/checkpoint.sh)
+resolves the existing parent and rejects symlinks (including the final file),
+paths outside the physical worktree, tracked files and unignored paths.
+If validation fails, stop without writing state and correct the path in the main
+session. Specify rechecks cleanliness after checkpointing and immediately before
+running spec-kit. These filesystem checks are agent-executed; the Workflow DSL
+cannot enforce filesystem operations itself.
+
 Brainstorm/write-plan/analyze use opus; specify/plan/tasks/execute use sonnet.
 Effort intent is in prompts. SDD retains its internal task/reviewer model choices.
 Review runs low passes with fixes, then high; high findings return to low after

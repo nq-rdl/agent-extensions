@@ -84,7 +84,10 @@ It runs only when issue creation is requested.
 
 ## Resume and validation limits
 
-Each unit has a repository-local JSON checkpoint under `.superpowers/rdl-workflow/`.
+Each unit has an ignored, untracked JSON checkpoint under `.superpowers/rdl-workflow/`.
+The main session validates the physical path and configures its exact local Git exclusion before launch.
+The checkpoint helper rejects symlink components and runs before every write.
+Specify checks the clean worktree again after checkpointing.
 It records identity, branch, base, HEAD, source hashes, completed steps, decisions, artifacts and the next gate.
 Resume validates those fields against the checkout before continuing.
 A checkpoint is an agent-written record, not proof that an action succeeded.

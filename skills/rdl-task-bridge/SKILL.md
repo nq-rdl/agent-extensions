@@ -13,15 +13,20 @@ execution; upstream helpers can change. Canonical sources:
 [Superpowers](https://github.com/obra/superpowers) and
 [spec-kit](https://github.com/github/spec-kit).
 
-1. Resolve the requested feature’s `tasks.md` and `plan.md` to absolute paths.
-   Read both plus its `spec.md`, constitution and analysis findings. Resolve
+1. Resolve the requested feature’s `tasks.md`, `plan.md`, `spec.md`, project
+   constitution and approved analysis record to absolute paths. Read all five. Resolve
    unresolved requirements before dispatching implementers; the adapter adds no
-   invented implementation steps or tests.
+   invented implementation steps or tests. If analysis exists only in the
+   conversation, persist its findings, agreed remediations and actual approval
+   in a feature-specific record before conversion. Do not invent an approval
+   or substitute a placeholder when a source is missing.
 2. Generate the combined plan with `bash <this-skill>/scripts/bridge.sh
-   "$tasks" "$plan"`. It emits `## Global Constraints` and numbered `## Task N`
+   "$tasks" "$plan" "$spec" "$constitution" "$analysis"`.
+   It emits `## Global Constraints` containing all five source documents and numbered `## Task N`
    sections, preserving original IDs, completion, phase/story/parallel metadata,
    continuation text and the complete source context. Non-task checkboxes remain
-   context. Source files stay unchanged; malformed or duplicate tasks fail closed.
+   context. Source files stay unchanged; missing/empty context and malformed,
+   metadata-only or duplicate tasks fail closed.
 3. Save stdout atomically under the target repo’s `.superpowers/plans/` as
    `speckit-<feature>-<identity>.md`. Compute `identity` with
    `printf '%s\n' "$tasks" | git hash-object --stdin` using the absolute task path;
