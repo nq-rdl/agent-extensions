@@ -1,6 +1,6 @@
 {
   "name": "git",
-  "version": "0.31.0",
+  "version": "0.32.0",
   "description": "Git PR feedback — review all comments, push fixes to the same PR, and resolve handled threads",
   "author": {
     "name": "nq-rdl"
