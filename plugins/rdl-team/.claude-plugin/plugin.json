@@ -1,10 +1,13 @@
 {
   "name": "rdl-team",
   "version": "0.31.0",
-  "description": "RDL team workflows — Claude Code onboarding, setup, and config management",
+  "description": "RDL team workflows — repository context, spec-kit delivery, and onboarding",
   "author": {
     "name": "nq-rdl"
   },
   "repository": "https://github.com/nq-rdl/agent-extensions",
-  "license": "MIT"
+  "license": "MIT",
+  "workflows": [
+    "./skills/workflow/scripts/house-style.js"
+  ]
 }

@@ -137,13 +137,17 @@ methods on `args` directly — no parsing. If omitted, `args` is `undefined`.
 
 ## Distribution reality (important)
 
-**Workflows cannot be bundled into a plugin or installed from a marketplace.**
-The recognized plugin components are skills, agents, hooks, MCP servers, LSP
-servers, monitors, and themes — `workflows/` is not one of them, and plugins are
-copied into a cache that workflow discovery never scans. The **only** sharing
-mechanisms are the two `.claude/workflows/` locations above. To share a workflow
-with a team, **commit it to `.claude/workflows/` in the repo**. To make the
-*authoring* reusable instead, package a skill like this one.
+**Claude Code 2.1.274 supports plugin workflows.** Store the JavaScript at the
+plugin root under `workflows/`, or declare script paths in the manifest’s
+`workflows` field. The plugin namespaces each script’s `meta.name`.
+For this catalog, keep scripts in the owning canonical skill’s `scripts/` folder.
+Register their packaged paths under `targets.claude.workflows` in the bundle.
+Sync copies the scripts, and manifest generation validates their source paths.
+Codex does not execute this runtime, so exclude Claude-only workflow entrypoints.
+
+Project and personal `.claude/workflows/` locations remain supported. For saved
+script edits, load `/workflow-authoring` first on Claude Code 2.1.248 or later.
+The RDL executable example ships as `/rdl-team:house-style`.
 
 ## Cost & model
 

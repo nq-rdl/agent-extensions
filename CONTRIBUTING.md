@@ -295,3 +295,21 @@ The plugin also registers a native agent review on `Stop` and a task-scoped
 `SubagentStop`. These hooks block on findings in the simplified STE profile;
 see [Technical-writing completion review](docs/tech-writing-ste-review.md)
 for scope, source review, and harness limitations.
+
+## Claude Workflow scripts
+
+Keep native Workflow JavaScript in the owning skill’s `scripts/` directory.
+These files use Claude Code’s orchestration runtime, not a Node CLI.
+The JavaScript format is required by that runtime. New CLI helpers still use Go.
+
+Register installed paths in `targets.claude.workflows`, for example:
+
+```yaml
+workflows: [./skills/workflow/scripts/house-style.js]
+```
+
+Paths must name `.js` files under a bundled skill’s `scripts/` directory.
+The generator validates canonical sources before adding the native manifest field.
+Normal skill sync copies the scripts and checks drift.
+Exclude Claude-only entrypoints from the Codex target with `excludeSkills`.
+See the [RDL house-style workflow](docs/rdl-workflow.md) for usage and runtime limits.

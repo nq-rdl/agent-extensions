@@ -356,14 +356,15 @@
     {
       "name": "rdl-team",
       "source": "./plugins/rdl-team",
-      "description": "RDL team workflows — Claude Code onboarding, setup, and config management",
+      "description": "RDL team workflows — repository context, spec-kit delivery, and onboarding",
       "version": "0.31.0",
       "keywords": [
         "rdl",
         "team",
         "onboarding",
         "claude-code",
-        "setup"
+        "spec-kit",
+        "workflow"
       ]
     },
     {

@@ -204,6 +204,24 @@ def _enabled_bundles(repo: Path) -> dict[str, dict]:
         if not claude.get("enabled"):
             continue
         plugin = claude.get("pluginName") or data.get("id") or bf.stem
+        workflows = claude.get("workflows", [])
+        if not isinstance(workflows, list) or not all(isinstance(p, str) for p in workflows):
+            raise ValueError(f"{bf.name}: Claude workflows must be a list of script paths")
+        leaves = {
+            member if isinstance(member, str) else member["leaf"]:
+            member if isinstance(member, str) else member["source"]
+            for member in data.get("skills") or []
+        }
+        for path in workflows:
+            parts = path.split("/")
+            if (len(parts) < 5 or parts[:2] != [".", "skills"]
+                    or parts[2] not in leaves or parts[3] != "scripts"
+                    or any(part in ("", ".", "..") for part in parts[1:])
+                    or "\\" in path or not path.endswith(".js")):
+                raise ValueError(f"{bf.name}: workflow must name a bundled skill scripts/*.js file: {path}")
+            source = repo / "skills" / leaves[parts[2]] / Path(*parts[3:])
+            if not source.is_file() or not source.resolve().is_relative_to((repo / "skills").resolve()):
+                raise ValueError(f"{bf.name}: missing or escaping workflow source: {path}")
         out[plugin] = {
             "displayName": data.get("displayName") or plugin,
             "description": data.get("description") or "",
@@ -212,6 +230,7 @@ def _enabled_bundles(repo: Path) -> dict[str, dict]:
             # vendored fork). None means "fall back to pluginDefaults.license".
             "license": data.get("license"),
             "skills": list(data.get("skills") or []),
+            "workflows": workflows,
         }
     return out
 
@@ -480,6 +499,7 @@ def generate(repo) -> dict:
             "repository": defaults.get("repository"),
             # A bundle's own `license:` wins; otherwise the marketplace default.
             "license": enabled[p].get("license") or defaults.get("license"),
+            **({"workflows": enabled[p]["workflows"]} if enabled[p]["workflows"] else {}),
         }
 
     # ── Native Codex marketplace + per-plugin manifests ────────────────────

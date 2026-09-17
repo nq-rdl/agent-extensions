@@ -1,14 +1,17 @@
 schemaVersion: v1
 id: rdl-team
 displayName: RDL Team
-description: RDL team workflows — Claude Code onboarding, setup, and config management
-keywords: [rdl, team, onboarding, claude-code, setup]
+description: RDL team workflows — repository context, spec-kit delivery, and onboarding
+keywords: [rdl, team, onboarding, claude-code, spec-kit, workflow]
 owners:
   - rdl
 channels:
   - stable
 skills:
   - {source: cc-setup, leaf: cc-setup}
+  - {source: rdl-switch-repo, leaf: switch-repo}
+  - {source: rdl-task-bridge, leaf: task-bridge}
+  - {source: rdl-workflow, leaf: workflow}
   - new-service-request
   - {source: marketplace-scout, leaf: discover-plugins}  # guest — home: claude-code
 hooks: []
@@ -19,8 +22,10 @@ targets:
     enabled: true
     pluginName: rdl-team
     marketplaceName: rdl-agent-extensions
+    workflows: [./skills/workflow/scripts/house-style.js]
 
   codex:
+    excludeSkills: [rdl-switch-repo, rdl-workflow]
     enabled: true
     pluginName: rdl-team
     marketplaceName: rdl-agent-extensions
@@ -31,6 +36,6 @@ targets:
       hooks: false
       apps: false
     interface:
-      shortDescription: RDL service requests and Claude Code onboarding
+      shortDescription: RDL task bridging, service requests, and onboarding
       defaultPrompt:
       - Use RDL Team to help with my task.
