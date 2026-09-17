@@ -1,6 +1,6 @@
 {
   "name": "rdl-team",
-  "version": "0.30.1",
+  "version": "0.31.0",
   "description": "RDL team workflows — Claude Code onboarding, setup, and config management",
   "author": {
     "name": "nq-rdl"
