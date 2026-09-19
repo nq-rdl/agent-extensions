@@ -1,0 +1,3 @@
+kind: Added
+body: '`scripts/generate_eval_graders.py` builds eval regex graders from a readable `graders.spec.yaml`, with fixtures graded in both Python and Node'
+time: 2026-09-19T06:26:30.419678106Z

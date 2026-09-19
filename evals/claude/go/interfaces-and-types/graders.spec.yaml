@@ -1,0 +1,51 @@
+# Source for graders/*.md (regex ones) — run `pixi run python3 scripts/generate_eval_graders.py .`
+package: ingest
+graders:
+  - name: validator-interface
+    why: "The single-method interface takes the -er name with no I prefix: Validator."
+    need: ['\btype\s+Validator\s+interface']
+    forbid: '\btype\s+I[A-Z]\w*\s+interface'
+  - name: reader-interface
+    why: "No Interface suffix: RecordReader (or Reader)."
+    need: ['\btype\s+(?:Record)?Reader\s+interface']
+    forbid: '\btype\s+\w*Interface\s+interface'
+  - name: no-type-in-name
+    why: "Names do not embed their type: records, not recordSlice / recordItem."
+    need: ['\brecords\s+\[\]Record']
+    forbid: '\w(?:Slice|Item|Map|List)\b'
+fixtures:
+  good: |
+    package ingest
+
+    type Record struct {
+    	Fields map[string]string
+    }
+
+    // Validator was IValidator.
+    type Validator interface {
+    	Validate(r Record) error
+    }
+
+    type RecordReader interface {
+    	ReadRecord() (Record, error)
+    }
+
+    func CountValid(records []Record, v Validator) int {
+    	valid := 0
+    	for _, r := range records {
+    		if v.Validate(r) == nil {
+    			valid++
+    		}
+    	}
+    	return valid
+    }
+  cases:
+    - name: I prefix kept
+      replace: [["type Validator interface", "type IValidator interface"], ["v Validator)", "v IValidator)"]]
+      fails: [validator-interface]
+    - name: Interface suffix kept
+      replace: [["type RecordReader interface", "type RecordReaderInterface interface"]]
+      fails: [reader-interface]
+    - name: type embedded in the parameter name
+      replace: [["records []Record", "recordSlice []Record"], ["range records", "range recordSlice"]]
+      fails: [no-type-in-name]
