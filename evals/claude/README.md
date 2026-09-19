@@ -78,3 +78,22 @@ Sync strips `name:` from packaged skills, so a `tool_used: Skill` grader matches
 the leaf: `input_match: '"skill"\s*:\s*"(?:[\w-]+:)?naming"'` for `/go:naming`.
 Prefer `regex`, `tool_used`, and `file_exists` graders (free, deterministic) and
 keep `llm` graders for short outputs.
+
+Lessons from `go/naming-rewrite`, all covered by `tests/test_eval_go_naming_graders.py`:
+
+- **Scope a regex to the artefact, not the whole reply.** Replies routinely quote
+  the original identifiers in their explanation, so a `not_contains` or negative
+  lookahead over `last_message` fails correct answers (a small judge model made the
+  same mistake). Its graders anchor on the last fenced go block (` ``` ` or `~~~`,
+  matched at a line start with a backreference for the closer) that opens with the
+  package clause, and skip Go comments and literals inside it.
+- **Never let a grader pass on an empty reply.** Pair every absence check with a
+  presence check.
+- **Test graders in the engine that runs them.** Patterns are JavaScript regexes;
+  the fixtures grade every reply in Node as well as Python and require agreement.
+- **Guard against catastrophic backtracking.** A skippable token that can also be
+  read character by character backtracks exponentially and would hang a run; make
+  it atomic with `(?=(token))\N` and keep a many-comments fixture with a time limit.
+
+Read Δ only with enough runs: this case measured −0.22 at 3 runs per arm and +0.10
+at 10 on the same skill, so it sets `runs: 5` and conclusions were drawn at 10.

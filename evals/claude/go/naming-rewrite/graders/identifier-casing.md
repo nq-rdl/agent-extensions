@@ -7,7 +7,7 @@ type: regex
 # consumed atomically, (?=(...))\N, to keep matching linear. Known limits, accepted
 # for a starter case: malformed literals and a file split across several blocks.
 # Shared prefix and fixtures: tests/test_eval_go_naming_graders.py (Python and Node).
-# A method receiver is present and none is this/self.
-pattern: '(?:^|\n) {0,3}(`{3,}|~{3,})go[^\n]*\n\s*(?://[^\n]*\n\s*)*package\s+account\b(?![\s\S]*\n {0,3}(?:`{3,}|~{3,})go[^\n]*\n\s*(?://[^\n]*\n\s*)*package\s+account\b)(?=(?:(?!\n {0,3}\1)(?:(?=(//[^\n]*|/\*[\s\S]*?\*/|"(?:[^"\\\n]|\\.)*"|''(?:[^''\\\n]|\\.)+''|`[^`]*`))\2|(?!//|/\*|"|''|`)[\s\S]))*\bfunc\s+\(\s*\w+\s+\*?\w+\s*\))(?:(?!\n {0,3}\1)(?:(?=(//[^\n]*|/\*[\s\S]*?\*/|"(?:[^"\\\n]|\\.)*"|''(?:[^''\\\n]|\\.)+''|`[^`]*`))\3|(?!//|/\*|"|''|`|\bfunc\s+\(\s*(?:this|self)\b)[\s\S]))*\n {0,3}\1'
+# No identifier in the file (types, params, references) keeps a title-cased initialism or an underscore.
+pattern: '(?:^|\n) {0,3}(`{3,}|~{3,})go[^\n]*\n\s*(?://[^\n]*\n\s*)*package\s+account\b(?![\s\S]*\n {0,3}(?:`{3,}|~{3,})go[^\n]*\n\s*(?://[^\n]*\n\s*)*package\s+account\b)(?:(?!\n {0,3}\1)(?:(?=(//[^\n]*|/\*[\s\S]*?\*/|"(?:[^"\\\n]|\\.)*"|''(?:[^''\\\n]|\\.)+''|`[^`]*`))\2|(?!//|/\*|"|''|`|Http|Url|Id\b|\w_\w)[\s\S]))*\n {0,3}\1'
 target: last_message
 ---

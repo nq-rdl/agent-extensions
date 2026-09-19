@@ -76,6 +76,22 @@ ring.NewRing()
 bufio.BufReader
 ```
 
+This applies to **types and their constructors** too, and is the rename most
+often skipped when cleaning up existing code: fixing the casing of
+`BillingApiServer` to `BillingAPIServer` still leaves the stutter.
+
+```go
+package billing
+
+// ✓ Good — callers write billing.APIServer, billing.NewAPIServer()
+type APIServer struct{}
+func NewAPIServer() *APIServer
+
+// ✗ Bad — billing.BillingAPIServer
+type BillingAPIServer struct{}
+func NewBillingAPIServer() *BillingAPIServer
+```
+
 ## Receivers
 
 - **One or two characters** reflecting the type name
@@ -99,7 +115,7 @@ func (sh serverHandler) ServeHTTP(w ResponseWriter, req *Request)
 
 1. Use `MixedCaps` — never underscores (except test names)
 2. Short names for small scopes, long names for large scopes
-3. Don't stutter — `pkg.New()` not `pkg.NewPkg()`
+3. Don't stutter — `pkg.New()` not `pkg.NewPkg()`, `billing.Server` not `billing.BillingServer`
 4. Don't embed the type — `users` not `userSlice`
 5. Don't embed context — `count` not `userCount` inside `UserCount()`
 6. Getters have no `Get` prefix — `Owner()` not `GetOwner()`
