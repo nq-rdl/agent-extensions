@@ -24,7 +24,7 @@ scripts/eval-claude-plugin.sh go \
 ```
 
 The script always passes `--trust-plugin`, `--no-publish`, and
-`--max-cost-usd "${EVAL_MAX_COST_USD:-2}"`; anything after the plugin name is
+`--max-cost-usd "${EVAL_MAX_COST_USD:-5}"`; anything after the plugin name is
 forwarded. A manual run evaluates the **working tree**, uncommitted edits included;
 set `EVAL_REV=<commit>` to evaluate a revision instead. `report.html` and `aggregate-result.json` land in `.eval-results/<plugin>/`
 (gitignored). While iterating on graders, `--runs 1 --ablation none` cuts the calls
@@ -62,7 +62,7 @@ was evaluated. Things to know before opting in:
 | `CLAUDE_EVAL_ENABLE=1` | required; without it the job is a no-op |
 | `CLAUDE_EVAL_STRICT=1` | block the push on a score below threshold or a partial run (default: report only) |
 | `CLAUDE_EVAL_ARGS` | replace the default `--model claude-sonnet-5 --judge-model claude-haiku-4-5 --threshold 0.8` |
-| `EVAL_MAX_COST_USD` | per-plugin spend cap (default `2`) |
+| `EVAL_MAX_COST_USD` | per-plugin spend cap (default `5`; the `go` suite costs about $2.20 a run) |
 
 ## Writing a suite
 
@@ -73,6 +73,24 @@ plugin root. Run it on a scratch copy, then move the result:
 tmp="$(mktemp -d)" && cp -R plugins/go "$tmp/go" && (cd "$tmp/go" && claude plugin eval init)
 mkdir -p evals/claude && cp -R "$tmp/go/evals" evals/claude/go
 ```
+
+### Generated regex graders
+
+A case that asks for a rewritten file is graded on that file only. Doing that in one
+regex needs a long shared prefix, so write a readable `graders.spec.yaml` beside
+`prompt.md` (the file's `package`, then per grader the code that must appear, `need`,
+and must not, `forbid`) and generate `graders/*.md` from it:
+
+```bash
+pixi run python3 scripts/generate_eval_graders.py .          # write
+pixi run python3 scripts/generate_eval_graders.py . --check  # fail on drift (pre-commit + unit tests)
+```
+
+Add `fixtures:` to the spec — a `good` rewrite plus `cases` that each `replace` text and
+name the graders that must then fail. `tests/test_eval_regex_graders.py` grades them in
+Python and Node, and also checks that the case's unchanged original fails every grader
+and that a before/after reply quoting the original still passes. Hand-written graders of
+other types (`tool_used`, `llm`) in the same directory are left alone.
 
 Sync strips `name:` from packaged skills, so a `tool_used: Skill` grader matches
 the leaf: `input_match: '"skill"\s*:\s*"(?:[\w-]+:)?naming"'` for `/go:naming`.
@@ -94,6 +112,19 @@ Lessons from `go/naming-rewrite`, all covered by `tests/test_eval_go_naming_grad
 - **Guard against catastrophic backtracking.** A skippable token that can also be
   read character by character backtracks exponentially and would hang a run; make
   it atomic with `(?=(token))\N` and keep a many-comments fixture with a time limit.
+
+What the `go` suite currently measures (sonnet-5, 5 runs per arm):
+
+| Case | WITH | W/OUT | Δ | What the no-plugin arm gets wrong |
+|---|---|---|---|---|
+| `expensive-getter` | 1.00 | 0.50 | +0.50 | names the DB query `Products()`, only dropping `Get` (5/5) |
+| `naming-rewrite` | 1.00 | 0.73 | +0.27 | keeps the stuttering `account.AccountHTTPClient` (4/5) |
+| `errors-and-constants` | 1.00 | 0.80 | +0.20 | keeps the error *type* named `ErrInvalidPayload` (3/5) |
+| `interfaces-and-types` | 1.00 | 1.00 | 0.00 | nothing — tagged `saturated` |
+
+A Δ of 0 means the model already does this without the skill, so that guidance is a
+candidate for cutting under CONTRIBUTING's "non-inferable delta" rule; the case is kept
+as a regression guard. One model and five runs is evidence, not proof.
 
 Read Δ only with enough runs: this case measured −0.22 at 3 runs per arm and +0.10
 at 10 on the same skill, so it sets `runs: 5` and conclusions were drawn at 10.

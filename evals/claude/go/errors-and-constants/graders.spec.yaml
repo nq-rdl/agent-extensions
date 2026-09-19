@@ -1,0 +1,50 @@
+# Source for graders/*.md (regex ones) — run `pixi run python3 scripts/generate_eval_graders.py .`
+package: jobs
+graders:
+  - name: sentinel-errors
+    why: "Sentinel error values are named ErrFoo: ErrTimeout and ErrNotFound."
+    need: ['\bErrTimeout\s*=', '\bErrNotFound\s*=']
+    forbid: '\b(?:TimeoutError|ErrorNotFound)\s*='
+  - name: error-type
+    why: "An error type is named FooError, not ErrFoo: InvalidPayloadError."
+    need: ['\btype\s+InvalidPayloadError\s+struct']
+    forbid: '\btype\s+Err\w*\s+struct'
+  - name: constants-mixedcaps
+    why: "A constant is declared and no identifier keeps an underscore (no ALL_CAPS)."
+    need: ['\bconst\b']
+    forbid: '\w_\w'
+fixtures:
+  good: |
+    package jobs
+
+    import "errors"
+
+    const MaxRetryCount = 5
+
+    var (
+    	ErrTimeout  = errors.New("job timed out")
+    	ErrNotFound = errors.New("job not found")
+    )
+
+    // InvalidPayloadError replaces ErrInvalidPayload; MAX_RETRY_COUNT is gone.
+    type InvalidPayloadError struct {
+    	Field string
+    }
+
+    func (e InvalidPayloadError) Error() string {
+    	return "invalid payload: " + e.Field
+    }
+
+    func Retryable(err error) bool {
+    	return errors.Is(err, ErrTimeout)
+    }
+  cases:
+    - name: error type keeps the Err prefix
+      replace: [["InvalidPayloadError struct", "ErrInvalidPayload struct"], ["(e InvalidPayloadError)", "(e ErrInvalidPayload)"]]
+      fails: [error-type]
+    - name: sentinel keeps the Error suffix
+      replace: [["ErrTimeout  =", "TimeoutError ="], ["err, ErrTimeout)", "err, TimeoutError)"]]
+      fails: [sentinel-errors]
+    - name: constant stays ALL_CAPS
+      replace: [["const MaxRetryCount", "const MAX_RETRY_COUNT"]]
+      fails: [constants-mixedcaps]

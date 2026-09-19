@@ -167,6 +167,10 @@ pixi run python3 scripts/generate_manifests.py . --check  # CI gate: fail on dri
 pixi run python3 scripts/generate_bundles_doc.py .          # write
 pixi run python3 scripts/generate_bundles_doc.py . --check  # CI gate: fail on drift
 
+# Regenerate evals/claude/**/graders/*.md from each case's graders.spec.yaml (also a --check gate).
+pixi run python3 scripts/generate_eval_graders.py .          # write
+pixi run python3 scripts/generate_eval_graders.py . --check  # fail on drift
+
 # Bundle reference + grouping + three-way consistency checks (also run by validate.yml)
 pixi run python3 scripts/check_bundle_refs.py .   # registry refs resolve to skills/
 pixi run python3 scripts/check_exposure.py .      # every canonical skill/hook/mcp is exposed by >=1 bundle (strict); add --warn for a non-blocking reminder

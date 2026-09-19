@@ -60,6 +60,12 @@ pre-commit:
         pixi run python3 scripts/generate_bundles_doc.py . --check
         pixi run python3 scripts/codex_directory.py . --check
 
+    # --- Eval regex graders are generated from graders.spec.yaml (the unit tests
+    #     gate this in CI; this catches a forgotten regenerate before the push).
+    - name: eval-graders-in-sync
+      glob: "{evals/claude/**,scripts/generate_eval_graders.py}"
+      run: pixi run python3 scripts/generate_eval_graders.py . --check
+
     # --- Reverse-exposure reminder. Just a nudge: a new skill/agent/hook/mcp
     #     that no bundle references yet is easy to miss locally. --warn always
     #     exits 0 (non-blocking); CI's strict `check_exposure.py .` is the hard

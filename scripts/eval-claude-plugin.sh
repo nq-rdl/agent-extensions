@@ -85,6 +85,6 @@ cp -R "$suite_src" "$stage/run/$plugin/evals"
 "$CLAUDE_BIN" plugin eval "$stage/run/$plugin" \
   --trust-plugin \
   --no-publish \
-  --max-cost-usd "${EVAL_MAX_COST_USD:-2}" \
+  --max-cost-usd "${EVAL_MAX_COST_USD:-5}" \
   --output-dir "$output_dir" \
   "$@"

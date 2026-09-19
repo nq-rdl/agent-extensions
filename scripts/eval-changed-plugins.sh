@@ -57,7 +57,7 @@ for rev in "${revs[@]}"; do
     plugin="$(basename "$suite")"
     grep -qE "^(evals/claude|plugins)/$plugin/" <<<"$changed" || continue
     ran=$((ran + 1))
-    echo "claude-plugin-eval: evaluating $plugin (cap \$${EVAL_MAX_COST_USD:-2}, may overshoot by in-flight runs)"
+    echo "claude-plugin-eval: evaluating $plugin (cap \$${EVAL_MAX_COST_USD:-5}, may overshoot by in-flight runs)"
     # shellcheck disable=SC2086
     EVAL_REV="$rev" "$REPO_ROOT/scripts/eval-claude-plugin.sh" "$plugin" $EVAL_ARGS </dev/null
     rc=$?
