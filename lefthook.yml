@@ -5,7 +5,8 @@
 # Activate:  lefthook install
 # Prereqs:   lefthook, Go (asctl), pixi (provides python3 + pyyaml for the
 #            registry scripts — jobs invoke them via `pixi run`).
-# Optional:  lychee (link check), Docker (SkillSpector pre-push scan).
+# Optional:  lychee (link check), Docker (SkillSpector pre-push scan), claude CLI
+#            >= 2.1.269 (plugin eval pre-push job).
 # Bypass:    LEFTHOOK=0 git commit ...   |   git commit --no-verify
 min_version: 1.9.0
 
@@ -125,6 +126,18 @@ pre-push:
     - name: skillspector
       glob: "skills/**"
       run: tools/skillspector/scan.sh || true
+
+    # Local-only (no CI twin) and OPT-IN: `claude plugin eval` makes paid,
+    # non-deterministic model calls, so this job is a no-op unless
+    # CLAUDE_EVAL_ENABLE=1. When enabled it evaluates plugins whose
+    # evals/claude/<plugin>/ suite or plugin tree changed in the pushed commits
+    # (staged from the pushed revision, read from git's pre-push stdin — never the
+    # working tree). Informational unless CLAUDE_EVAL_STRICT=1. It runs in
+    # parallel with the hard gates below, so a rejected push still spends.
+    - name: claude-plugin-eval
+      glob: "{evals/claude/**,plugins/**,scripts/eval-*.sh}"
+      use_stdin: true
+      run: scripts/eval-changed-plugins.sh
 
     # Hard gate, mirrors .github/workflows/changelog-check.yml. Bypass locally
     # with CHANGIE_SKIP=1 (use the 'skip-changelog' PR label for CI).

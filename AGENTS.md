@@ -42,7 +42,9 @@ Local hooks mirror CI so failures surface before you push. **pre-commit** runs
 fast checks (gofmt/vet/build of `tools/asctl`, `asctl repo-check`, plugin
 validation, generated-artifact drift, a per-fragment changie body-length cap,
 lychee links); **pre-push** runs `asctl` tests, the pipeline unit tests, a
-non-blocking SkillSpector scan, and a hard changie-fragment gate. Prereqs:
+non-blocking SkillSpector scan, a local-only `claude plugin eval` job for plugins whose
+`evals/claude/<plugin>/` suite changed (opt-in via `CLAUDE_EVAL_ENABLE=1`, non-blocking, no CI twin; paid model
+calls on your local `claude` login, see `evals/claude/README.md`), and a hard changie-fragment gate. Prereqs:
 `lefthook`, Go, `pixi` (provides the Python toolchain — hook jobs call
 `pixi run`); optional `lychee` and Docker. Bypass with `LEFTHOOK=0` or
 `git commit --no-verify`.
