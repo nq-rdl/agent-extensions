@@ -10,8 +10,8 @@ graders:
     need: ['\btype\s+InvalidPayloadError\s+struct']
     forbid: '\bErrInvalidPayload\b|\btype\s+Err\w*\s+struct'
   - name: constants-mixedcaps
-    why: "The retry constant uses MixedCaps: MaxRetryCount or maxRetryCount, never ALL_CAPS."
-    need: ['\bconst\s+(?:\(\s*)?[Mm]axRetryCount\b']
+    why: "The retry constant stays exported and uses MixedCaps: MaxRetryCount, never ALL_CAPS."
+    need: ['\bconst\s+(?:\(\s*)?MaxRetryCount\b']
     forbid: '\w_\w|\bMAXRETRYCOUNT\b'
 fixtures:
   good: |
@@ -42,9 +42,9 @@ fixtures:
     - name: uppercase constant without underscores
       replace: [["const MaxRetryCount", "const MAXRETRYCOUNT"]]
       fails: [constants-mixedcaps]
-    - name: unexported MixedCaps constant
+    - name: unexported MixedCaps constant loses visibility
       replace: [["MaxRetryCount", "maxRetryCount"]]
-      fails: []
+      fails: [constants-mixedcaps]
     - name: grouped MixedCaps constant
       replace: [["const MaxRetryCount = 5", "const (\nMaxRetryCount = 5\n)"]]
       fails: []

@@ -2,8 +2,8 @@
 package: ingest
 graders:
   - name: validator-interface
-    why: "The single-method interface takes the -er name with no I prefix: Validator."
-    need: ['\btype\s+Validator\s+interface']
+    why: "The single-method interface takes the -er name with no I prefix: Validator or RecordValidator."
+    need: ['\btype\s+(?:Record)?Validator\s+interface']
     forbid: '\bIValidator\b|\btype\s+I[A-Z]\w*\s+interface'
   - name: reader-interface
     why: "No Interface suffix: RecordReader (or Reader)."
@@ -40,6 +40,9 @@ fixtures:
     	return valid
     }
   cases:
+    - name: contextual validator name is accepted
+      replace: [["type Validator interface", "type RecordValidator interface"], ["v Validator)", "v RecordValidator)"]]
+      fails: []
     - name: redundant count context kept
       replace: [["valid", "validCount"]]
       fails: [no-type-in-name]

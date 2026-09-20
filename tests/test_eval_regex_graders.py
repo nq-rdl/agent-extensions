@@ -86,6 +86,28 @@ class GeneratedGradersTest(unittest.TestCase):
 
 
 class SpecFixturesTest(unittest.TestCase):
+    def test_nested_fences_do_not_select_commented_examples(self):
+        sources = {"name": gen.build_pattern("demo", [r"\bGood\b"], r"\bBad\b")}
+        for fence, nested in (("````", "```"), ("~~~~", "~~~"), ("~~~", "```")):
+            for outer, inner, fails in (("Good", "Bad", set()), ("Bad", "Good", {"name"})):
+                with self.subTest(fence=fence, outer=outer):
+                    code = (f"package demo\nvar {outer} int\n/*\n{nested}go\n"
+                            f"package demo\nvar {inner} int\n{nested}\n*/\n")
+                    reply = f"{fence}go\n{code}{fence}\n"
+                    self.assertEqual(self.grade(sources, reply), fails)
+                    # Nested examples in earlier/later unrelated Markdown blocks
+                    # must not become candidates either.
+                    unrelated = f"{fence}text\n{nested}go\npackage demo\nvar Bad int\n{nested}\n{fence}\n"
+                    self.assertEqual(self.grade(sources, unrelated + reply + unrelated), fails)
+
+    def test_last_top_level_file_controls_the_grade(self):
+        sources = {"name": gen.build_pattern("demo", [r"\bGood\b"], r"\bBad\b")}
+        good = block("package demo\nvar Good int\n")
+        bad = block("package demo\nvar Bad int\n")
+        self.assertEqual(self.grade(sources, good + bad), {"name"})
+        self.assertEqual(self.grade(sources, bad + good), set())
+        self.assertEqual(self.grade(sources, "```text\n```\n" + good + "```text\n```\n"), set())
+
     def test_query_fixture_only_changes_names(self):
         case = REPO / "evals/claude/go/expensive-getter"
         original = (case / "prompt.md").read_text().split("```go\n")[1].split("```")[0]

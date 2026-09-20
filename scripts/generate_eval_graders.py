@@ -39,7 +39,6 @@ import yaml
 SPEC_NAME = "graders.spec.yaml"
 SKIP = r"""//[^\n]*|/\*[\s\S]*?\*/|"(?:[^"\\\n]|\\.)*"|'(?:[^'\\\n]|\\.)+'|`[^`]*`"""
 START = r"""//|/\*|"|'|`"""
-CLOSE = r"\n {0,3}\1"
 
 
 def build_pattern(package: str, needs: list[str], forbid: str | None) -> str:
@@ -48,19 +47,37 @@ def build_pattern(package: str, needs: list[str], forbid: str | None) -> str:
         if re.compile(pattern).groups:
             raise ValueError(f"Capturing groups are not supported; use (?:...) instead: {pattern!r}")
     pkg = r"go[^\n]*\n\s*(?://[^\n]*\n\s*)*package\s+" + re.escape(package) + r"\b"
-    group = itertools.count(2)  # group 1 is the opening fence
+    group = itertools.count(1)
+    opening = r" {0,3}(?:`{3,}|~{3,})"
+
+    def markdown(exclude_package: bool = False) -> str:
+        # Consume whole fenced blocks atomically from a line boundary. Never
+        # restart at a shorter fence inside a block comment or another example.
+        token, fence = next(group), next(group)
+        excluded = (r"(?!" + opening + pkg + ")") if exclude_package else ""
+        fenced = (excluded + r" {0,3}(`{3,}|~{3,})[^\n]*\n(?:[^\n]*\n)*?"
+                  + r" {0,3}\%d[ \t\r]*(?:\n|$)" % fence)
+        return (r"(?:(?=(" + fenced + r"))\%d" % token
+                + r"|(?!" + opening + r")[^\n]*(?:\n|(?![\s\S])))*")
+
+    prefix = markdown()
+    fence = next(group)
+    close = r"\n {0,3}\%d[ \t\r]*(?:\n|$)" % fence
 
     def code(guard: str) -> str:
         # Zero or more steps through code: a whole comment/literal, or one character
         # that neither starts one nor begins forbidden text.
-        return (r"(?:(?!" + CLOSE + r")(?:(?=(" + SKIP + r"))\%d" % next(group)
+        return (r"(?:(?!" + close + r")(?:(?=(" + SKIP + r"))\%d" % next(group)
                 + r"|(?!" + guard + r")[\s\S]))*")
 
-    out = r"(?:^|\n) {0,3}(`{3,}|~{3,})" + pkg
-    out += r"(?![\s\S]*\n {0,3}(?:`{3,}|~{3,})" + pkg + ")"
+    out = "^" + prefix + r" {0,3}(`{3,}|~{3,})" + pkg
     for need in needs:
         out += r"(?=" + code(START) + need + ")"
-    return out + code(START + (("|" + forbid) if forbid else "")) + CLOSE
+    out += code(START + (("|" + forbid) if forbid else "")) + close
+    # The suffix can contain prose and unrelated blocks, but no later top-level
+    # file for this package. A failing final rewrite cannot fall back to an
+    # earlier passing one.
+    return out + markdown(exclude_package=True) + r"(?![\s\S])"
 
 
 def render(spec: dict, grader: dict) -> str:
