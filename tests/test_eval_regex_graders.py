@@ -12,6 +12,7 @@ import re
 import shutil
 import subprocess
 import sys
+import tempfile
 import unittest
 from pathlib import Path
 
@@ -36,6 +37,43 @@ def block(code: str) -> str:
 
 
 class GeneratedGradersTest(unittest.TestCase):
+    def test_stale_graders_without_specs(self):
+        for change in ("delete spec", "move spec", "remove grader"):
+            with self.subTest(change=change), tempfile.TemporaryDirectory() as tmp:
+                repo = Path(tmp)
+                case = repo / "evals/claude/go/old-case"
+                case.mkdir(parents=True)
+                spec = case / gen.SPEC_NAME
+                spec.write_text("package: demo\ngraders:\n  - name: sample\n    why: Test\n    need: ['foo']\n")
+                self.assertEqual(gen.main([tmp]), 0)
+                stale = case / "graders/sample.md"
+                manual = case / "graders/manual.md"
+                manual.write_text("---\ntype: tool_used\n---\n")
+                if change == "delete spec":
+                    spec.unlink()
+                elif change == "move spec":
+                    new_case = case.with_name("new-case")
+                    new_case.mkdir()
+                    spec.rename(new_case / gen.SPEC_NAME)
+                else:
+                    spec.write_text("package: demo\ngraders: []\n")
+                self.assertEqual(gen.main([tmp, "--check"]), 1)
+                self.assertTrue(stale.exists(), "check mode must not remove files")
+                self.assertEqual(gen.main([tmp]), 0)
+                self.assertFalse(stale.exists())
+                self.assertEqual(manual.read_text(), "---\ntype: tool_used\n---\n")
+                if change == "move spec":
+                    self.assertTrue((new_case / "graders/sample.md").exists())
+                self.assertEqual(gen.main([tmp, "--check"]), 0)
+
+    def test_embedded_captures_are_rejected(self):
+        for pattern in (r"(List|Fetch)", r"(?P<verb>List|Fetch)"):
+            for field in ("need", "forbid"):
+                with self.subTest(pattern=pattern, field=field):
+                    with self.assertRaisesRegex(ValueError, "Capturing groups are not supported"):
+                        gen.build_pattern("demo", [pattern] if field == "need" else [],
+                                          pattern if field == "forbid" else None)
+
     def test_generated_files_match_their_specs(self):
         self.assertEqual(gen.main([str(REPO), "--check"]), 0)
 
@@ -58,6 +96,14 @@ class SpecFixturesTest(unittest.TestCase):
             )
             self.assertEqual(json.loads(result.stdout), python, "JavaScript and Python disagree")
         return {name for name, ok in python.items() if not ok}
+
+    def test_noncapturing_groups_with_comments_and_literals(self):
+        source = gen.build_pattern("demo", [r"\b(?:List|Fetch)Products\b", r"\breturn\b"],
+                                   r"\b(?:GetProducts|Products)\b")
+        code = 'package demo\n// GetProducts\nfunc FetchProducts() string { return "Products" }\n'
+        self.assertEqual(self.grade({"verbs": source}, block(code)), set())
+        self.assertEqual(self.grade({"verbs": source}, block(code.replace("FetchProducts", "GetProducts"))),
+                         {"verbs"})
 
     def test_spec_fixtures(self):
         checked = 0

@@ -4,14 +4,14 @@ graders:
   - name: validator-interface
     why: "The single-method interface takes the -er name with no I prefix: Validator."
     need: ['\btype\s+Validator\s+interface']
-    forbid: '\btype\s+I[A-Z]\w*\s+interface'
+    forbid: '\bIValidator\b|\btype\s+I[A-Z]\w*\s+interface'
   - name: reader-interface
     why: "No Interface suffix: RecordReader (or Reader)."
     need: ['\btype\s+(?:Record)?Reader\s+interface']
     forbid: '\btype\s+\w*Interface\s+interface'
   - name: no-type-in-name
     why: "Names do not embed their type: records, not recordSlice / recordItem."
-    need: ['\brecords\s+\[\]Record']
+    need: ['\bfunc\s+CountValid\s*\(\s*[^\W\d]\w*\s+\[\]Record\b']
     forbid: '\w(?:Slice|Item|Map|List)\b'
 fixtures:
   good: |
@@ -48,4 +48,16 @@ fixtures:
       fails: [reader-interface]
     - name: type embedded in the parameter name
       replace: [["records []Record", "recordSlice []Record"], ["range records", "range recordSlice"]]
+      fails: [no-type-in-name]
+    - name: short slice parameter is accepted
+      replace: [["records", "rs"]]
+      fails: []
+    - name: alternative descriptive slice parameter is accepted
+      replace: [["records", "entries"]]
+      fails: []
+    - name: stale validator parameter after declaration renamed
+      replace: [["v Validator)", "v IValidator)"]]
+      fails: [validator-interface]
+    - name: missing slice parameter
+      replace: [["records []Record, ", ""]]
       fails: [no-type-in-name]

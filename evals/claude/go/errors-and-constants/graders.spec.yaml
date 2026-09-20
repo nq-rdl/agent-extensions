@@ -4,11 +4,11 @@ graders:
   - name: sentinel-errors
     why: "Sentinel error values are named ErrFoo: ErrTimeout and ErrNotFound."
     need: ['\bErrTimeout\s*=', '\bErrNotFound\s*=']
-    forbid: '\b(?:TimeoutError|ErrorNotFound)\s*='
+    forbid: '\b(?:TimeoutError|ErrorNotFound)\b'
   - name: error-type
     why: "An error type is named FooError, not ErrFoo: InvalidPayloadError."
     need: ['\btype\s+InvalidPayloadError\s+struct']
-    forbid: '\btype\s+Err\w*\s+struct'
+    forbid: '\bErrInvalidPayload\b|\btype\s+Err\w*\s+struct'
   - name: constants-mixedcaps
     why: "A constant is declared and no identifier keeps an underscore (no ALL_CAPS)."
     need: ['\bconst\b']
@@ -48,3 +48,15 @@ fixtures:
     - name: constant stays ALL_CAPS
       replace: [["const MaxRetryCount", "const MAX_RETRY_COUNT"]]
       fails: [constants-mixedcaps]
+    - name: stale timeout sentinel use after declaration renamed
+      replace: [["err, ErrTimeout)", "err, TimeoutError)"]]
+      fails: [sentinel-errors]
+    - name: stale not-found sentinel use
+      replace: [["err, ErrTimeout)", "err, ErrorNotFound)"]]
+      fails: [sentinel-errors]
+    - name: stale error receiver after declaration renamed
+      replace: [["(e InvalidPayloadError)", "(e ErrInvalidPayload)"]]
+      fails: [error-type]
+    - name: old error names in comments and strings are ignored
+      replace: [['"invalid payload: "', '"TimeoutError ErrorNotFound ErrInvalidPayload"'], ["// InvalidPayloadError replaces", "// TimeoutError ErrorNotFound InvalidPayloadError replaces"]]
+      fails: []

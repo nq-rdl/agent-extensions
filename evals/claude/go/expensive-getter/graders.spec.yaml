@@ -6,8 +6,8 @@ graders:
     need: ['\)\s+Name\(\)\s+string']
     forbid: '\bGetName\b'
   - name: expensive-getter
-    why: "The database query returning a collection is not a bare getter: List*/Fetch*/Load*/Query*, never Get* or plain Products()."
-    need: ['\)\s+(?:List|Fetch|Load|Query)\w*\(ctx\b']
+    why: "The database query returning a collection is not a bare getter: Compute*/List*/Fetch*/Load*/Query*, never Get* or plain Products()."
+    need: ['\)\s+(?:Compute|List|Fetch|Load|Query)\w*\(ctx\b']
     forbid: '\)\s+(?:GetProducts|Products)\('
 fixtures:
   good: |
@@ -50,3 +50,6 @@ fixtures:
     - name: cheap getter keeps Get
       replace: [["Name() string", "GetName() string"]]
       fails: [cheap-getter]
+    - name: Compute is accepted
+      replace: [["ListProducts(ctx", "ComputeProducts(ctx"]]
+      fails: []

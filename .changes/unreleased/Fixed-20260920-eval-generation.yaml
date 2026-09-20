@@ -1,0 +1,3 @@
+kind: Fixed
+body: Eval grader generation detects orphaned outputs and rejects unsafe capturing groups (#335)
+time: 2026-09-20T01:51:44.631461062Z
