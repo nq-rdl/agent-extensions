@@ -38,7 +38,16 @@ fixtures:
     		return nil, err
     	}
     	defer rows.Close()
-    	return nil, rows.Err()
+
+    	var products []Product
+    	for rows.Next() {
+    		var p Product
+    		if err := rows.Scan(&p.SKU); err != nil {
+    			return nil, err
+    		}
+    		products = append(products, p)
+    	}
+    	return products, rows.Err()
     }
   cases:
     - name: Get prefix merely dropped from the query method

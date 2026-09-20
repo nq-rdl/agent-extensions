@@ -10,9 +10,9 @@ graders:
     need: ['\btype\s+InvalidPayloadError\s+struct']
     forbid: '\bErrInvalidPayload\b|\btype\s+Err\w*\s+struct'
   - name: constants-mixedcaps
-    why: "A constant is declared and no identifier keeps an underscore (no ALL_CAPS)."
-    need: ['\bconst\b']
-    forbid: '\w_\w'
+    why: "The retry constant uses MixedCaps: MaxRetryCount or maxRetryCount, never ALL_CAPS."
+    need: ['\bconst\s+(?:\(\s*)?[Mm]axRetryCount\b']
+    forbid: '\w_\w|\bMAXRETRYCOUNT\b'
 fixtures:
   good: |
     package jobs
@@ -39,6 +39,15 @@ fixtures:
     	return errors.Is(err, ErrTimeout)
     }
   cases:
+    - name: uppercase constant without underscores
+      replace: [["const MaxRetryCount", "const MAXRETRYCOUNT"]]
+      fails: [constants-mixedcaps]
+    - name: unexported MixedCaps constant
+      replace: [["MaxRetryCount", "maxRetryCount"]]
+      fails: []
+    - name: grouped MixedCaps constant
+      replace: [["const MaxRetryCount = 5", "const (\nMaxRetryCount = 5\n)"]]
+      fails: []
     - name: error type keeps the Err prefix
       replace: [["InvalidPayloadError struct", "ErrInvalidPayload struct"], ["(e InvalidPayloadError)", "(e ErrInvalidPayload)"]]
       fails: [error-type]

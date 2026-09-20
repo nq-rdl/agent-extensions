@@ -86,6 +86,16 @@ class GeneratedGradersTest(unittest.TestCase):
 
 
 class SpecFixturesTest(unittest.TestCase):
+    def test_query_fixture_only_changes_names(self):
+        case = REPO / "evals/claude/go/expensive-getter"
+        original = (case / "prompt.md").read_text().split("```go\n")[1].split("```")[0]
+        good = yaml.safe_load((case / gen.SPEC_NAME).read_text())["fixtures"]["good"]
+        expected = original.replace("GetName", "Name").replace("GetProducts", "ListProducts")
+        # Ignore the explanatory comment; retain the query, scanning, error paths,
+        # and returned collection exactly as supplied in the prompt.
+        actual = good.replace("// ListProducts was GetProducts.\n", "")
+        self.assertEqual(actual, expected)
+
     def grade(self, sources: dict, reply: str) -> set:
         """Names of the graders that FAIL the reply (checked in both engines)."""
         python = {name: bool(re.search(src, reply)) for name, src in sources.items()}

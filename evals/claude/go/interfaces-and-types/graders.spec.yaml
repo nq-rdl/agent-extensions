@@ -10,9 +10,9 @@ graders:
     need: ['\btype\s+(?:Record)?Reader\s+interface']
     forbid: '\btype\s+\w*Interface\s+interface'
   - name: no-type-in-name
-    why: "Names do not embed their type: records, not recordSlice / recordItem."
+    why: "Names omit types and redundant context: records, not recordSlice / recordItem; valid, not validCount."
     need: ['\bfunc\s+CountValid\s*\(\s*[^\W\d]\w*\s+\[\]Record\b']
-    forbid: '\w(?:Slice|Item|Map|List)\b'
+    forbid: '\w(?:Slice|Item|Map|List)\b|\bvalidCount\b'
 fixtures:
   good: |
     package ingest
@@ -40,6 +40,12 @@ fixtures:
     	return valid
     }
   cases:
+    - name: redundant count context kept
+      replace: [["valid", "validCount"]]
+      fails: [no-type-in-name]
+    - name: short counter name is accepted
+      replace: [["valid", "n"]]
+      fails: []
     - name: I prefix kept
       replace: [["type Validator interface", "type IValidator interface"], ["v Validator)", "v IValidator)"]]
       fails: [validator-interface]
