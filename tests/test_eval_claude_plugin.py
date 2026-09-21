@@ -140,6 +140,42 @@ class EvalHookTest(unittest.TestCase):
         self.assertEqual(self.logged(), "")
         self.assertIn("only ref deletions", result.stdout)
 
+    def test_duplicate_refs_and_annotated_tags_evaluate_commit_once(self):
+        sha = self.commit_suite()
+        git(self.repo, "tag", "-a", "release", "-m", "release")
+        tag = git(self.repo, "rev-parse", "release")
+        stdin = "".join(
+            f"{ref} {rev} {ref} {'0' * 40}\n"
+            for ref, rev in (("refs/heads/feature", sha),
+                             ("refs/tags/lightweight", sha),
+                             ("refs/tags/release", tag))
+        )
+        result = self.hook(stdin, CLAUDE_EVAL_ENABLE="1")
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        self.assertEqual(self.logged().count("RUN"), 1)
+        self.assertEqual(
+            (self.repo / ".eval-results/go" / sha / "revision.txt").read_text().strip(), sha
+        )
+
+    def test_runner_mismatch_skips_paid_calls_and_obeys_strict_mode(self):
+        pushed = self.commit_suite()
+        runner = self.repo / "scripts/eval-claude-plugin.sh"
+        runner.write_text(runner.read_text() + '\necho WRONG-RUNNER\n')
+        stdin = f"refs/heads/feature {pushed} refs/heads/feature {'0' * 40}\n"
+        for state in ("dirty", "staged", "committed"):
+            if state == "staged":
+                git(self.repo, "add", "scripts/eval-claude-plugin.sh")
+            elif state == "committed":
+                git(self.repo, "commit", "-q", "-m", "different runner at HEAD")
+            for strict in ("0", "1"):
+                with self.subTest(state=state, strict=strict):
+                    result = self.hook(stdin, CLAUDE_EVAL_ENABLE="1", CLAUDE_EVAL_STRICT=strict)
+                    self.assertEqual(result.returncode, int(strict), result.stdout + result.stderr)
+                    self.assertIn("runner differs from " + pushed, result.stdout)
+                    self.assertNotIn("WRONG-RUNNER", result.stdout)
+                    self.assertEqual(self.logged(), "")
+                    self.assertFalse((self.repo / ".eval-results").exists())
+
     def test_multiple_tips_keep_separate_reports(self):
         first = self.commit_suite("first prompt\n")
         second = self.commit_suite("second prompt\n")

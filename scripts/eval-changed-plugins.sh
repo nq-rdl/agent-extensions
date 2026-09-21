@@ -47,7 +47,15 @@ command -v "${CLAUDE_BIN:-claude}" >/dev/null 2>&1 || skip "claude CLI not found
 
 failed=()
 ran=0
+seen_revs=" "
 for rev in "${revs[@]}"; do
+  # Peel annotated tags too: each commit should incur at most one eval per plugin.
+  rev="$(git -C "$REPO_ROOT" rev-parse --verify "$rev^{commit}")" || {
+    failed+=("invalid revision")
+    continue
+  }
+  case "$seen_revs" in *" $rev "*) continue ;; esac
+  seen_revs="$seen_revs$rev "
   base="$(git -C "$REPO_ROOT" merge-base "$rev" origin/main 2>/dev/null)"
   if [ -z "$base" ]; then
     echo "claude-plugin-eval: cannot resolve merge-base of $rev with origin/main; skipping it."
@@ -62,15 +70,22 @@ for rev in "${revs[@]}"; do
     ran=$((ran + 1))
     echo "claude-plugin-eval: evaluating $plugin (cap \$${EVAL_MAX_COST_USD:-5}, may overshoot by in-flight runs)"
     output_dir="${EVAL_OUTPUT_DIR:-$REPO_ROOT/.eval-results/$plugin}/$rev"
-    # shellcheck disable=SC2086
-    EVAL_OUTPUT_DIR="$output_dir" EVAL_REV="$rev" "$REPO_ROOT/scripts/eval-claude-plugin.sh" "$plugin" $EVAL_ARGS </dev/null
-    rc=$?
+    # The runner must match the revision whose plugin and suite it stages.
+    # Reject mismatches rather than execute different flags or staging logic.
+    if git -C "$REPO_ROOT" diff --quiet "$rev" -- scripts/eval-claude-plugin.sh; then
+      # shellcheck disable=SC2086
+      EVAL_OUTPUT_DIR="$output_dir" EVAL_REV="$rev" "$REPO_ROOT/scripts/eval-claude-plugin.sh" "$plugin" $EVAL_ARGS </dev/null
+      rc=$?
+    else
+      echo "claude-plugin-eval: runner differs from $rev; evaluation skipped (use a matching checkout)."
+      rc=2
+    fi
     echo "claude-plugin-eval: $plugin exit=$rc, report: $output_dir/report.html"
     [ "$rc" -eq 0 ] || failed+=("$plugin(exit $rc)")
   done
 done
 
-[ "$ran" -gt 0 ] || skip "no plugin with a suite changed in the pushed commits"
+[ "$ran" -gt 0 ] || [ "${#failed[@]}" -gt 0 ] || skip "no plugin with a suite changed in the pushed commits"
 
 if [ "${#failed[@]}" -gt 0 ]; then
   echo "claude-plugin-eval: below threshold or incomplete: ${failed[*]}"
