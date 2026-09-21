@@ -25,6 +25,15 @@ FAKE_CLAUDE = """#!/bin/bash
   cat "$3/skills/naming/SKILL.md"
   cat "$3/evals/case/prompt.md"
 } >>"$FAKE_CLAUDE_LOG"
+stage="$3"
+while [ "$#" -gt 0 ]; do
+  if [ "$1" = "--output-dir" ]; then
+    cp "$stage/evals/case/prompt.md" "$2/report.html"
+    cp "$stage/skills/naming/SKILL.md" "$2/aggregate-result.json"
+    break
+  fi
+  shift
+done
 exit "${FAKE_CLAUDE_EXIT:-0}"
 """
 
@@ -112,7 +121,7 @@ class EvalHookTest(unittest.TestCase):
         self.assertIn("skill v1", self.logged())
         self.assertIn("prompt v1", self.logged())
         self.assertNotIn("UNCOMMITTED", self.logged())
-        revision = (self.repo / ".eval-results" / "go" / "revision.txt").read_text().strip()
+        revision = (self.repo / ".eval-results" / "go" / sha / "revision.txt").read_text().strip()
         self.assertEqual(revision, sha)
 
     def test_pushed_ref_other_than_head_is_the_one_evaluated(self):
@@ -123,11 +132,33 @@ class EvalHookTest(unittest.TestCase):
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
         self.assertIn("prompt pushed", self.logged())
 
-    def test_branch_deletion_push_falls_back_without_error(self):
+    def test_deletion_only_push_never_calls_cli_even_in_strict_mode(self):
         self.commit_suite()
         stdin = f"(delete) {'0' * 40} refs/heads/gone {'1' * 40}\n"
-        result = self.hook(stdin, CLAUDE_EVAL_ENABLE="1")
+        result = self.hook(stdin, CLAUDE_EVAL_ENABLE="1", CLAUDE_EVAL_STRICT="1", FAKE_CLAUDE_EXIT="1")
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        self.assertEqual(self.logged(), "")
+        self.assertIn("only ref deletions", result.stdout)
+
+    def test_multiple_tips_keep_separate_reports(self):
+        first = self.commit_suite("first prompt\n")
+        second = self.commit_suite("second prompt\n")
+        stdin = (f"refs/heads/first {first} refs/heads/first {'0' * 40}\n"
+                 f"(delete) {'0' * 40} refs/heads/gone {'1' * 40}\n"
+                 f"refs/heads/second {second} refs/heads/second {'0' * 40}\n")
+        for override in (None, self.tmp / "custom reports"):
+            with self.subTest(override=override):
+                extra = {"EVAL_OUTPUT_DIR": str(override)} if override else {}
+                result = self.hook(stdin, CLAUDE_EVAL_ENABLE="1", **extra)
+                self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+                root = override or self.repo / ".eval-results" / "go"
+                for sha, prompt in ((first, "first prompt\n"), (second, "second prompt\n")):
+                    report = root / sha
+                    self.assertEqual((report / "revision.txt").read_text().strip(), sha)
+                    self.assertEqual((report / "report.html").read_text(), prompt)
+                    self.assertEqual((report / "aggregate-result.json").read_text(), "skill v1\n")
+                    self.assertIn(str(report / "report.html"), result.stdout)
+        self.assertEqual(self.logged().count("RUN"), 4)
 
     def test_low_score_only_blocks_in_strict_mode(self):
         self.commit_suite()

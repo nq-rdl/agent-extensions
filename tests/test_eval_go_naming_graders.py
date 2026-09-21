@@ -212,6 +212,17 @@ class GoNamingGraderTest(unittest.TestCase):
         code = GOOD_FILE.replace("OwnerID()", "GetOwnerID()")
         self.assert_only_fails(block(code), {"getter-initialism"})
 
+    def test_base_url_get_prefix_kept(self):
+        self.assert_only_fails(block(GOOD_FILE.replace("BaseURL()", "GetBaseURL()")), {"getter-initialism"})
+
+    def test_long_receiver_kept(self):
+        code = GOOD_FILE.replace("(c *HTTPClient)", "(client *HTTPClient)").replace("return c.", "return client.")
+        self.assert_only_fails(block(code), {"no-this-receiver"})
+
+    def test_two_character_receiver_passes(self):
+        code = GOOD_FILE.replace("(c *HTTPClient)", "(hc *HTTPClient)").replace("return c.", "return hc.")
+        self.assert_all_pass(block(code))
+
     def test_this_receiver_kept(self):
         code = GOOD_FILE.replace("(c *HTTPClient) OwnerID", "(this *HTTPClient) OwnerID").replace(
             "return c.ownerID", "return this.ownerID")

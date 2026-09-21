@@ -17,9 +17,9 @@ graders:
     why: "Both getters drop the Get prefix and keep initialisms uniform."
     need: ['\)\s+OwnerID\(\)\s+string', '\)\s+BaseURL\(\)\s+string']
   - name: no-this-receiver
-    why: "A method receiver is present and none is this/self."
+    why: "Method receivers have one or two characters."
     need: ['\bfunc\s+\(\s*\w+\s+\*?\w+\s*\)']
-    forbid: '\bfunc\s+\(\s*(?:this|self)\b'
+    forbid: '\bfunc\s+\(\s*\w{3,}\b'
   - name: identifier-casing
     why: "No identifier in the file (types, params, references) keeps a title-cased initialism or an underscore."
     forbid: 'Http|Url|Id\b|\w_\w'

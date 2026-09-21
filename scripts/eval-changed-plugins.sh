@@ -30,12 +30,15 @@ skip() {
 
 # git feeds pre-push "<local ref> <local sha> <remote ref> <remote sha>" lines.
 revs=()
+saw_ref=0
 if [ ! -t 0 ]; then
   while read -r _ local_sha _ _; do
+    saw_ref=1
     [ -n "${local_sha:-}" ] && [ "$local_sha" != "$ZERO_SHA" ] && revs+=("$local_sha")
   done
 fi
 if [ "${#revs[@]}" -eq 0 ]; then
+  [ "$saw_ref" -eq 0 ] || skip "push contains only ref deletions"
   head_sha="$(git -C "$REPO_ROOT" rev-parse --verify HEAD 2>/dev/null)" || skip "no HEAD commit"
   revs=("$head_sha")
 fi
@@ -58,10 +61,11 @@ for rev in "${revs[@]}"; do
     grep -qE "^(evals/claude|plugins)/$plugin/" <<<"$changed" || continue
     ran=$((ran + 1))
     echo "claude-plugin-eval: evaluating $plugin (cap \$${EVAL_MAX_COST_USD:-5}, may overshoot by in-flight runs)"
+    output_dir="${EVAL_OUTPUT_DIR:-$REPO_ROOT/.eval-results/$plugin}/$rev"
     # shellcheck disable=SC2086
-    EVAL_REV="$rev" "$REPO_ROOT/scripts/eval-claude-plugin.sh" "$plugin" $EVAL_ARGS </dev/null
+    EVAL_OUTPUT_DIR="$output_dir" EVAL_REV="$rev" "$REPO_ROOT/scripts/eval-claude-plugin.sh" "$plugin" $EVAL_ARGS </dev/null
     rc=$?
-    echo "claude-plugin-eval: $plugin exit=$rc, report: .eval-results/$plugin/report.html"
+    echo "claude-plugin-eval: $plugin exit=$rc, report: $output_dir/report.html"
     [ "$rc" -eq 0 ] || failed+=("$plugin(exit $rc)")
   done
 done

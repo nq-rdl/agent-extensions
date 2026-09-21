@@ -47,10 +47,16 @@ itself. Export it in your shell profile to opt in.
 
 When enabled, it evaluates each plugin whose `evals/claude/<plugin>/` suite or
 `plugins/<plugin>/` tree changed between the merge-base with `origin/main` and the
-commit being pushed. Both the plugin and the suite are staged from that pushed
-commit (`EVAL_REV`, taken from git's pre-push input, else `HEAD`), so uncommitted
-edits never affect the score; `.eval-results/<plugin>/revision.txt` records what
-was evaluated. Things to know before opting in:
+commit being pushed. The hook stages the plugin and suite from that commit.
+It sets `EVAL_REV` from git's pre-push input, or uses `HEAD` when input is absent.
+Uncommitted edits never affect the score.
+
+Reports for each commit go in `.eval-results/<plugin>/<commit>/`,
+where `revision.txt` records the evaluated commit. Deletion-only pushes skip evaluation.
+Set `EVAL_OUTPUT_DIR` to override the report directory for manual runs.
+The hook appends the commit to this override to keep reports separate.
+
+Things to know before opting in:
 
 - The job runs in parallel with the hard pre-push gates, so a push they reject
   still spends, and every retry spends again (nothing is cached).
@@ -71,7 +77,8 @@ plugin root. Run it on a scratch copy, then move the result:
 
 ```bash
 tmp="$(mktemp -d)" && cp -R plugins/go "$tmp/go" && (cd "$tmp/go" && claude plugin eval init)
-mkdir -p evals/claude && cp -R "$tmp/go/evals" evals/claude/go
+mkdir -p evals/claude/go
+cp -R "$tmp/go/evals/." evals/claude/go/
 ```
 
 ### Generated regex graders
