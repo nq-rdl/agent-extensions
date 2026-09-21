@@ -2,9 +2,10 @@
 
 scripts/generate_eval_graders.py turns each evals/claude/<plugin>/<case>/graders.spec.yaml
 into graders/*.md. These tests keep the generated files in sync with their specs and
-grade every spec's fixtures with the generated patterns — in Python's `re` and, when
-`node` is on PATH, in the JavaScript engine that actually runs them, requiring the two
-to agree. No model call is made.
+grade every spec's fixtures with the generated patterns in Python's `re` and Node's
+JavaScript engine, requiring the two to agree. Fixture tests explicitly skip when
+Node is unavailable; they never report Python-only checks as cross-engine passes.
+No model call is made.
 """
 
 import json
@@ -85,7 +86,24 @@ class GeneratedGradersTest(unittest.TestCase):
                 re.compile(meta["pattern"])
 
 
+@unittest.skipUnless(NODE, "Node required for Python/JavaScript grader agreement")
 class SpecFixturesTest(unittest.TestCase):
+    def test_comments_before_package(self):
+        sources = {"name": gen.build_pattern("demo", [r"\bGood\b"], r"\bBad\b")}
+        for preamble in ("/* License */\n", "/* Multiple\n * lines **/\n",
+                         "// First\n/* Second */ /* Third */\n// Fourth\n",
+                         "/* package demo\nvar Bad int */\n"):
+            with self.subTest(preamble=preamble):
+                good = block(preamble + "package demo\nvar Good int\n")
+                bad = block(preamble + "package demo\nvar Bad int\n")
+                self.assertEqual(self.grade(sources, good), set())
+                self.assertEqual(self.grade(sources, bad), {"name"})
+                self.assertEqual(self.grade(sources, good + bad), {"name"})
+                self.assertEqual(self.grade(sources, bad + good), set())
+        # A package clause inside a comment cannot select a different package.
+        unrelated = block("/* package demo */\npackage other\nvar Good int\n")
+        self.assertEqual(self.grade(sources, unrelated), {"name"})
+
     def test_nested_fences_do_not_select_commented_examples(self):
         sources = {"name": gen.build_pattern("demo", [r"\bGood\b"], r"\bBad\b")}
         for fence, nested in (("````", "```"), ("~~~~", "~~~"), ("~~~", "```")):
@@ -121,12 +139,11 @@ class SpecFixturesTest(unittest.TestCase):
     def grade(self, sources: dict, reply: str) -> set:
         """Names of the graders that FAIL the reply (checked in both engines)."""
         python = {name: bool(re.search(src, reply)) for name, src in sources.items()}
-        if NODE:
-            result = subprocess.run(
-                [NODE, "-e", NODE_SCRIPT], input=json.dumps({"patterns": sources, "reply": reply}),
-                capture_output=True, text=True, check=True, timeout=30,
-            )
-            self.assertEqual(json.loads(result.stdout), python, "JavaScript and Python disagree")
+        result = subprocess.run(
+            [NODE, "-e", NODE_SCRIPT], input=json.dumps({"patterns": sources, "reply": reply}),
+            capture_output=True, text=True, check=True, timeout=30,
+        )
+        self.assertEqual(json.loads(result.stdout), python, "JavaScript and Python disagree")
         return {name for name, ok in python.items() if not ok}
 
     def test_noncapturing_groups_with_comments_and_literals(self):

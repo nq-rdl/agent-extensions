@@ -12,7 +12,7 @@ graders:
   - name: no-type-in-name
     why: "Names omit types and redundant context: records, not recordSlice / recordItem; valid, not validCount."
     need: ['\bfunc\s+CountValid\s*\(\s*[^\W\d]\w*\s+\[\]Record\b']
-    forbid: '\w(?:Slice|Item|Map|List)\b|\bvalidCount\b'
+    forbid: '\w(?:Slice|Item|Map|List|_(?:slice|item|map|list))\b|\bvalid(?:Count|_count)\b'
 fixtures:
   good: |
     package ingest
@@ -40,6 +40,15 @@ fixtures:
     	return valid
     }
   cases:
+    - name: underscore type suffix in slice parameter
+      replace: [["records", "record_slice"]]
+      fails: [no-type-in-name]
+    - name: underscore type suffix in loop variable
+      replace: [["_, r :=", "_, record_item :="], ["Validate(r)", "Validate(record_item)"]]
+      fails: [no-type-in-name]
+    - name: underscore redundant count context
+      replace: [["valid", "valid_count"]]
+      fails: [no-type-in-name]
     - name: contextual validator name is accepted
       replace: [["type Validator interface", "type RecordValidator interface"], ["v Validator)", "v RecordValidator)"]]
       fails: []

@@ -24,8 +24,8 @@ Fixtures in each spec are graded by tests/test_eval_regex_graders.py in both Pyt
 and Node, which must agree.
 
 CLI:
-    python3 scripts/generate_eval_graders.py [REPO_ROOT]            # write
-    python3 scripts/generate_eval_graders.py [REPO_ROOT] --check    # fail on drift
+    pixi run python3 scripts/generate_eval_graders.py [REPO_ROOT]          # write
+    pixi run python3 scripts/generate_eval_graders.py [REPO_ROOT] --check  # fail on drift
 """
 from __future__ import annotations
 
@@ -46,7 +46,8 @@ def build_pattern(package: str, needs: list[str], forbid: str | None) -> str:
     for pattern in [*needs, *([forbid] if forbid else [])]:
         if re.compile(pattern).groups:
             raise ValueError(f"Capturing groups are not supported; use (?:...) instead: {pattern!r}")
-    pkg = r"go[^\n]*\n\s*(?://[^\n]*\n\s*)*package\s+" + re.escape(package) + r"\b"
+    pkg = (r"go[^\n]*\n\s*(?:(?://[^\n]*\n|/\*[^*]*(?:\*(?!/)[^*]*)*\*/)\s*)*"
+           + r"package\s+" + re.escape(package) + r"\b")
     group = itertools.count(1)
     opening = r" {0,3}(?:`{3,}|~{3,})"
 
@@ -135,7 +136,7 @@ def main(argv=None) -> int:
 
     if drift:
         for line in drift:
-            print(f"::error::{line} — run `python3 scripts/generate_eval_graders.py .`", file=sys.stderr)
+            print(f"::error::{line} — run `pixi run python3 scripts/generate_eval_graders.py .`", file=sys.stderr)
         return 1
     print("Eval regex graders are in sync." if do_check else "Eval regex graders written.")
     return 0

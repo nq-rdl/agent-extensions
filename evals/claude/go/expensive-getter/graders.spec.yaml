@@ -7,7 +7,7 @@ graders:
     forbid: '\bGetName\b'
   - name: expensive-getter
     why: "The database query returning a collection is not a bare getter: Compute*/List*/Fetch*/Load*/Query*, never Get* or plain Products()."
-    need: ['\)\s+(?:Compute|List|Fetch|Load|Query)\w*\(ctx\b']
+    need: ['\)\s+(?:Compute|List|Fetch|Load|Query)\w*\(\s*[^\W\d]\w*\s+context\.Context\b']
     forbid: '\)\s+(?:GetProducts|Products)\('
 fixtures:
   good: |
@@ -50,6 +50,12 @@ fixtures:
     	return products, rows.Err()
     }
   cases:
+    - name: alternate context parameter name is accepted
+      replace: [["ListProducts(ctx", "FetchProducts(c"], ["QueryContext(ctx,", "QueryContext(c,"]]
+      fails: []
+    - name: context parameter requires the context type
+      replace: [["ctx context.Context", "ctx string"]]
+      fails: [expensive-getter]
     - name: Get prefix merely dropped from the query method
       replace: [["ListProducts(ctx", "Products(ctx"]]
       fails: [expensive-getter]
