@@ -176,6 +176,41 @@ class EvalHookTest(unittest.TestCase):
                     self.assertEqual(self.logged(), "")
                     self.assertFalse((self.repo / ".eval-results").exists())
 
+    def test_existing_ref_only_evaluates_plugins_changed_since_remote_tip(self):
+        previous = self.commit_suite()
+        self.write("plugins/other/.claude-plugin/plugin.json", '{"name":"other"}\n')
+        self.write("plugins/other/skills/naming/SKILL.md", "other skill\n")
+        self.write("evals/claude/other/case/prompt.md", "other prompt\n")
+        git(self.repo, "add", "-A")
+        git(self.repo, "commit", "-q", "-m", "other suite")
+        tip = git(self.repo, "rev-parse", "HEAD")
+        result = self.hook(f"refs/heads/feature {tip} refs/heads/feature {previous}\n",
+                           CLAUDE_EVAL_ENABLE="1")
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        self.assertEqual(self.logged().count("RUN"), 1)
+        self.assertIn("other prompt", self.logged())
+        self.assertNotIn("prompt v1", self.logged())
+
+    def test_same_tip_with_different_remote_bases_preserves_union(self):
+        base = git(self.repo, "rev-parse", "HEAD")
+        tip = self.commit_suite()
+        # The first update selects nothing; the second must still select go.
+        stdin = (f"refs/heads/first {tip} refs/heads/first {tip}\n"
+                 f"refs/heads/second {tip} refs/heads/second {base}\n"
+                 f"refs/tags/new {tip} refs/tags/new {'0' * 40}\n")
+        result = self.hook(stdin, CLAUDE_EVAL_ENABLE="1")
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        self.assertEqual(self.logged().count("RUN"), 1)
+
+    def test_missing_remote_base_does_not_fall_back_to_main(self):
+        tip = self.commit_suite()
+        stdin = f"refs/heads/feature {tip} refs/heads/feature {'1' * 40}\n"
+        for strict in ("0", "1"):
+            result = self.hook(stdin, CLAUDE_EVAL_ENABLE="1", CLAUDE_EVAL_STRICT=strict)
+            self.assertEqual(result.returncode, int(strict), result.stdout + result.stderr)
+            self.assertIn("cannot resolve comparison base", result.stdout)
+            self.assertEqual(self.logged(), "")
+
     def test_multiple_tips_keep_separate_reports(self):
         first = self.commit_suite("first prompt\n")
         second = self.commit_suite("second prompt\n")

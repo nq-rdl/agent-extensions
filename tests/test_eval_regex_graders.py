@@ -88,6 +88,35 @@ class GeneratedGradersTest(unittest.TestCase):
 
 @unittest.skipUnless(NODE, "Node required for Python/JavaScript grader agreement")
 class SpecFixturesTest(unittest.TestCase):
+    def test_longer_closing_fences(self):
+        sources = {"name": gen.build_pattern("demo", [r"\bGood\b"], r"\bBad\b")}
+        for marker in ("`", "~"):
+            for width in (3, 4, 6):
+                with self.subTest(marker=marker, width=width):
+                    opener, closer = marker * width, marker * (width + 2)
+                    good = f"{opener}go\npackage demo\nvar Good int\n{closer}\n"
+                    bad = good.replace("Good", "Bad")
+                    unrelated = f"{opener}text\nexample\n{closer}\n"
+                    self.assertEqual(self.grade(sources, unrelated + good + unrelated), set())
+                    self.assertEqual(self.grade(sources, good + bad), {"name"})
+                    self.assertEqual(self.grade(sources, bad + good), set())
+                    for invalid in (marker * (width - 1), "~" * width if marker == "`" else "`" * width,
+                                    opener + ("~" if marker == "`" else "`")):
+                        reply = f"{opener}go\npackage demo\nvar Good int\n{invalid}\n"
+                        self.assertEqual(self.grade(sources, reply), {"name"})
+
+    def test_query_stub_cannot_pass(self):
+        spec = yaml.safe_load((REPO / "evals/claude/go/expensive-getter" / gen.SPEC_NAME).read_text())
+        sources = {g["name"]: gen.build_pattern(spec["package"], g.get("need", []), g.get("forbid"))
+                   for g in spec["graders"]}
+        good = spec["fixtures"]["good"]
+        start = good.index("\trows, err :=")
+        stub = good[:start] + "\treturn nil, nil\n}\n"
+        self.assertEqual(self.grade(sources, block(stub)), {"expensive-getter"})
+        # Even the original implementation quoted in a comment cannot rescue it.
+        commented = stub + "/*\n" + good[start:] + "*/\n"
+        self.assertEqual(self.grade(sources, block(commented)), {"expensive-getter"})
+
     def test_comments_before_package(self):
         sources = {"name": gen.build_pattern("demo", [r"\bGood\b"], r"\bBad\b")}
         for preamble in ("/* License */\n", "/* Multiple\n * lines **/\n",

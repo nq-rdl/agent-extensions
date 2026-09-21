@@ -45,11 +45,18 @@ workflow. The lefthook `pre-push` job `claude-plugin-eval` calls
 `CLAUDE_EVAL_ENABLE=1`** — installing the hooks never starts paid model calls by
 itself. Export it in your shell profile to opt in.
 
-When enabled, it evaluates each plugin whose `evals/claude/<plugin>/` suite or
-`plugins/<plugin>/` tree changed between the merge-base with `origin/main` and the
-commit being pushed. The hook stages the plugin and suite from that commit.
+When enabled, it evaluates plugins whose `evals/claude/<plugin>/` suite or
+`plugins/<plugin>/` tree changed in the update.
+For existing refs, the hook compares the remote tip with the pushed commit.
+For new refs or absent input, it compares the merge-base with `origin/main` with the pushed commit.
+The hook stages the plugin and suite from that commit.
 It sets `EVAL_REV` from git's pre-push input, or uses `HEAD` when input is absent.
 Uncommitted edits never affect the score.
+
+When several refs share a commit, the hook evaluates each selected plugin once.
+It combines plugin selections across those refs, even when their remote tips differ.
+If a comparison base is unavailable locally, the hook skips that update and reports an incomplete evaluation.
+Strict mode then fails the push.
 
 Reports for each commit go in `.eval-results/<plugin>/<commit>/`,
 where `revision.txt` records the evaluated commit. Deletion-only pushes skip evaluation.

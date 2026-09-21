@@ -51,19 +51,27 @@ def build_pattern(package: str, needs: list[str], forbid: str | None) -> str:
     group = itertools.count(1)
     opening = r" {0,3}(?:`{3,}|~{3,})"
 
+    def fences() -> tuple[str, str]:
+        fence, marker = next(group), next(group)
+        # Capture the marker separately so extra closing markers cannot mix
+        # backticks and tildes. Do not backtrack to a shorter opening run.
+        return (r"((`|~)\%d{2,})(?![`~])" % marker,
+                r"\%d\%d*[ \t\r]*(?:\n|$)" % (fence, marker))
+
     def markdown(exclude_package: bool = False) -> str:
         # Consume whole fenced blocks atomically from a line boundary. Never
         # restart at a shorter fence inside a block comment or another example.
-        token, fence = next(group), next(group)
+        token = next(group)
+        opener, closer = fences()
         excluded = (r"(?!" + opening + pkg + ")") if exclude_package else ""
-        fenced = (excluded + r" {0,3}(`{3,}|~{3,})[^\n]*\n(?:[^\n]*\n)*?"
-                  + r" {0,3}\%d[ \t\r]*(?:\n|$)" % fence)
+        fenced = (excluded + r" {0,3}" + opener + r"[^\n]*\n(?:[^\n]*\n)*?"
+                  + r" {0,3}" + closer)
         return (r"(?:(?=(" + fenced + r"))\%d" % token
                 + r"|(?!" + opening + r")[^\n]*(?:\n|(?![\s\S])))*")
 
     prefix = markdown()
-    fence = next(group)
-    close = r"\n {0,3}\%d[ \t\r]*(?:\n|$)" % fence
+    opener, closer = fences()
+    close = r"\n {0,3}" + closer
 
     def code(guard: str) -> str:
         # Zero or more steps through code: a whole comment/literal, or one character
@@ -71,7 +79,7 @@ def build_pattern(package: str, needs: list[str], forbid: str | None) -> str:
         return (r"(?:(?!" + close + r")(?:(?=(" + SKIP + r"))\%d" % next(group)
                 + r"|(?!" + guard + r")[\s\S]))*")
 
-    out = "^" + prefix + r" {0,3}(`{3,}|~{3,})" + pkg
+    out = "^" + prefix + r" {0,3}" + opener + pkg
     for need in needs:
         out += r"(?=" + code(START) + need + ")"
     out += code(START + (("|" + forbid) if forbid else "")) + close

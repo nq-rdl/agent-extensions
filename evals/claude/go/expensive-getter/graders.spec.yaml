@@ -6,8 +6,18 @@ graders:
     need: ['\)\s+Name\(\)\s+string']
     forbid: '\bGetName\b'
   - name: expensive-getter
-    why: "The database query returning a collection is not a bare getter: Compute*/List*/Fetch*/Load*/Query*, never Get* or plain Products()."
-    need: ['\)\s+(?:Compute|List|Fetch|Load|Query)\w*\(\s*[^\W\d]\w*\s+context\.Context\b']
+    why: "The collection method uses an explicit query verb and retains the query, scan loop, cleanup, error propagation and returned results."
+    # These are structural checks for the supplied example, not a Go semantic
+    # proof. Identifiers may change; comments/literals cannot supply code steps.
+    need:
+      - '\)\s+(?:Compute|List|Fetch|Load|Query)\w*\(\s*[^\W\d]\w*\s+context\.Context\s*\)\s*\(\s*\[\]Product\s*,\s*error\s*\)'
+      - '\b\w+\s*,\s*\w+\s*:=\s*\w+\.\w+\.QueryContext\(\s*\w+\s*,\s*(?:"SELECT sku FROM products"|`SELECT sku FROM products`)\s*\)\s*if\s+\w+\s*!=\s*nil\s*\{\s*return\s+nil\s*,\s*(?!nil\b)\w+\s*\}'
+      - '\bdefer\s+\w+\.Close\(\s*\)'
+      - '\bvar\s+\w+\s+\[\]Product\b'
+      - '\bfor\s+\w+\.Next\(\s*\)\s*\{'
+      - '\bif\s+\w+\s*:=\s*\w+\.Scan\(\s*&\w+\.SKU\s*\)\s*;\s*\w+\s*!=\s*nil\s*\{\s*return\s+nil\s*,\s*(?!nil\b)\w+\s*\}'
+      - '\b\w+\s*=\s*append\(\s*\w+\s*,\s*\w+\s*\)'
+      - '\breturn\s+\w+\s*,\s*\w+\.Err\(\s*\)'
     forbid: '\)\s+(?:GetProducts|Products)\('
 fixtures:
   good: |
@@ -50,6 +60,27 @@ fixtures:
     	return products, rows.Err()
     }
   cases:
+    - name: query text changes
+      replace: [['SELECT sku FROM products', 'SELECT sku FROM archived_products']]
+      fails: [expensive-getter]
+    - name: query error is swallowed
+      replace: [["return nil, err", "return nil, nil"]]
+      fails: [expensive-getter]
+    - name: rows are not closed
+      replace: [["defer rows.Close()", "// defer rows.Close()"]]
+      fails: [expensive-getter]
+    - name: iteration is removed
+      replace: [["for rows.Next()", "if true"]]
+      fails: [expensive-getter]
+    - name: scan is commented out
+      replace: [["if err := rows.Scan(&p.SKU); err != nil {", "/* if err := rows.Scan(&p.SKU); err != nil { */ if false {"]]
+      fails: [expensive-getter]
+    - name: results are discarded
+      replace: [["products = append(products, p)", "// products = append(products, p)"]]
+      fails: [expensive-getter]
+    - name: final error is discarded
+      replace: [["return products, rows.Err()", "return products, nil"]]
+      fails: [expensive-getter]
     - name: alternate context parameter name is accepted
       replace: [["ListProducts(ctx", "FetchProducts(c"], ["QueryContext(ctx,", "QueryContext(c,"]]
       fails: []
