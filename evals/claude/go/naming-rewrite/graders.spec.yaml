@@ -1,0 +1,25 @@
+# Source for graders/*.md (regex ones) — run `pixi run python3 scripts/generate_eval_graders.py .`
+# Fixtures for this case live in tests/test_eval_go_naming_graders.py.
+package: account
+graders:
+  - name: type-no-stutter
+    why: "package account: a struct type is declared and none is named Account*."
+    need: ['\btype\s+\w+\s+struct']
+    forbid: '\btype\s+Account\w*\s+struct'
+  - name: constructor-no-stutter
+    why: "A New* constructor is present and none is NewAccount*."
+    need: ['\bfunc\s+New\w*\(']
+    forbid: '\bfunc\s+NewAccount'
+  - name: field-initialisms
+    why: "Fields lose the underscore and keep initialisms uniform: baseURL and ownerID (grouped `a, b string` allowed)."
+    need: ['\bbaseURL(?:\s*,\s*\w+)*\s+string', '\bownerID(?:\s*,\s*\w+)*\s+string']
+  - name: getter-initialism
+    why: "Both getters drop the Get prefix and keep initialisms uniform."
+    need: ['\)\s+OwnerID\(\)\s+string', '\)\s+BaseURL\(\)\s+string']
+  - name: no-this-receiver
+    why: "A method receiver is present and none is this/self."
+    need: ['\bfunc\s+\(\s*\w+\s+\*?\w+\s*\)']
+    forbid: '\bfunc\s+\(\s*(?:this|self)\b'
+  - name: identifier-casing
+    why: "No identifier in the file (types, params, references) keeps a title-cased initialism or an underscore."
+    forbid: 'Http|Url|Id\b|\w_\w'

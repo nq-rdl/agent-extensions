@@ -1,0 +1,70 @@
+# Source for graders/*.md (regex ones) — run `pixi run python3 scripts/generate_eval_graders.py .`
+package: inventory
+graders:
+  - name: cheap-getter
+    why: "The field accessor drops the Get prefix: Name()."
+    need: ['\)\s+Name\(\)\s+string']
+    forbid: '\bGetName\b'
+  - name: expensive-getter
+    why: "The database query returning a collection is not a bare getter: Compute*/List*/Fetch*/Load*/Query*, never Get* or plain Products()."
+    need: ['\)\s+(?:Compute|List|Fetch|Load|Query)\w*\(\s*[^\W\d]\w*\s+context\.Context\b']
+    forbid: '\)\s+(?:GetProducts|Products)\('
+fixtures:
+  good: |
+    package inventory
+
+    import (
+    	"context"
+    	"database/sql"
+    )
+
+    type Product struct {
+    	SKU string
+    }
+
+    type Store struct {
+    	db   *sql.DB
+    	name string
+    }
+
+    func (s *Store) Name() string {
+    	return s.name
+    }
+
+    // ListProducts was GetProducts.
+    func (s *Store) ListProducts(ctx context.Context) ([]Product, error) {
+    	rows, err := s.db.QueryContext(ctx, "SELECT sku FROM products")
+    	if err != nil {
+    		return nil, err
+    	}
+    	defer rows.Close()
+
+    	var products []Product
+    	for rows.Next() {
+    		var p Product
+    		if err := rows.Scan(&p.SKU); err != nil {
+    			return nil, err
+    		}
+    		products = append(products, p)
+    	}
+    	return products, rows.Err()
+    }
+  cases:
+    - name: alternate context parameter name is accepted
+      replace: [["ListProducts(ctx", "FetchProducts(c"], ["QueryContext(ctx,", "QueryContext(c,"]]
+      fails: []
+    - name: context parameter requires the context type
+      replace: [["ctx context.Context", "ctx string"]]
+      fails: [expensive-getter]
+    - name: Get prefix merely dropped from the query method
+      replace: [["ListProducts(ctx", "Products(ctx"]]
+      fails: [expensive-getter]
+    - name: Fetch is accepted
+      replace: [["ListProducts(ctx", "FetchProducts(ctx"]]
+      fails: []
+    - name: cheap getter keeps Get
+      replace: [["Name() string", "GetName() string"]]
+      fails: [cheap-getter]
+    - name: Compute is accepted
+      replace: [["ListProducts(ctx", "ComputeProducts(ctx"]]
+      fails: []

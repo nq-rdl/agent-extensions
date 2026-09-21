@@ -115,7 +115,7 @@ class GoNamingGraderTest(unittest.TestCase):
         )
 
     def test_graders_share_one_block_scoping_prefix(self):
-        marker = "package\\s+account\\b)"  # end of the "last such block" lookahead
+        marker = "package\\s+account\\b"  # end of the selected block's package clause
         prefixes = {src[: src.index(marker) + len(marker)] for src in self.sources.values()}
         self.assertEqual(len(prefixes), 1)
 
