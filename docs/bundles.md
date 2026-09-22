@@ -754,6 +754,7 @@ Data Request — scope, map, draft, validate and fix request SQL and Python with
 - `/data-request:draft`
 - `/data-request:validate`
 - `/data-request:fix`
+- `/data-request:lift`
 
 **Codex skills**
 
@@ -766,6 +767,7 @@ Data Request — scope, map, draft, validate and fix request SQL and Python with
 - `$data-request:draft`
 - `$data-request:validate`
 - `$data-request:fix`
+- `$data-request:lift`
 
 **Codex hooks:** Native command hooks; see [coverage and limitations](codex.md#hooks).
 

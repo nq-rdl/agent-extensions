@@ -13,6 +13,11 @@ def steps(a): if (a | length) == 0 then "_none_" else (a | map("\(.step). **\(.t
 def changes(a): if (a | length) == 0 then "_none_" else (a | map("- r\(.revision) — \(.at // "") — \(.by // ""): \(.summary // "")") | join("\n")) end;
 $cfgs[0] as $cfg |
 {
+  recurring: ((.recurring // false) | tostring),
+  definition_lift_candidate: (($cfg.definitions.lift_candidate // "") | tostring),
+  lifts_list: ((.lifts // []) | if length == 0 then "_none recorded_" else map(
+    "## \(.id): \(.need)\n\nClassification: \(.classification // "unclassified") · status: \(.status)\n\nLibrary: \(.library) @ \(.pinned_version)\n\nInspected: \(.looked_in | map(.path + " @ " + .revision) | join(", "))\n\nShortfall: \(.shortfall)\n\nWorkaround: `\(.workaround.file)` lines \(lines(.workaround.lines))\n\nIssue: \(.issue_url // "none")\n\nConfirmed: \(.confirmed_by // "pending") · \(.confirmed_at // "") · revision \(.confirmed_revision // "")"
+  ) | join("\n\n") end),
   title: ((.title // .slug) | tostring),
   slug: (.slug | tostring),
   sql_path: (.sql_path | tostring),

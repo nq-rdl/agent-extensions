@@ -9,7 +9,7 @@ description: >-
 argument-hint: '<sql path | slug>'
 user-invocable: true
 compatibility: >-
-  .sqlreview schema 1 (docs/specs/2026-09-15-sql-review-plugin-design.md); bash 3.2+, jq >= 1.6.
+  .sqlreview schema 2 (schema 1 remains readable) (docs/specs/2026-09-15-sql-review-plugin-design.md); bash 3.2+, jq >= 1.6.
 allowed-tools: Bash, Read, Glob, Grep, Write, AskUserQuestion
 metadata:
   repo: https://github.com/nq-rdl/agent-extensions

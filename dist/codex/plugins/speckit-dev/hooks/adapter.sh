@@ -52,12 +52,26 @@ case "$mode" in
       paths="$(printf '%s\n' "$patch" | sed -nE 's/^\*\*\* (Add File|Update File|Delete File|Move to): //p')"
       while IFS= read -r path; do
         [ -n "$path" ] || continue
+        original_path="$path"
         path="$(printf '%s\n' "$path" | awk -F/ '{n=0; for(i=1;i<=NF;i++){if($i==""||$i==".")continue;if($i==".."){if(n>0)n--;continue}p[++n]=$i}for(i=1;i<=n;i++)printf "%s%s",(i>1?"/":""),p[i];print ""}')"
         case "/$path" in
-          */.sqlreview/config.json|*/.sqlreview/reviews/*/review.json|*/.sqlreview/reviews/*/scope.json|*/.sqlreview/reviews/*/review.md|*/.sqlreview/reviews/*/scope.md)
-            deny 'Authoritative SQL review files require whole-document validation. Write a confirmed draft, then run bash "${PLUGIN_ROOT}/skills/setup/scripts/sqlreview.sh" publish <slug> <scope|review> <draft-path>; this validates a staged copy before atomic replacement. Run the same helper with render <slug> <scope|review> for Markdown. Config changes use $data-request:setup. This patch guard does not intercept shell writes.'
+          */.sqlreview/config.json|*/.sqlreview/reviews/*/review.json|*/.sqlreview/reviews/*/scope.json|*/.sqlreview/reviews/*/review.md|*/.sqlreview/reviews/*/scope.md|*/.sqlreview/reviews/*/lifts.json|*/.sqlreview/reviews/*/lifts.md)
+            deny 'Authoritative SQL review files require whole-document validation. Write a confirmed draft, then run bash "${PLUGIN_ROOT}/skills/setup/scripts/sqlreview.sh" publish <slug> <scope|review|lifts> <draft-path>; this validates a staged copy before atomic replacement. Run the same helper with render <slug> <scope|review|lifts> for Markdown. Config changes use $data-request:setup. This patch guard does not intercept shell writes.'
             exit 0 ;;
         esac
+        # Pass only added lines for this patch file to the opt-in direct-call guard.
+        # Deletions and context cannot introduce string-built SQL.
+        added="$(printf '%s\n' "$patch" | awk -v target="$original_path" '
+          function flush() {if (p==target) printf "%s", lines; lines=""}
+          /^\*\*\* (Add|Update|Delete) File: / {flush(); p=$0; sub(/^\*\*\* (Add|Update|Delete) File: /,"",p); next}
+          /^\*\*\* Move to: / {p=$0; sub(/^\*\*\* Move to: /,"",p); next}
+          /^\*\*\*/ {next}
+          /^\+/ {lines=lines substr($0,2) "\n"}
+          END {flush()}')"
+        result="$(jq -nc --arg cwd "$(jq -r '.cwd // empty' <<<"$input")" --arg path "$original_path" --arg content "$added" \
+          '{tool_name:"Edit",cwd:$cwd,tool_input:{file_path:$path,new_string:$content}}' |
+          bash "$root/hooks/data-request-guard.sh")"
+        if [ -n "$result" ]; then printf '%s\n' "$result"; exit 0; fi
       done <<<"$paths"
       exit 0
     fi ;;

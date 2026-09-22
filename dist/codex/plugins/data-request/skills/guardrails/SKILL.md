@@ -13,11 +13,16 @@ metadata:
   repo: https://github.com/nq-rdl/agent-extensions
 ---
 
+## Codex execution
+
+Before shell examples, set PLUGIN_ROOT to the absolute installed plugin directory: two parent directories above this SKILL.md’s containing skill directory. Derive it from the loaded file path, never the working directory. This variable is not automatically supplied to ordinary shell tools. Quote it in commands.
+
 # Data Request — guardrails
 
 The shared advisory spine for RDL request repos and query-builder. Apply it to the
 request composition and SQL being worked on, including work outside a formal review.
-It requires no `.sqlreview/` setup and adds no SQL lint gate or approval record.
+Ordinary composition needs no `.sqlreview/` setup. Hand SQL requires the lift
+ledger below; its experimental hook is off by default.
 
 ## Confirm sources before using a fact
 
@@ -51,9 +56,23 @@ and storage facts against the current dataops DDL before presenting a result as 
 Atomic, testable Layer-1 `Spec`s, `@resolves` resolver handlers and reusable helpers
 belong in `query-builder` / `query-builder-plugins`. Request pipelines compose those
 units: `CohortQuery(resolver).add(spec_a).add(spec_b)` with resolver/spec instances.
-If a unit is missing or incorrect,
-identify the library enhancement and its tests; do not work around it with hand-rolled
-SQL in request code. Check the request's dependency pin before using an enhancement.
+Before SQL outside the composition API, inspect the actual dependency pin's spec,
+resolver and tests. Record a `candidate` in the pipeline's `.sqlreview` lift ledger
+with that pin, inspected paths/revisions, need, shortfall and workaround location.
+Read `${PLUGIN_ROOT}/skills/setup/references/lifts.rst` for the record and
+publish commands. Capture silently, with no confirmation question mid-draft;
+classification and confirmation belong to `$data-request:lift` at close-out.
+**No published entry means no hand SQL.** A missing source is not proof of a gap.
+The ledger permits a pinned-deadline workaround under this guidance, but does not
+override an explicit repository prohibition. Check the request's dependency pin
+before using an enhancement.
+
+For N related datasets from one cohort, check the pinned `create_temp_table()`,
+`register_result()` and `execute_pipeline_results()` implementations first:
+materialise the cohort once, then register the related result sets against it.
+Do not default to separate lookups that extract IDs and re-scan with `IN()`.
+Verify availability/signatures in the pinned core and tests; sufficient existing
+units make this request-specific composition, not a library enhancement.
 
 The API baseline is `nq-rdl/query-builder` tag `v0.4.0`
 (`clinical/specifications.py`, `clinical/resolver.py`, `clinical/query.py`) and

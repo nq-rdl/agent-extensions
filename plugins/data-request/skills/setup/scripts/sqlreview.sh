@@ -8,14 +8,14 @@
 #   status [--json]                            reviews and their state; exit 3 when not initialised
 #   slug PATH                                  slug for a project path; exit 5 on a conflicting binding
 #   check FILE | check --stdin                 validate a review/scope JSON; exit 4 with one violation per line
-#   publish SLUG scope|review DRAFT             validate a staged copy, then atomically replace the final JSON
+#   publish SLUG scope|review|lifts DRAFT             validate a staged copy, then atomically replace the final JSON
 #   roles ENGINEER ANALYST                     update only the two confirmed role names in config.json
 #   fingerprint SQL                            {sql_path, sql_sha256, git_commit, git_dirty}
 #   snapshot SLUG SQL                          verify final review SHA, retain history, advance source.sql
 #   delta SLUG                                 diff source.sql vs the current SQL; exit 10 when changed, 6 no baseline
 #   impact SLUG                                heuristic: identifiers in the diff traced into unchanged lines
 #   move OLDPATH NEWPATH                       rebind a review directory after the SQL moved
-#   render SLUG scope|review                   JSON + templates/<kind>.md -> reviews/SLUG/<kind>.md
+#   render SLUG scope|review|lifts                   JSON + templates/<kind>.md -> reviews/SLUG/<kind>.md
 #
 # Exit codes: 0 ok · 1 usage · 2 error · 3 not initialised · 4 invalid document · 5 slug conflict ·
 # 6 no baseline · 10 differences found (init --diff / delta).
@@ -52,7 +52,7 @@ cmd_init() {
   if [ "$mode" = "apply" ]; then
     [ "${#apply[@]}" -gt 0 ] || sr_die 1 "--apply needs at least one path (relative to $SR_DIR/)"
     for f in "${apply[@]}"; do
-      case "$f" in config.json|templates/scope.md|templates/review.md) ;; *) sr_die 2 "unknown bundled path: $f" ;; esac
+      case "$f" in config.json|templates/scope.md|templates/review.md|templates/lifts.md) ;; *) sr_die 2 "unknown bundled path: $f" ;; esac
       printf '%s\n' "$files" | grep -Fxq -- "$f" || sr_die 2 "no such file in the bundled default: $f"
       sr_no_symlinks "$target/$f" || exit 2
       mkdir -p "$target/$(dirname "$f")" || sr_die 2 "cannot create target directory"
@@ -103,7 +103,7 @@ cmd_init() {
 
 # ---------------------------------------------------------------------------------------------
 cmd_status() {
-  local json=0 d slug state schema rows="[]"
+  local json=0 d slug state schema lifts rows="[]"
   [ "${1:-}" = "--json" ] && json=1
   sr_need_jq
   sr_require_root
@@ -115,11 +115,17 @@ cmd_status() {
       IFS="$(printf '\t')" read -r state SR_SQL_PATH SR_REVISION <<EOF
 $(sr_state "$slug")
 EOF
+      lifts="{}"
+      if [ -f "$d/lifts.json" ]; then
+        if cmd_check "$d/lifts.json" >/dev/null; then
+          lifts="$(jq -c '.lifts | group_by(.status) | map({key: .[0].status, value: length}) | from_entries' "$d/lifts.json")"
+        else lifts='{"invalid":true}'; fi
+      fi
       if [ "$json" = 1 ]; then
-        rows="$(printf '%s' "$rows" | jq -c --arg slug "$slug" --arg state "$state" --arg sql "$SR_SQL_PATH" --arg rev "$SR_REVISION" \
-          '. + [{slug: $slug, state: $state, sql_path: $sql, revision: ($rev | tonumber? // null)}]')"
+        rows="$(printf '%s' "$rows" | jq -c --arg slug "$slug" --arg state "$state" --arg sql "$SR_SQL_PATH" --arg rev "$SR_REVISION" --argjson lifts "$lifts" \
+          '. + [{slug: $slug, state: $state, sql_path: $sql, revision: ($rev | tonumber? // null), lifts: $lifts}]')"
       else
-        printf '%s\t%s\t%s\t%s\n' "$slug" "$state" "$SR_SQL_PATH" "$SR_REVISION"
+        printf '%s\t%s\t%s\t%s\tlifts=%s\n' "$slug" "$state" "$SR_SQL_PATH" "$SR_REVISION" "$lifts"
       fi
     done
   fi
@@ -185,9 +191,9 @@ cmd_roles() (
   trap 'rm -f "$tmp"' EXIT
   trap 'exit 2' HUP INT TERM
   jq -se --arg engineer "$1" --arg analyst "$2" '
-    if length == 1 and (.[0] | type == "object" and .schemaVersion == 1 and (.roles | type == "object"))
+    if length == 1 and (.[0] | type == "object" and (.schemaVersion == 1 or .schemaVersion == 2) and (.roles | type == "object"))
     then .[0] | .roles.engineer = $engineer | .roles.analyst = $analyst
-    else error("expected one schema-1 configuration with a roles object") end
+    else error("expected one schema-1 or schema-2 configuration with a roles object") end
   ' "$config" > "$tmp" || sr_die 4 "invalid configuration; original preserved"
   mv "$tmp" "$config" || sr_die 2 "cannot update roles"
   printf 'updated\tconfig.json roles\n'
@@ -200,7 +206,7 @@ cmd_publish() (
   sr_require_root
   local slug="$1" kind="$2" draft="$3" dest tmp rel previous
   sr_safe_slug "$slug"
-  case "$kind" in scope|review) ;; *) usage ;; esac
+  case "$kind" in scope|review|lifts) ;; *) usage ;; esac
   dest="$SR_REVIEWS/$slug/$kind.json"
   sr_no_symlinks "$dest" || exit 2
   [ ! -d "$dest" ] || sr_die 2 "publish destination is a directory"
@@ -214,6 +220,10 @@ cmd_publish() (
   jq -e --arg s "$slug" --arg k "$kind" '.slug == $s and .kind == $k' "$tmp" >/dev/null || sr_die 4 "document slug/kind must match destination"
   rel="$(jq -r .sql_path "$tmp")"
   sr_safe_sql "$rel"
+  local bound_doc
+  if bound_doc="$(sr_doc_for "$slug")"; then
+    [ "$(jq -r .sql_path "$bound_doc")" = "$rel" ] || sr_die 5 "slug is bound to another pipeline path"
+  fi
   previous=0
   if [ -f "$dest" ]; then
     cmd_check "$dest" >/dev/null || sr_die 4 "existing document is invalid"
@@ -228,6 +238,45 @@ cmd_publish() (
     exit 0
   fi
   jq -e --argjson previous "$previous" '.revision == ($previous + 1)' "$tmp" >/dev/null || sr_die 4 "revision must follow the existing document (first revision is 1)"
+  if [ "$kind" = lifts ] && [ ! -f "$dest" ]; then
+    jq -e 'all(.lifts[]; .revision == 1 and .status == "candidate")' "$tmp" >/dev/null || sr_die 4 "new ledger entries start as candidates"
+  fi
+  if [ "$kind" = lifts ] && [ -f "$dest" ]; then
+    # Entry revisions let silent capture append candidates without refreshing human answers.
+    jq -e --slurpfile old "$dest" '
+      def rank: ["candidate", "confirmed", "filed", "released", "recomposed"] as $states | . as $s | $states | index($s);
+      all(.lifts[]; . as $new |
+        ([$old[0].lifts[] | select(.id == $new.id)][0]) as $prior |
+        if $prior == null then .revision == 1 and .status == "candidate"
+        else
+          if (.status | rank) < ($prior.status | rank) or (.status | rank) > (($prior.status | rank) + 1) then false
+          else (del(.status,.issue_url,.confirmed_by,.confirmed_at,.confirmed_revision,.revision,.release_evidence,.recomposition_evidence) ==
+            ($prior | del(.status,.issue_url,.confirmed_by,.confirmed_at,.confirmed_revision,.revision,.release_evidence,.recomposition_evidence))) as $same |
+          if $same then .revision == $prior.revision
+          else .revision == ($prior.revision + 1) end end
+        end)
+    ' "$tmp" >/dev/null || sr_die 4 "lift entry revision must match its evidence; new entries start as candidates"
+  fi
+  if [ "$kind" = review ] && jq -e 'any(.limitations[]; has("lift_id"))' "$tmp" >/dev/null; then
+    local ledger="$SR_REVIEWS/$slug/lifts.json"
+    sr_no_symlinks "$ledger" || exit 2
+    cmd_check "$ledger" >/dev/null || sr_die 4 "linked limitations require a valid lift ledger"
+    jq -e --slurpfile ledger "$ledger" '
+      all(.limitations[] | select(has("lift_id")); . as $lim |
+        [$ledger[0].lifts[] | select(.id == $lim.lift_id and
+          (.status == "filed" or .status == "released" or .status == "recomposed"))] as $entries |
+        ($entries | length) == 1 and
+        $lim.text == ($entries[0].need + " resolved with in-repo SQL. Library unit tracked in " + $entries[0].issue_url + ". Not backported."))
+    ' "$tmp" >/dev/null || sr_die 4 "lift limitation wording must match its ledger entry"
+  fi
+  if [ "$kind" = lifts ] && [ -f "$dest" ]; then
+    local history="$SR_REVIEWS/$slug/history/lifts/$previous.json"
+    sr_no_symlinks "$history" || exit 2
+    mkdir -p "$(dirname "$history")" || sr_die 2 "cannot create lift history"
+    if [ -e "$history" ]; then
+      cmp -s "$dest" "$history" || sr_die 2 "lift history conflict"
+    else cp "$dest" "$history" || sr_die 2 "cannot retain lift history"; fi
+  fi
   mv "$tmp" "$dest" || sr_die 2 "cannot publish document"
   printf 'published\t%s\n' "${dest#"$SR_ROOT"/}"
 )
@@ -364,14 +413,14 @@ cmd_move() {
   [ "$oldslug" = "$newslug" ] || [ ! -e "$SR_REVIEWS/$newslug" ] || sr_die 2 "reviews/$newslug/ already exists"
   sr_safe_slug "$oldslug"
   sr_safe_slug "$newslug"
-  for f in review.json scope.json rebind-required; do
+  for f in review.json scope.json lifts.json rebind-required; do
     sr_no_symlinks "$SR_REVIEWS/$oldslug/$f" || exit 2
     [ ! -d "$SR_REVIEWS/$oldslug/$f" ] || sr_die 2 "unexpected directory: $f"
   done
   [ "$oldslug" = "$newslug" ] || mv "$SR_REVIEWS/$oldslug" "$SR_REVIEWS/$newslug" || sr_die 2 "move failed"
   touch "$SR_REVIEWS/$newslug/rebind-required" || sr_die 2 "cannot mark stale"
-  rm -f "$SR_REVIEWS/$newslug/review.md" "$SR_REVIEWS/$newslug/scope.md" || sr_die 2 "cannot remove stale renders"
-  for f in review.json scope.json; do
+  rm -f "$SR_REVIEWS/$newslug/review.md" "$SR_REVIEWS/$newslug/scope.md" "$SR_REVIEWS/$newslug/lifts.md" || sr_die 2 "cannot remove stale renders"
+  for f in review.json scope.json lifts.json; do
     [ -f "$SR_REVIEWS/$newslug/$f" ] || continue
     tmp="$(mktemp "$SR_REVIEWS/$newslug/.move.XXXXXX")" || sr_die 2 "mktemp failed"
     jq --arg p "$newrel" --arg s "$newslug" '.sql_path = $p | .slug = $s' "$SR_REVIEWS/$newslug/$f" > "$tmp" && mv "$tmp" "$SR_REVIEWS/$newslug/$f" || { rm -f "$tmp"; sr_die 2 "rebind failed; review needs repair"; }
@@ -385,7 +434,7 @@ cmd_render() {
   sr_need_jq
   sr_require_root
   local slug="$1" kind="$2" doc tpl cfg out rendered unknown
-  case "$kind" in scope|review) ;; *) sr_die 2 "kind must be scope or review (got '$kind')" ;; esac
+  case "$kind" in scope|review|lifts) ;; *) sr_die 2 "kind must be scope or review (got '$kind')" ;; esac
   sr_safe_slug "$slug"
   doc="$SR_REVIEWS/$slug/$kind.json"
   [ -f "$doc" ] || sr_die 2 "no such document: reviews/$slug/$kind.json"

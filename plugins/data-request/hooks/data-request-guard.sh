@@ -52,6 +52,37 @@ cwd="$(field .cwd)"; [ -n "$cwd" ] || cwd="$(pwd -P)"
 case "$path" in /*) abs="$path" ;; *) abs="$cwd/$path" ;; esac
 # Collapse . and .. without touching the filesystem (the target may not exist yet).
 abs="$(printf '%s\n' "$abs" | awk -F/ '{ n=0; for (i=1;i<=NF;i++) { if ($i==""||$i==".") continue; if ($i=="..") { if (n>0) n--; continue }; p[++n]=$i }; o=""; for (i=1;i<=n;i++) o=o "/" p[i]; print (o==""?"/":o) }')"
+# Resolve once for both ledger coverage and authoritative record validation.
+here="$(cd "$(dirname "$0")" 2>/dev/null && pwd -P)"
+checker=""
+for c in "${CLAUDE_PLUGIN_ROOT:-/nonexistent}/skills/setup/scripts/sqlreview.sh" \
+         "$here/../skills/setup/scripts/sqlreview.sh" \
+         "$here/../skills/data-request-setup/scripts/sqlreview.sh"; do
+  [ -f "$c" ] && { checker="$c"; break; }
+done
+# Experimental narrow direct-call detector. Default off, including schema-1 configs.
+case "$abs" in
+  *.py|*.sql)
+    project="$(dirname "$abs")"
+    while [ "$project" != / ] && [ ! -d "$project/.sqlreview" ]; do project="$(dirname "$project")"; done
+    if command -v jq >/dev/null 2>&1 &&
+       jq -e '.guard.require_lift_for_string_sql == true' "$project/.sqlreview/config.json" >/dev/null 2>&1; then
+      if [ "$tool" = Write ]; then proposed="$(field .tool_input.content)"; else proposed="$(field .tool_input.new_string)"; fi
+      if printf '%s\n' "$proposed" | grep -Ei '(execute|executemany|query|read_sql)[[:space:]]*\(' |
+         grep -Ei '(select|with|insert|update|delete|merge)[[:space:]]' |
+         grep -Eq "\\([[:space:]]*([fF][rR]?|[rR][fF])[\"']|[\"'][[:space:]]*\\+"; then
+        [ -n "$checker" ] || decide deny "Lift guard cannot find sqlreview.sh; reinstall the data-request plugin."
+        covered=false
+        for ledger in "$project"/.sqlreview/reviews/*/lifts.json; do
+          [ -f "$ledger" ] && [ ! -L "$ledger" ] || continue
+          bash "$checker" check "$ledger" >/dev/null 2>&1 || continue
+          if jq -e --arg slug "$(basename "$(dirname "$ledger")")" --arg p "${abs#"$project"/}" '.slug == $slug and any(.lifts[]; .workaround.file == $p and
+            (.status == "candidate" or .status == "confirmed" or .status == "filed" or .status == "released" or .status == "recomposed"))' "$ledger" >/dev/null; then covered=true; break; fi
+        done
+        [ "$covered" = true ] || decide deny "Record a pinned-library lift candidate for ${abs#"$project"/} before string-built SQL. Publish the pipeline ledger with sqlreview.sh publish <slug> lifts <draft>."
+      fi
+    fi ;;
+esac
 case "$abs" in
   */.sqlreview/*) rel="${abs##*/.sqlreview/}" ;;
   *) exit 0 ;;
@@ -60,8 +91,10 @@ esac
 case "$rel" in
   config.json)
     decide ask "Editing .sqlreview/config.json directly bypasses the setup flow. Use /data-request:setup — on an initialised project it shows the per-file delta and applies only what the human confirms." ;;
-  reviews/*/review.md|reviews/*/scope.md)
+  reviews/*/review.md|reviews/*/scope.md|reviews/*/lifts.md)
     decide deny "$rel is rendered markdown — never hand-write it. Update reviews/<slug>/$(basename "${rel%.md}").json (whole-file Write, so the guard can validate it) and re-render: S=\${CLAUDE_PLUGIN_ROOT}/skills/setup/scripts; bash \"\$S/sqlreview.sh\" render <slug> $(basename "${rel%.md}")" ;;
+  reviews/*/lifts.json)
+    decide deny "Lift ledgers require publication checks. Write lifts.draft.json, then run sqlreview.sh publish <slug> lifts <draft> to validate evidence revisions and lifecycle transitions." ;;
   reviews/*/review.json|reviews/*/scope.json)
     ;;  # validated below
   *) exit 0 ;;
@@ -71,17 +104,13 @@ if [ "$tool" = "Edit" ]; then
   decide deny "$rel is an authoritative SQL Review document: it is validated as a whole (every assumption and limitation must carry a confirmation record). Write the complete file instead of an Edit fragment."
 fi
 
-here="$(cd "$(dirname "$0")" 2>/dev/null && pwd -P)"
-checker=""
-for c in "${CLAUDE_PLUGIN_ROOT:-/nonexistent}/skills/setup/scripts/sqlreview.sh" \
-         "$here/../skills/setup/scripts/sqlreview.sh" \
-         "$here/../skills/data-request-setup/scripts/sqlreview.sh"; do
-  [ -f "$c" ] && { checker="$c"; break; }
-done
 [ -n "$checker" ] || decide deny "SQL Review guard cannot find sqlreview.sh (looked under \${CLAUDE_PLUGIN_ROOT}/skills/setup/scripts/ and next to this hook). The plugin install is incomplete — reinstall data-request@rdl-agent-extensions before writing $rel."
 command -v jq >/dev/null 2>&1 || decide deny "SQL Review documents are validated with jq, which is not installed. Install jq (>= 1.6) before writing $rel."
 
 content="$(field .tool_input.content)"
+if printf '%s' "$content" | jq -e '.kind == "review" and any(.limitations[]; has("lift_id"))' >/dev/null 2>&1; then
+  decide deny "Review limitations linked to lifts require ledger consistency checks. Write review.draft.json, then run sqlreview.sh publish <slug> review <draft>."
+fi
 out="$(printf '%s' "$content" | bash "$checker" check --stdin 2>&1)"; rc=$?
 if [ "$rc" -eq 0 ]; then
   expected_slug="${rel#reviews/}"; expected_slug="${expected_slug%/*}"

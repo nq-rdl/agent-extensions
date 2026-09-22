@@ -7,7 +7,7 @@ description: 'Review a finished SQL file for handoff: read it against its scope,
   review.md. Re-running on reviewed SQL diffs against the stored snapshot, walks the
   human through the change, and reassesses every item. Use when SQL is ready to hand
   to the Data Analyst.'
-compatibility: .sqlreview schema 1 (docs/specs/2026-09-15-sql-review-plugin-design.md);
+compatibility: .sqlreview schema 2 (schema 1 remains readable) (docs/specs/2026-09-15-sql-review-plugin-design.md);
   bash 3.2+, jq >= 1.6, git optional (provenance only — the diff baseline is the stored
   snapshot).
 metadata:
@@ -120,7 +120,7 @@ change before continuing. Write the complete confirmed document to
 
 ```json
 {
-  "schemaVersion": 1, "kind": "review", "slug": "<SLUG>", "sql_path": "<sql path>", "title": "…",
+  "schemaVersion": 2, "kind": "review", "slug": "<SLUG>", "sql_path": "<sql path>", "title": "…",
   "revision": 1, "recorded_at": "<UTC ISO>", "recorded_by": "<user>",
   "sql_sha256": "<from fingerprint>", "git_commit": "<from fingerprint>", "git_dirty": "<boolean from fingerprint; preserve its JSON type>",
   "purpose": "…", "grain": "one row per …",

@@ -9,7 +9,7 @@ description: >-
 argument-hint: '<intended sql path> [--update]'
 user-invocable: true
 compatibility: >-
-  .sqlreview schema 1 (docs/specs/2026-09-15-sql-review-plugin-design.md); bash 3.2+, jq >= 1.6,
+  .sqlreview schema 2 (schema 1 remains readable) (docs/specs/2026-09-15-sql-review-plugin-design.md); bash 3.2+, jq >= 1.6,
   git optional.
 allowed-tools: Bash, Read, Glob, Grep, Write, AskUserQuestion
 metadata:
@@ -75,7 +75,7 @@ or email from `git config user.name` / `user.email`, else ask), `confirmed_at` i
 
 ```json
 {
-  "schemaVersion": 1, "kind": "scope", "slug": "<SLUG>", "sql_path": "<intended sql path>",
+  "schemaVersion": 2, "kind": "scope", "slug": "<SLUG>", "sql_path": "<intended sql path>",
   "title": "…", "revision": 1, "recorded_at": "<UTC ISO>", "recorded_by": "<user>",
   "git_commit": "<git rev-parse HEAD or null>",
   "intent": "…",

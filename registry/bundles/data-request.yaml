@@ -17,6 +17,7 @@ skills:
   - {source: data-request-draft, leaf: draft}
   - {source: data-request-validate, leaf: validate}
   - {source: data-request-fix, leaf: fix}
+  - {source: data-request-lift, leaf: lift}
 hooks: [data-request-preflight, data-request-guard]
 prompts: []
 mcp: []

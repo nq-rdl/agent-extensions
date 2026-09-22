@@ -7,7 +7,7 @@ description: 'Walk a Data Analyst through reviewed SQL, step by step, against it
   the analyst at every step. Produces no report; a small state marker lets a later
   run resume from what changed. Use after $data-request:analyse, when the analyst
   receives SQL for review or wants to understand a change to it.'
-compatibility: .sqlreview schema 1 (docs/specs/2026-09-15-sql-review-plugin-design.md);
+compatibility: .sqlreview schema 2 (schema 1 remains readable) (docs/specs/2026-09-15-sql-review-plugin-design.md);
   bash 3.2+, jq >= 1.6.
 metadata:
   repo: https://github.com/nq-rdl/agent-extensions
