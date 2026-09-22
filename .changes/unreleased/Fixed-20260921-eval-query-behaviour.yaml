@@ -1,3 +1,0 @@
-kind: Fixed
-body: The Go query naming grader rejects rewrites that remove database operations or discard results and errors (#334)
-time: 2026-09-21T07:58:46.956008564Z

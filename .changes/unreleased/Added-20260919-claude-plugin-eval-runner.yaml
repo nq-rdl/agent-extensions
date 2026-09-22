@@ -1,3 +1,0 @@
-kind: Added
-body: '`scripts/eval-claude-plugin.sh` runs `claude plugin eval` on a staged plugin copy with suites from `evals/claude/<plugin>/`, leaving Claude and Codex generated trees untouched (#334)'
-time: 2026-09-19T05:32:45.145932397Z
