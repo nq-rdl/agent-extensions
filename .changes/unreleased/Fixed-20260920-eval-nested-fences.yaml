@@ -1,3 +1,0 @@
-kind: Fixed
-body: Go eval graders select top-level rewritten files without treating nested fenced examples as answers (#335)
-time: 2026-09-20T22:20:08.570550954Z

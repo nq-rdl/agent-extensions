@@ -1,3 +1,0 @@
-kind: Fixed
-body: Go naming evals accept contextual validator names while preserving constant export visibility (#335)
-time: 2026-09-20T22:20:18.225980206Z

@@ -1,3 +1,0 @@
-kind: Changed
-body: 'Default `EVAL_MAX_COST_USD` ceiling for the eval runner raised from 2 to 5, since the four-case `go` suite costs about 2.20 per run (#335)'
-time: 2026-09-19T06:26:30.419678106Z

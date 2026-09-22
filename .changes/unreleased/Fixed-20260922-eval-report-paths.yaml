@@ -1,3 +1,0 @@
-kind: Fixed
-body: Custom eval report paths retain each plugin and revision; spend limits explicitly apply per plugin per revision (#334)
-time: 2026-09-22T00:25:21.943509652Z
