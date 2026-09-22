@@ -1,0 +1,3 @@
+kind: Fixed
+body: Expensive-getter eval fixture preserves row scanning and query results (#335)
+time: 2026-09-20T21:36:20.099252174Z

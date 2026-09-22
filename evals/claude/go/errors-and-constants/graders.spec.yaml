@@ -1,0 +1,93 @@
+# Source for graders/*.md (regex ones) — run `pixi run python3 scripts/generate_eval_graders.py .`
+package: jobs
+graders:
+  - name: sentinel-errors
+    why: "Sentinel error values are named ErrFoo: ErrTimeout and ErrNotFound."
+    need:
+      - '\bErrTimeout\s*=\s*errors\.New\s*\('
+      - '\bErrNotFound\s*=\s*errors\.New\s*\('
+      - '\bfunc\s+Retryable\s*\(\s*\w+\s+error\s*\)\s+bool\s*\{'
+      - '\breturn\s+errors\.Is\s*\(\s*\w+\s*,\s*ErrTimeout\s*\)'
+    forbid: '\b(?:TimeoutError|ErrorNotFound)\b'
+  - name: error-type
+    why: "An error type is named FooError, not ErrFoo: InvalidPayloadError."
+    need:
+      - '\btype\s+InvalidPayloadError\s+struct'
+      - '\bfunc\s*\(\s*\w+\s+\*?InvalidPayloadError\s*\)\s+Error\s*\(\s*\)\s+string\s*\{'
+      - '\breturn\s+"(?:[^"\\\n]|\\.)*"\s*\+\s*\w+\.Field\b'
+    forbid: '\bErrInvalidPayload\b|\btype\s+Err\w*\s+struct'
+  - name: constants-mixedcaps
+    why: "The retry constant stays exported and uses MixedCaps: MaxRetryCount, MaxRetries, or RetryLimit, never ALL_CAPS."
+    need: ['\bconst\s+(?:\(\s*)?(?:MaxRetryCount|MaxRetries|RetryLimit)\s*=\s*5\b']
+    forbid: '\w_\w|\bMAXRETRYCOUNT\b'
+fixtures:
+  good: |
+    package jobs
+
+    import "errors"
+
+    const MaxRetryCount = 5
+
+    var (
+    	ErrTimeout  = errors.New("job timed out")
+    	ErrNotFound = errors.New("job not found")
+    )
+
+    // InvalidPayloadError replaces ErrInvalidPayload; MAX_RETRY_COUNT is gone.
+    type InvalidPayloadError struct {
+    	Field string
+    }
+
+    func (e InvalidPayloadError) Error() string {
+    	return "invalid payload: " + e.Field
+    }
+
+    func Retryable(err error) bool {
+    	return errors.Is(err, ErrTimeout)
+    }
+  cases:
+    - name: uppercase constant without underscores
+      replace: [["const MaxRetryCount", "const MAXRETRYCOUNT"]]
+      fails: [constants-mixedcaps]
+    - name: unexported MixedCaps constant loses visibility
+      replace: [["MaxRetryCount", "maxRetryCount"]]
+      fails: [constants-mixedcaps]
+    - name: grouped MixedCaps constant
+      replace: [["const MaxRetryCount = 5", "const (\nMaxRetryCount = 5\n)"]]
+      fails: []
+    - name: error type keeps the Err prefix
+      replace: [["InvalidPayloadError struct", "ErrInvalidPayload struct"], ["(e InvalidPayloadError)", "(e ErrInvalidPayload)"]]
+      fails: [error-type]
+    - name: sentinel keeps the Error suffix
+      replace: [["ErrTimeout  =", "TimeoutError ="], ["err, ErrTimeout)", "err, TimeoutError)"]]
+      fails: [sentinel-errors]
+    - name: constant stays ALL_CAPS
+      replace: [["const MaxRetryCount", "const MAX_RETRY_COUNT"]]
+      fails: [constants-mixedcaps]
+    - name: stale timeout sentinel use after declaration renamed
+      replace: [["err, ErrTimeout)", "err, TimeoutError)"]]
+      fails: [sentinel-errors]
+    - name: stale not-found sentinel use
+      replace: [["err, ErrTimeout)", "err, ErrorNotFound)"]]
+      fails: [sentinel-errors]
+    - name: stale error receiver after declaration renamed
+      replace: [["(e InvalidPayloadError)", "(e ErrInvalidPayload)"]]
+      fails: [error-type]
+    - name: old error names in comments and strings are ignored
+      replace: [['"invalid payload: "', '"TimeoutError ErrorNotFound ErrInvalidPayload"'], ["// InvalidPayloadError replaces", "// TimeoutError ErrorNotFound InvalidPayloadError replaces"]]
+      fails: []
+    - name: alternative maximum retries name
+      replace: [["MaxRetryCount", "MaxRetries"]]
+      fails: []
+    - name: alternative retry limit name
+      replace: [["MaxRetryCount", "RetryLimit"]]
+      fails: []
+    - name: missing retry logic
+      replace: [["return errors.Is(err, ErrTimeout)", "return false"]]
+      fails: [sentinel-errors]
+    - name: missing sentinel construction
+      replace: [['errors.New("job timed out")', 'nil']]
+      fails: [sentinel-errors]
+    - name: missing error method body
+      replace: [['return "invalid payload: " + e.Field', 'return ""']]
+      fails: [error-type]

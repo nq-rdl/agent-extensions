@@ -1,0 +1,101 @@
+# Source for graders/*.md (regex ones) — run `pixi run python3 scripts/generate_eval_graders.py .`
+package: ingest
+graders:
+  - name: validator-interface
+    why: "The single-method interface takes the -er name with no I prefix: Validator or RecordValidator."
+    need: ['\btype\s+(?:Record)?Validator\s+interface\s*\{\s*Validate\s*\(\s*(?:\w+\s+)?Record\s*\)\s+error\b']
+    forbid: '\bIValidator\b|\btype\s+I[A-Z]\w*\s+interface'
+  - name: reader-interface
+    why: "No Interface suffix: RecordReader (or Reader)."
+    need: ['\btype\s+(?:Record)?Reader\s+interface\s*\{\s*ReadRecord\s*\(\s*\)\s*\(\s*Record\s*,\s*error\s*\)']
+    forbid: '\btype\s+\w*Interface\s+interface'
+  - name: no-type-in-name
+    why: "Names omit types and redundant context: records, not recordSlice / recordItem; valid, not validCount."
+    need:
+      - '\bfunc\s+CountValid\s*\(\s*[^\W\d]\w*\s+\[\]Record\b'
+      - '\b\w+\s*:=\s*0\b'
+      - '\bfor\s+_\s*,\s*\w+\s*:=\s*range\s+\w+\s*\{'
+      - '\bif\s+\w+\.Validate\s*\(\s*\w+\s*\)\s*==\s*nil\s*\{\s*\w+\+\+'
+      - '\breturn\s+[A-Za-z_]\w*\s*\}'
+    forbid: '\w(?:Slice|Item|Map|List|_(?:slice|item|map|list))\b|\bvalid(?:Count|_count)\b'
+fixtures:
+  good: |
+    package ingest
+
+    type Record struct {
+    	Fields map[string]string
+    }
+
+    // Validator was IValidator.
+    type Validator interface {
+    	Validate(r Record) error
+    }
+
+    type RecordReader interface {
+    	ReadRecord() (Record, error)
+    }
+
+    func CountValid(records []Record, v Validator) int {
+    	valid := 0
+    	for _, r := range records {
+    		if v.Validate(r) == nil {
+    			valid++
+    		}
+    	}
+    	return valid
+    }
+  cases:
+    - name: underscore type suffix in slice parameter
+      replace: [["records", "record_slice"]]
+      fails: [no-type-in-name]
+    - name: underscore type suffix in loop variable
+      replace: [["_, r :=", "_, record_item :="], ["Validate(r)", "Validate(record_item)"]]
+      fails: [no-type-in-name]
+    - name: underscore redundant count context
+      replace: [["valid", "valid_count"]]
+      fails: [no-type-in-name]
+    - name: contextual validator name is accepted
+      replace: [["type Validator interface", "type RecordValidator interface"], ["v Validator)", "v RecordValidator)"]]
+      fails: []
+    - name: redundant count context kept
+      replace: [["valid", "validCount"]]
+      fails: [no-type-in-name]
+    - name: short counter name is accepted
+      replace: [["valid", "n"]]
+      fails: []
+    - name: I prefix kept
+      replace: [["type Validator interface", "type IValidator interface"], ["v Validator)", "v IValidator)"]]
+      fails: [validator-interface]
+    - name: Interface suffix kept
+      replace: [["type RecordReader interface", "type RecordReaderInterface interface"]]
+      fails: [reader-interface]
+    - name: type embedded in the parameter name
+      replace: [["records []Record", "recordSlice []Record"], ["range records", "range recordSlice"]]
+      fails: [no-type-in-name]
+    - name: short slice parameter is accepted
+      replace: [["records", "rs"]]
+      fails: []
+    - name: alternative descriptive slice parameter is accepted
+      replace: [["records", "entries"]]
+      fails: []
+    - name: stale validator parameter after declaration renamed
+      replace: [["v Validator)", "v IValidator)"]]
+      fails: [validator-interface]
+    - name: missing slice parameter
+      replace: [["records []Record, ", ""]]
+      fails: [no-type-in-name]
+    - name: empty validator interface
+      replace: [["Validate(r Record) error", ""]]
+      fails: [validator-interface]
+    - name: empty reader interface
+      replace: [["ReadRecord() (Record, error)", ""]]
+      fails: [reader-interface]
+    - name: missing validation call
+      replace: [["v.Validate(r) == nil", "true"]]
+      fails: [no-type-in-name]
+    - name: missing increment
+      replace: [["valid++", ""]]
+      fails: [no-type-in-name]
+    - name: return zero instead of count
+      replace: [["return valid", "return 0"]]
+      fails: [no-type-in-name]

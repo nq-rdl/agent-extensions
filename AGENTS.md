@@ -42,7 +42,9 @@ Local hooks mirror CI so failures surface before you push. **pre-commit** runs
 fast checks (gofmt/vet/build of `tools/asctl`, `asctl repo-check`, plugin
 validation, generated-artifact drift, a per-fragment changie body-length cap,
 lychee links); **pre-push** runs `asctl` tests, the pipeline unit tests, a
-non-blocking SkillSpector scan, and a hard changie-fragment gate. Prereqs:
+non-blocking SkillSpector scan, a local-only `claude plugin eval` job for plugins whose
+`evals/claude/<plugin>/` suite changed (opt-in via `CLAUDE_EVAL_ENABLE=1`, non-blocking, no CI twin; paid model
+calls on your local `claude` login, see `evals/claude/README.md`), and a hard changie-fragment gate. Prereqs:
 `lefthook`, Go, `pixi` (provides the Python toolchain — hook jobs call
 `pixi run`); optional `lychee` and Docker. Bypass with `LEFTHOOK=0` or
 `git commit --no-verify`.
@@ -164,6 +166,10 @@ pixi run python3 scripts/generate_manifests.py . --check  # CI gate: fail on dri
 # Regenerate docs/bundles.md from the registry (also a --check CI gate).
 pixi run python3 scripts/generate_bundles_doc.py .          # write
 pixi run python3 scripts/generate_bundles_doc.py . --check  # CI gate: fail on drift
+
+# Regenerate evals/claude/**/graders/*.md from each case's graders.spec.yaml (also a --check gate).
+pixi run python3 scripts/generate_eval_graders.py .          # write
+pixi run python3 scripts/generate_eval_graders.py . --check  # fail on drift
 
 # Bundle reference + grouping + three-way consistency checks (also run by validate.yml)
 pixi run python3 scripts/check_bundle_refs.py .   # registry refs resolve to skills/

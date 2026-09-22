@@ -1,0 +1,3 @@
+kind: Fixed
+body: Skips paid plugin evaluations for deletion-only pushes (#334)
+time: 2026-09-21T02:29:41.800269028Z

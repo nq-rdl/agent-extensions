@@ -34,3 +34,6 @@ docs/superpowers/
 
 # Local/personal Claude Code overrides — never committed. Holds machine-local settings.
 .claude/settings.local.json
+
+# claude plugin eval output from scripts/eval-claude-plugin.sh (reports + JSON)
+.eval-results/
