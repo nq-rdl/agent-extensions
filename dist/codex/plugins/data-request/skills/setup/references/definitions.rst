@@ -43,3 +43,13 @@ Every assumption and limitation carries ``status``, ``confirmed_by``, ``confirme
 PreToolUse guard rejects a review or scope document in which any item lacks them or was confirmed
 for an earlier revision. On every update the whole list is re-put to the human — a confirmation
 never survives a revision it was not given for.
+
+Lift candidate
+--------------
+
+A request need whose pinned library capability was inspected and found insufficient,
+recorded before hand-written SQL or inline modelling so close-out can distinguish
+reusable library work from request-specific composition. Its id is ``LIFT-n``;
+classification is new-capability, existing-unit-gap or request-specific. Capture is
+silent and unconfirmed. Only answered human questions supply confirmation fields.
+See ``lifts.rst`` for independent entry revisions and the publication contract.

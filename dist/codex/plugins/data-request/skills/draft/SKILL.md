@@ -20,7 +20,11 @@ Here $ARGUMENTS means the user’s supplied skill arguments. Codex does not popu
 
 Read `${PLUGIN_ROOT}/skills/guardrails/SKILL.md` first. Arguments: `$ARGUMENTS`.
 Use the requested SQL path, existing SQL, request and any supplied scope. Drafting
-does not require `.sqlreview/` or create a formal scope/review record.
+requires no formal scope/review record. Before writing SQL outside the composition
+API, silently publish a lift candidate under the pipeline path, following
+`${PLUGIN_ROOT}/skills/setup/references/lifts.rst`. Cite the actual pin,
+inspected unit/resolver/tests and shortfall first. No entry means no hand SQL;
+leave classification and confirmation for `$data-request:lift` at close-out.
 
 Establish the population, exclusions, output grain, anchor, window boundaries and
 required columns from explicit instructions or confirmed scope. Consult column-spec

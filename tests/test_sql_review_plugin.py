@@ -17,7 +17,7 @@ BUNDLE = REPO / "registry" / "bundles" / "data-request.yaml"
 PLUGIN = REPO / "plugins" / "data-request"
 RECORD_STAGES = ("setup", "bootstrap", "analyse", "explain")
 SKILLS = {leaf: REPO / "skills" / f"data-request-{leaf}"
-          for leaf in (*RECORD_STAGES, "guardrails", "map", "draft", "validate", "fix")}
+          for leaf in (*RECORD_STAGES, "guardrails", "map", "draft", "validate", "fix", "lift")}
 
 
 def frontmatter(skill_md: Path) -> dict:
@@ -73,7 +73,7 @@ class Skills(unittest.TestCase):
 
     def test_definitions_live_once_in_setup(self):
         cfg = json.loads((SKILLS["setup"] / "assets" / "sqlreview" / "config.json").read_text())
-        self.assertEqual(cfg["schemaVersion"], 1)
+        self.assertEqual(cfg["schemaVersion"], 2)
         self.assertIn("Decision points made by the RDL", cfg["definitions"]["assumption"])
         self.assertTrue((SKILLS["setup"] / "references" / "definitions.rst").is_file())
         for leaf in ("bootstrap", "analyse", "explain"):

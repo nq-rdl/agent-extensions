@@ -124,7 +124,7 @@ class Init(unittest.TestCase):
                 self.assertTrue((p.root / ".sqlreview" / rel).is_file(), rel)
                 self.assertEqual((p.root / ".sqlreview" / rel).read_bytes(), (ASSETS / rel).read_bytes())
             cfg = json.loads((p.root / ".sqlreview" / "config.json").read_text())
-            self.assertEqual(cfg["schemaVersion"], 1)
+            self.assertEqual(cfg["schemaVersion"], 2)
             self.assertIn("Decision points made by the RDL", cfg["definitions"]["assumption"])
             self.assertTrue(cfg["definitions"]["limitation"])
 
@@ -132,7 +132,7 @@ class Init(unittest.TestCase):
         with tempfile.TemporaryDirectory() as tmp:
             p = Project(tmp)
             cfg = p.root / ".sqlreview" / "config.json"
-            cfg.write_text(cfg.read_text().replace('"schemaVersion": 1', '"schemaVersion": 1, "custom": true'))
+            cfg.write_text(cfg.read_text().replace('"schemaVersion": 2', '"schemaVersion": 2, "custom": true'))
             r = run(["init"], p.root)
             self.assertEqual(r.returncode, 10, r.stdout + r.stderr)
             self.assertIn('"custom": true', cfg.read_text())     # untouched
@@ -201,9 +201,9 @@ class Status(unittest.TestCase):
                 "reports__monthly": "current", "reports__weekly": "stale", "audits__gone": "missing",
                 "reports__nobase": "no-baseline", "reports__planned": "scoped",
             })
-            self.assertEqual(j["schemaVersion"], 1)
+            self.assertEqual(j["schemaVersion"], 2)
             text = run(["status"], p.root).stdout
-            self.assertRegex(text, r"(?m)^reports__weekly\tstale\treports/weekly.sql\t1$")
+            self.assertRegex(text, r"(?m)^reports__weekly\tstale\treports/weekly.sql\t1\tlifts=\{\}$")
 
 
 class Slug(unittest.TestCase):

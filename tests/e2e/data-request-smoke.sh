@@ -21,7 +21,7 @@ skip() { printf '  SKIP  %s\n' "$1"; fail=1; }
 echo "== static assertions =="
 jq -e '.plugins[]|select(.name=="data-request")' "$MP" >/dev/null 2>&1 && pass "A: data-request in marketplace.json" || bad "A: data-request missing from marketplace.json"
 [ -f registry/bundles/data-request.yaml ] && pass "A: bundle yaml" || bad "A: bundle yaml missing"
-for leaf in setup bootstrap analyse explain guardrails map draft validate fix; do
+for leaf in setup bootstrap analyse explain guardrails map draft validate fix lift; do
   [ -f "plugins/data-request/skills/$leaf/SKILL.md" ] && pass "B: plugin skill $leaf synced" || bad "B: plugin skill $leaf missing"
   grep -q '^name:' "plugins/data-request/skills/$leaf/SKILL.md" 2>/dev/null && bad "B: $leaf copy still carries name:" || pass "B: $leaf copy has no name: (labels as data-request:$leaf)"
 done

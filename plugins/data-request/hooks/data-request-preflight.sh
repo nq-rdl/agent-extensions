@@ -46,6 +46,7 @@ elif [ "$rc" -eq 0 ] && [ -n "$status" ]; then
         "SQL Review: .sqlreview/ is initialised (schema \(.schemaVersion)), \($n) review\(if $n == 1 then "" else "s" end): "
         + ([ (.counts.draft // 0 | select(. > 0) | "\(.) drafts (resume /data-request:bootstrap or :analyse: \(names("draft")))"),
              (.counts.invalid // 0 | select(. > 0) | "\(.) invalid (repair documents: \(names("invalid")))"),
+             (.counts.lifts // 0 | select(. > 0) | "\(.) lift ledgers (close out with /data-request:lift)"),
              (.counts.current // 0 | select(. > 0) | "\(.) current"),
              (.counts.scoped // 0 | select(. > 0) | "\(.) scoped (bootstrap only)"),
              (.counts.stale // 0 | select(. > 0) | "\(.) stale (\(names("stale")))"),

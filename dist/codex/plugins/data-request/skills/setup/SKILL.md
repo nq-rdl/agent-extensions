@@ -8,7 +8,7 @@ description: 'Initialise project scope and review records for the Data Request w
   by file and nothing is overwritten without confirmation. Use once per project before
   $data-request:bootstrap, :analyse or :explain, or whenever one of them reports "not
   initialised".'
-compatibility: .sqlreview schema 1 (docs/specs/2026-09-15-sql-review-plugin-design.md);
+compatibility: .sqlreview schema 2 (schema 1 remains readable) (docs/specs/2026-09-15-sql-review-plugin-design.md);
   bash 3.2+, jq >= 1.6, git optional. macOS and Linux.
 metadata:
   repo: https://github.com/nq-rdl/agent-extensions
@@ -26,8 +26,9 @@ Here $ARGUMENTS means the user’s supplied skill arguments. Codex does not popu
 
 # Data Request — setup
 
-Creates the `.sqlreview/` contract used by bootstrap, analyse and explain.
-The guardrails, map, draft, validate and fix actions can run without this setup. **Among the record stages, setup alone accepts an
+Creates the `.sqlreview/` contract used by bootstrap, analyse, explain and lift.
+Ordinary composition can run without setup; recording a hand-SQL candidate silently
+initialises the default store when absent. **Among the record stages, setup alone accepts an
 uninitialised project**: `sqlreview.sh status` exiting 3 means "proceed to init".
 Arguments: `$ARGUMENTS`.
 
@@ -52,7 +53,7 @@ and the other stages all resolve the same `.sqlreview/` by walking up from the c
   point at `references/definitions.rst` if asked, and say a change belongs in that file.
 
 Then confirm before writing (the host user-question tool, skipped only with `--yes`): the target path and
-the file list — `config.json`, `templates/scope.md`, `templates/review.md`, `reviews/`.
+the file list — `config.json`, `templates/scope.md`, `templates/review.md`, `templates/lifts.md`, `reviews/`.
 
 ```bash
 bash "$S/sqlreview.sh" init                # copies the bundled default; never touches existing files

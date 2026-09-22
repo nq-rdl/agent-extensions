@@ -1,0 +1,3 @@
+kind: Added
+body: Opt-in string-SQL guard checks lift coverage for Claude writes and Codex patches; disabled by default (#333)
+time: 2026-09-22T00:34:04.466648924Z

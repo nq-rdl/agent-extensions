@@ -95,7 +95,6 @@ sr_safe_slug() {
   sr_no_symlinks "$SR_REVIEWS/$1" || exit 2
 }
 sr_safe_sql() {
-  case "$1" in *.sql) ;; *) sr_die 2 "SQL path must end in .sql" ;; esac
   case "$1" in ""|/*|*/../*|../*|*/..|..|./*|*/./*|*/.|*//*|*/) sr_die 2 "unsafe sql_path: $1" ;; esac
   sr_no_symlinks "$SR_ROOT/$1" || exit 2
 }
@@ -120,6 +119,7 @@ sr_doc_for() { # <slug> -> path
   sr_no_symlinks "$d/scope.json" || exit 2
   if [ -f "$d/review.json" ]; then printf '%s\n' "$d/review.json"
   elif [ -f "$d/scope.json" ]; then printf '%s\n' "$d/scope.json"
+  elif [ -f "$d/lifts.json" ]; then sr_no_symlinks "$d/lifts.json" || exit 2; printf '%s\n' "$d/lifts.json"
   else return 1; fi
 }
 
@@ -144,6 +144,7 @@ sr_state() { # <slug>
   rev="$(jq -r '.revision // ""' "$doc" 2>/dev/null)"
   case "$doc" in
     */scope.json) state="scoped" ;;
+    */lifts.json) state="lifts" ;;
     *)
       if [ ! -f "$SR_ROOT/$sql" ]; then state="missing"
       elif [ ! -f "$d/source.sql" ]; then state="no-baseline"

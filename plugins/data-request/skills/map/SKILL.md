@@ -6,7 +6,7 @@ description: >-
 argument-hint: '<request, scope path or resolver> [--autonomous|--co-develop]'
 user-invocable: true
 compatibility: RDL dataops DDL and query-builder column-spec metadata; inspect the checked-out schema and resolver API version.
-allowed-tools: Read, Glob, Grep, AskUserQuestion
+allowed-tools: Bash, Write, Read, Glob, Grep, AskUserQuestion
 metadata:
   repo: https://github.com/nq-rdl/agent-extensions
 ---
@@ -14,7 +14,12 @@ metadata:
 # Data Request — map
 
 Read `${CLAUDE_PLUGIN_ROOT}/skills/guardrails/SKILL.md` first and follow its source
-hierarchy. This action proposes mappings; it requires no `.sqlreview/` setup.
+hierarchy. Ordinary mapping needs no `.sqlreview/` setup. Before a mapping leads
+to hand SQL, inspect the pinned unit/resolver/tests and silently publish a candidate
+for the target pipeline, following `${CLAUDE_PLUGIN_ROOT}/skills/setup/references/lifts.rst`.
+Record the pin, evidence and shortfall; no entry means no hand SQL. If the target
+path is not yet known, pass the gap to draft and require capture before writing.
+Classification and confirmation happen in `/data-request:lift` at close-out.
 Arguments: `$ARGUMENTS`.
 
 Read the request and any supplied scope. Identify population, output grain, anchor,
@@ -39,4 +44,4 @@ a decision. In either mode, an unanswered question is not agreement.
 
 Finish with the proposed mapping, evidence and remaining decisions. Hand a defined
 mapping to `/data-request:draft`; use `/data-request:bootstrap` when formal scope confirmation
-is wanted. A proposal does not update resolver code, column specs or confirmed records.
+is wanted. A proposal does not update resolver code, column specs or human confirmations.

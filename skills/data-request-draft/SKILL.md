@@ -7,7 +7,7 @@ description: >-
 argument-hint: '<request or scope path> <target sql path> [--autonomous|--co-develop]'
 user-invocable: true
 compatibility: RDL cohort SQL; verify target engine/version, dataops schema and query-builder column-spec metadata at use time.
-allowed-tools: Read, Glob, Grep, Write, Edit, AskUserQuestion
+allowed-tools: Bash, Write, Read, Glob, Grep, Edit, AskUserQuestion
 metadata:
   repo: https://github.com/nq-rdl/agent-extensions
 ---
@@ -16,7 +16,11 @@ metadata:
 
 Read `${CLAUDE_PLUGIN_ROOT}/skills/guardrails/SKILL.md` first. Arguments: `$ARGUMENTS`.
 Use the requested SQL path, existing SQL, request and any supplied scope. Drafting
-does not require `.sqlreview/` or create a formal scope/review record.
+requires no formal scope/review record. Before writing SQL outside the composition
+API, silently publish a lift candidate under the pipeline path, following
+`${CLAUDE_PLUGIN_ROOT}/skills/setup/references/lifts.rst`. Cite the actual pin,
+inspected unit/resolver/tests and shortfall first. No entry means no hand SQL;
+leave classification and confirmation for `/data-request:lift` at close-out.
 
 Establish the population, exclusions, output grain, anchor, window boundaries and
 required columns from explicit instructions or confirmed scope. Consult column-spec

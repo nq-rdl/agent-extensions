@@ -7,7 +7,7 @@ description: 'Scope a piece of SQL work with the Data Engineer before the SQL is
   confirmed by the human. Re-running on an existing scope walks through what changed.
   Use at the start of the Data Request scoping workflow, after $data-request:setup
   and before $data-request:analyse.'
-compatibility: .sqlreview schema 1 (docs/specs/2026-09-15-sql-review-plugin-design.md);
+compatibility: .sqlreview schema 2 (schema 1 remains readable) (docs/specs/2026-09-15-sql-review-plugin-design.md);
   bash 3.2+, jq >= 1.6, git optional.
 metadata:
   repo: https://github.com/nq-rdl/agent-extensions
@@ -78,7 +78,7 @@ or email from `git config user.name` / `user.email`, else ask), `confirmed_at` i
 
 ```json
 {
-  "schemaVersion": 1, "kind": "scope", "slug": "<SLUG>", "sql_path": "<intended sql path>",
+  "schemaVersion": 2, "kind": "scope", "slug": "<SLUG>", "sql_path": "<intended sql path>",
   "title": "…", "revision": 1, "recorded_at": "<UTC ISO>", "recorded_by": "<user>",
   "git_commit": "<git rev-parse HEAD or null>",
   "intent": "…",
