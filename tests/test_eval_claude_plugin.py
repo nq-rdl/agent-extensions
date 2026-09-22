@@ -222,7 +222,7 @@ class EvalHookTest(unittest.TestCase):
                 extra = {"EVAL_OUTPUT_DIR": str(override)} if override else {}
                 result = self.hook(stdin, CLAUDE_EVAL_ENABLE="1", **extra)
                 self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
-                root = override or self.repo / ".eval-results" / "go"
+                root = (override / "go") if override else self.repo / ".eval-results" / "go"
                 for sha, prompt in ((first, "first prompt\n"), (second, "second prompt\n")):
                     report = root / sha
                     self.assertEqual((report / "revision.txt").read_text().strip(), sha)
@@ -230,6 +230,27 @@ class EvalHookTest(unittest.TestCase):
                     self.assertEqual((report / "aggregate-result.json").read_text(), "skill v1\n")
                     self.assertIn(str(report / "report.html"), result.stdout)
         self.assertEqual(self.logged().count("RUN"), 4)
+
+    def test_custom_reports_separate_plugins_at_same_tip(self):
+        self.commit_suite()
+        self.write("plugins/other/.claude-plugin/plugin.json", '{"name":"other"}\n')
+        self.write("plugins/other/skills/naming/SKILL.md", "other skill\n")
+        self.write("evals/claude/other/case/prompt.md", "other prompt\n")
+        git(self.repo, "add", "-A")
+        git(self.repo, "commit", "-q", "-m", "other suite")
+        tip = git(self.repo, "rev-parse", "HEAD")
+        root = self.tmp / "custom reports"
+        result = self.hook(CLAUDE_EVAL_ENABLE="1", EVAL_OUTPUT_DIR=str(root))
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        self.assertEqual(self.logged().count("RUN"), 2)
+        for plugin, prompt, skill in (("go", "prompt v1\n", "skill v1\n"),
+                                      ("other", "other prompt\n", "other skill\n")):
+            report = root / plugin / tip
+            self.assertEqual((report / "revision.txt").read_text().strip(), tip)
+            self.assertEqual((report / "report.html").read_text(), prompt)
+            self.assertEqual((report / "aggregate-result.json").read_text(), skill)
+            self.assertIn(f"evaluating {plugin} @ {tip} (per-plugin-per-revision cap $5",
+                          result.stdout)
 
     def test_low_score_only_blocks_in_strict_mode(self):
         self.commit_suite()

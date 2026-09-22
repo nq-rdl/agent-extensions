@@ -61,7 +61,11 @@ Strict mode then fails the push.
 Reports for each commit go in `.eval-results/<plugin>/<commit>/`,
 where `revision.txt` records the evaluated commit. Deletion-only pushes skip evaluation.
 Set `EVAL_OUTPUT_DIR` to override the report directory for manual runs.
-The hook appends the commit to this override to keep reports separate.
+The hook appends the plugin name and commit to this override to keep reports separate.
+
+The cap applies separately to each selected plugin at each distinct commit.
+For example, two commits selecting one plugin each allow $10 at the default $5 cap,
+before any in-flight overshoot. There is no shared budget for the whole push.
 
 Things to know before opting in:
 
@@ -75,7 +79,7 @@ Things to know before opting in:
 | `CLAUDE_EVAL_ENABLE=1` | required; without it the job is a no-op |
 | `CLAUDE_EVAL_STRICT=1` | block the push on a score below threshold or a partial run (default: report only) |
 | `CLAUDE_EVAL_ARGS` | replace the default `--model claude-sonnet-5 --judge-model claude-haiku-4-5 --threshold 0.8` |
-| `EVAL_MAX_COST_USD` | per-plugin spend cap (default `5`; the `go` suite costs about $2.20 a run) |
+| `EVAL_MAX_COST_USD` | per-plugin-per-revision spend cap (default `5`; the `go` suite costs about $2.20 a run) |
 
 ## Writing a suite
 

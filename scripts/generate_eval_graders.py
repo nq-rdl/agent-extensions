@@ -46,7 +46,7 @@ def build_pattern(package: str, needs: list[str], forbid: str | None) -> str:
     for pattern in [*needs, *([forbid] if forbid else [])]:
         if re.compile(pattern).groups:
             raise ValueError(f"Capturing groups are not supported; use (?:...) instead: {pattern!r}")
-    pkg = (r"go[^\n]*\n\s*(?:(?://[^\n]*\n|/\*[^*]*(?:\*(?!/)[^*]*)*\*/)\s*)*"
+    pkg = (r"[ \t]*go[^\n]*\n\s*(?:(?://[^\n]*\n|/\*[^*]*(?:\*(?!/)[^*]*)*\*/)\s*)*"
            + r"package\s+" + re.escape(package) + r"\b")
     group = itertools.count(1)
     opening = r" {0,3}(?:`{3,}|~{3,})"

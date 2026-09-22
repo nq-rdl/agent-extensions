@@ -8,14 +8,16 @@ graders:
     forbid: '\btype\s+Account\w*\s+struct'
   - name: constructor-no-stutter
     why: "A New* constructor is present and none is NewAccount*."
-    need: ['\bfunc\s+New\w*\(']
+    need:
+      - '\bfunc\s+New\w*\('
+      - '\breturn\s+&\w+\s*\{\s*(?:baseURL\s*:\s*\w+\s*,\s*ownerID\s*:\s*\w+|ownerID\s*:\s*\w+\s*,\s*baseURL\s*:\s*\w+)\s*,?\s*\}'
     forbid: '\bfunc\s+NewAccount'
   - name: field-initialisms
     why: "Fields lose the underscore and keep initialisms uniform: baseURL and ownerID (grouped `a, b string` allowed)."
     need: ['\bbaseURL(?:\s*,\s*\w+)*\s+string', '\bownerID(?:\s*,\s*\w+)*\s+string']
   - name: getter-initialism
     why: "Both getters drop the Get prefix and keep initialisms uniform."
-    need: ['\)\s+OwnerID\(\)\s+string', '\)\s+BaseURL\(\)\s+string']
+    need: ['\)\s+OwnerID\(\)\s+string\s*\{\s*return\s+\w+\.ownerID\s*\}', '\)\s+BaseURL\(\)\s+string\s*\{\s*return\s+\w+\.baseURL\s*\}']
   - name: no-this-receiver
     why: "Method receivers have one or two characters."
     need: ['\bfunc\s+\(\s*\w+\s+\*?\w+\s*\)']

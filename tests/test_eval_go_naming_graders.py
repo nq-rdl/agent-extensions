@@ -119,6 +119,19 @@ class GoNamingGraderTest(unittest.TestCase):
         prefixes = {src[: src.index(marker) + len(marker)] for src in self.sources.values()}
         self.assertEqual(len(prefixes), 1)
 
+    def test_stubbed_bodies_fail(self):
+        for old, new, failed in (
+            ("return &HTTPClient{baseURL: baseURL, ownerID: ownerID}", "return nil",
+             {"constructor-no-stutter"}),
+            ("return c.ownerID", 'return ""', {"getter-initialism"}),
+            ("return c.baseURL", 'return ""', {"getter-initialism"}),
+            ("return c.ownerID", "return c.baseURL", {"getter-initialism"}),
+        ):
+            with self.subTest(old=old, new=new):
+                stub = GOOD_FILE.replace(old, new)
+                self.assert_only_fails(block(stub), failed)
+                self.assert_only_fails(block(stub + "/*\n" + GOOD_FILE + "*/\n"), failed)
+
     def test_correct_rewrite_passes(self):
         self.assert_all_pass("Here you go:\n\n" + block(GOOD_FILE))
 

@@ -88,6 +88,34 @@ class GeneratedGradersTest(unittest.TestCase):
 
 @unittest.skipUnless(NODE, "Node required for Python/JavaScript grader agreement")
 class SpecFixturesTest(unittest.TestCase):
+    def test_whitespace_before_info_string(self):
+        sources = {"name": gen.build_pattern("demo", [r"\bGood\b"], r"\bBad\b")}
+        for fence in ("```", "~~~~"):
+            for space in (" ", "\t", " \t "):
+                with self.subTest(fence=fence, space=space):
+                    good = f"{fence}{space}go\npackage demo\nvar Good int\n{fence}\n"
+                    bad = good.replace("Good", "Bad")
+                    self.assertEqual(self.grade(sources, good), set())
+                    self.assertEqual(self.grade(sources, good + bad), {"name"})
+                    self.assertEqual(self.grade(sources, bad + good), set())
+
+    def test_deleted_behavior_cannot_be_rescued_by_comments(self):
+        for case, marker, body, failed in (
+            ("errors-and-constants", "func (e InvalidPayloadError)", "",
+             {"sentinel-errors", "error-type"}),
+            ("interfaces-and-types", "func CountValid",
+             "func CountValid(records []Record, v Validator) int { return 0 }\n",
+             {"no-type-in-name"}),
+        ):
+            spec = yaml.safe_load((REPO / "evals/claude/go" / case / gen.SPEC_NAME).read_text())
+            sources = {g["name"]: gen.build_pattern(spec["package"], g.get("need", []), g.get("forbid"))
+                       for g in spec["graders"]}
+            good = spec["fixtures"]["good"]
+            stub = good[:good.index(marker)] + body
+            with self.subTest(case=case):
+                self.assertEqual(self.grade(sources, block(stub)), failed)
+                self.assertEqual(self.grade(sources, block(stub + "/*\n" + good + "*/\n")), failed)
+
     def test_longer_closing_fences(self):
         sources = {"name": gen.build_pattern("demo", [r"\bGood\b"], r"\bBad\b")}
         for marker in ("`", "~"):

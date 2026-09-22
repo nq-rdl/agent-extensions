@@ -3,15 +3,20 @@ package: ingest
 graders:
   - name: validator-interface
     why: "The single-method interface takes the -er name with no I prefix: Validator or RecordValidator."
-    need: ['\btype\s+(?:Record)?Validator\s+interface']
+    need: ['\btype\s+(?:Record)?Validator\s+interface\s*\{\s*Validate\s*\(\s*(?:\w+\s+)?Record\s*\)\s+error\b']
     forbid: '\bIValidator\b|\btype\s+I[A-Z]\w*\s+interface'
   - name: reader-interface
     why: "No Interface suffix: RecordReader (or Reader)."
-    need: ['\btype\s+(?:Record)?Reader\s+interface']
+    need: ['\btype\s+(?:Record)?Reader\s+interface\s*\{\s*ReadRecord\s*\(\s*\)\s*\(\s*Record\s*,\s*error\s*\)']
     forbid: '\btype\s+\w*Interface\s+interface'
   - name: no-type-in-name
     why: "Names omit types and redundant context: records, not recordSlice / recordItem; valid, not validCount."
-    need: ['\bfunc\s+CountValid\s*\(\s*[^\W\d]\w*\s+\[\]Record\b']
+    need:
+      - '\bfunc\s+CountValid\s*\(\s*[^\W\d]\w*\s+\[\]Record\b'
+      - '\b\w+\s*:=\s*0\b'
+      - '\bfor\s+_\s*,\s*\w+\s*:=\s*range\s+\w+\s*\{'
+      - '\bif\s+\w+\.Validate\s*\(\s*\w+\s*\)\s*==\s*nil\s*\{\s*\w+\+\+'
+      - '\breturn\s+[A-Za-z_]\w*\s*\}'
     forbid: '\w(?:Slice|Item|Map|List|_(?:slice|item|map|list))\b|\bvalid(?:Count|_count)\b'
 fixtures:
   good: |
@@ -78,4 +83,19 @@ fixtures:
       fails: [validator-interface]
     - name: missing slice parameter
       replace: [["records []Record, ", ""]]
+      fails: [no-type-in-name]
+    - name: empty validator interface
+      replace: [["Validate(r Record) error", ""]]
+      fails: [validator-interface]
+    - name: empty reader interface
+      replace: [["ReadRecord() (Record, error)", ""]]
+      fails: [reader-interface]
+    - name: missing validation call
+      replace: [["v.Validate(r) == nil", "true"]]
+      fails: [no-type-in-name]
+    - name: missing increment
+      replace: [["valid++", ""]]
+      fails: [no-type-in-name]
+    - name: return zero instead of count
+      replace: [["return valid", "return 0"]]
       fails: [no-type-in-name]

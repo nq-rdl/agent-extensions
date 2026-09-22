@@ -11,7 +11,7 @@
 #
 # Both change detection and staging use the pushed commit (from git's pre-push
 # stdin, else HEAD), never the working tree, so uncommitted edits cannot change
-# the score. Override the eval flags with CLAUDE_EVAL_ARGS and the per-plugin
+# the score. Override the eval flags with CLAUDE_EVAL_ARGS and the per-plugin-per-revision
 # spend cap with EVAL_MAX_COST_USD.
 
 set -uo pipefail
@@ -85,8 +85,8 @@ for index in "${!revs[@]}"; do
     case "$seen_evals" in *" $rev/$plugin "*) continue ;; esac
     seen_evals="$seen_evals$rev/$plugin "
     ran=$((ran + 1))
-    echo "claude-plugin-eval: evaluating $plugin (cap \$${EVAL_MAX_COST_USD:-5}, may overshoot by in-flight runs)"
-    output_dir="${EVAL_OUTPUT_DIR:-$REPO_ROOT/.eval-results/$plugin}/$rev"
+    echo "claude-plugin-eval: evaluating $plugin @ $rev (per-plugin-per-revision cap \$${EVAL_MAX_COST_USD:-5}, may overshoot by in-flight runs)"
+    output_dir="${EVAL_OUTPUT_DIR:-$REPO_ROOT/.eval-results}/$plugin/$rev"
     # The runner must match the revision whose plugin and suite it stages.
     # Reject mismatches rather than execute different flags or staging logic.
     if git -C "$REPO_ROOT" diff --quiet "$rev" -- scripts/eval-claude-plugin.sh; then
