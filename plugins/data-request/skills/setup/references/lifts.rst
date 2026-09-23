@@ -14,7 +14,7 @@ mid-draft. Use ``slug PATH`` and write ``reviews/SLUG/lifts.draft.json`` with:
 ::
 
   {
-    "schemaVersion": 2, "kind": "lifts", "slug": "pipeline%2Epy",
+    "schemaVersion": 2, "kind": "lifts", "slug": "pipeline.py",
     "sql_path": "pipeline.py", "revision": 1, "recurring": false,
     "lifts": [{
       "id": "LIFT-1", "revision": 1,
@@ -35,8 +35,9 @@ with actual lines at close-out. ``recurring: false`` means no recurring follow-u
 is authorised; set true only from explicit request/scope evidence.
 
 Run ``publish SLUG lifts DRAFT`` before hand SQL, then ``render SLUG lifts``.
-An older project can add the missing bundled template with
-``init --apply templates/lifts.md`` without replacing its customised templates.
+In an older project without ``templates/lifts.md``, ``render`` installs the
+bundled template first (one stderr line) and never replaces an existing or
+customised template; ``status`` lists missing templates with the fix command.
 No published entry means no hand SQL. Classification may remain null during
 capture; close-out settles it. A draft alone does not satisfy the hook.
 

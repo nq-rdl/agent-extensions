@@ -5,19 +5,38 @@
 # and by the plugin's hooks. Contract: docs/specs/2026-09-15-sql-review-plugin-design.md §4.
 #
 #   init [--diff] [--apply PATH...] [--json]   create .sqlreview/ from the bundled default; never overwrites
-#   status [--json]                            reviews and their state; exit 3 when not initialised
-#   slug PATH                                  slug for a project path; exit 5 on a conflicting binding
+#   status [--json] [--verbose]                reviews and their state (--verbose: why invalid/missing, and the
+#                                              move that migrates a legacy-encoded slug); exit 3 when not initialised
+#                                              missing bundled templates: JSON missing_templates, else one stderr line
+#   slug PATH                                  slug for a project path; exit 5 on a conflicting binding. Readable:
+#                                              sql/cohort_pipeline/x.sql -> sql__cohort_pipeline__x; an existing
+#                                              legacy-encoded reviews/sql__cohort%5Fpipeline__x/ is kept
 #   check FILE | check --stdin                 validate a review/scope JSON; exit 4 with one violation per line
+#   lint FILE                                  confirmed items whose wording is still provisional; exit 10 when any
 #   publish SLUG scope|review|lifts DRAFT             validate a staged copy, then atomically replace the final JSON
+#   publish --reconfirm-all SLUG KIND DRAFT    same, but refuse any carried (carried_from_revision) confirmation
 #   roles ENGINEER ANALYST                     update only the two confirmed role names in config.json
 #   fingerprint SQL                            {sql_path, sql_sha256, git_commit, git_dirty}
 #   snapshot SLUG SQL                          verify final review SHA, retain history, advance source.sql
 #   delta SLUG                                 diff source.sql vs the current SQL; exit 10 when changed, 6 no baseline
+#   carryover SLUG DRAFT                       review draft items matching confirmed, still-valid scope items (JSON)
+#   carryforward SLUG scope|review DRAFT       draft items whose previous-revision confirmation may be carried (JSON)
 #   impact SLUG                                heuristic: identifiers in the diff traced into unchanged lines
-#   move OLDPATH NEWPATH                       rebind a review directory after the SQL moved
+#   notes SQL [--against JSON]                 read-only: parse the query-builder >= 0.6.0 analysis-notes header
+#                                              (leading /* assumptions: / limitations: */ block in the first GO batch,
+#                                              before any -- @extract: marker) into JSON {present, lines,
+#                                              assumptions, limitations: [{text, rationale, lines}]}; a limitation's
+#                                              consequence becomes its rationale; absent detail -> null; no header
+#                                              -> present false, exit 0. --against adds match {id, rationale_same}
+#                                              (same list, same text) from a review/scope/draft JSON, else null.
+#                                              Needs no .sqlreview/. Exit 4: malformed header, "line N: why" on stderr
+#   move OLDPATH NEWPATH                       rebind a review directory after the SQL moved (to the readable slug)
+#   move PATH PATH                             migrate a legacy-encoded slug to the readable one (no rebind needed)
+#   move --slug OLDSLUG NEWPATH                rebind a legacy review whose slug no current path derives
 #   render SLUG scope|review|lifts                   JSON + templates/<kind>.md -> reviews/SLUG/<kind>.md
+#                                              (a missing templates/<kind>.md is first installed from the bundled default)
 #
-# Exit codes: 0 ok · 1 usage · 2 error · 3 not initialised · 4 invalid document · 5 slug conflict ·
+# Exit codes: 0 ok · 1 usage · 2 error · 3 not initialised · 4 invalid document or notes header · 5 slug conflict ·
 # 6 no baseline · 10 differences found (init --diff / delta).
 set -u
 SR_SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd -P)"
@@ -26,7 +45,7 @@ SR_SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd -P)"
 SR_ASSETS="$SR_SCRIPT_DIR/../assets/sqlreview"
 
 usage() {
-  sed -n '2,20p' "$0" | sed 's/^# \{0,1\}//' >&2
+  awk 'NR > 1 && !/^#/ { exit } NR > 1' "$0" | sed 's/^# \{0,1\}//' >&2
   exit 1
 }
 
@@ -103,11 +122,23 @@ cmd_init() {
 
 # ---------------------------------------------------------------------------------------------
 cmd_status() {
-  local json=0 d slug state schema lifts rows="[]"
-  [ "${1:-}" = "--json" ] && json=1
+  local json=0 verbose=0 d slug state reason migrate schema lifts rows="[]" f missing=""
+  while [ $# -gt 0 ]; do
+    case "$1" in --json) json=1 ;; --verbose) verbose=1 ;; *) usage ;; esac
+    shift
+  done
   sr_need_jq
   sr_require_root
   schema="$(jq -r '.schemaVersion // "?"' "$SR_ROOT/$SR_DIR/config.json" 2>/dev/null || echo '?')"
+  # Bundled templates the project lacks (e.g. lifts.md in a project initialised before lifts, #349).
+  for f in "$SR_ASSETS"/templates/*.md; do
+    [ -f "$f" ] || continue
+    f="templates/$(basename "$f")"
+    [ -f "$SR_ROOT/$SR_DIR/$f" ] || missing="$missing${missing:+ }$f"
+  done
+  if [ -n "$missing" ] && [ "$json" = 0 ]; then
+    printf 'sqlreview: missing bundled template(s): %s; render installs them automatically, or add them now with: sqlreview.sh init --apply %s\n' "$missing" "$missing" >&2
+  fi
   if [ -d "$SR_REVIEWS" ]; then
     for d in "$SR_REVIEWS"/*/; do
       [ -d "$d" ] || continue
@@ -121,18 +152,33 @@ EOF
           lifts="$(jq -c '.lifts | group_by(.status) | map({key: .[0].status, value: length}) | from_entries' "$d/lifts.json")"
         else lifts='{"invalid":true}'; fi
       fi
+      reason="" migrate=""
+      [ "$verbose" = 1 ] && reason="$(sr_state_reason "$slug" "$state")"
+      # A legacy-encoded slug (#353) of the path it records can be migrated to the readable one.
+      if [ "$verbose" = 1 ] && [ -n "$SR_SQL_PATH" ] &&
+         [ "$(sr_slug_pair "$SR_SQL_PATH" | sed -n 2p)" = "$slug" ] && [ "$(sr_slug_new "$SR_SQL_PATH")" != "$slug" ]; then
+        migrate="sqlreview.sh move '$SR_SQL_PATH' '$SR_SQL_PATH'"
+      fi
       if [ "$json" = 1 ]; then
         rows="$(printf '%s' "$rows" | jq -c --arg slug "$slug" --arg state "$state" --arg sql "$SR_SQL_PATH" --arg rev "$SR_REVISION" --argjson lifts "$lifts" \
-          '. + [{slug: $slug, state: $state, sql_path: $sql, revision: ($rev | tonumber? // null), lifts: $lifts}]')"
+          --arg reason "$reason" --arg migrate "$migrate" --argjson verbose "$verbose" \
+          '. + [{slug: $slug, state: $state, sql_path: $sql, revision: ($rev | tonumber? // null), lifts: $lifts}
+                + (if $verbose == 1 then {reason: (if $reason == "" then null else $reason end),
+                                          migrate: (if $migrate == "" then null else $migrate end)} else {} end)]')"
       else
-        printf '%s\t%s\t%s\t%s\tlifts=%s\n' "$slug" "$state" "$SR_SQL_PATH" "$SR_REVISION" "$lifts"
+        printf '%s\t%s\t%s\t%s\tlifts=%s' "$slug" "$state" "$SR_SQL_PATH" "$SR_REVISION" "$lifts"
+        [ -z "$reason" ] || printf '\treason=%s' "$reason"
+        [ -z "$migrate" ] || printf '\tmigrate=%s' "$migrate"
+        printf '\n'
       fi
     done
   fi
   if [ "$json" = 1 ]; then
-    printf '%s' "$rows" | jq --arg root "$SR_ROOT" --arg schema "$schema" \
+    printf '%s' "$rows" | jq --arg root "$SR_ROOT" --arg schema "$schema" --arg missing "$missing" \
       '{root: $root, schemaVersion: ($schema | tonumber? // $schema), reviews: .,
-        counts: (group_by(.state) | map({key: .[0].state, value: length}) | from_entries | . + {total: (map(.) | add // 0)})}'
+        counts: (group_by(.state) | map({key: .[0].state, value: length}) | from_entries | . + {total: (map(.) | add // 0)}),
+        missing_templates: ($missing | split(" ") | map(select(. != ""))),
+        missing_templates_fix: (if $missing == "" then null else "sqlreview.sh init --apply " + $missing end)}'
   fi
   return 0
 }
@@ -152,6 +198,15 @@ cmd_slug() {
     if [ -n "$bound" ] && [ "$bound" != "$rel" ]; then
       sr_die 5 "reviews/$slug/ is already bound to '$bound', not '$rel'. If the SQL moved, run: sqlreview.sh move '$bound' '$rel'"
     fi
+  elif [ -d "$SR_REVIEWS" ]; then
+    # A legacy review (non-path-derived slug) bound to this path would otherwise be silently orphaned.
+    for doc in "$SR_REVIEWS"/*/review.json "$SR_REVIEWS"/*/scope.json; do
+      [ -f "$doc" ] && [ ! -L "$doc" ] || continue
+      bound="$(basename "$(dirname "$doc")")"
+      [ "$bound" != "$slug" ] && [ "$(jq -r '.sql_path // "" | strings' "$doc" 2>/dev/null)" = "$rel" ] || continue
+      printf 'sqlreview: legacy review reviews/%s/ records sql_path %s; to keep its history run: sqlreview.sh move --slug %s %s\n' "$bound" "$rel" "$bound" "$rel" >&2
+      break
+    done
   fi
   printf '%s\n' "$slug"
 }
@@ -170,12 +225,34 @@ cmd_check() {
   if ! jq -se 'length == 1 and (.[0] | type == "object")' "$tmp" >/dev/null 2>&1; then
     rm -f "$tmp"; printf 'invalid JSON: the document does not parse\n'; return 4
   fi
-  out="$(jq -r -f "$SR_SCRIPT_DIR/sqlreview-check.jq" "$tmp" 2>&1)"; rc=$?
+  out="$(jq -r -L "$SR_SCRIPT_DIR" -f "$SR_SCRIPT_DIR/sqlreview-check.jq" "$tmp" 2>&1)"; rc=$?
   rm -f "$tmp"
   if [ "$rc" -ne 0 ]; then printf 'check failed to run: %s\n' "$out"; return 4; fi
   if [ -n "$out" ]; then printf '%s\n' "$out"; return 4; fi
   printf 'ok\n'
   return 0
+}
+
+# ---------------------------------------------------------------------------------------------
+# Advisory, not part of check: a confirmed item whose text or rationale still reads as a proposal
+# contradicts its confirmation (#340). Prints "<id>\t<field>\t<phrases>" per hit; exit 10 when any.
+cmd_lint() {
+  [ $# -eq 1 ] || usage
+  sr_need_jq
+  [ -f "$1" ] || sr_die 2 "no such file: $1"
+  local out
+  out="$(jq -r '
+    ("should be confirmed|to be confirmed|needs? (to be )?confirm(ing|ed|ation)?|pending confirmation|awaiting confirmation|unconfirmed|\\bproposed\\b|\\btbc\\b") as $re
+    | (.assumptions // [], .limitations // [])[]
+    | select(type == "object" and .status == "confirmed") as $item
+    | ("text", "rationale") as $field
+    | ([($item[$field] // "" | strings) | match($re; "gi").string | ascii_downcase] | unique) as $hits
+    | select($hits | length > 0)
+    | "\($item.id // "?")\t\($field)\t\($hits | join(", "))"
+  ' "$1")" || sr_die 4 "invalid JSON: $1"
+  [ -n "$out" ] || return 0
+  printf '%s\n' "$out"
+  return 10
 }
 
 # ---------------------------------------------------------------------------------------------
@@ -201,6 +278,8 @@ cmd_roles() (
 
 # ---------------------------------------------------------------------------------------------
 cmd_publish() (
+  local reconfirm_all=false
+  if [ "${1:-}" = "--reconfirm-all" ]; then reconfirm_all=true; shift; fi
   [ $# -eq 3 ] || usage
   sr_need_jq
   sr_require_root
@@ -233,11 +312,23 @@ cmd_publish() (
     [ -f "$SR_ROOT/$rel" ] || sr_die 2 "no such SQL: $rel"
     [ "$(sr_sha256 "$SR_ROOT/$rel")" = "$(jq -r .sql_sha256 "$tmp")" ] || sr_die 2 "SQL changed since fingerprint; reassess before publishing"
   fi
+  if [ "$kind" = scope ] && jq -e '.sql_sha256 | type == "string"' "$tmp" >/dev/null; then
+    # The scope was framed against existing SQL: refuse to publish over a later edit (#340).
+    [ -f "$SR_ROOT/$rel" ] || sr_die 2 "scope records sql_sha256 but the SQL is missing: $rel"
+    [ "$(sr_sha256 "$SR_ROOT/$rel")" = "$(jq -r .sql_sha256 "$tmp")" ] || sr_die 2 "SQL changed since the scope framing was confirmed; re-diff, re-put intent, inputs, outputs and affected items, then refresh sql_sha256"
+  fi
   if [ -f "$dest" ] && cmp -s "$tmp" "$dest"; then
     printf 'already published\t%s\n' "${dest#"$SR_ROOT"/}"
     exit 0
   fi
   jq -e --argjson previous "$previous" '.revision == ($previous + 1)' "$tmp" >/dev/null || sr_die 4 "revision must follow the existing document (first revision is 1)"
+  if [ "$kind" != lifts ]; then
+    # A carried confirmation must be provable from the previous revision and its SQL baseline (#348).
+    local violations
+    _carry_context "$slug" "$kind" "$rel"
+    violations="$(_carry_jq "$tmp" 'carry_violations($ctx; $reconfirm_all)' --argjson reconfirm_all "$reconfirm_all")" || sr_die 2 "carry-forward check failed to run"
+    if [ -n "$violations" ]; then printf '%s\n' "$violations"; sr_die 4 "carried confirmations refused; re-confirm those items for this revision"; fi
+  fi
   if [ "$kind" = lifts ] && [ ! -f "$dest" ]; then
     jq -e 'all(.lifts[]; .revision == 1 and .status == "candidate")' "$tmp" >/dev/null || sr_die 4 "new ledger entries start as candidates"
   fi
@@ -400,25 +491,269 @@ cmd_impact() {
 }
 
 # ---------------------------------------------------------------------------------------------
-cmd_move() {
+# Which review-draft items restate a confirmed item of the current scope revision (same list, same
+# text and rationale) on SQL the scope still describes: the whole SQL unchanged since scope publish,
+# or the item's location lines unchanged. Analyse offers these as one bulk confirmation (#346).
+cmd_carryover() {
   [ $# -eq 2 ] || usage
   sr_need_jq
   sr_require_root
-  local oldrel newrel oldslug newslug f tmp
-  oldrel="$(sr_relpath "$1")" || exit $?; newrel="$(sr_relpath "$2")" || exit $?
-  sr_safe_sql "$oldrel"
+  local slug="$1" draft="$2" scope base sql cur scope_sha="" base_sha="" cur_sha="" have_base=false
+  sr_safe_slug "$slug"
+  [ -f "$draft" ] || sr_die 2 "no such draft: $draft"
+  jq -e 'type == "object"' "$draft" >/dev/null 2>&1 || sr_die 4 "invalid JSON: $draft"
+  scope="$SR_REVIEWS/$slug/scope.json"
+  base="$SR_REVIEWS/$slug/scope.source.sql"
+  sr_no_symlinks "$scope" || exit 2
+  sr_no_symlinks "$base" || exit 2
+  if [ -f "$scope" ]; then
+    cmd_check "$scope" >/dev/null || sr_die 4 "scope.json is invalid; see sqlreview.sh check"
+    sql="$(jq -r .sql_path "$scope")"
+    scope_sha="$(jq -r '.sql_sha256 // "" | strings' "$scope")"
+  else
+    scope=/dev/null  # nothing to carry over: every draft item is walked
+    sql="$(jq -r '.sql_path // "" | strings' "$draft")"
+  fi
+  if [ -n "$sql" ]; then
+    sr_safe_sql "$sql"
+    cur="$SR_ROOT/$sql"
+    [ -f "$cur" ] && cur_sha="$(sr_sha256 "$cur")"
+  fi
+  if [ "$scope" != /dev/null ] && [ -f "$base" ]; then
+    base_sha="$(sr_sha256 "$base")"
+    # A baseline that disagrees with the SHA the scope recorded is not evidence of anything.
+    if [ -z "$scope_sha" ] || [ "$scope_sha" = "$base_sha" ]; then have_base=true; scope_sha="$base_sha"; fi
+  fi
+  jq -n --slurpfile scope "$scope" --slurpfile draft "$draft" \
+    --rawfile base "$([ "$have_base" = true ] && echo "$base" || echo /dev/null)" \
+    --rawfile cur "$([ -n "$cur_sha" ] && echo "$cur" || echo /dev/null)" \
+    --argjson have_base "$have_base" --arg scope_sha "$scope_sha" --arg cur_sha "$cur_sha" '
+    ($scope[0] // {revision: null, assumptions: [], limitations: []}) as $s | ($draft[0]) as $d
+    | ($scope_sha != "" and $cur_sha != "" and $scope_sha == $cur_sha) as $unchanged
+    | ($base | split("\n")) as $b | ($cur | split("\n")) as $c
+    | def lines_same($l): $have_base and $cur_sha != "" and ($l | type) == "array" and ($l | length) == 2 and
+        ($l | all(type == "number" and . >= 1)) and $l[0] <= $l[1] and $l[1] <= ($b | length) and $l[1] <= ($c | length) and $b[$l[0] - 1:$l[1]] == $c[$l[0] - 1:$l[1]];
+    [ ("assumptions", "limitations") as $k | ($d[$k] // [])[] | select(type == "object") | . as $i
+      | ([$s[$k][] | select(.text == $i.text and .rationale == $i.rationale)][0]) as $m
+      | {kind: $k, id: $i.id, text: $i.text, rationale: $i.rationale}
+        + if $m == null then {basis: null, why: "new, or text/rationale differs from the scope"}
+          elif $unchanged then {scope_id: $m.id, basis: "sql-unchanged"}
+          elif lines_same(($i.location | objects | .lines) // null) then {scope_id: $m.id, basis: "lines-unchanged"}
+          else {scope_id: $m.id, basis: null, why: "SQL changed since scope publish and the item has no unchanged location"} end
+    ] as $rows
+    | {scope_revision: $s.revision, sql_unchanged: $unchanged,
+       carry_over: [$rows[] | select(.basis != null)],
+       walk: [$rows[] | select(.basis == null) | {kind, id, why}]}'
+}
+
+# ---------------------------------------------------------------------------------------------
+# Evidence for carrying scope/review confirmations forward (#348), shared by publish and
+# carryforward. The previous published <kind>.json is the prior revision; its baseline is the SQL
+# bytes recorded after that publish (analyse: snapshot → source.sql; bootstrap: scope.source.sql),
+# counted only when its SHA256 equals the prior document's sql_sha256 (when it recorded one).
+# Sets CF_PRIOR, CF_BASE, CF_CUR (a path or /dev/null), CF_HAVE_BASE, CF_HAVE_CUR, CF_PRIOR_SHA, CF_CUR_SHA.
+_carry_context() { # <slug> <scope|review> <sql_path>
+  local d="$SR_REVIEWS/$1" base_sha
+  CF_PRIOR=/dev/null CF_CUR=/dev/null CF_HAVE_BASE=false CF_HAVE_CUR=false CF_PRIOR_SHA="" CF_CUR_SHA=""
+  if [ "$2" = review ]; then CF_BASE="$d/source.sql"; else CF_BASE="$d/scope.source.sql"; fi
+  sr_no_symlinks "$d/$2.json" || exit 2
+  sr_no_symlinks "$CF_BASE" || exit 2
+  if [ -f "$d/$2.json" ]; then
+    cmd_check "$d/$2.json" >/dev/null || sr_die 4 "existing $2.json is invalid; see sqlreview.sh check"
+    CF_PRIOR="$d/$2.json"
+    CF_PRIOR_SHA="$(jq -r '.sql_sha256 // "" | strings' "$CF_PRIOR")"
+  fi
+  if [ -f "$SR_ROOT/$3" ]; then CF_CUR="$SR_ROOT/$3"; CF_HAVE_CUR=true; CF_CUR_SHA="$(sr_sha256 "$CF_CUR")"; fi
+  if [ "$CF_PRIOR" != /dev/null ] && [ -f "$CF_BASE" ]; then
+    base_sha="$(sr_sha256 "$CF_BASE")"
+    if [ -z "$CF_PRIOR_SHA" ] || [ "$CF_PRIOR_SHA" = "$base_sha" ]; then CF_HAVE_BASE=true; CF_PRIOR_SHA="$base_sha"; fi
+  fi
+  [ "$CF_HAVE_BASE" = true ] || CF_BASE=/dev/null
+}
+
+# Run a jq filter over a draft with sqlreview-carry.jq included and $ctx bound (see its header).
+_carry_jq() { # <draft> <filter> [jq options...]
+  local draft="$1" filter="$2"
+  shift 2
+  jq -r -L "$SR_SCRIPT_DIR" "$@" --slurpfile prior "$CF_PRIOR" --rawfile base "$CF_BASE" --rawfile cur "$CF_CUR" \
+    --argjson have_base "$CF_HAVE_BASE" --argjson have_cur "$CF_HAVE_CUR" --arg prior_sha "$CF_PRIOR_SHA" --arg cur_sha "$CF_CUR_SHA" \
+    "include \"sqlreview-carry\";
+     {prior: \$prior[0], base: (if \$have_base then \$base else null end), cur: (if \$have_cur then \$cur else null end),
+      prior_sha: \$prior_sha, cur_sha: \$cur_sha} as \$ctx | $filter" "$draft"
+}
+
+# Which draft items may keep the confirmation of the previous published revision (#348). Read-only.
+cmd_carryforward() {
+  [ $# -eq 3 ] || usage
+  sr_need_jq
+  sr_require_root
+  local slug="$1" kind="$2" draft="$3" sql
+  sr_safe_slug "$slug"
+  case "$kind" in scope|review) ;; *) usage ;; esac
+  [ -f "$draft" ] || sr_die 2 "no such draft: $draft"
+  jq -e 'type == "object"' "$draft" >/dev/null 2>&1 || sr_die 4 "invalid JSON: $draft"
+  sql="$(jq -r '.sql_path // "" | strings' "$SR_REVIEWS/$slug/$kind.json" 2>/dev/null)"
+  [ -n "$sql" ] || sql="$(jq -r '.sql_path // "" | strings' "$draft")"
+  sr_safe_sql "$sql"
+  _carry_context "$slug" "$kind" "$sql"
+  _carry_jq "$draft" 'carry_rows($ctx) as $rows
+    | {document: $document, prior_revision: ($ctx.prior.revision // null),
+       revision: (if $ctx.prior == null then 1 else $ctx.prior.revision + 1 end),
+       sql_unchanged: ($ctx.prior_sha != "" and $ctx.prior_sha == $ctx.cur_sha),
+       carry: [$rows[] | select(.basis != null)],
+       walk: [$rows[] | select(.basis == null) | {kind, id, why}]}' --arg document "$kind"
+}
+
+# ---------------------------------------------------------------------------------------------
+# query-builder >= 0.6.0 renders record_assumption()/record_limitation() as a leading comment header
+# (nq-rdl/query-builder docs/ANALYSIS_NOTES.md, #355). Read-only: the header is review *evidence*;
+# analyse seeds candidates from it and the human still confirms every item.
+# Search window: from the top of the file, skipping blank lines, `--` comments, SET/USE statements
+# and other block comments; it ends at a `-- @extract:` marker, a GO line or any other statement.
+# The header is a block whose `/*` and `*/` lines stand alone and whose first line is a section key.
+_notes_scan() { # <sql file> → records separated by \037: H start end · I kind start end text has_detail detail · E line why
+  awk '
+    function rtrim(s) { sub(/[ \t\r]+$/, "", s); return s }
+    function bad(n, why) { printf "E\037%d\037%s\n", n, why; err = 1; exit }
+    function flush() {
+      if (have) printf "I\037%s\037%d\037%d\037%s\037%d\037%s\n", sect, istart, iend, itext, hasd, dtext
+      have = 0
+    }
+    BEGIN { st = "pre" }
+    {
+      line = rtrim($0)
+      if (st == "open") st = (line == "assumptions:" || line == "limitations:") ? "hdr" : "other"
+      if (st == "other") {        # a block comment that is not the header (e.g. a licence banner)
+        p = index(line, "*/")
+        if (p) { st = "pre"; if (substr(line, p + 2) ~ /[^ \t]/) exit }
+        next
+      }
+      if (st == "hdr") {
+        if (line == "*/") {
+          if (!nitems) bad(sline, sect ": section is empty")
+          flush(); printf "H\037%d\037%d\n", hstart, NR; st = "done"; exit
+        }
+        if (line == "") next
+        if (line == "assumptions:" || line == "limitations:") {
+          name = substr(line, 1, length(line) - 1)
+          if (sect != "" && !nitems) bad(sline, sect ": section is empty")
+          if (name == "assumptions" && (seen_a || seen_l)) bad(NR, "assumptions: must come before limitations: and appear once")
+          if (name == "limitations" && seen_l) bad(NR, "limitations: must appear once")
+          flush(); sect = name; sline = NR; nitems = 0
+          if (name == "assumptions") seen_a = 1; else seen_l = 1
+          next
+        }
+        if (line == "  -" || line ~ /^  - [ \t]*$/) bad(NR, "empty item text")
+        if (substr(line, 1, 4) == "  - ") {
+          flush(); have = 1; istart = NR; iend = NR; itext = substr(line, 5); hasd = 0; dtext = ""; nitems++
+          next
+        }
+        if (line ~ /^    (rationale|consequence):/) {
+          key = substr(line, 5); sub(/:.*/, "", key)
+          want = (sect == "assumptions") ? "rationale" : "consequence"
+          if (!have) bad(NR, key ": without an item above it")
+          if (key != want) bad(NR, key ": is not valid under " sect ": (expected " want ":)")
+          if (hasd) bad(NR, "second " key ": for one item")
+          dtext = substr(line, 6 + length(key)); sub(/^[ \t]+/, "", dtext)
+          if (dtext == "") bad(NR, "empty " key ":")
+          hasd = 1; iend = NR
+          next
+        }
+        bad(NR, "unexpected line in notes header: " line)
+      }
+      t = line; sub(/^[ \t]+/, "", t)
+      if (t == "") next
+      if (substr(t, 1, 2) == "--") { if (t ~ /^--[ \t]*@extract:/) exit; next }
+      if (line == "/*") { st = "open"; hstart = NR; next }
+      if (substr(t, 1, 2) == "/*") {
+        p = index(substr(t, 3), "*/")
+        if (!p) { st = "other"; next }
+        if (substr(t, p + 4) ~ /[^ \t]/) exit
+        next
+      }
+      if (tolower(t) ~ /^(set|use)[ \t]/) next
+      exit                        # GO or executable SQL: the header can only precede them
+    }
+    END { if (!err && st == "hdr") printf "E\037%d\037%s\n", hstart, "unterminated notes header: no closing */ line" }
+  ' "$1"
+}
+
+cmd_notes() {
+  local sql="" against="" recs errs
+  while [ $# -gt 0 ]; do
+    case "$1" in
+      --against) [ $# -ge 2 ] || usage; against="$2"; shift ;;
+      -*) usage ;;
+      *) [ -z "$sql" ] || usage; sql="$1" ;;
+    esac
+    shift
+  done
+  [ -n "$sql" ] || usage
+  sr_need_jq
+  [ -f "$sql" ] && [ -r "$sql" ] || sr_die 2 "no such readable file: $sql"
+  if [ -n "$against" ]; then
+    [ -f "$against" ] && [ -r "$against" ] || sr_die 2 "no such readable file: $against"
+    jq -e 'type == "object"' "$against" >/dev/null 2>&1 || sr_die 4 "invalid JSON: $against"
+  fi
+  recs="$(_notes_scan "$sql")" || sr_die 2 "cannot read $sql"
+  errs="$(printf '%s\n' "$recs" | awk 'BEGIN { FS = "\037" } $1 == "E" { printf "line %s: %s\n", $2, $3 }')"
+  [ -z "$errs" ] || sr_die 4 "malformed analysis-notes header in $sql: $errs"
+  printf '%s\n' "$recs" | jq -R -s --slurpfile against "${against:-/dev/null}" '
+    (split("\n") | map(select(. != "") | split("\u001f"))) as $recs
+    | ($against[0] // null) as $doc
+    | ([$recs[] | select(.[0] == "H")][0]) as $h
+    | def items($k): [$recs[] | select(.[0] == "I" and .[1] == $k)
+        | {text: .[4], rationale: (if .[5] == "1" then .[6] else null end), lines: [(.[2] | tonumber), (.[3] | tonumber)]}
+        | if $doc == null then . else . as $i
+            | ([($doc[$k] // [] | arrays)[] | select(type == "object" and .text == $i.text)][0]) as $m
+            | . + {match: (if $m == null then null else {id: $m.id, rationale_same: ($m.rationale == $i.rationale)} end)}
+          end];
+    {present: ($h != null), lines: (if $h == null then null else [($h[1] | tonumber), ($h[2] | tonumber)] end),
+     assumptions: items("assumptions"), limitations: items("limitations")}'
+}
+
+# ---------------------------------------------------------------------------------------------
+cmd_move() {
+  sr_need_jq
+  sr_require_root
+  local oldrel="" newrel oldslug newslug f tmp rebind=1
+  if [ "${1:-}" = "--slug" ]; then
+    # Legacy reviews (e.g. schema 1 with a hand-chosen slug) are named by no current path.
+    [ $# -eq 3 ] || usage
+    oldslug="$2"
+    newrel="$(sr_relpath "$3")" || exit $?
+  else
+    [ $# -eq 2 ] || usage
+    oldrel="$(sr_relpath "$1")" || exit $?; newrel="$(sr_relpath "$2")" || exit $?
+    sr_safe_sql "$oldrel"
+    oldslug="$(sr_slug "$oldrel")"
+  fi
   sr_safe_sql "$newrel"
-  oldslug="$(sr_slug "$oldrel")"; newslug="$(sr_slug "$newrel")"
-  [ -d "$SR_REVIEWS/$oldslug" ] || sr_die 2 "no review directory for '$oldrel' (slug $oldslug)"
-  [ "$oldslug" = "$newslug" ] || [ ! -e "$SR_REVIEWS/$newslug" ] || sr_die 2 "reviews/$newslug/ already exists"
+  newslug="$(sr_slug_new "$newrel")"
   sr_safe_slug "$oldslug"
   sr_safe_slug "$newslug"
+  [ -d "$SR_REVIEWS/$oldslug" ] || sr_die 2 "no review directory for '${oldrel:-$oldslug}' (slug $oldslug)"
+  if [ "$oldrel" = "$newrel" ] && [ "$oldslug" = "$newslug" ]; then
+    printf 'unchanged\t%s\t%s\n' "$newslug" "$newrel"
+    printf 'sqlreview: reviews/%s/ already uses the readable slug for %s; nothing to move\n' "$newslug" "$newrel" >&2
+    return 0
+  fi
+  [ "$oldslug" = "$newslug" ] || [ ! -e "$SR_REVIEWS/$newslug" ] || sr_die 2 "reviews/$newslug/ already exists"
   for f in review.json scope.json lifts.json rebind-required; do
     sr_no_symlinks "$SR_REVIEWS/$oldslug/$f" || exit 2
     [ ! -d "$SR_REVIEWS/$oldslug/$f" ] || sr_die 2 "unexpected directory: $f"
   done
+  # Migrating a legacy-encoded slug to the readable one for the same path (#353) leaves the SQL
+  # binding unchanged, so it does not force a re-analysis: no rebind-required marker.
+  if [ "$oldslug" != "$newslug" ] && [ "$oldslug" = "$(sr_slug_pair "$newrel" | sed -n 2p)" ]; then
+    rebind=0
+    for f in review.json scope.json lifts.json; do
+      [ -f "$SR_REVIEWS/$oldslug/$f" ] || continue
+      [ "$(jq -r '.sql_path // "" | strings' "$SR_REVIEWS/$oldslug/$f" 2>/dev/null)" = "$newrel" ] || rebind=1
+    done
+  fi
   [ "$oldslug" = "$newslug" ] || mv "$SR_REVIEWS/$oldslug" "$SR_REVIEWS/$newslug" || sr_die 2 "move failed"
-  touch "$SR_REVIEWS/$newslug/rebind-required" || sr_die 2 "cannot mark stale"
+  [ "$rebind" = 0 ] || touch "$SR_REVIEWS/$newslug/rebind-required" || sr_die 2 "cannot mark stale"
   rm -f "$SR_REVIEWS/$newslug/review.md" "$SR_REVIEWS/$newslug/scope.md" "$SR_REVIEWS/$newslug/lifts.md" || sr_die 2 "cannot remove stale renders"
   for f in review.json scope.json lifts.json; do
     [ -f "$SR_REVIEWS/$newslug/$f" ] || continue
@@ -429,6 +764,26 @@ cmd_move() {
 }
 
 # ---------------------------------------------------------------------------------------------
+# Install the bundled templates/<kind>.md when the project lacks it (#349): never replaces an
+# existing file, refuses symlink components, stages beside the target. Returns 1 when not bundled.
+_render_install_template() { # <kind>
+  local dir="$SR_ROOT/$SR_DIR/templates" src="$SR_ASSETS/templates/$1.md" tmp
+  [ -f "$src" ] || return 1
+  sr_no_symlinks "$dir/$1.md" || exit 2
+  [ ! -e "$dir/$1.md" ] || sr_die 2 "template is not a regular file: $SR_DIR/templates/$1.md"
+  mkdir -p "$dir" || sr_die 2 "cannot create $SR_DIR/templates"
+  tmp="$(mktemp "$dir/.install.XXXXXX")" || sr_die 2 "mktemp failed"
+  cp "$src" "$tmp" || { rm -f "$tmp"; sr_die 2 "cannot stage templates/$1.md"; }
+  chmod 644 "$tmp" || { rm -f "$tmp"; sr_die 2 "cannot stage templates/$1.md"; }  # mktemp makes 0600; match init's copies
+  # ln refuses an existing target, so a template that appeared meanwhile is kept; mv covers
+  # filesystems without hard links.
+  if ln "$tmp" "$dir/$1.md" 2>/dev/null || { [ ! -e "$dir/$1.md" ] && mv "$tmp" "$dir/$1.md"; }; then
+    printf 'sqlreview: installed missing template %s/templates/%s.md from the bundled default\n' "$SR_DIR" "$1" >&2
+  fi
+  rm -f "$tmp"
+  [ -f "$dir/$1.md" ] || sr_die 2 "cannot install $SR_DIR/templates/$1.md; run: sqlreview.sh init --apply templates/$1.md"
+}
+
 cmd_render() {
   [ $# -eq 2 ] || usage
   sr_need_jq
@@ -438,10 +793,10 @@ cmd_render() {
   sr_safe_slug "$slug"
   doc="$SR_REVIEWS/$slug/$kind.json"
   [ -f "$doc" ] || sr_die 2 "no such document: reviews/$slug/$kind.json"
-  tpl="$SR_ROOT/$SR_DIR/templates/$kind.md"
-  [ -f "$tpl" ] || sr_die 2 "template missing: $SR_DIR/templates/$kind.md ($SR_SETUP_HINT)"
   cfg="$SR_ROOT/$SR_DIR/config.json"
   [ -f "$cfg" ] || sr_die 2 "config missing: $SR_DIR/config.json ($SR_SETUP_HINT)"
+  tpl="$SR_ROOT/$SR_DIR/templates/$kind.md"
+  [ -f "$tpl" ] || _render_install_template "$kind" || sr_die 2 "template missing: $SR_DIR/templates/$kind.md ($SR_SETUP_HINT)"
   sr_no_symlinks "$doc" || exit 2
   cmd_check "$doc" >/dev/null || sr_die 4 "invalid document"
   out="$SR_REVIEWS/$slug/$kind.md"
@@ -466,12 +821,16 @@ case "$cmd" in
   status) cmd_status "$@" ;;
   slug) cmd_slug "$@" ;;
   check) cmd_check "$@" ;;
+  lint) cmd_lint "$@" ;;
   publish) cmd_publish "$@" ;;
   roles) cmd_roles "$@" ;;
   fingerprint) cmd_fingerprint "$@" ;;
   snapshot) cmd_snapshot "$@" ;;
   delta) cmd_delta "$@" ;;
   impact) cmd_impact "$@" ;;
+  carryover) cmd_carryover "$@" ;;
+  carryforward) cmd_carryforward "$@" ;;
+  notes) cmd_notes "$@" ;;
   move) cmd_move "$@" ;;
   render) cmd_render "$@" ;;
   -h|--help|help) usage ;;

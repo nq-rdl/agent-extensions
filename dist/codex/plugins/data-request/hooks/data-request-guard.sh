@@ -4,7 +4,8 @@
 #   reviews/*/review.json, scope.json   Write → content run through `sqlreview.sh check`:
 #                                        every assumption/limitation must carry a complete
 #                                        confirmation record for the current revision, else deny
-#                                        (the violations and the AskUserQuestion step are named)
+#                                        (the violations and the AskUserQuestion step are named);
+#                                        carried confirmations → deny (only publish can prove them)
 #                                       Edit  → deny (a fragment cannot be validated; Write the whole file)
 #   reviews/*/review.md, scope.md       deny  (rendered from the JSON by `sqlreview.sh render`)
 #   config.json                         ask   (config changes go through /data-request:setup)
@@ -110,6 +111,9 @@ command -v jq >/dev/null 2>&1 || decide deny "SQL Review documents are validated
 content="$(field .tool_input.content)"
 if printf '%s' "$content" | jq -e '.kind == "review" and any(.limitations[]; has("lift_id"))' >/dev/null 2>&1; then
   decide deny "Review limitations linked to lifts require ledger consistency checks. Write review.draft.json, then run sqlreview.sh publish <slug> review <draft>."
+fi
+if printf '%s' "$content" | jq -e 'any((.assumptions, .limitations | arrays | .[]); type == "object" and .carried_from_revision != null)' >/dev/null 2>&1; then
+  decide deny "Carried confirmations (carried_from_revision) must be proven against the previous revision. Write $(basename "${rel%.json}").draft.json, then run sqlreview.sh publish <slug> $(basename "${rel%.json}") <draft>."
 fi
 out="$(printf '%s' "$content" | bash "$checker" check --stdin 2>&1)"; rc=$?
 if [ "$rc" -eq 0 ]; then

@@ -4,6 +4,8 @@
 # Requires jq >= 1.6 for anything that reads or writes JSON.
 
 SR_DIR=".sqlreview"
+# Where the jq programs live (sqlreview.sh sets it before sourcing this file).
+: "${SR_SCRIPT_DIR:=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd -P)}"
 SR_SETUP_HINT="Run /data-request:setup to initialise the project (creates $SR_DIR/ with config.json and templates/)."
 
 sr_die() { # <exit-code> <message>
@@ -98,9 +100,26 @@ sr_safe_sql() {
   case "$1" in ""|/*|*/../*|../*|*/..|..|./*|*/./*|*/.|*//*|*/) sr_die 2 "unsafe sql_path: $1" ;; esac
   sr_no_symlinks "$SR_ROOT/$1" || exit 2
 }
-# Encode each stem component; underscores cannot collide with the directory separator.
+# Both encodings of a path, readable then legacy, one per line. The definitions live in
+# sqlreview-slug.jq, shared with check's slug/sql_path binding rule (#353).
+sr_slug_pair() {
+  jq -nr -L "$SR_SCRIPT_DIR" --arg p "$1" 'include "sqlreview-slug"; $p | path_slug, legacy_path_slug'
+}
+# The readable slug a path is (re)bound to: new reviews and move destinations.
+sr_slug_new() {
+  sr_slug_pair "$1" | sed -n 1p
+}
+# The slug of a path's review: the readable slug, unless only a legacy-encoded
+# reviews/<legacy>/ exists, so reviews created before #353 keep working untouched.
 sr_slug() {
-  jq -nr --arg p "$1" '$p | sub("\\.sql$"; "") | (if . == "" then [""] else split("/") end) | map(if . == "" then "%00" else @uri | gsub("~"; "%7E") | gsub("\u0027"; "%27") | gsub("[!]"; "%21") | gsub("[(]"; "%28") | gsub("[)]"; "%29") | gsub("[*]"; "%2A") | gsub("_"; "%5F") | gsub("\\."; "%2E") end) | join("__")'
+  local pair new legacy
+  pair="$(sr_slug_pair "$1")" || return 2
+  new="$(printf '%s\n' "$pair" | sed -n 1p)"; legacy="$(printf '%s\n' "$pair" | sed -n 2p)"
+  if [ "$new" != "$legacy" ] && [ -n "${SR_REVIEWS:-}" ] && [ ! -d "$SR_REVIEWS/$new" ] && [ -d "$SR_REVIEWS/$legacy" ]; then
+    printf '%s\n' "$legacy"
+  else
+    printf '%s\n' "$new"
+  fi
 }
 
 sr_sha256() { # <file> -> hex digest
@@ -154,4 +173,31 @@ sr_state() { # <slug>
       else state="stale"; fi ;;
   esac
   printf '%s\t%s\t%s\n' "$state" "$sql" "$rev"
+}
+
+# Why a review is invalid or missing, on one line (empty otherwise). Kept apart from sr_state:
+# tab-separated reads collapse empty fields, and invalid rows have no sql_path or revision.
+sr_state_reason() { # <slug> <state>
+  local slug="$1" d="$SR_REVIEWS/$1" doc violations schema sql why=""
+  case "$2" in
+    invalid)
+      doc="$(sr_doc_for "$slug")" || { printf 'no review.json, scope.json or lifts.json\n'; return 0; }
+      violations="$(cmd_check "$doc" 2>&1 | grep -v '^ok$' | tr '\n' ';' | sed 's/;$//; s/;/; /g')"
+      why="$(basename "$doc"): $violations"
+      schema="$(jq -r '.schemaVersion // "missing" | tostring' "$doc" 2>/dev/null || echo unreadable)"
+      why="$why; schemaVersion $schema"
+      sql="$(jq -r '.sql_path // "" | strings' "$doc" 2>/dev/null || true)"
+      if [ -n "$sql" ]; then
+        case "$sql" in /*|*..*) why="$why; sql_path '$sql' is not project-relative" ;; *)
+          [ -f "$SR_ROOT/$sql" ] || why="$why; sql_path target missing: $sql" ;;
+        esac
+      fi
+      case "$violations" in *"binding mismatch"*)
+        why="$why; the slug is not derived from any current path — rebind with: sqlreview.sh move --slug $slug <sql path>" ;;
+      esac ;;
+    missing)
+      sql="$(jq -r '.sql_path // ""' "$(sr_doc_for "$slug")" 2>/dev/null)"
+      why="sql_path target missing: $sql — if it moved, run: sqlreview.sh move '$sql' <new path>" ;;
+  esac
+  printf '%s\n' "$why"
 }

@@ -12,7 +12,7 @@ from test_sql_review_scripts import Project, run, review_doc, item, REPO
 
 def ledger():
     return {
-        'schemaVersion': 2, 'kind': 'lifts', 'slug': 'pipeline%2Epy',
+        'schemaVersion': 2, 'kind': 'lifts', 'slug': 'pipeline.py',
         'sql_path': 'pipeline.py', 'revision': 1, 'recurring': False,
         'lifts': [{
             'id': 'LIFT-1', 'revision': 1, 'need': 'Current labelled status',
@@ -60,9 +60,9 @@ class Lifts(unittest.TestCase):
         status = json.loads(self.command('status', '--json').stdout)
         self.assertEqual(status['reviews'][0]['lifts'], {'candidate': 1})
         self.command('move', 'pipeline.py', 'next.py')
-        moved = json.loads((self.p.review_dir('next%2Epy') / 'lifts.json').read_text())
+        moved = json.loads((self.p.review_dir('next.py') / 'lifts.json').read_text())
         self.assertEqual(moved['sql_path'], 'next.py')
-        self.assertFalse((self.p.review_dir('next%2Epy') / 'lifts.md').exists())
+        self.assertFalse((self.p.review_dir('next.py') / 'lifts.md').exists())
 
     def test_candidate_rejects_manufactured_confirmation_and_missing_evidence(self):
         for field, value in [('confirmed_by', 'Robot'), ('pinned_version', ''),
@@ -203,7 +203,7 @@ class Lifts(unittest.TestCase):
         self.assertEqual(self.hook('db.query(f"SELECT * FROM {table}")'), 'deny')
 
     def test_direct_authoritative_writes_cannot_bypass_publication(self):
-        self.assertEqual(self.hook(json.dumps(self.doc), path='.sqlreview/reviews/pipeline%2Epy/lifts.json'), 'deny')
+        self.assertEqual(self.hook(json.dumps(self.doc), path='.sqlreview/reviews/pipeline.py/lifts.json'), 'deny')
         review = review_doc(limitations=[item('L1', 'wrong text', lift_id='LIFT-1')])
         self.assertEqual(self.hook(json.dumps(review), path='.sqlreview/reviews/reports__monthly/review.json'), 'deny')
 

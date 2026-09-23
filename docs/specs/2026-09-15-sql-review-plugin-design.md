@@ -63,7 +63,11 @@ Nothing about the location is customisable.
   differs from the one requested. A renamed SQL file is a new slug; `status` lists the old one as
   `missing` and the skill offers `sqlreview.sh move OLD NEW` (renames the directory, rewrites
   `sql_path`, marks the review stale so it is reassessed). Bootstrap takes the *intended* path and
-  produces the same slug analyse will later use.
+  produces the same slug analyse will later use. Components stay readable
+  (`sql/cohort_pipeline/x.sql` → `sql__cohort_pipeline__x`): only a `_` next to another `_` or at a
+  component edge, and a component's leading `.`, are percent-encoded (`sqlreview-slug.jq`, #353).
+  Reviews under the older all-escaped encoding (`sql__cohort%5Fpipeline__x`) still validate and are
+  found by `slug`; `sqlreview.sh move PATH PATH` migrates one without marking it stale.
 - **JSON is authoritative; markdown is rendered.** `scope.md` / `review.md` are produced by
   `sqlreview.sh render` from the JSON plus the template. This is what makes the reports
   "standardised" (#131) and gives `explain` a machine-readable cross-reference (#128 names "the
@@ -85,9 +89,10 @@ Nothing about the location is customisable.
 - Item shape (assumptions and limitations alike):
   `{id: "A1", text, rationale, location: {lines: [a,b]} | null, status: "confirmed", confirmed_by, confirmed_at, confirmed_revision}`.
   Only `confirmed` items may reach the final JSON; rejected candidates stay in the draft.
-  `confirmed_revision` is the review revision at which the human last confirmed the item — on an
-  update every item is re-put to the human and gets the new revision, so a stale confirmation is
-  visible (`confirmed_revision < revision`) and `check` rejects it.
+  `confirmed_revision` is the review revision at which the human last confirmed the item. On an
+  update, changed items are re-put to the human and get the new revision; an unchanged item may be
+  carried (§12), keeping its earlier `confirmed_revision` and recording `carried_from_revision`.
+  Any other `confirmed_revision < revision` is a stale confirmation and `check` rejects it.
 
 Note on #126's wording "reference template in the skill's `references/`": `asctl repo-check` allows
 only `.rst` under `references/`, so the template files live under `assets/` and the prose that
@@ -136,15 +141,17 @@ scripts across a plugin's skills).
 | Subcommand | Does | Exit |
 |---|---|---|
 | `init [--diff] [--apply PATH...]` | Create `.sqlreview/` from the bundled default at the resolved root (cwd's git top-level when nothing exists yet). Never overwrites: `--diff` reports each template file as `new` / `same` / `differs` (with a unified diff); `--apply` replaces only the named files after the human confirmed. | 0 ok · 10 differences · 2 error |
-| `status [--json]` | Lists reviews with `slug, sql_path, revision, state ∈ {current, stale, missing, no-baseline, scoped, draft, invalid}`. Exit 3 when not initialised — **setup is the one caller that treats 3 as "proceed to init"**; every other skill stops and points at `/sql-review:setup`. | 0 · 3 |
+| `status [--json]` | Lists reviews with `slug, sql_path, revision, state ∈ {current, stale, missing, no-baseline, scoped, draft, invalid}`. Exit 3 when not initialised — **setup is the one caller that treats 3 as "proceed to init"**; every other skill stops and points at `/sql-review:setup`. Bundled templates the project lacks are reported as `missing_templates` plus `missing_templates_fix` (`--json`) or one stderr line (text rows unchanged). | 0 · 3 |
 | `slug PATH` | Prints the slug for a project-relative path; exit 5 if `reviews/<slug>/` exists bound to a different `sql_path`. | 0 · 5 |
-| `check FILE [--stdin]` | Validates a scope/review JSON: required keys, item shape, every item `confirmed` with `confirmed_by`/`confirmed_at`/`confirmed_revision == revision`. One line per violation. | 0 valid · 4 invalid |
+| `check FILE [--stdin]` | Validates a scope/review JSON: required keys, item shape, every item `confirmed` with `confirmed_by`/`confirmed_at` and `confirmed_revision == revision`, or a carried item's fields (§12). One line per violation. | 0 valid · 4 invalid |
+| `carryforward SLUG scope\|review DRAFT` | Read-only JSON: which draft items may carry the previous published revision's confirmation (with the exact fields to set) and which must be walked, and why (§12). | 0 · 2 · 4 |
 | `fingerprint SQL` | `{sql_path, sql_sha256, git_commit, git_dirty}` for the skill to embed. | 0 · 2 |
 | `snapshot SLUG SQL` | Copies the current SQL bytes to `reviews/<slug>/source.sql` (called by analyse after the guarded final JSON Write succeeds, verifying its SHA256 and preserving history/<revision>.sql). | 0 · 2 |
 | `delta SLUG` | Unified diff of `source.sql` vs the current file; header lines report both sha256s. | 0 unchanged · 10 changed · 6 no baseline · 2 |
 | `impact SLUG` | **Hints only.** Identifiers introduced/altered inside the diff hunks (CTE names, aliases, columns) and the non-diff lines referencing them. Printed under a "heuristic — does not prove anything unaffected" banner. | 0 · 6 · 2 |
-| `move OLD NEW` | Rename a review directory when the SQL moved; rewrites `sql_path`, invalidates the baseline state to `stale`. | 0 · 2 |
-| `render SLUG scope\|review` | JSON + `templates/<kind>.md` → `<kind>.md`. Fixed placeholder set; unknown placeholders are left in place and reported. Deterministic. | 0 · 2 |
+| `notes SQL [--against JSON]` | Read-only; needs no `.sqlreview/`. Parses the query-builder ≥ 0.6.0 analysis-notes header (§13) into `{present, lines, assumptions, limitations: [{text, rationale, lines}]}`; a limitation's `consequence` becomes `rationale`, absent detail is `null`, `lines` are the header lines each item came from. `--against` adds `match: {id, rationale_same}` (same list, identical text) or `null`. | 0 (also with no header: `present: false`) · 1 · 2 · 4 malformed header, `line N: why` |
+| `move OLD NEW` | Rename a review directory when the SQL moved; rewrites `sql_path`, invalidates the baseline state to `stale`. `move PATH PATH` migrates a legacy-encoded slug to the readable one without invalidating it. | 0 · 2 |
+| `render SLUG scope\|review\|lifts` | JSON + `templates/<kind>.md` → `<kind>.md`. A missing template is first installed from the bundled default (never overwriting, symlinks refused, one stderr line). Fixed placeholder set; unknown placeholders are left in place and reported. Deterministic. | 0 · 2 |
 
 Portability: no associative arrays, no `mapfile`, `shasum -a 256` / `sha256sum` probe — the same
 rules `rh-lib.sh` follows.
@@ -172,8 +179,8 @@ cannot be asked, leave the draft on disk and write nothing final; say so.
 **bootstrap** (`<intended sql path> [--update]`)
 1. Existing `scope.json` → update path: if the SQL now exists, show it against the scope's intent /
    inputs / outputs; `git log -p` on `scope.json` when tracked shows how the scope itself moved.
-   Re-put **every** assumption to the human (confirm / reword / drop) and ask for new ones — no
-   item keeps a confirmation from an earlier revision.
+   Re-put every assumption `carryforward` does not carry (§12) to the human (confirm / reword /
+   drop) and ask for new ones.
 2. Else interview: intent, inputs, outputs, candidate assumptions (using the config's definition —
    decision points the RDL is taking), open questions. Pause for confirmation on each scoping
    decision; confirm each assumption individually via AskUserQuestion.
@@ -182,8 +189,9 @@ cannot be asked, leave the draft on disk and write nothing final; say so.
 **analyse** (`<sql path> [--update]`)
 1. `slug`, `fingerprint`; find the scope by slug (offer to run bootstrap retroactively if none).
 2. Existing `review.json` with a baseline → update path: `delta` → walk the human through each
-   hunk → `impact` hints → then **reassess every existing assumption and limitation** (confirm /
-   reword / drop, hints flag the likely-affected ones first) and add new ones → `revision + 1`,
+   hunk → `impact` hints → then **reassess every existing assumption and limitation** `carryforward`
+   does not carry (§12) (confirm / reword / drop, hints flag the likely-affected ones first) and add
+   new ones → `revision + 1`,
    `changes[]` entry. No baseline → full analyse.
 3. Else full read of the SQL against the scope: purpose, inputs (sources/tables), outputs
    (grain, columns), logic walkthrough (numbered steps with line ranges), candidate assumptions,
@@ -306,3 +314,53 @@ with the host's OAuth credentials, and execute: `pixi install`, the unit tests,
   Setup already requires confirmation (or explicit `--yes`), draft cleanup follows successful
   finalization, and temporary validation input is local. These are reviewed as informational;
   path containment and persistence checks above cover the concrete tool-parameter concerns.
+
+
+## 12. Carrying unchanged confirmations across revisions (#348)
+
+A revision bump no longer invalidates every confirmation. The lift ledger already keeps an entry's
+revision when its confirmed content is unchanged; scope and review items now do the same.
+
+- **Fields.** A fresh item has `confirmed_revision == revision` and no (or null)
+  `carried_from_revision`. A carried item keeps the `confirmed_by`, `confirmed_at` and
+  `confirmed_revision` of the revision where a human confirmed it, and records
+  `carried_from_revision` = the previous published revision. Chains keep the original confirmation.
+- **`check` (stateless).** `confirmed_revision` is an integer in 1..revision; equal to revision
+  → no `carried_from_revision`; lower → `carried_from_revision == revision - 1` and
+  `>= confirmed_revision`. The guard denies a direct Write carrying items: only publish can prove them.
+- **`publish` (stateful).** Each carried item needs, in the previous published document of the same
+  kind, an item with the same id in the same list and identical `text`, `rationale`,
+  `confirmed_by`, `confirmed_at` and `confirmed_revision`, and unchanged governed SQL. The baseline
+  is `source.sql` (review; written by `snapshot` after each publish) or `scope.source.sql` (scope;
+  copied by bootstrap after each publish). It is evidence only when its SHA256 equals the previous
+  document's `sql_sha256` (when one was recorded), as for `carryover`. With a `location`, the previous
+  lines in the baseline must equal the new lines in the current SQL (remaps allowed, same length).
+  With `location: null`, the whole SQL must be unchanged (SHA equality) or absent at both revisions.
+  `publish --reconfirm-all` refuses every carried item.
+- **`carryforward`** prints the same verdict for a draft, from the same jq definition
+  (`sqlreview-carry.jq`) publish enforces, so the two cannot drift. Bootstrap and analyse walk only
+  what it lists under `walk`, plus any carryable item the diff implicates indirectly.
+- **Render** marks a carried item's revision cell `N (carried)`; `N` is where it was confirmed.
+
+## 13. The rendered analysis-notes header as review evidence (#355)
+
+query-builder 0.6.0 renders what pipeline and resolver code recorded with `record_assumption()` /
+`record_limitation()` as a leading comment header
+([contract](https://github.com/nq-rdl/query-builder/blob/main/docs/ANALYSIS_NOTES.md)). The engineer
+skills (draft, fix, lift via guardrails) prescribe recording at the point of logic; the review reads
+the result.
+
+- **Recognition (`notes`).** Scan from the top of the file, skipping blank lines, `--` comments,
+  `SET`/`USE` statements and other block comments (e.g. a licence banner). The window ends at a
+  `-- @extract:` marker, a `GO` line or any other statement. The header is a block whose `/*` and
+  `*/` lines stand alone and whose first line is `assumptions:` or `limitations:`. Inside it:
+  `assumptions:` then `limitations:` (each at most once, never empty), items `  - text`, one
+  optional `    rationale:` (assumptions) or `    consequence:` (limitations) per item. Anything
+  else is malformed (exit 4). CRLF and trailing whitespace are tolerated.
+- **Candidates only.** Analyse seeds header items into `review.draft.json` as `status: candidate`
+  (verbatim text; consequence → rationale), reusing an existing item where `--against` reports a
+  `match`, so `carryover`/`carryforward` behave as before. The human confirms every item; nothing is
+  confirmed because the header states it. Before publishing, `notes --against` the confirmed draft
+  surfaces header items with no confirmed counterpart as mismatches.
+- **Absence proves nothing.** SQL built before 0.6.0, or by code that recorded nothing, has no
+  header; the review still looks for assumptions and limitations in the SQL.

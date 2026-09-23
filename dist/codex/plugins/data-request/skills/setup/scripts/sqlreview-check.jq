@@ -1,11 +1,12 @@
 # Validation rules for a .sqlreview/reviews/<slug>/{review,scope}.json document.
 # Emits one violation per line; no output means the document is valid. Used by
 # `sqlreview.sh check` and, through it, by the PreToolUse guard hook.
+# Run with `jq -L <this directory>`: path_slug/legacy_path_slug live in sqlreview-slug.jq.
+include "sqlreview-slug";
 def nonempty: type == "string" and length > 0;
 def integer: type == "number" and . >= 1 and . == floor;
 def line_range: type == "array" and length == 2 and all(.[]; integer) and .[0] <= .[1];
 def path_ok: nonempty and (startswith("/") | not) and (split("/") | all(.[]; . != "" and . != "." and . != ".."));
-def path_slug: sub("\\.sql$"; "") | (if . == "" then [""] else split("/") end) | map(if . == "" then "%00" else @uri | gsub("~"; "%7E") | gsub("\u0027"; "%27") | gsub("[!]"; "%21") | gsub("[(]"; "%28") | gsub("[)]"; "%29") | gsub("[*]"; "%2A") | gsub("_"; "%5F") | gsub("\\."; "%2E") end) | join("__");
 def req($k): if has($k) then empty else "missing key: \($k)" end;
 
 def items($kind; $rev):
@@ -20,7 +21,15 @@ def items($kind; $rev):
         (if .status != "confirmed" then "\($id): status is \(.status // "missing") — every assumption and limitation must be confirmed by the human before it is written" else empty end),
         (if (.confirmed_by | nonempty | not) then "\($id): confirmed_by is empty" else empty end),
         (if (.confirmed_at | nonempty | not) then "\($id): confirmed_at is empty" else empty end),
-        (if .confirmed_revision != $rev then "\($id): confirmed_revision \(.confirmed_revision // "missing") != revision \($rev // "missing") — re-confirm for this revision" else empty end)
+        # Fresh: confirmed_revision == revision, no carried_from_revision. Carried (#348): an earlier
+        # confirmed_revision with carried_from_revision == revision - 1; publish proves the claim
+        # against the previous published document, this stateless check validates only the fields.
+        (.confirmed_revision as $cr | .carried_from_revision as $cf
+         | if ($cr | integer | not) or ($rev | integer | not) or $cr > $rev then "\($id): confirmed_revision \($cr // "missing") != revision \($rev // "missing") — re-confirm for this revision"
+           elif $cr == $rev then (if $cf != null then "\($id): carried_from_revision \($cf) on an item confirmed at revision \($rev) — remove it, or re-confirm for this revision" else empty end)
+           elif $cf == null then "\($id): confirmed_revision \($cr) != revision \($rev) — re-confirm for this revision, or carry it forward with carried_from_revision (sqlreview.sh carryforward)"
+           elif ($cf | integer | not) or $cf != $rev - 1 or $cf < $cr then "\($id): carried_from_revision \($cf) must be revision - 1 (\($rev - 1)) and >= confirmed_revision \($cr) — re-confirm for this revision"
+           else empty end)
     );
 
 
@@ -74,13 +83,14 @@ else
   .revision as $rev
   | (if (.sql_path | path_ok | not) then "sql_path must be a normalized project-relative path" else empty end),
     (if (.slug | nonempty | not) or (.slug | test("^[A-Za-z0-9_%.-]+$") | not) or .slug == "." or .slug == ".." then "unsafe slug" else empty end),
-    (if (.sql_path | path_ok) and .slug != (.sql_path | path_slug) then "slug/sql_path binding mismatch" else empty end),
+    (if (.sql_path | path_ok) and .slug != (.sql_path | path_slug) and .slug != (.sql_path | legacy_path_slug) then "slug/sql_path binding mismatch" else empty end),
     ((if .kind == "lifts" then [] else ["inputs", "outputs"] end)[] as $key | if (.[$key] | type) != "array" or (.[$key] | all(.[]; type == "object" and (.name | nonempty) and (.description | type == "string")) | not) then "\($key) must be an array of named descriptions" else empty end),
     (if has("logic") and ((.logic | type) != "array" or (.logic | all(.[]; type == "object" and (.step | integer) and (.title | type == "string") and (.description | type == "string") and (.lines | line_range)) | not)) then "logic must be an array of numbered steps with line ranges" else empty end),
     (if has("open_questions") and ((.open_questions | type) != "array" or (.open_questions | all(.[]; type == "string") | not)) then "open_questions must be an array of strings" else empty end),
     (if has("changes") and ((.changes | type) != "array" or (.changes | all(.[]; type == "object" and (.revision | integer) and (.at | nonempty) and (.by | nonempty) and (.summary | nonempty)) | not)) then "changes must be an array of revision records" else empty end),
     (if .kind == "review" and ((.purpose | nonempty | not) or (.sql_sha256 | test("^[0-9a-f]{64}$") | not)) then "review requires purpose and SHA256" else empty end),
     (if .kind == "scope" and (.intent | nonempty | not) then "scope requires intent" else empty end),
+    (if .kind == "scope" and .sql_sha256 != null and (.sql_sha256 | (type == "string" and test("^[0-9a-f]{64}$")) | not) then "scope sql_sha256 must be null or a SHA256" else empty end),
     (.revision as $rev
   | req("schemaVersion"), req("kind"), req("slug"), req("sql_path"), req("revision"),
     (if .kind != "lifts" then req("assumptions"), req("limitations") else empty end),

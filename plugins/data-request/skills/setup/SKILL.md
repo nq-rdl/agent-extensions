@@ -103,6 +103,13 @@ missing source JSON or any retained old invocations as incomplete migration.
 bash "$S/sqlreview.sh" status          # exit 0 now; lists reviews (none yet on a fresh project)
 ```
 
+For any `invalid` review, run `status --verbose` to name the reason. A legacy review whose slug is
+not derived from any current path (a schema-1 hand-chosen slug) reports a binding mismatch; after
+confirming the SQL it now describes, rebind it with `sqlreview.sh move --slug <old slug> <sql path>`.
+`status --verbose` also prints `migrate=sqlreview.sh move '<path>' '<path>'` for a review under a
+legacy-encoded slug (`sql__cohort%5Fpipeline__x`). It keeps working as is; the command renames it to
+the readable slug (`sql__cohort_pipeline__x`) without marking it stale, then re-render its reports.
+
 Tell the user the next stage: `/data-request:bootstrap <intended sql path>` before the SQL is
 written, or `/data-request:analyse <sql path>` for SQL that already exists. Suggest committing
 `.sqlreview/` — the reviews inside it are the handoff record.

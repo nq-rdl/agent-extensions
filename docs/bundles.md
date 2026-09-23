@@ -50,7 +50,7 @@ Delegation outlines are optional skill references, not registered agent types.
 | [`tech-writing`](#tech-writing) | Yes | Yes | Technical writing — developer docs, tutorials, ADRs, and guides |
 | [`lucid`](#lucid) | Yes | Yes | Lucid — visual collaboration boards and diagrams (Lucidchart / Lucidspark) via the hosted Lucid MCP server |
 | [`pandera`](#pandera) | Yes | Yes | Pandera — dataframe schema validation and debugging for pandas and Polars |
-| [`data-request`](#data-request) | Yes | Yes | Data Request — scope, map, draft, validate and fix request SQL and Python with shared RDL guardrails and human-confirmed review handoffs |
+| [`data-request`](#data-request) | Yes | Yes | Data Request — triage, scope, map, draft, validate, fix and amend request SQL and Python with shared RDL guardrails and human-confirmed review handoffs |
 
 ## Install
 
@@ -741,7 +741,7 @@ Pandera — dataframe schema validation and debugging for pandas and Polars.
 
 ## data-request
 
-Data Request — scope, map, draft, validate and fix request SQL and Python with shared RDL guardrails and human-confirmed review handoffs.
+Data Request — triage, scope, map, draft, validate, fix and amend request SQL and Python with shared RDL guardrails and human-confirmed review handoffs.
 
 **Claude Code skills**
 
@@ -754,7 +754,9 @@ Data Request — scope, map, draft, validate and fix request SQL and Python with
 - `/data-request:draft`
 - `/data-request:validate`
 - `/data-request:fix`
+- `/data-request:amend`
 - `/data-request:lift`
+- `/data-request:triage`
 
 **Codex skills**
 
@@ -767,7 +769,9 @@ Data Request — scope, map, draft, validate and fix request SQL and Python with
 - `$data-request:draft`
 - `$data-request:validate`
 - `$data-request:fix`
+- `$data-request:amend`
 - `$data-request:lift`
+- `$data-request:triage`
 
 **Codex hooks:** Native command hooks; see [coverage and limitations](codex.md#hooks).
 

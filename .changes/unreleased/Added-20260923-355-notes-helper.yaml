@@ -1,0 +1,3 @@
+kind: Added
+body: 'sqlreview.sh notes parses the query-builder 0.6.0 analysis-notes SQL header into JSON; --against matches its items to a review'
+time: 2026-09-23T22:40:53.000000000Z

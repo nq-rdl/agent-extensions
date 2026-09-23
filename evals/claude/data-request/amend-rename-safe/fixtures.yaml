@@ -1,0 +1,62 @@
+# Replies graded by tests/test_eval_data_request_amend_graders.py in Python and Node. No model call.
+pass:
+  - name: skill-shaped reply
+    reply: |
+      classification: analyst-safe
+
+      A rename of an already-surfaced column keeps the same rows and the same meaning, so it
+      is analyst-safe under query-builder's docs/ANALYST_AMENDMENTS.md. Governance: a rename is
+      a format change within the approved scope.
+
+      Change the maintained source only:
+
+      ```python
+              .select("MRN", "EncounterId", "AdmitDateTime", "DischargeDateTime", "AgeAtAdmit",
+                      rename={"MRN": "URN"})
+      ```
+
+      Regenerate with `pixi run --environment framework amend regenerate sql/v2/falls_request.sql`.
+
+      Add to `specs/amendments.md`:
+
+      ### AMD-001 — Rename MRN to URN in the falls extract
+      - enquiry: <original request ID>
+      - classification: analyst-safe
+      - sql: sql/v2/falls_request.sql
+
+      Validate: the fast SQL gate and spec-validate; `pixi run amend check` shows a diff in the
+      final projection only; `pixi run amend validate-output ... --key URN=MRN` confirms the row
+      count and key set match v1.0.0.
+  - name: bold labels and dict() rename
+    reply: |
+      **Classification:** `analyst-safe`
+
+      Use `.select(..., rename=dict(MRN="URN"))`, regenerate, and record it in specs/amendments.md.
+      Then confirm the row-count and key-set match the released extract.
+fail:
+  - name: hand edit without classification
+    fails: [classified-safe, rename-extension-point, amendment-record, same-rows-check]
+    reply: |
+      Open sql/v2/falls_request.sql and change `AS MRN` to `AS URN` in the final SELECT.
+  - name: over-cautious classification
+    fails: [classified-safe]
+    reply: |
+      classification: engineer-required
+
+      Use `.select(..., rename={"MRN": "URN"})`, record it in specs/amendments.md, and check the
+      row count and key set.
+  - name: contradictory classifications
+    fails: [classified-safe]
+    reply: |
+      classification: analyst-safe
+
+      Use `.select(..., rename={"MRN": "URN"})` and record it in specs/amendments.md:
+      - classification: engineer-required
+
+      Check the row count and key set.
+  - name: no comparison with the previous extract
+    fails: [same-rows-check]
+    reply: |
+      classification: analyst-safe
+
+      Use `.select(..., rename={"MRN": "URN"})`, regenerate and record it in specs/amendments.md.

@@ -81,6 +81,10 @@ Things to know before opting in:
 | `CLAUDE_EVAL_ARGS` | replace the default `--model claude-sonnet-5 --judge-model claude-haiku-4-5 --threshold 0.8` |
 | `EVAL_MAX_COST_USD` | per-plugin-per-revision spend cap (default `5`; the `go` suite costs about $2.20 a run) |
 
+The `data-request` cases use fictional enquiry numbers, approval-ID repositories, issue
+and PR numbers, branches, people and facts (`ENQ9001`, `THHSAQUIRE-9901`, `SSAQHTS-99001`,
+and so on). Only the naming shapes match the real service desk.
+
 ## Writing a suite
 
 `claude plugin eval init` interviews you in a terminal and writes cases into the
@@ -109,6 +113,14 @@ name the graders that must then fail. `tests/test_eval_regex_graders.py` grades 
 Python and Node, and also checks that the case's unchanged original fails every grader
 and that a before/after reply quoting the original still passes. Hand-written graders of
 other types (`tool_used`, `llm`) in the same directory are left alone.
+
+### Hand-written text graders
+
+When a case's answer is prose, such as a classification, grade the labelled lines the skill
+tells the agent to write, not a code block. The `data-request` suite does this. Its regex
+graders are hand-written (the generator changes only files with its `GENERATED` marker). Each
+case's `fixtures.yaml` lists passing and failing replies, and
+`tests/test_eval_data_request_amend_graders.py` grades them in Python and Node.
 
 Sync strips `name:` from packaged skills, so a `tool_used: Skill` grader matches
 the leaf: `input_match: '"skill"\s*:\s*"(?:[\w-]+:)?naming"'` for `/go:naming`.

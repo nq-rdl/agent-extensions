@@ -10,6 +10,7 @@ user-invocable: true
 compatibility: >-
   RDL cohort SQL; DATEADD example targets SQL Server 2022 (16.x).
   Composition API baseline: query-builder 0.4.0 and query-builder-plugins 0.3.0.
+  record_assumption/record_limitation need query-builder 0.6.0 or later.
   Source patterns from issues 313 and 325 (2026-09-15 to 2026-09-17).
   Composition examples are schematic; verify pinned library APIs, deployed engine
   and current metadata.
@@ -108,6 +109,23 @@ query = (
 display-resolution enhancement behind this example.
 The issue is a discovery pointer, not proof that a request's installed version has it.
 
+## Record assumptions and limitations where the logic makes them
+
+With query-builder 0.6.0 or later, call `pipeline.record_assumption(text, rationale=...)`
+beside the join, filter, exclusion or source read that commits to one reading of the
+request or source data, and `pipeline.record_limitation(text, consequence=...)` where
+the code accepts a known weakness. Resolver handlers record on the `pipeline` they
+receive. `finalize()` / `build()` render the records as the SQL's leading comment header,
+which `/data-request:analyse` reads as review evidence, so do not keep them in a separate
+notes file. Write text an analyst can confirm or reject. A plugin that assembles SQL
+without `finalize()` puts `pipeline.analysis_header()` first. Below 0.6.0 the API is
+absent: report the items in the task output and recommend the pin bump; never
+hand-write the header. Verify behaviour against the installed version and the
+[analysis-notes contract](https://github.com/nq-rdl/query-builder/blob/main/docs/ANALYSIS_NOTES.md).
+
+Advisory: flag a new filter, join or exclusion that settles an ambiguous request, or
+accepts a known source weakness, with no nearby record.
+
 ## Performance: shift the anchor
 
 Keep a filtered indexed column bare. In the incident behind #313, wrapping
@@ -125,6 +143,8 @@ The half-open interval above is illustrative: preserve the request's agreed boun
 semantics. Do not silently replace an inclusive endpoint, choose nine months, or
 substitute a fixed offset where daylight-saving rules apply. Check bound types and
 implicit conversions too; a bare column alone does not prove an index seek.
+Render datetime bounds as `'YYYY-MM-DDTHH:MM:SS'`; `'YYYYMMDD'` is safe only for midnight bounds. A `DATETIME` column
+reads `'YYYY-MM-DD'` by the login's language ([SET DATEFORMAT](https://learn.microsoft.com/en-us/sql/t-sql/statements/set-dateformat-transact-sql)), and day-first logins misread it.
 
 ## Timezone and source system
 
@@ -165,9 +185,9 @@ encode that choice in the request's spec composition, not an implicit resolver d
   `nq-rdl/query-builder` issue #79 describes an ieMR source that undercounts deaths
   outside hospital and over longer follow-up
   without death-registry linkage. Verify the current source and limitation; do not
-  assume the proposed automatic annotation mechanism is installed. Carry the caveat
-  into the task output even if it must be recorded manually. Turning that date into
-  **30-day mortality**, including the anchor and window boundaries, is the researcher's
+  assume the proposed automatic annotation mechanism is installed. Record the caveat
+  with `record_limitation()` where the date is read, or carry it into the task output.
+  Turning that date into **30-day mortality**, including the anchor and window boundaries, is the researcher's
   modelling choice, expressed in the request's own spec composition.
 - **Suburb/postcode:** latest address and address at the time of an encounter answer
   different questions. Leave that choice and its temporal anchor to the researcher/spec;

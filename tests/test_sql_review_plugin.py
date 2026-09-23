@@ -17,7 +17,8 @@ BUNDLE = REPO / "registry" / "bundles" / "data-request.yaml"
 PLUGIN = REPO / "plugins" / "data-request"
 RECORD_STAGES = ("setup", "bootstrap", "analyse", "explain")
 SKILLS = {leaf: REPO / "skills" / f"data-request-{leaf}"
-          for leaf in (*RECORD_STAGES, "guardrails", "map", "draft", "validate", "fix", "lift")}
+          for leaf in (*RECORD_STAGES, "guardrails", "map", "draft", "validate", "fix", "amend", "lift",
+                       "triage")}
 
 
 def frontmatter(skill_md: Path) -> dict:
@@ -84,7 +85,8 @@ class Skills(unittest.TestCase):
 
     def test_templates_and_helper_shipped(self):
         for rel in ("assets/sqlreview/config.json", "assets/sqlreview/templates/scope.md",
-                    "assets/sqlreview/templates/review.md", "scripts/sqlreview.sh", "scripts/sqlreview-lib.sh"):
+                    "assets/sqlreview/templates/review.md", "scripts/sqlreview.sh", "scripts/sqlreview-lib.sh",
+                    "scripts/sqlreview-check.jq", "scripts/sqlreview-slug.jq"):
             with self.subTest(rel):
                 self.assertTrue((SKILLS["setup"] / rel).is_file())
                 self.assertTrue((PLUGIN / "skills" / "setup" / rel).is_file(), "plugin copy missing — run sync-plugins.sh")
