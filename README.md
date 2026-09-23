@@ -82,8 +82,11 @@ Planned work is tracked as epics and on the
 
 - [#180](https://github.com/nq-rdl/agent-extensions/issues/180) — reviewable,
   merge-triggered release process hardened to Actions best practice
-- [#261](https://github.com/nq-rdl/agent-extensions/issues/261) — `redhat` plugin for
-  Red Hat documentation and Customer Portal content
+- [#261](https://github.com/nq-rdl/agent-extensions/issues/261) — follow-up for the
+  shipped `redhat` plugin: settle the credential path and docs-to-source map
+  ([#262](https://github.com/nq-rdl/agent-extensions/issues/262)) and verify it end to
+  end on Linux and macOS with real credentials
+  ([#267](https://github.com/nq-rdl/agent-extensions/issues/267))
 - [#312](https://github.com/nq-rdl/agent-extensions/issues/312) — reliable,
   discoverable skills: verified fixes, behavioural pilots, and link integrity
 
