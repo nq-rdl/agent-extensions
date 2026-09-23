@@ -5,7 +5,7 @@
 # and by the plugin's hooks. Contract: docs/specs/2026-09-15-sql-review-plugin-design.md §4.
 #
 #   init [--diff] [--apply PATH...] [--json]   create .sqlreview/ from the bundled default; never overwrites
-#   status [--json]                            reviews and their state; exit 3 when not initialised
+#   status [--json] [--verbose]                reviews and their state (--verbose: why invalid/missing); exit 3 when not initialised
 #   slug PATH                                  slug for a project path; exit 5 on a conflicting binding
 #   check FILE | check --stdin                 validate a review/scope JSON; exit 4 with one violation per line
 #   publish SLUG scope|review|lifts DRAFT             validate a staged copy, then atomically replace the final JSON
@@ -15,6 +15,7 @@
 #   delta SLUG                                 diff source.sql vs the current SQL; exit 10 when changed, 6 no baseline
 #   impact SLUG                                heuristic: identifiers in the diff traced into unchanged lines
 #   move OLDPATH NEWPATH                       rebind a review directory after the SQL moved
+#   move --slug OLDSLUG NEWPATH                rebind a legacy review whose slug no current path derives
 #   render SLUG scope|review|lifts                   JSON + templates/<kind>.md -> reviews/SLUG/<kind>.md
 #
 # Exit codes: 0 ok · 1 usage · 2 error · 3 not initialised · 4 invalid document · 5 slug conflict ·
@@ -26,7 +27,7 @@ SR_SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd -P)"
 SR_ASSETS="$SR_SCRIPT_DIR/../assets/sqlreview"
 
 usage() {
-  sed -n '2,20p' "$0" | sed 's/^# \{0,1\}//' >&2
+  awk 'NR > 1 && !/^#/ { exit } NR > 1' "$0" | sed 's/^# \{0,1\}//' >&2
   exit 1
 }
 
@@ -103,8 +104,11 @@ cmd_init() {
 
 # ---------------------------------------------------------------------------------------------
 cmd_status() {
-  local json=0 d slug state schema lifts rows="[]"
-  [ "${1:-}" = "--json" ] && json=1
+  local json=0 verbose=0 d slug state reason schema lifts rows="[]"
+  while [ $# -gt 0 ]; do
+    case "$1" in --json) json=1 ;; --verbose) verbose=1 ;; *) usage ;; esac
+    shift
+  done
   sr_need_jq
   sr_require_root
   schema="$(jq -r '.schemaVersion // "?"' "$SR_ROOT/$SR_DIR/config.json" 2>/dev/null || echo '?')"
@@ -121,11 +125,17 @@ EOF
           lifts="$(jq -c '.lifts | group_by(.status) | map({key: .[0].status, value: length}) | from_entries' "$d/lifts.json")"
         else lifts='{"invalid":true}'; fi
       fi
+      reason=""
+      [ "$verbose" = 1 ] && reason="$(sr_state_reason "$slug" "$state")"
       if [ "$json" = 1 ]; then
         rows="$(printf '%s' "$rows" | jq -c --arg slug "$slug" --arg state "$state" --arg sql "$SR_SQL_PATH" --arg rev "$SR_REVISION" --argjson lifts "$lifts" \
-          '. + [{slug: $slug, state: $state, sql_path: $sql, revision: ($rev | tonumber? // null), lifts: $lifts}]')"
+          --arg reason "$reason" --argjson verbose "$verbose" \
+          '. + [{slug: $slug, state: $state, sql_path: $sql, revision: ($rev | tonumber? // null), lifts: $lifts}
+                + (if $verbose == 1 then {reason: (if $reason == "" then null else $reason end)} else {} end)]')"
       else
-        printf '%s\t%s\t%s\t%s\tlifts=%s\n' "$slug" "$state" "$SR_SQL_PATH" "$SR_REVISION" "$lifts"
+        printf '%s\t%s\t%s\t%s\tlifts=%s' "$slug" "$state" "$SR_SQL_PATH" "$SR_REVISION" "$lifts"
+        [ -z "$reason" ] || printf '\treason=%s' "$reason"
+        printf '\n'
       fi
     done
   fi
@@ -152,6 +162,15 @@ cmd_slug() {
     if [ -n "$bound" ] && [ "$bound" != "$rel" ]; then
       sr_die 5 "reviews/$slug/ is already bound to '$bound', not '$rel'. If the SQL moved, run: sqlreview.sh move '$bound' '$rel'"
     fi
+  elif [ -d "$SR_REVIEWS" ]; then
+    # A legacy review (non-path-derived slug) bound to this path would otherwise be silently orphaned.
+    for doc in "$SR_REVIEWS"/*/review.json "$SR_REVIEWS"/*/scope.json; do
+      [ -f "$doc" ] && [ ! -L "$doc" ] || continue
+      bound="$(basename "$(dirname "$doc")")"
+      [ "$bound" != "$slug" ] && [ "$(jq -r '.sql_path // "" | strings' "$doc" 2>/dev/null)" = "$rel" ] || continue
+      printf 'sqlreview: legacy review reviews/%s/ records sql_path %s; to keep its history run: sqlreview.sh move --slug %s %s\n' "$bound" "$rel" "$bound" "$rel" >&2
+      break
+    done
   fi
   printf '%s\n' "$slug"
 }
@@ -401,18 +420,26 @@ cmd_impact() {
 
 # ---------------------------------------------------------------------------------------------
 cmd_move() {
-  [ $# -eq 2 ] || usage
   sr_need_jq
   sr_require_root
-  local oldrel newrel oldslug newslug f tmp
-  oldrel="$(sr_relpath "$1")" || exit $?; newrel="$(sr_relpath "$2")" || exit $?
-  sr_safe_sql "$oldrel"
+  local oldrel="" newrel oldslug newslug f tmp
+  if [ "${1:-}" = "--slug" ]; then
+    # Legacy reviews (e.g. schema 1 with a hand-chosen slug) are named by no current path.
+    [ $# -eq 3 ] || usage
+    oldslug="$2"
+    newrel="$(sr_relpath "$3")" || exit $?
+  else
+    [ $# -eq 2 ] || usage
+    oldrel="$(sr_relpath "$1")" || exit $?; newrel="$(sr_relpath "$2")" || exit $?
+    sr_safe_sql "$oldrel"
+    oldslug="$(sr_slug "$oldrel")"
+  fi
   sr_safe_sql "$newrel"
-  oldslug="$(sr_slug "$oldrel")"; newslug="$(sr_slug "$newrel")"
-  [ -d "$SR_REVIEWS/$oldslug" ] || sr_die 2 "no review directory for '$oldrel' (slug $oldslug)"
-  [ "$oldslug" = "$newslug" ] || [ ! -e "$SR_REVIEWS/$newslug" ] || sr_die 2 "reviews/$newslug/ already exists"
+  newslug="$(sr_slug "$newrel")"
   sr_safe_slug "$oldslug"
   sr_safe_slug "$newslug"
+  [ -d "$SR_REVIEWS/$oldslug" ] || sr_die 2 "no review directory for '${oldrel:-$oldslug}' (slug $oldslug)"
+  [ "$oldslug" = "$newslug" ] || [ ! -e "$SR_REVIEWS/$newslug" ] || sr_die 2 "reviews/$newslug/ already exists"
   for f in review.json scope.json lifts.json rebind-required; do
     sr_no_symlinks "$SR_REVIEWS/$oldslug/$f" || exit 2
     [ ! -d "$SR_REVIEWS/$oldslug/$f" ] || sr_die 2 "unexpected directory: $f"

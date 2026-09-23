@@ -28,7 +28,8 @@ Arguments: `$ARGUMENTS`.
 ```bash
 S="${CLAUDE_PLUGIN_ROOT}/skills/setup/scripts"
 bash "$S/sqlreview.sh" status --json                # exit 3 → stop: not initialised, run /data-request:setup first
-SLUG="$(bash "$S/sqlreview.sh" slug "<sql path>")"  # exit 5 → bound to another path: offer `sqlreview.sh move OLD NEW`
+SLUG="$(bash "$S/sqlreview.sh" slug "<sql path>")"  # exit 5 → bound to another path: offer `sqlreview.sh move OLD NEW`;
+                                                    # a stderr legacy-review note → offer its `move --slug OLD_SLUG NEW`
 bash "$S/sqlreview.sh" fingerprint "<sql path>"     # {sql_path, sql_sha256, git_commit, git_dirty} — embed as-is
 ```
 
