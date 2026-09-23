@@ -5,7 +5,7 @@ description: >-
   outputs, logic steps, assumptions and limitations in .sqlreview/reviews/<slug>/review.json,
   with every assumption and limitation confirmed by the human, and render the standardised
   review.md. Re-running on reviewed SQL diffs against the stored snapshot, walks the human through
-  the change, and reassesses every item. Use when SQL is ready to hand to the Data Analyst.
+  the change, and reassesses every item the change touches. Use when SQL is ready to hand to the Data Analyst.
 argument-hint: '<sql path> [--update]'
 user-invocable: true
 compatibility: >-
@@ -77,14 +77,26 @@ bash "$S/sqlreview.sh" impact "$SLUG"    # HINTS ONLY: identifiers from the chan
 2. Show the impact hints as *places to look*, then check the unchanged code yourself for indirect
    consequences the hints cannot see (a changed literal, join type or `DISTINCT` shifts grain
    without touching an identifier). Confirm or dismiss each candidate with the human.
-3. **Reassess every existing assumption and limitation** — confirm / reword / drop each one
-   (hint-flagged items first) and add new ones. A confirmation from an earlier revision never
-   carries over; the guard rejects `confirmed_revision < revision`.
+3. **Reassess the existing assumptions and limitations.** Draft the next revision keeping each
+   unchanged item's `id`, `text` and `rationale` verbatim, its `location` lines remapped to the
+   current SQL, then find which keep their confirmation (#348):
+
+   ```bash
+   bash "$S/sqlreview.sh" carryforward "$SLUG" review ".sqlreview/reviews/$SLUG/review.draft.json"
+   # → {prior_revision, revision, sql_unchanged, carry: [{kind, id, basis, set}], walk: [{kind, id, why}]}
+   ```
+
+   `carry` items are unchanged since the previous review with their governed SQL lines unchanged
+   (`basis`: `sql-unchanged` or `lines-unchanged`); copy each one's `set` fields onto it verbatim
+   and do not ask again. Confirm / reword / drop **only** the `walk` items (hint-flagged first),
+   plus any `carry` item the hunks or hints implicate indirectly, and add new ones. When the human
+   asks for a full re-walk, walk every item and publish with `--reconfirm-all`.
 4. Set `revision` to the previous value + 1, append to `changes[]` `{revision, at, by, summary}`.
    Then *Confirm, write, render* below.
 
 A missing baseline is still an update: preserve the existing `changes[]`, increment the previous
-revision, and reassess every assumption and limitation. Never reset an existing review to revision 1.
+revision, and reassess every item `carryforward` does not list under `carry` (without a baseline
+only an unchanged SQL SHA can carry). Never reset an existing review to revision 1.
 
 ## Full review
 
@@ -103,8 +115,9 @@ Read the SQL. Draft into `reviews/$SLUG/review.draft.json` (guard-exempt) as you
 
 ## Confirm, write, render
 
-The human-in-the-loop trigger (#130 §1.1). First, when a scope exists, find what bootstrap
-already settled:
+The human-in-the-loop trigger (#130 §1.1). On an update, items `carryforward` listed under
+`carry` are already settled: leave them out of everything below. First, when a scope exists,
+find what bootstrap already settled:
 
 ```bash
 bash "$S/sqlreview.sh" carryover "$SLUG" ".sqlreview/reviews/$SLUG/review.draft.json"
@@ -126,7 +139,9 @@ the draft. If the engineer stops, leave the draft and write nothing final — sa
 
 **Never fill `confirmed_by`, `confirmed_at` or `confirmed_revision` from anything but an answered
 question** (the bulk carry-over answer counts for the items it listed, and only those): `confirmed_by` is the user (`git config user.name` / `user.email`, else ask),
-`confirmed_at` is now (UTC ISO), `confirmed_revision` equals the document `revision`.
+`confirmed_at` is now (UTC ISO), `confirmed_revision` equals the document `revision` — except an
+item carried forward on an update, which takes exactly the `set` fields `carryforward` printed.
+Never set `carried_from_revision` by hand.
 
 Re-run fingerprint and compare its SHA with the bytes you reviewed; if different, reassess the
 change before continuing. Write the complete confirmed document to
@@ -160,7 +175,9 @@ rm -f ".sqlreview/reviews/$SLUG/review.draft.json"
 Show `review.md`. Hand over: the analyst runs `/data-request:explain <sql path>`.
 
 Publish validates a staged copy, confirmations, next revision and current SQL fingerprint before
-atomically replacing `review.json`. Never copy or patch the draft directly into the final path.
+atomically replacing `review.json`, and re-proves each carried item against the previous
+`review.json` and `source.sql` (so snapshot must follow every publish); on refusal, re-run
+`carryforward` and walk what it lists. Never copy or patch the draft directly into the final path.
 Snapshot verifies the final review hash before advancing `source.sql` and preserves
 `history/<revision>.sql` for resumed explanations. Stop on any failure and keep the draft. A failed
 or interrupted publish must never advance the baseline; a failed snapshot leaves the review stale.
