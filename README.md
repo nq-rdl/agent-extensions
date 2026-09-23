@@ -94,10 +94,8 @@ See [open issues](https://github.com/nq-rdl/agent-extensions/issues) for smaller
 
 ## Agent File Management
 
-This repo keeps a single source of truth for top-level agent context files:
-
-- `AGENTS.md` — single source of truth for agent contributor guidance.
-- `CLAUDE.md` → symlink to `AGENTS.md`. Claude Code loads `CLAUDE.md` as project context; symlinking keeps the two in sync.
+`AGENTS.md` is the single source of truth for agent contributor guidance. The repo
+does not carry a `CLAUDE.md`; there is no symlink or copy to keep in sync.
 
 ## License
 
