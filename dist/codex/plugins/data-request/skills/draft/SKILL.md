@@ -5,7 +5,8 @@ description: Draft or revise RDL cohort SQL from a defined request and verified 
   mappings, working autonomously on settled requirements or co-developing unresolved
   decisions.
 compatibility: RDL cohort SQL; verify target engine/version, dataops schema and query-builder
-  column-spec metadata at use time.
+  column-spec metadata at use time. record_assumption/record_limitation need query-builder
+  0.6.0 or later.
 metadata:
   repo: https://github.com/nq-rdl/agent-extensions
 ---
@@ -44,6 +45,10 @@ bare, transform verified anchors, and use verified encounter/event join keys. Tr
 the resulting grain through joins and exclusions. Keep unresolved placeholders out
 of executable SQL; if only a partial draft is possible, present it as incomplete
 and explain the missing decision before creating a runnable file.
+In pipeline or resolver code, record each reading you commit to with
+`pipeline.record_assumption(text, rationale=...)` and each accepted weakness with
+`pipeline.record_limitation(text, consequence=...)` at the line that introduces it
+(guardrails), not in a separate notes file.
 
 Return the path, implemented cohort definition, evidence locations for mappings and
 conversions, and any unresolved limitations. Perform a static check using

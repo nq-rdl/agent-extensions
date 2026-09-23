@@ -22,13 +22,21 @@
 #   carryover SLUG DRAFT                       review draft items matching confirmed, still-valid scope items (JSON)
 #   carryforward SLUG scope|review DRAFT       draft items whose previous-revision confirmation may be carried (JSON)
 #   impact SLUG                                heuristic: identifiers in the diff traced into unchanged lines
+#   notes SQL [--against JSON]                 read-only: parse the query-builder >= 0.6.0 analysis-notes header
+#                                              (leading /* assumptions: / limitations: */ block in the first GO batch,
+#                                              before any -- @extract: marker) into JSON {present, lines,
+#                                              assumptions, limitations: [{text, rationale, lines}]}; a limitation's
+#                                              consequence becomes its rationale; absent detail -> null; no header
+#                                              -> present false, exit 0. --against adds match {id, rationale_same}
+#                                              (same list, same text) from a review/scope/draft JSON, else null.
+#                                              Needs no .sqlreview/. Exit 4: malformed header, "line N: why" on stderr
 #   move OLDPATH NEWPATH                       rebind a review directory after the SQL moved (to the readable slug)
 #   move PATH PATH                             migrate a legacy-encoded slug to the readable one (no rebind needed)
 #   move --slug OLDSLUG NEWPATH                rebind a legacy review whose slug no current path derives
 #   render SLUG scope|review|lifts                   JSON + templates/<kind>.md -> reviews/SLUG/<kind>.md
 #                                              (a missing templates/<kind>.md is first installed from the bundled default)
 #
-# Exit codes: 0 ok · 1 usage · 2 error · 3 not initialised · 4 invalid document · 5 slug conflict ·
+# Exit codes: 0 ok · 1 usage · 2 error · 3 not initialised · 4 invalid document or notes header · 5 slug conflict ·
 # 6 no baseline · 10 differences found (init --diff / delta).
 set -u
 SR_SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd -P)"
@@ -597,6 +605,114 @@ cmd_carryforward() {
 }
 
 # ---------------------------------------------------------------------------------------------
+# query-builder >= 0.6.0 renders record_assumption()/record_limitation() as a leading comment header
+# (nq-rdl/query-builder docs/ANALYSIS_NOTES.md, #355). Read-only: the header is review *evidence*;
+# analyse seeds candidates from it and the human still confirms every item.
+# Search window: from the top of the file, skipping blank lines, `--` comments, SET/USE statements
+# and other block comments; it ends at a `-- @extract:` marker, a GO line or any other statement.
+# The header is a block whose `/*` and `*/` lines stand alone and whose first line is a section key.
+_notes_scan() { # <sql file> → records separated by \037: H start end · I kind start end text has_detail detail · E line why
+  awk '
+    function rtrim(s) { sub(/[ \t\r]+$/, "", s); return s }
+    function bad(n, why) { printf "E\037%d\037%s\n", n, why; err = 1; exit }
+    function flush() {
+      if (have) printf "I\037%s\037%d\037%d\037%s\037%d\037%s\n", sect, istart, iend, itext, hasd, dtext
+      have = 0
+    }
+    BEGIN { st = "pre" }
+    {
+      line = rtrim($0)
+      if (st == "open") st = (line == "assumptions:" || line == "limitations:") ? "hdr" : "other"
+      if (st == "other") {        # a block comment that is not the header (e.g. a licence banner)
+        p = index(line, "*/")
+        if (p) { st = "pre"; if (substr(line, p + 2) ~ /[^ \t]/) exit }
+        next
+      }
+      if (st == "hdr") {
+        if (line == "*/") {
+          if (!nitems) bad(sline, sect ": section is empty")
+          flush(); printf "H\037%d\037%d\n", hstart, NR; st = "done"; exit
+        }
+        if (line == "") next
+        if (line == "assumptions:" || line == "limitations:") {
+          name = substr(line, 1, length(line) - 1)
+          if (sect != "" && !nitems) bad(sline, sect ": section is empty")
+          if (name == "assumptions" && (seen_a || seen_l)) bad(NR, "assumptions: must come before limitations: and appear once")
+          if (name == "limitations" && seen_l) bad(NR, "limitations: must appear once")
+          flush(); sect = name; sline = NR; nitems = 0
+          if (name == "assumptions") seen_a = 1; else seen_l = 1
+          next
+        }
+        if (line == "  -" || line ~ /^  - [ \t]*$/) bad(NR, "empty item text")
+        if (substr(line, 1, 4) == "  - ") {
+          flush(); have = 1; istart = NR; iend = NR; itext = substr(line, 5); hasd = 0; dtext = ""; nitems++
+          next
+        }
+        if (line ~ /^    (rationale|consequence):/) {
+          key = substr(line, 5); sub(/:.*/, "", key)
+          want = (sect == "assumptions") ? "rationale" : "consequence"
+          if (!have) bad(NR, key ": without an item above it")
+          if (key != want) bad(NR, key ": is not valid under " sect ": (expected " want ":)")
+          if (hasd) bad(NR, "second " key ": for one item")
+          dtext = substr(line, 6 + length(key)); sub(/^[ \t]+/, "", dtext)
+          if (dtext == "") bad(NR, "empty " key ":")
+          hasd = 1; iend = NR
+          next
+        }
+        bad(NR, "unexpected line in notes header: " line)
+      }
+      t = line; sub(/^[ \t]+/, "", t)
+      if (t == "") next
+      if (substr(t, 1, 2) == "--") { if (t ~ /^--[ \t]*@extract:/) exit; next }
+      if (line == "/*") { st = "open"; hstart = NR; next }
+      if (substr(t, 1, 2) == "/*") {
+        p = index(substr(t, 3), "*/")
+        if (!p) { st = "other"; next }
+        if (substr(t, p + 4) ~ /[^ \t]/) exit
+        next
+      }
+      if (tolower(t) ~ /^(set|use)[ \t]/) next
+      exit                        # GO or executable SQL: the header can only precede them
+    }
+    END { if (!err && st == "hdr") printf "E\037%d\037%s\n", hstart, "unterminated notes header: no closing */ line" }
+  ' "$1"
+}
+
+cmd_notes() {
+  local sql="" against="" recs errs
+  while [ $# -gt 0 ]; do
+    case "$1" in
+      --against) [ $# -ge 2 ] || usage; against="$2"; shift ;;
+      -*) usage ;;
+      *) [ -z "$sql" ] || usage; sql="$1" ;;
+    esac
+    shift
+  done
+  [ -n "$sql" ] || usage
+  sr_need_jq
+  [ -f "$sql" ] && [ -r "$sql" ] || sr_die 2 "no such readable file: $sql"
+  if [ -n "$against" ]; then
+    [ -f "$against" ] && [ -r "$against" ] || sr_die 2 "no such readable file: $against"
+    jq -e 'type == "object"' "$against" >/dev/null 2>&1 || sr_die 4 "invalid JSON: $against"
+  fi
+  recs="$(_notes_scan "$sql")" || sr_die 2 "cannot read $sql"
+  errs="$(printf '%s\n' "$recs" | awk 'BEGIN { FS = "\037" } $1 == "E" { printf "line %s: %s\n", $2, $3 }')"
+  [ -z "$errs" ] || sr_die 4 "malformed analysis-notes header in $sql: $errs"
+  printf '%s\n' "$recs" | jq -R -s --slurpfile against "${against:-/dev/null}" '
+    (split("\n") | map(select(. != "") | split("\u001f"))) as $recs
+    | ($against[0] // null) as $doc
+    | ([$recs[] | select(.[0] == "H")][0]) as $h
+    | def items($k): [$recs[] | select(.[0] == "I" and .[1] == $k)
+        | {text: .[4], rationale: (if .[5] == "1" then .[6] else null end), lines: [(.[2] | tonumber), (.[3] | tonumber)]}
+        | if $doc == null then . else . as $i
+            | ([($doc[$k] // [] | arrays)[] | select(type == "object" and .text == $i.text)][0]) as $m
+            | . + {match: (if $m == null then null else {id: $m.id, rationale_same: ($m.rationale == $i.rationale)} end)}
+          end];
+    {present: ($h != null), lines: (if $h == null then null else [($h[1] | tonumber), ($h[2] | tonumber)] end),
+     assumptions: items("assumptions"), limitations: items("limitations")}'
+}
+
+# ---------------------------------------------------------------------------------------------
 cmd_move() {
   sr_need_jq
   sr_require_root
@@ -714,6 +830,7 @@ case "$cmd" in
   impact) cmd_impact "$@" ;;
   carryover) cmd_carryover "$@" ;;
   carryforward) cmd_carryforward "$@" ;;
+  notes) cmd_notes "$@" ;;
   move) cmd_move "$@" ;;
   render) cmd_render "$@" ;;
   -h|--help|help) usage ;;

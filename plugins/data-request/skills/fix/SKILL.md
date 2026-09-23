@@ -6,7 +6,9 @@ description: >-
   targeted corrections to existing code with a concrete expected result.
 argument-hint: '<issue description> [SQL or Python path]'
 user-invocable: true
-compatibility: RDL request repos; verify the repository's SQL dialect, Python environment and installed library versions at use time.
+compatibility: >-
+  RDL request repos; verify the repository's SQL dialect, Python environment and installed library versions at use time.
+  record_assumption/record_limitation need query-builder 0.6.0 or later.
 allowed-tools: Bash, Read, Glob, Grep, Write, Edit, AskUserQuestion
 metadata:
   repo: https://github.com/nq-rdl/agent-extensions
@@ -54,7 +56,10 @@ punctuation from opaque IDs unless the contract establishes that it is formattin
 ## Verify the correction
 
 Make the smallest source change that resolves the reported defect, preserving
-unrelated edits. Use the repository's managed environment and existing checks.
+unrelated edits. When the fix changes a filter, join or meaning in pipeline or
+resolver code, add or update its `record_assumption()` / `record_limitation()` call
+at that point (guardrails); remove a record whose logic the fix removes. Use the
+repository's managed environment and existing checks.
 Inspect test/export commands before running them; exercise the affected path with
 local synthetic fixtures, without querying a live database or publishing exports
 as part of a code fix. Verify correctness-critical API behavior against the
