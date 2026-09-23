@@ -8,6 +8,7 @@
 #   status [--json] [--verbose]                reviews and their state (--verbose: why invalid/missing); exit 3 when not initialised
 #   slug PATH                                  slug for a project path; exit 5 on a conflicting binding
 #   check FILE | check --stdin                 validate a review/scope JSON; exit 4 with one violation per line
+#   lint FILE                                  confirmed items whose wording is still provisional; exit 10 when any
 #   publish SLUG scope|review|lifts DRAFT             validate a staged copy, then atomically replace the final JSON
 #   roles ENGINEER ANALYST                     update only the two confirmed role names in config.json
 #   fingerprint SQL                            {sql_path, sql_sha256, git_commit, git_dirty}
@@ -198,6 +199,28 @@ cmd_check() {
 }
 
 # ---------------------------------------------------------------------------------------------
+# Advisory, not part of check: a confirmed item whose text or rationale still reads as a proposal
+# contradicts its confirmation (#340). Prints "<id>\t<field>\t<phrases>" per hit; exit 10 when any.
+cmd_lint() {
+  [ $# -eq 1 ] || usage
+  sr_need_jq
+  [ -f "$1" ] || sr_die 2 "no such file: $1"
+  local out
+  out="$(jq -r '
+    ("should be confirmed|to be confirmed|needs? (to be )?confirm(ing|ed|ation)?|pending confirmation|awaiting confirmation|unconfirmed|\\bproposed\\b|\\btbc\\b") as $re
+    | (.assumptions // [], .limitations // [])[]
+    | select(type == "object" and .status == "confirmed") as $item
+    | ("text", "rationale") as $field
+    | ([($item[$field] // "" | strings) | match($re; "gi").string | ascii_downcase] | unique) as $hits
+    | select($hits | length > 0)
+    | "\($item.id // "?")\t\($field)\t\($hits | join(", "))"
+  ' "$1")" || sr_die 4 "invalid JSON: $1"
+  [ -n "$out" ] || return 0
+  printf '%s\n' "$out"
+  return 10
+}
+
+# ---------------------------------------------------------------------------------------------
 cmd_roles() (
   [ $# -eq 2 ] || usage
   sr_need_jq
@@ -251,6 +274,11 @@ cmd_publish() (
   if [ "$kind" = review ]; then
     [ -f "$SR_ROOT/$rel" ] || sr_die 2 "no such SQL: $rel"
     [ "$(sr_sha256 "$SR_ROOT/$rel")" = "$(jq -r .sql_sha256 "$tmp")" ] || sr_die 2 "SQL changed since fingerprint; reassess before publishing"
+  fi
+  if [ "$kind" = scope ] && jq -e '.sql_sha256 | type == "string"' "$tmp" >/dev/null; then
+    # The scope was framed against existing SQL: refuse to publish over a later edit (#340).
+    [ -f "$SR_ROOT/$rel" ] || sr_die 2 "scope records sql_sha256 but the SQL is missing: $rel"
+    [ "$(sr_sha256 "$SR_ROOT/$rel")" = "$(jq -r .sql_sha256 "$tmp")" ] || sr_die 2 "SQL changed since the scope framing was confirmed; re-diff, re-put intent, inputs, outputs and affected items, then refresh sql_sha256"
   fi
   if [ -f "$dest" ] && cmp -s "$tmp" "$dest"; then
     printf 'already published\t%s\n' "${dest#"$SR_ROOT"/}"
@@ -493,6 +521,7 @@ case "$cmd" in
   status) cmd_status "$@" ;;
   slug) cmd_slug "$@" ;;
   check) cmd_check "$@" ;;
+  lint) cmd_lint "$@" ;;
   publish) cmd_publish "$@" ;;
   roles) cmd_roles "$@" ;;
   fingerprint) cmd_fingerprint "$@" ;;

@@ -81,6 +81,7 @@ else
     (if has("changes") and ((.changes | type) != "array" or (.changes | all(.[]; type == "object" and (.revision | integer) and (.at | nonempty) and (.by | nonempty) and (.summary | nonempty)) | not)) then "changes must be an array of revision records" else empty end),
     (if .kind == "review" and ((.purpose | nonempty | not) or (.sql_sha256 | test("^[0-9a-f]{64}$") | not)) then "review requires purpose and SHA256" else empty end),
     (if .kind == "scope" and (.intent | nonempty | not) then "scope requires intent" else empty end),
+    (if .kind == "scope" and .sql_sha256 != null and (.sql_sha256 | (type == "string" and test("^[0-9a-f]{64}$")) | not) then "scope sql_sha256 must be null or a SHA256" else empty end),
     (.revision as $rev
   | req("schemaVersion"), req("kind"), req("slug"), req("sql_path"), req("revision"),
     (if .kind != "lifts" then req("assumptions"), req("limitations") else empty end),
