@@ -50,10 +50,12 @@ class CompletePublication(unittest.TestCase):
         template = self.workspace / ".sqlreview/templates/review.md"
         original = template.read_text()
         template.unlink()
+        template.mkdir()  # a missing template is reinstalled (#349); a directory still fails
         self.assertNotEqual(self.helper("render", "q", "review").returncode, 0)
         self.assertEqual(self.helper("delta", "q").returncode, 0)
         self.assertNotEqual(self.recover().returncode, 0)
         self.assertTrue(self.draft.exists())
+        template.rmdir()
         template.write_text(original)
         result = self.recover()
         self.assertEqual(result.returncode, 0, result.stderr)

@@ -6,6 +6,7 @@
 #
 #   init [--diff] [--apply PATH...] [--json]   create .sqlreview/ from the bundled default; never overwrites
 #   status [--json] [--verbose]                reviews and their state (--verbose: why invalid/missing); exit 3 when not initialised
+#                                              missing bundled templates: JSON missing_templates, else one stderr line
 #   slug PATH                                  slug for a project path; exit 5 on a conflicting binding
 #   check FILE | check --stdin                 validate a review/scope JSON; exit 4 with one violation per line
 #   lint FILE                                  confirmed items whose wording is still provisional; exit 10 when any
@@ -19,6 +20,7 @@
 #   move OLDPATH NEWPATH                       rebind a review directory after the SQL moved
 #   move --slug OLDSLUG NEWPATH                rebind a legacy review whose slug no current path derives
 #   render SLUG scope|review|lifts                   JSON + templates/<kind>.md -> reviews/SLUG/<kind>.md
+#                                              (a missing templates/<kind>.md is first installed from the bundled default)
 #
 # Exit codes: 0 ok · 1 usage · 2 error · 3 not initialised · 4 invalid document · 5 slug conflict ·
 # 6 no baseline · 10 differences found (init --diff / delta).
@@ -106,7 +108,7 @@ cmd_init() {
 
 # ---------------------------------------------------------------------------------------------
 cmd_status() {
-  local json=0 verbose=0 d slug state reason schema lifts rows="[]"
+  local json=0 verbose=0 d slug state reason schema lifts rows="[]" f missing=""
   while [ $# -gt 0 ]; do
     case "$1" in --json) json=1 ;; --verbose) verbose=1 ;; *) usage ;; esac
     shift
@@ -114,6 +116,15 @@ cmd_status() {
   sr_need_jq
   sr_require_root
   schema="$(jq -r '.schemaVersion // "?"' "$SR_ROOT/$SR_DIR/config.json" 2>/dev/null || echo '?')"
+  # Bundled templates the project lacks (e.g. lifts.md in a project initialised before lifts, #349).
+  for f in "$SR_ASSETS"/templates/*.md; do
+    [ -f "$f" ] || continue
+    f="templates/$(basename "$f")"
+    [ -f "$SR_ROOT/$SR_DIR/$f" ] || missing="$missing${missing:+ }$f"
+  done
+  if [ -n "$missing" ] && [ "$json" = 0 ]; then
+    printf 'sqlreview: missing bundled template(s): %s; render installs them automatically, or add them now with: sqlreview.sh init --apply %s\n' "$missing" "$missing" >&2
+  fi
   if [ -d "$SR_REVIEWS" ]; then
     for d in "$SR_REVIEWS"/*/; do
       [ -d "$d" ] || continue
@@ -142,9 +153,11 @@ EOF
     done
   fi
   if [ "$json" = 1 ]; then
-    printf '%s' "$rows" | jq --arg root "$SR_ROOT" --arg schema "$schema" \
+    printf '%s' "$rows" | jq --arg root "$SR_ROOT" --arg schema "$schema" --arg missing "$missing" \
       '{root: $root, schemaVersion: ($schema | tonumber? // $schema), reviews: .,
-        counts: (group_by(.state) | map({key: .[0].state, value: length}) | from_entries | . + {total: (map(.) | add // 0)})}'
+        counts: (group_by(.state) | map({key: .[0].state, value: length}) | from_entries | . + {total: (map(.) | add // 0)}),
+        missing_templates: ($missing | split(" ") | map(select(. != ""))),
+        missing_templates_fix: (if $missing == "" then null else "sqlreview.sh init --apply " + $missing end)}'
   fi
   return 0
 }
@@ -541,6 +554,26 @@ cmd_move() {
 }
 
 # ---------------------------------------------------------------------------------------------
+# Install the bundled templates/<kind>.md when the project lacks it (#349): never replaces an
+# existing file, refuses symlink components, stages beside the target. Returns 1 when not bundled.
+_render_install_template() { # <kind>
+  local dir="$SR_ROOT/$SR_DIR/templates" src="$SR_ASSETS/templates/$1.md" tmp
+  [ -f "$src" ] || return 1
+  sr_no_symlinks "$dir/$1.md" || exit 2
+  [ ! -e "$dir/$1.md" ] || sr_die 2 "template is not a regular file: $SR_DIR/templates/$1.md"
+  mkdir -p "$dir" || sr_die 2 "cannot create $SR_DIR/templates"
+  tmp="$(mktemp "$dir/.install.XXXXXX")" || sr_die 2 "mktemp failed"
+  cp "$src" "$tmp" || { rm -f "$tmp"; sr_die 2 "cannot stage templates/$1.md"; }
+  chmod 644 "$tmp" || { rm -f "$tmp"; sr_die 2 "cannot stage templates/$1.md"; }  # mktemp makes 0600; match init's copies
+  # ln refuses an existing target, so a template that appeared meanwhile is kept; mv covers
+  # filesystems without hard links.
+  if ln "$tmp" "$dir/$1.md" 2>/dev/null || { [ ! -e "$dir/$1.md" ] && mv "$tmp" "$dir/$1.md"; }; then
+    printf 'sqlreview: installed missing template %s/templates/%s.md from the bundled default\n' "$SR_DIR" "$1" >&2
+  fi
+  rm -f "$tmp"
+  [ -f "$dir/$1.md" ] || sr_die 2 "cannot install $SR_DIR/templates/$1.md; run: sqlreview.sh init --apply templates/$1.md"
+}
+
 cmd_render() {
   [ $# -eq 2 ] || usage
   sr_need_jq
@@ -550,10 +583,10 @@ cmd_render() {
   sr_safe_slug "$slug"
   doc="$SR_REVIEWS/$slug/$kind.json"
   [ -f "$doc" ] || sr_die 2 "no such document: reviews/$slug/$kind.json"
-  tpl="$SR_ROOT/$SR_DIR/templates/$kind.md"
-  [ -f "$tpl" ] || sr_die 2 "template missing: $SR_DIR/templates/$kind.md ($SR_SETUP_HINT)"
   cfg="$SR_ROOT/$SR_DIR/config.json"
   [ -f "$cfg" ] || sr_die 2 "config missing: $SR_DIR/config.json ($SR_SETUP_HINT)"
+  tpl="$SR_ROOT/$SR_DIR/templates/$kind.md"
+  [ -f "$tpl" ] || _render_install_template "$kind" || sr_die 2 "template missing: $SR_DIR/templates/$kind.md ($SR_SETUP_HINT)"
   sr_no_symlinks "$doc" || exit 2
   cmd_check "$doc" >/dev/null || sr_die 4 "invalid document"
   out="$SR_REVIEWS/$slug/$kind.md"

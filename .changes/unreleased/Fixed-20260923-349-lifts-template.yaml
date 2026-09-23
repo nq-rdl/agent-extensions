@@ -1,0 +1,3 @@
+kind: Fixed
+body: 'sqlreview render installs a missing bundled template (e.g. lifts.md in older projects) without overwriting, so silent lift capture no longer stops'
+time: 2026-09-23T12:00:00.000000000Z
