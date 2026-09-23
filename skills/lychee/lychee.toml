@@ -41,6 +41,8 @@ exclude = [
   # Team spec-kit catalog (may be private) — referenced by speckit-dev skills/hook
   "^https://github\\.com/nq-rdl/spec-kit-extensions",
   "^https://raw\\.githubusercontent\\.com/nq-rdl/spec-kit-extensions",
+  # Private RDL repositories linked by the data-request skills (resolve for org members only)
+  "^https://github\\.com/nq-rdl/(query-builder|documentation|data-analysis-scaffold)/",
   # RDL Service Desk (access-controlled) — referenced by the new-service-request skill
   "^https://github\\.com/rdl-service-desk/service-desk",
   # Red Hat: docs.redhat.com bot-blocks non-browser clients (Akamai 403 — see redhat plugin,

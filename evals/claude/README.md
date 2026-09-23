@@ -114,6 +114,14 @@ Python and Node, and also checks that the case's unchanged original fails every 
 and that a before/after reply quoting the original still passes. Hand-written graders of
 other types (`tool_used`, `llm`) in the same directory are left alone.
 
+### Hand-written text graders
+
+When a case's answer is prose, such as a classification, grade the labelled lines the skill
+tells the agent to write, not a code block. The `data-request` suite does this. Its regex
+graders are hand-written (the generator changes only files with its `GENERATED` marker). Each
+case's `fixtures.yaml` lists passing and failing replies, and
+`tests/test_eval_data_request_amend_graders.py` grades them in Python and Node.
+
 Sync strips `name:` from packaged skills, so a `tool_used: Skill` grader matches
 the leaf: `input_match: '"skill"\s*:\s*"(?:[\w-]+:)?naming"'` for `/go:naming`.
 Prefer `regex`, `tool_used`, and `file_exists` graders (free, deterministic) and

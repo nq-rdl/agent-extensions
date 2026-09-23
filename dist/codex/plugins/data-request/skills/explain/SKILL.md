@@ -82,7 +82,11 @@ In review order, one step per turn, pausing each time with the host user-questio
 2. **Inputs** — each source and what one row of it means.
 3. **Each logic step** — Read and show the SQL lines it covers; then the assumptions and
    limitations whose `location` falls in those lines, **by id** (`A1`, `L2`), with the decision,
-   its rationale and who confirmed it — this is the cross-reference (#128 §1.2).
+   its rationale and who confirmed it — this is the cross-reference (#128 §1.2). If the SQL
+   explained opens with a query-builder analysis-notes header, run
+   `bash "$S/sqlreview.sh" notes "<that SQL>" --against ".sqlreview/reviews/$SLUG/review.json"`
+   once and name the review id each header item matches. A header item with `match: null` is
+   unreviewed: say so and note it for the engineer; the confirmed review is the authority.
 4. **Outputs** — each column; then items with no `location` (global ones).
 5. **Open questions** — what is still with the requester.
 

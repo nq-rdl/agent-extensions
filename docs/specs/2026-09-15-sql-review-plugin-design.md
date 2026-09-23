@@ -149,6 +149,7 @@ scripts across a plugin's skills).
 | `snapshot SLUG SQL` | Copies the current SQL bytes to `reviews/<slug>/source.sql` (called by analyse after the guarded final JSON Write succeeds, verifying its SHA256 and preserving history/<revision>.sql). | 0 · 2 |
 | `delta SLUG` | Unified diff of `source.sql` vs the current file; header lines report both sha256s. | 0 unchanged · 10 changed · 6 no baseline · 2 |
 | `impact SLUG` | **Hints only.** Identifiers introduced/altered inside the diff hunks (CTE names, aliases, columns) and the non-diff lines referencing them. Printed under a "heuristic — does not prove anything unaffected" banner. | 0 · 6 · 2 |
+| `notes SQL [--against JSON]` | Read-only; needs no `.sqlreview/`. Parses the query-builder ≥ 0.6.0 analysis-notes header (§13) into `{present, lines, assumptions, limitations: [{text, rationale, lines}]}`; a limitation's `consequence` becomes `rationale`, absent detail is `null`, `lines` are the header lines each item came from. `--against` adds `match: {id, rationale_same}` (same list, identical text) or `null`. | 0 (also with no header: `present: false`) · 1 · 2 · 4 malformed header, `line N: why` |
 | `move OLD NEW` | Rename a review directory when the SQL moved; rewrites `sql_path`, invalidates the baseline state to `stale`. `move PATH PATH` migrates a legacy-encoded slug to the readable one without invalidating it. | 0 · 2 |
 | `render SLUG scope\|review\|lifts` | JSON + `templates/<kind>.md` → `<kind>.md`. A missing template is first installed from the bundled default (never overwriting, symlinks refused, one stderr line). Fixed placeholder set; unknown placeholders are left in place and reported. Deterministic. | 0 · 2 |
 
@@ -340,3 +341,26 @@ revision when its confirmed content is unchanged; scope and review items now do 
   (`sqlreview-carry.jq`) publish enforces, so the two cannot drift. Bootstrap and analyse walk only
   what it lists under `walk`, plus any carryable item the diff implicates indirectly.
 - **Render** marks a carried item's revision cell `N (carried)`; `N` is where it was confirmed.
+
+## 13. The rendered analysis-notes header as review evidence (#355)
+
+query-builder 0.6.0 renders what pipeline and resolver code recorded with `record_assumption()` /
+`record_limitation()` as a leading comment header
+([contract](https://github.com/nq-rdl/query-builder/blob/main/docs/ANALYSIS_NOTES.md)). The engineer
+skills (draft, fix, lift via guardrails) prescribe recording at the point of logic; the review reads
+the result.
+
+- **Recognition (`notes`).** Scan from the top of the file, skipping blank lines, `--` comments,
+  `SET`/`USE` statements and other block comments (e.g. a licence banner). The window ends at a
+  `-- @extract:` marker, a `GO` line or any other statement. The header is a block whose `/*` and
+  `*/` lines stand alone and whose first line is `assumptions:` or `limitations:`. Inside it:
+  `assumptions:` then `limitations:` (each at most once, never empty), items `  - text`, one
+  optional `    rationale:` (assumptions) or `    consequence:` (limitations) per item. Anything
+  else is malformed (exit 4). CRLF and trailing whitespace are tolerated.
+- **Candidates only.** Analyse seeds header items into `review.draft.json` as `status: candidate`
+  (verbatim text; consequence → rationale), reusing an existing item where `--against` reports a
+  `match`, so `carryover`/`carryforward` behave as before. The human confirms every item; nothing is
+  confirmed because the header states it. Before publishing, `notes --against` the confirmed draft
+  surfaces header items with no confirmed counterpart as mismatches.
+- **Absence proves nothing.** SQL built before 0.6.0, or by code that recorded nothing, has no
+  header; the review still looks for assumptions and limitations in the SQL.

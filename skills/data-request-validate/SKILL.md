@@ -41,6 +41,7 @@ human and update the findings. Infer mode from the request when omitted. Do not 
 SQL or carry an unanswered question forward as confirmation.
 
 Use `/data-request:fix` for targeted corrections or `/data-request:draft` to develop SQL.
+`/data-request:amend` classifies an analyst amendment to a released extract.
 `/data-request:analyse` remains the separate
 human-confirmed handoff: this technical validation does not approve assumptions,
 advance snapshots or clear stale review state.

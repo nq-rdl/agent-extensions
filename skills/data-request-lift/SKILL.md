@@ -10,6 +10,7 @@ user-invocable: true
 compatibility: >-
   .sqlreview schema 2 (schema 1 remains readable); Bash 3.2+, jq >= 1.6.
   API baseline query-builder 0.4.0 and query-builder-plugins 0.3.0;
+  record_limitation needs query-builder 0.6.0 or later;
   inspect the enquiry's actual framework_ref before claiming availability.
 allowed-tools: Bash, Read, Glob, Grep, Write, AskUserQuestion
 metadata:
@@ -99,6 +100,9 @@ with the proposed limitation; report close-out incomplete until it is recorded.
 For request-specific hand SQL there is no library issue: propose a truthful
 limitation describing the local composition and no planned backport, without a
 fabricated URL. Keep rejected/unconfirmed delivery risks visible in the draft.
+Recommend recording the confirmed text with `pipeline.record_limitation(text,
+consequence=...)` beside the workaround so the rendered header carries it; draft or
+fix makes that edit, and recomposition removes it with the workaround.
 
 ## Recurring follow-up
 

@@ -1,0 +1,27 @@
+# Replies graded by tests/test_eval_data_request_amend_graders.py in Python and Node. No model call.
+pass:
+  - name: skill-shaped hand-off
+    reply: |
+      classification: engineer-required
+
+      Length of stay is a new derived value: it interprets two columns (units, rounding,
+      same-day stays, time zones), so "simple addition" does not apply. Make no edit.
+
+      requested change: add LengthOfStayDays = DischargeDateTime - AdmitDateTime
+      boundary rule: add a derived value, e.g. length of stay (docs/ANALYST_AMENDMENTS.md)
+      affected files: src/cohort/falls.py; sql/v2/falls_request.sql (regenerated)
+      governance: a new column is a new data element; ask for the original request ID and reason
+fail:
+  - name: treated as presentation
+    fails: [classified-engineer, hand-off]
+    reply: |
+      classification: analyst-safe
+
+      Both columns are already surfaced, so compute it in the export:
+      `df["LengthOfStayDays"] = (df.DischargeDateTime - df.AdmitDateTime).dt.days`.
+  - name: classified but no hand-off
+    fails: [hand-off]
+    reply: |
+      classification: engineer-required
+
+      Ask an engineer to add it to src/cohort/falls.py.

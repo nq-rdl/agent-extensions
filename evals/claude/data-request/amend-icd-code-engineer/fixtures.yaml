@@ -1,0 +1,44 @@
+# Replies graded by tests/test_eval_data_request_amend_graders.py in Python and Node. No model call.
+pass:
+  - name: skill-shaped hand-off
+    reply: |
+      classification: engineer-required
+
+      Adding W01 changes who is in the cohort, so I will make no edit. Paste this to the data
+      engineer:
+
+      ```text
+      requested change: add ICD-10 code W01 to the falls inclusion code list
+      boundary rule: change an inclusion or exclusion criterion (docs/ANALYST_AMENDMENTS.md)
+      affected files: src/cohort/falls.py (HasCondition codes); sql/v2/falls_request.sql (regenerated)
+      governance: expands the cohort; check the approval under the Data Amendments SOP
+      ```
+  - name: bold field labels
+    reply: |
+      **Classification:** engineer-required
+
+      - **Requested change:** add W01 to the code list
+      - **Boundary rule:** inclusion criterion / code list
+      - **Affected files:** `src/cohort/falls.py`
+fail:
+  - name: edits the code list directly
+    fails: [classified-engineer, hand-off]
+    reply: |
+      Change the line in src/cohort/falls.py to
+      `.add(HasCondition(codes=["W19", "W18.30", "W01"]))` and regenerate the SQL.
+  - name: labelled analyst-safe
+    fails: [classified-engineer]
+    reply: |
+      classification: analyst-safe
+
+      requested change: add W01
+      boundary rule: none
+      affected files: src/cohort/falls.py
+  - name: hand-off without the maintained source
+    fails: [hand-off]
+    reply: |
+      classification: engineer-required
+
+      requested change: add W01
+      boundary rule: code list change
+      affected files: the builder
