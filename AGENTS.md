@@ -40,8 +40,8 @@ pixi install
 
 Local hooks mirror CI so failures surface before you push. **pre-commit** runs
 fast checks (gofmt/vet/build of `tools/asctl`, `asctl repo-check`, plugin
-validation, generated-artifact drift, a per-fragment changie body-length cap,
-lychee links); **pre-push** runs `asctl` tests, the pipeline unit tests, a
+validation, generated-artifact drift, a per-fragment changie body-length cap
+that also rejects fragments whose YAML does not parse, lychee links); **pre-push** runs `asctl` tests, the pipeline unit tests, a
 non-blocking SkillSpector scan, a local-only `claude plugin eval` job for plugins whose
 `evals/claude/<plugin>/` suite changed (opt-in via `CLAUDE_EVAL_ENABLE=1`, non-blocking, no CI twin; paid model
 calls on your local `claude` login, see `evals/claude/README.md`), and a hard changie-fragment gate. Prereqs:
@@ -199,7 +199,7 @@ CI runs `validate.yml` on every PR/push to main. It checks:
 - Skills validate against the agentskills.io spec **and the directory-structure standard** (`asctl repo-check`, built from `tools/asctl/`)
 
 Three more workflows run on PRs alongside `validate.yml`:
-- `changelog-check.yml` — fails if no changie fragment was added (bypass with the `skip-changelog` label), and lints each *added* fragment's body against the 200-char per-fragment cap (`scripts/check_changie_length.py`)
+- `changelog-check.yml` — fails if no changie fragment was added (bypass with the `skip-changelog` label), and lints each *added* fragment's body against the 200-char per-fragment cap (`scripts/check_changie_length.py`, which also fails on fragments whose YAML does not parse)
 - `link-check.yml` — lychee link check over changed `skills/**/*.md`
 - `skillspector.yml` — NVIDIA SkillSpector scan over `skills/`; informational, uploads SARIF to code scanning (non-gating)
 
@@ -311,7 +311,10 @@ changie merge             # merge versions into CHANGELOG.md
 command, so this is enforced two ways: `changie new` rejects an over-long body
 at creation, and `scripts/check_changie_length.py` re-lints *added* fragments in
 the pre-commit hook and in `changelog-check.yml` (catching fragments written
-directly, bypassing the prompt). The cap is **per fragment, not per change** —
+directly, bypassing the prompt). The same check also rejects a fragment whose
+YAML does not parse (e.g. an unquoted `body:` containing `: `), so a malformed
+hand-written fragment fails at commit/PR time instead of at release `changie
+batch`. The cap is **per fragment, not per change** —
 there is no limit on how many fragments a branch adds, so split a large change
 into several: run `changie new` once per idea (`Added: thing 1`, `Added: thing
 2`, …) rather than packing everything into one run-on body. The cap governs
