@@ -236,9 +236,11 @@ changes here. See [GitHub's protected-branch documentation](https://docs.github.
 Keep external `check-links` advisory and outside that intended set: its path
 filter skips unrelated PRs, so requiring it could leave them waiting. The
 `check-changie-fragment`, SkillSpector `scan`, and release-specific
-`version-monotonic` checks are also outside the always-run set. Release reviewers
-must check `version-monotonic` separately; it is not currently a configured
-required status check.
+`version-monotonic` checks are also outside the always-run set. It is not
+currently a configured required status check, and base-branch moves do not
+retrigger it, so a green result can be stale. Before merging a release PR,
+reviewers must rerun `version-monotonic` against current `main` (or confirm the
+PR's `VERSION` is strictly newer than `main`'s current `VERSION`).
 
 [Issue #300](https://github.com/nq-rdl/agent-extensions/issues/300) plans a
 deterministic local Markdown/RST reference check, distinct from external HTTP
