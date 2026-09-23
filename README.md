@@ -19,6 +19,34 @@ Curated reusable agent skills packaged as self-contained plugins. Claude Code an
 
 See [`docs/bundles.md`](docs/bundles.md) for the full subject list.
 
+#### Using skills in Claude Code
+
+Each plugin is a **subject**, and each skill in it is a facet, so skills invoke as
+`/<subject>:<skill>`. For example, the `go` plugin provides `/go:naming` and
+`/go:secure`:
+
+```text
+/go:naming review the identifiers in internal/store/
+```
+
+Type `/<subject>` to list a plugin's skills in autocomplete. Claude can also load an
+installed skill on its own when your request matches the skill's description.
+[`docs/bundles.md`](docs/bundles.md) lists every skill per plugin for both Claude Code
+and Codex.
+
+#### Updating and removing plugins
+
+Run these from a shell. `/plugin` opens the same manager inside a session.
+
+```bash
+# Refresh the marketplace catalog, then update an installed plugin
+claude plugin marketplace update rdl-agent-extensions
+claude plugin update go@rdl-agent-extensions   # restart Claude Code to apply
+
+# Remove a plugin
+claude plugin uninstall go@rdl-agent-extensions
+```
+
 ### Codex
 
 ```bash
@@ -38,6 +66,28 @@ The CLI also provides `/skills`. Refer to [Invoking skills](docs/codex.md#invoki
 for desktop menu behaviour and differences from Claude Code slash commands.
 
 See [Delegation](docs/delegation.md) for optional subagent execution and migrated agent names.
+
+## Contributing
+
+See [`CONTRIBUTING.md`](CONTRIBUTING.md) for how skills are grouped into plugins, the
+skill directory layout, content conventions, and the packaging loop. See
+[`AGENTS.md`](AGENTS.md) for repo commands, CI checks, local hooks, and the changelog and
+release flow. Design decisions live in [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md).
+
+## Roadmap
+
+Planned work is tracked as epics and on the
+[RDL Planning project board](https://github.com/orgs/nq-rdl/projects/1) (visible to
+`nq-rdl` organization members):
+
+- [#180](https://github.com/nq-rdl/agent-extensions/issues/180) — reviewable,
+  merge-triggered release process hardened to Actions best practice
+- [#261](https://github.com/nq-rdl/agent-extensions/issues/261) — `redhat` plugin for
+  Red Hat documentation and Customer Portal content
+- [#312](https://github.com/nq-rdl/agent-extensions/issues/312) — reliable,
+  discoverable skills: verified fixes, behavioural pilots, and link integrity
+
+See [open issues](https://github.com/nq-rdl/agent-extensions/issues) for smaller items.
 
 ## Agent File Management
 
