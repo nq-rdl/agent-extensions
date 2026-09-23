@@ -37,6 +37,7 @@ class MissingTemplate(unittest.TestCase):
         self.assertIn("installed missing template .sqlreview/templates/lifts.md from the bundled default", r.stderr)
         self.assertNotIn("installed", r.stdout)
         self.assertIn("Current labelled status", self.rendered())
+        self.assertEqual(self.tpl.stat().st_mode & 0o777, 0o644)  # not mktemp's 0600
         self.assertEqual(list((self.sr / "templates").glob(".*")), [])  # no staging leftovers
         self.assertNotIn("installed", self.render().stderr)  # second render: nothing to install
 

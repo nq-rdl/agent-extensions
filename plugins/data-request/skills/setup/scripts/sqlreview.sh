@@ -564,6 +564,7 @@ _render_install_template() { # <kind>
   mkdir -p "$dir" || sr_die 2 "cannot create $SR_DIR/templates"
   tmp="$(mktemp "$dir/.install.XXXXXX")" || sr_die 2 "mktemp failed"
   cp "$src" "$tmp" || { rm -f "$tmp"; sr_die 2 "cannot stage templates/$1.md"; }
+  chmod 644 "$tmp" || { rm -f "$tmp"; sr_die 2 "cannot stage templates/$1.md"; }  # mktemp makes 0600; match init's copies
   # ln refuses an existing target, so a template that appeared meanwhile is kept; mv covers
   # filesystems without hard links.
   if ln "$tmp" "$dir/$1.md" 2>/dev/null || { [ ! -e "$dir/$1.md" ] && mv "$tmp" "$dir/$1.md"; }; then
