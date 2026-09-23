@@ -27,7 +27,7 @@ reopening the repository in a container.
 
 ## Docker and CI
 
-The required plugin-validation job runs these same image and test commands:
+The `validate-plugins` CI job runs these same image and test commands:
 
 ```bash
 docker build --build-arg CODEX_VERSION=0.154.0 \

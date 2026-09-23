@@ -40,7 +40,7 @@ as the host uid, and give Claude a throwaway home seeded with your own OAuth cre
 
 Run `bash scripts/smoke-codex-marketplace.sh` with Codex and jq installed, or use
 [the dedicated Codex devcontainer](../../.devcontainer/codex/README.md).
-The existing required plugin-validation CI job builds that image and runs the
+The `validate-plugins` CI job builds that image and runs the
 same smoke test with a read-only checkout and networking disabled.
 
 Coverage includes all enabled marketplace plugins, qualified skill discovery,
