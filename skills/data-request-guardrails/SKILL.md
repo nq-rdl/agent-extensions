@@ -126,6 +126,8 @@ The half-open interval above is illustrative: preserve the request's agreed boun
 semantics. Do not silently replace an inclusive endpoint, choose nine months, or
 substitute a fixed offset where daylight-saving rules apply. Check bound types and
 implicit conversions too; a bare column alone does not prove an index seek.
+Render datetime bounds as `'YYYY-MM-DDTHH:MM:SS'`; `'YYYYMMDD'` is safe only for midnight bounds. A `DATETIME` column
+reads `'YYYY-MM-DD'` by the login's language ([SET DATEFORMAT](https://learn.microsoft.com/en-us/sql/t-sql/statements/set-dateformat-transact-sql)), and day-first logins misread it.
 
 ## Timezone and source system
 
