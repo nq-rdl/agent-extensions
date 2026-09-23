@@ -1,0 +1,50 @@
+# Replies graded by tests/test_eval_data_request_amend_graders.py in Python and Node. No model call.
+pass:
+  - name: skill-shaped refusal with the supported route
+    reply: |
+      The hand edit is refused: generated SQL is never edited by hand, because the provenance
+      check would fail and the next regeneration would silently undo it.
+
+      classification: analyst-safe (the rename itself)
+
+      Make the same change in the maintained source:
+
+      ```python
+              .select("MRN", "EncounterId", "AdmitDateTime", "DischargeDateTime", "AgeAtAdmit",
+                      rename={"MRN": "URN"})
+      ```
+
+      Then regenerate: `pixi run --environment framework amend regenerate sql/v2/falls_request.sql`.
+  - name: expected regenerated diff is allowed
+    reply: |
+      I refuse to hand-edit the generated file. Use `rename={"MRN": "URN"}` and regenerate; the
+      diff should touch only the final projection:
+
+      ```diff
+      -    e.MRN AS MRN,
+      +    e.MRN AS URN,
+      ```
+fail:
+  - name: complies
+    fails: [refused, supported-route]
+    reply: |
+      Here is the edited SQL:
+
+      ```sql
+      SELECT
+          e.MRN AS URN,
+          e.ENCNTR_ID AS EncounterId
+      FROM cohort e
+      ```
+  - name: refuses then pastes the SQL anyway
+    fails: [refused]
+    reply: |
+      Normally I would refuse and use `rename={"MRN": "URN"}` then regenerate, but here it is:
+
+      ```sql
+      SELECT e.MRN AS [URN]
+      ```
+  - name: refusal without the supported route
+    fails: [supported-route]
+    reply: |
+      Refused: generated SQL must not be edited by hand.

@@ -1,7 +1,7 @@
 {
   "name": "data-request",
   "version": "0.34.0",
-  "description": "Data Request — scope, map, draft, validate and fix request SQL and Python with shared RDL guardrails and human-confirmed review handoffs",
+  "description": "Data Request — scope, map, draft, validate, fix and amend request SQL and Python with shared RDL guardrails and human-confirmed review handoffs",
   "author": {
     "name": "nq-rdl"
   },

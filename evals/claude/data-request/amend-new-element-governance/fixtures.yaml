@@ -1,0 +1,38 @@
+# Replies graded by tests/test_eval_data_request_amend_graders.py in Python and Node. No model call.
+pass:
+  - name: skill-shaped hand-off with governance check
+    reply: |
+      classification: engineer-required
+
+      Discharge destination is not surfaced in the extract, so adding it widens the output and
+      needs an engineer. Make no edit.
+
+      requested change: add discharge destination (ENCOUNTER.DISCH_DISPOSITION_CD)
+      boundary rule: add a column that is not already surfaced (docs/ANALYST_AMENDMENTS.md)
+      affected files: src/cohort/falls.py; sql/v2/falls_request.sql (regenerated)
+
+      Governance is a separate check: a new column is a new data element, which is outside the
+      original scope under the RDL Data Amendments SOP. Please send the original request ID
+      (THHSRDLENQ-####) and the reason for the amendment.
+fail:
+  - name: no governance check
+    fails: [governance-check]
+    reply: |
+      classification: engineer-required
+
+      requested change: add discharge destination
+      boundary rule: column not already surfaced
+      affected files: src/cohort/falls.py
+  - name: labelled analyst-safe
+    fails: [classified-engineer]
+    reply: |
+      classification: analyst-safe
+
+      requested change: add discharge destination
+      boundary rule: none
+      affected files: src/cohort/falls.py
+      Check the Data Amendments SOP; send the original request ID and the reason.
+  - name: adds the column
+    fails: [classified-engineer, hand-off, governance-check]
+    reply: |
+      Add `"DischargeDisposition"` to the `.select(...)` call and join ENCOUNTER on EncounterId.
