@@ -40,9 +40,18 @@ Confirmation record
 
 Every assumption and limitation carries ``status``, ``confirmed_by``, ``confirmed_at`` and
 ``confirmed_revision``. These fields are filled only from an answered ``AskUserQuestion``; the
-PreToolUse guard rejects a review or scope document in which any item lacks them or was confirmed
-for an earlier revision. On every update the whole list is re-put to the human — a confirmation
-never survives a revision it was not given for.
+PreToolUse guard rejects a review or scope document in which any item lacks them.
+
+``confirmed_revision`` is the revision at which a human confirmed the item. A freshly confirmed
+item has ``confirmed_revision`` equal to the document ``revision``. On an update, an item may
+instead be *carried* from the previous published revision: it keeps that revision's
+``confirmed_by``, ``confirmed_at`` and ``confirmed_revision`` and records
+``carried_from_revision`` (always ``revision - 1``). ``sqlreview.sh publish`` allows a carried item
+only when the previous revision has the same id in the same list with identical text, rationale and
+confirmation, and its governed SQL is unchanged: the item's location lines (remapping allowed, the
+line count may not change), or, with no location, the whole SQL. ``sqlreview.sh carryforward`` lists
+which draft items qualify; every other item is re-put to the human. ``publish --reconfirm-all``
+refuses carried items when a full re-walk is wanted.
 
 Lift candidate
 --------------

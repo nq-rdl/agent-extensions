@@ -7,7 +7,7 @@ def cell: tostring | gsub("\\|"; "&#124;") | gsub("[\r\n]+"; "<br>");
 def table(a; heading):
   if (a | length) == 0 then "_none recorded_"
   else "| ID | \(heading) | Rationale | Lines | Confirmed by | Revision |\n|---|---|---|---|---|---|\n"
-       + (a | map("| \(.id | cell) | \(.text | cell) | \(.rationale // "" | cell) | \(lines(.location.lines) | cell) | \(.confirmed_by // "" | cell) | \(.confirmed_revision // "" | cell) |") | join("\n"))
+       + (a | map("| \(.id | cell) | \(.text | cell) | \(.rationale // "" | cell) | \(lines(.location.lines) | cell) | \(.confirmed_by // "" | cell) | \((.confirmed_revision // "" | tostring) + (if .carried_from_revision != null then " (carried)" else "" end) | cell) |") | join("\n"))
   end;
 def steps(a): if (a | length) == 0 then "_none_" else (a | map("\(.step). **\(.title // "")** (lines \(lines(.lines))) — \(.description // "")") | join("\n")) end;
 def changes(a): if (a | length) == 0 then "_none_" else (a | map("- r\(.revision) — \(.at // "") — \(.by // ""): \(.summary // "")") | join("\n")) end;
