@@ -77,8 +77,10 @@ pre-commit:
     # --- Changie fragment length. Each staged unreleased fragment's body must
     #     stay under the per-fragment cap (default 200; CHANGIE_MAX_BODY_LENGTH
     #     overrides). Changie's own body.maxLength guards `changie new`; this
-    #     catches fragments written directly. On failure the script prints the
-    #     split-into-multiple-fragments reminder. ---
+    #     catches fragments written directly. It also fails on a fragment whose
+    #     YAML does not parse (e.g. an unquoted `body:` containing `: `), which
+    #     would otherwise only break release `changie batch`. On failure the
+    #     script prints the split-into-multiple-fragments reminder. ---
     - name: changie-length
       glob: ".changes/unreleased/*.yaml"
       run: pixi run python3 scripts/check_changie_length.py {staged_files}
@@ -118,9 +120,14 @@ pre-push:
       glob: "{*.go,go.mod,go.sum}"
       run: go test -count=1 ./...
 
+    # Git exports GIT_DIR (and, depending on the hook, GIT_WORK_TREE /
+    # GIT_INDEX_FILE) into hooks, e.g. when pushing from a linked worktree.
+    # Tests that build throwaway repos in a temp dir would inherit it and run
+    # their git commands against THIS repo (rewriting refs, HEAD, index and
+    # config), so clear them. CI runs with none of them set.
     - name: python-unit-tests
       glob: "{scripts/**,tests/**}"
-      run: pixi run python3 -m unittest discover -s tests -p 'test_*.py'
+      run: env -u GIT_DIR -u GIT_WORK_TREE -u GIT_INDEX_FILE pixi run python3 -m unittest discover -s tests -p 'test_*.py'
 
     - name: codex-js-tests
       glob: "{plugins/codex/**,tests/codex/**,hooks/codex-*.sh}"
