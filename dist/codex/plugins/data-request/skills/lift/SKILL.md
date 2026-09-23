@@ -36,7 +36,7 @@ Run `status --json`, `slug <pipeline path>` and `fingerprint <pipeline path>`.
 If uninitialised, use `$data-request:setup --default --yes`; existing config and
 custom templates are preserved. Read scope, review and `lifts.json` for that slug.
 For schema-1 projects use the bundled lift definition/template when absent;
-adding the new template through `init --apply templates/lifts.md` is additive.
+`render SLUG lifts` installs a missing `templates/lifts.md` and never overwrites.
 Read `recurring` from the ledger or explicit request evidence; do not infer it
 from a filename or propose a backport for a one-off extract.
 

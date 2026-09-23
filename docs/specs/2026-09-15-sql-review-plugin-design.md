@@ -136,7 +136,7 @@ scripts across a plugin's skills).
 | Subcommand | Does | Exit |
 |---|---|---|
 | `init [--diff] [--apply PATH...]` | Create `.sqlreview/` from the bundled default at the resolved root (cwd's git top-level when nothing exists yet). Never overwrites: `--diff` reports each template file as `new` / `same` / `differs` (with a unified diff); `--apply` replaces only the named files after the human confirmed. | 0 ok · 10 differences · 2 error |
-| `status [--json]` | Lists reviews with `slug, sql_path, revision, state ∈ {current, stale, missing, no-baseline, scoped, draft, invalid}`. Exit 3 when not initialised — **setup is the one caller that treats 3 as "proceed to init"**; every other skill stops and points at `/sql-review:setup`. | 0 · 3 |
+| `status [--json]` | Lists reviews with `slug, sql_path, revision, state ∈ {current, stale, missing, no-baseline, scoped, draft, invalid}`. Exit 3 when not initialised — **setup is the one caller that treats 3 as "proceed to init"**; every other skill stops and points at `/sql-review:setup`. Bundled templates the project lacks are reported as `missing_templates` plus `missing_templates_fix` (`--json`) or one stderr line (text rows unchanged). | 0 · 3 |
 | `slug PATH` | Prints the slug for a project-relative path; exit 5 if `reviews/<slug>/` exists bound to a different `sql_path`. | 0 · 5 |
 | `check FILE [--stdin]` | Validates a scope/review JSON: required keys, item shape, every item `confirmed` with `confirmed_by`/`confirmed_at`/`confirmed_revision == revision`. One line per violation. | 0 valid · 4 invalid |
 | `fingerprint SQL` | `{sql_path, sql_sha256, git_commit, git_dirty}` for the skill to embed. | 0 · 2 |
@@ -144,7 +144,7 @@ scripts across a plugin's skills).
 | `delta SLUG` | Unified diff of `source.sql` vs the current file; header lines report both sha256s. | 0 unchanged · 10 changed · 6 no baseline · 2 |
 | `impact SLUG` | **Hints only.** Identifiers introduced/altered inside the diff hunks (CTE names, aliases, columns) and the non-diff lines referencing them. Printed under a "heuristic — does not prove anything unaffected" banner. | 0 · 6 · 2 |
 | `move OLD NEW` | Rename a review directory when the SQL moved; rewrites `sql_path`, invalidates the baseline state to `stale`. | 0 · 2 |
-| `render SLUG scope\|review` | JSON + `templates/<kind>.md` → `<kind>.md`. Fixed placeholder set; unknown placeholders are left in place and reported. Deterministic. | 0 · 2 |
+| `render SLUG scope\|review\|lifts` | JSON + `templates/<kind>.md` → `<kind>.md`. A missing template is first installed from the bundled default (never overwriting, symlinks refused, one stderr line). Fixed placeholder set; unknown placeholders are left in place and reported. Deterministic. | 0 · 2 |
 
 Portability: no associative arrays, no `mapfile`, `shasum -a 256` / `sha256sum` probe — the same
 rules `rh-lib.sh` follows.
