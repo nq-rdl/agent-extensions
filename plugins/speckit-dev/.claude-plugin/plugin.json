@@ -1,6 +1,6 @@
 {
   "name": "speckit-dev",
-  "version": "0.33.0",
+  "version": "0.34.0",
   "description": "SpecKit extension toolkit — scaffold, validate, manage, and publish spec-kit extensions",
   "author": {
     "name": "nq-rdl"

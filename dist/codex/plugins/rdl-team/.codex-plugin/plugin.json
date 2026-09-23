@@ -1,6 +1,6 @@
 {
   "name": "rdl-team",
-  "version": "0.33.0",
+  "version": "0.34.0",
   "description": "RDL team workflows — repository context, spec-kit delivery, and onboarding",
   "author": {
     "name": "nq-rdl"
