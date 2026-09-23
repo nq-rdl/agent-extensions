@@ -20,7 +20,15 @@ def items($kind; $rev):
         (if .status != "confirmed" then "\($id): status is \(.status // "missing") — every assumption and limitation must be confirmed by the human before it is written" else empty end),
         (if (.confirmed_by | nonempty | not) then "\($id): confirmed_by is empty" else empty end),
         (if (.confirmed_at | nonempty | not) then "\($id): confirmed_at is empty" else empty end),
-        (if .confirmed_revision != $rev then "\($id): confirmed_revision \(.confirmed_revision // "missing") != revision \($rev // "missing") — re-confirm for this revision" else empty end)
+        # Fresh: confirmed_revision == revision, no carried_from_revision. Carried (#348): an earlier
+        # confirmed_revision with carried_from_revision == revision - 1; publish proves the claim
+        # against the previous published document, this stateless check validates only the fields.
+        (.confirmed_revision as $cr | .carried_from_revision as $cf
+         | if ($cr | integer | not) or ($rev | integer | not) or $cr > $rev then "\($id): confirmed_revision \($cr // "missing") != revision \($rev // "missing") — re-confirm for this revision"
+           elif $cr == $rev then (if $cf != null then "\($id): carried_from_revision \($cf) on an item confirmed at revision \($rev) — remove it, or re-confirm for this revision" else empty end)
+           elif $cf == null then "\($id): confirmed_revision \($cr) != revision \($rev) — re-confirm for this revision, or carry it forward with carried_from_revision (sqlreview.sh carryforward)"
+           elif ($cf | integer | not) or $cf != $rev - 1 or $cf < $cr then "\($id): carried_from_revision \($cf) must be revision - 1 (\($rev - 1)) and >= confirmed_revision \($cr) — re-confirm for this revision"
+           else empty end)
     );
 
 

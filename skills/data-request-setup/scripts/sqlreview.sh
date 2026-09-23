@@ -11,11 +11,13 @@
 #   check FILE | check --stdin                 validate a review/scope JSON; exit 4 with one violation per line
 #   lint FILE                                  confirmed items whose wording is still provisional; exit 10 when any
 #   publish SLUG scope|review|lifts DRAFT             validate a staged copy, then atomically replace the final JSON
+#   publish --reconfirm-all SLUG KIND DRAFT    same, but refuse any carried (carried_from_revision) confirmation
 #   roles ENGINEER ANALYST                     update only the two confirmed role names in config.json
 #   fingerprint SQL                            {sql_path, sql_sha256, git_commit, git_dirty}
 #   snapshot SLUG SQL                          verify final review SHA, retain history, advance source.sql
 #   delta SLUG                                 diff source.sql vs the current SQL; exit 10 when changed, 6 no baseline
 #   carryover SLUG DRAFT                       review draft items matching confirmed, still-valid scope items (JSON)
+#   carryforward SLUG scope|review DRAFT       draft items whose previous-revision confirmation may be carried (JSON)
 #   impact SLUG                                heuristic: identifiers in the diff traced into unchanged lines
 #   move OLDPATH NEWPATH                       rebind a review directory after the SQL moved
 #   move --slug OLDSLUG NEWPATH                rebind a legacy review whose slug no current path derives
@@ -257,6 +259,8 @@ cmd_roles() (
 
 # ---------------------------------------------------------------------------------------------
 cmd_publish() (
+  local reconfirm_all=false
+  if [ "${1:-}" = "--reconfirm-all" ]; then reconfirm_all=true; shift; fi
   [ $# -eq 3 ] || usage
   sr_need_jq
   sr_require_root
@@ -299,6 +303,13 @@ cmd_publish() (
     exit 0
   fi
   jq -e --argjson previous "$previous" '.revision == ($previous + 1)' "$tmp" >/dev/null || sr_die 4 "revision must follow the existing document (first revision is 1)"
+  if [ "$kind" != lifts ]; then
+    # A carried confirmation must be provable from the previous revision and its SQL baseline (#348).
+    local violations
+    _carry_context "$slug" "$kind" "$rel"
+    violations="$(_carry_jq "$tmp" 'carry_violations($ctx; $reconfirm_all)' --argjson reconfirm_all "$reconfirm_all")" || sr_die 2 "carry-forward check failed to run"
+    if [ -n "$violations" ]; then printf '%s\n' "$violations"; sr_die 4 "carried confirmations refused; re-confirm those items for this revision"; fi
+  fi
   if [ "$kind" = lifts ] && [ ! -f "$dest" ]; then
     jq -e 'all(.lifts[]; .revision == 1 and .status == "candidate")' "$tmp" >/dev/null || sr_die 4 "new ledger entries start as candidates"
   fi
@@ -517,6 +528,64 @@ cmd_carryover() {
 }
 
 # ---------------------------------------------------------------------------------------------
+# Evidence for carrying scope/review confirmations forward (#348), shared by publish and
+# carryforward. The previous published <kind>.json is the prior revision; its baseline is the SQL
+# bytes recorded after that publish (analyse: snapshot → source.sql; bootstrap: scope.source.sql),
+# counted only when its SHA256 equals the prior document's sql_sha256 (when it recorded one).
+# Sets CF_PRIOR, CF_BASE, CF_CUR (a path or /dev/null), CF_HAVE_BASE, CF_HAVE_CUR, CF_PRIOR_SHA, CF_CUR_SHA.
+_carry_context() { # <slug> <scope|review> <sql_path>
+  local d="$SR_REVIEWS/$1" base_sha
+  CF_PRIOR=/dev/null CF_CUR=/dev/null CF_HAVE_BASE=false CF_HAVE_CUR=false CF_PRIOR_SHA="" CF_CUR_SHA=""
+  if [ "$2" = review ]; then CF_BASE="$d/source.sql"; else CF_BASE="$d/scope.source.sql"; fi
+  sr_no_symlinks "$d/$2.json" || exit 2
+  sr_no_symlinks "$CF_BASE" || exit 2
+  if [ -f "$d/$2.json" ]; then
+    cmd_check "$d/$2.json" >/dev/null || sr_die 4 "existing $2.json is invalid; see sqlreview.sh check"
+    CF_PRIOR="$d/$2.json"
+    CF_PRIOR_SHA="$(jq -r '.sql_sha256 // "" | strings' "$CF_PRIOR")"
+  fi
+  if [ -f "$SR_ROOT/$3" ]; then CF_CUR="$SR_ROOT/$3"; CF_HAVE_CUR=true; CF_CUR_SHA="$(sr_sha256 "$CF_CUR")"; fi
+  if [ "$CF_PRIOR" != /dev/null ] && [ -f "$CF_BASE" ]; then
+    base_sha="$(sr_sha256 "$CF_BASE")"
+    if [ -z "$CF_PRIOR_SHA" ] || [ "$CF_PRIOR_SHA" = "$base_sha" ]; then CF_HAVE_BASE=true; CF_PRIOR_SHA="$base_sha"; fi
+  fi
+  [ "$CF_HAVE_BASE" = true ] || CF_BASE=/dev/null
+}
+
+# Run a jq filter over a draft with sqlreview-carry.jq included and $ctx bound (see its header).
+_carry_jq() { # <draft> <filter> [jq options...]
+  local draft="$1" filter="$2"
+  shift 2
+  jq -r -L "$SR_SCRIPT_DIR" "$@" --slurpfile prior "$CF_PRIOR" --rawfile base "$CF_BASE" --rawfile cur "$CF_CUR" \
+    --argjson have_base "$CF_HAVE_BASE" --argjson have_cur "$CF_HAVE_CUR" --arg prior_sha "$CF_PRIOR_SHA" --arg cur_sha "$CF_CUR_SHA" \
+    "include \"sqlreview-carry\";
+     {prior: \$prior[0], base: (if \$have_base then \$base else null end), cur: (if \$have_cur then \$cur else null end),
+      prior_sha: \$prior_sha, cur_sha: \$cur_sha} as \$ctx | $filter" "$draft"
+}
+
+# Which draft items may keep the confirmation of the previous published revision (#348). Read-only.
+cmd_carryforward() {
+  [ $# -eq 3 ] || usage
+  sr_need_jq
+  sr_require_root
+  local slug="$1" kind="$2" draft="$3" sql
+  sr_safe_slug "$slug"
+  case "$kind" in scope|review) ;; *) usage ;; esac
+  [ -f "$draft" ] || sr_die 2 "no such draft: $draft"
+  jq -e 'type == "object"' "$draft" >/dev/null 2>&1 || sr_die 4 "invalid JSON: $draft"
+  sql="$(jq -r '.sql_path // "" | strings' "$SR_REVIEWS/$slug/$kind.json" 2>/dev/null)"
+  [ -n "$sql" ] || sql="$(jq -r '.sql_path // "" | strings' "$draft")"
+  sr_safe_sql "$sql"
+  _carry_context "$slug" "$kind" "$sql"
+  _carry_jq "$draft" 'carry_rows($ctx) as $rows
+    | {document: $document, prior_revision: ($ctx.prior.revision // null),
+       revision: (if $ctx.prior == null then 1 else $ctx.prior.revision + 1 end),
+       sql_unchanged: ($ctx.prior_sha != "" and $ctx.prior_sha == $ctx.cur_sha),
+       carry: [$rows[] | select(.basis != null)],
+       walk: [$rows[] | select(.basis == null) | {kind, id, why}]}' --arg document "$kind"
+}
+
+# ---------------------------------------------------------------------------------------------
 cmd_move() {
   sr_need_jq
   sr_require_root
@@ -619,6 +688,7 @@ case "$cmd" in
   delta) cmd_delta "$@" ;;
   impact) cmd_impact "$@" ;;
   carryover) cmd_carryover "$@" ;;
+  carryforward) cmd_carryforward "$@" ;;
   move) cmd_move "$@" ;;
   render) cmd_render "$@" ;;
   -h|--help|help) usage ;;
