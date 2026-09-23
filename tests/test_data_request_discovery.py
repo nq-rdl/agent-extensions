@@ -59,6 +59,16 @@ class SqlDiscovery(unittest.TestCase):
                 self.assertNotIn("go:naming", context)
                 self.assertIn("Advisory only", context)
 
+    def test_service_desk_triage_prompts_surface_the_triage_skill(self):
+        for prompt in ("Triage the urgent data requests in the service desk queue",
+                       "Which data request should we pick up next? ENQ1196, not ENQ1187",
+                       "/data-request:triage ENQ1213 --triage-only"):
+            with self.subTest(prompt=prompt):
+                context = self.run_hook(prompt)
+                self.assertIn("data-request:triage", context)
+                self.assertIn("data-request:guardrails", context)
+                self.assertNotIn("go:naming", context)
+
     def test_unrelated_prompts_are_quiet(self):
         for prompt in ("Fix the CSS button", "skills should always be reviewed", "", None):
             with self.subTest(prompt=prompt):

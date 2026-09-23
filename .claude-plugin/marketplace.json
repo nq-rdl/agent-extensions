@@ -444,10 +444,11 @@
     {
       "name": "data-request",
       "source": "./plugins/data-request",
-      "description": "Data Request — scope, map, draft, validate and fix request SQL and Python with shared RDL guardrails and human-confirmed review handoffs",
+      "description": "Data Request — triage, scope, map, draft, validate and fix request SQL and Python with shared RDL guardrails and human-confirmed review handoffs",
       "version": "0.34.0",
       "keywords": [
         "data-request",
+        "triage",
         "sql",
         "python",
         "cohort",
