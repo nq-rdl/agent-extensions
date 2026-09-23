@@ -13,6 +13,7 @@
 #   fingerprint SQL                            {sql_path, sql_sha256, git_commit, git_dirty}
 #   snapshot SLUG SQL                          verify final review SHA, retain history, advance source.sql
 #   delta SLUG                                 diff source.sql vs the current SQL; exit 10 when changed, 6 no baseline
+#   carryover SLUG DRAFT                       review draft items matching confirmed, still-valid scope items (JSON)
 #   impact SLUG                                heuristic: identifiers in the diff traced into unchanged lines
 #   move OLDPATH NEWPATH                       rebind a review directory after the SQL moved
 #   render SLUG scope|review|lifts                   JSON + templates/<kind>.md -> reviews/SLUG/<kind>.md
@@ -26,7 +27,7 @@ SR_SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd -P)"
 SR_ASSETS="$SR_SCRIPT_DIR/../assets/sqlreview"
 
 usage() {
-  sed -n '2,20p' "$0" | sed 's/^# \{0,1\}//' >&2
+  awk 'NR > 1 && !/^#/ { exit } NR > 1' "$0" | sed 's/^# \{0,1\}//' >&2
   exit 1
 }
 
@@ -400,6 +401,62 @@ cmd_impact() {
 }
 
 # ---------------------------------------------------------------------------------------------
+# Which review-draft items restate a confirmed item of the current scope revision (same list, same
+# text and rationale) on SQL the scope still describes: the whole SQL unchanged since scope publish,
+# or the item's location lines unchanged. Analyse offers these as one bulk confirmation (#346).
+cmd_carryover() {
+  [ $# -eq 2 ] || usage
+  sr_need_jq
+  sr_require_root
+  local slug="$1" draft="$2" scope base sql cur scope_sha="" base_sha="" cur_sha="" have_base=false
+  sr_safe_slug "$slug"
+  [ -f "$draft" ] || sr_die 2 "no such draft: $draft"
+  jq -e 'type == "object"' "$draft" >/dev/null 2>&1 || sr_die 4 "invalid JSON: $draft"
+  scope="$SR_REVIEWS/$slug/scope.json"
+  base="$SR_REVIEWS/$slug/scope.source.sql"
+  sr_no_symlinks "$scope" || exit 2
+  sr_no_symlinks "$base" || exit 2
+  if [ -f "$scope" ]; then
+    cmd_check "$scope" >/dev/null || sr_die 4 "scope.json is invalid; see sqlreview.sh check"
+    sql="$(jq -r .sql_path "$scope")"
+    scope_sha="$(jq -r '.sql_sha256 // "" | strings' "$scope")"
+  else
+    scope=/dev/null  # nothing to carry over: every draft item is walked
+    sql="$(jq -r '.sql_path // "" | strings' "$draft")"
+  fi
+  if [ -n "$sql" ]; then
+    sr_safe_sql "$sql"
+    cur="$SR_ROOT/$sql"
+    [ -f "$cur" ] && cur_sha="$(sr_sha256 "$cur")"
+  fi
+  if [ "$scope" != /dev/null ] && [ -f "$base" ]; then
+    base_sha="$(sr_sha256 "$base")"
+    # A baseline that disagrees with the SHA the scope recorded is not evidence of anything.
+    if [ -z "$scope_sha" ] || [ "$scope_sha" = "$base_sha" ]; then have_base=true; scope_sha="$base_sha"; fi
+  fi
+  jq -n --slurpfile scope "$scope" --slurpfile draft "$draft" \
+    --rawfile base "$([ "$have_base" = true ] && echo "$base" || echo /dev/null)" \
+    --rawfile cur "$([ -n "$cur_sha" ] && echo "$cur" || echo /dev/null)" \
+    --argjson have_base "$have_base" --arg scope_sha "$scope_sha" --arg cur_sha "$cur_sha" '
+    ($scope[0] // {revision: null, assumptions: [], limitations: []}) as $s | ($draft[0]) as $d
+    | ($scope_sha != "" and $cur_sha != "" and $scope_sha == $cur_sha) as $unchanged
+    | ($base | split("\n")) as $b | ($cur | split("\n")) as $c
+    | def lines_same($l): $have_base and $cur_sha != "" and ($l | type) == "array" and ($l | length) == 2 and
+        ($l | all(type == "number" and . >= 1)) and $l[0] <= $l[1] and $l[1] <= ($b | length) and $l[1] <= ($c | length) and $b[$l[0] - 1:$l[1]] == $c[$l[0] - 1:$l[1]];
+    [ ("assumptions", "limitations") as $k | ($d[$k] // [])[] | select(type == "object") | . as $i
+      | ([$s[$k][] | select(.text == $i.text and .rationale == $i.rationale)][0]) as $m
+      | {kind: $k, id: $i.id, text: $i.text, rationale: $i.rationale}
+        + if $m == null then {basis: null, why: "new, or text/rationale differs from the scope"}
+          elif $unchanged then {scope_id: $m.id, basis: "sql-unchanged"}
+          elif lines_same(($i.location | objects | .lines) // null) then {scope_id: $m.id, basis: "lines-unchanged"}
+          else {scope_id: $m.id, basis: null, why: "SQL changed since scope publish and the item has no unchanged location"} end
+    ] as $rows
+    | {scope_revision: $s.revision, sql_unchanged: $unchanged,
+       carry_over: [$rows[] | select(.basis != null)],
+       walk: [$rows[] | select(.basis == null) | {kind, id, why}]}'
+}
+
+# ---------------------------------------------------------------------------------------------
 cmd_move() {
   [ $# -eq 2 ] || usage
   sr_need_jq
@@ -472,6 +529,7 @@ case "$cmd" in
   snapshot) cmd_snapshot "$@" ;;
   delta) cmd_delta "$@" ;;
   impact) cmd_impact "$@" ;;
+  carryover) cmd_carryover "$@" ;;
   move) cmd_move "$@" ;;
   render) cmd_render "$@" ;;
   -h|--help|help) usage ;;

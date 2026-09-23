@@ -95,19 +95,36 @@ Read the SQL. Draft into `reviews/$SLUG/review.draft.json` (guard-exempt) as you
   then the final select; joins, filters and aggregations named explicitly.
 - **assumptions** — every place the SQL commits to one reading where the request allowed more;
   **limitations** — every constraint the analyst must know before relying on the output. Give
-  each the `location` lines it governs and a one-line rationale.
+  each the `location` lines it governs and a one-line rationale. Where an item restates a
+  confirmed scope item that still holds, keep the scope's `text` and `rationale` verbatim so it
+  can be carried over (below); reword only where the SQL changed what is true.
 - **open_questions** — anything unresolved.
 
 ## Confirm, write, render
 
-The human-in-the-loop trigger (#130 §1.1): put **each** candidate assumption and limitation to
-the engineer via AskUserQuestion — batches of at most four per call, one question per item,
-options **Confirm (Recommended)** / **Reword** / **Reject**. Reworded items are asked again.
-Only confirmed items reach `review.json`; rejected ones stay in the draft. If the engineer stops,
-leave the draft and write nothing final — say so.
+The human-in-the-loop trigger (#130 §1.1). First, when a scope exists, find what bootstrap
+already settled:
+
+```bash
+bash "$S/sqlreview.sh" carryover "$SLUG" ".sqlreview/reviews/$SLUG/review.draft.json"
+# → {scope_revision, sql_unchanged, carry_over: [{kind, id, scope_id, basis, text, rationale}], walk: [{kind, id, why}]}
+```
+
+`carry_over` lists draft items whose text and rationale match a confirmed item of the current
+scope revision, on SQL the scope still describes (`basis`: `sql-unchanged` since scope publish, or
+`lines-unchanged` at the item's location). If it is non-empty, put them in **one**
+AskUserQuestion that lists every item's id, text, rationale and basis, with options **Carry over
+all (Recommended)** / **Walk each individually**. Carry over confirms them all from that answer;
+Walk moves them to the per-item walk.
+
+Then put **each** remaining candidate (the `walk` list, or every item when there is no scope) to
+the engineer via AskUserQuestion — batches of at most four per call, one question per item
+showing its text and rationale, options **Confirm (Recommended)** / **Reword** / **Reject**.
+Reworded items are asked again. Only confirmed items reach `review.json`; rejected ones stay in
+the draft. If the engineer stops, leave the draft and write nothing final — say so.
 
 **Never fill `confirmed_by`, `confirmed_at` or `confirmed_revision` from anything but an answered
-question**: `confirmed_by` is the user (`git config user.name` / `user.email`, else ask),
+question** (the bulk carry-over answer counts for the items it listed, and only those): `confirmed_by` is the user (`git config user.name` / `user.email`, else ask),
 `confirmed_at` is now (UTC ISO), `confirmed_revision` equals the document `revision`.
 
 Re-run fingerprint and compare its SHA with the bytes you reviewed; if different, reassess the
