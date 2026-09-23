@@ -1,0 +1,34 @@
+# Replies graded by tests/test_eval_data_request_amend_graders.py in Python and Node. No model call.
+pass:
+  - name: skill-shaped reply
+    reply: |
+      classification: analyst-safe
+
+      Reordering output columns changes neither rows nor meaning. Change the field order in
+      the existing projection and regenerate:
+
+      ```python
+              .select("EncounterId", "MRN", "AdmitDateTime", "DischargeDateTime", "AgeAtAdmit")
+      ```
+
+      The regenerated SQL must differ only in the final projection, and the row count and key
+      set must match v1.0.0 (`pixi run amend validate-output`).
+fail:
+  - name: order unchanged
+    fails: [reordered-select]
+    reply: |
+      classification: analyst-safe
+
+      Keep `.select("MRN", "EncounterId", "AdmitDateTime", "DischargeDateTime", "AgeAtAdmit")`
+      and sort the rows instead. The row count and key set are unchanged.
+  - name: reorder in the export only, unclassified
+    fails: [classified-safe, reordered-select, same-rows-check]
+    reply: |
+      Reorder the DataFrame before writing: `df = df[["EncounterId", "MRN", "AdmitDateTime"]]`.
+  - name: over-cautious classification
+    fails: [classified-safe]
+    reply: |
+      classification: engineer-required
+
+      `.select("EncounterId", "MRN", "AdmitDateTime", "DischargeDateTime", "AgeAtAdmit")`, then
+      check the row count and key set.

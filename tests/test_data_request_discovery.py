@@ -59,6 +59,14 @@ class SqlDiscovery(unittest.TestCase):
                 self.assertNotIn("go:naming", context)
                 self.assertIn("Advisory only", context)
 
+    def test_amend_is_discoverable_beside_the_existing_leaves(self):
+        for prompt in ("/data-request:amend rename MRN to URN in the released extract",
+                       "Add an ICD-10 code to the cohort extract"):
+            with self.subTest(prompt=prompt):
+                context = self.run_hook(prompt)
+                for leaf in ("amend", "fix", "validate", "guardrails", "analyse"):
+                    self.assertIn(f"data-request:{leaf}", context)
+
     def test_unrelated_prompts_are_quiet(self):
         for prompt in ("Fix the CSS button", "skills should always be reviewed", "", None):
             with self.subTest(prompt=prompt):

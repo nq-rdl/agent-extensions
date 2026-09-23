@@ -36,6 +36,8 @@ ask for the missing detail while continuing independent investigation. Implement
 settled requirements directly; ask before choosing a different population, grain
 or business meaning.
 
+A reported “defect” that is really a change request belongs in `$data-request:amend`.
+
 ## Identifier and export defects
 
 For a request such as “`Encounter_id`, `Test_encounter_id` and `Event_id` appear as
