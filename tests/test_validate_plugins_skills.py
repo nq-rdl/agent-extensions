@@ -1,6 +1,6 @@
 """Tests for the skill validation in scripts/validate-plugins.sh (audit #3).
 
-The local pre-merge check (`bash scripts/validate-plugins.sh`, per CLAUDE.md)
+The local pre-merge check (`bash scripts/validate-plugins.sh`, per AGENTS.md)
 must fail when a bundle references a skill that is missing from skills/, or when
 a declared skill's self-contained plugin copy is absent. Before this work the
 word "skill" did not appear in the script at all.
