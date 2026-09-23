@@ -1,7 +1,7 @@
 {
   "name": "data-request",
   "version": "0.34.0",
-  "description": "Data Request — scope, map, draft, validate, fix and amend request SQL and Python with shared RDL guardrails and human-confirmed review handoffs",
+  "description": "Data Request — triage, scope, map, draft, validate, fix and amend request SQL and Python with shared RDL guardrails and human-confirmed review handoffs",
   "author": {
     "name": "nq-rdl"
   },
@@ -9,6 +9,7 @@
   "license": "MIT",
   "keywords": [
     "data-request",
+    "triage",
     "sql",
     "python",
     "cohort",
@@ -25,7 +26,7 @@
   "interface": {
     "displayName": "Data Request",
     "shortDescription": "Develop and review SQL; fix request SQL and Python",
-    "longDescription": "Data Request — scope, map, draft, validate, fix and amend request SQL and Python with shared RDL guardrails and human-confirmed review handoffs",
+    "longDescription": "Data Request — triage, scope, map, draft, validate, fix and amend request SQL and Python with shared RDL guardrails and human-confirmed review handoffs",
     "developerName": "nq-rdl",
     "category": "Developer Tools",
     "capabilities": [

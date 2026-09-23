@@ -63,7 +63,8 @@ def regex_sources(case: str) -> dict:
 
 class SuiteShape(unittest.TestCase):
     def test_suite_covers_every_acceptance_example(self):
-        found = {p.parent.name for p in SUITE.glob("*/prompt.md")}
+        # The suite directory is shared with the triage cases (#338); amend owns the amend-* cases.
+        found = {p.parent.name for p in SUITE.glob("amend-*/prompt.md")}
         self.assertEqual(found, set(CASES))
 
     def test_cases_answer_in_text_without_mutating_tools(self):
