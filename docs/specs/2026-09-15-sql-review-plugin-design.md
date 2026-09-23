@@ -63,7 +63,11 @@ Nothing about the location is customisable.
   differs from the one requested. A renamed SQL file is a new slug; `status` lists the old one as
   `missing` and the skill offers `sqlreview.sh move OLD NEW` (renames the directory, rewrites
   `sql_path`, marks the review stale so it is reassessed). Bootstrap takes the *intended* path and
-  produces the same slug analyse will later use.
+  produces the same slug analyse will later use. Components stay readable
+  (`sql/cohort_pipeline/x.sql` → `sql__cohort_pipeline__x`): only a `_` next to another `_` or at a
+  component edge, and a component's leading `.`, are percent-encoded (`sqlreview-slug.jq`, #353).
+  Reviews under the older all-escaped encoding (`sql__cohort%5Fpipeline__x`) still validate and are
+  found by `slug`; `sqlreview.sh move PATH PATH` migrates one without marking it stale.
 - **JSON is authoritative; markdown is rendered.** `scope.md` / `review.md` are produced by
   `sqlreview.sh render` from the JSON plus the template. This is what makes the reports
   "standardised" (#131) and gives `explain` a machine-readable cross-reference (#128 names "the
@@ -143,7 +147,7 @@ scripts across a plugin's skills).
 | `snapshot SLUG SQL` | Copies the current SQL bytes to `reviews/<slug>/source.sql` (called by analyse after the guarded final JSON Write succeeds, verifying its SHA256 and preserving history/<revision>.sql). | 0 · 2 |
 | `delta SLUG` | Unified diff of `source.sql` vs the current file; header lines report both sha256s. | 0 unchanged · 10 changed · 6 no baseline · 2 |
 | `impact SLUG` | **Hints only.** Identifiers introduced/altered inside the diff hunks (CTE names, aliases, columns) and the non-diff lines referencing them. Printed under a "heuristic — does not prove anything unaffected" banner. | 0 · 6 · 2 |
-| `move OLD NEW` | Rename a review directory when the SQL moved; rewrites `sql_path`, invalidates the baseline state to `stale`. | 0 · 2 |
+| `move OLD NEW` | Rename a review directory when the SQL moved; rewrites `sql_path`, invalidates the baseline state to `stale`. `move PATH PATH` migrates a legacy-encoded slug to the readable one without invalidating it. | 0 · 2 |
 | `render SLUG scope\|review` | JSON + `templates/<kind>.md` → `<kind>.md`. Fixed placeholder set; unknown placeholders are left in place and reported. Deterministic. | 0 · 2 |
 
 Portability: no associative arrays, no `mapfile`, `shasum -a 256` / `sha256sum` probe — the same

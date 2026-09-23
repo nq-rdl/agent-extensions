@@ -7,7 +7,7 @@ from test_sql_review_scripts import Project, SQL_V1, review_doc, run
 
 LEGACY_SLUG = "aaa_screening_log"
 NEW_PATH = "sql/cohort_pipeline/aaa_screening_log.sql"
-NEW_SLUG = "sql__cohort%5Fpipeline__aaa%5Fscreening%5Flog"
+NEW_SLUG = "sql__cohort_pipeline__aaa_screening_log"  # readable encoding (#353)
 
 
 class LegacyReviews(unittest.TestCase):

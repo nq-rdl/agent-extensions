@@ -14,7 +14,7 @@ mid-draft. Use ``slug PATH`` and write ``reviews/SLUG/lifts.draft.json`` with:
 ::
 
   {
-    "schemaVersion": 2, "kind": "lifts", "slug": "pipeline%2Epy",
+    "schemaVersion": 2, "kind": "lifts", "slug": "pipeline.py",
     "sql_path": "pipeline.py", "revision": 1, "recurring": false,
     "lifts": [{
       "id": "LIFT-1", "revision": 1,
