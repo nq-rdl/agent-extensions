@@ -155,3 +155,30 @@ sr_state() { # <slug>
   esac
   printf '%s\t%s\t%s\n' "$state" "$sql" "$rev"
 }
+
+# Why a review is invalid or missing, on one line (empty otherwise). Kept apart from sr_state:
+# tab-separated reads collapse empty fields, and invalid rows have no sql_path or revision.
+sr_state_reason() { # <slug> <state>
+  local slug="$1" d="$SR_REVIEWS/$1" doc violations schema sql why=""
+  case "$2" in
+    invalid)
+      doc="$(sr_doc_for "$slug")" || { printf 'no review.json, scope.json or lifts.json\n'; return 0; }
+      violations="$(cmd_check "$doc" 2>&1 | grep -v '^ok$' | tr '\n' ';' | sed 's/;$//; s/;/; /g')"
+      why="$(basename "$doc"): $violations"
+      schema="$(jq -r '.schemaVersion // "missing" | tostring' "$doc" 2>/dev/null || echo unreadable)"
+      why="$why; schemaVersion $schema"
+      sql="$(jq -r '.sql_path // "" | strings' "$doc" 2>/dev/null || true)"
+      if [ -n "$sql" ]; then
+        case "$sql" in /*|*..*) why="$why; sql_path '$sql' is not project-relative" ;; *)
+          [ -f "$SR_ROOT/$sql" ] || why="$why; sql_path target missing: $sql" ;;
+        esac
+      fi
+      case "$violations" in *"binding mismatch"*)
+        why="$why; the slug is not derived from any current path — rebind with: sqlreview.sh move --slug $slug <sql path>" ;;
+      esac ;;
+    missing)
+      sql="$(jq -r '.sql_path // ""' "$(sr_doc_for "$slug")" 2>/dev/null)"
+      why="sql_path target missing: $sql — if it moved, run: sqlreview.sh move '$sql' <new path>" ;;
+  esac
+  printf '%s\n' "$why"
+}
