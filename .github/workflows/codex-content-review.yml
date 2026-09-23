@@ -15,8 +15,8 @@
 #
 # INFORMATIONAL / NON-GATING: like skillspector.yml, this check is advisory
 # only — it never fails the job (see the continue-on-error / no-op steps
-# below) and MUST stay OUT of the branch-protection required-checks list on
-# `main` (see CLAUDE.md's "Required status checks on main" note). Its purpose
+# below) and MUST stay OUT of any branch-protection required-checks list on
+# `main` (see AGENTS.md's "Configured checks and merge enforcement" note). Its purpose
 # is to give reviewers a second opinion, not to block merges.
 #
 # PREREQUISITES (both optional — the workflow no-ops cleanly, staying green,

@@ -200,21 +200,51 @@ CI runs `validate.yml` on every PR/push to main. It checks:
 
 Three more workflows run on PRs alongside `validate.yml`:
 - `changelog-check.yml` — fails if no changie fragment was added (bypass with the `skip-changelog` label), and lints each *added* fragment's body against the 200-char per-fragment cap (`scripts/check_changie_length.py`)
-- `link-check.yml` — lychee link check over changed `skills/**/*.md`
+- `link-check.yml` — external (HTTP) link check with lychee, advisory for merging: a PR that changes `skills/**/*.md` or `skills/speckit-*/**/*.rst` triggers a scan of all skill Markdown and Spec Kit RST, using `skills/lychee/lychee.toml`
 - `skillspector.yml` — NVIDIA SkillSpector scan over `skills/`; informational, uploads SARIF to code scanning (non-gating)
 
 The same checks run locally via `lefthook` (see Setup commands).
 
-**Required status checks on `main` are coupled to these job names.** The always-run
-`validate.yml` jobs above are marked as required status checks so red CI blocks the merge
-button. A required check is matched by the **exact job
-`name:`** — renaming or dropping a `name:` in `validate.yml` silently drops the
-requirement (the gate disappears while still showing green). When you rename, add, or
-remove an always-run `validate.yml` job, update `main`'s required-checks list in the repo's
-branch-protection settings to match. Keep the subset-only checks **out of this always-run set**:
-`link-check`'s `paths:` filter would hang non-skill PRs, and `check-changie-fragment` /
-SkillSpector `scan` are excluded. (`version-monotonic` is also outside this set, but the
-release flow *does* require it separately.)
+**Configured checks and merge enforcement are separate.** Observed on
+**2026-09-23** via `GET /repos/nq-rdl/agent-extensions/branches/main/protection`
+and `GET /repos/nq-rdl/agent-extensions/rules/branches/main`: the protection
+response returned `required_status_checks: null`, and the branch rules response
+was `[]`. No required status checks were configured. Protection required one PR
+approval and conversation resolution; `enforce_admins.enabled` was `false`.
+Failed validation therefore did not itself block merging through required-check
+enforcement. This observation describes those settings on that date, not their
+history. Contributors should still resolve applicable validation failures before
+merging.
+
+The intended always-run check inventory comes from these exact `validate.yml`
+job names (legacy wording is retained for stable check contexts):
+
+| Job ID | Check name |
+|---|---|
+| `validate-bundles` | Validate bundle references + registry consistency |
+| `validate-symlinks` | Validate skill + agent symlinks |
+| `validate-plugins` | Validate Claude plugin structure, hooks, and agents |
+| `unit-tests` | Unit tests (pipeline scripts) |
+| `validate-skills` | Validate skills against the agentskills.io spec (asctl) |
+
+Enabling required checks and deciding administrator bypass policy are separate
+maintainer settings decisions. If required checks are enabled, keep their
+configured contexts aligned with the exact job names whenever jobs change;
+renaming a job can leave a required context waiting for a result. Record settings
+changes here. See [GitHub's protected-branch documentation](https://docs.github.com/en/repositories/configuring-branches-and-merges-in-your-repository/managing-protected-branches/about-protected-branches).
+
+Keep external `check-links` advisory and outside that intended set: its path
+filter skips unrelated PRs, so requiring it could leave them waiting. The
+`check-changie-fragment`, SkillSpector `scan`, and release-specific
+`version-monotonic` checks are also outside the always-run set. Release reviewers
+must check `version-monotonic` separately; it is not currently a configured
+required status check.
+
+[Issue #300](https://github.com/nq-rdl/agent-extensions/issues/300) plans a
+deterministic local Markdown/RST reference check, distinct from external HTTP
+health, and broader external coverage. [Issue #301](https://github.com/nq-rdl/agent-extensions/issues/301)
+plans advisory weekly link-rot monitoring. Neither check is implemented yet;
+update this description when those changes land.
 
 ## Testing instructions
 
@@ -238,7 +268,7 @@ For the isolated native Codex install/discovery smoke test (requires `codex` and
 scripts/smoke-codex-marketplace.sh
 ```
 
-The existing required plugin-validation job also runs this test in the dedicated
+The existing plugin-validation job also runs this test in the dedicated
 `.devcontainer/codex` image (CLI 0.154.0, no network or credentials, read-only
 checkout). See `.devcontainer/codex/README.md` for local Docker/devcontainer commands.
 
