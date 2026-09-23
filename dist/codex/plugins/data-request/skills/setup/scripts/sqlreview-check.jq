@@ -1,11 +1,12 @@
 # Validation rules for a .sqlreview/reviews/<slug>/{review,scope}.json document.
 # Emits one violation per line; no output means the document is valid. Used by
 # `sqlreview.sh check` and, through it, by the PreToolUse guard hook.
+# Run with `jq -L <this directory>`: path_slug/legacy_path_slug live in sqlreview-slug.jq.
+include "sqlreview-slug";
 def nonempty: type == "string" and length > 0;
 def integer: type == "number" and . >= 1 and . == floor;
 def line_range: type == "array" and length == 2 and all(.[]; integer) and .[0] <= .[1];
 def path_ok: nonempty and (startswith("/") | not) and (split("/") | all(.[]; . != "" and . != "." and . != ".."));
-def path_slug: sub("\\.sql$"; "") | (if . == "" then [""] else split("/") end) | map(if . == "" then "%00" else @uri | gsub("~"; "%7E") | gsub("\u0027"; "%27") | gsub("[!]"; "%21") | gsub("[(]"; "%28") | gsub("[)]"; "%29") | gsub("[*]"; "%2A") | gsub("_"; "%5F") | gsub("\\."; "%2E") end) | join("__");
 def req($k): if has($k) then empty else "missing key: \($k)" end;
 
 def items($kind; $rev):
@@ -82,7 +83,7 @@ else
   .revision as $rev
   | (if (.sql_path | path_ok | not) then "sql_path must be a normalized project-relative path" else empty end),
     (if (.slug | nonempty | not) or (.slug | test("^[A-Za-z0-9_%.-]+$") | not) or .slug == "." or .slug == ".." then "unsafe slug" else empty end),
-    (if (.sql_path | path_ok) and .slug != (.sql_path | path_slug) then "slug/sql_path binding mismatch" else empty end),
+    (if (.sql_path | path_ok) and .slug != (.sql_path | path_slug) and .slug != (.sql_path | legacy_path_slug) then "slug/sql_path binding mismatch" else empty end),
     ((if .kind == "lifts" then [] else ["inputs", "outputs"] end)[] as $key | if (.[$key] | type) != "array" or (.[$key] | all(.[]; type == "object" and (.name | nonempty) and (.description | type == "string")) | not) then "\($key) must be an array of named descriptions" else empty end),
     (if has("logic") and ((.logic | type) != "array" or (.logic | all(.[]; type == "object" and (.step | integer) and (.title | type == "string") and (.description | type == "string") and (.lines | line_range)) | not)) then "logic must be an array of numbered steps with line ranges" else empty end),
     (if has("open_questions") and ((.open_questions | type) != "array" or (.open_questions | all(.[]; type == "string") | not)) then "open_questions must be an array of strings" else empty end),

@@ -5,9 +5,12 @@
 # and by the plugin's hooks. Contract: docs/specs/2026-09-15-sql-review-plugin-design.md §4.
 #
 #   init [--diff] [--apply PATH...] [--json]   create .sqlreview/ from the bundled default; never overwrites
-#   status [--json] [--verbose]                reviews and their state (--verbose: why invalid/missing); exit 3 when not initialised
+#   status [--json] [--verbose]                reviews and their state (--verbose: why invalid/missing, and the
+#                                              move that migrates a legacy-encoded slug); exit 3 when not initialised
 #                                              missing bundled templates: JSON missing_templates, else one stderr line
-#   slug PATH                                  slug for a project path; exit 5 on a conflicting binding
+#   slug PATH                                  slug for a project path; exit 5 on a conflicting binding. Readable:
+#                                              sql/cohort_pipeline/x.sql -> sql__cohort_pipeline__x; an existing
+#                                              legacy-encoded reviews/sql__cohort%5Fpipeline__x/ is kept
 #   check FILE | check --stdin                 validate a review/scope JSON; exit 4 with one violation per line
 #   lint FILE                                  confirmed items whose wording is still provisional; exit 10 when any
 #   publish SLUG scope|review|lifts DRAFT             validate a staged copy, then atomically replace the final JSON
@@ -19,7 +22,8 @@
 #   carryover SLUG DRAFT                       review draft items matching confirmed, still-valid scope items (JSON)
 #   carryforward SLUG scope|review DRAFT       draft items whose previous-revision confirmation may be carried (JSON)
 #   impact SLUG                                heuristic: identifiers in the diff traced into unchanged lines
-#   move OLDPATH NEWPATH                       rebind a review directory after the SQL moved
+#   move OLDPATH NEWPATH                       rebind a review directory after the SQL moved (to the readable slug)
+#   move PATH PATH                             migrate a legacy-encoded slug to the readable one (no rebind needed)
 #   move --slug OLDSLUG NEWPATH                rebind a legacy review whose slug no current path derives
 #   render SLUG scope|review|lifts                   JSON + templates/<kind>.md -> reviews/SLUG/<kind>.md
 #                                              (a missing templates/<kind>.md is first installed from the bundled default)
@@ -110,7 +114,7 @@ cmd_init() {
 
 # ---------------------------------------------------------------------------------------------
 cmd_status() {
-  local json=0 verbose=0 d slug state reason schema lifts rows="[]" f missing=""
+  local json=0 verbose=0 d slug state reason migrate schema lifts rows="[]" f missing=""
   while [ $# -gt 0 ]; do
     case "$1" in --json) json=1 ;; --verbose) verbose=1 ;; *) usage ;; esac
     shift
@@ -140,16 +144,23 @@ EOF
           lifts="$(jq -c '.lifts | group_by(.status) | map({key: .[0].status, value: length}) | from_entries' "$d/lifts.json")"
         else lifts='{"invalid":true}'; fi
       fi
-      reason=""
+      reason="" migrate=""
       [ "$verbose" = 1 ] && reason="$(sr_state_reason "$slug" "$state")"
+      # A legacy-encoded slug (#353) of the path it records can be migrated to the readable one.
+      if [ "$verbose" = 1 ] && [ -n "$SR_SQL_PATH" ] &&
+         [ "$(sr_slug_pair "$SR_SQL_PATH" | sed -n 2p)" = "$slug" ] && [ "$(sr_slug_new "$SR_SQL_PATH")" != "$slug" ]; then
+        migrate="sqlreview.sh move '$SR_SQL_PATH' '$SR_SQL_PATH'"
+      fi
       if [ "$json" = 1 ]; then
         rows="$(printf '%s' "$rows" | jq -c --arg slug "$slug" --arg state "$state" --arg sql "$SR_SQL_PATH" --arg rev "$SR_REVISION" --argjson lifts "$lifts" \
-          --arg reason "$reason" --argjson verbose "$verbose" \
+          --arg reason "$reason" --arg migrate "$migrate" --argjson verbose "$verbose" \
           '. + [{slug: $slug, state: $state, sql_path: $sql, revision: ($rev | tonumber? // null), lifts: $lifts}
-                + (if $verbose == 1 then {reason: (if $reason == "" then null else $reason end)} else {} end)]')"
+                + (if $verbose == 1 then {reason: (if $reason == "" then null else $reason end),
+                                          migrate: (if $migrate == "" then null else $migrate end)} else {} end)]')"
       else
         printf '%s\t%s\t%s\t%s\tlifts=%s' "$slug" "$state" "$SR_SQL_PATH" "$SR_REVISION" "$lifts"
         [ -z "$reason" ] || printf '\treason=%s' "$reason"
+        [ -z "$migrate" ] || printf '\tmigrate=%s' "$migrate"
         printf '\n'
       fi
     done
@@ -206,7 +217,7 @@ cmd_check() {
   if ! jq -se 'length == 1 and (.[0] | type == "object")' "$tmp" >/dev/null 2>&1; then
     rm -f "$tmp"; printf 'invalid JSON: the document does not parse\n'; return 4
   fi
-  out="$(jq -r -f "$SR_SCRIPT_DIR/sqlreview-check.jq" "$tmp" 2>&1)"; rc=$?
+  out="$(jq -r -L "$SR_SCRIPT_DIR" -f "$SR_SCRIPT_DIR/sqlreview-check.jq" "$tmp" 2>&1)"; rc=$?
   rm -f "$tmp"
   if [ "$rc" -ne 0 ]; then printf 'check failed to run: %s\n' "$out"; return 4; fi
   if [ -n "$out" ]; then printf '%s\n' "$out"; return 4; fi
@@ -589,7 +600,7 @@ cmd_carryforward() {
 cmd_move() {
   sr_need_jq
   sr_require_root
-  local oldrel="" newrel oldslug newslug f tmp
+  local oldrel="" newrel oldslug newslug f tmp rebind=1
   if [ "${1:-}" = "--slug" ]; then
     # Legacy reviews (e.g. schema 1 with a hand-chosen slug) are named by no current path.
     [ $# -eq 3 ] || usage
@@ -602,17 +613,31 @@ cmd_move() {
     oldslug="$(sr_slug "$oldrel")"
   fi
   sr_safe_sql "$newrel"
-  newslug="$(sr_slug "$newrel")"
+  newslug="$(sr_slug_new "$newrel")"
   sr_safe_slug "$oldslug"
   sr_safe_slug "$newslug"
   [ -d "$SR_REVIEWS/$oldslug" ] || sr_die 2 "no review directory for '${oldrel:-$oldslug}' (slug $oldslug)"
+  if [ "$oldrel" = "$newrel" ] && [ "$oldslug" = "$newslug" ]; then
+    printf 'unchanged\t%s\t%s\n' "$newslug" "$newrel"
+    printf 'sqlreview: reviews/%s/ already uses the readable slug for %s; nothing to move\n' "$newslug" "$newrel" >&2
+    return 0
+  fi
   [ "$oldslug" = "$newslug" ] || [ ! -e "$SR_REVIEWS/$newslug" ] || sr_die 2 "reviews/$newslug/ already exists"
   for f in review.json scope.json lifts.json rebind-required; do
     sr_no_symlinks "$SR_REVIEWS/$oldslug/$f" || exit 2
     [ ! -d "$SR_REVIEWS/$oldslug/$f" ] || sr_die 2 "unexpected directory: $f"
   done
+  # Migrating a legacy-encoded slug to the readable one for the same path (#353) leaves the SQL
+  # binding unchanged, so it does not force a re-analysis: no rebind-required marker.
+  if [ "$oldslug" != "$newslug" ] && [ "$oldslug" = "$(sr_slug_pair "$newrel" | sed -n 2p)" ]; then
+    rebind=0
+    for f in review.json scope.json lifts.json; do
+      [ -f "$SR_REVIEWS/$oldslug/$f" ] || continue
+      [ "$(jq -r '.sql_path // "" | strings' "$SR_REVIEWS/$oldslug/$f" 2>/dev/null)" = "$newrel" ] || rebind=1
+    done
+  fi
   [ "$oldslug" = "$newslug" ] || mv "$SR_REVIEWS/$oldslug" "$SR_REVIEWS/$newslug" || sr_die 2 "move failed"
-  touch "$SR_REVIEWS/$newslug/rebind-required" || sr_die 2 "cannot mark stale"
+  [ "$rebind" = 0 ] || touch "$SR_REVIEWS/$newslug/rebind-required" || sr_die 2 "cannot mark stale"
   rm -f "$SR_REVIEWS/$newslug/review.md" "$SR_REVIEWS/$newslug/scope.md" "$SR_REVIEWS/$newslug/lifts.md" || sr_die 2 "cannot remove stale renders"
   for f in review.json scope.json lifts.json; do
     [ -f "$SR_REVIEWS/$newslug/$f" ] || continue

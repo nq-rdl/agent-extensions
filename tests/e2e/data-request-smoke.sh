@@ -25,7 +25,7 @@ for leaf in setup bootstrap analyse explain guardrails map draft validate fix li
   [ -f "plugins/data-request/skills/$leaf/SKILL.md" ] && pass "B: plugin skill $leaf synced" || bad "B: plugin skill $leaf missing"
   grep -q '^name:' "plugins/data-request/skills/$leaf/SKILL.md" 2>/dev/null && bad "B: $leaf copy still carries name:" || pass "B: $leaf copy has no name: (labels as data-request:$leaf)"
 done
-for f in scripts/sqlreview.sh scripts/sqlreview-lib.sh scripts/sqlreview-check.jq scripts/sqlreview-render.jq \
+for f in scripts/sqlreview.sh scripts/sqlreview-lib.sh scripts/sqlreview-check.jq scripts/sqlreview-slug.jq scripts/sqlreview-render.jq \
          assets/sqlreview/config.json assets/sqlreview/templates/scope.md assets/sqlreview/templates/review.md references/definitions.rst; do
   [ -f "plugins/data-request/skills/setup/$f" ] && pass "C: setup/$f shipped" || bad "C: setup/$f missing from plugin"
 done
