@@ -373,6 +373,11 @@ new release. This is a verification drill, not the routine recovery path.
 
 `marketplace.json` sources are relative paths (`./plugins/<bundle>`) — installs read directly from `main` (or whatever ref the user pinned), no separate release branch involved.
 
+**Runbook.** `docs/releasing.md` is the operator checklist: cutting a release, partial-failure
+recovery, a changie fragment that lands after Prepare ran, and rollback (unpublish = revert on
+`main` plus a new patch release; yanking a GitHub release; the `v*` tag deletion policy pending
+the #175 ruleset).
+
 ## Docs
 
 The docs site uses Zensical (configured in `zensical.toml`), provided by the pixi `docs` environment (linux-64 only). Source is `docs/`. Architecture decisions live in `docs/ARCHITECTURE.md`.
