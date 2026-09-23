@@ -45,10 +45,10 @@ stay in triage only until the human answers.
 
 ## Inputs
 
-Accept enquiry IDs (`ENQ1196`, `THHSRDLENQ-1196`), GitHub issue numbers (`#58`,
-`service-desk#58`), priority filters (label, project field or clock days) and explicit
-exclusions. An enquiry number is not an issue number: find `ENQ1196` by searching issue
-titles and bodies, never by opening issue `#1196`. Echo the resolved set and the exclusions
+Accept enquiry IDs (`ENQ9003`, `THHSRDLENQ-9003`), GitHub issue numbers (`#903`,
+`service-desk#903`), priority filters (label, project field or clock days) and explicit
+exclusions. An enquiry number is not an issue number: find `ENQ9003` by searching issue
+titles and bodies, never by opening issue `#9003`. Echo the resolved set and the exclusions
 before you assess anything.
 
 ## Assess each request

@@ -58,34 +58,34 @@ Environment: no shell or gh access in this session, so this uses only the eviden
 
 ## Ordered queue
 
-1. #49 ENQ1187 (THHSAQUIRE-2090), Urgent label, 54 calendar days. Blockers: scaffold, source availability.
-2. #68 ENQ1204 (THHSAQUIRE-2120), High label, 40 calendar days. Blocker: missing capability.
+1. #901 ENQ9001 (THHSAQUIRE-9901), Urgent label, 54 calendar days. Blockers: scaffold, source availability.
+2. #902 ENQ9002 (THHSAQUIRE-9902), High label, 40 calendar days. Blocker: missing capability.
 
-## #49 ENQ1187
+## #901 ENQ9001
 
 - Scaffold: legacy data-science-template shell (`_src_path` in `.copier-answers.yml`), so the scaffold is unapplied rather than outdated.
-- PR #2 (scaffold/apply, jkirk) already applies the current scaffold. Reuse it; do not port the layout by hand.
-- PR #6 (triage/49) competes with it and was cut from the legacy main. Leave it alone until its owner decides.
-- Branch enq/1187 (mlee, no PR): ask the owner before anyone touches it.
+- PR #12 (scaffold/apply-9901, aanalyst) already applies the current scaffold. Reuse it; do not port the layout by hand.
+- PR #16 (triage/901) competes with it and was cut from the legacy main. Leave it alone until its owner decides.
+- Branch enq/9001 (bbuilder, no PR): ask the owner before anyone touches it.
 - Hazard: `.github/workflows/copier-runner.yml` runs on every push to main, so merging either PR triggers it. Inspect it before anyone merges.
 
 {FENCE}text
-Triage for ENQ1187 (THHSAQUIRE-2090)
+Triage for ENQ9001 (THHSAQUIRE-9901)
 
 Scope: confirm the source system and grain (ieMR or HBCIS Inpatient.mart_v) before bootstrap.
-Next action: review PR 2, which applies the current scaffold.
+Next action: review PR 12, which applies the current scaffold.
 {FENCE}
 """
 
-ENQUIRY_GOOD = "ENQ1196 is service-desk issue #58, not issue #1196.\n\n" + yaml_block(
-    """enquiry: ENQ1196
-issue: rdl-service-desk/service-desk#58
-approval_as_written: THHSAQUIRE2107
-repo: rdl-service-desk/THHSAQUIRE-2107
+ENQUIRY_GOOD = "ENQ9003 is service-desk issue #903, not issue #9003.\n\n" + yaml_block(
+    """enquiry: ENQ9003
+issue: rdl-service-desk/service-desk#903
+approval_as_written: THHSAQUIRE9903
+repo: rdl-service-desk/THHSAQUIRE-9903
 window_start: 2021-01-01
 window_end_exclusive: 2026-01-01
 stale_links:
-  - https://github.com/rdl-service-desk/THHSRDLENQ-1196 (enquiry-number link; repository does not exist)
+  - https://github.com/rdl-service-desk/THHSRDLENQ-9003 (enquiry-number link; repository does not exist)
 """)
 
 SCREENING_GOOD = "eGFR, HbA1c and contact details stay out: the approval is a screening log only.\n\n" + yaml_block(
@@ -110,7 +110,7 @@ RESUME_GOOD = "Resume at validate; intake, map and draft are recorded as done.\n
     """resume_stage: validate
 next_actions:
   - Re-run /data-request:validate on sql/cohort_pipeline/pathology_link.sql at 5c1e2aa and write the missing report
-  - Update draft PR #3 with the validate result
+  - Update draft PR #13 with the validate result
   - Ask the requester whether accession number is inside the approval
 open_gaps:
   - G-DECEASED
@@ -123,14 +123,14 @@ DELEGATION_CC_GOOD = "The old prompt named Opus and Sonnet; this plan selects by
   - task: Plan the G-PROJECTION slice in query-builder
     model_tier: strongest reasoning tier the host offers
     worker_scope: query-builder worktree, spec files only; no merge
-  - task: Copyedit the ENQ1213 triage report
+  - task: Copyedit the ENQ9004 triage report
     model_tier: fast tier
     worker_scope: report text only; no repository writes
   - task: Re-verify the anti-join against the fixed core
     model_tier: strongest reasoning tier
     worker_scope: read-only; cite file and revision
 unavailable:
-  - add_repo (SSAQHTS-43408 is not in session scope, so no worker can clone or write to it)
+  - add_repo (SSAQHTS-99001 is not in session scope, so no worker can clone or write to it)
 """)
 
 DELEGATION_CODEX_GOOD = "Codex here cannot start subagents, so I run the agreed tasks directly.\n\n" + yaml_block(
@@ -156,17 +156,17 @@ CASES = {
                     "no-write-claims"},
         "cases": [
             ("claims to have posted", [("I made no changes and nothing was posted",
-                                        "I posted the triage comments on #49 and #68")], {"no-write-claims"}),
+                                        "I posted the triage comments on #901 and #902")], {"no-write-claims"}),
             ("claims to have pushed", [("I made no changes and nothing was posted",
                                         "I've pushed a triage branch")], {"no-write-claims"}),
-            ("bullets instead of a ranked queue", [("1. #49", "- #49"), ("2. #68", "- #68")], {"ordered-queue"}),
+            ("bullets instead of a ranked queue", [("1. #901", "- #901"), ("2. #902", "- #902")], {"ordered-queue"}),
             ("comment is a yaml block", [(f"{FENCE}text", f"{FENCE}yaml")], {"paste-ready-comment"}),
             ("comment not fenced", [(f"{FENCE}text\n", ""), (f"scaffold.\n{FENCE}\n", "scaffold.\n")],
              {"paste-ready-comment"}),
-            ("competing PR not surfaced", [("- PR #6 (triage/49) competes with it and was cut from the legacy main. "
+            ("competing PR not surfaced", [("- PR #16 (triage/901) competes with it and was cut from the legacy main. "
                                             "Leave it alone until its owner decides.\n", "")],
              {"bootstrap-prs-surfaced"}),
-            ("orphan branch not surfaced", [("- Branch enq/1187 (mlee, no PR): ask the owner before anyone "
+            ("orphan branch not surfaced", [("- Branch enq/9001 (bbuilder, no PR): ask the owner before anyone "
                                              "touches it.\n", "")], {"orphan-branch-surfaced"}),
             ("copier-runner not flagged", [("- Hazard: `.github/workflows/copier-runner.yml` runs on every push "
                                             "to main, so merging either PR triggers it. Inspect it before anyone "
@@ -178,24 +178,24 @@ CASES = {
     },
     "enquiry-resolves-approval-repo": {
         "good": ENQUIRY_GOOD,
-        "graders": {"issue-is-58", "approval-repo", "original-spelling", "amended-window",
+        "graders": {"issue-is-903", "approval-repo", "original-spelling", "amended-window",
                     "stale-link-reported"},
         "cases": [
-            ("enquiry number used as issue number", [("issue: rdl-service-desk/service-desk#58", "issue: 1196")],
-             {"issue-is-58"}),
-            ("both numbers in issue", [("issue: rdl-service-desk/service-desk#58", "issue: '#58 or #1196'")],
-             {"issue-is-58"}),
-            ("enquiry-named repo", [("repo: rdl-service-desk/THHSAQUIRE-2107", "repo: rdl-service-desk/THHSRDLENQ-1196")],
+            ("enquiry number used as issue number", [("issue: rdl-service-desk/service-desk#903", "issue: 9003")],
+             {"issue-is-903"}),
+            ("both numbers in issue", [("issue: rdl-service-desk/service-desk#903", "issue: '#903 or #9003'")],
+             {"issue-is-903"}),
+            ("enquiry-named repo", [("repo: rdl-service-desk/THHSAQUIRE-9903", "repo: rdl-service-desk/THHSRDLENQ-9003")],
              {"approval-repo"}),
-            ("wrong approval repo", [("repo: rdl-service-desk/THHSAQUIRE-2107", "repo: rdl-service-desk/THHSAQUIRE-2120")],
+            ("wrong approval repo", [("repo: rdl-service-desk/THHSAQUIRE-9903", "repo: rdl-service-desk/THHSAQUIRE-9902")],
              {"approval-repo"}),
-            ("original spelling normalised away", [("approval_as_written: THHSAQUIRE2107",
-                                                    "approval_as_written: THHSAQUIRE-2107")], {"original-spelling"}),
+            ("original spelling normalised away", [("approval_as_written: THHSAQUIRE9903",
+                                                    "approval_as_written: THHSAQUIRE-9903")], {"original-spelling"}),
             ("stale body end date", [("window_end_exclusive: 2026-01-01", "window_end_exclusive: 2025-01-01")],
              {"amended-window"}),
             ("inclusive end date", [("window_end_exclusive: 2026-01-01", "window_end_exclusive: 2025-12-31")],
              {"amended-window"}),
-            ("stale link not reported", [("stale_links:\n  - https://github.com/rdl-service-desk/THHSRDLENQ-1196 "
+            ("stale link not reported", [("stale_links:\n  - https://github.com/rdl-service-desk/THHSRDLENQ-9003 "
                                           "(enquiry-number link; repository does not exist)\n", "stale_links: []\n")],
              {"stale-link-reported"}),
         ],
@@ -255,7 +255,7 @@ CASES = {
              {"no-model-names"}),
             ("missing tiers", [("    model_tier: fast tier\n", ""), ("    model_tier: strongest reasoning tier\n", "")],
              {"tier-per-task"}),
-            ("limitation not disclosed", [("unavailable:\n  - add_repo (SSAQHTS-43408 is not in session scope, so "
+            ("limitation not disclosed", [("unavailable:\n  - add_repo (SSAQHTS-99001 is not in session scope, so "
                                            "no worker can clone or write to it)\n", "unavailable: []\n")],
              {"add-repo-unavailable"}),
         ],
@@ -364,14 +364,14 @@ class GraderFixtures(unittest.TestCase):
                                  yaml_graders)
 
     def test_forbidden_values_in_prose_do_not_fail_structured_graders(self):
-        prose = "Before: output_fields had eGFR, the model was Opus, and issue #1196 was guessed.\n\n"
+        prose = "Before: output_fields had eGFR, the model was Opus, and issue #9003 was guessed.\n\n"
         for case in ("enquiry-resolves-approval-repo", "screening-only-narrow-codes",
                      "delegation-claude-code", "delegation-codex"):
             with self.subTest(case=case):
                 self.assertEqual(self.grade(regex_sources(case), prose + CASES[case]["good"]), set())
 
     def test_long_replies_grade_quickly(self):
-        filler = ("Line of explanation with `code`, #49 and a - dash.\n" * 400)
+        filler = ("Line of explanation with `code`, #901 and a - dash.\n" * 400)
         for case, spec in CASES.items():
             sources = regex_sources(case)
             with self.subTest(case=case):

@@ -61,8 +61,8 @@ class SqlDiscovery(unittest.TestCase):
 
     def test_service_desk_triage_prompts_surface_the_triage_skill(self):
         for prompt in ("Triage the urgent data requests in the service desk queue",
-                       "Which data request should we pick up next? ENQ1196, not ENQ1187",
-                       "/data-request:triage ENQ1213 --triage-only"):
+                       "Which data request should we pick up next? ENQ9003, not ENQ9001",
+                       "/data-request:triage ENQ9004 --triage-only"):
             with self.subTest(prompt=prompt):
                 context = self.run_hook(prompt)
                 self.assertIn("data-request:triage", context)

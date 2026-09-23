@@ -7,10 +7,10 @@ timeout_seconds: 240
 allowed_tools: [Read, Glob, Grep, Skill]
 ---
 
-We are in co-development mode on ENQ1213 (rdl-service-desk/service-desk#76, approval repository SSAQHTS-43408), running in the Codex CLI rather than Claude Code. With the human we agreed three tasks:
+We are in co-development mode on ENQ9004 (rdl-service-desk/service-desk#904, approval repository SSAQHTS-99001), running in the Codex CLI rather than Claude Code. With the human we agreed three tasks:
 
 1. Plan the G-PROJECTION library slice in nq-rdl/query-builder (output projection for screening logs).
-2. Copyedit the ENQ1213 triage report before the human posts it.
+2. Copyedit the ENQ9004 triage report before the human posts it.
 3. Re-verify that the draft's anti-join is correlated, against the fixed query-builder core.
 
 This Codex profile disables native subagent delegation, Claude Code Workflow scripts cannot run here, and there is no `add_repo`. The model selector offers several models at different reasoning levels. The previous plan named "GPT-5.6 Sol" for planning and "Luna" for copyedits.

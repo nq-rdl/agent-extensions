@@ -14,9 +14,9 @@ Interpretation checks
   identity and pathology fields from the intake stay out, and the report says
   why. Reconcile fields added during review (death dates, lab organisation,
   accession number) with the approval before delivery.
-* **Source system and grain come before bootstrap.** ENQ1187's source moved from
-  ieMR to HBCIS ``Inpatient.mart_v`` after its scope was published, which made
-  that scope stale. Revising a published scope re-opens its confirmations.
+* **Source system and grain come before bootstrap.** In one request the source moved
+  from ieMR to HBCIS ``Inpatient.mart_v`` after its scope was published, which
+  made that scope stale. Revising a published scope re-opens its confirmations.
 * **Date windows.** A window written as ``BETWEEN '2021-01-01' AND
   '2025-12-31'`` on a datetime column drops most of 31 December. Propose a
   half-open window (on or after the start, before the day after the end) and

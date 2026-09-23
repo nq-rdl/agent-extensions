@@ -12,8 +12,8 @@ Number the queue, one line per request, highest first:
 
 .. code-block:: text
 
-   1. service-desk#49 ENQ1187 (THHSAQUIRE-2090) – Urgent label, 54 calendar days.
-      Blocked: scaffold. Next: review PR 2 – owner.
+   1. service-desk#901 ENQ9001 (THHSAQUIRE-9901) – Urgent label, 54 calendar days.
+      Blocked: scaffold. Next: review PR 12 – owner.
 
 Give the verified priority and its source, the age and how it was counted, the
 primary blocker class, and the next action with its owner. List the exclusions
@@ -27,10 +27,10 @@ verbatim:
 
 .. code-block:: text
 
-   Triage – ENQ1196 (THHSAQUIRE-2107)
+   Triage – ENQ9003 (THHSAQUIRE-9903)
 
    Status: draft complete; blocked on clarification.
-   Repository: rdl-service-desk/THHSAQUIRE-2107 (approval as written: THHSAQUIRE2107).
+   Repository: rdl-service-desk/THHSAQUIRE-9903 (approval as written: THHSAQUIRE9903).
    Confirmed: population, window and outputs, each with its source.
    Proposed, awaiting confirmation: each assumption with its reason.
    Questions for the requester:

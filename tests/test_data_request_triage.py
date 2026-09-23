@@ -198,7 +198,7 @@ class FieldNotes(unittest.TestCase):
     def test_repository_and_scaffold_facts(self):
         for fact in ("_src_path", "data-science-template", "copier-runner.yml", "answers.yaml",
                      ".copier-answers.yml", "framework_ref", "GOVERNANCE.md",
-                     "THHSAQUIRE-2107", "THHSRDLENQ-1196"):
+                     "THHSAQUIRE-9903", "THHSRDLENQ-9003"):
             with self.subTest(fact=fact):
                 self.assertIn(fact, self.all)
         self.assertRegex(self.all, r"(?i)unapplied")
