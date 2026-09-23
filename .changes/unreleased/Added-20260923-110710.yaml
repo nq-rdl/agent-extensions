@@ -1,0 +1,3 @@
+kind: Added
+body: sqlreview carryover lists review draft items that match confirmed scope items on unchanged SQL (whole file or the item's lines)
+time: 2026-09-23T11:07:10.302400724Z
