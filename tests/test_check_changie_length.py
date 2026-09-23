@@ -92,6 +92,25 @@ class TestChangieLength(unittest.TestCase):
                 check_changie_length.find_length_issues([str(keep), str(empty)], 200), []
             )
 
+    def test_malformed_yaml_flagged(self):
+        # Regression for #187: an unquoted plain-scalar body containing ": "
+        # is invalid YAML ("mapping values are not allowed in this context").
+        # `changie new` auto-quotes, so this only happens to hand-written
+        # fragments — and it used to surface only at release `changie batch`.
+        with tempfile.TemporaryDirectory() as t:
+            d = Path(t) / ".changes" / "unreleased"
+            d.mkdir(parents=True)
+            p = d / "Changed-1.yaml"
+            p.write_text(
+                "kind: Changed\nbody: set `effort: xhigh` by default\n"
+                "time: 2026-07-02T00:00:00Z\n"
+            )
+            issues = check_changie_length.find_length_issues([str(p)], 200)
+            self.assertEqual(len(issues), 1)
+            self.assertIn("Changed-1.yaml", issues[0])
+            self.assertIn("could not parse YAML", issues[0])
+            self.assertEqual(check_changie_length.main([str(p)]), 1)
+
     def test_env_override(self):
         import os
 
