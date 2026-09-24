@@ -1,3 +1,0 @@
-kind: Added
-body: 'sqlreview.sh move PATH PATH migrates a legacy-escaped review slug to the readable one without marking the review stale'
-time: 2026-09-23T12:00:01.000000000Z

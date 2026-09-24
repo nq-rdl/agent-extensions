@@ -1,3 +1,0 @@
-kind: Added
-body: 'data-request guardrails: render datetime bounds as ISO 8601 with time (YYYYMMDD only at midnight), since DATETIME parses YYYY-MM-DD by login language'
-time: 2026-09-23T00:00:00.000000+10:00

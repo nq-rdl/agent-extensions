@@ -1,3 +1,0 @@
-kind: Added
-body: sqlreview move --slug OLD_SLUG NEW_PATH rebinds legacy reviews whose slug no current path derives; slug warns about them
-time: 2026-09-23T10:54:46.483868823Z

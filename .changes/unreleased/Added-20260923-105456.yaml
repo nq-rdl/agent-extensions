@@ -1,3 +1,0 @@
-kind: Added
-body: sqlreview status --verbose names why a review is invalid or missing (e.g. legacy slug binding mismatch, missing sql_path target)
-time: 2026-09-23T10:54:56.344043105Z
