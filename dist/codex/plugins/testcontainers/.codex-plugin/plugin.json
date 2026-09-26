@@ -1,0 +1,32 @@
+{
+  "name": "testcontainers",
+  "version": "0.35.0",
+  "description": "Testcontainers — integration tests against real services in throwaway containers",
+  "author": {
+    "name": "nq-rdl"
+  },
+  "repository": "https://github.com/nq-rdl/agent-extensions",
+  "license": "MIT",
+  "keywords": [
+    "testcontainers",
+    "testing",
+    "integration-tests",
+    "docker",
+    "containers"
+  ],
+  "skills": "./skills/",
+  "interface": {
+    "displayName": "Testcontainers",
+    "shortDescription": "Testcontainers — integration tests against real services in throwaway containers",
+    "longDescription": "Testcontainers — integration tests against real services in throwaway containers",
+    "developerName": "nq-rdl",
+    "category": "Developer Tools",
+    "capabilities": [
+      "Skills"
+    ],
+    "defaultPrompt": [
+      "Use Testcontainers to help with my task."
+    ],
+    "websiteURL": "https://github.com/nq-rdl/agent-extensions"
+  }
+}

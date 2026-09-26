@@ -45,6 +45,7 @@ Delegation outlines are optional skill references, not registered agent types.
 | [`speckit-dev`](#speckit-dev) | Yes | Yes | SpecKit extension toolkit — scaffold, validate, manage, and publish spec-kit extensions |
 | [`rdl-team`](#rdl-team) | Yes | Yes | RDL team workflows — repository context, spec-kit delivery, and onboarding |
 | [`playwright`](#playwright) | Yes | Yes | Playwright — generate and debug end-to-end browser tests |
+| [`testcontainers`](#testcontainers) | Yes | Yes | Testcontainers — integration tests against real services in throwaway containers |
 | [`planning`](#planning) | Yes | Yes | Planning — implementation strategy, technical-spike validation, file-level sequencing, API/repo architecture, and ADRs |
 | [`debug`](#debug) | Yes | Yes | Debugging and cleanup — systematic diagnosis and tech-debt removal |
 | [`tech-writing`](#tech-writing) | Yes | Yes | Technical writing — developer docs, tutorials, ADRs, and guides |
@@ -654,6 +655,20 @@ Playwright — generate and debug end-to-end browser tests.
 **Codex MCP:** playwright
 
 **Claude Code MCP server(s):** `playwright`
+
+---
+
+## testcontainers
+
+Testcontainers — integration tests against real services in throwaway containers.
+
+**Claude Code skills**
+
+- `/testcontainers:integration-test`
+
+**Codex skills**
+
+- `$testcontainers:integration-test`
 
 ---
 
