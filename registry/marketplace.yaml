@@ -52,6 +52,7 @@ order:
   - speckit-dev
   - rdl-team
   - playwright
+  - testcontainers
   - planning
   - debug
   - tech-writing

@@ -1,0 +1,52 @@
+rdl-agent-extensions
+
+This repository is licensed under the MIT License (see LICENSE), with the
+following exceptions derived from openai/codex-plugin-cc (Apache License 2.0,
+Copyright 2026 OpenAI; fork point v1.0.6 @ db52e28):
+
+  skills/codex-setup/               skills/codex-review/
+  skills/codex-adversarial-review/  skills/codex-rescue/
+  skills/codex-result/              skills/codex-status/
+  skills/codex-transfer/            skills/codex-cancel/
+  skills/codex-cli-runtime/         skills/codex-result-handling/
+  skills/gpt-5-6-prompting/         skills/codex-model-guide/
+  hooks/codex-session-lifecycle.sh  hooks/codex-stop-review-gate.sh
+  plugins/codex/scripts/  plugins/codex/prompts/  plugins/codex/schemas/
+  tests/codex/
+
+Header convention: the derived Markdown, shell, and `tests/codex/` JavaScript
+files above carry an `SPDX-License-Identifier: Apache-2.0` header, while the
+vendored runtime trees (`plugins/codex/scripts/`, `plugins/codex/prompts/`,
+`plugins/codex/schemas/`) are kept as-is from upstream without per-file headers
+and are covered wholesale. Header presence alone is therefore not a provenance
+signal inside those trees — see the carve-out below.
+
+First-party carve-out. The files below sit inside the paths listed above but are
+original nq-rdl work, NOT derived from openai/codex-plugin-cc. They are licensed
+Apache-2.0 to match the bundle they ship in (`registry/bundles/codex.yaml` sets
+`license: Apache-2.0`), and each carries an explicit
+`SPDX-FileCopyrightText: 2026 nq-rdl` line alongside its
+`SPDX-License-Identifier`:
+
+  plugins/codex/scripts/codex-defects.mjs
+  plugins/codex/scripts/defect-report-hook.mjs
+  plugins/codex/scripts/codex-defect-report.sh
+  plugins/codex/scripts/lib/defect-classify.mjs
+  plugins/codex/scripts/lib/defect-log.mjs
+  hooks/codex-defect-report.sh
+  skills/codex-report-defect/
+  tests/codex/defect-classify.test.mjs
+  tests/codex/defect-cli.test.mjs
+  tests/codex/defect-hook.test.mjs
+  tests/codex/defect-log.test.mjs
+  tests/codex/defect-record-integration.test.mjs
+
+Copyright in these files is held by nq-rdl; the OpenAI copyright statement in
+`plugins/codex/NOTICE` does not extend to them.
+
+All of the paths above are governed by `plugins/codex/LICENSE` and
+`plugins/codex/NOTICE`. Skills declaring `license: CC-BY-4.0` in their SKILL.md
+frontmatter, including their generated copies, are governed by LICENSE-CC-BY-4.0.
+The package manifest license describes the package default; individual skill
+license declarations take precedence for that skill. All other files remain
+under the MIT License.

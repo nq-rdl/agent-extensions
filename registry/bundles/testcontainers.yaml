@@ -1,0 +1,34 @@
+schemaVersion: v1
+id: testcontainers
+displayName: Testcontainers
+description: Testcontainers — integration tests against real services in throwaway containers
+keywords: [testcontainers, testing, integration-tests, docker, containers]
+owners:
+  - rdl
+channels:
+  - stable
+skills:
+  - {source: testcontainers, leaf: integration-test}
+hooks: []
+prompts: []
+mcp: []
+targets:
+  claude:
+    enabled: true
+    pluginName: testcontainers
+    marketplaceName: rdl-agent-extensions
+
+  codex:
+    enabled: true
+    pluginName: testcontainers
+    marketplaceName: rdl-agent-extensions
+    category: Developer Tools
+    components:
+      skills: true
+      mcp: false
+      hooks: false
+      apps: false
+    interface:
+      shortDescription: Testcontainers — integration tests against real services in throwaway containers
+      defaultPrompt:
+      - Use Testcontainers to help with my task.
