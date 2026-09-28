@@ -1,0 +1,3 @@
+kind: Fixed
+body: 'data-request:map invokes /data-request:guardrails instead of reading the guardrails SKILL.md file path (#375)'
+time: 2026-09-28T00:43:54.000000000Z

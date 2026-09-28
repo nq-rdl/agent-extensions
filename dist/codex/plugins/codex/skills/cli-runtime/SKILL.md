@@ -33,19 +33,19 @@ Execution rules:
 - That prompt drafting is the only Claude-side work allowed. Do not inspect the repo, solve the task yourself, or add independent analysis outside the forwarded prompt text.
 - Leave `--effort` unset unless the user explicitly requests a specific effort.
 - Leave model unset by default. Add `--model` only when the user explicitly asks for one.
-- Map `spark` to `--model gpt-5.3-codex-spark`; `sol`/`terra`/`luna` map to `gpt-5.6-sol`/`gpt-5.6-terra`/`gpt-5.6-luna`.
+- Map `spark` to `--model gpt-5.3-codex-spark`; bare `sol`/`terra`/`luna` map to `gpt-5.6-sol`/`gpt-5.6-terra`/`gpt-5.6-luna`. GPT-6 needs `sol-6`, `luna-6`, or `astra` (`gpt-6-sol`, `gpt-6-luna`, `gpt-6-astra`). Full table: `codex:model-guide`.
 - Default to a write-capable Codex run by adding `--write` unless the user explicitly asks for read-only behavior or only wants review, diagnosis, or research without edits.
 
 Command selection:
 - Use exactly one `task` invocation per rescue handoff.
 - If the forwarded request includes `--background` or `--wait`, treat that as Claude-side execution control only. Strip it before calling `task`, and do not treat it as part of the natural-language task text.
-- If the forwarded request includes `--model`, normalize aliases (`spark`, `sol`, `terra`, `luna`) and pass it through to `task`.
+- If the forwarded request includes `--model`, pass it through to `task`; the companion resolves every alias in the `codex:model-guide` table.
 - If the forwarded request includes `--effort`, pass it through to `task`.
 - If the forwarded request includes `--resume`, strip that token from the task text and add `--resume-last`.
 - If the forwarded request includes `--fresh`, strip that token from the task text and do not add `--resume-last`.
 - `--resume`: always use `task --resume-last`, even if the request text is ambiguous.
 - `--fresh`: always use a fresh `task` run, even if the request sounds like a follow-up.
-- `--effort`: accepted values are `low`, `medium`, `high`, `xhigh`, `max`, `ultra` (`ultra` is Sol/Terra only). Unknown values warn and pass through; codex enforces per-model gating.
+- `--effort`: accepted values are `low`, `medium`, `high`, `xhigh`, `max`, `ultra` (`ultra` is not available on either Luna). Unknown values warn and pass through; codex enforces per-model gating.
 - `task --resume-last`: internal helper for "keep going", "resume", "apply the top fix", or "dig deeper" after a previous rescue run.
 
 Codex CLI facts (pinned to 0.144.6 — verify with `codex --version`):

@@ -1,7 +1,7 @@
 ---
 license: Apache-2.0
 description: Forward investigation, an explicit fix request, or follow-up rescue work to the Codex companion runtime
-argument-hint: "[--background|--wait] [--resume|--fresh] [--model <model|spark>] [--effort <low|medium|high|xhigh|max|ultra>] [what Codex should investigate, solve, or continue]"
+argument-hint: "[--background|--wait] [--resume|--fresh] [--model <model|alias>] [--effort <low|medium|high|xhigh|max|ultra>] [what Codex should investigate, solve, or continue]"
 user-invocable: true
 allowed-tools: Bash(node:*), AskUserQuestion, Agent
 metadata:
@@ -63,8 +63,8 @@ Operating rules:
 - Return the Codex companion stdout verbatim to the user.
 - Do not paraphrase, summarize, rewrite, or add commentary before or after it.
 - The executor must not inspect files, monitor progress, poll `/codex:status`, fetch `/codex:result`, call `/codex:cancel`, summarize output, or do follow-up work of its own.
-- Leave `--effort` unset unless the user explicitly asks for a specific reasoning effort. Accepted efforts are `low`, `medium`, `high`, `xhigh`, `max`, and `ultra` (`ultra` is Sol/Terra only); unknown values warn and pass through to Codex.
-- Leave the model unset unless the user explicitly asks for one. If they ask for `spark`, map it to `gpt-5.3-codex-spark`. If they ask for `sol`, `terra`, or `luna`, map to `gpt-5.6-sol`, `gpt-5.6-terra`, or `gpt-5.6-luna`.
+- Leave `--effort` unset unless the user explicitly asks for a specific reasoning effort. Accepted efforts are `low`, `medium`, `high`, `xhigh`, `max`, and `ultra` (`ultra` is not available on either Luna); unknown values warn and pass through to Codex.
+- Leave the model unset unless the user explicitly asks for one. If they ask for `spark`, map it to `gpt-5.3-codex-spark`. Bare `sol`, `terra`, or `luna` map to `gpt-5.6-sol`, `gpt-5.6-terra`, or `gpt-5.6-luna`. GPT-6 needs an explicit form: `sol-6` or "sol 6" map to `gpt-6-sol`, `luna-6` or "luna 6" to `gpt-6-luna`, `astra` to `gpt-6-astra`. There is no GPT-6 Terra; ask instead of substituting. Full alias table: `codex:model-guide`.
 - Leave `--resume` and `--fresh` in the forwarded request. The runtime contract handles that routing when it builds the `task` command.
 - If the helper reports that Codex is missing or unauthenticated, stop and tell the user to run `/codex:setup`.
 - If the user did not supply a request, ask what Codex should investigate or fix.

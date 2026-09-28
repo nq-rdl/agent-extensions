@@ -120,7 +120,8 @@ When a case's answer is prose, such as a classification, grade the labelled line
 tells the agent to write, not a code block. The `data-request` suite does this. Its regex
 graders are hand-written (the generator changes only files with its `GENERATED` marker). Each
 case's `fixtures.yaml` lists passing and failing replies, and
-`tests/test_eval_data_request_amend_graders.py` grades them in Python and Node.
+`tests/test_eval_data_request_amend_graders.py` (the `field-*` cases:
+`tests/test_eval_data_request_field_graders.py`) grades them in Python and Node.
 
 Sync strips `name:` from packaged skills, so a `tool_used: Skill` grader matches
 the leaf: `input_match: '"skill"\s*:\s*"(?:[\w-]+:)?naming"'` for `/go:naming`.

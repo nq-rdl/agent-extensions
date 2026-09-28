@@ -1,9 +1,11 @@
 ---
 license: CC-BY-4.0
 description: >-
-  Fix reported defects in an RDL data-request repository's SQL and Python, including
-  query results, transformations, identifier types and export formatting. Use for
-  targeted corrections to existing code with a concrete expected result.
+  Fix a defect or make a decided pre-release logic change in RDL request SQL and Python:
+  query results, transformations, identifier types, export formatting, keys, joins and
+  filters. Use for targeted corrections with a concrete expected result, and for logic
+  changes confirmed to come before an extract's first release. A change to a released
+  extract goes to amend.
 argument-hint: '<issue description> [SQL or Python path]'
 user-invocable: true
 compatibility: >-
@@ -34,7 +36,45 @@ ask for the missing detail while continuing independent investigation. Implement
 settled requirements directly; ask before choosing a different population, grain
 or business meaning.
 
-A reported “defect” that is really a change request belongs in `/data-request:amend`.
+A reported “defect” that is really a change request goes to `/data-request:amend` only
+when the extract is released. Before its first release, use *Pre-release logic change* below.
+If you cannot tell whether it is released, ask, and make no edit in either skill until answered.
+
+## Pre-release logic change
+
+An extract is released when a version exists under `data/Released/v*/`, a release tag
+exists or any version of it reached the requester. A `data/Review/` pointer is a release
+candidate, not a release; if its data reached the requester, for UAT or otherwise, the
+extract is released. Treat an extract as unreleased only on positive confirmation: the
+human, or the service-desk issue, says that nothing was delivered. Absent signals do not
+prove it: legacy or seed repositories and manual deliveries leave no `data/Released/v*/`
+or tag. If you cannot tell, ask, and make no edit here or in `/data-request:amend` until
+answered: amend edits and records against a previous release that may not exist.
+
+While no release exists, a full logic change is allowed here: population, keys, grain,
+joins, filters, deduplication or source mappings. Make it only for a settled decision,
+such as a recorded decision ID with its reason; do not choose the new meaning yourself.
+Approval scope still applies: a new data element, a wider cohort or a longer timeframe is
+a governance question (`/data-request:amend` step 3). If the change moves the grain, keys
+or population in an existing `scope.json`, update it with `/data-request:bootstrap --update`.
+Change the maintained source and regenerate the SQL; never hand-edit generated SQL.
+Then verify it as in *Verify the correction*.
+
+Change the runbook and the UAT checklist (for example `specs/uat-checklist.md`) together
+with the SQL, in the same change. This includes a renamed validation or UAT output column:
+search the runbook, UAT checklist, validation SQL and tests for each old name and update
+every live reference (queries, checklist items, expected-output tables). A changelog or
+history line that records the rename may keep the old name. An SQL change without its runbook and UAT checklist changes is incomplete;
+report it as a blocker. If the repository has no runbook or UAT checklist, say so. Do not
+add an `AMD-` entry to `specs/amendments.md`, which records changes to released extracts;
+put the decision and its reason in the pull request.
+
+The existing `.sqlreview/` review is stale in meaning: its purpose, grain, outputs,
+assumptions and limitations describe the old logic, even where a fingerprint still matches.
+Before the first release, re-run `/data-request:analyse` on each changed SQL file with a
+full re-walk: walk every item and publish with `--reconfirm-all`. Carry-forward would
+otherwise keep items whose SQL lines did not change, although their meaning did. A passing
+local check or `/data-request:validate` does not replace it.
 
 ## Identifier and export defects
 
@@ -77,4 +117,5 @@ Preserve `.sqlreview/` snapshots, JSON confirmations and history; a code fix can
 approve a review or clear stale state. Existing review fingerprints cover SQL only:
 a Python-only change may affect delivered data without marking the review stale.
 Call out that impact and recommend `/data-request:analyse` when a refreshed formal
-handoff is needed; do not claim release approval from a passing local check.
+handoff is needed (a pre-release logic change requires it; see above); do not claim
+release approval from a passing local check.
