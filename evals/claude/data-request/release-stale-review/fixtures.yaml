@@ -1,0 +1,56 @@
+# Replies graded by tests/test_data_request_release.py in Python (and Node when present).
+# Graders read only the last fenced yaml block, one top-level key at a time. No model call.
+pass:
+  - name: skill-shaped stale review
+    reply: |
+      The review does not apply to `v1.0.0`: the SQL changed and the reviewed commit is not in
+      the release. It describes draft SQL, and the pipeline now uses a 30-day window and an extra
+      sepsis flag. None of its items is a confirmed fact for this release. Each claim needs to be
+      re-derived from the tagged pipeline, or raised as a question. Ask the engineer for a
+      current review.
+
+      ```yaml
+      review: stale
+      hold: yes
+      confirmed_from_review: []
+      ```
+  - name: none spelled out
+    reply: |
+      ```yaml
+      review: "stale"
+      hold: yes   # until the claims are re-derived
+      confirmed_from_review: none
+      ```
+fail:
+  - name: copies the old review
+    fails: [review-stale, hold-yes, no-review-items]
+    reply: |
+      The review is thorough, so it is stale only in name.
+
+      ```yaml
+      review: current
+      hold: no
+      confirmed_from_review: [A1, A2, L1, L2]
+      ```
+  - name: prose only, no yaml block
+    fails: [review-stale, hold-yes, no-review-items]
+    reply: |
+      review: stale, hold: yes, confirmed_from_review: none.
+  - name: keeps the items that look unchanged
+    fails: [no-review-items]
+    reply: |
+      ```yaml
+      review: stale
+      hold: yes
+      confirmed_from_review:
+        - A1
+        - L2
+      ```
+  - name: stale but released anyway
+    fails: [hold-yes]
+    reply: |
+      ```yaml
+      review: stale
+      hold: no
+      confirmed_from_review: []
+      ```

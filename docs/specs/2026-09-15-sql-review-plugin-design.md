@@ -56,6 +56,8 @@ Nothing about the location is customisable.
     source.sql                # analyse:   exact bytes of the SQL as last reviewed (diff baseline)
     review.draft.json         # analyse work-in-progress before human confirmation (guard-exempt)
     explain.json              # explain: state marker only (last walked-through fingerprint)
+  releases/<tag>/
+    release.json release.md   # release (#407): analyst's claim record + rendered release body
 ```
 
 - **Slug = project-relative path identity**: encoded stem components joined with `__`, `.sql` extension dropped
@@ -127,6 +129,9 @@ It fires only for paths under `.sqlreview/`:
 | `reviews/*/scope.md`, `reviews/*/review.md` | Write/Edit | `deny`   | rendered artefacts — edit the JSON and re-render |
 | `config.json`                               | Write/Edit | `ask`    | config changes go through the setup update path with human confirmation |
 | `templates/*`                               | any        | pass     | user-customisable |
+| `releases/*/release.json`                   | Write      | run `release.sh check` on the content and match `tag` to the directory → `allow`, else `deny` | analyst decisions are recorded only from answered questions (#407) |
+| same file                                   | Edit       | `deny`   | validated whole |
+| `releases/*/release.md`                     | Write/Edit | `deny`   | rendered by `release.sh render` |
 
 The validation logic lives in one place, `sqlreview.sh check`, resolved by the guard via
 `${CLAUDE_PLUGIN_ROOT}/skills/setup/scripts/`, then relative to the hook's own plugin copy, then the
@@ -381,3 +386,25 @@ the result.
   surfaces header items with no confirmed counterpart as mismatches.
 - **Absence proves nothing.** SQL built before 0.6.0, or by code that recorded nothing, has no
   header; the review still looks for assumptions and limitations in the SQL.
+
+## 14. Analyst-approved release summary (#407)
+
+`/data-request:release <tag>` drafts the researcher-facing **Extraction Summary** and **Extraction
+Assumptions / Important limitations** from the release tag's own artifacts. `analyse` stays the
+engineer's detailed review; this step is Analyst → Researcher communication.
+
+- **Applicability first (`release.sh evidence REF [SLUG...]`).** Reviews are read from the working
+  tree; the SQL from `REF` (`git show REF:./<sql_path>`), never the working tree. Each review is
+  `current`, `header-only` (only the leading header differs, `sr_body_same`), `changed`,
+  `missing-at-ref`, `unreviewed` (scope only) or `invalid`, with `reviewed_commit_in_ref` from
+  `git merge-base --is-ancestor`. Exit 10 when any review does not apply. Read-only.
+- **Record (`.sqlreview/releases/<tag>/release.json`, schemaVersion 1).** Claims (`C<n>`, section
+  `summary` or `assumptions`) carry the proposed wording, the analyst's decision (`pending`,
+  `accepted`, `reworded`, `rejected`) with `decided_by`/`decided_at`, the final wording and their
+  sources (review item + revision, scope, or release file + tag). Questions (`Q<n>`) hold
+  discrepancies until resolved. `release.sh check` refuses a kept claim that cites a review whose
+  evidence does not apply, and an `approved` record with a pending claim, an open question or an
+  empty section. The technical review is never changed.
+- **Body (`release.sh render`).** Kept claims under the two headings, each with its sources in a
+  hidden HTML comment; a draft adds a banner, `[pending]` claims and the open questions. Nothing is
+  published: the analyst posts the body.

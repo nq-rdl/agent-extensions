@@ -1,0 +1,90 @@
+# Replies graded by tests/test_data_request_release.py in Python (and Node when present).
+# Graders read only the last fenced yaml block, one top-level key at a time. No model call.
+pass:
+  - name: skill-shaped current review
+    reply: |
+      The review applies to `v1.2.0` (`current`, reviewed commit in the release), and the
+      pipeline, manifest and validation agree with it. A1 and L1 change who is in the cohort,
+      so they go in the release body. L2 and L3 stay internal: the counts reconcile, and row
+      order means nothing to the researcher.
+
+      ```yaml
+      review: current
+      hold: no
+      include: [A1, L1]
+      internal: [L2, L3]
+      ```
+  - name: block lists, quotes and comments
+    reply: |
+      ```yaml
+      review: "current"
+      hold: 'no'   # nothing blocks
+      include:
+        - A1
+        - L1
+      internal:
+        - L2   # locking hint, counts reconcile
+        - L3
+      ```
+fail:
+  - name: right words, wrong answers
+    fails: [review-current, hold-no, include-a1-l1, internal-l2-l3]
+    reply: |
+      The review is current and nothing holds the release, but I would be careful.
+
+      ```yaml
+      review: stale
+      hold: yes
+      include: [A1, L1, L2, L3]
+      internal: []
+      ```
+  - name: prose only, no yaml block
+    fails: [review-current, hold-no, include-a1-l1, internal-l2-l3]
+    reply: |
+      review: current. hold: no. include: A1, L1. internal: L2, L3.
+  - name: exports every assumption
+    fails: [include-a1-l1]
+    reply: |
+      ```yaml
+      review: current
+      hold: no
+      include: [A1, L1, L2]
+      internal: [L2, L3]
+      ```
+  - name: hides a researcher-relevant limitation
+    fails: [include-a1-l1, internal-l2-l3]
+    reply: |
+      ```yaml
+      review: current
+      hold: no
+      include: [A1]
+      internal: [L1, L2, L3]
+      ```
+  - name: an earlier block is not the answer
+    fails: [review-current, hold-no, include-a1-l1, internal-l2-l3]
+    reply: |
+      ```yaml
+      review: current
+      hold: no
+      include: [A1, L1]
+      internal: [L2, L3]
+      ```
+
+      On reflection:
+
+      ```yaml
+      review: stale
+      hold: yes
+      include: []
+      internal: [A1, L1, L2, L3]
+      ```
+  - name: duplicate hold key hedges
+    fails: [hold-no]
+    reply: |
+      ```yaml
+      review: current
+      hold: no
+      hold: yes
+      include: [A1, L1]
+      internal: [L2, L3]
+      ```
