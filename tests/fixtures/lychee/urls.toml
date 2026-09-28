@@ -244,6 +244,16 @@ shipped = false
 repository = false
 
 [[cases]]
+url = "https://pypi.org/simple"
+shipped = false
+repository = true
+
+[[cases]]
+url = "https://pypi.org/project/pixi/"
+shipped = false
+repository = false
+
+[[cases]]
 url = "https://conda.anaconda.org/conda-forge"
 shipped = false
 repository = true

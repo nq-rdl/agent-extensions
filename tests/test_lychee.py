@@ -125,7 +125,8 @@ class ConfigTests(unittest.TestCase):
         # prefix and a fixed-fragment pattern, and added commented exclusions
         # for API endpoints and identifiers. The historical Quarto, Conventional
         # Commits and Bootstrap icons runner exclusions were then dropped once CI
-        # passed without them. Anything else is unreviewed drift.
+        # passed without them, and the PyPI simple index root was excluded as an
+        # index endpoint. Anything else is unreviewed drift.
         removed = {
             "^https?://quarto\\.org/docs/",
             "^https?://quarto\\.org/docs$",
@@ -149,6 +150,7 @@ class ConfigTests(unittest.TestCase):
             "^https://mcp\\.sentry\\.dev/mcp$",
             "^https://token\\.actions\\.githubusercontent\\.com/?$",
             "^https://conda\\.anaconda\\.org/conda-forge$",
+            "^https://pypi\\.org/simple/?$",
             "^https://api\\.access\\.redhat\\.com/(support|support/search/kcs|rs/solutions/)$",
             "^https://access\\.redhat\\.com/hydra/rest/search/kcs$",
             "^https://sso\\.redhat\\.com/auth/realms/redhat-external/protocol/openid-connect/token$",

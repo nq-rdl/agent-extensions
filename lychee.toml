@@ -67,6 +67,10 @@ exclude = [
   # pixi_pack.rst). Without the trailing slash the channel root answers 404;
   # the key must match the channel spelling, so it is not rewritten.
   "^https://conda\\.anaconda\\.org/conda-forge$",
+  # PyPI simple index root in a pixi.lock example (pixi references/
+  # first_workspace.rst). It is a package index endpoint, not a page, and answers
+  # 503 to plain GETs (GitHub run 36408792886 and locally, 2026-09-28).
+  "^https://pypi\\.org/simple/?$",
   # Red Hat Customer Portal API endpoints documented by redhat-docs-fetch
   # (references/customer-portal-api.rst): search needs Solr parameters (400
   # without), the token endpoint is POST-only (405), /support is an API base
