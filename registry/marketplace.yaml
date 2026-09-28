@@ -47,6 +47,7 @@ order:
   - lychee
   - charm-tui
   - claude-code
+  - claude-prompting
   - codex
   - opencode-dev
   - speckit-dev

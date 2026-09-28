@@ -40,6 +40,7 @@ Delegation outlines are optional skill references, not registered agent types.
 | [`lychee`](#lychee) | Yes | Yes | Lychee — fast link checking for docs and Markdown |
 | [`charm-tui`](#charm-tui) | Yes | Yes | Charm — build terminal UIs with Bubbletea, Lip Gloss, and Fang |
 | [`claude-code`](#claude-code) | Yes | Yes | Claude Code — agent-team coordination, hook authoring, skill-quality auditing, and prompt engineering |
+| [`claude-prompting`](#claude-prompting) | Yes | Yes | Claude model prompting — model-specific prompt and harness guidance, starting with Claude Opus 5.5 |
 | [`codex`](#codex) | Yes | Yes | Delegate work to the OpenAI Codex CLI — reviews, background tasks, and rescue sessions |
 | [`opencode-dev`](#opencode-dev) | Yes | Yes | OpenCode development toolkit — author plugins, agents, the SDK, custom tools, skills, governance policies, and delegation harnesses |
 | [`speckit-dev`](#speckit-dev) | Yes | Yes | SpecKit extension toolkit — scaffold, validate, manage, and publish spec-kit extensions |
@@ -519,6 +520,20 @@ Claude Code — agent-team coordination, hook authoring, skill-quality auditing,
 **Codex hooks:** Native command hooks; see [coverage and limitations](codex.md#hooks).
 
 **Claude Code hooks:** `skill-audit-nudge`
+
+---
+
+## claude-prompting
+
+Claude model prompting — model-specific prompt and harness guidance, starting with Claude Opus 5.5.
+
+**Claude Code skills**
+
+- `/claude-prompting:opus-5-5`
+
+**Codex skills**
+
+- `$claude-prompting:opus-5-5`
 
 ---
 
