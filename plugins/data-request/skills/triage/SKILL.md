@@ -9,10 +9,11 @@ description: >-
 argument-hint: '<enquiry IDs | issue numbers | priority filter> [--exclude <ids>] [--triage-only|--co-develop]'
 user-invocable: true
 compatibility: >-
-  gh CLI authenticated for rdl-service-desk and nq-rdl; git. Layout observed 2026-09-21 to
-  2026-09-23: requests are rdl-service-desk/service-desk issues, children are
-  rdl-service-desk/<APPROVAL-ID> repositories rendered from data-analysis-scaffold, and
-  query-builder-plugins is consolidated into query-builder. Re-check the layout before relying on it.
+  gh CLI authenticated for rdl-service-desk and nq-rdl, or the GitHub MCP read tools
+  (search_issues, issue_read, list_issues, get_file_contents, ...) when gh is absent; git.
+  Layout observed 2026-09-21 to 2026-09-23: requests are rdl-service-desk/service-desk issues,
+  children are rdl-service-desk/<APPROVAL-ID> repositories rendered from data-analysis-scaffold,
+  and query-builder-plugins is consolidated into query-builder. Re-check the layout before relying on it.
 allowed-tools: Bash, Read, Glob, Grep, Write, Edit, AskUserQuestion
 metadata:
   repo: https://github.com/nq-rdl/agent-extensions
@@ -32,7 +33,9 @@ requirement or a gap.
 queue, resolve repositories, identify blockers and propose the next request. This mode is
 read-only in every repository, including service-desk, children and libraries: no branch,
 commit, push, pull request, label, project field edit, or issue or PR comment. Use read-only
-queries (`gh ... view`, `gh ... list`, `gh api` GET, a fetch into a scratch clone). Return
+queries (`gh ... view`, `gh ... list`, `gh api` GET, a fetch into a scratch clone), or the
+GitHub MCP read tools when `gh` is absent. Read another child's branch with `git show` or
+`git ls-tree`, never `git checkout`: a checkout fires that repository's own hooks. Return
 paste-ready comments, an ordered queue and ledger entries for the human to post and store,
 and say that nothing was posted. Stop at triage when that is the requested scope, even when a
 fix looks small.
@@ -53,18 +56,19 @@ before you assess anything.
 
 ## Assess each request
 
-1. **Probe the environment** every session: `gh auth status`, repository access, egress
-   through the proxy, the pixi solve and hooks such as the PII gate. Report what you
-   observed. Never copy an earlier failure, and never say CI is red without reading the
-   current run. Name each capability the session lacks.
+1. **Probe the environment** every session: `gh auth status` (or its MCP fallback), repository
+   access, proxy egress, the pixi solve (skip it and say why when the child has no
+   `pyproject.toml`) and hooks such as the PII gate. Report what you observed. Never copy an
+   earlier failure or call CI red without reading the current run. Name each missing capability.
 2. **Read everything before proposing work**: the issue body, all comments, linked
    amendments, child issues and the existing scope in the child repository. A later dated
    amendment supersedes the body; record which source each fact came from and flag the stale one.
+   Look for a prior version's SQL or delivery, and propose a default for each open question.
 3. **Resolve the repository from evidence**: enquiry, then issue, then approval ID, then
    child repository. Children are named by approval ID, not by enquiry number. Keep the
    original spelling and report conflicting or stale links. Read
    [references/repositories.rst](references/repositories.rst) for the resolution order,
-   naming drift, scaffold states and branch ownership.
+   naming drift, scaffold states, branch ownership and read-only access.
 4. **Verify priority from its source** and name the source: label, project field, elapsed
    calendar days or a business-day clock. Never convert one into another by guess.
 5. **Inspect repository state before declaring anything missing**: `main`, open PRs, active
@@ -106,14 +110,12 @@ Choose one request from the queue with the human, then route each agreed task:
 | Library shortfalls and upstream issues | `/data-request:lift` |
 | Comments, reports and PR bodies | `/tech-writing:copyedit` |
 
-Fulfilment handoff:
-
-- Request pipelines compose library units, and committed SQL is generated from them with
-  parity coverage.
-- Reusable correctness fixes belong upstream in the library, captured through `/data-request:lift`.
-- Re-pin a child only after the library change it needs is available; then regenerate and
-  verify its SQL. Record the cross-repository order in the ledger's `depends_on`.
-- Open PRs as drafts by default, so that a coordinated change set cannot merge early.
+Fulfilment: request pipelines compose library units, and committed SQL is generated from them
+with parity coverage. Reusable correctness fixes belong upstream, through `/data-request:lift`.
+Re-pin a child only after the library change it needs is available, then regenerate and verify
+its SQL; record the order in the ledger's `depends_on`. Open PRs as drafts by default, so that
+a coordinated change set cannot merge early. Read [references/handoff.rst](references/handoff.rst)
+when library work goes through spec-kit and when a deliverable PR is ready for review.
 
 Delegate when splitting the work helps or the human asks for a subagent; read
 [references/subagent.rst](references/subagent.rst) first. Select models by capability,

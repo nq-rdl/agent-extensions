@@ -1,0 +1,3 @@
+kind: Fixed
+body: data-request:triage names the GitHub MCP read tools (search_issues, issue_read, list_issues, ...) as the fallback for the probe and read-only queries when gh is absent
+time: 2026-09-28T00:50:35.352930595Z

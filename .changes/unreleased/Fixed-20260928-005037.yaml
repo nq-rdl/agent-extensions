@@ -1,0 +1,3 @@
+kind: Fixed
+body: data-request:triage follows a repository link and compares full_name before calling it stale, re-resolves before each write, and trusts merged_at over the merged flag
+time: 2026-09-28T00:50:37.363132943Z
