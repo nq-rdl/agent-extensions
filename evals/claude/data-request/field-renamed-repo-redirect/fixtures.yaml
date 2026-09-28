@@ -1,0 +1,94 @@
+# Replies graded by tests/test_eval_data_request_field_graders.py in Python and Node. No model call.
+pass:
+  - name: skill-shaped reply
+    reply: |
+      Triage only: nothing was posted, pushed or changed.
+
+      The body's repo link, THHSRDLENQ-9005, is not stale: the API resolves it to
+      rdl-service-desk/THHSAQUIRE-9905, which matches the approval ID, so it is a rename
+      redirect. THHSRDLENQ-9006 returns 404, so that link is stale.
+
+      PR #4 merged on 2026-09-18 (merged_at and merge commit 5e1f0c2), whatever the merged flag says.
+
+      The newest written comment (2026-09-10) keeps lactate. The verbal instruction to drop it is
+      recorded as unlinked until the requester writes a dated comment.
+
+      ```yaml
+      repo: rdl-service-desk/THHSAQUIRE-9905
+      redirected_links:
+        - https://github.com/rdl-service-desk/THHSRDLENQ-9005 -> rdl-service-desk/THHSAQUIRE-9905
+      stale_links:
+        - https://github.com/rdl-service-desk/THHSRDLENQ-9006 (404)
+      scaffold_pr_4_merged: true
+      lactate_decision_status: unlinked (verbal, 2026-09-28); ask the requester for a written, dated comment
+      ```
+  - name: inline lists and a draft block first
+    reply: |
+      ```yaml
+      draft: true
+      ```
+
+      ```yaml
+      repo: THHSAQUIRE-9905
+      redirected_links: [THHSRDLENQ-9005]
+      stale_links: [THHSRDLENQ-9006]
+      scaffold_pr_4_merged: yes
+      lactate_decision_status: Unlinked
+      ```
+fail:
+  - name: redirect reported as stale
+    fails: [redirect-resolved, redirect-not-stale]
+    reply: |
+      ```yaml
+      repo: rdl-service-desk/THHSAQUIRE-9905
+      redirected_links: []
+      stale_links:
+        - THHSRDLENQ-9005
+        - THHSRDLENQ-9006
+      scaffold_pr_4_merged: true
+      lactate_decision_status: unlinked
+      ```
+  - name: enquiry-named repo kept
+    fails: [redirect-resolved]
+    reply: |
+      ```yaml
+      repo: rdl-service-desk/THHSRDLENQ-9005
+      redirected_links: [THHSRDLENQ-9005]
+      stale_links: [THHSRDLENQ-9006]
+      scaffold_pr_4_merged: true
+      lactate_decision_status: unlinked
+      ```
+  - name: 404 link not reported
+    fails: [redirect-not-stale]
+    reply: |
+      ```yaml
+      repo: rdl-service-desk/THHSAQUIRE-9905
+      redirected_links: [THHSRDLENQ-9005]
+      stale_links: []
+      scaffold_pr_4_merged: true
+      lactate_decision_status: unlinked
+      ```
+  - name: merged flag trusted
+    fails: [merged-from-merged-at]
+    reply: |
+      ```yaml
+      repo: rdl-service-desk/THHSAQUIRE-9905
+      redirected_links: [THHSRDLENQ-9005]
+      stale_links: [THHSRDLENQ-9006]
+      scaffold_pr_4_merged: false
+      lactate_decision_status: unlinked
+      ```
+  - name: verbal decision treated as confirmed
+    fails: [verbal-unlinked]
+    reply: |
+      ```yaml
+      repo: rdl-service-desk/THHSAQUIRE-9905
+      redirected_links: [THHSRDLENQ-9005]
+      stale_links: [THHSRDLENQ-9006]
+      scaffold_pr_4_merged: true
+      lactate_decision_status: confirmed (dropped on the 2026-09-28 call)
+      ```
+  - name: answer only in prose
+    fails: [redirect-resolved, redirect-not-stale, merged-from-merged-at, verbal-unlinked]
+    reply: |
+      repo: rdl-service-desk/THHSAQUIRE-9905, stale_links: THHSRDLENQ-9006, merged, unlinked.
