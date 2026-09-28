@@ -4,11 +4,12 @@
 made before an extract's first release goes to `/data-request:fix`. These checks pin
 that routing in both skills, their frontmatter descriptions (what skill discovery
 shows) and their packaged Claude Code and Codex copies, plus the three rules the path
-carries: a full logic change is allowed while no release exists, the runbook and UAT
-checklist change together with the SQL (renamed validation/UAT columns included), and
-the existing `.sqlreview` review is stale in meaning so `/data-request:analyse` must
-re-run. They also grade the fixtures of the `prerelease-change-routes-to-fix` eval case
-in Python and Node. No model call is made.
+carries: a full logic change is allowed only while no release exists (confirmed, never
+inferred from absent signals; an unclear status means ask and edit nothing), the runbook
+and UAT checklist change together with the SQL (renamed validation/UAT columns included),
+and the existing `.sqlreview` review is stale in meaning so `/data-request:analyse`
+re-runs with a full re-walk. They also own and grade the `prerelease-*` eval cases in
+Python always and in Node when it is on PATH. No model call is made.
 """
 
 import json
@@ -17,6 +18,7 @@ import re
 import shutil
 import subprocess
 import tempfile
+import time
 import unittest
 from pathlib import Path
 
@@ -24,7 +26,14 @@ import yaml
 
 REPO = Path(__file__).resolve().parent.parent
 HOOK = REPO / "skills/cc-setup/assets/forced-eval-hook.sh"
-CASE = REPO / "evals/claude/data-request/prerelease-change-routes-to-fix"
+SUITE = REPO / "evals/claude/data-request"
+# Eval case -> the regex graders its answer is decided by.
+CASES = {
+    "prerelease-change-routes-to-fix": {
+        "workflow-fix", "no-amd-entry", "runbook-uat-same-change", "review-stale",
+        "analyse-full-rewalk", "renamed-column"},
+    "prerelease-unclear-asks": {"release-unconfirmed", "asks-first", "no-edits"},
+}
 
 
 def copies(source: str, leaf: str) -> dict[str, Path]:
@@ -69,14 +78,29 @@ class FixOwnsPreReleaseChanges(unittest.TestCase):
                 self.assertRegex(routing, r"only when the extract is released")
                 self.assertIn("*Pre-release logic change*", flat(body))
 
-    def test_release_is_defined_and_unclear_status_defaults_to_released(self):
+    def test_release_needs_positive_confirmation(self):
         for target, path in FIX.items():
             with self.subTest(target=target):
                 text = flat(section(frontmatter(path)[1], "## Pre-release logic change"))
-                for signal in ("data/Released/v*/", "release tag", "requester has received"):
+                for signal in ("data/Released/v*/", "release tag", "reached the requester"):
                     self.assertIn(signal, text)
-                self.assertRegex(text, r"If you cannot tell, ask; until then, treat the extract "
-                                       r"as released and use `/data-request:amend`")
+                self.assertIn("unreleased only on positive confirmation", text)
+                self.assertIn("service-desk issue", text)
+                self.assertIn("Absent signals do not prove it", text)
+                self.assertIn("legacy or seed repositories and manual deliveries", text)
+                # A UAT drop in data/Review/ is a candidate, but delivery makes it a release.
+                self.assertIn("A `data/Review/` pointer is a release candidate, not a release", text)
+                self.assertIn("for UAT or otherwise, the extract is released", text)
+
+    def test_unclear_status_means_ask_and_edit_nothing(self):
+        for target, path in FIX.items():
+            with self.subTest(target=target):
+                body = flat(frontmatter(path)[1])
+                self.assertIn("If you cannot tell, ask, and make no edit here or in "
+                              "`/data-request:amend` until answered", body)
+                self.assertIn("make no edit in either skill until answered", body)
+                # The first cut sent an unclear status to amend, which edits and records.
+                self.assertNotRegex(body, r"(?i)treat the extract as released and use")
 
     def test_full_logic_change_is_allowed_for_a_settled_decision(self):
         for target, path in FIX.items():
@@ -96,6 +120,9 @@ class FixOwnsPreReleaseChanges(unittest.TestCase):
                 self.assertIn("Change the runbook and the UAT checklist", text)
                 self.assertIn("together with the SQL, in the same change", text)
                 self.assertIn("renamed validation or UAT output column", text)
+                self.assertIn("every live reference (queries, checklist items, "
+                              "expected-output tables)", text)
+                self.assertIn("history line that records the rename may keep the old name", text)
                 self.assertRegex(text, r"incomplete; report it as a blocker")
 
     def test_no_amendment_record_before_a_release(self):
@@ -104,22 +131,18 @@ class FixOwnsPreReleaseChanges(unittest.TestCase):
                 text = flat(section(frontmatter(path)[1], "## Pre-release logic change"))
                 self.assertIn("Do not add an `AMD-` entry to `specs/amendments.md`", text)
 
-    def test_review_is_stale_in_meaning_and_analyse_must_rerun(self):
+    def test_review_is_stale_and_analyse_re_walks_every_item(self):
         for target, path in FIX.items():
             with self.subTest(target=target):
                 text = flat(section(frontmatter(path)[1], "## Pre-release logic change"))
                 self.assertIn("`.sqlreview/` review is stale in meaning", text)
                 self.assertIn("even where a fingerprint still matches", text)
-                self.assertIn("`/data-request:analyse` must re-run", text)
+                self.assertIn("re-run `/data-request:analyse` on each changed SQL file with a "
+                              "full re-walk", text)
+                # analyse's carry-forward keeps unchanged-line items unless every item is re-walked.
+                self.assertIn("`--reconfirm-all`", text)
+                self.assertIn("Carry-forward would otherwise keep items", text)
                 self.assertIn("does not replace it", text)
-
-    def test_description_names_the_path_within_the_catalog_line(self):
-        # forced-eval-hook.sh shows each description cut at 80 characters.
-        for target, path in FIX.items():
-            with self.subTest(target=target):
-                desc = flat(frontmatter(path)[0]["description"])
-                self.assertIn("before an extract's first", desc[:80])
-                self.assertIn("A change to a released extract goes to amend", desc)
 
 
 class AmendIsReleasedOnly(unittest.TestCase):
@@ -135,7 +158,10 @@ class AmendIsReleasedOnly(unittest.TestCase):
             with self.subTest(target=target):
                 body = flat(frontmatter(path)[1])
                 self.assertIn("This skill applies only to a released extract", body)
+                self.assertIn("a `data/Review/` drop that reached them counts", body)
                 self.assertIn("goes to `/data-request:fix` (*Pre-release logic change*)", body)
+                self.assertIn("If you cannot tell whether the extract is released, ask, and make "
+                              "no edit until answered", body)
                 self.assertLess(body.index("Pre-release logic change"),
                                 body.index("## 1. Classify before any edit"))
 
@@ -146,25 +172,34 @@ class AmendIsReleasedOnly(unittest.TestCase):
                 text = flat(section(body, "### Runbook, UAT checklist and validation outputs"))
                 self.assertIn("together with the SQL, in the same change", text)
                 self.assertIn("a column that a validation or UAT output shows", text)
+                self.assertIn("every live reference (queries, checklist items, "
+                              "expected-output tables)", text)
                 self.assertIn("report it as a blocker", text)
                 handoff = next(l for l in body.splitlines() if l.startswith("affected files:"))
                 self.assertIn("runbook and UAT checklist", handoff)
-                self.assertIn("the runbook and UAT checklist name the new columns", flat(body))
+                validate = flat(section(body, "## 6. Validate"))
+                self.assertIn("no live reference (a query, a checklist item or an expected-output "
+                              "table) uses an old name", validate)
+                # A changelog line that mentions the old name is history, not a blocker.
+                self.assertNotIn("no old name remains", validate)
 
-    def test_review_is_stale_in_meaning_and_analyse_must_rerun(self):
+    def test_review_is_stale_and_analyse_re_walks_every_item(self):
         for target, path in AMEND.items():
             with self.subTest(target=target):
                 report = flat(section(frontmatter(path)[1], "## Report"))
                 self.assertIn("renamed validation or UAT output column", report)
                 self.assertIn("stale in meaning, even where its fingerprint still matches", report)
-                self.assertIn("`/data-request:analyse` must re-run", report)
+                self.assertIn("re-run `/data-request:analyse` on each changed SQL file with a full "
+                              "re-walk", report)
+                self.assertIn("`--reconfirm-all`", report)
                 # The pre-#390 wording made the re-run optional.
                 self.assertNotIn("recommend `/data-request:analyse` when a refreshed", report)
 
 
 @unittest.skipUnless(shutil.which("jq"), "plugin discovery requires jq")
 class Discovery(unittest.TestCase):
-    def test_catalog_lines_separate_pre_release_fix_from_released_amend(self):
+    def catalog(self) -> dict[str, str]:
+        """The data-request lines exactly as forced-eval-hook.sh shows them (80-char cut)."""
         with tempfile.TemporaryDirectory() as tmp:
             home = Path(tmp)
             manifest = home / ".claude/plugins/installed_plugins.json"
@@ -172,13 +207,17 @@ class Discovery(unittest.TestCase):
             manifest.write_text(json.dumps({"plugins": {"data-request@rdl-agent-extensions": [
                 {"installPath": str(REPO / "plugins/data-request")}]}}))
             env = {**os.environ, "HOME": str(home), "XDG_CACHE_HOME": str(home / ".cache")}
-            prompt = "Re-key the cohort SQL on site code and MRN before the first release"
+            prompt = "Re-key the cohort SQL on site code and MRN"
             result = subprocess.run(["bash", str(HOOK)], input=json.dumps({"prompt": prompt}),
                                     text=True, capture_output=True, env=env, check=True)
             context = json.loads(result.stdout)["hookSpecificOutput"]["additionalContext"]
-        lines = {l.split(":", 2)[1]: l for l in context.splitlines()
-                 if l.startswith("  - data-request:")}
-        self.assertIn("before an extract's first", lines["fix"])
+        return {l.split(":", 2)[1]: l.split(": ", 1)[1] for l in context.splitlines()
+                if l.startswith("  - data-request:")}
+
+    def test_displayed_lines_keep_the_release_routing_word(self):
+        lines = self.catalog()
+        self.assertTrue(lines["fix"].endswith("..."), "the fix description is long enough to be cut")
+        self.assertIn("pre-release", lines["fix"])
         self.assertIn("released", lines["amend"])
 
 
@@ -189,77 +228,114 @@ const out = {};
 for (const [name, source] of Object.entries(patterns)) out[name] = new RegExp(source).test(reply);
 process.stdout.write(JSON.stringify(out));
 """
+MUTATING_TOOLS = {"Bash", "Write", "Edit", "NotebookEdit"}
 
 
 def grader_meta(path: Path) -> dict:
     return yaml.safe_load(path.read_text().split("\n---\n")[0].removeprefix("---\n"))
 
 
-def graders() -> dict:
-    return {p.stem: grader_meta(p) for p in sorted((CASE / "graders").glob("*.md"))}
+def graders(case: str) -> dict:
+    return {p.stem: grader_meta(p) for p in sorted((SUITE / case / "graders").glob("*.md"))}
 
 
-def regex_sources() -> dict:
-    return {name: g["pattern"] for name, g in graders().items() if g["type"] == "regex"}
+def regex_sources(case: str) -> dict:
+    return {name: g["pattern"] for name, g in graders(case).items() if g["type"] == "regex"}
 
 
-class EvalCase(unittest.TestCase):
+class EvalCases(unittest.TestCase):
+    def test_this_module_owns_every_prerelease_case(self):
+        # test_eval_data_request_graders skips prerelease-* directories, so an unowned one
+        # would otherwise go ungraded.
+        found = {p.parent.name for p in SUITE.glob("prerelease-*/prompt.md")}
+        self.assertEqual(found, set(CASES))
+        dirs = {p.name for p in SUITE.glob("prerelease-*") if p.is_dir()}
+        self.assertEqual(dirs, set(CASES))
+        source = (REPO / "tests/test_eval_data_request_graders.py").read_text()
+        self.assertIn('"prerelease-"', source)
+
     def test_case_shape(self):
-        front = grader_meta(CASE / "prompt.md")
-        self.assertTrue(front["description"])
-        self.assertIn("pre-release", front["tags"])
-        self.assertGreaterEqual(front["runs"], 3)
-        self.assertIn("Skill", front["allowed_tools"])
-        self.assertFalse({"Bash", "Write", "Edit", "NotebookEdit"} & set(front["allowed_tools"]))
-        self.assertEqual(set(regex_sources()), {"not-amended", "runbook-uat", "analyse-rerun"})
-        for name, source in regex_sources().items():
-            re.compile(source)
-            self.assertEqual(graders()[name]["target"], "last_message")
+        for case, expected in CASES.items():
+            with self.subTest(case=case):
+                meta = grader_meta(SUITE / case / "prompt.md")
+                prompt = (SUITE / case / "prompt.md").read_text()
+                self.assertTrue(meta["description"])
+                self.assertIn("pre-release", meta["tags"])
+                self.assertGreaterEqual(meta["runs"], 3)
+                self.assertIn("Skill", meta["allowed_tools"])
+                self.assertNotIn("Bash", meta["allowed_tools"])
+                self.assertIn("End your reply with one fenced `yaml` block", prompt)
+                self.assertEqual(set(regex_sources(case)), expected)
+                for name, source in regex_sources(case).items():
+                    re.compile(source)
+                    self.assertEqual(graders(case)[name]["target"], "last_message")
+                    self.assertIn("`{3,}ya?ml", source, f"{name} must read the yaml block")
 
-    def test_skill_fired_matches_fix_not_amend(self):
-        fired = graders()["skill-fired"]
-        self.assertEqual((fired["type"], fired["tool"]), ("tool_used", "Skill"))
-        matcher = re.compile(fired["input_match"])
+    def test_routing_case_loads_fix_and_writes_nothing(self):
+        case = "prerelease-change-routes-to-fix"
+        meta = grader_meta(SUITE / case / "prompt.md")
+        self.assertFalse(MUTATING_TOOLS & set(meta["allowed_tools"]))
+        matcher = re.compile(graders(case)["skill-fired"]["input_match"])
         self.assertTrue(matcher.search('{"skill": "data-request:fix"}'))
         self.assertTrue(matcher.search('{"skill":"fix"}'))
         self.assertFalse(matcher.search('{"skill": "data-request:amend"}'))
 
-    def test_other_suite_modules_leave_this_case_to_us(self):
-        # test_eval_data_request_graders owns every non-amend-* case except prerelease-* ones.
-        self.assertTrue(CASE.name.startswith("prerelease-"))
-        self.assertFalse(CASE.name.startswith("amend-"))
-        source = (REPO / "tests/test_eval_data_request_graders.py").read_text()
-        self.assertIn('"prerelease-"', source)
+    def test_unclear_case_forbids_edits_with_the_tools_granted(self):
+        case = "prerelease-unclear-asks"
+        meta = grader_meta(SUITE / case / "prompt.md")
+        forbidden = {g["tool"] for g in graders(case).values()
+                     if g["type"] == "tool_used" and g.get("max") == 0}
+        self.assertEqual(forbidden, {"Write", "Edit"})
+        for g in graders(case).values():
+            if g["type"] == "tool_used" and g.get("max") == 0:
+                self.assertEqual((g["min"], g["max"], g["arm"]), (0, 0, "both"))
+                self.assertIn(g["tool"], meta["allowed_tools"], "a must-not check needs the tool")
+        matcher = re.compile(graders(case)["skill-fired"]["input_match"])
+        for skill in ("data-request:fix", "data-request:amend", "fix"):
+            self.assertTrue(matcher.search(f'{{"skill": "{skill}"}}'))
+        self.assertFalse(matcher.search('{"skill": "data-request:triage"}'))
 
 
-@unittest.skipUnless(NODE, "Node required for Python/JavaScript grader agreement")
 class EvalFixtures(unittest.TestCase):
-    def grade(self, reply: str) -> set:
-        """Names of the regex graders that FAIL the reply (checked in both engines)."""
-        sources = regex_sources()
+    def grade(self, sources: dict, reply: str) -> set:
+        """Names of the regex graders that FAIL the reply (both engines when node exists)."""
         python = {name: bool(re.search(src, reply)) for name, src in sources.items()}
-        result = subprocess.run(
-            [NODE, "-e", NODE_SCRIPT], input=json.dumps({"patterns": sources, "reply": reply}),
-            capture_output=True, text=True, check=True, timeout=30)
-        self.assertEqual(json.loads(result.stdout), python, "JavaScript and Python disagree")
+        if NODE:
+            result = subprocess.run(
+                [NODE, "-e", NODE_SCRIPT], input=json.dumps({"patterns": sources, "reply": reply}),
+                capture_output=True, text=True, check=True, timeout=30)
+            self.assertEqual(json.loads(result.stdout), python, "JavaScript and Python disagree")
         return {name for name, ok in python.items() if not ok}
 
     def test_empty_reply_fails_every_regex_grader(self):
-        self.assertEqual(self.grade(""), set(regex_sources()))
+        for case in CASES:
+            with self.subTest(case=case):
+                sources = regex_sources(case)
+                self.assertEqual(self.grade(sources, ""), set(sources))
 
     def test_fixtures(self):
-        fixtures = yaml.safe_load((CASE / "fixtures.yaml").read_text())
-        self.assertTrue(fixtures["pass"])
-        for fixture in fixtures["pass"]:
-            with self.subTest(fixture=fixture["name"]):
-                self.assertEqual(self.grade(fixture["reply"]), set())
-        covered = set()
-        for fixture in fixtures["fail"]:
-            with self.subTest(fixture=fixture["name"]):
-                self.assertTrue(fixture["fails"])
-                self.assertEqual(self.grade(fixture["reply"]), set(fixture["fails"]))
-                covered |= set(fixture["fails"])
-        self.assertEqual(covered, set(regex_sources()), "every grader needs a failing fixture")
+        for case in CASES:
+            sources = regex_sources(case)
+            fixtures = yaml.safe_load((SUITE / case / "fixtures.yaml").read_text())
+            self.assertTrue(fixtures["pass"], case)
+            for fixture in fixtures["pass"]:
+                with self.subTest(case=case, fixture=fixture["name"]):
+                    self.assertEqual(self.grade(sources, fixture["reply"]), set())
+            covered = set()
+            for fixture in fixtures["fail"]:
+                with self.subTest(case=case, fixture=fixture["name"]):
+                    self.assertTrue(fixture["fails"])
+                    self.assertEqual(self.grade(sources, fixture["reply"]), set(fixture["fails"]))
+                    covered |= set(fixture["fails"])
+            self.assertEqual(covered, set(sources), f"{case}: every grader needs a failing fixture")
+
+    def test_large_replies_grade_quickly(self):
+        reply = ("```yaml\n" + "workflow: amend\n" * 2000 + "```\n" + "renamed: x\n" * 2000) * 3
+        for case in CASES:
+            with self.subTest(case=case):
+                start = time.monotonic()
+                self.grade(regex_sources(case), reply)
+                self.assertLess(time.monotonic() - start, 5)
 
 
 if __name__ == "__main__":

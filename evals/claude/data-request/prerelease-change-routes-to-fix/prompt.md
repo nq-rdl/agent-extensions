@@ -1,5 +1,5 @@
 ---
-description: "A decided logic change before the extract's first release goes to fix, not amend: change it with the runbook and UAT checklist, then re-run analyse"
+description: "A confirmed pre-release logic change goes to fix, not amend: no AMD- entry, runbook and UAT checklist in the same change, stale review, full analyse re-walk"
 tags: [fix, pre-release]
 runs: 3
 max_turns: 10
@@ -30,3 +30,12 @@ decision D7: patients are keyed on site code plus MRN, not MRN alone. The valida
 column `distinct_mrn` becomes `distinct_patient_key`. Is this an amendment for
 `/data-request:amend`? Tell me which workflow applies and what has to change, and what happens
 to the existing review, before we release.
+
+End your reply with one fenced `yaml` block with exactly these top-level keys:
+
+- `workflow`: `fix` or `amend`
+- `amd_entry`: `none`, or the `AMD-` entry you would add to `specs/amendments.md`
+- `runbook_uat`: `same change`, `after release` or `no change`
+- `review`: `stale` or `current`
+- `analyse`: `rerun --reconfirm-all`, `rerun` or `not needed`
+- `renamed`: a list of `old -> new` column renames the runbook and UAT checklist must follow
