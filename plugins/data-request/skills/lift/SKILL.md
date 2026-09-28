@@ -151,6 +151,16 @@ updated review is confirmed. Record `recomposition_evidence` with the new `pin`,
 `sql_sha256` and `review_revision`. Retain the original delivery limitation as history.
 One-off extracts stay forward-only; do not open backport issues or modify pins.
 
-Report candidates by bucket, issue links, unresolved confirmations/evidence and
-review limitation publication status. Do not call a candidate filed or a close-out
+## Upstream decision candidates
+
+Scope and review items marked `upstream` repeat a listed decision (#362); they are not hand SQL.
+List them by decision with `bash "${CLAUDE_PLUGIN_ROOT}/skills/setup/scripts/recurring-decisions.sh" marked`
+on the slug's `scope.json` and `review.json`. For each target issue, link it or add one evidence
+comment, or file a new issue, without duplicates and only after the human confirms. Follow
+`${CLAUDE_PLUGIN_ROOT}/skills/setup/references/recurring-decisions.rst`, including the list change it proposes.
+
+## Report
+
+Report candidates by bucket, upstream decision candidates, issue links, unresolved
+confirmations/evidence and review limitation publication status. Do not call a candidate filed or a close-out
 complete until those writes have succeeded.

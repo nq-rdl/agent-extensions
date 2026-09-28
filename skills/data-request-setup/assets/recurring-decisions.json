@@ -1,0 +1,190 @@
+{
+  "schemaVersion": 1,
+  "updated": "2026-09-28",
+  "tracking_issue": "https://github.com/nq-rdl/query-builder/issues/172",
+  "decisions": [
+    {
+      "id": "death-date-raw",
+      "title": "Date of death is the raw ieMR value, with no derived mortality flag",
+      "kind": "assumption",
+      "status": "open",
+      "proposal": {
+        "text": "Date of death is the raw ieMR `PERSON.DECEASED_DT_TM`, shown as AEST. The extract derives no mortality flag.",
+        "rationale": "The researcher applies any mortality window. A derived flag fixes a modelling choice that belongs to the researcher."
+      },
+      "match": [["deceased_dt_tm", "date of death", "death date", "deceased date", "dates of death"]],
+      "evidence": ["https://github.com/nq-rdl/query-builder/issues/172"],
+      "library_issue": null,
+      "related_issues": ["https://github.com/nq-rdl/query-builder/issues/79"],
+      "retired_by": null
+    },
+    {
+      "id": "mortality-undercount",
+      "title": "Mortality limitation: no death-registry linkage",
+      "kind": "limitation",
+      "status": "open",
+      "proposal": {
+        "text": "Deaths outside hospital and long-term deaths undercount. There is no death-registry linkage, so a blank date of death does not mean that the patient is alive.",
+        "rationale": "ieMR records only the deaths that the hospital knows about. It has no link to the death registry."
+      },
+      "match": [
+        ["death", "deaths", "mortality", "deceased"],
+        ["undercount", "undercounts", "under-count", "no death-registry", "no death registry", "without death-registry", "no registry linkage", "out-of-hospital", "out of hospital", "does not mean alive", "not mean that the patient is alive"]
+      ],
+      "evidence": ["https://github.com/nq-rdl/query-builder/issues/172"],
+      "library_issue": "https://github.com/nq-rdl/query-builder/issues/79",
+      "related_issues": [],
+      "retired_by": null
+    },
+    {
+      "id": "iemr-event-dates",
+      "title": "ieMR clinical event dates: EVENT_END_DT_TM versus PERFORMED_DT_TM",
+      "kind": "assumption",
+      "status": "open",
+      "proposal": {
+        "text": "For ieMR clinical events, `EVENT_END_DT_TM` is the clinically relevant time (collected or resulted). `PERFORMED_DT_TM` is the time that the event was performed or authored.",
+        "rationale": "The two columns answer different questions. The extract names each date, so the analyst can choose."
+      },
+      "match": [["event_end_dt_tm", "performed_dt_tm"]],
+      "evidence": ["https://github.com/nq-rdl/query-builder/issues/172"],
+      "library_issue": "https://github.com/nq-rdl/query-builder/issues/81",
+      "related_issues": [],
+      "retired_by": null
+    },
+    {
+      "id": "output-aest",
+      "title": "Output time zone: ieMR UTC shown as AEST in the projection only",
+      "kind": "assumption",
+      "status": "open",
+      "proposal": {
+        "text": "ieMR UTC times are shown as AEST with a fixed +10 hours, in the output projection only. Filters shift the anchor and keep the stored column bare.",
+        "rationale": "Queensland has no daylight saving, so the fixed offset is correct today. A bare filter column keeps the index usable."
+      },
+      "match": [
+        ["aest", "australia/brisbane", "utc+10", "brisbane time", "brisbane local time", "queensland time"],
+        ["utc", "output", "projection", "shown", "display", "displayed", "converted"]
+      ],
+      "evidence": ["https://github.com/nq-rdl/query-builder/issues/172"],
+      "library_issue": null,
+      "related_issues": ["https://github.com/nq-rdl/query-builder/issues/81"],
+      "retired_by": null
+    },
+    {
+      "id": "aest-fixed-offset",
+      "title": "Output time zone limitation: the fixed +10 hours needs no daylight saving",
+      "kind": "limitation",
+      "status": "open",
+      "proposal": {
+        "text": "The AEST output uses a fixed +10 hours from UTC. It is correct only while Queensland has no daylight saving.",
+        "rationale": "The projection does not use a time zone database. A change to Queensland time rules would shift every output time."
+      },
+      "match": [
+        ["+10", "fixed offset", "fixed +10", "utc+10"],
+        ["daylight saving", "dst"]
+      ],
+      "evidence": ["https://github.com/nq-rdl/query-builder/issues/172"],
+      "library_issue": null,
+      "related_issues": ["https://github.com/nq-rdl/query-builder/issues/81"],
+      "retired_by": null
+    },
+    {
+      "id": "iemr-result-validity",
+      "title": "ieMR result validity bundle",
+      "kind": "assumption",
+      "status": "open",
+      "proposal": {
+        "text": "A valid ieMR result has `RECORD_STATUS_CD` 188, `RESULT_STATUS_CD` 25, `VIEW_LEVEL > 0` and `VALID_UNTIL_DT_TM > GETUTCDATE()`.",
+        "rationale": "The bundle removes deleted, unverified, hidden and superseded rows."
+      },
+      "match": [["record_status_cd", "result_status_cd", "view_level", "valid_until_dt_tm", "validity bundle"]],
+      "evidence": ["https://github.com/nq-rdl/query-builder/issues/172"],
+      "library_issue": null,
+      "related_issues": ["https://github.com/nq-rdl/query-builder/issues/137"],
+      "retired_by": null
+    },
+    {
+      "id": "iemr-result-currency",
+      "title": "Result validity limitation: the currency test depends on the run time",
+      "kind": "limitation",
+      "status": "open",
+      "proposal": {
+        "text": "Result validity uses `VALID_UNTIL_DT_TM > GETUTCDATE()`. A re-run on another day can return different result rows.",
+        "rationale": "The currency test compares with the time of the run, not with a fixed date."
+      },
+      "match": [
+        ["valid_until_dt_tm", "getutcdate", "validity", "currency"],
+        ["re-run", "rerun", "run time", "run-time", "time of the run", "another day"]
+      ],
+      "evidence": ["https://github.com/nq-rdl/query-builder/issues/172"],
+      "library_issue": null,
+      "related_issues": ["https://github.com/nq-rdl/query-builder/issues/137"],
+      "retired_by": null
+    },
+    {
+      "id": "half-open-date-window",
+      "title": "Date window: half-open, with ISO literals",
+      "kind": "assumption",
+      "status": "open",
+      "proposal": {
+        "text": "Date windows are half-open: start <= date < end. The bounds are ISO `'YYYY-MM-DDTHH:MM:SS'` literals.",
+        "rationale": "A half-open window does not count a boundary instant twice. ISO literals do not depend on the language of the login."
+      },
+      "match": [["half-open", "half open", "exclusive upper", "exclusive end", "yyyy-mm-ddthh:mm:ss", "< end"]],
+      "evidence": ["https://github.com/nq-rdl/query-builder/issues/172"],
+      "library_issue": "https://github.com/nq-rdl/query-builder/issues/93",
+      "related_issues": ["https://github.com/nq-rdl/query-builder/pull/143"],
+      "retired_by": null
+    },
+    {
+      "id": "raw-dated-events",
+      "title": "Deliver raw dated events, not derived outcomes",
+      "kind": "assumption",
+      "status": "open",
+      "proposal": {
+        "text": "The extract delivers raw dated events, not derived outcomes. The researcher applies any window.",
+        "rationale": "An outcome window is a modelling choice. Raw dated rows let the researcher change a window without a new extract."
+      },
+      "match": [["dated event", "dated events", "event row", "event rows", "derived outcome", "derived outcomes", "derived flag", "researcher applies"]],
+      "evidence": ["https://github.com/nq-rdl/query-builder/issues/172"],
+      "library_issue": null,
+      "related_issues": [],
+      "retired_by": null
+    },
+    {
+      "id": "current-demographics",
+      "title": "Demographics: current values, not as at the anchor",
+      "kind": "assumption",
+      "status": "open",
+      "proposal": {
+        "text": "Demographics are the current values (the latest `mart_patient_view` row), not the values at the anchor date.",
+        "rationale": "The source keeps the current row by default. Values at the anchor date need a history source and a separate decision."
+      },
+      "match": [
+        ["demographic", "demographics", "address", "addresses", "postcode", "suburb", "mart_patient_view"],
+        ["current", "latest", "most recent", "as at", "as-at", "at the anchor"]
+      ],
+      "evidence": ["https://github.com/nq-rdl/query-builder/issues/172"],
+      "library_issue": null,
+      "related_issues": [],
+      "retired_by": null
+    },
+    {
+      "id": "raw-episode-mrn",
+      "title": "Patient identity: the HBCIS URN is the raw episode MRN",
+      "kind": "assumption",
+      "status": "open",
+      "proposal": {
+        "text": "The HBCIS URN is the raw episode MRN, with no merge-chain canonicalisation. A patient with merged MRNs can appear under more than one URN.",
+        "rationale": "This is the query-builder default (ADR 0003). If the request needs merged identities, use `HBCISResolver(canonicalize_mrn=True)`, not a hand-written chain."
+      },
+      "match": [
+        ["mrn", "mrns", "urn", "urns", "ur number", "patient identifier", "patient key"],
+        ["merge", "merged", "merges", "merge-chain", "canonical", "canonicalisation", "canonicalization", "raw episode", "episode mrn"]
+      ],
+      "evidence": ["https://github.com/nq-rdl/query-builder/issues/172#issuecomment-5806010117"],
+      "library_issue": null,
+      "related_issues": ["https://github.com/nq-rdl/query-builder/issues/150", "https://github.com/nq-rdl/query-builder/issues/133"],
+      "retired_by": null
+    }
+  ]
+}

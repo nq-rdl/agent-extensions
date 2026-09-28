@@ -35,6 +35,12 @@ SLUG="$(bash "$S/sqlreview.sh" slug "<intended sql path>")"   # exit 5 → the s
 Read `definitions` from `.sqlreview/config.json` and use that wording, verbatim, whenever you
 tell the engineer what counts as an assumption or a limitation. Do not paraphrase it.
 
+Some decisions recur in every enquiry (#362). Before you put candidate items to the engineer, run
+`bash "$S/recurring-decisions.sh" match ".sqlreview/reviews/$SLUG/scope.draft.json"`. For each match,
+show the prior enquiries, offer the listed wording and mark the item `upstream`, as
+`${CLAUDE_PLUGIN_ROOT}/skills/setup/references/recurring-decisions.rst` says. The engineer still confirms each item.
+Rows from `carryforward` omit `upstream`: copy it from the prior item when you re-draft that item.
+
 ## Existing scope → update path (#127 §2)
 
 If `.sqlreview/reviews/$SLUG/scope.json` exists (or `--update`):
