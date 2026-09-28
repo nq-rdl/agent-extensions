@@ -347,7 +347,8 @@ class SpecKitDirectMode(unittest.TestCase):
 
     def test_decision_uses_the_shape_the_workflow_reuses(self):
         # rdl-team:house-style reuses only {"decision": "generativeMode", "value": "direct", by, at, scope}
-        # whose scope equals the unit's repo or physicalWorktree (PR #402's directAuthorised()).
+        # (PR #402's directAuthorised()). Triage cannot know the unit's worktree path, so it records the
+        # repository owner/name and the main session translates it into the unit's physicalWorktree.
         for name in ("handoff.rst", "ledger.rst"):
             with self.subTest(ref=name):
                 objs = [yaml.safe_load(m) for m in re.findall(r'\{"decision": "generativeMode"[^}]*\}',
@@ -356,9 +357,11 @@ class SpecKitDirectMode(unittest.TestCase):
                 for obj in objs:
                     self.assertEqual(set(obj), {"decision", "value", "by", "at", "scope"})
                     self.assertEqual(obj["value"], "direct")
-                    self.assertIn("physicalWorktree", obj["scope"])
+                    self.assertEqual(obj["scope"], "<owner/name>")
         spec = flat(rst_section("handoff.rst", "Library work through spec-kit"))
-        self.assertRegex(spec, r"``scope`` must equal[^.]*``repo`` or ``physicalWorktree`` exactly")
+        self.assertRegex(spec, r"``scope`` as the repository ``owner/name``")
+        self.assertRegex(spec, r"(?i)keep these five keys exactly")
+        self.assertRegex(spec, r"translates ``owner/name`` into that path")
 
 
 class Packaging(unittest.TestCase):

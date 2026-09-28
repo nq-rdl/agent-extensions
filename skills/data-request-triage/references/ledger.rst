@@ -45,7 +45,7 @@ Keep one entry per request:
        decision: one sentence
        source: comment or PR link, or "unlinked (verbal)" until a written comment exists
      # spec-kit direct mode, in the exact shape /rdl-team:workflow reuses:
-     - {"decision": "generativeMode", "value": "direct", "by": "<who>", "at": "<ISO time>", "scope": "<repo or physicalWorktree>"}
+     - {"decision": "generativeMode", "value": "direct", "by": "<who>", "at": "<ISO time>", "scope": "<owner/name>"}
    blockers:
      - class: dependency
        detail: one sentence
