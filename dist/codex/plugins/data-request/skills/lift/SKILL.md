@@ -120,3 +120,11 @@ One-off extracts stay forward-only; do not open backport issues or modify pins.
 Report candidates by bucket, issue links, unresolved confirmations/evidence and
 review limitation publication status. Do not call a candidate filed or a close-out
 complete until those writes have succeeded.
+
+## Recurring decisions
+
+Scope and review items marked `upstream` are recurring decisions (#362), not hand SQL. List
+them with `bash "${PLUGIN_ROOT}/skills/setup/scripts/recurring-decisions.sh" marked`
+on the slug's `scope.json` and `review.json`. Report them beside the three buckets. Link the
+library issue, add this enquiry as evidence, or file one, without duplicates and only after
+the human confirms, as `${PLUGIN_ROOT}/skills/setup/references/recurring-decisions.rst` says.

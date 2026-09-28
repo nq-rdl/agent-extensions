@@ -182,6 +182,7 @@ The library supplies atomic, verified facts and flags known intrinsic data-quali
 caveats. The researcher chooses how those facts define an outcome or exposure;
 encode that choice in the request's spec composition, not an implicit resolver default.
 
+- **Patient identity:** use the raw HBCIS episode MRN as the URN unless the request asks for merged identities. Then use `HBCISResolver(canonicalize_mrn=True)` (query-builder 0.6.0 or later, #150, ADR 0003), not a hand-written merge chain.
 - **Mortality:** supply date of death with its source limitation.
   `nq-rdl/query-builder` issue #79 describes an ieMR source that undercounts deaths
   outside hospital and over longer follow-up
