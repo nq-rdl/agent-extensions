@@ -159,7 +159,7 @@ class ModelSelection(unittest.TestCase):
 
 
 class References(unittest.TestCase):
-    EXPECTED = {"subagent.rst", "ledger.rst", "repositories.rst", "checks.rst", "comments.rst"}
+    EXPECTED = {"subagent.rst", "ledger.rst", "repositories.rst", "checks.rst", "comments.rst", "handoff.rst"}
 
     def test_references_exist_are_rst_and_linked_with_when_to_read(self):
         refs = CANON / "references"

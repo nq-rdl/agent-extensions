@@ -278,10 +278,11 @@ CASES = {
 
 class SuiteShape(unittest.TestCase):
     def test_every_case_has_a_fixture_and_every_regex_grader_is_covered(self):
-        # amend-* cases (#356) are covered by test_eval_data_request_amend_graders and prerelease-*
-        # cases (#390) by test_data_request_prerelease_change; any other directory is ours.
+        # amend-* cases (#356) are covered by test_eval_data_request_amend_graders, field-* cases by
+        # test_eval_data_request_field_graders and prerelease-* cases (#390) by
+        # test_data_request_prerelease_change; any other directory is ours.
         cases = {p.name for p in SUITE.iterdir()
-                 if p.is_dir() and not p.name.startswith(("amend-", "prerelease-"))}
+                 if p.is_dir() and not p.name.startswith(("amend-", "field-", "prerelease-"))}
         self.assertEqual(cases, set(CASES))
         for case, spec in CASES.items():
             with self.subTest(case=case):
