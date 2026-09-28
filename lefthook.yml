@@ -129,9 +129,11 @@ pre-push:
       glob: "{scripts/**,tests/**}"
       run: env -u GIT_DIR -u GIT_WORK_TREE -u GIT_INDEX_FILE pixi run python3 -m unittest discover -s tests -p 'test_*.py'
 
+    # Same hook-env leak as above. tests/codex/helpers.mjs also scrubs these on
+    # import (see tests/codex/git-env-isolation.test.mjs); this is the outer guard.
     - name: codex-js-tests
       glob: "{plugins/codex/**,tests/codex/**,hooks/codex-*.sh}"
-      run: node --test tests/codex/*.test.mjs
+      run: env -u GIT_DIR -u GIT_WORK_TREE -u GIT_INDEX_FILE -u GIT_PREFIX -u GIT_COMMON_DIR node --test tests/codex/*.test.mjs
 
     # Informational: report findings but never block the push (CI uploads the
     # SARIF to the Security tab). scan.sh skips itself when Docker is absent;

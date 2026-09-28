@@ -69,14 +69,25 @@ const ROOT_DIR = path.resolve(fileURLToPath(new URL("..", import.meta.url)));
 const REVIEW_SCHEMA = path.join(ROOT_DIR, "schemas", "review-output.schema.json");
 const DEFAULT_STATUS_WAIT_TIMEOUT_MS = 240000;
 const DEFAULT_STATUS_POLL_INTERVAL_MS = 2000;
-// Verified against `codex debug models` (Codex 0.144.6). The server-fetched catalog is
-// authoritative; unknown values warn-and-pass-through so codex enforces per-model gating.
+// Verified against `codex debug models` (GPT-5.6 on Codex 0.144.6; GPT-6 on 0.156.1 and
+// 0.157.0). The server-fetched catalog is authoritative; unknown values warn-and-pass-through
+// so codex enforces per-model gating.
 const VALID_REASONING_EFFORTS = new Set(["low", "medium", "high", "xhigh", "max", "ultra"]);
+// Keep in sync with skills/codex-model-guide/SKILL.md and the codex-rescue outline
+// (tests/test_codex_model_aliases.py). Bare sol/terra/luna stay on GPT-5.6: it runs on
+// every account and client, and there is no gpt-6-terra. GPT-6 needs an explicit form.
 const MODEL_ALIASES = new Map([
   ["spark", "gpt-5.3-codex-spark"],
   ["sol", "gpt-5.6-sol"],
   ["terra", "gpt-5.6-terra"],
-  ["luna", "gpt-5.6-luna"]
+  ["luna", "gpt-5.6-luna"],
+  ["sol-5.6", "gpt-5.6-sol"],
+  ["terra-5.6", "gpt-5.6-terra"],
+  ["luna-5.6", "gpt-5.6-luna"],
+  ["astra", "gpt-6-astra"],
+  ["astra-6", "gpt-6-astra"],
+  ["sol-6", "gpt-6-sol"],
+  ["luna-6", "gpt-6-luna"]
 ]);
 const STOP_REVIEW_TASK_MARKER = "Run a stop-gate review of the previous Claude turn.";
 
@@ -85,9 +96,9 @@ function printUsage() {
     [
       "Usage:",
       "  node scripts/codex-companion.mjs setup [--enable-review-gate|--disable-review-gate] [--json]",
-      "  node scripts/codex-companion.mjs review [--wait|--background] [--base <ref>] [--scope <auto|working-tree|branch>]",
-      "  node scripts/codex-companion.mjs adversarial-review [--wait|--background] [--base <ref>] [--scope <auto|working-tree|branch>] [focus text]",
-      "  node scripts/codex-companion.mjs task [--background] [--write] [--resume-last|--resume|--fresh] [--model <model|spark>] [--effort <low|medium|high|xhigh|max|ultra>] [prompt]",
+      "  node scripts/codex-companion.mjs review [--wait|--background] [--base <ref>] [--scope <auto|working-tree|branch>] [--model <model|alias>]",
+      "  node scripts/codex-companion.mjs adversarial-review [--wait|--background] [--base <ref>] [--scope <auto|working-tree|branch>] [--model <model|alias>] [focus text]",
+      "  node scripts/codex-companion.mjs task [--background] [--write] [--resume-last|--resume|--fresh] [--model <model|alias>] [--effort <low|medium|high|xhigh|max|ultra>] [prompt]",
       "  node scripts/codex-companion.mjs transfer [--source <claude-jsonl>] [--json]",
       "  node scripts/codex-companion.mjs status [job-id] [--all] [--json]",
       "  node scripts/codex-companion.mjs result [job-id] [--json]",
@@ -754,7 +765,7 @@ async function handleReviewCommand(argv, config) {
         cwd,
         base: options.base,
         scope: options.scope,
-        model: options.model,
+        model: normalizeRequestedModel(options.model),
         focusText,
         reviewName: config.reviewName,
         onProgress: progress

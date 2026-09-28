@@ -23,3 +23,5 @@ Preserve the user's arguments as one literal argument as required by the compani
 For background runs, report the job/session identity and use $codex:status only on
 a requested follow-up. Do not claim completion at launch. Custom review focus,
 staged-only or unstaged-only scope requires $codex:adversarial-review.
+``--model <model|alias>`` selects the model for one run; see $codex:model-guide
+for aliases and GPT-6 caveats.

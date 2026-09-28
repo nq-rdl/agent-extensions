@@ -5,7 +5,7 @@ import fs from "node:fs";
 import path from "node:path";
 import process from "node:process";
 
-import { writeExecutable } from "./helpers.mjs";
+import { scrubGitEnv, writeExecutable } from "./helpers.mjs";
 
 export function installFakeCodex(binDir, behavior = "review-ok") {
   const statePath = path.join(binDir, "fake-codex-state.json");
@@ -315,6 +315,10 @@ rl.on("line", (line) => {
         if (requiresExperimental("persistExtendedHistory", message, state) || requiresExperimental("persistFullHistory", message, state)) {
           throw new Error("thread/start.persistFullHistory requires experimentalApi capability");
         }
+        state.lastThreadStart = {
+          model: message.params.model ?? null,
+          ephemeral: Boolean(message.params.ephemeral)
+        };
         const thread = nextThread(state, message.params.cwd, message.params.ephemeral);
         send({ id: message.id, result: { thread: buildThread(thread), model: message.params.model || "gpt-5.4", modelProvider: "openai", serviceTier: null, cwd: thread.cwd, approvalPolicy: "never", sandbox: { type: "readOnly", access: { type: "fullAccess" }, networkAccess: false }, reasoningEffort: null } });
         send({ method: "thread/started", params: { thread: { id: thread.id } } });
@@ -654,8 +658,8 @@ rl.on("line", (line) => {
 
 export function buildEnv(binDir) {
   const sep = process.platform === "win32" ? ";" : ":";
-  return {
+  return scrubGitEnv({
     ...process.env,
     PATH: `${binDir}${sep}${process.env.PATH}`
-  };
+  });
 }

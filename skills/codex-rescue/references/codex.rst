@@ -9,7 +9,9 @@ variable. Use the host shell tool and its background-session support. Never call
 Claude's Bash, BashOutput, Agent, or AskUserQuestion tools from Codex.
 
 Forward the user's task to an independent Codex CLI session. Preserve explicitly
-requested model and effort; leave both unset otherwise. Default to foreground.
+requested model and effort; leave both unset otherwise. Map model words with the
+alias table in $codex:model-guide: bare ``sol``/``terra``/``luna`` mean GPT-5.6;
+"luna 6" or ``luna-6`` means ``gpt-6-luna``. Default to foreground.
 Honor --background with the host shell's background support; strip --wait and
 --background before calling ``task``. Keep --resume or --fresh if supplied.
 
