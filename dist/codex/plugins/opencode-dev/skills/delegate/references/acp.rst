@@ -137,7 +137,7 @@ require("codecompanion").setup({
 
 This config sets up CodeCompanion to use OpenCode as the ACP agent for chat.
 
-If you need to pass environment variables (like `OPENCODE_API_KEY`), refer to [Configuring Adapters: Environment Variables](https://codecompanion.olimorris.dev/getting-started#setting-an-api-key) in the CodeCompanion.nvim documentation for full details.
+If you need to pass environment variables (like `OPENCODE_API_KEY`), refer to [Configuring ACP Adapters: Customising an Adapter](https://codecompanion.olimorris.dev/configuration/adapters-acp#customising-an-adapter) in the CodeCompanion.nvim documentation for full details.
 
 ## Support
 

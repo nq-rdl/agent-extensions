@@ -64,7 +64,7 @@ From URL
 
 .. code:: bash
 
-   quarto add https://github.com/user/repo/archive/main.zip
+   quarto add https://github.com/<owner>/<repo>/archive/main.zip
 
 Interactive Installation
 ~~~~~~~~~~~~~~~~~~~~~~~~

@@ -1,5 +1,6 @@
-# URL policy fixtures. Root expectations preserve the legacy policy, including
-# its known broad matches; narrowing root policy belongs to #300.
+# URL policy fixtures. Root expectations follow the #300 review: look-alike
+# hosts are no longer swallowed by example/localhost/your- prefixes, and each
+# new endpoint/identifier exclusion has a neighbouring URL that is still checked.
 
 [[cases]]
 url = "https://example.com/"
@@ -135,22 +136,22 @@ repository = true
 [[cases]]
 url = "https://your-business.com/"
 shipped = false
-repository = true
+repository = false
 
 [[cases]]
 url = "https://example.commercial.org/"
 shipped = false
-repository = true
+repository = false
 
 [[cases]]
 url = "http://localhost.company.org/"
 shipped = false
-repository = true
+repository = false
 
 [[cases]]
 url = "https://example.com.real.org/"
 shipped = false
-repository = true
+repository = false
 
 [[cases]]
 url = "https://github.com/lycheeverse/lychee"
@@ -201,3 +202,98 @@ repository = false
 url = "https://real.org/example.com/"
 shipped = false
 repository = false
+
+[[cases]]
+url = "https://mcp.context7.com/mcp"
+shipped = false
+repository = true
+
+[[cases]]
+url = "https://mcp.context7.com/"
+shipped = false
+repository = false
+
+[[cases]]
+url = "https://mcp.grep.app/"
+shipped = false
+repository = true
+
+[[cases]]
+url = "https://grep.app/"
+shipped = false
+repository = false
+
+[[cases]]
+url = "https://mcp.sentry.dev/mcp"
+shipped = false
+repository = true
+
+[[cases]]
+url = "https://docs.sentry.io/product/sentry-mcp/"
+shipped = false
+repository = false
+
+[[cases]]
+url = "https://token.actions.githubusercontent.com/"
+shipped = false
+repository = true
+
+[[cases]]
+url = "https://token.actions.githubusercontent.com/.well-known/openid-configuration"
+shipped = false
+repository = false
+
+[[cases]]
+url = "https://conda.anaconda.org/conda-forge"
+shipped = false
+repository = true
+
+[[cases]]
+url = "https://conda.anaconda.org/conda-forge/linux-64/"
+shipped = false
+repository = false
+
+[[cases]]
+url = "https://api.access.redhat.com/support/search/kcs"
+shipped = false
+repository = true
+
+[[cases]]
+url = "https://api.access.redhat.com/rs/solutions/"
+shipped = false
+repository = true
+
+[[cases]]
+url = "https://api.access.redhat.com/support"
+shipped = false
+repository = true
+
+[[cases]]
+url = "https://api.access.redhat.com/management/v1/"
+shipped = false
+repository = false
+
+[[cases]]
+url = "https://access.redhat.com/hydra/rest/search/kcs"
+shipped = false
+repository = true
+
+[[cases]]
+url = "https://access.redhat.com/articles/6873281"
+shipped = false
+repository = false
+
+[[cases]]
+url = "https://sso.redhat.com/auth/realms/redhat-external/protocol/openid-connect/token"
+shipped = false
+repository = true
+
+[[cases]]
+url = "https://sso.redhat.com/auth/realms/redhat-external/"
+shipped = false
+repository = false
+
+[[cases]]
+url = "https://quarto.org/docs/faq/rmarkdown.html#quarto-vs.-r-markdown"
+shipped = false
+repository = true

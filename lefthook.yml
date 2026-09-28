@@ -32,7 +32,8 @@ pre-commit:
       glob: "*.go"
       run: CGO_ENABLED=0 go build ./...
 
-    # --- Skills: agentskills.io spec + directory-structure standard ---
+    # --- Skills: agentskills.io spec + directory-structure standard + offline
+    #     local Markdown/RST references (links resolve inside the skill) ---
     # Build to a temp path and run from repo root (asctl resolves skills/
     # relative to its working directory, which must stay the repo root).
     - name: asctl-repo-check
@@ -86,11 +87,11 @@ pre-commit:
       run: pixi run python3 scripts/check_changie_length.py {staged_files}
 
     # --- Docs link health. With lychee installed, a broken link in a staged
-    #     skill .md fails the commit (the old `|| true` wrongly swallowed real
-    #     failures). When lychee is absent we skip cleanly; CI (link-check.yml)
-    #     still enforces link health over the full skills/ tree. ---
+    #     skill .md/.rst fails the commit (the old `|| true` wrongly swallowed
+    #     real failures). When lychee is absent we skip cleanly; CI
+    #     (link-check.yml, advisory) still checks the full skills/ tree. ---
     - name: lychee-links
-      glob: "skills/**/*.md"
+      glob: "skills/**/*.{md,rst}"
       run: |
         if command -v lychee >/dev/null 2>&1; then
           skills/lychee/scripts/check-links.sh --config lychee.toml --cache=false {staged_files}

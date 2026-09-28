@@ -7,6 +7,7 @@ import (
 	"sort"
 	"strings"
 
+	"github.com/nq-rdl/agent-extensions/tools/asctl/internal/localrefs"
 	"github.com/nq-rdl/agent-extensions/tools/asctl/internal/parser"
 	"github.com/nq-rdl/agent-extensions/tools/asctl/internal/prompt"
 	"github.com/nq-rdl/agent-extensions/tools/asctl/internal/structure"
@@ -78,7 +79,9 @@ func ResolveSkillDirs(paths []string, skillsRoot string) ([]string, error) {
 	return selected, nil
 }
 
-// ValidateSkillDirs validates skill directories and ensures prompt generation works.
+// ValidateSkillDirs validates skill directories (frontmatter, directory
+// structure, and offline local Markdown/RST references) and ensures prompt
+// generation works.
 // Returns a list of error messages; an empty slice means all skills are valid.
 func ValidateSkillDirs(skillDirs []string) []string {
 	var errors []string
@@ -87,6 +90,7 @@ func ValidateSkillDirs(skillDirs []string) []string {
 	for _, dir := range skillDirs {
 		errs := validator.Validate(dir)
 		errs = append(errs, structure.ValidateStructure(dir)...)
+		errs = append(errs, localrefs.Check(dir)...)
 		if len(errs) > 0 {
 			for _, e := range errs {
 				errors = append(errors, dir+": "+e)

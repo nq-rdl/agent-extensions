@@ -437,7 +437,7 @@ community-maintained channel:
       [workspace]
       channels = ["conda-forge"]
       # Add additional channels:
-      # channels = ["conda-forge", "pytorch", "https://my-company.com/channel"]
+      # channels = ["conda-forge", "pytorch", "https://conda.example.com/channel"]
 
 For private packages, you can host your own channel on
 `prefix.dev <https://prefix.dev/>`__, S3, or JFrog Artifactory. See

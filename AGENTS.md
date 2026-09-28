@@ -39,9 +39,9 @@ pixi install
 ```
 
 Local hooks mirror CI so failures surface before you push. **pre-commit** runs
-fast checks (gofmt/vet/build of `tools/asctl`, `asctl repo-check`, plugin
+fast checks (gofmt/vet/build of `tools/asctl`, `asctl repo-check` incl. local references, plugin
 validation, generated-artifact drift, a per-fragment changie body-length cap
-that also rejects fragments whose YAML does not parse, lychee links); **pre-push** runs `asctl` tests, the pipeline unit tests, a
+that also rejects fragments whose YAML does not parse, lychee links on staged skill `.md`/`.rst`); **pre-push** runs `asctl` tests, the pipeline unit tests, a
 non-blocking SkillSpector scan, a local-only `claude plugin eval` job for plugins whose
 `evals/claude/<plugin>/` suite changed (opt-in via `CLAUDE_EVAL_ENABLE=1`, non-blocking, no CI twin; paid model
 calls on your local `claude` login, see `evals/claude/README.md`), and a hard changie-fragment gate. Prereqs:
@@ -196,11 +196,11 @@ CI runs `validate.yml` on every PR/push to main. It checks:
 - Codex `0.152.0` and `0.154.0` install every native marketplace entry and discover the enabled native skill copies with explicit leaf names (`scripts/smoke-codex-marketplace.sh`)
 - Any symlink under `plugins/` resolves (`validate-symlinks` — plugin trees are real-file copies, so this guards against accidental links)
 - The pipeline scripts' unit tests pass (`tests/`)
-- Skills validate against the agentskills.io spec **and the directory-structure standard** (`asctl repo-check`, built from `tools/asctl/`)
+- Skills validate against the agentskills.io spec, **the directory-structure standard, and offline local Markdown/RST references** (`asctl repo-check`, built from `tools/asctl/`; every relative link target must exist inside its skill — see `CONTRIBUTING.md` → "Local references")
 
 Three more workflows run on PRs alongside `validate.yml`:
 - `changelog-check.yml` — fails if no changie fragment was added (bypass with the `skip-changelog` label), and lints each *added* fragment's body against the 200-char per-fragment cap (`scripts/check_changie_length.py`, which also fails on fragments whose YAML does not parse)
-- `link-check.yml` — external (HTTP) link check with lychee, advisory for merging: a PR that changes `skills/**/*.md` or `skills/speckit-*/**/*.rst` triggers a scan of all skill Markdown and Spec Kit RST, using `skills/lychee/lychee.toml`
+- `link-check.yml` — external (HTTP) link check with lychee, advisory for merging: a PR that changes `skills/**/*.md`, `skills/**/*.rst`, the workflow, `skills/lychee/scripts/check-links.sh`, or either `lychee.toml` triggers an uncached scan of all skill Markdown and RST using the root `lychee.toml` (narrow, commented exclusions; see `CONTRIBUTING.md` → "Example URLs and placeholders"). It can also be run by `workflow_dispatch`. Generated `plugins/**` and `dist/**` copies are not scanned
 - `skillspector.yml` — NVIDIA SkillSpector scan over `skills/`; informational, uploads SARIF to code scanning (non-gating)
 
 The same checks run locally via `lefthook` (see Setup commands).
@@ -242,11 +242,14 @@ retrigger it, so a green result can be stale. Before merging a release PR,
 reviewers must rerun `version-monotonic` against current `main` (or confirm the
 PR's `VERSION` is strictly newer than `main`'s current `VERSION`).
 
-[Issue #300](https://github.com/nq-rdl/agent-extensions/issues/300) plans a
-deterministic local Markdown/RST reference check, distinct from external HTTP
-health, and broader external coverage. [Issue #301](https://github.com/nq-rdl/agent-extensions/issues/301)
-plans advisory weekly link-rot monitoring. Neither check is implemented yet;
-update this description when those changes land.
+Local and external link checks are separate. The deterministic, offline local
+Markdown/RST reference check runs inside `asctl repo-check`, so it is part of the
+always-run `validate-skills` job and the `asctl-repo-check` pre-commit hook; network
+failures cannot affect it. External HTTP health stays in the advisory `check-links`
+job ([issue #300](https://github.com/nq-rdl/agent-extensions/issues/300)).
+[Issue #301](https://github.com/nq-rdl/agent-extensions/issues/301) plans advisory
+weekly link-rot monitoring, including canonical URLs under `agents/`, `docs/` and
+`hooks/`; it is not implemented yet. Update this description when it lands.
 
 ## Testing instructions
 

@@ -428,4 +428,4 @@ Resources
 - `Quarto for R Markdown
   Users <https://quarto.org/docs/faq/rmarkdown.html>`__
 - `Quarto vs R
-  Markdown <https://quarto.org/docs/faq/rmarkdown.html#quarto-vs.-r-markdown>`__
+  Markdown <https://quarto.org/docs/faq/rmarkdown.html#quarto-sounds-similar-to-r-markdown.-what-is-the-difference-and-why-create-a-new-project>`__

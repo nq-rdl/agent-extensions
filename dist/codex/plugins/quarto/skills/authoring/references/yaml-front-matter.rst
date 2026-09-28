@@ -68,7 +68,7 @@ Detailed Author
    author:
      name: "Jane Doe"
      email: jane@example.com
-     url: https://janedoe.com
+     url: https://janedoe.example.com
      orcid: 0000-0000-0000-0000
 
 Multiple Authors

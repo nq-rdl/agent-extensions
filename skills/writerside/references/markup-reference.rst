@@ -72,7 +72,7 @@ Structure
 
    <procedure title="Deploy the Service" id="deploy-service">
        <step>
-           Clone the repository: <code>git clone https://github.com/org/repo.git</code>
+           Clone the repository: <code>git clone https://git.example.com/org/repo.git</code>
        </step>
        <step>
            Copy the configuration template and update environment variables.

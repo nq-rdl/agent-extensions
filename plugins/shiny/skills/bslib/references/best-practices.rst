@@ -388,7 +388,7 @@ fluidRow/column Doesn’t Fill
 system.
 
 **Solution:** Use ``layout_columns()`` instead. See
-`migration.md <migration.rst>`__.
+`migration.rst <migration.rst>`__.
 
 Plotly Doesn’t Resize
 ~~~~~~~~~~~~~~~~~~~~~

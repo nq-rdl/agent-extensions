@@ -78,7 +78,7 @@ and checks both content and executable modes for drift. No agents tree is restor
 
 ### `asctl` — the skills spec validator
 
-`tools/asctl/` is a Go CLI imported from the former agent-skills repo. `asctl repo-check` validates every skill directory under `skills/` (frontmatter, structure, and prompt generation) against the [agentskills.io](https://agentskills.io) spec. It runs in CI as the `validate-skills` job, and locally:
+`tools/asctl/` is a Go CLI imported from the former agent-skills repo. `asctl repo-check` validates every skill directory under `skills/` (frontmatter, structure, and prompt generation) against the [agentskills.io](https://agentskills.io) spec, and checks offline that every local Markdown/RST link target exists inside its skill (`internal/localrefs`; conventions in `CONTRIBUTING.md` → "Local references"). It runs in CI as the `validate-skills` job, and locally:
 
 ```bash
 go -C tools/asctl build -o /tmp/asctl ./cmd/asctl/ && /tmp/asctl repo-check
@@ -92,7 +92,7 @@ go -C tools/asctl build -o /tmp/asctl ./cmd/asctl/ && /tmp/asctl repo-check
 - `validate-symlinks`: any symlink under `plugins/` resolves (plugin trees are real-file copies, so this is a guardrail against accidental links).
 - `validate-plugins`: plugin manifests (`plugin.json`), hooks, and `.mcp.json` wiring are well-formed (`scripts/validate-plugins.sh`); a pinned Codex CLI then installs every native marketplace entry and verifies installed skill discovery (`scripts/smoke-codex-marketplace.sh`).
 - `unit-tests`: the pipeline scripts' unit tests pass (`python3 -m unittest discover -s tests`).
-- `validate-skills`: every skill under `skills/` passes `asctl repo-check` (agentskills.io spec + prompt generation), built from `tools/asctl/`.
+- `validate-skills`: every skill under `skills/` passes `asctl repo-check` (agentskills.io spec, structure, local references, and prompt generation), built from `tools/asctl/`.
 
 ## Registry schema
 

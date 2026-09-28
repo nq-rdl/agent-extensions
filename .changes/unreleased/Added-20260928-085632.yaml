@@ -1,0 +1,3 @@
+kind: Added
+body: 'asctl repo-check verifies local Markdown/RST link targets offline: each must exist inside its skill; runs in validate-skills CI and the pre-commit hook.'
+time: 2026-09-28T08:56:32.512189924Z

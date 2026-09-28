@@ -1,11 +1,21 @@
 name: Link Check
 
+# Advisory external (HTTP) link health for canonical skill docs. Local
+# Markdown/RST file references are checked offline and deterministically by
+# `asctl repo-check` in validate.yml; this job only covers network targets.
+# Generated plugins/** and dist/** copies are not scanned. agents/, docs/ and
+# hooks/ URLs are left to the weekly report (#301).
 on:
   pull_request:
     paths:
       - skills/**/*.md
-      - skills/speckit-*/**/*.rst
+      - skills/**/*.rst
+      # Files that control this check.
       - .github/workflows/link-check.yml
+      - skills/lychee/scripts/check-links.sh
+      - skills/lychee/lychee.toml
+      - lychee.toml
+  workflow_dispatch:
 
 permissions:
   contents: read
@@ -23,10 +33,8 @@ jobs:
           lycheeVersion: v0.24.2
 
       - name: Check skill links
-        # .md is checked repo-wide; .rst is scoped to the speckit-dev skills so we
-        # monitor their doc-grounding links without failing on pre-existing
-        # placeholder/rotted URLs in other skills' .rst (a separate hygiene pass
-        # can widen this to skills/**/*.rst once those are cleaned/excluded).
+        # All canonical skill Markdown and RST, with the repository policy in
+        # the root lychee.toml (narrow, commented exclusions only).
         # Stylepedia returns 403 from GitHub runners even with its required headers
         # (PR #331, run 35185281164, attempts 1 and 2). The page and all anchors
         # pass uncached local checks. Scope this exception to CI and this page;
@@ -35,4 +43,4 @@ jobs:
           bash skills/lychee/scripts/check-links.sh
           --config lychee.toml --cache=false
           --exclude '^https://stylepedia\.net/style/(#.*)?$'
-          'skills/**/*.md' 'skills/speckit-*/**/*.rst'
+          'skills/**/*.md' 'skills/**/*.rst'

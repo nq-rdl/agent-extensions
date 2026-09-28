@@ -275,13 +275,13 @@ Hugo
 
 .. code:: markdown
 
-   {{</* youtube VIDEO_ID */>}}
+   {{</* youtube wo9vZccmqwc */>}}
    ```
 
    #### Quarto
 
    ````markdown
-   {{< video https://www.youtube.com/embed/VIDEO_ID >}}
+   {{< video https://www.youtube.com/embed/wo9vZccmqwc >}}
 
 Gist
 ~~~~
