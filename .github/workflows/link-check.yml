@@ -39,6 +39,10 @@ jobs:
         # (PR #331, run 35185281164, attempts 1 and 2). The page and all anchors
         # pass uncached local checks. Scope this exception to CI and this page;
         # the bundled lychee config continues checking it for local users.
+        # lychee reads GITHUB_TOKEN; the widened scan makes enough github.com
+        # requests that unauthenticated runs hit transient 429/503 rate limits.
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: >-
           bash skills/lychee/scripts/check-links.sh
           --config lychee.toml --cache=false
