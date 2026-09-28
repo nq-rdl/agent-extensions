@@ -123,8 +123,16 @@ class ConfigTests(unittest.TestCase):
         old["cache"] = False
         # #300 narrowed look-alike host prefixes, dropped an unused placeholder
         # prefix and a fixed-fragment pattern, and added commented exclusions
-        # for API endpoints and identifiers. Anything else is an unreviewed drift.
+        # for API endpoints and identifiers. The historical Quarto, Conventional
+        # Commits and Bootstrap icons runner exclusions were then dropped once CI
+        # passed without them, and the PyPI simple index root was excluded as an
+        # index endpoint. Anything else is unreviewed drift.
         removed = {
+            "^https?://quarto\\.org/docs/",
+            "^https?://quarto\\.org/docs$",
+            "^https?://quarto\\.org/docs/$",
+            "^https://www\\.conventionalcommits\\.org/",
+            "^https?://icons\\.getbootstrap\\.com",
             "^https?://quarto\\.org/docs/faq/rmarkdown\\.html#quarto-vs.-r-markdown",
             "^https?://localhost",
             "^https?://0\\.0\\.0\\.0",
@@ -142,6 +150,7 @@ class ConfigTests(unittest.TestCase):
             "^https://mcp\\.sentry\\.dev/mcp$",
             "^https://token\\.actions\\.githubusercontent\\.com/?$",
             "^https://conda\\.anaconda\\.org/conda-forge$",
+            "^https://pypi\\.org/simple/?$",
             "^https://api\\.access\\.redhat\\.com/(support|support/search/kcs|rs/solutions/)$",
             "^https://access\\.redhat\\.com/hydra/rest/search/kcs$",
             "^https://sso\\.redhat\\.com/auth/realms/redhat-external/protocol/openid-connect/token$",
