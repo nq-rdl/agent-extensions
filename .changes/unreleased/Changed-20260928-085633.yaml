@@ -1,3 +1,0 @@
-kind: Changed
-body: Link Check scans all skill Markdown and RST, reruns when its workflow, wrapper, or lychee configs change, and supports manual dispatch; pre-commit checks staged RST too.
-time: 2026-09-28T08:56:33.517357578Z

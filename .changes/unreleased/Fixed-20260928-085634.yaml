@@ -1,3 +1,0 @@
-kind: Fixed
-body: 'Repair broken local skill references: OpenCode site-root links now use opencode.ai URLs; Pixi prefix screenshots point to pinned upstream images; stale .md link labels fixed.'
-time: 2026-09-28T08:56:34.522818752Z

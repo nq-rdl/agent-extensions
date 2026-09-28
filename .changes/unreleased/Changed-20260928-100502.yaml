@@ -1,3 +1,0 @@
-kind: Changed
-body: Link check no longer excludes quarto.org docs, conventionalcommits.org and Bootstrap icons; GitHub runners now check those URLs again
-time: 2026-09-28T10:05:02.421000051Z

@@ -1,6 +1,6 @@
 {
   "name": "testcontainers",
-  "version": "0.36.0",
+  "version": "0.36.1",
   "description": "Testcontainers — integration tests against real services in throwaway containers",
   "author": {
     "name": "nq-rdl"
