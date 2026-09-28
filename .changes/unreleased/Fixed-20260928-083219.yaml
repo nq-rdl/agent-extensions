@@ -1,3 +1,0 @@
-kind: Fixed
-body: 'cc-create-workflow and cc-hook: correct stale workflow permission/resume claims and add DirectoryAdded, PreModelSwitch and PostModelSwitch hook events (#298)'
-time: 2026-09-28T08:32:19.13507975Z

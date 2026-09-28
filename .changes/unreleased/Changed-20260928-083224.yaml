@@ -1,3 +1,0 @@
-kind: Changed
-body: 'R skills defer to the project''s formatter: air when air.toml exists, else the existing convention; air stays the new-package default (#298)'
-time: 2026-09-28T08:32:24.679333021Z
