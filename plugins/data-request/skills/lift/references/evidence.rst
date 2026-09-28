@@ -19,7 +19,8 @@ Do not include patient rows, identifiers or credentials.
   non-SQL capability include the expected metadata/API contract as well; never
   invent SQL for an introspection feature. Unavailable canonical evidence blocks
   filing until resolved.
-* **Proposed fix and tests** — core or plugin owner, bounded implementation scope,
-  regressions proving equivalence with the canonical contract, and exclusions.
+* **Proposed fix and tests** — core or source resolver (``resolvers/iemr``,
+  ``resolvers/hbcis``), bounded implementation scope, regressions proving
+  equivalence with the canonical contract, and exclusions.
 * **Rollout** — delivered under the old pin; additive/forward release, no enquiry
   backport. Explicitly recurring extracts may later bump the pin and re-compose.
