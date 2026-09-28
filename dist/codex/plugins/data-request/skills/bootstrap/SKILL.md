@@ -77,7 +77,11 @@ Work through these in order, pausing (the host user-question tool) on each scopi
    **Reject**. Each question shows the item's `text` **and** its `rationale`: both are the
    confirmed record, so a rationale the engineer never saw must not be published. Reword may change
    either; a reworded item is asked again with its new text and rationale.
-5. **Open questions** — anything the engineer must take back to the requester.
+5. **Open questions** — anything the engineer must take back to the requester. First look for a
+   prior version's SQL or delivery (a V2 request's V1 repository or release). When it answers the
+   question, ask it as confirm-or-change, quoting the prior answer and its source. Propose a
+   default answer for each open question: the engineer can accept it as a candidate assumption
+   (confirmed as in step 4), or keep the question open with the default noted for the requester.
 
 Keep the working set in `.sqlreview/reviews/$SLUG/scope.draft.json` (guard-exempt). If the
 engineer stops, leave the draft and write nothing final — say so.

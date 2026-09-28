@@ -33,10 +33,41 @@ Interpretation checks
 * **Explicit code list.** Use the requested codes exactly. A library concept with
   a different code set is a mismatch to raise, not a substitute: an aneurysm
   concept that adds I71.8 to a request for I71.3 and I71.4 broadens the cohort.
+* **Internal range conflict.** One field can name a code range that is wider
+  than the conditions it also names: C00 to C80 beside eight named cancer types.
+  This is a conflict inside the request, not a library-concept broadening. Raise
+  it as a clarification for the requester, and propose the narrower reading (the
+  named conditions) as the default.
+* **Classification edition change.** A window can span a change of coding
+  edition, such as ICD-10-AM 12th to 13th edition. Name the edition in force at
+  each end of the window, and list the requested code sets and reference tables
+  (code lookups, library concepts, DRG or grouper tables) to re-verify for codes
+  that were added, retired or retitled. Record the edition as an assumption.
+* **Ethnicity.** The records hold no ethnicity field. When a request asks for
+  ethnicity, propose Indigenous status from ``PERSON_INFO`` (the RDL convention)
+  and ask once, during scoping, whether to add country of birth or preferred
+  language as optional surrogates; the requester or engineer decides. Record the
+  limitation that ethnicity is not held. ``/data-request:guardrails`` owns the
+  convention.
 * **Stale issue body.** A later dated amendment or comment supersedes the body.
   Cite both sources and carry the newer value.
+* **Verbal decision.** When a decision given in a call or a chat contradicts the
+  newest written comment, ask the decider for a written, dated comment. Until it
+  exists, record the decision as unlinked in the ledger, and show both values in
+  the triage comment as a conflict to settle.
 * **Unanswered question.** Silence, a pending request for information or an
   assumption nobody contradicted is not approval.
+
+Open questions
+--------------
+
+Give each open question a proposed default, so that the engineer can accept it as
+a scope assumption or send it to the requester. Before you ask, look for a prior
+version of the request: a V2 request's V1 repository, its SQL and its delivery.
+When the prior version answers the question, turn it into a confirm-or-change
+question that quotes the prior answer and its source. In September 2026, reading
+a V1 request's SQL removed the last open question for its V2. A default is a proposal;
+it becomes a requirement only when a named human accepts it.
 
 Blocker taxonomy
 ----------------

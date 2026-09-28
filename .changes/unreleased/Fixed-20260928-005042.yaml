@@ -1,0 +1,3 @@
+kind: Fixed
+body: data-request:triage reads another child branch with git show or git ls-tree, never git checkout, which fires that repository hooks
+time: 2026-09-28T00:50:42.388926988Z

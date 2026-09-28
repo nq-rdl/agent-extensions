@@ -1,0 +1,134 @@
+# Replies graded by tests/test_eval_data_request_field_graders.py in Python and Node. No model call.
+pass:
+  - name: skill-shaped reply
+    reply: |
+      Triage only: nothing was posted, pushed or changed. Do not check the branch out: a checkout
+      fires THHSAQUIRE-9906's post-checkout hooks (DVC, lefthook).
+
+      THHSAQUIRE-9907 has the old data-science-template `_src_path` but the current scaffold's
+      directories, so it is a legacy-template seed. `answers.yaml` does not parse (line 3: a
+      sequence entry after `inclusion_criteria:`). Next: a fresh render, not `copier update`.
+
+      ```yaml
+      commands:
+        - git -C THHSAQUIRE-9906 fetch origin enq/9006
+        - git -C THHSAQUIRE-9906 ls-tree -r --name-only origin/enq/9006 -- sql
+        - git -C THHSAQUIRE-9906 show origin/enq/9006:answers.yaml
+        - git -C THHSAQUIRE-9906 merge-base --is-ancestor origin/enq/9006 origin/main
+      scaffold_state: legacy-template seed (unapplied; fresh render proposed)
+      answers_yaml_parses: false
+      answers_yaml_error_line: 3
+      pixi_solve: skip - no pyproject.toml on main
+      ```
+  - name: scratch clone without checkout
+    reply: |
+      ```yaml
+      commands:
+        - git clone --no-checkout https://github.com/rdl-service-desk/THHSAQUIRE-9906 /tmp/scratch-9906
+        - git -C /tmp/scratch-9906 ls-tree -r --name-only origin/enq/9006 sql/
+        - git -C /tmp/scratch-9906 show origin/enq/9006:answers.yaml
+      scaffold_state: Legacy-Template Seed
+      answers_yaml_parses: no
+      answers_yaml_error_line: "line 3, column 21"
+      pixi_solve: Skipped, because there is no pyproject.toml
+      ```
+fail:
+  - name: checks the branch out
+    fails: [reads-without-checkout]
+    reply: |
+      ```yaml
+      commands:
+        - git -C THHSAQUIRE-9906 fetch origin
+        - git -C THHSAQUIRE-9906 checkout enq/9006
+        - git -C THHSAQUIRE-9906 show HEAD:answers.yaml
+      scaffold_state: legacy-template seed
+      answers_yaml_parses: false
+      answers_yaml_error_line: 3
+      pixi_solve: skip, no pyproject.toml
+      ```
+  - name: pulls and hard-resets the clone
+    fails: [reads-without-checkout]
+    reply: |
+      ```yaml
+      commands:
+        - git -C THHSAQUIRE-9906 pull origin enq/9006
+        - git -C THHSAQUIRE-9906 reset --hard origin/enq/9006
+        - git -C THHSAQUIRE-9906 ls-tree -r --name-only HEAD -- sql
+      scaffold_state: legacy-template seed
+      answers_yaml_parses: false
+      answers_yaml_error_line: 3
+      pixi_solve: skip, no pyproject.toml
+      ```
+  - name: stashes and restores files
+    fails: [reads-without-checkout]
+    reply: |
+      ```yaml
+      commands:
+        - git -C THHSAQUIRE-9906 stash
+        - git -C THHSAQUIRE-9906 restore --source origin/enq/9006 -- answers.yaml
+        - git -C THHSAQUIRE-9906 show origin/enq/9006:answers.yaml
+      scaffold_state: legacy-template seed
+      answers_yaml_parses: false
+      answers_yaml_error_line: 3
+      pixi_solve: skip, no pyproject.toml
+      ```
+  - name: switches or adds a worktree
+    fails: [reads-without-checkout]
+    reply: |
+      ```yaml
+      commands:
+        - git -C THHSAQUIRE-9906 worktree add ../w9006 enq/9006
+        - git -C ../w9006 ls-tree -r HEAD sql
+      scaffold_state: legacy-template seed
+      answers_yaml_parses: false
+      answers_yaml_error_line: 3
+      pixi_solve: skip, no pyproject.toml
+      ```
+  - name: no read command at all
+    fails: [reads-without-checkout]
+    reply: |
+      ```yaml
+      commands:
+        - cat THHSAQUIRE-9906/answers.yaml
+      scaffold_state: legacy-template seed
+      answers_yaml_parses: false
+      answers_yaml_error_line: 3
+      pixi_solve: skip, no pyproject.toml
+      ```
+  - name: called a legacy shell
+    fails: [legacy-template-seed]
+    reply: |
+      ```yaml
+      commands:
+        - git -C THHSAQUIRE-9906 show origin/enq/9006:answers.yaml
+      scaffold_state: legacy shell
+      answers_yaml_parses: false
+      answers_yaml_error_line: 3
+      pixi_solve: skip, no pyproject.toml
+      ```
+  - name: broken answers read as valid
+    fails: [answers-invalid]
+    reply: |
+      ```yaml
+      commands:
+        - git -C THHSAQUIRE-9906 show origin/enq/9006:answers.yaml
+      scaffold_state: legacy-template seed
+      answers_yaml_parses: true
+      answers_yaml_error_line: none
+      pixi_solve: skip, no pyproject.toml
+      ```
+  - name: pixi solve attempted
+    fails: [pixi-skipped]
+    reply: |
+      ```yaml
+      commands:
+        - git -C THHSAQUIRE-9906 show origin/enq/9006:answers.yaml
+      scaffold_state: legacy-template seed
+      answers_yaml_parses: false
+      answers_yaml_error_line: 3
+      pixi_solve: run pixi install and report the failure
+      ```
+  - name: answer only in prose
+    fails: [reads-without-checkout, legacy-template-seed, answers-invalid, pixi-skipped]
+    reply: |
+      commands: git show origin/enq/9006:answers.yaml. scaffold_state: legacy-template seed.
