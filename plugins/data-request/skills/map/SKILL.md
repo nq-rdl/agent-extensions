@@ -19,16 +19,24 @@ Arguments: `$ARGUMENTS`.
 
 ## Lift capture
 
-Ordinary mapping needs no `.sqlreview/` setup. Before a mapping leads
-to hand SQL, inspect the pinned unit/resolver/tests and silently publish a candidate
-for the target pipeline, following `${CLAUDE_PLUGIN_ROOT}/skills/setup/references/lifts.rst`.
-Record the pin, evidence and shortfall; no entry means no hand SQL. If the target
-path is not yet known, pass the gap to draft and require capture before writing.
-If the run is read-only, the child repo has no `.sqlreview/` yet, or you cannot
-write to it, publish nothing: return the candidate ledger entry as text, marked
-unpublished. A text entry authorises no hand SQL; draft publishes it before writing.
-Aggregate-only, small-cell-suppressed, single-scan operator probes are outside the
-hand-SQL gate; record any `NOLOCK` use. Guardrails is the source of truth for both rules.
+Ordinary mapping needs no `.sqlreview/` setup. Mapping never initialises
+`.sqlreview/`; stages that own the store (setup, bootstrap) still initialise it.
+Before a mapping leads to hand SQL, inspect the pinned unit/resolver/tests and
+silently publish a candidate for the target pipeline, following
+`${CLAUDE_PLUGIN_ROOT}/skills/setup/references/lifts.rst`. Record the pin,
+evidence and shortfall; no entry means no hand SQL. If the target path is not
+yet known, pass the gap to draft and require capture before writing.
+
+**Proposal-only:** if the run is read-only, the child repo has no `.sqlreview/`
+yet, or you cannot write to it, publish nothing. Return the candidate ledger
+entry as text, marked proposal-only. A proposal-only entry authorises no hand SQL:
+none is committed or run, except exempt probes, until a writable run publishes the entry.
+
+**Exempt probes:** an operator probe is outside the hand-SQL gate only when it is
+aggregate-only, small-cell-suppressed and single-scan, returns no identifying
+values (no patient or clinician identifiers, no staff or person keys), and feeds
+no delivered extract. Record any `NOLOCK` use. Guardrails is the source of truth
+for these rules.
 Classification and confirmation happen in `/data-request:lift` at close-out.
 
 ## Inputs
