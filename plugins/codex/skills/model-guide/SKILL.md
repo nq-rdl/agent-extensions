@@ -33,14 +33,15 @@ The companion maps each alias to its full id (`MODEL_ALIASES` in `scripts/codex-
 | `astra`, `astra-6` | `gpt-6-astra` | medium | yes | not recorded | GPT-6 frontier tier |
 | `sol-6` | `gpt-6-sol` | medium | yes | not recorded | GPT-6 workhorse for coding |
 | `luna-6` | `gpt-6-luna` | medium | no | not recorded | GPT-6 fast / cheap |
-| `spark` | `gpt-5.3-codex-spark` | — | — | — | Still live |
+| `spark` | `gpt-5.3-codex-spark` | — | — | — | Unverified: absent from `codex debug models` on 0.157.0 |
 
 Alias decision:
 - Bare `sol`, `terra`, and `luna` mean **GPT-5.6**. GPT-5.6 runs on every account and every supported CLI. There is **no** `gpt-6-terra`, so a GPT-6 meaning for bare names would split the family.
+- The catalog now describes the GPT-5.6 models as "Older…". Bare aliases still map to GPT-5.6 by design; use `sol-6` (or `luna-6`, `astra`) for GPT-6.
 - GPT-6 needs an explicit form: `sol-6`, `luna-6`, or `astra` (`astra` exists only in GPT-6). Use `sol-5.6`, `terra-5.6`, or `luna-5.6` to state GPT-5.6 without ambiguity.
 - `terra-6` is not an alias. Do not map it to another model.
 - `gpt-5.6` (bare) aliases to Sol. There is **no** `gpt-5.6-codex`.
-- GPT-5.6 context: API 1.05M in / 128K out; Codex harness context 272,000 tokens. GPT-6 context is not recorded here.
+- GPT-5.6 context: API 1.05M in / 128K out; Codex harness context 272,000 tokens. GPT-6: Codex harness context 272,000 tokens (`context_window`, `codex debug models` on 0.157.0). GPT-6 API limits are not recorded here.
 - Prices are OpenAI API input/output rates per million tokens. A ChatGPT-subscription Codex user is not necessarily billed these amounts; treat them as relative cost signal, not a quote.
 - GPT-6 positions paraphrase the `codex debug models` descriptions. No benchmark or capability claim is made here.
 
@@ -48,7 +49,7 @@ Alias decision:
 
 - A third-party report says the backend accepts GPT-6 Sol and Luna from ChatGPT-account sign-ins only on Codex CLI >= 0.155.0 ([bman654/clodex#267](https://github.com/bman654/clodex/pull/267)). Older clients are rejected.
 - nq-rdl/agent-extensions#392 (CLI 0.156.1, ChatGPT sign-in): native review on `gpt-6-luna` failed with `The 'gpt-6-luna' model is not supported when using Codex with a ChatGPT account`. Adversarial review on the same default succeeded. GPT-6 task runs on a ChatGPT account are untested.
-- If Codex rejects a GPT-6 model, retry with the GPT-5.6 alias. Do not retry the same model.
+- If Codex rejects a GPT-6 model, report the rejection to the user and suggest the GPT-5.6 alias (for example `luna-5.6`). Do not retry automatically, with this or any other model.
 
 ## Reasoning effort ladder
 
@@ -64,7 +65,7 @@ No account-plan gating is asserted beyond the caveats above; there is no authori
 
 ## Review commands
 
-`/codex:review` and `/codex:adversarial-review` accept `--model <model|alias>` for one run. For a persistent native-review model, set `review_model` in `~/.codex/config.toml` ([config reference](https://learn.chatgpt.com/docs/config-file/config-reference)). Per that reference it overrides the session model for native review. `--model` sets the session model, so a set `review_model` takes precedence on `/codex:review`. It does not apply to `/codex:adversarial-review`, which runs an ordinary turn on `model`.
+`/codex:review` and `/codex:adversarial-review` accept `--model <model|alias>` for one run. For a persistent native-review model, set `review_model` in `~/.codex/config.toml` ([config reference](https://learn.chatgpt.com/docs/config-file/config-reference)). Per that reference it overrides the session model for native review. `--model` sets the session model, so a set `review_model` takes precedence on `/codex:review` (per the Codex config reference; not verified against a live backend). It does not apply to `/codex:adversarial-review`, which runs an ordinary turn on `model`.
 
 ## Task → model / effort mapping
 

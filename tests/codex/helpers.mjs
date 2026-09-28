@@ -14,7 +14,9 @@ import { spawnSync } from "node:child_process";
 // real repository, rewriting its refs, HEAD, index and config. Strip the
 // repository-local variables (`git rev-parse --local-env-vars`) from this process
 // as soon as any test imports this module, and from every env run() spawns with.
-export const GIT_LOCAL_ENV_VARS = Object.freeze([
+// The static list is git 2.x's output; the live output is unioned in at import so a
+// newer git's additions are covered too.
+const STATIC_GIT_LOCAL_ENV_VARS = [
   "GIT_ALTERNATE_OBJECT_DIRECTORIES",
   "GIT_CONFIG",
   "GIT_CONFIG_PARAMETERS",
@@ -30,6 +32,25 @@ export const GIT_LOCAL_ENV_VARS = Object.freeze([
   "GIT_PREFIX",
   "GIT_SHALLOW_FILE",
   "GIT_COMMON_DIR"
+];
+
+function liveGitLocalEnvVars() {
+  // Read-only and repository-independent; falls back to the static list when git is
+  // missing or fails.
+  const result = spawnSync("git", ["rev-parse", "--local-env-vars"], {
+    cwd: os.tmpdir(),
+    encoding: "utf8",
+    shell: false,
+    windowsHide: true
+  });
+  if (result.error || result.status !== 0) {
+    return [];
+  }
+  return result.stdout.split(/\s+/).filter((name) => /^GIT_[A-Z0-9_]+$/.test(name));
+}
+
+export const GIT_LOCAL_ENV_VARS = Object.freeze([
+  ...new Set([...STATIC_GIT_LOCAL_ENV_VARS, ...liveGitLocalEnvVars()])
 ]);
 
 export function scrubGitEnv(env) {

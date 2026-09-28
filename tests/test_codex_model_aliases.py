@@ -138,8 +138,21 @@ class AliasSourcesAgree(unittest.TestCase):
 
 class AliasDecision(unittest.TestCase):
     def test_bare_names_stay_on_gpt_5_6(self):
+        # Pinned against the parsed runtime map, not EXPECTED, so it can fail on its own.
+        aliases = js_aliases(COMPANION)
         for name in ("sol", "terra", "luna"):
-            self.assertEqual(EXPECTED[name], f"gpt-5.6-{name}")
+            self.assertEqual(aliases[name], f"gpt-5.6-{name}")
+
+    def test_gpt6_rejection_is_reported_not_retried(self):
+        # A user who asked for luna-6 must not silently get gpt-5.6-luna: the rescue
+        # contract allows exactly one task call and no substitution.
+        caveats = section(GUIDE.read_text(), "GPT-6 availability caveats")
+        self.assertIn("report the rejection", caveats)
+        self.assertIn("Do not retry automatically", caveats)
+        self.assertNotRegex(caveats, r"(?i)\bretry with\b")
+        for root in PACKAGED_ROOTS:
+            packaged = section((root / "model-guide" / "SKILL.md").read_text(), "GPT-6 availability caveats")
+            self.assertIn("Do not retry automatically", packaged, str(root))
 
     def test_version_phrasings_in_rescue_outline(self):
         # #393: "luna 6" through /codex:rescue must reach gpt-6-luna.
@@ -195,6 +208,20 @@ class ModelGuideFacts(unittest.TestCase):
             if path.is_file():
                 self.assertNotRegex(path.read_text(), r"Sol/Terra\s+only", str(path))
 
+    def test_spark_and_context_facts(self):
+        rows = self.rows()
+        self.assertRegex(rows["gpt-5.3-codex-spark"][5], r"Unverified.*0\.157\.0")
+        aliases = section(GUIDE.read_text(), "Models and aliases")
+        self.assertRegex(aliases, r"GPT-6: Codex harness context 272,000 tokens.*0\.157\.0")
+        self.assertIn("by design", aliases)
+
+    def test_review_model_precedence_is_marked_unverified(self):
+        for text in (
+            (SKILLS / "codex-review" / "SKILL.md").read_text(),
+            section(GUIDE.read_text(), "Review commands"),
+        ):
+            self.assertIn("not verified against a live backend", text)
+
     def test_pin_and_gpt6_caveats(self):
         text = GUIDE.read_text()
         self.assertIn("0.144.6", text)
@@ -223,13 +250,8 @@ class ReviewModelDocs(unittest.TestCase):
             self.assertIsNotNone(line, sub)
             self.assertIn("--model <model|alias>", line.group(1))
 
-    def test_review_path_normalises_model(self):
-        src = COMPANION.read_text()
-        handler = re.search(r"async function handleReviewCommand\(.*?\n}\n", src, re.S)
-        self.assertIsNotNone(handler)
-        self.assertIn("model: normalizeRequestedModel(options.model)", handler.group(0))
-        self.assertNotRegex(handler.group(0), r"model: options\.model\b")
-
+    # Review-path normalisation is tested behaviourally in
+    # tests/codex/model-aliases.test.mjs, not by grepping the source here.
 
 if __name__ == "__main__":
     unittest.main()

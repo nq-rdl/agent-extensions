@@ -22,7 +22,7 @@ const HERE = path.dirname(fileURLToPath(import.meta.url));
 const ROOT = path.resolve(HERE, "..", "..");
 // Suites that create temp repos through helpers.mjs, the companion runtime, and the
 // fake codex fixture.
-const GIT_HEAVY_SUITES = ["git.test.mjs", "model-aliases.test.mjs"];
+const GIT_HEAVY_SUITES = ["git.test.mjs", "model-aliases.test.mjs", "runtime.test.mjs"];
 
 function makeDecoyRepo() {
   const decoy = makeTempDir("codex-git-env-decoy-");

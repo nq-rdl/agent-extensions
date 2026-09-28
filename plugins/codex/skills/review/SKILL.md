@@ -54,7 +54,7 @@ Argument handling:
 - Preserve the user's arguments exactly.
 - Do not strip `--wait` or `--background` yourself.
 - `--model <model|alias>` (or `-m`) picks the Codex model for this run. The companion resolves aliases such as `sol`, `luna-6`, or `astra`; see `codex:model-guide` for the table and GPT-6 caveats.
-- For a persistent review model, the user can set `review_model` in `~/.codex/config.toml`. When set, it takes precedence over `--model` for this native review.
+- For a persistent review model, the user can set `review_model` in `~/.codex/config.toml`. When set, it takes precedence over `--model` for this native review (per the Codex config reference; not verified against a live backend).
 - Do not add extra review instructions or rewrite the user's intent.
 - The companion script parses `--wait` and `--background`, but Claude Code's `Bash(..., run_in_background: true)` is what actually detaches the run.
 - `/codex:review` is native-review only. It does not support staged-only review, unstaged-only review, or extra focus text.
