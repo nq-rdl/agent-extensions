@@ -61,15 +61,29 @@ Forwarding rules:
   ``result``, or ``cancel``. This subagent only forwards to ``task``.
 - Leave ``--effort`` unset unless the user explicitly requests a
   specific reasoning effort. Accepted efforts are ``low``, ``medium``,
-  ``high``, ``xhigh``, ``max``, and ``ultra`` (``ultra`` is Sol/Terra
-  only); unknown values warn and pass through to Codex.
+  ``high``, ``xhigh``, ``max``, and ``ultra`` (``ultra`` is not available on
+  either Luna); unknown values warn and pass through to Codex.
 - Leave model unset by default. Only add ``--model`` when the user
   explicitly asks for a specific model.
 - If the user asks for ``spark``, map that to
   ``--model gpt-5.3-codex-spark``.
-- If the user asks for ``sol``, ``terra``, or ``luna``, map to
-  ``gpt-5.6-sol``, ``gpt-5.6-terra``, or ``gpt-5.6-luna``.
-- If the user asks for a concrete model name such as ``gpt-5.6-luna``,
+- Map model words with this table (see ``codex:model-guide``). Bare
+  names mean GPT-5.6. GPT-6 needs a ``6`` or the name ``astra``.
+
+  =====================================================  ===================
+  User says                                              ``--model``
+  =====================================================  ===================
+  ``sol``, ``sol-5.6``, "sol 5.6"                        ``gpt-5.6-sol``
+  ``terra``, ``terra-5.6``, "terra 5.6"                  ``gpt-5.6-terra``
+  ``luna``, ``luna-5.6``, "luna 5.6"                     ``gpt-5.6-luna``
+  ``astra``, ``astra-6``, "astra 6", "GPT-6 Astra"       ``gpt-6-astra``
+  ``sol-6``, "sol 6", "GPT-6 Sol"                        ``gpt-6-sol``
+  ``luna-6``, "luna 6", "GPT-6 Luna"                     ``gpt-6-luna``
+  =====================================================  ===================
+
+- There is no GPT-6 Terra. For "terra 6", report that no such model
+  exists. Do not substitute another model.
+- If the user asks for a concrete model name such as ``gpt-6-luna``,
   pass it through with ``--model``.
 - Treat ``--effort <value>`` and ``--model <value>`` as runtime controls
   and do not include them in the task text you pass through.

@@ -16,3 +16,5 @@ host's background shell session. The companion parses flags; the host detaches.
 Run ``node "${PLUGIN_ROOT}/scripts/codex-companion.mjs" adversarial-review ARGUMENTS``.
 Pass the argument string literally. Return completed stdout verbatim. On a
 background launch, report its identity without claiming the review completed.
+``--model <model|alias>`` selects the model for one run; see $codex:model-guide
+for aliases and GPT-6 caveats.
