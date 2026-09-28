@@ -1,3 +1,0 @@
-kind: Added
-body: 'data-request:map accepts answers.yaml and hand SQL inputs, returns one row per element and candidate with library support, and has a partial-map mode (#383)'
-time: 2026-09-28T00:43:55.000000000Z

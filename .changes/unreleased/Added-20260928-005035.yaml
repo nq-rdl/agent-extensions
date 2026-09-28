@@ -1,3 +1,0 @@
-kind: Added
-body: data-request lift ledger gains a proposal-only mode for read-only runs; aggregate operator probes sit outside the hand-SQL gate (#372)
-time: 2026-09-28T00:50:35.454997631Z

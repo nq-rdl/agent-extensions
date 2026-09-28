@@ -1,3 +1,0 @@
-kind: Fixed
-body: 'codex tests: strip inherited GIT_DIR and other repo-local git env vars in the Node test helpers and the pre-push job, so hook runs cannot write to the real repository'
-time: 2026-09-28T00:55:02.56095391Z

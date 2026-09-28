@@ -1,3 +1,0 @@
-kind: Added
-body: 'data-request: sqlreview.sh lint --ste flags long sentences, contractions, semicolons and e.g./i.e.; bootstrap and analyse run it before asking (#394)'
-time: 2026-09-28T00:57:00.727633207Z
