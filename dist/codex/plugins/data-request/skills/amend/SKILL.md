@@ -35,9 +35,11 @@ contradicts what was agreed (a wrong value, type or format), it is a defect: use
 `$data-request:fix` instead.
 
 This skill applies only to a released extract: a version exists under `data/Released/v*/`,
-a release tag exists or the requester has received it. Before the first release there is no
-extract to amend. A logic change then goes to `$data-request:fix` (*Pre-release logic change*),
-which allows it with the same runbook, UAT and review rules.
+a release tag exists or any version reached the requester (a `data/Review/` drop that reached
+them counts). Before the first release there is no extract to amend. A logic change then goes
+to `$data-request:fix` (*Pre-release logic change*), which allows it with the same runbook, UAT
+and review rules. If you cannot tell whether the extract is released, ask, and make no edit
+until answered.
 
 ## 1. Classify before any edit
 
@@ -106,7 +108,8 @@ When an amendment changes what the runbook or the UAT checklist (for example
 `specs/uat-checklist.md`) describes, change them together with the SQL, in the same change.
 This includes an analyst-safe rename, reorder or drop of a column that a validation or UAT
 output shows: search the runbook, UAT checklist, validation SQL and tests for each old name
-and update every use. Until they match the new output, the amendment is incomplete: report
+and update every live reference (queries, checklist items, expected-output tables). A changelog
+or history line that records the rename may keep the old name. Until they match the new output, the amendment is incomplete: report
 it as a blocker. For an engineer-required change, list them under `affected files:`. If the
 repository has no runbook or UAT checklist, say so.
 
@@ -131,7 +134,8 @@ it. An analyst-safe change passes only when all of these hold:
   (scaffold: `pixi run amend check`);
 - the row count and key set match the previous extract (scaffold: `pixi run amend
   validate-output --sql <sql> --extract <new> --previous <released> --key NEW=OLD`);
-- the runbook and UAT checklist name the new columns, and no old name remains.
+- the runbook and UAT checklist name the new columns, and no live reference (a query, a
+  checklist item or an expected-output table) uses an old name.
 
 Any other difference (a CTE body, predicate, join, dedupe step, row count or key) is a
 blocker. Report it as a blocker, never as a success, and hand the change off (step 2). A check
@@ -146,5 +150,7 @@ Return the classification, the governance status (request ID, reason, open quest
 changed paths, the regenerated SQL, the record entry, the checks run with their results and
 any blocker. Regenerated SQL or a renamed validation or UAT output column leaves an existing
 `.sqlreview/` review stale in meaning, even where its fingerprint still matches: its outputs
-and steps describe the released logic. `$data-request:analyse` must re-run on each changed SQL
-file before the next release. A passing check is not release approval.
+and steps describe the released logic. Before the next release, re-run `$data-request:analyse`
+on each changed SQL file with a full re-walk (walk every item and publish with
+`--reconfirm-all`), because carry-forward keeps items whose SQL lines did not change. A passing
+check is not release approval.
