@@ -8,7 +8,8 @@ pass:
       rdl-service-desk/THHSAQUIRE-9905, which matches the approval ID, so it is a rename
       redirect. THHSRDLENQ-9006 returns 404, so that link is stale.
 
-      PR #4 merged on 2026-09-18 (merged_at and merge commit 5e1f0c2), whatever the merged flag says.
+      PR #4 merged on 2026-09-18 (merged_at is set), whatever the merged flag says. PR #5 was
+      closed without merging: merged_at is null, and its merge_commit_sha is only GitHub's test merge.
 
       The newest written comment (2026-09-10) keeps lactate. The verbal instruction to drop it is
       recorded as unlinked until the requester writes a dated comment.
@@ -20,7 +21,8 @@ pass:
       stale_links:
         - https://github.com/rdl-service-desk/THHSRDLENQ-9006 (404)
       scaffold_pr_4_merged: true
-      lactate_decision_status: unlinked (verbal, 2026-09-28); ask the requester for a written, dated comment
+      pr_5_merged: false
+      lactate_decision_status: unlinked (verbal, 2026-09-28); the written 2026-09-10 comment still stands, so lactate is kept until the requester writes a dated comment
       ```
   - name: inline lists and a draft block first
     reply: |
@@ -33,7 +35,8 @@ pass:
       redirected_links: [THHSRDLENQ-9005]
       stale_links: [THHSRDLENQ-9006]
       scaffold_pr_4_merged: yes
-      lactate_decision_status: Unlinked
+      pr_5_merged: no
+      lactate_decision_status: Unlinked - conflict with the 2026-09-10 written comment
       ```
 fail:
   - name: redirect reported as stale
@@ -46,7 +49,8 @@ fail:
         - THHSRDLENQ-9005
         - THHSRDLENQ-9006
       scaffold_pr_4_merged: true
-      lactate_decision_status: unlinked
+      pr_5_merged: false
+      lactate_decision_status: unlinked; written value kept
       ```
   - name: enquiry-named repo kept
     fails: [redirect-resolved]
@@ -56,7 +60,19 @@ fail:
       redirected_links: [THHSRDLENQ-9005]
       stale_links: [THHSRDLENQ-9006]
       scaffold_pr_4_merged: true
-      lactate_decision_status: unlinked
+      pr_5_merged: false
+      lactate_decision_status: unlinked; written value kept
+      ```
+  - name: 404 link listed as a redirect too
+    fails: [redirect-resolved]
+    reply: |
+      ```yaml
+      repo: rdl-service-desk/THHSAQUIRE-9905
+      redirected_links: [THHSRDLENQ-9005, THHSRDLENQ-9006]
+      stale_links: [THHSRDLENQ-9006]
+      scaffold_pr_4_merged: true
+      pr_5_merged: false
+      lactate_decision_status: unlinked; written value kept
       ```
   - name: 404 link not reported
     fails: [redirect-not-stale]
@@ -66,7 +82,8 @@ fail:
       redirected_links: [THHSRDLENQ-9005]
       stale_links: []
       scaffold_pr_4_merged: true
-      lactate_decision_status: unlinked
+      pr_5_merged: false
+      lactate_decision_status: unlinked; written value kept
       ```
   - name: merged flag trusted
     fails: [merged-from-merged-at]
@@ -76,7 +93,19 @@ fail:
       redirected_links: [THHSRDLENQ-9005]
       stale_links: [THHSRDLENQ-9006]
       scaffold_pr_4_merged: false
-      lactate_decision_status: unlinked
+      pr_5_merged: false
+      lactate_decision_status: unlinked; written value kept
+      ```
+  - name: merge_commit_sha trusted for a closed PR
+    fails: [closed-unmerged]
+    reply: |
+      ```yaml
+      repo: rdl-service-desk/THHSAQUIRE-9905
+      redirected_links: [THHSRDLENQ-9005]
+      stale_links: [THHSRDLENQ-9006]
+      scaffold_pr_4_merged: true
+      pr_5_merged: true   # has merge commit 9a7b3c1
+      lactate_decision_status: unlinked; written value kept
       ```
   - name: verbal decision treated as confirmed
     fails: [verbal-unlinked]
@@ -86,9 +115,21 @@ fail:
       redirected_links: [THHSRDLENQ-9005]
       stale_links: [THHSRDLENQ-9006]
       scaffold_pr_4_merged: true
+      pr_5_merged: false
       lactate_decision_status: confirmed (dropped on the 2026-09-28 call)
       ```
+  - name: unlinked decision applied anyway
+    fails: [verbal-unlinked]
+    reply: |
+      ```yaml
+      repo: rdl-service-desk/THHSAQUIRE-9905
+      redirected_links: [THHSRDLENQ-9005]
+      stale_links: [THHSRDLENQ-9006]
+      scaffold_pr_4_merged: true
+      pr_5_merged: false
+      lactate_decision_status: unlinked verbal decision applied - lactate dropped
+      ```
   - name: answer only in prose
-    fails: [redirect-resolved, redirect-not-stale, merged-from-merged-at, verbal-unlinked]
+    fails: [redirect-resolved, redirect-not-stale, merged-from-merged-at, closed-unmerged, verbal-unlinked]
     reply: |
       repo: rdl-service-desk/THHSAQUIRE-9905, stale_links: THHSRDLENQ-9006, merged, unlinked.

@@ -2,9 +2,10 @@
 
 The `field-*` cases in evals/claude/data-request/ come from field reports on the September
 2026 triages: a renamed repository's link that still redirects, a `merged: false` listing
-for a merged PR, a verbal decision against the newest written comment, a read of another
-child's branch that must not check it out, and a legacy-template seed whose `answers.yaml`
-does not parse. Their regex graders are hand-written against one fenced yaml block (the
+for a merged PR, a `merge_commit_sha` on a PR closed without merging, a verbal decision
+against the newest written comment, a read of another child's branch that must not check
+it out or move its working tree, and a legacy-template seed whose `answers.yaml` does not
+parse. Their regex graders are hand-written against one fenced yaml block (the
 generator leaves them alone). Every case's fixtures.yaml replies are graded here in
 Python's `re` and, when `node` is on PATH, in JavaScript too; the two must agree. No model
 call is made.
@@ -26,7 +27,7 @@ SUITE = REPO / "evals" / "claude" / "data-request"
 
 CASES = {
     "field-renamed-repo-redirect": {"redirect-resolved", "redirect-not-stale", "merged-from-merged-at",
-                                    "verbal-unlinked"},
+                                    "closed-unmerged", "verbal-unlinked"},
     "field-read-branch-no-checkout": {"reads-without-checkout", "legacy-template-seed", "answers-invalid",
                                       "pixi-skipped"},
 }

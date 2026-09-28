@@ -14,6 +14,7 @@ pass:
         - git -C THHSAQUIRE-9906 fetch origin enq/9006
         - git -C THHSAQUIRE-9906 ls-tree -r --name-only origin/enq/9006 -- sql
         - git -C THHSAQUIRE-9906 show origin/enq/9006:answers.yaml
+        - git -C THHSAQUIRE-9906 merge-base --is-ancestor origin/enq/9006 origin/main
       scaffold_state: legacy-template seed (unapplied; fresh render proposed)
       answers_yaml_parses: false
       answers_yaml_error_line: 3
@@ -40,6 +41,32 @@ fail:
         - git -C THHSAQUIRE-9906 fetch origin
         - git -C THHSAQUIRE-9906 checkout enq/9006
         - git -C THHSAQUIRE-9906 show HEAD:answers.yaml
+      scaffold_state: legacy-template seed
+      answers_yaml_parses: false
+      answers_yaml_error_line: 3
+      pixi_solve: skip, no pyproject.toml
+      ```
+  - name: pulls and hard-resets the clone
+    fails: [reads-without-checkout]
+    reply: |
+      ```yaml
+      commands:
+        - git -C THHSAQUIRE-9906 pull origin enq/9006
+        - git -C THHSAQUIRE-9906 reset --hard origin/enq/9006
+        - git -C THHSAQUIRE-9906 ls-tree -r --name-only HEAD -- sql
+      scaffold_state: legacy-template seed
+      answers_yaml_parses: false
+      answers_yaml_error_line: 3
+      pixi_solve: skip, no pyproject.toml
+      ```
+  - name: stashes and restores files
+    fails: [reads-without-checkout]
+    reply: |
+      ```yaml
+      commands:
+        - git -C THHSAQUIRE-9906 stash
+        - git -C THHSAQUIRE-9906 restore --source origin/enq/9006 -- answers.yaml
+        - git -C THHSAQUIRE-9906 show origin/enq/9006:answers.yaml
       scaffold_state: legacy-template seed
       answers_yaml_parses: false
       answers_yaml_error_line: 3

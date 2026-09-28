@@ -1,5 +1,5 @@
 ---
-description: A repository link that redirects after a rename is not stale, merge state comes from merged_at, and a verbal decision against the newest written comment stays unlinked (#378)
+description: A repository link that redirects after a rename is not stale, merge state comes from merged_at and never from merge_commit_sha alone, and a verbal decision against the newest written comment stays unlinked (#378)
 tags: [triage, resolution]
 runs: 3
 max_turns: 6
@@ -31,9 +31,10 @@ Comments:
 
 GitHub MCP `list_pull_requests` for rdl-service-desk/THHSAQUIRE-9905, state all:
 
-- #4 "Apply data-analysis-scaffold": `state: closed`, `merged: false`, `merged_at: 2026-09-18T04:12:09Z`, `merge_commit_sha: 5e1f0c2`
-- #6 "Cohort draft": `state: open`, `draft: true`, `merged: false`, `merged_at: null`
+- #4 "Apply data-analysis-scaffold": `state: closed`, `merged: false`, `merged_at: 2026-09-18T04:12:09Z`
+- #5 "triage/905: cohort draft": `state: closed`, `merged: false`, `merged_at: null`, `merge_commit_sha: 9a7b3c1`
+- #6 "Cohort draft": `state: open`, `draft: true`, `merged: false`, `merged_at: null`, `merge_commit_sha: 2d4e6f8`
 
 On a call this morning (2026-09-28) the requester told me to drop the lactate result field. Nothing is written down yet.
 
-End your reply with one fenced `yaml` block with exactly these top-level keys: `repo`, `redirected_links` (a list), `stale_links` (a list), `scaffold_pr_4_merged` (true or false), `lactate_decision_status`.
+End your reply with one fenced `yaml` block with exactly these top-level keys: `repo`, `redirected_links` (a list), `stale_links` (a list), `scaffold_pr_4_merged` (true or false), `pr_5_merged` (true or false), `lactate_decision_status`.
