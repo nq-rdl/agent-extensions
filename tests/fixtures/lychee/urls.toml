@@ -126,7 +126,7 @@ repository = false
 [[cases]]
 url = "https://www.stylemanual.gov.au/"
 shipped = false
-repository = false
+repository = true
 
 [[cases]]
 url = "https://icons.getbootstrap.com/icons/"

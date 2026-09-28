@@ -49,6 +49,10 @@ exclude = [
   # nq-rdl/agent-extensions#261) and the API-token page is login-gated — referenced by the redhat skills
   "^https?://docs\\.redhat\\.com/",
   "^https://access\\.redhat\\.com/management/api",
+  # Australian Government Style Manual — referenced by tech-writing-copyedit. lychee on
+  # GitHub runners still fails with "HTTP/2 protocol error" (re-confirmed in run
+  # 36407979723, 2026-09-28); curl, browsers and local lychee succeed.
+  "^https?://www\\.stylemanual\\.gov\\.au/",
   # Remote MCP server endpoints in OpenCode config examples
   # (opencode-tools references/mcp-servers.rst). They speak MCP over POST; a
   # plain GET answers 405 (context7, grep.app) or 401 (sentry).
