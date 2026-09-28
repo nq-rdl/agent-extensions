@@ -1,0 +1,40 @@
+# Replies graded by tests/test_data_request_prerelease_change.py in Python and Node. No model call.
+pass:
+  - name: skill-shaped pre-release change
+    reply: |
+      No. Nothing is released yet, so `/data-request:amend` does not apply. This is a pre-release
+      logic change under `/data-request:fix`, and decision D7 settles it.
+
+      1. Change the key in `src/cohort/ed.py` to site code plus MRN and regenerate
+         `sql/v1/ed_request.sql`. Do not edit the generated SQL by hand.
+      2. In the same change, update `docs/runbook.md` and the UAT checklist
+         (`specs/uat-checklist.md`), and rename `distinct_mrn` to `distinct_patient_key` in
+         `sql/validation/ed_checks.sql` and everywhere the runbook and checklist use it.
+      3. The confirmed review is stale in meaning: its grain and outputs describe MRN keys.
+         Re-run `/data-request:analyse` on `sql/v1/ed_request.sql` before the first release.
+  - name: bold headings and checklist path only
+    reply: |
+      **Workflow:** pre-release logic change (`data-request:fix`), not an amendment.
+
+      - Update the runbook and `specs/uat-checklist.md` with the SQL; the check column is now
+        `distinct_patient_key`.
+      - The `.sqlreview` record is now stale; run data-request:analyse again.
+fail:
+  - name: treated as a released amendment
+    fails: [not-amended]
+    reply: |
+      classification: engineer-required
+
+      Pre-release or not, re-keying changes the rows. Update the runbook and UAT checklist for
+      `distinct_patient_key`; the review is stale, so re-run /data-request:analyse.
+  - name: SQL only, runbook forgotten
+    fails: [runbook-uat]
+    reply: |
+      This is a pre-release change. Re-key on site code plus MRN, regenerate the SQL and rename
+      the validation column to `distinct_patient_key`. The review is stale; re-run
+      /data-request:analyse.
+  - name: review left as it is
+    fails: [analyse-rerun]
+    reply: |
+      This is a pre-release change. Update the runbook and UAT checklist with the SQL, and rename
+      `distinct_mrn` to `distinct_patient_key`. The existing review still covers the file.

@@ -1,10 +1,11 @@
 ---
 license: CC-BY-4.0
 description: >-
-  Classify and make an analyst amendment to an engineer-produced RDL extract. Renames,
-  reorders, dropped already-surfaced columns and presentation changes go through
+  Classify and make an analyst amendment to a released, engineer-produced RDL extract.
+  Renames, reorders, dropped already-surfaced columns and presentation changes go through
   query-builder's projection extension points; anything that changes rows or meaning
-  becomes a paste-ready engineer hand-off. Use when a released extract needs a change.
+  becomes a paste-ready engineer hand-off. Use when a released extract needs a change;
+  before the first release, a logic change goes to fix.
 argument-hint: '<requested change> [builder, cohort.yaml, SQL or extract path]'
 user-invocable: true
 compatibility: >-
@@ -29,6 +30,11 @@ differ, the document wins. If the pinned query-builder has no such document or n
 An amendment asks for different output than was agreed. When the delivered output
 contradicts what was agreed (a wrong value, type or format), it is a defect: use
 `/data-request:fix` instead.
+
+This skill applies only to a released extract: a version exists under `data/Released/v*/`,
+a release tag exists or the requester has received it. Before the first release there is no
+extract to amend. A logic change then goes to `/data-request:fix` (*Pre-release logic change*),
+which allows it with the same runbook, UAT and review rules.
 
 ## 1. Classify before any edit
 
@@ -55,7 +61,7 @@ filled in and ready to paste to the data engineer, and stop:
 classification: engineer-required
 requested change: <the change, in the requester's words>
 boundary rule: <the ANALYST_AMENDMENTS.md rule or example it hits>
-affected files: <maintained source paths; request SQL to regenerate>
+affected files: <maintained source paths; request SQL to regenerate; runbook and UAT checklist>
 governance: <the scope question from step 3, or "none identified">
 enquiry: <original request ID, or "not supplied">
 ```
@@ -91,6 +97,16 @@ through the repository's existing workflow (in a data-analysis-scaffold child,
 refused, whatever the change: say that it is refused, then classify the same change made in
 the maintained source (step 1). Preserve unrelated edits.
 
+### Runbook, UAT checklist and validation outputs
+
+When an amendment changes what the runbook or the UAT checklist (for example
+`specs/uat-checklist.md`) describes, change them together with the SQL, in the same change.
+This includes an analyst-safe rename, reorder or drop of a column that a validation or UAT
+output shows: search the runbook, UAT checklist, validation SQL and tests for each old name
+and update every use. Until they match the new output, the amendment is incomplete: report
+it as a blocker. For an engineer-required change, list them under `affected files:`. If the
+repository has no runbook or UAT checklist, say so.
+
 ## 5. Record the amendment
 
 Add one entry per amendment, with its classification, to the child's amendment record. In a
@@ -111,7 +127,8 @@ it. An analyst-safe change passes only when all of these hold:
 - the regenerated SQL differs from the previous SQL only in the final projection
   (scaffold: `pixi run amend check`);
 - the row count and key set match the previous extract (scaffold: `pixi run amend
-  validate-output --sql <sql> --extract <new> --previous <released> --key NEW=OLD`).
+  validate-output --sql <sql> --extract <new> --previous <released> --key NEW=OLD`);
+- the runbook and UAT checklist name the new columns, and no old name remains.
 
 Any other difference (a CTE body, predicate, join, dedupe step, row count or key) is a
 blocker. Report it as a blocker, never as a success, and hand the change off (step 2). A check
@@ -124,6 +141,7 @@ if the new extract does not exist yet, the row and key check is pending. Use
 
 Return the classification, the governance status (request ID, reason, open questions), the
 changed paths, the regenerated SQL, the record entry, the checks run with their results and
-any blocker. Regenerated SQL leaves an existing `.sqlreview/` review stale; recommend
-`/data-request:analyse` when a refreshed formal handoff is needed. A passing check is not
-release approval.
+any blocker. Regenerated SQL or a renamed validation or UAT output column leaves an existing
+`.sqlreview/` review stale in meaning, even where its fingerprint still matches: its outputs
+and steps describe the released logic. `/data-request:analyse` must re-run on each changed SQL
+file before the next release. A passing check is not release approval.
