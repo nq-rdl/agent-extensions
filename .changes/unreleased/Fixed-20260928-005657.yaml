@@ -1,3 +1,0 @@
-kind: Fixed
-body: 'data-request: unchanged scope items keep their confirmation after an SQL edit, and a scope confirmed before the SQL existed carries over into analyse (#366)'
-time: 2026-09-28T00:56:57.71271556Z

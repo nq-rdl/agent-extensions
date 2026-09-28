@@ -1,3 +1,0 @@
-kind: Fixed
-body: 'data-request setup: documents --default --yes as the non-interactive form, keeps reviews/ in git, and points to the string-SQL guard (#379)'
-time: 2026-09-28T00:57:01.732321849Z

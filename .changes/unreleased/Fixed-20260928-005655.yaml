@@ -1,3 +1,0 @@
-kind: Fixed
-body: 'codex tests: also clear inherited CODEX_COMPANION_* and CLAUDE_PLUGIN_DATA so runs from a Claude Code session never touch the user''s real Codex jobs'
-time: 2026-09-28T00:56:55.591882069Z

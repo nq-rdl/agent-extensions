@@ -1,3 +1,0 @@
-kind: Added
-body: 'data-request: the guard validates .sqlreview/releases/<tag>/release.json on Write and denies a hand-written release.md'
-time: 2026-09-28T07:21:49.723914647Z

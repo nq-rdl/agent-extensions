@@ -1,3 +1,0 @@
-kind: Added
-body: 'data-request:lift classify-only mode for read-only runs; a request-local TypedTable or unit is a request-specific candidate with no library issue (#385)'
-time: 2026-09-28T00:43:56.000000000Z

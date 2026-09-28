@@ -1,3 +1,0 @@
-kind: Fixed
-body: 'codex: /codex:review and /codex:adversarial-review resolve --model aliases (--model sol no longer reaches the backend as literal sol) and document --model in usage and argument hints'
-time: 2026-09-28T00:47:10.164632461Z

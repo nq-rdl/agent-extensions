@@ -1,3 +1,0 @@
-kind: Fixed
-body: 'new-service-request examples use fictional IDs; a test now rejects real-looking enquiry and approval IDs in skills, packaged copies, evals and docs'
-time: 2026-09-28T01:30:00.000000000Z
