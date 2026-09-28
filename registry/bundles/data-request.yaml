@@ -1,8 +1,8 @@
 schemaVersion: v1
 id: data-request
 displayName: Data Request
-description: Data Request — triage, scope, map, draft, validate, fix and amend request SQL and Python with shared RDL guardrails and human-confirmed review handoffs
-keywords: [data-request, triage, sql, python, cohort, guardrails, mapping, drafting, validation, fixes, amendments, review, handoff]
+description: Data Request — triage, scope, map, draft, validate, fix and amend request SQL and Python, and draft analyst-approved release summaries, with shared RDL guardrails and human-confirmed review handoffs
+keywords: [data-request, triage, sql, python, cohort, guardrails, mapping, drafting, validation, fixes, amendments, review, handoff, release]
 owners:
   - rdl
 channels:
@@ -12,6 +12,7 @@ skills:
   - {source: data-request-bootstrap, leaf: bootstrap}  # → /data-request:bootstrap
   - {source: data-request-analyse, leaf: analyse}      # → /data-request:analyse
   - {source: data-request-explain, leaf: explain}      # → /data-request:explain
+  - {source: data-request-release, leaf: release}      # → /data-request:release
   - {source: data-request-guardrails, leaf: guardrails}
   - {source: data-request-map, leaf: map}
   - {source: data-request-draft, leaf: draft}

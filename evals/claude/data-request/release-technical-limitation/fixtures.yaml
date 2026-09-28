@@ -1,0 +1,65 @@
+# Replies graded by tests/test_data_request_release.py in Python (and Node when present).
+# Graders read only the last fenced yaml block, one top-level key at a time. No model call.
+pass:
+  - name: skill-shaped translation
+    reply: |
+      L4 matters: over ten years, postcode and Indigenous status can change, and the extract
+      holds today's values. L3 stays internal because the counts reconcile.
+
+      ```yaml
+      include: [L4]
+      internal: [L3]
+      claims:
+        - Sex, postcode and Indigenous status show the patient's current record, not the values at the time of the presentation.
+        - Area and Indigenous status comparisons over time may be affected where these details changed.
+      ```
+  - name: quoted claim
+    reply: |
+      ```yaml
+      include:
+        - L4
+      internal:
+        - L3
+      claims: ["Demographic details are the latest recorded values, not those at the visit."]
+      ```
+fail:
+  - name: exposes the mechanism
+    fails: [claims-no-sql-jargon]
+    reply: |
+      ```yaml
+      include: [L4]
+      internal: [L3]
+      claims:
+        - Demographics come from a LEFT JOIN to PERSON, so they are the current record.
+      ```
+  - name: prose only, no yaml block
+    fails: [include-l4, internal-l3, claims-no-sql-jargon, claims-current-record]
+    reply: |
+      include: L4. internal: L3. claims: demographics are current.
+  - name: drops the consequence
+    fails: [include-l4, internal-l3, claims-current-record]
+    reply: |
+      ```yaml
+      include: [L3]
+      internal: [L4]
+      claims:
+        - Source data were read without waiting for other users.
+      ```
+  - name: exports both limitations
+    fails: [include-l4]
+    reply: |
+      ```yaml
+      include: [L3, L4]
+      internal: [L3]
+      claims:
+        - Sex, postcode and Indigenous status reflect the current record.
+      ```
+  - name: vague wording
+    fails: [claims-current-record]
+    reply: |
+      ```yaml
+      include: [L4]
+      internal: [L3]
+      claims:
+        - Demographic details may differ from other sources.
+      ```

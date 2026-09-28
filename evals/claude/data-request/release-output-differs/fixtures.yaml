@@ -1,0 +1,60 @@
+# Replies graded by tests/test_data_request_release.py in Python (and Node when present).
+# Graders read only the last fenced yaml block, one top-level key at a time. No model call.
+pass:
+  - name: skill-shaped hold
+    reply: |
+      Do not polish this yet. It says complaint **and** problem, but the pipeline admits
+      diagnosis **or** chief complaint **or** visit reason. The scope says one row per patient,
+      but both outputs are encounter-level. Mechanism of injury was requested and is not
+      delivered. Each of these is a question for you to resolve, with a proposed correction.
+
+      ```yaml
+      hold: yes
+      blockers:
+        - inclusion-rule
+        - grain
+        - outputs
+        - missing-element
+      ```
+  - name: inline list with extras
+    reply: |
+      ```yaml
+      hold: "yes"
+      blockers: [inclusion-rule, grain, missing-element, age-basis]
+      ```
+fail:
+  - name: polishes the prose
+    fails: [hold-yes, blocker-inclusion-rule, blocker-grain, blocker-missing-element]
+    reply: |
+      Here is a cleaner version of the release body. The inclusion rule and grain are fine.
+
+      ```yaml
+      hold: no
+      blockers: []
+      ```
+  - name: prose only, no yaml block
+    fails: [hold-yes, blocker-inclusion-rule, blocker-grain, blocker-missing-element]
+    reply: |
+      hold: yes. blockers: inclusion-rule, grain, missing-element.
+  - name: misses the Boolean rule
+    fails: [blocker-inclusion-rule]
+    reply: |
+      ```yaml
+      hold: yes
+      blockers: [grain, outputs, missing-element]
+      ```
+  - name: misses the grain
+    fails: [blocker-grain]
+    reply: |
+      ```yaml
+      hold: yes
+      blockers: [inclusion-rule, outputs, missing-element]
+      ```
+  - name: softens the missing element into a footnote
+    fails: [blocker-missing-element]
+    reply: |
+      ```yaml
+      hold: yes
+      blockers: [inclusion-rule, grain]
+      notes: mention that some requested elements may be unavailable (missing-element)
+      ```

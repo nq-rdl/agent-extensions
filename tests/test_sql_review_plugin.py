@@ -15,7 +15,7 @@ import yaml
 REPO = Path(__file__).resolve().parent.parent
 BUNDLE = REPO / "registry" / "bundles" / "data-request.yaml"
 PLUGIN = REPO / "plugins" / "data-request"
-RECORD_STAGES = ("setup", "bootstrap", "analyse", "explain")
+RECORD_STAGES = ("setup", "bootstrap", "analyse", "explain", "release")
 SKILLS = {leaf: REPO / "skills" / f"data-request-{leaf}"
           for leaf in (*RECORD_STAGES, "guardrails", "map", "draft", "validate", "fix", "amend", "lift",
                        "triage")}
@@ -55,7 +55,7 @@ class Skills(unittest.TestCase):
                 self.assertEqual(fm["metadata"]["repo"], "https://github.com/nq-rdl/agent-extensions")
 
     def test_consumer_skills_point_at_setup_and_setup_is_exempt(self):
-        for leaf in ("bootstrap", "analyse", "explain"):
+        for leaf in ("bootstrap", "analyse", "explain", "release"):
             body = (SKILLS[leaf] / "SKILL.md").read_text()
             with self.subTest(leaf):
                 self.assertIn("/data-request:setup", body)
@@ -67,7 +67,8 @@ class Skills(unittest.TestCase):
         self.assertNotIn("stop and point", setup.lower())
 
     def test_stage_pointers(self):
-        chain = {"setup": "/data-request:bootstrap", "bootstrap": "/data-request:analyse", "analyse": "/data-request:explain"}
+        chain = {"setup": "/data-request:bootstrap", "bootstrap": "/data-request:analyse", "analyse": "/data-request:explain",
+                 "explain": "/data-request:release"}
         for leaf, nxt in chain.items():
             with self.subTest(leaf):
                 self.assertIn(nxt, (SKILLS[leaf] / "SKILL.md").read_text())

@@ -9,6 +9,8 @@
 #                                       Edit  → deny (a fragment cannot be validated; Write the whole file)
 #   reviews/*/review.md, scope.md       deny  (rendered from the JSON by `sqlreview.sh render`)
 #   config.json                         ask   (config changes go through /data-request:setup)
+#   releases/*/release.json             Write → content run through `release.sh check`; Edit → deny
+#   releases/*/release.md               deny  (rendered from the record by `release.sh render`)
 #   reviews/*/*.draft.json, explain.json, source.sql, templates/*   pass
 # This is an invariant check, not proof that a human answered: it makes "forgot to ask" a denied
 # tool call with the offending ids named, and leaves a fabricated confirmation auditable in the
@@ -98,6 +100,20 @@ case "$rel" in
     decide deny "Lift ledgers require publication checks. Write lifts.draft.json, then run sqlreview.sh publish <slug> lifts <draft> to validate evidence revisions and lifecycle transitions." ;;
   reviews/*/review.json|reviews/*/scope.json)
     ;;  # validated below
+  releases/*/release.md)
+    decide deny "$rel is the rendered release body — never hand-write it. Update releases/<tag>/release.json (whole-file Write) and re-render it with release.sh render: S=\${CLAUDE_PLUGIN_ROOT}/skills/setup/scripts; bash \"\$S/release.sh\" render <record> > <body>" ;;
+  releases/*/release.json)
+    # The analyst's release record (#407): validated whole, like a review.
+    [ "$tool" = "Write" ] || decide deny "$rel is the analyst's release record: it is validated as a whole. Write the complete file instead of an Edit fragment."
+    [ -n "$checker" ] || decide deny "SQL Review guard cannot find sqlreview.sh, so it cannot find release.sh next to it. Reinstall data-request@rdl-agent-extensions before writing $rel."
+    command -v jq >/dev/null 2>&1 || decide deny "Release records are validated with jq, which is not installed. Install jq (>= 1.6) before writing $rel."
+    content="$(field .tool_input.content)"
+    out="$(printf '%s' "$content" | bash "$(dirname "$checker")/release.sh" check --stdin 2>&1)" ||
+      decide deny "$rel rejected by release.sh check: $(printf '%s' "$out" | tr '\n' ';' | sed 's/;$//'). Put each claim to the analyst via AskUserQuestion and record decided_by and decided_at only from an answered question; keep status draft while any claim is pending or any question is open."
+    expected_tag="${rel#releases/}"; expected_tag="${expected_tag%/*}"
+    printf '%s' "$content" | jq -e --arg t "$expected_tag" '.tag == $t' >/dev/null ||
+      decide deny "The record's tag must match its directory: releases/$expected_tag/."
+    exit 0 ;;
   *) exit 0 ;;
 esac
 

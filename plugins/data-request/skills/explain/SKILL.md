@@ -100,3 +100,6 @@ Write `reviews/$SLUG/explain.json` (state marker only — not a report):
 ```
 
 A stop writes `completed: false` with the step reached, so the next run can resume.
+
+At release, `/data-request:release <tag>` drafts the researcher-facing summary from the release's
+own artifacts; this walkthrough is not a release note.

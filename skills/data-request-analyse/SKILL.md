@@ -215,7 +215,8 @@ bash "$S/sqlreview.sh" render "$SLUG" review || exit $?  # → reviews/<slug>/re
 rm -f ".sqlreview/reviews/$SLUG/review.draft.json"
 ```
 
-Show `review.md`. Hand over: the analyst runs `/data-request:explain <sql path>`.
+Show `review.md`. Hand over: the analyst runs `/data-request:explain <sql path>`. The review stays an
+internal handoff, not a release note: at release, the analyst runs `/data-request:release <tag>`.
 
 Publish validates a staged copy, confirmations, next revision and current SQL fingerprint before
 atomically replacing `review.json`, and re-proves each carried item against the previous
