@@ -54,13 +54,13 @@ Labels are case-sensitive: `ICT` is uppercase, the other two are not.
 5. **Return the new issue's URL** so the user can confirm it.
 
 **Title convention:** the issue number prefixed with `THHSRDLENQ-`, uniform
-across all three templates — issue number `1181` becomes the title
-`THHSRDLENQ-1181`.
+across all three templates — issue number `9181` becomes the title
+`THHSRDLENQ-9181`.
 
 ```bash
 gh issue create \
   --repo rdl-service-desk/service-desk \
-  --title "THHSRDLENQ-1181" \
+  --title "THHSRDLENQ-9181" \
   --label enquiry \
   --assignee @me \
   --body "$(cat <<'EOF'
@@ -83,7 +83,7 @@ relevant one first if you need to confirm the current headings.
 
 ### 1. Data Request (`data-request`)
 - **Project title** — e.g. "Emergency Examination Authority Presentations in the Emergency Department"
-- **Approval ID** — e.g. `THHSAQUIRE-1234` or `SSAQTHS-123456`
+- **Approval ID** — e.g. `THHSAQUIRE-9904` or `SSAQTHS-990002`
 - **Workflow checklist** — mark items complete (e.g. repo bootstrapped, released)
 
 ### 2. Enquiry Request (`enquiry`)
