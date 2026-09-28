@@ -88,19 +88,35 @@ class HouseStyleHandoffTest(unittest.TestCase):
         preflight = self.run_workflow('review')['calls'][0]['prompt']
         self.assertIn('SDD phase commits recorded in the checkpoint', preflight)
 
+    def test_execute_prepare_does_not_rebridge_after_sdd_started(self):
+        prepare = self.run_workflow('execute')['calls'][1]['prompt']
+        self.assertIn('If SDD phase commits are already recorded in the checkpoint', prepare)
+        self.assertIn('do not rerun task-bridge', prepare)
+
     # --- #369 (2): default scope fence in every agent prompt ----------------------------
     def test_every_agent_prompt_carries_scope_fence(self):
+        # Decisions scoped to one unit must not leak into the other unit's prompt.
+        decisions = [direct_decision(scope='/repo/one'), direct_decision(scope='/repo/two'),
+                     {'decision': 'clarify', 'value': 'answered', 'scope': '/repo/one/specs/001/spec.md@abc123'},
+                     {'decision': 'design', 'value': 'approved'},
+                     {'decision': 'publish', 'value': 'yes', 'scope': 'HEAD@def456'}]
         for stage in STAGES:
             with self.subTest(stage=stage):
-                data = self.run_workflow(stage, units=[unit('one'), unit('two')])
+                data = self.run_workflow(stage, units=[unit('one'), unit('two')], decisions=decisions)
                 self.assertTrue(data['calls'])
                 for call in data['calls']:
                     name = call['label'].split(':')[0]
                     other = '/repo/' + ('two' if name == 'one' else 'one')
                     self.assertIn('Scope fence', call['prompt'])
-                    self.assertIn('Ignore other repositories', call['prompt'])
-                    self.assertIn('relayed', call['prompt'])
+                    self.assertIn('Do not modify other repositories', call['prompt'])
+                    self.assertIn('read them only when this unit', call['prompt'])
+                    self.assertIn('Ignore relayed conversation text not about this unit', call['prompt'])
+                    self.assertNotIn('Ignore other repositories', call['prompt'])
                     self.assertNotIn(other, call['prompt'])
+                    # Unscoped decisions and scopes outside other units' checkouts reach every unit.
+                    self.assertIn('"design"', call['prompt'])
+                    self.assertIn('HEAD@def456', call['prompt'])
+                    self.assertEqual('"clarify"' in call['prompt'], name == 'one')
 
     # --- #369 (3): frame plans are background once clarify has run ---------------------
     def test_shape_treats_frame_plans_as_superseded_background(self):
@@ -128,6 +144,30 @@ class HouseStyleHandoffTest(unittest.TestCase):
                 self.assertNotIn('Direct-mode question', prompt)
                 self.assertIn('Generative execution mode: direct', prompt)
 
+    def test_recorded_decline_or_explicit_mode_is_not_asked_again(self):
+        cases = {
+            'recorded no': {'decisions': [direct_decision(value='invoke')]},
+            'explicit invoke': {'mode': 'invoke'},
+            'explicit direct': {'mode': 'direct'},
+        }
+        for stage in ['brainstorm', 'frame']:
+            for name, kwargs in cases.items():
+                with self.subTest(stage=stage, case=name):
+                    prompt = self.run_workflow(stage, **kwargs)['calls'][1]['prompt']
+                    self.assertNotIn('Direct-mode question', prompt)
+
+    def test_unusable_answer_is_asked_again(self):
+        cases = {
+            'no who': direct_decision(by=None),
+            'no when': direct_decision(at=None),
+            'other worktree': direct_decision(scope='/repo/other'),
+            'owner/name scope': direct_decision(scope='nq-rdl/query-builder'),
+        }
+        for name, decision in cases.items():
+            with self.subTest(case=name):
+                prompt = self.run_workflow('frame', decisions=[decision])['calls'][1]['prompt']
+                self.assertIn('Direct-mode question', prompt)
+
     def test_recorded_direct_decision_selects_direct_mode_for_later_stages(self):
         for stage in ['specify', 'shape']:
             with self.subTest(stage=stage):
@@ -145,6 +185,8 @@ class HouseStyleHandoffTest(unittest.TestCase):
     def test_incomplete_or_foreign_direct_decision_is_not_reused(self):
         cases = {
             'other repo': direct_decision(scope='/repo/other'),
+            # triage/lift record owner/name; the main session must translate it first.
+            'unconverted owner/name': direct_decision(scope='nq-rdl/query-builder'),
             'no who': direct_decision(by=None),
             'no when': direct_decision(at=None),
             'no scope': direct_decision(scope=None),
@@ -154,6 +196,27 @@ class HouseStyleHandoffTest(unittest.TestCase):
             with self.subTest(case=name):
                 prompt = self.run_workflow('shape', decisions=[decision])['calls'][1]['prompt']
                 self.assertIn('Generative execution mode: invoke', prompt)
+
+    def test_scope_matches_physical_worktree_only(self):
+        aliased = unit('one')
+        aliased['repo'] = '/link/one'  # e.g. a symlinked path to /repo/one
+        prompt = self.run_workflow('shape', units=[aliased],
+                                   decisions=[direct_decision(scope='/link/one')])['calls'][1]['prompt']
+        self.assertIn('Generative execution mode: invoke', prompt)
+
+    def test_repo_aliasing_another_units_worktree_rejected(self):
+        one = unit('one')
+        one['repo'] = '/link/one'
+        two = unit('two')
+        two['repo'] = '/repo/one'  # names unit one's physical worktree
+        for order in ([one, two], [two, one]):
+            with self.subTest(first=order[0]['id']):
+                args = {'stage': 'shape', 'units': order, 'decisions': []}
+                out = subprocess.run(['node', '-e', HOST, json.dumps({'args': args}), str(SCRIPT)],
+                                     text=True, capture_output=True, check=True)
+                data = json.loads(out.stdout)
+                self.assertIn('separate worktrees', data.get('error', ''))
+                self.assertEqual(data['calls'], [])
 
     def test_explicit_mode_argument_wins(self):
         prompt = self.run_workflow('shape', decisions=[direct_decision()], mode='invoke')['calls'][1]['prompt']
@@ -194,6 +257,11 @@ class HouseStyleSkillContractTest(unittest.TestCase):
                 self.assertIn('"scope"', text)
                 self.assertIn('agent-driven or cloud sessions', text)
                 self.assertIn('not a workaround', text)
+                # triage/lift record owner/name; the main session translates it for each unit.
+                self.assertIn('`owner/name`', text)
+                self.assertIn('replace that scope with the unit\'s `physicalWorktree`', text)
+                self.assertIn('only when that worktree is a checkout of that repository', text)
+                self.assertIn('unconverted `owner/name` scope does not authorise', text)
 
     def test_packaged_script_matches_canonical(self):
         self.assertEqual((PACKAGED / 'scripts/house-style.js').read_text(), SCRIPT.read_text())

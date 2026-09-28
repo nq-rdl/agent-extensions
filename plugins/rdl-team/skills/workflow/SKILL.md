@@ -29,7 +29,14 @@ Recommend `direct` for agent-driven or cloud sessions. Record the answer in
 ```
 
 The script uses direct mode for a unit only when `by`, `at` and a `scope` equal to
-its `repo` or `physicalWorktree` are present; an explicit `generativeMode` argument wins.
+its `physicalWorktree` are present; an explicit `generativeMode` argument wins.
+A recorded "no" (`"value": "invoke"`) or an explicit argument also stops the question.
+`/data-request:triage` and `/data-request:lift` record the same shape with `scope`
+set to the repository as `owner/name`. When you build a unit's `decisions`, replace
+that scope with the unit's `physicalWorktree`, but only when that worktree is a
+checkout of that repository (`git -C "$repo" remote get-url origin`). An unconverted
+`owner/name` scope does not authorise direct mode.
+Each unit's prompt omits decisions scoped to another unit's checkout.
 Direct mode reads the exact target command instructions when Skill invocation is
 unavailable. It keeps embedded human gates and tool permissions. Clarify, analyze
 remediation choice and application, and constitution changes stay with the human
@@ -99,7 +106,8 @@ analyze reports any that remain.
 Workflow agents have no subagent-dispatch tool (observed on Claude Code 2.1.281),
 and SDD needs a fresh implementer per task. So `execute` only prepares: it runs
 task-bridge, records the bridged plan, its hash and task IDs in the checkpoint, and
-returns `needs-human` with an SDD hand-off. The main session then runs
+returns `needs-human` with an SDD hand-off. If SDD phase commits are already
+recorded, a rerun keeps the bridged plan and its hash. The main session then runs
 `superpowers:subagent-driven-development` with `Agent`: one implementer and one
 reviewer per `tasks.md` phase, TDD per task, then a final branch review. Record each
 phase's commits in the checkpoint before the `review` stage. Keep the recorded

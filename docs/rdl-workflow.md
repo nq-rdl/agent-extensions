@@ -54,7 +54,11 @@ By default, the workflow returns user-only spec-kit commands for human invocatio
 The brainstorm or frame stage asks once whether to authorise `generativeMode: "direct"`.
 Direct mode is recommended for agent-driven and cloud sessions.
 The main session records who answered, when, and the worktree the answer covers.
-Later stages reuse that recorded decision without asking again.
+Later stages reuse that recorded decision, whether yes or no, without asking again.
+The decision applies only to the unit whose physical worktree matches its scope.
+Data-request triage and lift record the repository as `owner/name`.
+The main session replaces that with the physical worktree of a checkout of the same repository.
+An unconverted `owner/name` scope does not authorise direct mode.
 Direct mode follows the target command files for specify, plan, tasks and analyze.
 It preserves tool permissions and embedded human gates.
 Clarify and the choice and application of analyze remediations remain interactive.
@@ -64,10 +68,13 @@ Routine features retain the existing constitution. Constitution changes require 
 Frame plans written before clarify are background only.
 The shape stage follows `spec.md` and lists any contradiction with a frame plan.
 Every Workflow agent prompt carries a scope fence.
-Agents ignore other repositories and relayed text that is not about their unit.
+Agents do not modify other repositories and read them only when their unit's request names them.
+They ignore relayed conversation text that is not about their unit.
+A unit's prompt omits decisions scoped to another unit's checkout.
 
 Workflow agents have no subagent-dispatch tool, so the execute stage only prepares.
 It bridges the tasks, records the plan hash in the checkpoint and returns an SDD hand-off.
+When SDD phase commits are already recorded, a rerun keeps the bridged plan unchanged.
 The main session runs subagent-driven development with `Agent`.
 It uses one implementer and one reviewer per `tasks.md` phase, then a final branch review.
 It records each phase's commits in the checkpoint before the review stage.
