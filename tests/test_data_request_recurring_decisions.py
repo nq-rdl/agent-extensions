@@ -40,10 +40,16 @@ LEAVES = {"bootstrap": "data-request-bootstrap", "analyse": "data-request-analys
 REQUIRED = {"id", "title", "kind", "status", "proposal", "match", "evidence",
             "library_issue", "related_issues", "retired_by"}
 ISSUE_URL = re.compile(r"^https://github\.com/nq-rdl/query-builder(-plugins)?/(issues|pull)/[1-9][0-9]*$")
-# The seed: the eight rows of nq-rdl/query-builder#172 plus the MRN row from its comment.
+# The seed: the eight rows of nq-rdl/query-builder#172, the two limitations those rows declare
+# (fixed AEST offset, result currency), and the MRN row from its comment.
 SEED = {"death-date-raw", "mortality-undercount", "iemr-event-dates", "output-aest",
-        "iemr-result-validity", "half-open-date-window", "raw-dated-events",
-        "current-demographics", "raw-episode-mrn"}
+        "aest-fixed-offset", "iemr-result-validity", "iemr-result-currency",
+        "half-open-date-window", "raw-dated-events", "current-demographics", "raw-episode-mrn"}
+# Deliberate cross-matches between proposals of the same kind: one prior item (A17 in #172)
+# counts under the death-date, output-time-zone and raw-dated-events rows.
+DELIBERATE_OVERLAPS = {("death-date-raw", "output-aest"), ("death-date-raw", "raw-dated-events")}
+# Fictional ids use a leading 9 (ENQ9001, ...-9901); anything else looks like a real enquiry.
+REAL_ID = re.compile(r"\b(?:ENQ(?!9)\d{3,}|[A-Z]{4,}-(?!9)\d{3,})\b")
 
 
 def skill_path(tree: str, leaf: str, rel: str) -> Path:
@@ -101,8 +107,8 @@ class ListShape(unittest.TestCase):
                 self.assertIn(d["status"], {"open", "retired"})
                 self.assertTrue(d["proposal"]["text"].strip())
                 self.assertTrue(d["proposal"]["rationale"].strip())
-                self.assertTrue(d["match"] and all(g and all(isinstance(t, str) and t for t in g)
-                                                   for g in d["match"]))
+                self.assertTrue(d["match"] and all(g and all(isinstance(t, str) and t and t == t.lower()
+                                                             for t in g) for g in d["match"]))
                 self.assertTrue(d["evidence"])
                 for url in d["evidence"]:
                     # The per-enquiry rows live in the private library issue, not here.
@@ -127,10 +133,20 @@ class ListShape(unittest.TestCase):
 
     def test_mrn_entry_names_the_library_default_and_opt_in(self):
         mrn = next(d for d in self.decisions if d["id"] == "raw-episode-mrn")
-        self.assertEqual(mrn["library_issue"], "https://github.com/nq-rdl/query-builder/issues/150")
+        # #150 (the opt-in canonicalisation helper) shipped in 0.6.0; raw-MRN evidence would be
+        # off-topic there, so the decision falls back to the tracking epic.
+        self.assertIsNone(mrn["library_issue"])
+        self.assertIn("https://github.com/nq-rdl/query-builder/issues/150", mrn["related_issues"])
         self.assertIn("ADR 0003", mrn["proposal"]["rationale"])
         self.assertIn("canonicalize_mrn=True", mrn["proposal"]["rationale"])
         self.assertEqual(mrn["evidence"], ["https://github.com/nq-rdl/query-builder/issues/172#issuecomment-5806010117"])
+
+    def test_split_limitations_are_their_own_entries(self):
+        kinds = {d["id"]: d["kind"] for d in self.decisions}
+        self.assertEqual(kinds["aest-fixed-offset"], "limitation")
+        self.assertEqual(kinds["iemr-result-currency"], "limitation")
+        aest = next(d for d in self.decisions if d["id"] == "output-aest")
+        self.assertNotIn("exact", aest["proposal"]["rationale"])
 
     def test_every_proposal_matches_its_own_decision(self):
         draft = {"kind": "scope", "assumptions": [], "limitations": []}
@@ -145,6 +161,7 @@ class ListShape(unittest.TestCase):
             hits = {(m["id"], m["decision"]) for m in json.loads(r.stdout)["matches"]}
         for d in self.decisions:
             self.assertIn((d["id"], d["id"]), hits)
+        self.assertEqual({h for h in hits if h[0] != h[1]}, DELIBERATE_OVERLAPS)
 
 
 class OneHome(unittest.TestCase):
@@ -164,12 +181,15 @@ class OneHome(unittest.TestCase):
                                     "several decision ids: the list is restated here")
 
     def test_public_files_name_no_enquiry(self):
-        # This repository is public: ticket-style ids (a capitalised prefix, a hyphen and
-        # digits) and ENQ numbers stay in the private library issue that `evidence` links.
-        ticket = re.compile(r"\b(?:ENQ\d{3,}|[A-Z]{4,}-\d{3,})\b")
-        for path in (LIST, REFERENCE, HELPER):
-            with self.subTest(path=path.name):
-                self.assertIsNone(ticket.search(path.read_text()))
+        # This repository is public: real enquiry and ticket ids stay in the private library
+        # issue that `evidence` links. Covers every file this change touches.
+        paths = [LIST, REFERENCE, HELPER, Path(__file__)]
+        paths += [REPO / "skills" / LEAVES[leaf] / "SKILL.md"
+                  for leaf in ("bootstrap", "analyse", "lift", "guardrails")]
+        paths += sorted((REPO / ".changes" / "unreleased").glob("*.yaml"))
+        for path in paths:
+            with self.subTest(path=str(path.relative_to(REPO))):
+                self.assertIsNone(REAL_ID.search(path.read_text()))
 
     def test_packaged_copies_are_the_canonical_bytes(self):
         for tree in ("claude", "codex"):
@@ -221,11 +241,26 @@ class Pointers(unittest.TestCase):
                 self.assertIn("marked", text)
                 self.assertIn("skills/setup/references/recurring-decisions.rst", text)
                 self.assertIn("without duplicates", text)
+                self.assertIn("## Upstream decision candidates", text)
+                self.assertNotIn("## Recurring decisions", text)
+                # Before the final report, so close-out cannot be called complete without it.
+                self.assertLess(text.index("## Upstream decision candidates"),
+                                text.index("Report candidates by bucket"))
+                self.assertIn("upstream decision candidates, issue links", text)
+
+    def test_carry_rows_keep_the_marker(self):
+        for tree in TREES:
+            with self.subTest(tree=tree):
+                self.assertIn("omit `upstream`: copy it", self.read(tree, "bootstrap"))
+                self.assertIn("`carryover` omit `upstream`: copy it", self.read(tree, "analyse"))
 
     def test_reference_keeps_confirmation_and_deduplication(self):
-        text = REFERENCE.read_text()
+        text = " ".join(REFERENCE.read_text().split())
         for token in ("Human confirmation is still", "open and closed issues",
-                      "already cite this", "Never edit the installed plugin copy",
+                      "already cite this enquiry for that decision",
+                      "pair of enquiry and decision ``id``", "one evidence comment per target issue",
+                      "set that entry's ``library_issue``", "the search in step 2 found nothing",
+                      "Never edit the installed plugin copy", "copy ``upstream`` from the prior",
                       "do not authorise hand SQL", "retired_by"):
             self.assertIn(token, text)
 
@@ -280,7 +315,7 @@ class Helper(unittest.TestCase):
         mrn = by_id[("assumptions", "A1")]
         self.assertEqual(mrn["decision"], "raw-episode-mrn")
         self.assertEqual(mrn["evidence"], ["https://github.com/nq-rdl/query-builder/issues/172#issuecomment-5806010117"])
-        self.assertEqual(mrn["library_issue"], "https://github.com/nq-rdl/query-builder/issues/150")
+        self.assertIsNone(mrn["library_issue"])
         self.assertEqual(mrn["tracking_issue"], "https://github.com/nq-rdl/query-builder/issues/172")
         self.assertFalse(mrn["marked"])
         self.assertTrue(mrn["proposal"]["text"])
@@ -289,11 +324,39 @@ class Helper(unittest.TestCase):
         self.assertNotIn(("assumptions", "A2"), by_id)
         self.assertNotIn(("assumptions", "A3"), by_id)
 
+    def test_match_reads_the_rationale(self):
+        draft = self.write("d.json", {"assumptions": [
+            item("A1", "Patient identity rule.", "The URN is the raw episode MRN, with no merge chain.")]})
+        self.assertEqual([m["decision"] for m in self.helper("match", draft)["matches"]], ["raw-episode-mrn"])
+
+    def test_match_uses_whole_words(self):
+        draft = self.write("d.json", {"assumptions": [
+            item("F1", "The extract returns one row per admission.", "Merged episodes are excluded."),
+            item("F2", "Patients who has attended the clinic are included by postcode.", "Scope."),
+            item("F3", "Age is computed in years +10 days rounding.", "The output shows ages."),
+            item("N1", "The patient identifier is the UR number, with no linking of merged records.", "x"),
+            item("N2", "Suburb and postcode come from the most recent address.", "Default."),
+        ]})
+        hits = {(m["id"], m["decision"]) for m in self.helper("match", "--any-kind", draft)["matches"]}
+        self.assertEqual(hits, {("N1", "raw-episode-mrn"), ("N2", "current-demographics")})
+
+    def test_match_filters_by_kind(self):
+        text = ("Deaths outside hospital undercount.", "No death-registry linkage.")
+        draft = self.write("d.json", {"assumptions": [item("A1", *text)], "limitations": [item("L1", *text)]})
+        self.assertEqual([(m["kind"], m["decision"]) for m in self.helper("match", draft)["matches"]],
+                         [("limitations", "mortality-undercount")])
+        any_kind = self.helper("match", "--any-kind", draft)["matches"]
+        self.assertIn(("assumptions", "mortality-undercount"), {(m["kind"], m["decision"]) for m in any_kind})
+
     def test_match_reports_an_existing_marker(self):
         draft = self.write("review.draft.json", {"kind": "review", "assumptions": [
             item("A1", "The URN is the raw episode MRN.", "No merge chain.",
-                 upstream={"decision": "raw-episode-mrn"})], "limitations": []})
-        self.assertTrue(self.helper("match", draft)["matches"][0]["marked"])
+                 upstream={"decision": "raw-episode-mrn"}),
+            item("A2", "The URN is the raw episode MRN.", "No merge chain.",
+                 upstream={"decision": "current-demographics"})], "limitations": []})
+        marked = {m["id"]: m["marked"] for m in self.helper("match", draft)["matches"]}
+        # A marker that names another decision does not mark this match.
+        self.assertEqual(marked, {"A1": True, "A2": False})
 
     def test_match_carries_retirement(self):
         def retire(doc):
@@ -314,37 +377,62 @@ class Helper(unittest.TestCase):
             "retired without unit": lambda doc: doc["decisions"][0].update(status="retired"),
             "no evidence": lambda doc: doc["decisions"][0].update(evidence=[]),
             "evidence not a link": lambda doc: doc["decisions"][0].update(evidence=["ENQ9001 A1"]),
+            "bad kind": lambda doc: doc["decisions"][0].update(kind="decision"),
+            "bad status": lambda doc: doc["decisions"][0].update(status="closed"),
+            "id not kebab-case": lambda doc: doc["decisions"][0].update(id="Death_Date"),
+            "library_issue not a link": lambda doc: doc["decisions"][0].update(library_issue="#150"),
+            "uppercase term": lambda doc: doc["decisions"][0].update(match=[["DECEASED_DT_TM"]]),
         }
         for name, mutate in mutations.items():
             with self.subTest(name):
                 r = self.helper("match", draft, expected=4, env=self.custom_list(mutate))
                 self.assertIn("list:", r.stderr)
 
-    def test_marked_lists_items_across_records(self):
+    def test_marked_groups_items_by_decision(self):
+        mrn = {"decision": "raw-episode-mrn"}
         scope = self.write("scope.json", {"kind": "scope", "assumptions": [
-            item("A1", "URN is the raw episode MRN.", upstream={"decision": "raw-episode-mrn"}),
+            item("A1", "URN is the raw episode MRN.", upstream=mrn),
             item("A2", "Adults only."),
         ], "limitations": []})
-        review = self.write("review.json", {"kind": "review", "assumptions": [], "limitations": [
+        review = self.write("review.json", {"kind": "review", "assumptions": [
+            item("A1", "URN is the raw episode MRN.", upstream=mrn),
+        ], "limitations": [
             item("L4", "Something new recurs.", upstream={"decision": "not-listed-yet"}),
         ]})
-        items = self.helper("marked", scope, review)["items"]
-        self.assertEqual([(i["file"], i["id"], i["known"]) for i in items],
-                         [(str(scope), "A1", True), (str(review), "L4", False)])
-        self.assertEqual(items[0]["library_issue"], "https://github.com/nq-rdl/query-builder/issues/150")
-        self.assertEqual(items[0]["evidence"], ["https://github.com/nq-rdl/query-builder/issues/172#issuecomment-5806010117"])
+        decisions = {d["decision"]: d for d in self.helper("marked", scope, review)["decisions"]}
+        self.assertEqual(set(decisions), {"raw-episode-mrn", "not-listed-yet"})
+        found = decisions["raw-episode-mrn"]
+        self.assertTrue(found["known"])
+        self.assertEqual([(i["file"], i["id"]) for i in found["items"]], [(str(scope), "A1"), (str(review), "A1")])
+        self.assertIsNone(found["library_issue"])
+        self.assertEqual(found["tracking_issue"], "https://github.com/nq-rdl/query-builder/issues/172")
+        self.assertEqual(found["evidence"], ["https://github.com/nq-rdl/query-builder/issues/172#issuecomment-5806010117"])
+        self.assertFalse(decisions["not-listed-yet"]["known"])
+        self.assertEqual([i["id"] for i in decisions["not-listed-yet"]["items"]], ["L4"])
 
     def test_marked_without_markers_is_empty(self):
         scope = self.write("scope.json", {"schemaVersion": 1, "kind": "scope",
                                           "assumptions": [item("A1", "Adults only.")]})
-        self.assertEqual(self.helper("marked", scope), {"items": []})
+        self.assertEqual(self.helper("marked", scope), {"decisions": []})
 
-    def test_malformed_marker_is_refused(self):
-        for bad in ("raw-episode-mrn", {"decision": ""}, {"issue": "x"}):
-            with self.subTest(marker=bad):
-                scope = self.write("scope.json", {"assumptions": [item("A1", "x", upstream=bad)]})
-                r = self.helper("marked", scope, expected=4)
-                self.assertIn("A1: upstream", r.stderr)
+    def test_invalid_documents_exit_4(self):
+        cases = {
+            "string marker": {"assumptions": [item("A1", "URN is the raw episode MRN.", upstream="raw-episode-mrn")]},
+            "empty decision": {"assumptions": [item("A1", "x", upstream={"decision": ""})]},
+            "marker without decision": {"assumptions": [item("A1", "x", upstream={"issue": "x"})]},
+            "assumptions not an array": {"assumptions": "oops"},
+            "limitations not an array": {"limitations": {"L1": "x"}},
+            "item not an object": {"assumptions": ["x"]},
+            "document not an object": ["x"],
+        }
+        for name, doc in cases.items():
+            for command in ("match", "marked"):
+                with self.subTest(name, command=command):
+                    r = self.helper(command, self.write("doc.json", doc), expected=4)
+                    self.assertNotIn("jq: error", r.stderr)
+        (self.root / "broken.json").write_text("{")
+        for command in ("match", "marked"):
+            self.helper(command, self.root / "broken.json", expected=4)
 
     def test_usage_and_missing_file(self):
         self.helper(expected=1)

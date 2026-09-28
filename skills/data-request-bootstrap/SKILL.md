@@ -39,6 +39,7 @@ Some decisions recur in every enquiry (#362). Before you put candidate items to 
 `bash "$S/recurring-decisions.sh" match ".sqlreview/reviews/$SLUG/scope.draft.json"`. For each match,
 show the prior enquiries, offer the listed wording and mark the item `upstream`, as
 `${CLAUDE_PLUGIN_ROOT}/skills/setup/references/recurring-decisions.rst` says. The engineer still confirms each item.
+Rows from `carryforward` omit `upstream`: copy it from the prior item when you re-draft that item.
 
 ## Existing scope → update path (#127 §2)
 
