@@ -8,8 +8,8 @@ argument-hint: '<pipeline path>'
 user-invocable: true
 compatibility: >-
   .sqlreview schema 2 (schema 1 remains readable); Bash 3.2+, jq >= 1.6.
-  API baseline query-builder 0.4.0 and query-builder-plugins 0.3.0;
-  record_limitation needs query-builder 0.6.0 or later;
+  API baseline and record_limitation floor: query-builder 0.6.0, with source
+  resolvers under resolvers/iemr and resolvers/hbcis;
   inspect the enquiry's actual framework_ref before claiming availability.
 allowed-tools: Bash, Read, Glob, Grep, Write, AskUserQuestion
 metadata:
@@ -21,13 +21,22 @@ metadata:
 Close-out asks what belongs in the library; `/data-request:analyse` separately
 reviews what the delivered pipeline does. Do not implement library fixes here.
 
-Read `${CLAUDE_PLUGIN_ROOT}/skills/guardrails/SKILL.md` and the shared
-ledger contract at `${CLAUDE_PLUGIN_ROOT}/skills/setup/references/lifts.rst` (canonical source:
+Invoke `/data-request:guardrails` and read the shared ledger contract at
+`${CLAUDE_PLUGIN_ROOT}/skills/setup/references/lifts.rst` (canonical source:
 `skills/data-request-setup/references/lifts.rst`). Verify correctness-critical API
-claims against the pinned implementation and tests in
-`nq-rdl/query-builder` and
-`nq-rdl/query-builder-plugins`.
-The baseline is a discovery aid, not evidence that a pin contains a unit.
+claims against the pinned implementation and tests in `nq-rdl/query-builder`.
+From v0.6.0 its source resolvers live under `resolvers/iemr` and `resolvers/hbcis`;
+an older pin may still depend on the archived separate resolver package, so inspect
+the pin as it is. The baseline is a discovery aid, not evidence that a pin contains a unit.
+
+## Classify-only mode
+
+Use it for a read-only run, such as a read-only subagent, or when the human asks
+for a proposal. Do the read-only discovery and scan below; read the ledger files
+directly if you cannot run the helper. Propose a bucket and evidence for every
+candidate as text, then stop before any write: no `/data-request:setup`, no
+`sqlreview.sh` `init`, `publish` or `render`, no AskUserQuestion, no issue filing.
+Proposed buckets are unconfirmed. Report close-out as not started.
 
 ## Discover before classifying
 
@@ -42,9 +51,10 @@ from a filename or propose a backport for a one-off extract.
 
 Scan the whole pipeline and its local helpers, even when the ledger is populated:
 f-string/concatenated SQL, raw query strings, secondary lookup queries, repeated
-cohort execution, and inline modelling such as 30-day mortality or latest versus
-at-time address. Inspect output/metadata construction too: manually assembled
-spec descriptions or resolver provenance may expose a missing library capability.
+cohort execution, request-local TypedTables or units, and inline modelling such
+as 30-day mortality or latest versus at-time address. Inspect output/metadata
+construction too: manually assembled spec descriptions or resolver provenance
+may expose a missing library capability.
 Read canonical SQL, the dependency lock/framework_ref, matching specs, resolver
 handlers and tests at that revision. Record actual paths/revisions and shortfalls;
 missing access is unresolved evidence, never proof that a unit is absent.
@@ -61,6 +71,8 @@ Propose a bucket for every candidate, including composition that should stay loc
 - `existing-unit-gap`: a pinned unit exists but lacks required behaviour.
 - `request-specific`: researcher modelling or composition using sufficient units.
   An agent not knowing an existing API is a composition error, not a library gap.
+  A request-local TypedTable or unit is a `request-specific` candidate, not hand
+  SQL: record it in the ledger; it needs no library issue.
 
 Put each candidate, classification, evidence and proposed disposition to the human
 via AskUserQuestion, at most four per batch (use smaller batches if the host limit
@@ -78,8 +90,8 @@ issues for equivalent work before creating anything. Reuse a matching issue afte
 checking its evidence and scope; do not create a duplicate on retries. For new
 issues use the fixed [evidence block](references/evidence.rst), with canonical SQL
 and regression expectations grounded in inspected sources. The owning repo is
-`nq-rdl/query-builder` for shared composition/spec infrastructure, or
-`nq-rdl/query-builder-plugins` for source-specific resolvers. Invoking this skill
+`nq-rdl/query-builder`, for shared composition/spec infrastructure and for
+source-specific resolvers (`resolvers/iemr`, `resolvers/hbcis`). Invoking this skill
 includes filing confirmed library candidates. Do not file on the enquiry repo.
 Use a structured GitHub tool or `gh issue create --repo <owner> --body-file <file>`.
 After success record the returned URL and `filed`; after an uncertain response,
@@ -102,6 +114,17 @@ fabricated URL. Keep rejected/unconfirmed delivery risks visible in the draft.
 Recommend recording the confirmed text with `pipeline.record_limitation(text,
 consequence=...)` beside the workaround so the rendered header carries it; draft or
 fix makes that edit, and recomposition removes it with the workaround.
+
+## House-style hand-off
+
+When you propose or launch the house-style workflow (`/rdl-team:workflow`) for
+filed library work, ask once, up front, whether to authorise spec-kit
+`generativeMode: "direct"` for `specify`, `plan`, `tasks` and `analyze`. Record
+the answer as a workflow decision with who gave it, when, and the repo or worktree
+it covers. Pass it in the workflow `decisions`; without a recorded yes, keep
+`invoke`. Clarify, `analyze` remediations and constitution changes stay with the
+human. Routing `/speckit.*` through another agent (Codex, a subagent) to avoid
+`disable-model-invocation` is not a workaround; direct mode is the supported path.
 
 ## Recurring follow-up
 
