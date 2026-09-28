@@ -8,8 +8,8 @@ argument-hint: '<pipeline path>'
 user-invocable: true
 compatibility: >-
   .sqlreview schema 2 (schema 1 remains readable); Bash 3.2+, jq >= 1.6.
-  API baseline and record_limitation floor: query-builder 0.6.0, with source
-  resolvers under resolvers/iemr and resolvers/hbcis;
+  API baseline and record_limitation floor: query-builder 0.6.0; source
+  resolvers live under resolvers/iemr and resolvers/hbcis from 0.5.0;
   inspect the enquiry's actual framework_ref before claiming availability.
 allowed-tools: Bash, Read, Glob, Grep, Write, AskUserQuestion
 metadata:
@@ -25,9 +25,10 @@ Invoke `/data-request:guardrails` and read the shared ledger contract at
 `${CLAUDE_PLUGIN_ROOT}/skills/setup/references/lifts.rst` (canonical source:
 `skills/data-request-setup/references/lifts.rst`). Verify correctness-critical API
 claims against the pinned implementation and tests in `nq-rdl/query-builder`.
-From v0.6.0 its source resolvers live under `resolvers/iemr` and `resolvers/hbcis`;
-an older pin may still depend on the archived separate resolver package, so inspect
-the pin as it is. The baseline is a discovery aid, not evidence that a pin contains a unit.
+Its source resolvers live under `resolvers/iemr` and `resolvers/hbcis` from
+v0.5.0; the baseline is v0.6.0. An older pin may still depend on the archived
+separate resolver package, so inspect the pin as it is. The baseline is a
+discovery aid, not evidence that a pin contains a unit.
 
 ## Classify-only mode
 
@@ -118,10 +119,21 @@ fix makes that edit, and recomposition removes it with the workaround.
 ## House-style hand-off
 
 When you propose or launch the house-style workflow (`/rdl-team:workflow`) for
-filed library work, ask once, up front, whether to authorise spec-kit
-`generativeMode: "direct"` for `specify`, `plan`, `tasks` and `analyze`. Record
-the answer as a workflow decision with who gave it, when, and the repo or worktree
-it covers. Pass it in the workflow `decisions`; without a recorded yes, keep
+filed library work, first reuse a recorded direct-mode decision for the same
+repository `owner/name` (for example one recorded by triage); do not ask twice.
+Otherwise ask once, up front, whether to authorise spec-kit
+`generativeMode: "direct"` for `specify`, `plan`, `tasks` and `analyze`. Record a
+yes as a workflow decision in exactly this shape and pass it in the workflow
+`decisions`:
+
+```json
+{"decision":"generativeMode","value":"direct","by":"<who>","at":"<ISO-8601 time>","scope":"nq-rdl/query-builder"}
+```
+
+Set `scope` to the owning repository's `owner/name`. If a worktree for the work
+already exists, add the same record with its absolute path as `scope`. The
+workflow matches only the unit's worktree path; the main session translates
+`owner/name` into the unit's `physicalWorktree`. Without a recorded yes, keep
 `invoke`. Clarify, `analyze` remediations and constitution changes stay with the
 human. Routing `/speckit.*` through another agent (Codex, a subagent) to avoid
 `disable-model-invocation` is not a workaround; direct mode is the supported path.
