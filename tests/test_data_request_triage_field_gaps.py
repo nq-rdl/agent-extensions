@@ -101,8 +101,8 @@ class GitHubMcpFallback(unittest.TestCase):
         for tool in self.TOOLS + ("get_me", "get_file_contents", "list_pull_requests", "pull_request_read"):
             with self.subTest(tool=tool):
                 self.assertIn(f"``{tool}``", access)
-        self.assertRegex(access, r"``get_me`` in place of ``gh auth status``")
-        self.assertIn("Use only the read tools", access)
+        self.assertRegex(access, r"``get_me``[^.;]*``gh auth status``")
+        self.assertRegex(access, r"(?i)only the read tools")
         self.assertIn("pixi solve", access)
 
 
@@ -111,10 +111,12 @@ class LedgerDefaultLocation(unittest.TestCase):
 
     def test_default_is_text_until_a_location_is_agreed(self):
         where = flat(rst_section("ledger.rst", "Where it lives"))
-        self.assertIn("no location is agreed", where)
-        self.assertRegex(where, r"return the full entries as text, as in triage-only mode")
-        self.assertIn("tracking issue body", where)
-        self.assertRegex(where, r"Do not pick a location yourself")
+        default = where.split("no location is agreed", 1)
+        self.assertEqual(len(default), 2, "no rule for a co-development session without an agreed location")
+        self.assertRegex(default[1], r"(?i)entries as text")
+        self.assertIn("triage-only", default[1])
+        self.assertIn("tracking issue body", default[1])
+        self.assertRegex(default[1], r"(?i)not pick a location")
 
 
 class VerifyBeforeStale(unittest.TestCase):
@@ -124,11 +126,16 @@ class VerifyBeforeStale(unittest.TestCase):
         self.resolve = flat(rst_section("repositories.rst", "Enquiry, issue and approval"))
 
     def test_link_is_followed_and_full_name_compared(self):
-        self.assertIn("Follow the link before you judge it", self.resolve)
-        self.assertIn(".full_name", self.resolve)
-        self.assertRegex(self.resolve, r"compare the resolved ``full_name`` with the approval ID")
+        self.assertRegex(self.resolve, r"(?i)follow the link")
+        self.assertIn("--jq .full_name", self.resolve)
+        self.assertRegex(self.resolve, r"``full_name``[^.]*approval ID")
         self.assertIn("rename redirect", self.resolve)
         self.assertIn("THHSRDLENQ-9003", self.resolve)
+
+    def test_without_gh_an_unconfirmed_redirect_is_unverified(self):
+        self.assertRegex(self.resolve, r"``search_repositories`` does not follow renames")
+        self.assertIn("``get_file_contents``", self.resolve)
+        self.assertIn("unverified", self.resolve)
 
     def test_old_unconditional_stale_rule_is_gone_everywhere(self):
         for root in [TRIAGE] + [c / "triage" for c in COPIES.values()]:
@@ -140,12 +147,21 @@ class VerifyBeforeStale(unittest.TestCase):
     def test_naming_drift_and_mid_task_renames(self):
         self.assertIn("trailing punctuation", self.resolve)
         self.assertIn("THHSAQUIRE-9903-", self.resolve)
-        self.assertIn("Re-resolve it through the API before each write", self.resolve)
+        self.assertRegex(self.resolve, r"(?i)re-resolve[^.]*before each write")
 
     def test_merge_state_from_merged_at(self):
         branches = flat(rst_section("repositories.rst", "Branches, owners and pins"))
         self.assertIn("``merged_at``", branches)
-        self.assertIn("not from the ``merged`` flag alone", branches)
+        self.assertIn("``merged`` flag alone", branches)
+        self.assertIn("git merge-base --is-ancestor", branches)
+
+    def test_merge_commit_sha_alone_is_not_evidence(self):
+        branches = flat(rst_section("repositories.rst", "Branches, owners and pins"))
+        self.assertRegex(branches, r"``merge_commit_sha`` alone is not evidence")
+        self.assertRegex(branches, r"open PRs[^.]*closed without merging")
+        for root in [TRIAGE] + [c / "triage" for c in COPIES.values()]:
+            with self.subTest(root=str(root.relative_to(REPO))):
+                self.assertNotIn("``merged_at`` or its merge commit", flat((root / "references" / "repositories.rst").read_text()))
 
     def test_verbal_decision_needs_a_written_dated_comment(self):
         verbal = rst_bullet(rst_section("checks.rst", "Interpretation checks"), "Verbal decision")
@@ -165,7 +181,7 @@ class ScaffoldStates(unittest.TestCase):
     def test_answers_yaml_is_parsed_before_any_state(self):
         before = flat(self.states.split("\nLegacy shell\n")[0])
         self.assertIn("yaml.safe_load", before)
-        self.assertIn("Before you decide a state", before)
+        self.assertRegex(before, r"(?i)before you decide")
         self.assertIn("line and column", before)
 
     def test_legacy_template_seed(self):
@@ -184,7 +200,9 @@ class ScaffoldStates(unittest.TestCase):
     def test_fresh_render_recipe(self):
         recipe = rst_term(self.states, "Fresh render")
         for token in ("copier copy", "--vcs-ref", "--data-file answers.yaml",
-                      "gh:nq-rdl/data-analysis-scaffold", "co-development", "byte-identical", "re-lock pixi"):
+                      "gh:nq-rdl/data-analysis-scaffold", "co-development", "byte-identical", "Re-lock pixi",
+                      "``--trust`` runs the template's tasks", "pinned release tag", "list each one in the PR body",
+                      "``.seed-manifest.yml``", "``scripts/template_sync.py``", "``src/service_desk/``"):
             with self.subTest(token=token):
                 self.assertIn(token, recipe)
         self.assertNotRegex(recipe, r"run[^.]*copier update")
@@ -196,8 +214,8 @@ class ScaffoldStates(unittest.TestCase):
 
     def test_pixi_solve_skipped_without_pyproject(self):
         step = numbered_step(md_section(body(TRIAGE / "SKILL.md"), "Assess each request"), 1)
-        self.assertRegex(step, r"pixi solve \(skip it and say why when the child has no `pyproject.toml`\)")
-        self.assertRegex(flat(self.states), r"no ``pyproject.toml``\. The environment probe then skips the pixi solve and records why")
+        self.assertRegex(step, r"pixi solve \(skip[^)]*why[^)]*`pyproject.toml`\)")
+        self.assertRegex(flat(self.states), r"no ``pyproject.toml``[^.]*\.[^.]*skips the pixi solve[^.]*why")
 
 
 class CodeChecks(unittest.TestCase):
@@ -267,7 +285,13 @@ class HandOffToReview(unittest.TestCase):
     def test_linked_from_co_development(self):
         codev = md_section(body(TRIAGE / "SKILL.md"), "Co-development")
         self.assertIn("](references/handoff.rst)", codev)
-        self.assertIn("ready for review", codev)
+        self.assertIn("hand-off", codev)
+        # Fulfilment rules moved to handoff.rst to leave SKILL.md headroom.
+        self.assertLessEqual(len((TRIAGE / "SKILL.md").read_text().splitlines()), 136)
+        fulfilment = flat(rst_section("handoff.rst", "Fulfilment"))
+        for token in ("parity", "upstream", "/data-request:lift", "Re-pin", "depends_on", "drafts by default"):
+            with self.subTest(token=token):
+                self.assertIn(token, fulfilment)
 
     def test_steps_in_order(self):
         labels = re.findall(r"^\d+\. \*\*(\w+)\.?\*\*", self.handoff, re.M)
@@ -276,6 +300,7 @@ class HandOffToReview(unittest.TestCase):
     def test_gate_reviewer_comment_board_and_record(self):
         text = flat(self.handoff)
         for token in ("out of draft", "green on the current head", "SQL review status is ``current``",
+                      "``/data-request:analyse`` re-ran", "--reconfirm-all", "Actions toolset",
                       "open delivery gate", "Never guess a reviewer", "tracking issue",
                       "service-desk request issue", "**In-Review**", "head SHA", "reviewer",
                       "board state"):
@@ -285,7 +310,7 @@ class HandOffToReview(unittest.TestCase):
     def test_writes_need_authorisation_and_triage_only_posts_nothing(self):
         text = flat(self.handoff)
         self.assertIn("explicit instruction", text)
-        self.assertRegex(text, r"In triage-only mode, post nothing")
+        self.assertRegex(text, r"(?i)triage-only mode, post nothing")
         self.assertIn("board moves", text)
         self.assertIn("handoff.rst", (REFS / "comments.rst").read_text())
 
@@ -317,10 +342,23 @@ class SpecKitDirectMode(unittest.TestCase):
         for stage in ("specify", "plan", "tasks", "analyze"):
             with self.subTest(stage=stage):
                 self.assertIn(f"``{stage}``", spec)
-        self.assertRegex(spec, r"who gave it, when, and the repository or worktree")
         self.assertIn("disable-model-invocation", spec)
         self.assertIn("is not a workaround", spec)
-        self.assertIn('generativeMode "direct"', (REFS / "ledger.rst").read_text())
+
+    def test_decision_uses_the_shape_the_workflow_reuses(self):
+        # rdl-team:house-style reuses only {"decision": "generativeMode", "value": "direct", by, at, scope}
+        # whose scope equals the unit's repo or physicalWorktree (PR #402's directAuthorised()).
+        for name in ("handoff.rst", "ledger.rst"):
+            with self.subTest(ref=name):
+                objs = [yaml.safe_load(m) for m in re.findall(r'\{"decision": "generativeMode"[^}]*\}',
+                                                              (REFS / name).read_text())]
+                self.assertTrue(objs, f"{name} has no generativeMode decision object")
+                for obj in objs:
+                    self.assertEqual(set(obj), {"decision", "value", "by", "at", "scope"})
+                    self.assertEqual(obj["value"], "direct")
+                    self.assertIn("physicalWorktree", obj["scope"])
+        spec = flat(rst_section("handoff.rst", "Library work through spec-kit"))
+        self.assertRegex(spec, r"``scope`` must equal[^.]*``repo`` or ``physicalWorktree`` exactly")
 
 
 class Packaging(unittest.TestCase):

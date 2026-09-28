@@ -44,11 +44,8 @@ Keep one entry per request:
        who: name of the human who decided
        decision: one sentence
        source: comment or PR link, or "unlinked (verbal)" until a written comment exists
-     - date: 2026-09-22
-       who: name of the human who authorised it
-       decision: spec-kit generativeMode "direct" for specify, plan, tasks and analyze
-       scope: nq-rdl/query-builder, the named worktree or branch
-       source: comment link or "unlinked (verbal)"
+     # spec-kit direct mode, in the exact shape /rdl-team:workflow reuses:
+     - {"decision": "generativeMode", "value": "direct", "by": "<who>", "at": "<ISO time>", "scope": "<repo or physicalWorktree>"}
    blockers:
      - class: dependency
        detail: one sentence

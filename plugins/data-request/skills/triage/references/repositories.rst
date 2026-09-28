@@ -43,7 +43,10 @@ Enquiry, issue and approval
   the resolved ``full_name`` with the approval ID. A match is a rename redirect:
   use the resolved name and report the old link as a redirect. Only a link that
   does not resolve, or resolves to another approval ID, is stale or invented.
-  Without ``gh``, search for the approval-ID name with ``search_repositories``.
+  Without ``gh``, ``search_repositories`` does not follow renames: read a file
+  through the old owner and name with ``get_file_contents`` (the API follows the
+  redirect) and check that it names the approval ID. When you cannot confirm the
+  redirect, report the link as unverified, not as a redirect or as stale.
 * Take the approval ID from the issue body, comments and amendments. Then
   confirm that the repository exists and that its README, ``.copier-answers.yml``
   or ``answers.yaml`` names the same enquiry. Similar names are not evidence.
@@ -111,10 +114,16 @@ Fresh render
    directory: ``copier copy --vcs-ref <tag> --defaults --trust --data-file
    answers.yaml gh:nq-rdl/data-analysis-scaffold <scratch>`` (copier 9.18.2 in
    September 2026), with an ``answers.yaml`` that parses and uses the scaffold's
-   layout. Keep the request's values byte-identical. Take the template's generic
-   tree onto the branch, carry only request-specific files and workflows, drop
-   seed-era files, and re-lock pixi in a separate commit. Record the scaffold tag
-   and ``framework_ref`` in the PR body.
+   layout. ``--trust`` runs the template's tasks: use it only with the canonical
+   ``gh:nq-rdl/data-analysis-scaffold`` at a pinned release tag. Keep the
+   request's values byte-identical. Take the template's generic tree onto the
+   branch and carry only request-specific files and workflows. Drop only files
+   that the template replaces or that the new scaffold's checks reject, and list
+   each one in the PR body. One render dropped ``template-sync.yml`` and
+   ``scripts/template_sync.py``, ``release.yaml`` and its test,
+   ``.seed-manifest.yml``, ``src/service_desk/``, and the ``data/`` README and
+   ``DO NOT RELEASE`` files. Re-lock pixi in a separate commit. Record the
+   scaffold tag and ``framework_ref`` in the PR body.
 
 Before you propose a manual port of the current layout, look for an open
 bootstrap or scaffold PR. In one child, a scaffold PR applied the scaffold while
@@ -137,9 +146,12 @@ Branches, owners and pins
   ``git switch`` or ``git worktree add`` in a repository the session did not ask
   to change. Each fires that repository's ``post-checkout`` hook: in one child, a
   DVC hook failed on a missing cache.
-* Take a PR's merge state from ``merged_at`` or its merge commit, not from the
-  ``merged`` flag alone. A listing returned ``merged: false`` with a
-  ``merged_at`` date for a PR that had merged.
+* A PR has merged when ``merged_at`` is set, or when its merge commit is an
+  ancestor of the base branch (``git merge-base --is-ancestor <sha>
+  origin/main``). Do not trust the ``merged`` flag alone: a listing returned
+  ``merged: false`` with a ``merged_at`` date for a PR that had merged. A
+  ``merge_commit_sha`` alone is not evidence: GitHub also sets it, as a test
+  merge, on open PRs and on PRs closed without merging.
 * Read the child's ``GOVERNANCE.md`` for who reviews and how changes reach
   ``main``.
 * Read ``framework_ref`` and the lock file to learn which library revision the

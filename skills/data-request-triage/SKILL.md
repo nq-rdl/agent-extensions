@@ -111,12 +111,8 @@ Choose one request from the queue with the human, then route each agreed task:
 | Library shortfalls and upstream issues | `/data-request:lift` |
 | Comments, reports and PR bodies | `/tech-writing:copyedit` |
 
-Fulfilment: request pipelines compose library units, and committed SQL is generated from them
-with parity coverage. Reusable correctness fixes belong upstream, through `/data-request:lift`.
-Re-pin a child only after the library change it needs is available, then regenerate and verify
-its SQL; record the order in the ledger's `depends_on`. Open PRs as drafts by default, so that
-a coordinated change set cannot merge early. Read [references/handoff.rst](references/handoff.rst)
-when library work goes through spec-kit and when a deliverable PR is ready for review.
+Fulfilment (parity-covered SQL from library units, fixes upstream, re-pin order, PRs as drafts
+by default), spec-kit library work and the review hand-off: read [references/handoff.rst](references/handoff.rst).
 
 Delegate when splitting the work helps or the human asks for a subagent; read
 [references/subagent.rst](references/subagent.rst) first. Select models by capability,
