@@ -332,6 +332,7 @@ SAME = [
     ("leading -- lines and blank lines", SQL_V1, "-- generated\n\n--   by query-builder\n\n" + SQL_V1),
     ("two header blocks", "/* a */\n" + SQL_V1, "/* a */\n/* b\n   c */\n\n" + SQL_V1),
     ("CRLF in header lines only", "/* a */\n" + SQL_V1, "/* a\r\n   b */\r\n" + SQL_V1),
+    ("CRLF -- header lines", SQL_V1, "-- a\r\n-- b \r\n" + SQL_V1),
 ]
 
 # Real changes (or undecidable headers): the body must count as changed.
@@ -362,6 +363,14 @@ CHANGED = [
     ("@extract inside a header block", "/*\n-- @extract: a\n*/\nSELECT 1;\n", "/*\n-- @extract: b\n*/\nSELECT 1;\n"),
     ("header edit with code after */", "/* h1 */ SELECT 1;\n", "/* h2 */ SELECT 1;\n"),
     ("unterminated header", "/* x\nSELECT 1;\n", "/* y\nSELECT 1;\n"),
+    # a lone CR is a line break to databases and editors, but not to awk
+    ("lone CR in a leading -- line", "-- h\rSELECT 1\r", "-- h\rSELECT 2\r"),
+    ("lone CR after a block and --", "/* a */ -- b\rDROP TABLE x;\nSELECT 1\n",
+     "/* a */ -- b\rDROP TABLE y;\nSELECT 1\n"),
+    ("lone CR after a closing */", "/* a\n*/\rSELECT 1;\n", "/* a\n*/\rSELECT 2;\n"),
+    ("@extract on a block's opening line", "/* @extract: a */\nSELECT 1;\n", "/* @extract: b */\nSELECT 1;\n"),
+    ("MySQL executable comment", "/*!40101 SET x = 1 */;\nSELECT 1;\n", "/*!40101 SET x = 2 */;\nSELECT 1;\n"),
+    ("optimiser hint", "/*+ INDEX(t a) */\nSELECT 1;\n", "/*+ INDEX(t b) */\nSELECT 1;\n"),
 ]
 
 
@@ -400,14 +409,18 @@ class BodyComparison(Base):
                 self.assertEqual(out["carry"], [])
                 self.assertEqual([b["id"] for b in out["bulk"]], ["A1"])
 
-    def test_nested_header_literal_edit_cannot_be_published_as_carried(self):
-        _, before, after = CHANGED[0]
-        out = self.verdict(before, after)
-        self.assertEqual(out["carry"], [])
-        a1 = scope_items()["assumptions"][0]
-        forged = carried(a1, 2, carried_basis="sql-body-unchanged")
-        r = self.publish(self.review(2, after, assumptions=[forged], limitations=[]), expected=4)
-        self.assertIn("A1", r.stdout + r.stderr)
+    def test_hidden_code_edits_cannot_be_published_as_carried(self):
+        cases = {name: (before, after) for name, before, after in CHANGED}
+        for name in ("nested header, literal edit", "lone CR in a leading -- line", "lone CR after a block and --"):
+            with self.subTest(name):
+                self.fresh_project()
+                before, after = cases[name]
+                out = self.verdict(before, after)
+                self.assertEqual(out["carry"], [])
+                a1 = scope_items()["assumptions"][0]
+                forged = carried(a1, 2, carried_basis="sql-body-unchanged")
+                r = self.publish(self.review(2, after, assumptions=[forged], limitations=[]), expected=4)
+                self.assertIn("A1", r.stdout + r.stderr)
 
     def test_a_failing_normaliser_counts_as_a_change(self):
         # awk failing (and printing nothing) for both files must not compare two empty digests.
@@ -495,7 +508,8 @@ class AnalyseSkillContract(unittest.TestCase):
                 text = " ".join(path.read_text().split())
                 for token in ("sql-body-unchanged", "scope-before-sql", "intent-unchanged", "``location`` lines",
                               "Carry these N forward", "Carry over all (Recommended)", "neither recommended",
-                              "summary of the SQL delta", "nested ``/*``"):
+                              "summary of the SQL delta", "nested ``/*``", "lone CR",
+                              "compares the draft's line numbers"):
                     self.assertIn(token, text)
 
 

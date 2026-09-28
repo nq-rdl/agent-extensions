@@ -16,9 +16,12 @@ A ``basis`` is the evidence that an item's confirmation still holds.
    Only the leading comment header changed, such as the scope items copied into the SQL
    ``/* ... */`` header. The rest of the file is byte-identical. A comment edit after the first
    line of code is a change. A header that is not terminated, has a nested ``/*`` or mentions
-   ``@extract:`` counts as a change.
+   ``@extract:`` counts as a change. So does text after a lone CR in a header comment line (CR
+   breaks lines for databases and editors), and a ``/*!`` or ``/*+`` opening (executable).
 ``lines-unchanged``
-   The item's location lines are unchanged (a remap is allowed; the line count is not).
+   The item's location lines are unchanged. ``carryforward`` allows a remap (same line count).
+   ``carryover`` compares the draft's line numbers in both files, so a shifted item is not
+   ``lines-unchanged`` there.
 ``scope-before-sql``
    ``carryover`` only. The scope was confirmed before the SQL existed (``sql_sha256: null``, no
    baseline). The review adds each item's first ``location``.

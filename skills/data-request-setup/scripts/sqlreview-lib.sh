@@ -136,6 +136,9 @@ sr_sha256() { # <file> -> hex digest
 #     that mentions `@extract:` is kept in the body
 #   - a header block with a nested /* is kept in the body (dialects disagree on nesting)
 #   - code after a closing */ starts the body at that line
+#   - a `--` line with text after a lone CR starts the body there: awk splits lines on LF only, but
+#     databases and editors also break lines on CR, so that text may be code
+#   - /*! and /*+ (MySQL executable comments, optimiser hints) are code, not header
 #   - an unterminated header block: exit 3, so the caller treats the body as changed
 sr_body_start() { # <file> -> line number (N+1 when the whole file is header)
   awk '
@@ -154,15 +157,20 @@ sr_body_start() { # <file> -> line number (N+1 when the whole file is header)
         }
         r = substr(line, i); sub(/^[ \t\r]+/, "", r)
         if (r == "") return
+        if (substr(r, 1, 3) == "/*!" || substr(r, 1, 3) == "/*+") hstart(NR)
         if (substr(r, 1, 2) == "/*") {
           bstart = NR; nested = 0; bad = (r ~ /@extract:/); depth = 1
           i = length(line) - length(r) + 3; continue
         }
-        if (substr(r, 1, 2) == "--" && r !~ /^--[ \t]*@extract:/) return
+        if (substr(r, 1, 2) == "--" && r !~ /^--[ \t]*@extract:/) {
+          p = index(r, cr)
+          if (p) { t = substr(r, p + 1); gsub(/[ \t]/, "", t); gsub(cr, "", t); if (t != "") hstart(NR) }
+          return
+        }
         hstart(NR)                      # code, or a -- @extract: marker: the body starts here
       }
     }
-    BEGIN { depth = 0; done = 0 }
+    BEGIN { depth = 0; done = 0; cr = sprintf("%c", 13) }
     {
       if (depth > 0 && $0 ~ /@extract:/) bad = 1
       scan($0, 1)
