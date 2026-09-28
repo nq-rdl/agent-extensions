@@ -82,7 +82,7 @@ For users migrating from Claude Code, OpenCode supports Claude Code's file conve
 
 - **Project rules**: `CLAUDE.md` in your project directory (used if no `AGENTS.md` exists)
 - **Global rules**: `~/.claude/CLAUDE.md` (used if no `~/.config/opencode/AGENTS.md` exists)
-- **Skills**: `~/.claude/skills/` — see [Agent Skills](/docs/skills/) for details
+- **Skills**: `~/.claude/skills/` — see [Agent Skills](https://opencode.ai/docs/skills/) for details
 
 To disable Claude Code compatibility, set one of these environment variables:
 
@@ -124,7 +124,7 @@ You can also use remote URLs to load instructions from the web.
 ```json title="opencode.json"
 {
   "$schema": "https://opencode.ai/config.json",
-  "instructions": ["https://raw.githubusercontent.com/my-org/shared-rules/main/style.md"]
+  "instructions": ["https://raw.githubusercontent.com/<org>/shared-rules/main/style.md"]
 }
 ```
 

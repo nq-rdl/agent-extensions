@@ -94,3 +94,17 @@ func TestValidateSkillDirs_invalidSkill(t *testing.T) {
 		t.Error("expected errors for invalid skill")
 	}
 }
+
+func TestValidateSkillDirs_brokenLocalReference(t *testing.T) {
+	root := t.TempDir()
+	dir := makeSkillDir(t, root, "linked", "A skill with a broken local link")
+	body := "---\nname: linked\ndescription: A skill with a broken local link\n---\n\nSee [guide](references/guide.rst).\n"
+	if err := os.WriteFile(filepath.Join(dir, "SKILL.md"), []byte(body), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	errs := repocheck.ValidateSkillDirs([]string{dir})
+	want := dir + `: SKILL.md:6: local reference "references/guide.rst" does not resolve: references not found`
+	if len(errs) != 1 || errs[0] != want {
+		t.Fatalf("errs = %v, want [%s]", errs, want)
+	}
+}

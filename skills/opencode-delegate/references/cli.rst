@@ -4,7 +4,7 @@
 
 OpenCode CLI options and commands.
 
-The OpenCode CLI by default starts the [TUI](/docs/tui) when run without any arguments.
+The OpenCode CLI by default starts the [TUI](https://opencode.ai/docs/tui/) when run without any arguments.
 
 ```bash
 opencode
@@ -268,7 +268,7 @@ opencode run --attach http://localhost:4096 "Explain async/await in JavaScript"
 
 ### serve
 
-Start a headless OpenCode server for API access. Check out the [server docs](/docs/server) for the full HTTP interface.
+Start a headless OpenCode server for API access. Check out the [server docs](https://opencode.ai/docs/server/) for the full HTTP interface.
 
 ```bash
 opencode serve

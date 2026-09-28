@@ -17,7 +17,7 @@ First, sign up for an account on prefix.dev, using Github, Google or
 your email address. Create a channel by navigating to ``Channels`` and
 clicking "New Channel"
 
-.. image:: ../../assets/prefix_create_channel.png
+.. image:: https://raw.githubusercontent.com/prefix-dev/pixi/v0.81.0/docs/assets/prefix_create_channel.png
    :alt: Create new channel
 
 Fill in the channel creation form: choose a *name*, a description and
@@ -25,7 +25,7 @@ whether the channel should be public or private. Public channels are
 accessible without authentication. You can also use a GitHub avatar URL
 as a channel logo (e.g. ``https://github.com/myaccount.png``).
 
-.. image:: ../../assets/prefix_channel_creation.png
+.. image:: https://raw.githubusercontent.com/prefix-dev/pixi/v0.81.0/docs/assets/prefix_channel_creation.png
    :alt: Channel creation form
 
 You have your channel! Now you can start uploading packages or adding
@@ -37,7 +37,7 @@ Adding more channel members\ `# <#adding-more-channel-members>`__
 To manage members, navigate to your channel's settings and click on
 **Members** in the sidebar.
 
-.. image:: ../../assets/prefix_members.png
+.. image:: https://raw.githubusercontent.com/prefix-dev/pixi/v0.81.0/docs/assets/prefix_members.png
    :alt: Members overview
 
 To invite a new member, click **Invite member**, search for their
@@ -45,7 +45,7 @@ username and select a role (e.g. Contributor or Viewer), then click
 **Add**. Note: there can be only a single channel *owner*, but you can
 transfer channel ownership in the channel settings as well.
 
-.. image:: ../../assets/prefix_edit_members.png
+.. image:: https://raw.githubusercontent.com/prefix-dev/pixi/v0.81.0/docs/assets/prefix_edit_members.png
    :alt: Invite a member
 
 Uploading packages\ `# <#uploading-packages>`__
@@ -56,7 +56,7 @@ You can upload packages directly through the web interface. Navigate to
 ``.conda`` or ``.tar.bz2`` files (up to 1 GB) into the upload area, or
 click to select files from your filesystem.
 
-.. image:: ../../assets/prefix_upload_package.png
+.. image:: https://raw.githubusercontent.com/prefix-dev/pixi/v0.81.0/docs/assets/prefix_upload_package.png
    :alt: Upload a package
 
 Alternatively, you can build and publish packages using the ``pixi``
@@ -123,7 +123,7 @@ Under **Delete or Transfer** in the channel settings, you can transfer
 ownership of the channel to another user or permanently delete the
 channel and all its packages.
 
-.. image:: ../../assets/prefix_delete_channel.png
+.. image:: https://raw.githubusercontent.com/prefix-dev/pixi/v0.81.0/docs/assets/prefix_delete_channel.png
    :alt: Danger zone
 
 .. admonition::
@@ -159,7 +159,7 @@ fill in the required fields:
 -  **Environment Name** (optional) — restrict publishing to a specific
    GitHub environment (e.g. ``production``)
 
-.. image:: ../../assets/prefix_trusted_publishing.png
+.. image:: https://raw.githubusercontent.com/prefix-dev/pixi/v0.81.0/docs/assets/prefix_trusted_publishing.png
    :alt: Trusted Publishing
 
 Using trusted publishing in GitHub Actions\ `# <#using-trusted-publishing-in-github-actions>`__

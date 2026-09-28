@@ -29,20 +29,20 @@ YouTube
 
 .. code:: markdown
 
-   {{< video https://www.youtube.com/embed/VIDEO_ID >}}
+   {{< video https://www.youtube.com/embed/wo9vZccmqwc >}}
 
 Or with just the ID:
 
 .. code:: markdown
 
-   {{< video https://youtu.be/VIDEO_ID >}}
+   {{< video https://youtu.be/wo9vZccmqwc >}}
 
 Vimeo
 ~~~~~
 
 .. code:: markdown
 
-   {{< video https://vimeo.com/VIDEO_ID >}}
+   {{< video https://vimeo.com/548291297 >}}
 
 Local Video
 ~~~~~~~~~~~
@@ -56,7 +56,7 @@ Video Options
 
 .. code:: markdown
 
-   {{< video https://youtu.be/VIDEO_ID
+   {{< video https://youtu.be/wo9vZccmqwc
    title="Video Title"
    start="30"
    aspect-ratio="16x9"
@@ -376,7 +376,7 @@ Documentation Site
 
    ## Video Tutorial
 
-   {{< video https://youtu.be/TUTORIAL_ID >}}
+   {{< video https://youtu.be/wo9vZccmqwc >}}
 
    ## Keyboard Shortcuts
 

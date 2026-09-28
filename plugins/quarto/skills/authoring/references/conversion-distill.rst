@@ -111,7 +111,7 @@ distill
    author:
      - name: "First Author"
        affiliation: Institution A
-       affiliation_url: https://a.edu
+       affiliation_url: https://institution-a.example.org
      - name: "Second Author"
        affiliation: Institution B
 
@@ -126,7 +126,7 @@ Quarto
      - name: "First Author"
        affiliations:
          - name: Institution A
-           url: https://a.edu
+           url: https://institution-a.example.org
      - name: "Second Author"
        affiliations:
          - Institution B

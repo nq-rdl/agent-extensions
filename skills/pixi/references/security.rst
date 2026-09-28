@@ -113,7 +113,7 @@ trusted internal channels or urgent fixes through without delay.
       channels = [
         "conda-forge",
         # get most recent versions of packages you control
-        { channel = "https://prefix.dev/my-internal-channel", exclude-newer = "0d" },
+        { channel = "https://prefix.dev/<internal-channel>", exclude-newer = "0d" },
       ]
       exclude-newer = "14d"
       platforms = ["linux-64", "osx-arm64", "win-64"]

@@ -1,7 +1,9 @@
 # Catalog CI/local-hook policy, selected explicitly with --config lychee.toml.
-# Exclusions moved unchanged from skills/lychee/lychee.toml for #299.
-# Historical broad patterns remain here pending evidence-based review in #300;
-# they are not consumer defaults or evidence of current URL health.
+# Exclusions moved from skills/lychee/lychee.toml for #299 and reviewed for #300.
+# They are not consumer defaults or evidence of current URL health. Add only
+# narrow, commented patterns for URLs that ordinary HTTP page checks cannot
+# verify (API endpoints, identifiers, bot-blocked hosts); fix rot and use
+# RFC 2606 hosts or <placeholder> segments for examples (CONTRIBUTING.md).
 
 # Verification must make fresh requests, even if .lycheecache already exists.
 cache = false
@@ -20,18 +22,22 @@ max_retries = 3
 
 # Exclude common false-positive patterns
 exclude = [
-  # Quarto documentation: historical CI failures; preserve scope pending #300.
+  # Quarto documentation: historical CI failures. An uncached local run on
+  # 2026-09-28 passed every skills/ quarto.org URL once one rotted fragment was
+  # fixed (its dedicated pattern was removed); drop this after a CI dispatch
+  # of link-check.yml confirms GitHub runners pass too.
   "^https?://quarto\\.org/docs/",
-  "^https?://quarto\\.org/docs/faq/rmarkdown\\.html#quarto-vs.-r-markdown",
 
-  # Localhost/example URLs
-  "^https?://localhost",
+  # Localhost/example URLs, anchored at the end of the host so look-alike
+  # hosts (example.com.real.org, localhost.company.org) are still checked.
+  # lychee itself skips example.net, *.example.{com,org,net}, .example, .test,
+  # .invalid and .localhost.
+  "^https?://localhost(?:[:/?#]|$)",
   "^https?://127\\.0\\.0\\.",
-  "^https?://0\\.0\\.0\\.0",
-  "^https?://example\\.com",
-  "^https?://example\\.org",
-  # Legacy catalog placeholders; retain their existing breadth until #300.
-  "^https?://your-",
+  "^https?://0\\.0\\.0\\.0(?:[:/?#]|$)",
+  "^https?://example\\.com(?:[:/?#]|$)",
+  "^https?://example\\.org(?:[:/?#]|$)",
+  # Template placeholders ($VAR, {{ var }}) where the whole host is variable.
   "^https?://\\$",
   "^https?://\\{\\{",
   # Email addresses (often not real in docs)
@@ -54,11 +60,33 @@ exclude = [
   # Australian Government Style Manual — referenced by tech-writing-copyedit. lychee on the
   # GitHub runner fails with "HTTP/2 protocol error" against this host (curl/browsers are fine).
   "^https?://www\\.stylemanual\\.gov\\.au/",
-  # Bootstrap icons: historical CI failure exclusion; cause needs review in #300.
+  # Bootstrap icons: historical CI failure exclusion. Passed an uncached local
+  # run on 2026-09-28; drop after a CI dispatch confirms runners pass.
   "^https?://icons\\.getbootstrap\\.com",
   # Quarto documentation root: preserve both historical root spellings.
   "^https?://quarto\\.org/docs$",
   "^https?://quarto\\.org/docs/$",
+  # Remote MCP server endpoints in OpenCode config examples
+  # (opencode-tools references/mcp-servers.rst). They speak MCP over POST; a
+  # plain GET answers 405 (context7, grep.app) or 401 (sentry).
+  "^https://mcp\\.context7\\.com/mcp$",
+  "^https://mcp\\.grep\\.app/?$",
+  "^https://mcp\\.sentry\\.dev/mcp$",
+  # GitHub Actions OIDC issuer identifier (cosign --certificate-oidc-issuer in
+  # pixi references/security.rst). Not a page: the root 404s while its
+  # /.well-known/openid-configuration answers 200.
+  "^https://token\\.actions\\.githubusercontent\\.com/?$",
+  # conda-forge channel URL used as a pixi mirror key (pixi references/
+  # pixi_pack.rst). Without the trailing slash the channel root answers 404;
+  # the key must match the channel spelling, so it is not rewritten.
+  "^https://conda\\.anaconda\\.org/conda-forge$",
+  # Red Hat Customer Portal API endpoints documented by redhat-docs-fetch
+  # (references/customer-portal-api.rst): search needs Solr parameters (400
+  # without), the token endpoint is POST-only (405), /support is an API base
+  # (404), and rs/solutions/ is the documented decommissioned Strata API (410).
+  "^https://api\\.access\\.redhat\\.com/(support|support/search/kcs|rs/solutions/)$",
+  "^https://access\\.redhat\\.com/hydra/rest/search/kcs$",
+  "^https://sso\\.redhat\\.com/auth/realms/redhat-external/protocol/openid-connect/token$",
 ]
 
 # Exclude private/loopback IPs

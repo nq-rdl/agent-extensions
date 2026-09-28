@@ -32,7 +32,7 @@ package in its own environment, exposing only the necessary entry
 points. This means you don't have to worry about removing a package and
 accidentally breaking seemingly unrelated packages. This behavior is
 quite similar to that of
-`pipx <https://pipx.pypa.io/latest/installation/>`__.
+`pipx <https://pipx.pypa.io/stable/>`__.
 
 However, there are times when you may want multiple dependencies in the
 same environment. For instance, while ``ipython`` is really useful on
@@ -117,7 +117,7 @@ If the source resides in a git repository, you can access it like this:
 
    ::
 
-      pixi global install --git https://github.com/ORG_NAME/cpp_math.git
+      pixi global install --git https://github.com/<org>/cpp_math.git
 
 One has to take care if the source contains multiple outputs, see for
 example this recipe:

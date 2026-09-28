@@ -11,7 +11,7 @@ Custom commands let you specify a prompt you want to run when that command is ex
 /my-command
 ```
 
-Custom commands are in addition to the built-in commands like `/init`, `/undo`, `/redo`, `/share`, `/help`. [Learn more](/docs/tui#commands).
+Custom commands are in addition to the built-in commands like `/init`, `/undo`, `/redo`, `/share`, `/help`. [Learn more](https://opencode.ai/docs/tui/#commands).
 
 ---
 
@@ -50,7 +50,7 @@ You can add custom commands through the OpenCode config or by creating markdown 
 
 ### JSON
 
-Use the `command` option in your OpenCode [config](/docs/config):
+Use the `command` option in your OpenCode [config](https://opencode.ai/docs/config/):
 
 ```json title="opencode.jsonc" {4-12}
 {
@@ -165,7 +165,7 @@ This replaces:
 
 ### Shell output
 
-Use _!`command`_ to inject [bash command](/docs/tui#bash-commands) output into your prompt.
+Use _!`command`_ to inject [bash command](https://opencode.ai/docs/tui/#bash-commands) output into your prompt.
 
 For example, to create a custom command that analyzes test coverage:
 
@@ -258,8 +258,8 @@ This is shown as the description in the TUI when you type in the command.
 
 ### Agent
 
-Use the `agent` config to optionally specify which [agent](/docs/agents) should execute this command.
-If this is a [subagent](/docs/agents/#subagents) the command will trigger a subagent invocation by default.
+Use the `agent` config to optionally specify which [agent](https://opencode.ai/docs/agents/) should execute this command.
+If this is a [subagent](https://opencode.ai/docs/agents/#subagents) the command will trigger a subagent invocation by default.
 To disable this behavior, set `subtask` to `false`.
 
 ```json title="opencode.json"
@@ -278,9 +278,9 @@ This is an **optional** config option. If not specified, defaults to your curren
 
 ### Subtask
 
-Use the `subtask` boolean to force the command to trigger a [subagent](/docs/agents/#subagents) invocation.
+Use the `subtask` boolean to force the command to trigger a [subagent](https://opencode.ai/docs/agents/#subagents) invocation.
 This is useful if you want the command to not pollute your primary context and will **force** the agent to act as a subagent,
-even if `mode` is set to `primary` on the [agent](/docs/agents) configuration.
+even if `mode` is set to `primary` on the [agent](https://opencode.ai/docs/agents/) configuration.
 
 ```json title="opencode.json"
 {
@@ -316,7 +316,7 @@ This is an **optional** config option.
 
 ## Built-in
 
-opencode includes several built-in commands like `/init`, `/undo`, `/redo`, `/share`, `/help`; [learn more](/docs/tui#commands).
+opencode includes several built-in commands like `/init`, `/undo`, `/redo`, `/share`, `/help`; [learn more](https://opencode.ai/docs/tui/#commands).
 
 :::note
 Custom commands can override built-in commands.

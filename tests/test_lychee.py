@@ -116,11 +116,39 @@ class WrapperTests(unittest.TestCase):
 
 
 class ConfigTests(unittest.TestCase):
-    def test_repository_policy_is_unchanged_except_cache(self):
+    def test_repository_policy_matches_legacy_except_reviewed_changes(self):
         old = config(FIXTURES / "legacy.toml")
         current = config(REPO / "lychee.toml")
         self.assertFalse(current["cache"])
         old["cache"] = False
+        # #300 narrowed look-alike host prefixes, dropped an unused placeholder
+        # prefix and a fixed-fragment pattern, and added commented exclusions
+        # for API endpoints and identifiers. Anything else is an unreviewed drift.
+        removed = {
+            "^https?://quarto\\.org/docs/faq/rmarkdown\\.html#quarto-vs.-r-markdown",
+            "^https?://localhost",
+            "^https?://0\\.0\\.0\\.0",
+            "^https?://example\\.com",
+            "^https?://example\\.org",
+            "^https?://your-",
+        }
+        added = {
+            "^https?://localhost(?:[:/?#]|$)",
+            "^https?://0\\.0\\.0\\.0(?:[:/?#]|$)",
+            "^https?://example\\.com(?:[:/?#]|$)",
+            "^https?://example\\.org(?:[:/?#]|$)",
+            "^https://mcp\\.context7\\.com/mcp$",
+            "^https://mcp\\.grep\\.app/?$",
+            "^https://mcp\\.sentry\\.dev/mcp$",
+            "^https://token\\.actions\\.githubusercontent\\.com/?$",
+            "^https://conda\\.anaconda\\.org/conda-forge$",
+            "^https://api\\.access\\.redhat\\.com/(support|support/search/kcs|rs/solutions/)$",
+            "^https://access\\.redhat\\.com/hydra/rest/search/kcs$",
+            "^https://sso\\.redhat\\.com/auth/realms/redhat-external/protocol/openid-connect/token$",
+        }
+        self.assertEqual(set(old["exclude"]) - set(current["exclude"]), removed)
+        self.assertEqual(set(current["exclude"]) - set(old["exclude"]), added)
+        del old["exclude"], current["exclude"]
         self.assertEqual(current, old)
 
     def test_exclusion_fixtures(self):
@@ -166,11 +194,16 @@ class LycheeRuntimeTests(unittest.TestCase):
                     # filter/mod.rs, even with --exclude-all-private=false.
                     excluded = case[name] or case.get("builtin", False)
                     self.assertEqual(case["url"] in urls, not excluded)
-            if name == "repository":
-                legacy = self.run_lychee("--config", str(FIXTURES / "legacy.toml"),
-                                         "--cache=false", "--dump", str(source))
-                self.assertEqual(legacy.returncode, 0, legacy.stderr)
-                self.assertEqual(set(legacy.stdout.splitlines()), urls)
+        # The legacy policy is still interpreted by lychee as its regexes say.
+        legacy_patterns = config(FIXTURES / "legacy.toml")["exclude"]
+        legacy = self.run_lychee("--config", str(FIXTURES / "legacy.toml"),
+                                 "--cache=false", "--dump", str(source))
+        self.assertEqual(legacy.returncode, 0, legacy.stderr)
+        self.assertEqual(set(legacy.stdout.splitlines()), {
+            case["url"] for case in cases
+            if not case.get("builtin", False)
+            and not any(re.search(pattern, case["url"]) for pattern in legacy_patterns)
+        })
         self.assertFalse((self.root / ".lycheecache").exists())
 
     def test_private_addresses_and_mail_are_excluded(self):

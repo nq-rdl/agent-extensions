@@ -86,8 +86,8 @@ For example, if your ``Cargo.toml`` contains:
       version = "1.0.0"
       description = "A useful Rust command-line tool"
       license = "MIT"
-      homepage = "https://github.com/user/my-rust-tool"
-      repository = "https://github.com/user/my-rust-tool"
+      homepage = "https://github.com/<owner>/my-rust-tool"
+      repository = "https://github.com/<owner>/my-rust-tool"
 
 You can create a minimal ``pixi.toml``:
 

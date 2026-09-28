@@ -172,6 +172,9 @@ jobs:
       - name: Build asctl
         run: CGO_ENABLED=0 go -C tools/asctl build -o "$RUNNER_TEMP/asctl" ./cmd/asctl/
 
-      - name: Validate all skills (spec + prompt generation)
+      # repo-check covers frontmatter, directory structure, prompt generation,
+      # and offline local Markdown/RST references (each link target must exist
+      # inside its skill). No network access: external URLs are link-check.yml.
+      - name: Validate all skills (spec + structure + local references + prompt generation)
         run: |
           "$RUNNER_TEMP/asctl" repo-check

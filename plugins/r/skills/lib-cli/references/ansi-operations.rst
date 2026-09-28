@@ -338,8 +338,8 @@ technical
 
 .. code:: r
 
-   cli_text("Read the {.href [complete guide](https://very-long-url.com/path)}")
-   cli_text("See {.href [issue #123](https://github.com/org/repo/issues/123)}")
+   cli_text("Read the {.href [complete guide](https://example.com/a/very/long/path)}")
+   cli_text("See {.href [issue #123](https://github.com/<owner>/<repo>/issues/123)}")
 
 .file with Line and Column Syntax
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~

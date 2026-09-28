@@ -111,7 +111,7 @@ route, do not post the comment until this same completed-draft approval is recei
 ### 6. File the Issue
 
 Extract `owner/repo` from the `repo` URL:
-- Strip trailing slashes and `.git` suffixes (e.g., `https://github.com/org/repo.git` → `org/repo`)
+- Strip trailing slashes and `.git` suffixes (e.g., `https://github.com/<owner>/<repo>.git` → `<owner>/<repo>`)
 - Use only the path after `github.com/`
 
 **Title format:** `[skill:<skill-name>] <concise summary of the problem>`

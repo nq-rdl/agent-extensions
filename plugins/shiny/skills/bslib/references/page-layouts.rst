@@ -243,7 +243,7 @@ Theming
 ~~~~~~~
 
 Pass a ``bs_theme()`` object to the ``theme`` parameter of any page
-function to customize appearance. See `theming.md <theming.rst>`__ for
+function to customize appearance. See `theming.rst <theming.rst>`__ for
 comprehensive theming guidance.
 
 Plot Styling

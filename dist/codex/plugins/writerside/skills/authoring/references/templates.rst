@@ -159,7 +159,7 @@ For code examples, use triple backticks with the language specified:
 
    ```bash
    # Example bash command
-   git clone https://github.com/example/repo.git
+   git clone https://git.example.com/example/repo.git
    cd repo
    ```
 

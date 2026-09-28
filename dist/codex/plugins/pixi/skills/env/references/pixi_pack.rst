@@ -168,7 +168,7 @@ location <https://github.com/Quantco/pixi-pack/releases/latest>`__.
 You can provide one of the following as the ``--pixi-unpack-source``:
 
 -  a URL to a ``pixi-unpack`` executable like
-   ``https://my.mirror/pixi-pack/pixi-unpack-x86_64-unknown-linux-musl``
+   ``https://mirror.example.com/pixi-pack/pixi-unpack-x86_64-unknown-linux-musl``
 -  a path to a ``pixi-unpack`` binary like
    ``./pixi-unpack-x86_64-unknown-linux-musl``
 
@@ -181,7 +181,7 @@ Using a URL:
 
    ::
 
-      pixi-pack --create-executable --pixi-unpack-source https://my.mirror/pixi-pack/pixi-unpack-x86_64-unknown-linux-musl
+      pixi-pack --create-executable --pixi-unpack-source https://mirror.example.com/pixi-pack/pixi-unpack-x86_64-unknown-linux-musl
 
 Using a path:
 
@@ -253,7 +253,7 @@ and referencing it using ``--config``.
    ::
 
       [mirrors]
-      "https://conda.anaconda.org/conda-forge" = ["https://my.artifactory/conda-forge"]
+      "https://conda.anaconda.org/conda-forge" = ["https://artifactory.example.com/conda-forge"]
 
 If you are using `S3 in pixi <https://pixi.prefix.dev/latest/deployment/s3/>`__, you can also add the
 appropriate S3 config in your config file and reference it.

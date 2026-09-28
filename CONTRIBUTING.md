@@ -187,6 +187,66 @@ authoritative docs. See `skills/rust-explain/SKILL.md` for the model pattern.
 
 References: Biggs, *You're Probably Using Agent Skills Wrong*; SkillsBench (arXiv 2602.12670).
 
+### Local references
+
+Links between files of a skill are checked offline by `asctl repo-check` (the
+`validate-skills` CI job and the `asctl-repo-check` pre-commit hook). Run it
+from the repository root:
+
+```bash
+go -C tools/asctl build -o /tmp/asctl ./cmd/asctl/ && /tmp/asctl repo-check
+```
+
+- **Supported syntax.** Markdown inline links and images `[text](path)`,
+  `![alt](path)` and definitions `[label]: path` (in `.md`, and in `.rst` files
+  that carry Markdown prose). RST embedded links `` `text <path>`_ `` /
+  `` `text <path>`__ ``, targets `.. _name: path` / `.. __: path`, and the
+  `image`, `figure`, `include` and `literalinclude` directives (including
+  `.. |name| image:: path`). Named RST references (`` `name`_ ``,
+  `` `text <name_>`_ ``) point at targets, not files.
+- **Resolution.** A target resolves from the directory of the file that
+  contains it, not the working directory. `references/codex.rst` is a Codex
+  entrypoint body, so its links resolve from the skill root. Name matching is
+  exact. A target must stay inside the skill: an installed plugin copies only
+  the skill directory, so `../other-skill/…`, `/docs/…` and `~/…` fail. Use a
+  full URL for anything outside the skill.
+- **Ignored.** External URIs (`https:`, `mailto:`, any scheme, `//host`),
+  `#fragment`-only links, fenced code blocks, inline code, HTML and RST
+  comments, RST literal blocks (`::` and `code`/`code-block` directives), and
+  placeholders containing `<`, `>`, `{`, `}`, `$`, `*`, `...` or `…`. A
+  `#fragment` or `?query` is removed before the file check; fragments are not
+  validated.
+- **Not supported.** Markdown indented code blocks (use fences), links whose
+  destination spans lines, the short `__ path` anonymous target, and Sphinx
+  roles such as `:doc:`.
+
+### Example URLs and placeholders
+
+External links are checked by lychee (`link-check.yml`, advisory) against the
+root [`lychee.toml`](lychee.toml). Keep examples out of its failure list:
+
+- **Illustrative hosts** use RFC 2606/6761 reserved names: `example.com`,
+  `example.org`, `example.net`, their subdomains (`docs.example.com`,
+  `git.example.com`), or the `.example`, `.test` and `.invalid` TLDs. Do not
+  invent plausible hosts such as `my-company.com`, `janedoe.com` or `a.edu`.
+- **Variable parts of a real host's URL** use angle-bracket placeholders:
+  `https://github.com/<owner>/<repo>.git`. In XML or HTML examples, where
+  `<…>` is markup, use a reserved host instead.
+- **Real URLs** must resolve. Fix rot at the source; verify that a
+  replacement answers and says the same thing.
+- **Exclusions** go in the root `lychee.toml` only when a plain HTTP page check
+  cannot verify the URL, such as API endpoints, OIDC issuers, channel roots or
+  bot-blocked hosts. Anchor each pattern narrowly, add a comment with the file
+  and reason, and add a fixture to `tests/fixtures/lychee/urls.toml`. Do not
+  accept 4xx statuses globally.
+
+Run the external scan locally as CI does:
+
+```bash
+bash skills/lychee/scripts/check-links.sh --config lychee.toml --cache=false \
+  'skills/**/*.md' 'skills/**/*.rst'
+```
+
 ## Packaging a new skill into a plugin
 
 A new skill authored under `skills/<name>/` is **not installable until you map it into a bundle**

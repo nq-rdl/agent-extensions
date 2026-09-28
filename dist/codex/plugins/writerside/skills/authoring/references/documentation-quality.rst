@@ -209,7 +209,7 @@ Common Issues and Fixes
 | Problem                     | Cause                 | Fix                                           |
 +=============================+=======================+===============================================+
 | “Unknown element”           | Using a tag not in    | Check                                         |
-|                             | the Writerside schema | `markup-reference.md <markup-reference.rst>`__ |
+|                             | the Writerside schema | `markup-reference.rst <markup-reference.rst>`__ |
 |                             |                       | for valid tags                                |
 +-----------------------------+-----------------------+-----------------------------------------------+
 | “Duplicate ID”              | Two elements share    | Rename one of the duplicate IDs               |
