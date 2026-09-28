@@ -1,0 +1,3 @@
+kind: Fixed
+body: rdl-team:house-style execute now prepares the SDD plan and hands SDD to the main session, which dispatches implementer and reviewer agents per tasks.md phase (#369)
+time: 2026-09-28T00:45:39.161836093Z
