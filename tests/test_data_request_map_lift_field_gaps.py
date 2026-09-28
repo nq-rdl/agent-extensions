@@ -5,6 +5,7 @@ section where each belongs, and check that stale references are gone from the ca
 skills and from both packaged copies (Claude Code and Codex). No model call is made.
 """
 
+import json
 import re
 import unittest
 from pathlib import Path
@@ -39,12 +40,17 @@ def files(root: Path) -> list[Path]:
     return sorted(p for p in root.rglob("*") if p.is_file())
 
 
-def section(text: str, heading: str) -> str:
+def raw_section(text: str, heading: str) -> str:
     """The Markdown section under `## <heading>` up to the next `## ` heading."""
     match = re.search(r"^## " + re.escape(heading) + r"[^\n]*\n(.*?)(?=^## |\Z)", text, re.M | re.S)
     if not match:
         raise AssertionError(f"SKILL.md has no '## {heading}' section")
-    return " ".join(match.group(1).split())
+    return match.group(1)
+
+
+def section(text: str, heading: str) -> str:
+    """The same section with whitespace collapsed, so wrapping does not matter."""
+    return " ".join(raw_section(text, heading).split())
 
 
 def flat(text: str) -> str:
@@ -113,17 +119,28 @@ class MapInputsAndOutput(unittest.TestCase):
 class MapLiftCapture(unittest.TestCase):
     """#372 (map part): read-only proposal and the operator-probe exemption."""
 
-    def test_read_only_run_returns_the_entry_as_text(self):
+    def test_mapping_never_initialises_the_store(self):
         capture = section(MAP_RAW, "Lift capture")
-        self.assertIn("read-only", capture)
-        self.assertIn("no `.sqlreview/` yet", capture)
-        self.assertIn("return the candidate ledger entry as text", capture)
-        self.assertIn("A text entry authorises no hand SQL", capture)
+        self.assertIn("Mapping never initialises `.sqlreview/`; stages that own the store "
+                      "(setup, bootstrap) still initialise it.", capture)
 
-    def test_operator_probes_are_outside_the_gate_and_guardrails_owns_it(self):
+    def test_proposal_only_entry_is_returned_as_text_and_authorises_nothing(self):
         capture = section(MAP_RAW, "Lift capture")
-        for token in ("Aggregate-only", "small-cell-suppressed", "single-scan", "outside the hand-SQL gate",
-                      "`NOLOCK`", "Guardrails is the source of truth"):
+        self.assertIn("if the run is read-only, the child repo has no `.sqlreview/` yet, "
+                      "or you cannot write to it, publish nothing", capture)
+        self.assertIn("Return the candidate ledger entry as text, marked proposal-only", capture)
+        # Shared verbatim with the guardrails rule (#372).
+        self.assertIn("A proposal-only entry authorises no hand SQL: none is committed or run, "
+                      "except exempt probes, until a writable run publishes the entry.", capture)
+        self.assertNotIn("draft publishes it before writing", capture)
+
+    def test_exempt_probes_carry_every_condition_and_defer_to_guardrails(self):
+        capture = section(MAP_RAW, "Lift capture")
+        for token in ("outside the hand-SQL gate only when", "aggregate-only", "small-cell-suppressed",
+                      "single-scan",
+                      "returns no identifying values (no patient or clinician identifiers, no staff or person keys)",
+                      "feeds no delivered extract", "Record any `NOLOCK` use",
+                      "Guardrails is the source of truth"):
             with self.subTest(token=token):
                 self.assertIn(token, capture)
 
@@ -146,11 +163,11 @@ class LiftClassifyOnly(unittest.TestCase):
         mode = section(LIFT_RAW, "Classify-only mode")
         self.assertIn("read-only run", mode)
         self.assertIn("as text", mode)
-        self.assertIn("stop before any write", mode)
-        for write in ("`sqlreview.sh`", "`publish`", "AskUserQuestion", "no issue filing"):
-            with self.subTest(write=write):
-                self.assertIn(write, mode)
-        self.assertIn("unconfirmed", mode)
+        # The list form, so "run sqlreview.sh publish" elsewhere cannot satisfy it.
+        self.assertIn("then stop before any write: no `/data-request:setup`, no `sqlreview.sh` `init`, "
+                      "`publish` or `render`, no AskUserQuestion, no issue filing.", mode)
+        self.assertIn("Proposed buckets are unconfirmed", mode)
+        self.assertNotRegex(mode, r"(?i)\brun `?sqlreview\.sh`? `?(?:init|publish|render)")
 
     def test_classify_only_precedes_the_writing_steps(self):
         order = [LIFT_RAW.index(f"## {h}") for h in
@@ -179,9 +196,12 @@ class LiftQueryBuilderBaseline(unittest.TestCase):
     def test_compatibility_names_v060_and_resolver_paths(self):
         compat = flat(frontmatter(canon("lift") / "SKILL.md")["compatibility"])
         self.assertIn("query-builder 0.6.0", compat)
-        for token in ("resolvers/iemr", "resolvers/hbcis"):
-            self.assertIn(token, compat)
+        self.assertIn("resolvers/iemr and resolvers/hbcis from 0.5.0", compat)
         self.assertNotRegex(compat, r"0\.[34]\.0")
+
+    def test_resolvers_moved_at_v050_and_baseline_is_v060(self):
+        intro = flat(LIFT_RAW.split("\n## ", 1)[0])
+        self.assertIn("live under `resolvers/iemr` and `resolvers/hbcis` from v0.5.0; the baseline is v0.6.0", intro)
 
     def test_source_resolver_candidates_file_on_query_builder(self):
         delivery = section(LIFT_RAW, "File and record delivery")
@@ -193,14 +213,28 @@ class LiftQueryBuilderBaseline(unittest.TestCase):
 class LiftHouseStyleDirectMode(unittest.TestCase):
     """#367 (lift part): ask once for direct generative mode; no routing workaround."""
 
-    def test_ask_once_and_record_the_decision(self):
+    def test_ask_once_after_reusing_a_recorded_decision(self):
         handoff = section(LIFT_RAW, "House-style hand-off")
-        self.assertIn("ask once, up front", handoff)
+        reuse = handoff.index("first reuse a recorded direct-mode decision for the same repository `owner/name`")
+        self.assertIn("do not ask twice", handoff)
+        self.assertGreater(handoff.index("Otherwise ask once, up front"), reuse)
         self.assertIn('`generativeMode: "direct"`', handoff)
         for stage in ("`specify`", "`plan`", "`tasks`", "`analyze`"):
             with self.subTest(stage=stage):
                 self.assertIn(stage, handoff)
-        self.assertIn("workflow decision with who gave it, when, and the repo or worktree", handoff)
+
+    def test_decision_has_the_shape_the_workflow_reuses(self):
+        handoff = raw_section(LIFT_RAW, "House-style hand-off")
+        blocks = re.findall(r"```json\n(.*?)```", handoff, re.S)
+        self.assertEqual(len(blocks), 1, "one JSON decision example")
+        decision = json.loads(blocks[0])
+        self.assertEqual(list(decision), ["decision", "value", "by", "at", "scope"])
+        self.assertEqual((decision["decision"], decision["value"]), ("generativeMode", "direct"))
+        self.assertEqual(decision["scope"], "nq-rdl/query-builder")  # owner/name, not a guessed path
+        text = flat(handoff)
+        self.assertIn("Set `scope` to the owning repository's `owner/name`", text)
+        self.assertIn("If a worktree for the work already exists, add the same record with its absolute path", text)
+        self.assertIn("translates `owner/name` into the unit's `physicalWorktree`", text)
 
     def test_routing_through_another_agent_is_not_a_workaround(self):
         handoff = section(LIFT_RAW, "House-style hand-off")
