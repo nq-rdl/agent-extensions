@@ -1,0 +1,3 @@
+kind: Fixed
+body: 'cc-agent-teams: drop removed TeamCreate/Shift+Down/cleanup steps; in-process is the default, teammateMode lives in settings.json, plan approval is automatic (#298)'
+time: 2026-09-28T08:32:18.027894548Z

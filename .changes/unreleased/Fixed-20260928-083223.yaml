@@ -1,0 +1,3 @@
+kind: Fixed
+body: terraform uses Terraform MCP only when configured and keeps lockfiles/backends; go-mcp-expert, hlbpa, adr-generator and marketplace-scout facts corrected (#298)
+time: 2026-09-28T08:32:23.573678014Z

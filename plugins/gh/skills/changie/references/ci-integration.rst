@@ -114,9 +114,10 @@ Key Points
 ----------
 
 - **Do NOT use ``v`` prefix** with ``changie batch`` —
-  ``changie batch 0.2.1`` creates ``.changes/0.2.1.md`` (correct), while
-  ``changie batch v0.2.1`` creates ``.changes/v0.2.1.md`` (wrong, breaks
-  release workflow).
+  ``changie batch 0.2.1`` creates ``.changes/0.2.1.md``, while
+  ``changie batch v0.2.1`` keeps the prefix and creates
+  ``.changes/v0.2.1.md``, which release tooling that expects
+  ``.changes/<X.Y.Z>.md`` will not find.
 - **``--dry-run``** prints to stdout without writing files — useful for
   validation in CI.
 - **Fragment files are plain YAML** — they can be edited manually after

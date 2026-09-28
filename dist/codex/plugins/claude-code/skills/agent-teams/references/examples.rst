@@ -86,16 +86,17 @@ and teammates need to agree on interfaces.
    Database teammate should share the schema with API teammate.
    API teammate should share endpoint contracts with frontend teammate.
    Test teammate should wait for interfaces to stabilize before writing tests.
-   Require plan approval for the database teammate before they run migrations.
+   Have the database teammate stop and report before running migrations.
 
-**Expected team structure**: - Lead: coordinates interface agreements,
-reviews plans - database: owns ``migrations/``, ``models/`` - api: owns
+**Expected team structure**: - Lead: coordinates interface agreements -
+database: owns ``migrations/``, ``models/`` - api: owns
 ``routes/notifications/``, ``services/`` - frontend: owns
 ``components/Notifications/`` - test: owns
 ``tests/integration/notifications/``
 
-**Tips**: - Explicit file ownership prevents overwrites - “Require plan
-approval” for risky changes (database migrations) - Dependency order:
+**Tips**: - Explicit file ownership prevents overwrites - Plan-mode
+approval is automatic, not a lead review; gate risky steps (database
+migrations) with an explicit stop or permission prompts - Dependency order:
 database -> API -> frontend, with tests last - Each teammate messages
 the next when their interface is ready
 
@@ -215,7 +216,7 @@ Full setup (teams + display mode + permissions)
      }
    }
 
-In ``~/.claude.json`` (global config):
+In ``~/.claude/settings.json`` (``in-process`` is already the default):
 
 .. code:: json
 

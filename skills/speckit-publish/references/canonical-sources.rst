@@ -29,7 +29,7 @@ Context
 
 - Extensions system overview & catalog format:
   https://github.com/github/spec-kit/tree/main/extensions
-- Install (the uv footgun):
+- Install (PyPI ``specify-cli`` or a pinned GitHub tag; both official):
   https://github.github.io/spec-kit/installation.html
 - Community catalog submission (issue-template path, review SLA):
   https://github.github.io/spec-kit/community/extensions.html

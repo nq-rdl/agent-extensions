@@ -36,7 +36,9 @@ do not restate it here.
 - User-facing messages/errors via `cli::cli_abort()` / `cli::cli_inform()` /
   `cli::cli_warn()` (not bare `stop()` / `warning()` / `message()`). cli markup
   (`{.val}`, `{.code}`, pluralization) gives consistent, styled output.
-- Format with `styler`; lint with `lintr`.
+- Formatter: follow the project's existing config — `air.toml`/`.air.toml`
+  present → `air format .`; otherwise keep the project's convention (e.g.
+  `styler`). Do not switch formatters unasked. Lint with `lintr`.
 - Performance / IO stack: `bench` (benchmarking), `data.table` / `arrow` /
   `vroom` (large data + fast IO), `future` + `furrr` (embarrassingly parallel).
 

@@ -1,4 +1,4 @@
-<!-- Source: https://github.github.io/spec-kit/reference/extensions.html + EXTENSION-USER-GUIDE.md + src/specify_cli/extensions/_commands.py — fetched 2026-07-04. -->
+<!-- Source: https://github.github.io/spec-kit/reference/extensions.html + EXTENSION-USER-GUIDE.md — fetched 2026-07-04. CLI section re-verified 2026-09-28 against v1.0.12 src/specify_cli/extensions/command_*.py and catalog/command_add.py. -->
 
 specify extension — CLI & Catalog Stack
 =======================================
@@ -6,69 +6,36 @@ specify extension — CLI & Catalog Stack
 CLI surface
 -----------
 
-``specify extension search [q]``
-  Search all configured catalogs for extensions matching ``q`` (name,
-  description, or tag substring). Flags:
+Flags change between releases, so do not rely on a copied table. The
+installed CLI is authoritative::
 
-  - ``--tag`` — restrict results to a tag (e.g. ``--tag jira``).
-  - ``--author`` — restrict results to a publisher/author.
-  - ``--verified`` — show only extensions from verified/official publishers.
+    specify extension --help
+    specify extension <cmd> --help        # search, add, remove, list, info,
+                                          # update, enable, disable, set-priority
+    specify extension catalog --help      # list, add, remove
 
-``specify extension add <name>``
-  Install an extension by id from the resolved catalog stack. Flags:
+Semantics ``--help`` does not make obvious:
 
-  - ``--dev <path>`` — install from a local directory in editable/dev mode
-    instead of a catalog entry (for extension authors iterating locally).
-  - ``--from <url>`` — install directly from a URL/git ref, bypassing catalog
-    lookup.
-  - ``--force`` — reinstall even if the extension (or a conflicting version)
-    is already installed.
-  - ``--priority N`` — set the extension's resolution priority at install
-    time (lower ``N`` wins on conflicts; see Catalog stack below).
-
-``specify extension remove <name>``
-  Uninstall an extension. Flags:
-
-  - ``--keep-config`` — leave the extension's ``<ext>-config.yml`` /
-    ``<ext>-config.local.yml`` on disk instead of deleting them.
-  - ``--force`` — remove without confirmation, even if other extensions
-    declare a dependency on it.
-
-``specify extension list``
-  List installed extensions (id, version, enabled/disabled state, priority).
-  Flags:
-
-  - ``--available`` — also list extensions available in the catalog stack
-    but not yet installed.
-  - ``--all`` — include disabled extensions in the listing.
-
-``specify extension info <name>``
-  Print full detail for one extension: manifest metadata, schema_version,
-  declared hooks/commands, install source, and current config values.
-
-``specify extension update [name]``
-  Update one named extension, or all installed extensions when ``name`` is
-  omitted, to the latest version available from the catalog stack.
-
-``specify extension enable <name>`` / ``specify extension disable <name>``
-  Toggle whether an installed extension's hooks/commands are active, without
-  uninstalling it. Disabled extensions are retained by ``list`` only under
-  ``--all``.
-
-``specify extension set-priority <name> <N>``
-  Change an installed extension's resolution priority after install (see
-  Catalog stack below for how ``N`` is used on id conflicts).
-
-``specify extension catalog list`` / ``catalog add`` / ``catalog remove``
-  Manage the catalog stack itself (as opposed to individual extensions).
-  ``catalog add`` flags:
-
-  - ``--name`` — catalog id/label used in precedence resolution and in
-    ``extension-catalogs.yml``.
-  - ``--priority`` — lower number wins when the same extension id appears in
-    more than one catalog.
-  - ``--install-allowed`` — whether extensions may be installed directly
-    from this catalog (``false`` means discovery/search only, no install).
+- ``add <name-or-path>`` — with ``--dev`` (a boolean flag) the positional is a
+  local extension directory; ``--from <url>`` installs from a URL and skips
+  catalog lookup; ``--force`` overwrites an existing install.
+- Priority — ``add --priority N``, ``set-priority <name> <N>``, and
+  ``catalog add --priority N`` all use *lower number = higher precedence*,
+  default 10.
+- ``list`` shows every installed extension, enabled or disabled. To browse
+  catalogs use ``search`` (in v1.0.12 ``list --available``/``--all`` only print
+  an install hint). ``list --json`` emits installed extensions (with hooks)
+  for scripting.
+- ``update`` with no name updates every installed extension.
+- ``remove --force`` skips the confirmation prompt; ``--keep-config`` keeps
+  the extension's config files.
+- ``catalog add <url> --name <n>`` — the URL must be HTTPS and ``--name`` is
+  required. It appends to the project ``.specify/extension-catalogs.yml``
+  (``--description`` is optional). ``--install-allowed/--no-install-allowed``
+  defaults to **discovery-only**: enable install only for a catalog you own
+  and vet, never an unvetted public one. The built-in community catalog is
+  discovery-only by design; to install something found there, vet it and use
+  ``specify extension add <name> --from <url>``.
 
 Catalog Configuration
 ----------------------

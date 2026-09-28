@@ -86,7 +86,7 @@ When helping with Go MCP development:
     context cancellation
 4.  **Idiomatic Go**: Follow Go conventions and community standards
 5.  **SDK Patterns**: Use official SDK patterns (``mcp.AddTool``,
-    ``mcp.AddResource``, etc.)
+    ``(*mcp.Server).AddResource``, etc.)
 6.  **Testing**: Encourage writing tests for tool handlers
 7.  **Documentation**: Recommend clear comments and README documentation
 8.  **Performance**: Consider concurrency and resource management
@@ -97,31 +97,41 @@ When helping with Go MCP development:
 Key SDK Components
 ------------------
 
+Identifiers below were checked against go-sdk v1.0.0 and v1.8.0. Verify
+them against https://pkg.go.dev/github.com/modelcontextprotocol/go-sdk/mcp
+for the project's pinned v1.x version before writing code.
+
 Server Creation
 ~~~~~~~~~~~~~~~
 
 - ``mcp.NewServer()`` with Implementation and Options
-- ``mcp.ServerCapabilities`` for feature declaration
-- Transport selection (StdioTransport, HTTPTransport)
+- ``mcp.ServerCapabilities`` for feature declaration (set through
+  ``ServerOptions.Capabilities`` from v1.2.0; earlier v1.x infers
+  capabilities from registered features)
+- Transport selection: ``StdioTransport`` for stdio; for HTTP, serve
+  ``mcp.NewStreamableHTTPHandler`` (there is no ``HTTPTransport`` type)
 
 Tool Registration
 ~~~~~~~~~~~~~~~~~
 
-- ``mcp.AddTool()`` with Tool definition and handler
+- Generic package function ``mcp.AddTool(server, tool, handler)``
 - Type-safe input/output structs
 - JSON schema tags for documentation
 
 Resource Registration
 ~~~~~~~~~~~~~~~~~~~~~
 
-- ``mcp.AddResource()`` with Resource definition and handler
+- ``server.AddResource()`` (a ``*Server`` method, not a package
+  function) with Resource definition and handler
 - Resource URIs and MIME types
-- ``ResourceContents`` and ``TextResourceContents``
+- ``ReadResourceResult`` with ``[]*ResourceContents`` (set ``Text`` or
+  ``Blob``; there is no ``TextResourceContents`` type)
 
 Prompt Registration
 ~~~~~~~~~~~~~~~~~~~
 
-- ``mcp.AddPrompt()`` with Prompt definition and handler
+- ``server.AddPrompt()`` (a ``*Server`` method) with Prompt definition
+  and handler
 - ``PromptArgument`` definitions
 - ``PromptMessage`` construction
 
@@ -167,7 +177,7 @@ Transport Setup
 Demonstrate:
 
 - Stdio transport for CLI integration
-- HTTP transport for web services
+- Streamable HTTP (``mcp.NewStreamableHTTPHandler``) for web services
 - Custom transport if needed
 - Graceful shutdown patterns
 

@@ -63,7 +63,7 @@ phase it hooks). If empty, ask for: the extension **id** (kebab), one-line
 | `extension.effect` | optional **enum** `read-only \| read-write` |
 | `extension.category` | optional free string (`docs/code/process/integration/visibility`) |
 | `requires.speckit_version` | required version specifier, e.g. `">=0.12.0"` |
-| provides | **at least one command OR one hook** is required |
+| provides | ≥1 of `provides.commands`/`templates`/`scripts`, top-level `hooks`, or top-level `events` (spec-kit ≥0.16.2; older releases accept a subset) |
 | `provides.commands[].name` | `^speckit\.[a-z0-9-]+\.[a-z0-9-]+$` |
 | `provides.commands[].file` | path **relative** to the extension root (no `..`, no absolute) |
 | `provides.commands[].aliases` | free-form (not pattern-enforced) — still keep the `speckit.<id>.*` shape |
@@ -73,8 +73,7 @@ phase it hooks). If empty, ask for: the extension **id** (kebab), one-line
 `implement`, `analyze`, `checklist`, `clarify`, `constitution`, `taskstoissues`.
 
 **Traps:** `tags`/`defaults` are read but **not** validated — don't rely on them
-for correctness. `pip install specify-cli` from PyPI is an unrelated stub; spec-kit
-is `uv tool install specify-cli --from git+https://github.com/github/spec-kit.git`.
+for correctness.
 
 ## Canonical sources
 

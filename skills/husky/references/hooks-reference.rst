@@ -244,6 +244,3 @@ Disabling Hooks
 | Globally (GUI)                 | Add ``export HUSKY=0`` to           |
 |                                | ``~/.config/husky/init.sh``         |
 +--------------------------------+-------------------------------------+
-
-Note: ``--no-verify`` is blocked by this repo’s safety hooks. Use
-``HUSKY=0`` in CI instead.

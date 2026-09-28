@@ -4,13 +4,16 @@ description: >-
   Claude Code agent teams — coordinate multiple independent Claude Code sessions
   working in parallel with shared task lists and inter-agent messaging. Use when
   the user asks to create a team, spawn teammates, coordinate parallel work, or
-  describes work that benefits from parallel agents. Also triggers on TeamCreate,
+  describes work that benefits from parallel agents. Also triggers on
   SendMessage, teammate mode, team lead, agent coordination, parallel sessions,
   or 'can we parallelize this with agents?'. Helps with planning parallel
   execution strategies and structuring team-based work.
 argument-hint: "Describe the work to parallelize (e.g., 'review PR #42 for security and performance')"
 compatibility: >-
-  Requires Claude Code v2.1.32+. Split-pane mode requires tmux or iTerm2.
+  Agent teams first shipped in Claude Code v2.1.32; this guidance assumes the
+  implicit per-session team of v2.1.178+ (TeamCreate/TeamDelete removed).
+  Checked against the agent-teams docs for v2.1.283 on 2026-09-28. Split-pane
+  mode requires tmux or iTerm2 with the it2 CLI.
 user-invocable: true
 metadata:
   repo: https://github.com/nq-rdl/agent-extensions
@@ -106,11 +109,11 @@ Add to your project or user `settings.json`:
 }
 ```
 
-**Settings file locations** (checked in this order):
-- Project: `<project>/.claude/settings.json`
+**Settings file locations** (highest precedence first, below managed settings
+and CLI flags):
 - Project local: `<project>/.claude/settings.local.json`
+- Project: `<project>/.claude/settings.json`
 - User: `~/.claude/settings.json`
-- User local: `~/.claude/settings.local.json`
 
 ### Verify or toggle configuration
 
@@ -160,7 +163,8 @@ Create an agent team to review PR #142. Spawn three reviewers:
 Have them each review and report findings.
 ```
 
-Claude handles TeamCreate, task list setup, and teammate spawning.
+Every session has one implicit team (v2.1.178+); Claude spawns teammates
+directly with the Agent tool's `name` — there is no team-creation step.
 
 ### Team sizing guidance
 
@@ -177,19 +181,21 @@ Aim for **5-6 tasks per teammate** to keep everyone productive. If you have
 
 | Mode | Setting | When to use |
 |------|---------|-------------|
-| `in-process` | Default | All teammates in one terminal. Shift+Down to cycle. |
+| `in-process` | Default | All teammates in one terminal; select them in the agent panel. |
+| `auto` | Opt-in | Split panes when already in tmux (or iTerm2 with `it2`), in-process otherwise. |
 | `tmux` | Requires tmux or iTerm2 | Each teammate gets its own pane. |
-| `auto` | Default behavior | Uses split panes if already in tmux, in-process otherwise. |
+| `iterm2` | Requires the `it2` CLI | iTerm2 native split panes. |
 
-Set in `~/.claude.json`:
+Set `teammateMode` in `~/.claude/settings.json` (older versions read
+`~/.claude.json`, which is still honoured):
 
 ```json
 {
-  "teammateMode": "in-process"
+  "teammateMode": "auto"
 }
 ```
 
-Or per-session: `claude --teammate-mode in-process`
+Or per-session: `claude --teammate-mode auto`
 
 ### Specify teammates and models
 
@@ -202,19 +208,20 @@ Use Sonnet for each teammate.
 
 ### Require plan approval for teammates
 
-For risky changes, require teammates to plan before implementing:
+Put the lead in plan mode before spawning; the teammate then works read-only
+until its plan is ready:
 
 ```text
 Spawn an architect teammate to refactor the authentication module.
-Require plan approval before they make any changes.
 ```
 
-The lead reviews and approves/rejects plans autonomously. Influence judgment with
-criteria: "only approve plans that include test coverage."
+Claude Code approves the teammate's plan as soon as it arrives, **without the
+lead reviewing it** — plan mode is not a review gate. The teammate's edits and
+commands still go through permission prompts in the lead session.
 
 ### Use subagent definitions for teammates
 
-Reference any subagent type (project, user, plugin, or CLI-defined) when
+Reference a subagent type from the project, user, or managed scope when
 spawning a teammate. The teammate inherits that subagent's system prompt, tools,
 and model:
 
@@ -226,9 +233,9 @@ Spawn a teammate using the security-reviewer agent type to audit the auth module
 
 ### Message teammates directly
 
-- **In-process mode**: Shift+Down to cycle through teammates, then type.
-  Press Enter to view a teammate's session, Escape to interrupt.
-  Press Ctrl+T to toggle the task list.
+- **In-process mode**: select a teammate in the agent panel with the up/down
+  arrows, press Enter to view its session and type to message it; Escape
+  interrupts, `x` stops it, Ctrl+T toggles the task list.
 - **Split-pane mode**: Click into a teammate's pane
 
 ### Task coordination
@@ -258,13 +265,8 @@ Three hooks enforce quality:
 Ask the researcher teammate to shut down
 ```
 
-When done with the whole team:
-
-```text
-Clean up the team
-```
-
-Always use the lead to clean up — teammates should not run cleanup.
+There is no separate team cleanup step: the team config directory is removed
+when the session ends, and the task list persists for resumed sessions.
 
 ## Architecture
 
@@ -314,7 +316,7 @@ worthwhile. For routine tasks, a single session is more cost-effective.
 
 | Issue | Fix |
 |-------|-----|
-| Teammates not appearing | Press Shift+Down to cycle; check task was complex enough |
+| Teammates not appearing | Look in the agent panel (idle rows hide or collapse); check task was complex enough |
 | Too many permission prompts | Pre-approve common operations in permission settings |
 | Teammates stopping on errors | Message them directly with additional instructions |
 | Lead implements instead of delegating | Say "Wait for teammates to complete before proceeding" |
@@ -324,11 +326,12 @@ worthwhile. For routine tasks, a single session is more cost-effective.
 ## Limitations (Experimental)
 
 - No session resumption for in-process teammates (`/resume` won't restore them)
-- One team per session (clean up before starting a new one)
+- One implicit team per session; you can't create additional teams
 - No nested teams (teammates cannot spawn their own teams)
 - Lead is fixed for the lifetime of the team
 - Split panes require tmux or iTerm2 (not VS Code terminal, Windows Terminal, Ghostty)
-- Requires Claude Code v2.1.32+
+- Behaviour here assumes v2.1.178+ — see `compatibility` and verify against
+  <https://code.claude.com/docs/en/agent-teams> when being wrong would mislead
 
 ## References
 

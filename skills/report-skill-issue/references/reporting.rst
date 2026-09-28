@@ -80,7 +80,7 @@ Use this template for the issue body:
 
 ## Environment
 
-- **Client:** [Claude Code / Gemini CLI / etc.]
+- **Client:** [AI coding client and version]
 - **Model:** [e.g., claude-sonnet-4-20250514]
 - **OS:** [e.g., macOS 15.2, Ubuntu 24.04]
 - **Skill version:** [commit hash or date if known]
@@ -116,7 +116,7 @@ Extract `owner/repo` from the `repo` URL:
 
 **Title format:** `[skill:<skill-name>] <concise summary of the problem>`
 
-**Labels:** Attempt to add `bug` and `skill` labels. If either label does not exist on the repo, do not fail — but tell the user:
+**Labels:** Attempt to add `bug` and `skill` labels. `gh issue create --label` aborts the whole create when a label is missing (`could not add label: '<label>' not found`); on that error, retry without that label and tell the user:
 > "Note: The label '<label>' does not exist on this repository and was not applied. You may want to add it manually."
 
 **Using an available GitHub integration:** Discover its issue-creation capability and pass owner/repo, the title, and the complete approved body as structured data. Do not assume a particular MCP tool name is installed.

@@ -4,39 +4,44 @@ license: CC-BY-4.0
 compatibility: spec-kit >=0.12; `specify extension` CLI; re-verify at github.github.io/spec-kit
 description: Install, list, enable/disable, update, and configure GitHub spec-kit
   extensions, and manage the catalog stack. Use when running `specify extension` commands,
-  wiring a team/internal catalog, resolving the PyPI specify-cli install footgun,
-  configuring .specify/extension-catalogs.yml or extensions.yml, or when the user
-  runs $speckit-dev:manage.
+  wiring a team/internal catalog, installing spec-kit itself, configuring .specify/extension-catalogs.yml
+  or extensions.yml, or when the user runs $speckit-dev:manage.
 metadata:
   repo: https://github.com/nq-rdl/agent-extensions
 ---
 
 # Manage spec-kit extensions
 
-> **Verify-canonical guard.** CLI flags/behavior are pinned to v0.12.x
-> (2026-07-04). Confirm against `references/cli-and-catalogs.rst` and the live
+> **Verify-canonical guard.** CLI semantics below were re-verified against
+> v1.0.12 source (2026-09-28); flags drift, so `--help` is authoritative. Confirm
+> against `references/cli-and-catalogs.rst` and the live
 > [extensions reference](https://github.github.io/spec-kit/reference/extensions.html)
 > and [user guide](https://raw.githubusercontent.com/github/spec-kit/main/extensions/EXTENSION-USER-GUIDE.md).
 
-## Install spec-kit correctly (footgun)
+## Install spec-kit
 
-`uv tool install specify-cli --from git+https://github.com/github/spec-kit.git`
-Plain `pip install specify-cli` from PyPI is an **unrelated stub** without the
-`extension`/`preset` commands.
+PyPI `specify-cli` and a pinned GitHub tag are both official install routes
+(uv, pipx, or pip). Follow the
+[installation guide](https://github.github.io/spec-kit/installation.html);
+`specify version` confirms the CLI is on `PATH`.
 
 ## CLI surface
 
-| Command | Purpose | Key flags |
-|---|---|---|
-| `specify extension search [q]` | search catalogs | `--tag --author --verified` |
-| `specify extension add <name>` | install | `--dev <path>`, `--from <url>`, `--force`, `--priority N` |
-| `specify extension remove <name>` | uninstall | `--keep-config`, `--force` |
-| `specify extension list` | installed | `--available`, `--all` |
-| `specify extension info <name>` | details | |
-| `specify extension update [name]` | update one/all | |
-| `specify extension enable/disable <name>` | toggle | |
-| `specify extension set-priority <name> <N>` | resolution order | |
-| `specify extension catalog list/add/remove` | manage catalogs | add: `--name --priority --install-allowed` |
+Run `specify extension --help`, `specify extension <cmd> --help`, and
+`specify extension catalog --help` for the current commands and flags.
+Non-obvious semantics:
+
+- `add <path> --dev` — `--dev` is a boolean; the positional is the local
+  directory. `--from <url>` installs from a URL, bypassing catalog lookup.
+- Priority (`add --priority`, `set-priority <name> <N>`, `catalog add --priority`)
+  — lower number wins; default 10.
+- `list` shows installed extensions, enabled or disabled; browse catalogs with
+  `search`. `list --json` emits installed extensions for scripting.
+- `update` with no name updates every installed extension.
+- `catalog add <https-url> --name <n>` writes the project
+  `.specify/extension-catalogs.yml`. It is **discovery-only by default**; pass
+  `--install-allowed` only for a catalog you own and vet. The built-in community
+  catalog is discovery-only: vet an entry, then `add <name> --from <url>`.
 
 ## Catalog stack (precedence)
 

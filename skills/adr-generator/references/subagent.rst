@@ -63,8 +63,9 @@ The agent follows a systematic process:
    prompt or interactive prompting. Validates completeness before
    proceeding.
 
-2. **Numbering** — Checks existing ADRs in ``/docs/adr/`` via the Read
-   and Glob tools to assign the next sequential 4-digit number (0001,
+2. **Numbering** — Checks existing ADRs in ``docs/adr/`` (relative to
+   the repository root), or the repo's existing ADR directory, via the
+   Read and Glob tools to assign the next sequential 4-digit number (0001,
    0002, etc.).
 
 3. **Document Generation** — Creates markdown files with standardized
@@ -94,7 +95,11 @@ Format: ``adr-NNNN-[title-slug].md``
 
 Example: ``adr-0042-authentication-strategy.md``
 
-Files save to ``/docs/adr/``
+Files save to ``docs/adr/`` (relative to the repository root, not the
+filesystem root), or to the repo's existing ADR directory. Follow the
+repo's existing ADR format when one exists; a structured MADR ADR skill
+is proposed separately in
+https://github.com/nq-rdl/agent-extensions/issues/202.
 
 Quality Standards
 -----------------

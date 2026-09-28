@@ -3,8 +3,7 @@ name: changie
 license: CC-BY-4.0
 description: Changelog entry creation with Changie. Use when writing a changelog entry,
   adding a new change fragment, recording what shipped, or following the Keep a Changelog
-  format. Covers non-interactive usage, entry quality rules, issue linking, and fragment
-  file naming.
+  format. Covers non-interactive usage, entry quality rules, and issue linking.
 compatibility: Requires changie CLI
 metadata:
   repo: https://github.com/nq-rdl/agent-extensions
@@ -53,7 +52,7 @@ Follow all seven rules before running the command.
 
 1. **One entry per logical change.** Two features shipped = two `changie new` calls with two fragments.
 
-2. **20-word limit** (excluding the issue reference). Count words in the body, minus any trailing `(#NNN)`.
+2. **Keep it short.** If the project's `.changie.yaml` sets `body.maxLength`, that is the hard cap — changie rejects a longer `--body`; a hand-edited fragment bypasses that check, so stay under it anyway. Without a cap, aim for one line. Cut root cause, internal helper names, and implementation mechanics — they belong in the commit message or PR description.
 
 3. **Lead with what the user can now do.** Write from a release note perspective, not a commit message perspective.
    - Good: "New `changie` skill teaches agents to write changelog entries in non-interactive mode"
@@ -84,7 +83,7 @@ changie new --interactive=false --kind Fixed \
 - GitHub auto-links bare `#NNN` references in markdown — no full URL needed.
 - Find the relevant issue number with `gh issue list` or `gh pr list`.
 - Read issue context with `gh issue view NNN` before writing the entry.
-- The issue ref does not count toward the 20-word limit.
+- The issue ref counts toward any `body.maxLength` cap — it is part of the body.
 
 ---
 
@@ -100,44 +99,6 @@ changie new --interactive=false --kind Fixed \
 | `Fixed bug` | ❌ Bad | No context, not actionable |
 | `Fixes crash when \`extract\` runs on empty PDFs — also fixes broken retry logic in \`upload\`` | ❌ Bad | Two logical fixes fused with "also" — Rule #1 violation; split into two `changie new` calls |
 | `Fixes crash when \`extract\` runs on empty PDFs` (+ separate) `Fixes broken retry logic in \`upload\`` | ✅ Good | Each fix is its own fragment — two calls, two bullets in the release note |
-
----
-
-## Trim Example
-
-**Before (64 words — 3× over limit):**
-
-> "tui: guide marker now stays inside the filled region when utilization > guide. At narrow bar widths the fill cell count and marker cell were rounded independently, which could place the │ past the visual fill edge. A new `guidePosition` helper snaps the marker inward so visual ordering matches numeric ordering"
-
-**After (16 words — within limit):**
-
-> "tui: keep guide marker inside the filled region when utilization exceeds the guide on narrow bars"
-
-**What was cut:** root-cause analysis, internal helper name, and implementation mechanics. Those belong in the commit message or PR description, not the changelog. The entry title carries the user-visible outcome.
-
----
-
-## Fragment File Renaming
-
-After `changie new` creates the fragment, rename it to a human-readable slug:
-
-```bash
-# Default name (timestamp-based):
-.changes/unreleased/Added-20260319-123456.yaml
-
-# Rename to:
-.changes/unreleased/Added-20260319-<slug>.yaml
-```
-
-Where `<slug>` is a short kebab-case descriptor (e.g., `changie-skill`, `pdf-empty-fix`).
-
-Changie ignores filenames — it reads the `kind` and `body` fields from YAML. Renaming is for human navigation only.
-
-```bash
-# Example rename
-mv .changes/unreleased/Added-20260319-*.yaml \
-   .changes/unreleased/Added-20260319-changie-skill.yaml
-```
 
 ---
 
@@ -187,9 +148,10 @@ changie merge
 > | `changie batch 0.2.0` | `.changes/0.2.0.md` | ✅ Correct |
 > | `changie batch v0.2.0` | `.changes/v0.2.0.md` | ❌ Wrong |
 >
-> The release workflow strips the `v` from the tag name (`v0.2.0` → `0.2.0`) and looks for
-> `.changes/0.2.0.md`. Using the `v` prefix creates the wrong filename, causing the release
-> workflow to exit with "file not found" and the GitHub Release to never be created.
+> Changie keeps the prefix in the filename, so release tooling that looks up
+> `.changes/0.2.0.md` will not find it. Match the naming of the project's existing
+> `.changes/<version>.md` files, and follow the project's own release process (which may
+> batch in CI from an explicit version input) rather than batching by hand.
 
 These commands are reserved for release managers. Agents must not run them unless the user explicitly requests a release.
 
@@ -201,7 +163,7 @@ Run through this before executing `changie new`:
 
 - [ ] Exactly one logical change — if body contains "also", "and also", "additionally", or ", also" stop and split into separate `changie new` calls
 - [ ] Kind matches what changed (Added/Changed/Deprecated/Removed/Fixed/Security)
-- [ ] Body is ≤ 20 words (excluding issue ref) — count the words; if >20 ask yourself "what can be cut?" and trim before continuing
+- [ ] Body fits the project's `body.maxLength` in `.changie.yaml` (if set) — if it is long, ask "what can be cut?" and trim, or split into more fragments
 - [ ] Body uses present tense, active voice
 - [ ] Code names are wrapped in backticks
 - [ ] Em dash used for elaboration (not comma or semicolon)

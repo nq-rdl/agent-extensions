@@ -202,6 +202,7 @@ Non-inferable traps:
 ## Version pins
 
 OpenCode SDK packages: `@opencode-ai/sdk`, `@opencode-ai/plugin` (JS/TS); official Go module
-`github.com/sst/opencode-sdk-go` (Go SDK **v0.19.2**, **Go 1.22+**) — verify this exact module
-path. Skills themselves are plain markdown and need no SDK; these pins matter only if
+`github.com/sst/opencode-sdk-go` (Go SDK **v0.19.2**, **Go 1.22+**) — module path (repo now at
+`github.com/anomalyco/opencode-sdk-go`; import the `sst` path). Skills themselves are plain
+markdown and need no SDK; these pins matter only if
 a skill shells out to OpenCode tooling. Re-verify current versions before pinning.

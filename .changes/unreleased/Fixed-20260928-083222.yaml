@@ -1,0 +1,3 @@
+kind: Fixed
+body: 'lefthook: correct follow, the parallel default and min_version for jobs:; husky drops false .husky/ and --no-verify claims (#298)'
+time: 2026-09-28T08:32:22.468125723Z

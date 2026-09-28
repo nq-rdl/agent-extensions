@@ -164,7 +164,7 @@ Event                        When it fires
 ``UserPromptExpansion``      A typed command expands into a prompt (can block)
 ``PreToolUse``               Before a tool call executes (can block)
 ``PermissionRequest``        A permission dialog is about to appear
-``PermissionDenied``         A tool call was denied by the auto-mode classifier
+``PermissionDenied``         Auto mode denied a tool call
 ``PostToolUse``              After a tool call succeeds
 ``PostToolUseFailure``       After a tool call fails
 ``PostToolBatch``            After a batch of parallel tool calls resolves
@@ -180,15 +180,22 @@ Event                        When it fires
 ``InstructionsLoaded``       A CLAUDE.md / ``.claude/rules/*.md`` file is loaded
 ``ConfigChange``             A configuration file changes during a session
 ``CwdChanged``               The working directory changes (e.g. ``cd``)
+``DirectoryAdded``           A directory is added mid-session (``/add-dir``)
 ``FileChanged``              A watched file changes on disk
 ``WorktreeCreate``           A worktree is being created
 ``WorktreeRemove``           A worktree is being removed
 ``PreCompact``               Before context compaction
 ``PostCompact``              After context compaction completes
+``PreModelSwitch``           Before a requested model switch applies (can block)
+``PostModelSwitch``          After the session's model changes
 ``Elicitation``              An MCP server requests user input
 ``ElicitationResult``        After the user responds to an MCP elicitation
 ``SessionEnd``               A session terminates
 ============================ =====================================================
+
+33 events, checked 2026-09-28 against the hooks guide for v2.1.283.
+``DirectoryAdded`` needs v2.1.219+; ``PreModelSwitch`` / ``PostModelSwitch``
+need v2.1.251+.
 
 --------------
 
@@ -211,6 +218,8 @@ Without a ``matcher`` a hook fires on every occurrence of its event. The
 - **SubagentStart / SubagentStop** — agent type (``Explore``, ``Plan``,
   ``general-purpose``, custom names).
 - **PreCompact / PostCompact** — ``manual``, ``auto``.
+- **PreModelSwitch / PostModelSwitch** — canonical name of the target model.
+- **DirectoryAdded** — ``slash_command``, ``register_repo_root``.
 - **ConfigChange** — ``user_settings``, ``project_settings``, ``local_settings``,
   ``policy_settings``, ``skills``.
 - **StopFailure** — ``rate_limit``, ``authentication_failed``, ``server_error``, …

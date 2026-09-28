@@ -29,7 +29,11 @@ requires
 provides
 --------
 
-At least one command OR one hook is required.
+At least one of ``provides.commands``, ``provides.templates``,
+``provides.scripts``, top-level ``hooks``, or top-level ``events`` is required
+(spec-kit >= 0.16.2; 0.12-0.14 accepted only a command or hook, 0.15 added
+events). See the Development Guide's ``provides`` section for
+template/script/event shapes.
 
 - ``commands[].name``   : ``^speckit\.[a-z0-9-]+\.[a-z0-9-]+$``
 - ``commands[].file``   : relative path (traversal-guarded)

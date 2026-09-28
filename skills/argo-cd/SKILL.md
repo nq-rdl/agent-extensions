@@ -20,7 +20,7 @@ as well as create Declarative GitOps configurations.
 The `argocd` CLI might need to be downloaded if not present. Run the installation script:
 
 ```bash
-bash skills/argo-cd/scripts/install-cli.sh
+bash "${CLAUDE_PLUGIN_ROOT}/skills/manage/scripts/install-cli.sh"
 sudo mv argocd /usr/local/bin/
 ```
 

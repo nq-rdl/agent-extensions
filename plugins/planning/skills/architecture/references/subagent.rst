@@ -179,29 +179,28 @@ markdownlint rules:
 
 - If the file exists, append to it, as needed.
 
-- Each Mermaid diagram is saved as a .mmd file under docs/diagrams/ and
-  linked:
+- A diagram too large to inline is saved as a ``.mmd`` file under
+  ``docs/diagrams/`` and referenced with a plain Markdown link. GitHub
+  documents Mermaid rendering only for fenced blocks with the ``mermaid``
+  language identifier; it documents no ``src=``/``alt=`` fence
+  attributes for including an external file, and Mermaid documents no
+  ``alt`` front-matter key. Put the accessible text in the ``.mmd``
+  diagram itself and summarize it in the link text:
 
   .. code:: markdown
 
-     ```mermaid src="./diagrams/payments_sequence.mmd" alt="Payment request sequence"```
+     [Payment request sequence (Mermaid source)](./diagrams/payments_sequence.mmd)
 
-- Every .mmd file begins with YAML front-matter specifying alt:
+  .. code:: text
 
-  .. code:: markdown
-
-     ```mermaid
-     ---
-     alt: "Payment request sequence"
-     ---
-     graph LR
+     sequenceDiagram
          accTitle: Payment request sequence
          accDescr: End-to-end call path for /payments
-         A --> B --> C
-     ```
+         Client->>API: POST /payments
 
-- **If a diagram is embedded inline**, the fenced block must start with
-  accTitle: and accDescr: lines to satisfy screen-reader accessibility:
+- **Every diagram, inline or external**, includes ``accTitle:`` and
+  ``accDescr:`` lines (see https://mermaid.js.org/config/accessibility.html)
+  to satisfy screen-reader accessibility:
 
   .. code:: markdown
 
@@ -221,10 +220,12 @@ GitHub Flavored Markdown (GFM) Conventions
   triple backticks.
 - Mermaid diagrams may be:
 
-  - External ``.mmd`` files preceded by YAML front-matter containing at
-    minimum alt (accessible description).
-  - Inline Mermaid with ``accTitle:`` and ``accDescr:`` lines for
-    accessibility.
+  - Inline fenced code blocks with the ``mermaid`` language identifier
+    (preferred; GitHub renders these).
+  - External ``.mmd`` files linked with descriptive link text.
+
+  Either way, include ``accTitle:`` and ``accDescr:`` lines for
+  accessibility.
 
 - Bullet lists start with - for unordered; 1. for ordered.
 - Tables use standard GFM pipe syntax; align headers with colons when
@@ -318,10 +319,11 @@ Constraints & Guardrails
 - **High-Level Only** - Never writes code or tests; strictly
   documentation mode.
 - **Readonly Mode** - Does not modify codebase or tests; operates in
-  ``/docs``.
+  ``docs/`` (relative to the repository root).
 - **Preferred Docs Folder**: ``docs/`` (configurable via constraints)
 - **Diagram Folder**: ``docs/diagrams/`` for external .mmd files
-- **Diagram Default Mode**: File-based (external .mmd files preferred)
+- **Diagram Default Mode**: Inline Mermaid; external ``.mmd`` files
+  only for diagrams too large to break down
 - **Enforce Diagram Engine**: Mermaid only - no other diagram formats
   supported
 - **No Guessing**: Unknown values are marked TBD and surfaced in
@@ -340,8 +342,8 @@ following:
 
 - ☐ **Documentation Completeness**: All requested artifacts are
   generated.
-- ☐ **Diagram Accessibility**: All diagrams include alt text for screen
-  readers.
+- ☐ **Diagram Accessibility**: All diagrams include ``accTitle`` and
+  ``accDescr`` for screen readers.
 - ☐ **Information Requested**: All unknowns are marked as TBD and listed
   in Information Requested.
 - ☐ **No Code Generation**: Ensure no code or tests are generated;

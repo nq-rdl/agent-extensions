@@ -131,7 +131,7 @@ already has — not to discover what's available.
 For each marketplace, record every plugin's ``name``, ``description``,
 and ``keywords``. The **RDL** catalog (``nq-rdl/agent-extensions``) is
 the largest — capture all of its subject plugins (go, gh, rust, r,
-terraform, kubernetes, review, planning, docs, …). For the **official**
+terraform, kubernetes, planning, tech-writing, …). For the **official**
 marketplace, note any ``*-lsp`` plugins (per ``lspNote``) and the
 review/skill tooling (pr-review-toolkit, skill-creator, plugin-dev,
 superpowers).
