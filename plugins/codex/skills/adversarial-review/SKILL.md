@@ -1,7 +1,7 @@
 ---
 license: Apache-2.0
 description: Run a Codex review that challenges the implementation approach and design choices
-argument-hint: '[--wait|--background] [--base <ref>] [--scope auto|working-tree|branch] [focus ...]'
+argument-hint: '[--wait|--background] [--base <ref>] [--scope auto|working-tree|branch] [--model <model|alias>] [focus ...]'
 user-invocable: true
 disable-model-invocation: true
 allowed-tools: Read, Glob, Grep, Bash(node:*), Bash(git:*), AskUserQuestion
@@ -56,6 +56,8 @@ Execution mode rules:
 Argument handling:
 - Preserve the user's arguments exactly.
 - Do not strip `--wait` or `--background` yourself.
+- `--model <model|alias>` (or `-m`) picks the Codex model for this run. The companion resolves aliases such as `sol`, `luna-6`, or `astra`; see `codex:model-guide` for the table and GPT-6 caveats.
+- The Codex `review_model` config key does not apply here. This review runs an ordinary turn on the session model or `--model`.
 - Do not weaken the adversarial framing or rewrite the user's focus text.
 - The companion script parses `--wait` and `--background`, but Claude Code's `Bash(..., run_in_background: true)` is what actually detaches the run.
 - `/codex:adversarial-review` uses the same review target selection as `/codex:review`.

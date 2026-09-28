@@ -1,0 +1,3 @@
+kind: Fixed
+body: 'Delegation guidance: a user-approved destructive step runs in the parent, not a worker (approval does not transfer); routine in-scope work stays with the worker (#391)'
+time: 2026-09-28T00:41:46.723502594Z

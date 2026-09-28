@@ -40,6 +40,8 @@ Apache-2.0 to match the bundle they ship in (`registry/bundles/codex.yaml` sets
   tests/codex/defect-hook.test.mjs
   tests/codex/defect-log.test.mjs
   tests/codex/defect-record-integration.test.mjs
+  tests/codex/git-env-isolation.test.mjs
+  tests/codex/model-aliases.test.mjs
 
 Copyright in these files is held by nq-rdl; the OpenAI copyright statement in
 `plugins/codex/NOTICE` does not extend to them.

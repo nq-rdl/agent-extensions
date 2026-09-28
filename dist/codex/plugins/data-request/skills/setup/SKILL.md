@@ -30,7 +30,8 @@ Creates the `.sqlreview/` contract used by bootstrap, analyse, explain and lift.
 Ordinary composition can run without setup; recording a hand-SQL candidate silently
 initialises the default store when absent. **Among the record stages, setup alone accepts an
 uninitialised project**: `sqlreview.sh status` exiting 3 means "proceed to init".
-Arguments: `$ARGUMENTS`.
+Arguments: `$ARGUMENTS`. `--default --yes` is the non-interactive form: take defaults, do not ask.
+Treat free-text such as "take defaults, do not ask" or "non-interactive" as `--default --yes`.
 
 ```bash
 S="${PLUGIN_ROOT}/skills/setup/scripts"
@@ -53,7 +54,8 @@ and the other stages all resolve the same `.sqlreview/` by walking up from the c
   point at `references/definitions.rst` if asked, and say a change belongs in that file.
 
 Then confirm before writing (the host user-question tool, skipped only with `--yes`): the target path and
-the file list — `config.json`, `templates/scope.md`, `templates/review.md`, `templates/lifts.md`, `reviews/`.
+the file list — `config.json`, `templates/scope.md`, `templates/review.md`, `templates/lifts.md`,
+`reviews/.gitkeep` (an empty placeholder, so git keeps `reviews/` in a committed `.sqlreview/`).
 
 ```bash
 bash "$S/sqlreview.sh" init                # copies the bundled default; never touches existing files
@@ -68,6 +70,20 @@ bash "$S/sqlreview.sh" roles "<confirmed engineer role>" "<confirmed analyst rol
 
 The helper atomically updates only the two role names. It preserves `schemaVersion`, `definitions`
 and all other settings. Stop on failure; do not patch or overwrite `config.json` directly.
+
+### Requests that forbid hand-written SQL
+
+On a fresh project or a re-run, when the request forbids hand-written SQL, tell the engineer about
+`guard.require_lift_for_string_sql` in `config.json` (default `false`). When `true`, the guard hook
+denies a Python or SQL write that passes a same-line f-string or concatenation to `execute`,
+`executemany`, `query` or `read_sql`, unless a lift ledger entry names the file. It is experimental
+and a reminder, not a sandbox: read `references/lifts.rst` (*Experimental write guard*) first, and
+measure false positives on three backlog enquiries before enabling it. Enable it only after the
+engineer confirms (the host user-question tool; with `--yes`, report it and leave it off), through the helper:
+
+```bash
+bash "$S/sqlreview.sh" guard string-sql on     # off to disable; updates only that key
+```
 
 ## 2. Already initialised (re-run — #126 §2)
 

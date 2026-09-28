@@ -90,14 +90,15 @@ bash "$S/sqlreview.sh" impact "$SLUG"    # HINTS ONLY: identifiers from the chan
 
    ```bash
    bash "$S/sqlreview.sh" carryforward "$SLUG" review ".sqlreview/reviews/$SLUG/review.draft.json"
-   # → {prior_revision, revision, sql_unchanged, carry: [{kind, id, basis, set}], walk: [{kind, id, why}]}
+   # → {prior_revision, revision, sql_unchanged, sql_body_unchanged, carry: [{kind, id, basis, set}],
+   #    bulk: [{kind, id, text, rationale, location, why}], walk: [{kind, id, why}]}
    ```
 
-   `carry` items are unchanged since the previous review with their governed SQL lines unchanged
-   (`basis`: `sql-unchanged` or `lines-unchanged`); copy each one's `set` fields onto it verbatim
-   and do not ask again. Confirm / reword / drop **only** the `walk` items (hint-flagged first),
-   plus any `carry` item the hunks or hints implicate indirectly, and add new ones. When the human
-   asks for a full re-walk, walk every item and publish with `--reconfirm-all`.
+   Copy each `carry` item's `set` fields (with `carried_basis`) onto it verbatim; do not ask
+   again. Ask the `bulk` items once, with their `location` lines, as
+   [references/carry.rst](references/carry.rst) describes. Confirm / reword / drop the `walk` items
+   (hint-flagged first), plus any `carry` item the hunks or hints implicate indirectly, and add
+   new ones. When the human asks for a full re-walk, walk every item and publish with `--reconfirm-all`.
    Seed new header items as in *Rendered header* below, `--against` the published `review.json`.
 4. Set `revision` to the previous value + 1, append to `changes[]` `{revision, at, by, summary}`.
    Then *Confirm, write, render* below.
@@ -141,21 +142,31 @@ omits; `present: false` is not evidence of no assumptions.
 
 ## Confirm, write, render
 
+Before each batch of questions below, the carry-over question included, check the wording (#394):
+
+```bash
+bash "$S/sqlreview.sh" lint --ste ".sqlreview/reviews/$SLUG/review.draft.json"  # exit 10 → "<id>\t<field>\t<rule>\t<detail>" per hit
+```
+
+Reword each hit (a sentence over 25 words, a contraction, a semicolon, `e.g.` or `i.e.`) before
+the human sees it. A reworded scope item no longer matches its scope text, so it is walked.
+
 The human-in-the-loop trigger (#130 §1.1). On an update, items `carryforward` listed under
 `carry` are already settled: leave them out of everything below. First, when a scope exists,
 find what bootstrap already settled:
 
 ```bash
 bash "$S/sqlreview.sh" carryover "$SLUG" ".sqlreview/reviews/$SLUG/review.draft.json"
-# → {scope_revision, sql_unchanged, carry_over: [{kind, id, scope_id, basis, text, rationale}], walk: [{kind, id, why}]}
+# → {scope_revision, sql_unchanged, sql_body_unchanged, scope_before_sql, carry_over: [{kind, id,
+#    scope_id, basis, text, rationale, location}], carry_over_intent: [same], walk: [{kind, id, why}]}
 ```
 
-`carry_over` lists draft items whose text and rationale match a confirmed item of the current
-scope revision, on SQL the scope still describes (`basis`: `sql-unchanged` since scope publish, or
-`lines-unchanged` at the item's location). If it is non-empty, put them in **one**
-AskUserQuestion that lists every item's id, text, rationale and basis, with options **Carry over
-all (Recommended)** / **Walk each individually**. Carry over confirms them all from that answer;
-Walk moves them to the per-item walk.
+`carry_over` and `carry_over_intent` list draft items whose list, text and rationale match a
+confirmed item of the current scope revision; `basis` is the evidence. Check the SQL against
+each, then ask each non-empty list as **one** question, as
+[references/carry.rst](references/carry.rst) describes: `carry_over` (the SQL under the item did
+not change) with **Carry over all (Recommended)**, `carry_over_intent` (the SQL changed or came
+after the scope) with a delta summary and no recommended option. Every item shows its `location`.
 
 Then put **each** remaining candidate (the `walk` list, or every item when there is no scope) to
 the engineer via AskUserQuestion — batches of at most four per call, one question per item
@@ -164,7 +175,7 @@ Reworded items are asked again. Only confirmed items reach `review.json`; reject
 the draft. If the engineer stops, leave the draft and write nothing final — say so.
 
 **Never fill `confirmed_by`, `confirmed_at` or `confirmed_revision` from anything but an answered
-question** (the bulk carry-over answer counts for the items it listed, and only those): `confirmed_by` is the user (`git config user.name` / `user.email`, else ask),
+question** (a bulk answer, carry-over or `bulk`, counts for the items it listed, and only those): `confirmed_by` is the user (`git config user.name` / `user.email`, else ask),
 `confirmed_at` is now (UTC ISO), `confirmed_revision` equals the document `revision` — except an
 item carried forward on an update, which takes exactly the `set` fields `carryforward` printed.
 Never set `carried_from_revision` by hand.

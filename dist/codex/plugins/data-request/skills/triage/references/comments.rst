@@ -34,10 +34,12 @@ verbatim:
    Confirmed: population, window and outputs, each with its source.
    Proposed, awaiting confirmation: each assumption with its reason.
    Questions for the requester:
-   1. One question per decision.
+   1. One question per decision. Proposed default: the answer to accept if the
+      requester agrees (for a V2 request, the V1 answer: confirm or change).
    Next action: one action – owner.
 
-Keep confirmed requirements and proposed assumptions in separate lines. Include
-no patient data, credentials or identifiers beyond the enquiry, approval and
-issue references. End the reply by stating that nothing was posted, pushed or
-changed.
+Keep confirmed requirements and proposed assumptions in separate lines. When a
+deliverable PR is ready for review, add the hand-off comment and the board moves
+from ``handoff.rst``. Include no patient data, credentials or identifiers beyond
+the enquiry, approval and issue references. End the reply by stating that nothing
+was posted, pushed or changed.

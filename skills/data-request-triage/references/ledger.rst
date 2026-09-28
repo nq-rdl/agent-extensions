@@ -13,6 +13,12 @@ session and does not count. In triage-only mode, return the entries as text for
 the human to store. In co-development mode, write them only to the agreed
 location.
 
+When co-development starts and no location is agreed, ask once and propose the
+child repository's tracking issue body. Until the human agrees a location,
+return the full entries as text, as in triage-only mode, after each stage that
+changes them. Do not pick a location yourself: every candidate is a write that
+needs the human's instruction.
+
 Entry fields
 ------------
 
@@ -27,7 +33,7 @@ Keep one entry per request:
    repo: rdl-service-desk/THHSAQUIRE-9903
    branch: triage/903
    owner: person or worker currently writing to the branch
-   stage: validate          # intake, map, draft, validate, analyse, lift, report or parked
+   stage: validate          # intake, map, draft, validate, analyse, lift, report, review or parked
    stages_done: [intake, map, draft]
    evidence_revision:       # what was read, so a newer revision is noticed
      service-desk#903: last comment date read
@@ -37,7 +43,9 @@ Keep one entry per request:
      - date: 2026-09-21
        who: name of the human who decided
        decision: one sentence
-       source: comment or PR link
+       source: comment or PR link, or "unlinked (verbal)" until a written comment exists
+     # spec-kit direct mode, in the exact shape /rdl-team:workflow reuses:
+     - {"decision": "generativeMode", "value": "direct", "by": "<who>", "at": "<ISO time>", "scope": "<owner/name>"}
    blockers:
      - class: dependency
        detail: one sentence
@@ -45,6 +53,12 @@ Keep one entry per request:
      - nq-rdl/query-builder change merged and released
      - child re-pinned, then scope re-bootstrapped
    next_action: one action and its owner
+   handoff:                 # set by the hand-off to review
+     pr: rdl-service-desk/THHSAQUIRE-9903#4
+     head_sha: commit the gate was checked on
+     reviewer: login the human named
+     board_state: In-Review  # child issue and service-desk issue
+     date: 2026-09-24
    verification:
      status: unverified     # unverified, partial or verified
      commands: [commands actually run, with results]
@@ -55,6 +69,8 @@ Rules
 
 * Date every decision and record who made it. A business decision needs a named
   human; an agent never records itself as the decider.
+* A verbal decision stays ``unlinked (verbal)`` until the decider writes a dated
+  comment; then replace the source with its link.
 * ``evidence_revision`` records what you read. When a later read shows a newer
   revision, re-check the affected stage before continuing.
 * To resume, confirm that each completed stage's artefact still exists at its

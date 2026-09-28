@@ -20,8 +20,9 @@ Version 2.0.
 
 Fork source: openai/codex-plugin-cc v1.0.6, commit db52e28.
 Modifications by nq-rdl (rdl-agent-extensions): converted slash-commands to
-skills; updated the model/effort catalog to GPT-5.6 (Sol/Terra/Luna); added a
-model-selection guide; adapted hooks to Claude Code exec form with a Node.js
+skills; updated the model/effort catalog to GPT-5.6 (Sol/Terra/Luna) and GPT-6
+(Astra/Sol/Luna) aliases; added a model-selection guide; normalised review
+`--model` aliases; adapted hooks to Claude Code exec form with a Node.js
 preflight; patched `scripts/codex-companion.mjs`'s top-level `main().catch`
 handler to record a defect marker; made state writes atomic and moved the
 non-Claude fallback into private user storage, including broker session state.
