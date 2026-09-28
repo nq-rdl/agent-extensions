@@ -2,7 +2,7 @@
 name: codex-review
 license: Apache-2.0
 description: Run a Codex code review against local git state
-argument-hint: '[--wait|--background] [--base <ref>] [--scope auto|working-tree|branch]'
+argument-hint: '[--wait|--background] [--base <ref>] [--scope auto|working-tree|branch] [--model <model|alias>]'
 user-invocable: true
 disable-model-invocation: true
 allowed-tools: Read, Glob, Grep, Bash(node:*), Bash(git:*), AskUserQuestion
@@ -54,6 +54,8 @@ Execution mode rules:
 Argument handling:
 - Preserve the user's arguments exactly.
 - Do not strip `--wait` or `--background` yourself.
+- `--model <model|alias>` (or `-m`) picks the Codex model for this run. The companion resolves aliases such as `sol`, `luna-6`, or `astra`; see `codex:model-guide` for the table and GPT-6 caveats.
+- For a persistent review model, the user can set `review_model` in `~/.codex/config.toml`. When set, it takes precedence over `--model` for this native review.
 - Do not add extra review instructions or rewrite the user's intent.
 - The companion script parses `--wait` and `--background`, but Claude Code's `Bash(..., run_in_background: true)` is what actually detaches the run.
 - `/codex:review` is native-review only. It does not support staged-only review, unstaged-only review, or extra focus text.

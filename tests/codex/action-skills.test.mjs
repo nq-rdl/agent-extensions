@@ -78,7 +78,7 @@ test("result and status forbid summarizing the companion output", () => {
 
 test("rescue documents the GPT-5.6 effort ladder and model aliases", () => {
   const src = readSkill("rescue");
-  // ultra is Sol/Terra only; the effort ladder has no `minimal` rung.
+  // The effort ladder has no `minimal` rung. Full alias contract: tests/test_codex_model_aliases.py.
   assert.match(src, /`low`, `medium`, `high`, `xhigh`, `max`, and `ultra`/);
   assert.doesNotMatch(src, /minimal/i);
   assert.match(src, /gpt-5\.6-sol/);
