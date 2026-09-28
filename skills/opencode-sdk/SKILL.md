@@ -47,7 +47,7 @@ shell over it.
 
 | Thing | Pin | Note |
 |---|---|---|
-| Go SDK module | `github.com/sst/opencode-sdk-go@v0.19.2` | **official path** — other namesake Go modules exist; verify this one |
+| Go SDK module | `github.com/sst/opencode-sdk-go@v0.19.2` | module path (repo now at `github.com/anomalyco/opencode-sdk-go`; import the `sst` path) |
 | Go toolchain | **Go 1.22+** | required by the SDK |
 | JS package | `@opencode-ai/sdk` | `npm install @opencode-ai/sdk` |
 | Plugin/tool types | `@opencode-ai/plugin` | for in-plugin clients (see `/opencode-dev:plugin`) |

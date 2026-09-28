@@ -86,7 +86,8 @@ usethis::use_mit_license()        # or use_gpl3_license(), etc.
 usethis::use_readme_rmd()         # README with badges
 usethis::use_news_md()            # NEWS.md changelog
 usethis::use_pkgdown()            # pkgdown documentation site
-usethis::use_github_actions()     # CI via GitHub Actions
+usethis::use_air()                # air.toml (usethis >= 3.2.0)
+usethis::use_github_action("check-standard")  # CI; use_github_actions() removed in usethis 3.2.0
 ```
 
 After creation, open the project and verify the directory structure matches the
@@ -147,8 +148,10 @@ air format .
 air format R/fit_model.R
 ```
 
-**Always run `air format .` after generating or modifying R code.** This ensures
-consistent style across the package without manual intervention.
+Run `air format .` after generating or modifying R code when the project has an
+`air.toml`/`.air.toml` (air is the default for new packages here). An existing
+package without one keeps its own convention (e.g. `styler`); do not switch
+formatters unasked.
 
 ---
 
@@ -295,7 +298,7 @@ This is the typical edit-test-document loop during active development:
 ```
 1. EDIT        Write or modify code in R/
                  |
-2. FORMAT      air format .
+2. FORMAT      air format .  (or the project's formatter)
                  |
 3. LOAD        Rscript -e "devtools::load_all()"
                Interactively test your changes
@@ -363,5 +366,6 @@ skills for depth:
   `lifecycle::deprecate_warn()`, renaming helpers.
 - **r-lib-cran-extrachecks**: CRAN submission checklist, reviewer feedback
   responses, documentation requirements beyond `devtools::check()`.
-- **r-expert**: Base R idioms, vectorization, performance, S3/S4/R6 class
-  design, error handling patterns.
+- **r-expert**: R-version-pinned idioms (`|>`, `\(x)`), cli-based errors, and
+  the performance/IO stack. For S3/S4/R6 class design see
+  [Advanced R](https://adv-r.hadley.nz/oo.html).

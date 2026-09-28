@@ -148,23 +148,6 @@ npx lint-staged
 npx commitlint --edit $1
 ```
 
-### Marketplace validation (this repo's pattern)
-
-```bash
-# .husky/pre-commit
-#!/usr/bin/env bash
-set -euo pipefail
-
-if command -v claude >/dev/null 2>&1; then
-  claude plugin validate . || {
-    echo "FAIL: Marketplace validation failed."
-    exit 1
-  }
-fi
-```
-
-See this repo's actual `.husky/pre-commit` for a full real-world example combining marketplace validation with lychee link checking.
-
 ---
 
 ## CI/CD Integration
@@ -231,9 +214,6 @@ export NVM_DIR="$HOME/.nvm"
 **`command not found` in hook:**
 - Tool is not on PATH in the hook's environment (common with GUI clients)
 - Fix: add sourcing to `~/.config/husky/init.sh`
-
-**Hooks blocked by `--no-verify`:**
-- This repo's safety hooks block `--no-verify` usage — use `HUSKY=0` in CI instead
 
 **Hooks installed but not executing:**
 - Check shebang line is correct: `#!/usr/bin/env bash` (not `#!/bin/sh` on macOS)

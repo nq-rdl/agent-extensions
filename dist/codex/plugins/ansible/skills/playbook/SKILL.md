@@ -8,8 +8,7 @@ description: Use this skill whenever the user wants to create, modify, debug, or
   service orchestration, or VM provisioning. Also use when the user asks to scaffold
   a new role, review an existing playbook, fix a failed play, or write handlers/templates.
   If the user mentions 'ansible-navigator', 'ansible-vault', or their infrastructure
-  layer patterns (layer1, layer2, etc.), use this skill. Do NOT use for AWX/Tower-specific
-  configuration (job templates, workflows, credentials) — that is a separate skill.
+  layer patterns (layer1, layer2, etc.), use this skill.
 compatibility: Requires Python 3.11+, ansible-core 2.16+, ansible-lint 24.0+
 metadata:
   repo: https://github.com/nq-rdl/agent-extensions
@@ -207,7 +206,7 @@ read the values.
 ```yaml
 # group_vars/all.yml
 proxy_password: !vault |
-  $ANSIBLE_VAULT;1.3;AES256
+  $ANSIBLE_VAULT;1.1;AES256
   ...encrypted content...
 ```
 

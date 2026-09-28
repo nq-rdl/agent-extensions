@@ -167,13 +167,19 @@ echo ""
 # Teammate mode
 echo -e "${BOLD}Teammate Mode${NC}"
 echo "-------------"
-teammate_mode="auto (default)"
+teammate_mode="in-process (default)"
 
-# Check ~/.claude.json (global config) first
-if [[ -f "$HOME/.claude.json" ]] && grep -q '"teammateMode"' "$HOME/.claude.json" 2>/dev/null; then
-  mode=$(grep -o '"teammateMode"[[:space:]]*:[[:space:]]*"[^"]*"' "$HOME/.claude.json" | head -1 | sed 's/.*: *"//' | sed 's/"//')
-  teammate_mode="$mode (from ~/.claude.json)"
-fi
+# teammateMode is a settings key (highest precedence first); older versions
+# stored it in ~/.claude.json, which is still read as a fallback. Managed
+# settings and --teammate-mode can override what this reports.
+for mode_file in "$(settings_path 'Project local')" "$(settings_path Project)" \
+                 "$(settings_path User)" "$HOME/.claude.json"; do
+  if [[ -f "$mode_file" ]] && grep -q '"teammateMode"' "$mode_file" 2>/dev/null; then
+    mode=$(grep -o '"teammateMode"[[:space:]]*:[[:space:]]*"[^"]*"' "$mode_file" | head -1 | sed 's/.*: *"//' | sed 's/"//')
+    teammate_mode="$mode (from $mode_file)"
+    break
+  fi
+done
 
 echo "  Mode: $teammate_mode"
 echo ""
@@ -193,7 +199,7 @@ echo "-------------------"
 if command -v claude &>/dev/null; then
   claude_version=$(claude --version 2>/dev/null || echo "unknown")
   echo "  Version: $claude_version"
-  echo "  (Agent teams require v2.1.32+)"
+  echo "  (Agent teams first shipped in v2.1.32; this skill assumes v2.1.178+)"
 else
   echo -e "  ${YELLOW}WARN${NC}  claude CLI not found in PATH"
 fi

@@ -56,7 +56,7 @@ Use Lefthook when:
 - ☐ Pure Python, Ruby, or Rust project
 - ☐ Polyglot repo where no single language dominates
 - ☐ Performance matters (large repo, many hooks)
-- ☐ Team wants parallel hook execution out of the box
+- ☐ Team wants built-in parallel hook execution (``parallel: true``)
 - ☐ No Node.js in the project toolchain
 - ☐ Monorepo with multiple Go modules
 
@@ -117,7 +117,7 @@ Feature Comparison
 |                   | on ``npm install``  | (manual or npm             |
 |                   |                     | postinstall)               |
 +-------------------+---------------------+----------------------------+
-| **Parallel        | No (sequential)     | Yes (default)              |
+| **Parallel        | No (sequential)     | Yes (``parallel: true``)   |
 | execution**       |                     |                            |
 +-------------------+---------------------+----------------------------+
 | **Staged file     | Via lint-staged     | Built-in                   |

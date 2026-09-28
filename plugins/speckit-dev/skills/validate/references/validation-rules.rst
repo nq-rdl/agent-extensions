@@ -40,8 +40,11 @@ requires block
 provides block
 ---------------
 
-- **At least one command OR one hook is required.** An extension with neither
-  ``provides.commands`` nor top-level ``hooks`` fails validation.
+- **At least one provided artifact is required**: a non-empty
+  ``provides.commands``, ``provides.templates``, ``provides.scripts``,
+  top-level ``hooks``, or top-level ``events`` (spec-kit >= 0.16.2, re-verified
+  against v1.0.12 on 2026-09-28). A manifest with none of these fails. Releases
+  0.12-0.14 accepted only commands or hooks; 0.15 added events.
 - ``commands[].name`` must match ``^speckit\.[a-z0-9-]+\.[a-z0-9-]+$`` and the
   middle segment must equal ``extension.id``. Valid (for ``id: my-ext``):
   ``speckit.my-ext.hello``. Invalid: ``speckit.hello`` (missing the id

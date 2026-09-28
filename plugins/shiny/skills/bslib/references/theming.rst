@@ -101,8 +101,9 @@ changes needed.
 
    bs_theme(brand = FALSE)  # Disable auto-discovery
 
-Requires the ``brand.yml`` R package. See the **brand-yml** skill for
-creating ``_brand.yml`` files.
+Requires the ``brand.yml`` R package. For the ``_brand.yml`` format see
+https://posit-dev.github.io/brand-yml/; for ``brand =`` options see the
+**shiny-bslib-theming** skill.
 
 Theming R Plots
 ---------------

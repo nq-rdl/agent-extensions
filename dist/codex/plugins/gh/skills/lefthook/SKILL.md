@@ -15,7 +15,7 @@ metadata:
 # Lefthook
 
 Fast, language-agnostic Git hooks manager written in Go. Single binary, no
-runtime dependencies, parallel execution by default.
+runtime dependencies, opt-in parallel execution (jobs run sequentially by default).
 
 > **See also**: The **husky** skill covers Node.js/Bun projects.
 > For a decision guide, see [references/husky-vs-lefthook.rst](references/husky-vs-lefthook.rst).
@@ -86,7 +86,7 @@ pre-commit:
 ### Parallel vs Piped Execution
 
 ```yaml
-# Parallel (default) — all jobs run concurrently
+# Parallel (opt-in; default is sequential) — all jobs run concurrently
 pre-commit:
   parallel: true
   jobs:
@@ -238,13 +238,13 @@ pre-commit:
 
 ```yaml
 # lefthook.yml — full structure
-min_version: 1.9.0            # minimum lefthook version
+min_version: 1.10.0           # minimum lefthook version (`jobs:` needs >= 1.10.0)
 
 # Hook definitions (any git hook name)
 pre-commit:
   parallel: true               # run jobs concurrently (default: false)
-  piped: false                 # run jobs sequentially (mutually exclusive with parallel)
-  follow: false                # continue on failure
+  piped: false                 # stop remaining jobs after one fails (error if combined with parallel)
+  follow: false                # stream job STDOUT live (avoid with parallel)
   skip:
     - merge                    # skip during merges
     - rebase                   # skip during rebases

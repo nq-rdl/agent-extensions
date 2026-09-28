@@ -1,8 +1,10 @@
 // Drive OpenCode from Go via the official SDK.
 // Verify the surface in references/go.rst and re-check github.com/sst/opencode-sdk-go for drift.
 //
-// Official module (NOT the anomalyco/manno23 forks):
-//   go get -u 'github.com/sst/opencode-sdk-go@v0.19.2'   // requires Go 1.22+
+// Module path github.com/sst/opencode-sdk-go (repo now at github.com/anomalyco/opencode-sdk-go;
+// import the sst path):
+//
+//	go get -u 'github.com/sst/opencode-sdk-go@v0.19.2'   // requires Go 1.22+
 //
 // NewClient() targets a running `opencode serve` (default http://127.0.0.1:4096).
 // Point it elsewhere or add auth with option.With* (e.g. option.WithBaseURL,

@@ -162,12 +162,10 @@ conversation; runs count toward plan usage and rate limits. Before a large run:
 
 ## Permissions
 
-Your session permission mode controls **only the launch prompt**. The subagents a
-workflow spawns always run in **`acceptEdits`** and inherit your tool allowlist
-regardless of session mode — file edits are auto-approved. Shell commands, web
-fetches, and MCP tools **not** in your allowlist still prompt mid-run, so
-**pre-allowlist what the agents need** before a long run to avoid interruptions.
-In `claude -p` / Agent SDK there's no prompt; runs start immediately.
+Spawned agents use your permission rules, so **pre-allowlist what the agents
+need** before a long run. Launch approval, headless (`claude -p` / Agent SDK)
+behaviour, and each agent's permission mode vary by mode and version — see
+[workflows: approve the plan](https://code.claude.com/docs/en/workflows#approve-the-plan-before-it-runs).
 
 ## Turn workflows off
 
@@ -178,9 +176,9 @@ toggle in `/config`. When disabled, bundled workflow commands vanish and
 
 ## Resumption
 
-A paused run resumes **within the same session** (completed agents return cached
-results). **Exiting Claude Code loses progress** — the next session starts the
-workflow fresh.
+A relaunched run replays saved agent results, but a failed or changed agent reruns
+every later agent. Whether a run survives leaving the session depends on how you
+leave — see [resume after a pause](https://code.claude.com/docs/en/workflows#resume-after-a-pause).
 
 ---
 

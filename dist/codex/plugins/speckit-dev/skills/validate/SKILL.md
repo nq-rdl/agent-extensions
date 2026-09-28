@@ -44,7 +44,8 @@ Here $ARGUMENTS means the user’s supplied skill arguments. Codex does not popu
 - [ ] `requires.speckit_version` present and a valid specifier.
 
 **provides**
-- [ ] at least one command OR one hook.
+- [ ] at least one of `provides.commands`/`templates`/`scripts`, top-level
+      `hooks`, or top-level `events` (spec-kit ≥0.16.2; older releases accept a subset).
 - [ ] every `commands[].name` matches `^speckit\.[a-z0-9-]+\.[a-z0-9-]+$` and the
       middle segment equals `extension.id`.
 - [ ] every `commands[].file` is a relative path that exists (no `..`, not absolute).

@@ -44,7 +44,7 @@ codex-plugin-cc template mapped onto it.
 
 **Version pins** (verify current before authoring): JS packages `@opencode-ai/sdk`,
 `@opencode-ai/plugin`; Go module `github.com/sst/opencode-sdk-go` **v0.19.2**, Go
-**1.22+** — verify this exact module path (other namesake Go modules exist).
+**1.22+** — module path (repo now at `github.com/anomalyco/opencode-sdk-go`; import the `sst` path).
 
 ---
 

@@ -1,8 +1,9 @@
 ---
 name: provision
 description: Terraform infrastructure specialist that generates compliant HCL using
-  latest provider/module versions, manages HCP Terraform workspaces, orchestrates
-  plan/apply workflows, and enforces security and formatting best practices.
+  current provider/module versions that fit existing constraints, manages HCP Terraform
+  workspaces when used, orchestrates plan/apply workflows, and enforces security and
+  formatting best practices.
 license: MIT
 metadata:
   upstream: https://github.com/github/awesome-copilot/blob/main/agents/terraform.agent.md

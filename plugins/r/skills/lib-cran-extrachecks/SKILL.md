@@ -286,7 +286,7 @@ Some URLs that don't currently resolve will exist once the package is published 
 
 - CRAN badge URLs (e.g., `https://cran.r-project.org/package=pkgname`)
 - CRAN status badges (e.g., `https://www.r-pkg.org/badges/version/pkgname`)
-- CRAN check results (e.g., `https://cranchecks.info/badges/pkgname`)
+- CRAN check results (e.g., `https://badges.cranchecks.info/worst/pkgname.svg`)
 - Package documentation URLs on r-universe or pkgdown sites that deploy after release
 
 When `urlchecker::url_check()` flags these URLs, leave them as-is. They are aspirational URLs that will work once the package is on CRAN.

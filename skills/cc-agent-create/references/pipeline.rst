@@ -17,7 +17,8 @@ Run from the repository root. All repository Python uses pixi.
       pixi run python3 scripts/generate_bundles_doc.py .
 
 4. Use ``changie new`` for one concise fragment per idea (200 characters maximum).
-5. Validate the complete result:
+5. Validate the complete result (the CI gates; ``AGENTS.md`` → "Build, test,
+   lint" is authoritative if this list drifts):
 
    .. code:: bash
 
@@ -25,8 +26,11 @@ Run from the repository root. All repository Python uses pixi.
       pixi run python3 scripts/check_exposure.py .
       pixi run python3 scripts/check_grouping.py .
       pixi run python3 scripts/check_consistency.py .
+      pixi run python3 scripts/generate_manifests.py . --check
+      pixi run python3 scripts/generate_bundles_doc.py . --check
       pixi run bash scripts/validate-plugins.sh
       pixi run bash scripts/sync-plugins.sh --check
+      pixi run python3 -m unittest discover -s tests -p 'test_*.py'
       go -C tools/asctl build -o /tmp/asctl ./cmd/asctl/
       /tmp/asctl repo-check
 

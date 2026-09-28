@@ -53,7 +53,7 @@ What NOT to Include
 The “Unreleased” Concept
 ------------------------
 
-In this repo, ``.changes/unreleased/`` holds fragments for changes not
+With changie's default layout, ``.changes/unreleased/`` holds fragments for changes not
 yet assigned to a version. These are: - Created by ``changie new`` after
 each meaningful change - Batched into a release with
 ``changie batch <version>`` - Merged into ``CHANGELOG.md`` with
@@ -79,5 +79,7 @@ Added, Deprecated **minor**
 Fixed, Security   **patch**
 ================= =================
 
-Pick the kind that accurately describes the change — it directly
-determines the next version number.
+Pick the kind that accurately describes the change. It determines the
+next version only when the release runs ``changie batch auto``; a
+release that passes an explicit version (``changie batch 1.4.0``) is
+decided by whoever cuts it, not by the fragment kinds.

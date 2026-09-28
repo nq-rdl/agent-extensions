@@ -57,8 +57,8 @@ Side-by-Side Comparison
 | **Model           | Per-agent via ``model`` parameter  | Per-teammate via natural language or lead  |
 | selection**       |                                    | decision                                   |
 +-------------------+------------------------------------+--------------------------------------------+
-| **Lifecycle**     | Ephemeral — dies when task         | Persistent — runs until shut down or team  |
-|                   | completes                          | cleaned up                                 |
+| **Lifecycle**     | Ephemeral — dies when task         | Persistent — runs until shut down or the   |
+|                   | completes                          | session ends                               |
 +-------------------+------------------------------------+--------------------------------------------+
 | **Token cost**    | Lower — results summarized back    | Higher — each teammate is a separate       |
 |                   |                                    | Claude instance                            |
@@ -68,8 +68,8 @@ Side-by-Side Comparison
 +-------------------+------------------------------------+--------------------------------------------+
 | **Nesting**       | Subagents can spawn subagents      | Teammates cannot spawn their own teams     |
 +-------------------+------------------------------------+--------------------------------------------+
-| **User            | None — runs in background          | Direct: Shift+Down to message, or click    |
-| interaction**     |                                    | pane                                       |
+| **User            | None — runs in background          | Direct: select in the agent panel, or      |
+| interaction**     |                                    | click pane                                 |
 +-------------------+------------------------------------+--------------------------------------------+
 | **Best for**      | Focused tasks where only the       | Complex work requiring discussion and      |
 |                   | result matters                     | collaboration                              |
