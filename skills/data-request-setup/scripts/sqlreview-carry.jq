@@ -6,7 +6,8 @@
 # id in the same list, identical text and rationale, and one of these holds (the basis):
 #   location null  → sql-unchanged      the whole SQL is unchanged (SHA evidence)
 #                    sql-absent         the SQL is absent at both revisions
-#                    sql-body-unchanged only comments, blank lines or whitespace changed (sr_sql_body)
+#                    sql-body-unchanged only the leading comment header changed; the rest of the
+#                                       file is byte-identical (sr_body_start in sqlreview-lib.sh)
 #                    intent-unchanged   scope only: a scope item states intent, not SQL lines, so it
 #                                       carries whatever the SQL did; analyse checks the SQL later
 #   location lines → the prior lines in the prior baseline equal the new lines in the current SQL
@@ -16,7 +17,8 @@
 #
 # A review item that does not qualify only because the SQL changed under it (location null, or a
 # location added or removed) is marked bulk: its wording is unchanged, so the skill may put all such
-# items to the human in one question. The answer is a fresh confirmation, never a carried one.
+# items to the human in one question, with each item's current location. The answer is a fresh
+# confirmation, never a carried one.
 
 def cf_sql_lines: if . == null then null elif . == "" then [] else rtrimstr("\n") | split("\n") end;
 def cf_range: type == "array" and length == 2 and all(.[]; type == "number" and . >= 1 and . == floor) and .[0] <= .[1];
@@ -25,9 +27,10 @@ def cf_range: type == "array" and length == 2 and all(.[]; type == "number" and 
 #   {kind: "scope"|"review", prior: document|null,
 #    base: string|null (prior baseline SQL, only when it is evidence), cur: string|null (current SQL),
 #    prior_sha: string ("" = SQL absent/unknown at the prior revision), cur_sha: string ("" = SQL absent now),
-#    body_unchanged: boolean (baseline and current SQL have the same sr_sql_body)}
+#    body_unchanged: boolean (baseline and current SQL differ at most in the leading comment header)}
 # Output: an array with one row per assumption/limitation object:
-#   {kind, id, basis, set} when it qualifies · {kind, id, basis: null, bulk, why} when it must be asked.
+#   {kind, id, basis, set} when it qualifies ·
+#   {kind, id, basis: null, bulk, why, text, rationale, location} when it must be asked.
 def carry_rows($ctx):
   . as $d
   | $ctx.prior as $p
@@ -65,7 +68,7 @@ def carry_rows($ctx):
       | if has("basis") then
           . + {set: {status: "confirmed", confirmed_by: $m.confirmed_by, confirmed_at: $m.confirmed_at,
                      confirmed_revision: $m.confirmed_revision, carried_from_revision: $pr, carried_basis: .basis}}
-        else . + {basis: null, bulk: (.bulk // false), text: $i.text, rationale: $i.rationale} end
+        else . + {basis: null, bulk: (.bulk // false), text: $i.text, rationale: $i.rationale, location: $i.location} end
     ];
 
 # Publish's verdict: one violation line per carried item (carried_from_revision set) that does not

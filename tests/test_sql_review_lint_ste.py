@@ -1,7 +1,7 @@
 """Issue 394: `sqlreview.sh lint --ste` checks STE wording before the human confirms it.
 
 Plain `lint` (provisional wording in confirmed items, #340) passed scope drafts whose sentences
-were too long, so ENQ1204 needed a second scope revision only for STE splits. `lint --ste` checks
+were too long, so a scope needed a second revision only for STE splits. `lint --ste` checks
 `intent` and every assumption/limitation `text` and `rationale`, whatever the status, and prints
 one `<id>\t<field>\t<rule>\t<detail>` line per hit (exit 10). It is opt-in so the plain `lint`
 contract (3 columns, confirmed items only) stays as bootstrap and the existing tests use it.

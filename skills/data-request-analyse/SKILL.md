@@ -86,18 +86,12 @@ bash "$S/sqlreview.sh" impact "$SLUG"    # HINTS ONLY: identifiers from the chan
    ```bash
    bash "$S/sqlreview.sh" carryforward "$SLUG" review ".sqlreview/reviews/$SLUG/review.draft.json"
    # → {prior_revision, revision, sql_unchanged, sql_body_unchanged, carry: [{kind, id, basis, set}],
-   #    bulk: [{kind, id, text, rationale, why}], walk: [{kind, id, why}]}
+   #    bulk: [{kind, id, text, rationale, location, why}], walk: [{kind, id, why}]}
    ```
 
-   `carry` items are unchanged since the previous review with their governed SQL unchanged
-   (`basis`: `sql-unchanged`, `lines-unchanged`, or `sql-body-unchanged` when only comments,
-   blank lines or whitespace changed, such as the header copy of the scope). Copy each one's `set`
-   fields (including `carried_basis`) onto it verbatim and do not ask again. `bulk` items keep
-   their wording but have no location, so the SQL change is not evidence for them (#366). Drop any
-   bulk item the hunks or hints implicate into the walk, then put the rest in **one**
-   AskUserQuestion that lists each id, text and rationale: **Carry these N forward
-   (Recommended)** / **Walk each individually**. The answer confirms them afresh for this revision
-   (`confirmed_*` from the answer, never the old values). Confirm / reword / drop the `walk` items
+   Copy each `carry` item's `set` fields (with `carried_basis`) onto it verbatim; do not ask
+   again. Ask the `bulk` items once, with their `location` lines, as
+   [references/carry.rst](references/carry.rst) describes. Confirm / reword / drop the `walk` items
    (hint-flagged first), plus any `carry` item the hunks or hints implicate indirectly, and add
    new ones. When the human asks for a full re-walk, walk every item and publish with `--reconfirm-all`.
    Seed new header items as in *Rendered header* below, `--against` the published `review.json`.
@@ -158,22 +152,16 @@ find what bootstrap already settled:
 
 ```bash
 bash "$S/sqlreview.sh" carryover "$SLUG" ".sqlreview/reviews/$SLUG/review.draft.json"
-# → {scope_revision, sql_unchanged, sql_body_unchanged, scope_before_sql,
-#    carry_over: [{kind, id, scope_id, basis, text, rationale, location}], walk: [{kind, id, why}]}
+# → {scope_revision, sql_unchanged, sql_body_unchanged, scope_before_sql, carry_over: [{kind, id,
+#    scope_id, basis, text, rationale, location}], carry_over_intent: [same], walk: [{kind, id, why}]}
 ```
 
-`carry_over` lists draft items whose list, text and rationale match a confirmed item of the
-current scope revision. `basis` is the evidence: `sql-unchanged` (same SHA since scope publish),
-`sql-body-unchanged` (only comments, blank lines or whitespace changed, such as the scope copied
-into the SQL header), `lines-unchanged` (the item's location lines), `scope-before-sql` (the scope
-was confirmed before the SQL existed) or `intent-unchanged` (the SQL changed, but the scope item
-has no location: it states intent). A scope item whose located lines changed is walked (#366).
-Check the SQL against each `carry_over` item first. Move to the walk any item the SQL contradicts
-or, for `intent-unchanged`, any item a changed part of the SQL touches. If items remain, put them
-in **one** AskUserQuestion that lists every item's id, text, rationale, basis and `location`
-lines, with options **Carry over all (Recommended)** / **Walk each individually**. Carry over
-confirms them all, their new locations included, from that answer; Walk moves them to the
-per-item walk.
+`carry_over` and `carry_over_intent` list draft items whose list, text and rationale match a
+confirmed item of the current scope revision; `basis` is the evidence. Check the SQL against
+each, then ask each non-empty list as **one** question, as
+[references/carry.rst](references/carry.rst) describes: `carry_over` (the SQL under the item did
+not change) with **Carry over all (Recommended)**, `carry_over_intent` (the SQL changed or came
+after the scope) with a delta summary and no recommended option. Every item shows its `location`.
 
 Then put **each** remaining candidate (the `walk` list, or every item when there is no scope) to
 the engineer via AskUserQuestion — batches of at most four per call, one question per item

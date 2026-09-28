@@ -128,42 +128,66 @@ sr_sha256() { # <file> -> hex digest
   else sr_die 2 "neither sha256sum nor shasum is available"; fi
 }
 
-# The executable body of an SQL file (#366), to tell a comment-only change from an SQL change.
-# Outside string literals and quoted identifiers ('...', "...", [...]) it drops `--` and /* */
-# comments, collapses whitespace runs to one space and drops blank lines; CRLF counts as LF.
-# Literal text is kept byte for byte, blank lines inside it too. Block comments do not nest, so a
-# nested comment ends early and the rest is compared as code (stricter, never looser). A full-line
-# `-- @extract:` marker is kept: query-builder splits extracts on it.
-sr_sql_body() { # <file> -> normalised body on stdout
+# Where the SQL body starts, after the leading comment header (#366): the first line number that
+# is not a blank line, a full-line `--` comment or part of a leading /* */ block. The body is then
+# compared byte for byte, so any edit after the header (a comment edit included) is a change.
+# Fails closed, keeping more of the file in the body, never less:
+#   - a `-- @extract:` line ends the header (query-builder splits extracts on it); a header block
+#     that mentions `@extract:` is kept in the body
+#   - a header block with a nested /* is kept in the body (dialects disagree on nesting)
+#   - code after a closing */ starts the body at that line
+#   - an unterminated header block: exit 3, so the caller treats the body as changed
+sr_body_start() { # <file> -> line number (N+1 when the whole file is header)
   awk '
-    function sp() { if (out != "" && substr(out, length(out), 1) != " ") out = out " " }
-    BEGIN { st = 0; q = sprintf("%c", 39) }   # st: 0 code, 1 quote, 2 double quote, 3 bracket, 4 block comment
-    {
-      line = $0; sub(/\r$/, "", line)
-      if (st == 0 && line ~ /^[ \t]*--[ \t]*@extract:/) { sub(/^[ \t]+/, "", line); sub(/[ \t]+$/, "", line); print line; next }
-      out = ""; lit = (st >= 1 && st <= 3); n = length(line); i = 1
-      while (i <= n) {
-        c = substr(line, i, 1); c2 = substr(line, i, 2)
-        if (st == 4) { if (c2 == "*/") { st = 0; sp(); i += 2 } else i++; continue }
-        if (st == 1) { out = out c; if (c == q) st = 0; i++; continue }
-        if (st == 2) { out = out c; if (c == "\"") st = 0; i++; continue }
-        if (st == 3) { out = out c; if (c == "]") st = 0; i++; continue }
-        if (c2 == "--") break
-        if (c2 == "/*") { st = 4; sp(); i += 2; continue }
-        if (c == " " || c == "\t") { sp(); i++; continue }
-        if (c == q) st = 1; else if (c == "\"") st = 2; else if (c == "[") st = 3
-        out = out c; i++
+    function hstart(n) { start = n; done = 1; exit }
+    # Scan line from position i with the current depth; returns when the line is consumed.
+    function scan(line, i,    r) {
+      while (1) {
+        if (depth > 0) {
+          r = substr(line, i)
+          po = index(r, "/*"); pc = index(r, "*/")
+          if (!po && !pc) return
+          if (po && (!pc || po < pc)) { depth++; nested = 1; i += po + 1; continue }
+          depth--; i += pc + 1
+          if (depth == 0 && (nested || bad)) hstart(bstart)
+          continue
+        }
+        r = substr(line, i); sub(/^[ \t\r]+/, "", r)
+        if (r == "") return
+        if (substr(r, 1, 2) == "/*") {
+          bstart = NR; nested = 0; bad = (r ~ /@extract:/); depth = 1
+          i = length(line) - length(r) + 3; continue
+        }
+        if (substr(r, 1, 2) == "--" && r !~ /^--[ \t]*@extract:/) return
+        hstart(NR)                      # code, or a -- @extract: marker: the body starts here
       }
-      if (st == 0 || st == 4) { sub(/ $/, "", out); if (out == "" && !lit) next }
-      print out
+    }
+    BEGIN { depth = 0; done = 0 }
+    {
+      if (depth > 0 && $0 ~ /@extract:/) bad = 1
+      scan($0, 1)
+    }
+    END {
+      if (done) print start
+      else if (depth > 0) exit 3
+      else print NR + 1
     }' "$1"
 }
-sr_body_sha256() { # <file> -> hex digest of sr_sql_body
-  local tmp sha
-  tmp="$(mktemp)" || sr_die 2 "mktemp failed"
-  sr_sql_body "$1" > "$tmp" || { rm -f "$tmp"; sr_die 2 "cannot read $1"; }
-  sha="$(sr_sha256 "$tmp")"; rm -f "$tmp"
-  printf '%s\n' "$sha"
+# SHA256 of the SQL body (tail from sr_body_start). Prints nothing and returns 1 on any failure
+# (unterminated header, awk/tail/mktemp error): callers compare only two non-empty digests.
+sr_body_sha256() { # <file> -> hex digest
+  local n tmp sha
+  n="$(sr_body_start "$1")" || return 1
+  case "$n" in ""|*[!0-9]*) return 1 ;; esac
+  tmp="$(mktemp)" || return 1
+  if ! tail -n +"$n" "$1" > "$tmp"; then rm -f "$tmp"; return 1; fi
+  sha="$( (sr_sha256 "$tmp") 2>/dev/null )"; rm -f "$tmp"
+  case "$sha" in [0-9a-f]*) printf '%s\n' "$sha" ;; *) return 1 ;; esac
+}
+# True when both files' bodies are known and equal (a failure on either side counts as a change).
+sr_body_same() { # <file> <file>
+  local a b
+  a="$(sr_body_sha256 "$1")" && b="$(sr_body_sha256 "$2")" && [ -n "$a" ] && [ "$a" = "$b" ]
 }
 
 sr_now() { date -u +%Y-%m-%dT%H:%M:%SZ; }

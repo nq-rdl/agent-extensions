@@ -67,12 +67,16 @@ and all other settings. Stop on failure; do not patch or overwrite `config.json`
 ### Requests that forbid hand-written SQL
 
 On a fresh project or a re-run, when the request forbids hand-written SQL, tell the engineer about
-`guard.require_lift_for_string_sql` in `config.json` (default `false`). When set to `true`, the
-guard hook denies a Python or SQL write that passes an f-string or concatenated SQL to `execute`,
+`guard.require_lift_for_string_sql` in `config.json` (default `false`). When `true`, the guard hook
+denies a Python or SQL write that passes a same-line f-string or concatenation to `execute`,
 `executemany`, `query` or `read_sql`, unless a lift ledger entry names the file. It is experimental
-and a reminder, not a sandbox: read `references/lifts.rst` (*Experimental write guard*) first.
-Enable it only after the engineer confirms (AskUserQuestion; with `--yes`, report it and leave it off).
-Change only that key to `true`; the guard asks before the `config.json` write.
+and a reminder, not a sandbox: read `references/lifts.rst` (*Experimental write guard*) first, and
+measure false positives on three backlog enquiries before enabling it. Enable it only after the
+engineer confirms (AskUserQuestion; with `--yes`, report it and leave it off), through the helper:
+
+```bash
+bash "$S/sqlreview.sh" guard string-sql on     # off to disable; updates only that key
+```
 
 ## 2. Already initialised (re-run — #126 §2)
 

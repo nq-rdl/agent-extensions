@@ -19,6 +19,7 @@
 #   publish SLUG scope|review|lifts DRAFT             validate a staged copy, then atomically replace the final JSON
 #   publish --reconfirm-all SLUG KIND DRAFT    same, but refuse any carried (carried_from_revision) confirmation
 #   roles ENGINEER ANALYST                     update only the two confirmed role names in config.json
+#   guard string-sql on|off                    set only guard.require_lift_for_string_sql in config.json
 #   fingerprint SQL                            {sql_path, sql_sha256, git_commit, git_dirty}
 #   snapshot SLUG SQL                          verify final review SHA, retain history, advance source.sql
 #   delta SLUG                                 diff source.sql vs the current SQL; exit 10 when changed, 6 no baseline
@@ -319,6 +320,30 @@ cmd_roles() (
 )
 
 # ---------------------------------------------------------------------------------------------
+# The experimental string-SQL lift guard (#379): set only guard.require_lift_for_string_sql, as
+# roles does for the role names, so setup never patches config.json by hand.
+cmd_guard() (
+  [ $# -eq 2 ] && [ "$1" = string-sql ] || usage
+  local value config tmp
+  case "$2" in on) value=true ;; off) value=false ;; *) usage ;; esac
+  sr_need_jq
+  sr_require_root
+  config="$SR_ROOT/$SR_DIR/config.json"
+  sr_no_symlinks "$config" || exit 2
+  [ -f "$config" ] || sr_die 2 "config.json is missing"
+  tmp="$(mktemp "$SR_ROOT/$SR_DIR/.guard.XXXXXX")" || sr_die 2 "mktemp failed"
+  trap 'rm -f "$tmp"' EXIT
+  trap 'exit 2' HUP INT TERM
+  jq -se --argjson v "$value" '
+    if length == 1 and (.[0] | type == "object" and .schemaVersion == 2 and ((.guard // {}) | type == "object"))
+    then .[0] | .guard = ((.guard // {}) + {require_lift_for_string_sql: $v})
+    else error("expected one schema-2 configuration") end
+  ' "$config" > "$tmp" || sr_die 4 "invalid configuration; original preserved"
+  mv "$tmp" "$config" || sr_die 2 "cannot update guard"
+  printf 'updated\tconfig.json guard.require_lift_for_string_sql=%s\n' "$value"
+)
+
+# ---------------------------------------------------------------------------------------------
 cmd_publish() (
   local reconfirm_all=false
   if [ "${1:-}" = "--reconfirm-all" ]; then reconfirm_all=true; shift; fi
@@ -534,15 +559,16 @@ cmd_impact() {
 
 # ---------------------------------------------------------------------------------------------
 # Which review-draft items restate a confirmed item of the current scope revision (same list, same
-# text and rationale). Analyse offers these as one bulk confirmation (#346); the basis says why:
-#   sql-unchanged       the whole SQL is unchanged since scope publish (SHA)
-#   sql-body-unchanged  only comments, blank lines or whitespace changed, e.g. the scope copied into
-#                       the SQL header (#366, sr_sql_body)
-#   lines-unchanged     the item's location lines are unchanged
-#   scope-before-sql    the scope was confirmed before the SQL existed (sql_sha256 null, no
-#                       baseline); the bulk answer also confirms the item's new location (#366)
-#   intent-unchanged    the SQL changed, but the scope item has no location: it states intent (#366)
-# A scope item with location lines whose lines changed is walked, as is every new or reworded item.
+# text and rationale). Analyse offers each list as one bulk confirmation (#346); the basis says why.
+# carry_over: the SQL under the item did not change since scope publish
+#   sql-unchanged       the whole SQL is unchanged (SHA)
+#   sql-body-unchanged  only the leading comment header changed, e.g. the scope copied into the SQL
+#                       header (#366, sr_body_start); the rest of the file is byte-identical
+#   lines-unchanged     the draft item's location lines are unchanged
+# carry_over_intent: the SQL changed (or did not exist) under an unchanged scope statement (#366)
+#   scope-before-sql    the scope was confirmed before the SQL existed (sql_sha256 null, no baseline)
+#   intent-unchanged    the SQL changed, but the scope item has no location: it states intent
+# Every other matching item is walked, as is every new or reworded item.
 cmd_carryover() {
   [ $# -eq 2 ] || usage
   sr_need_jq
@@ -576,8 +602,7 @@ cmd_carryover() {
   fi
   # Scope-first: framed and confirmed before any SQL existed, so there is no SQL to compare with.
   if [ "$scope" != /dev/null ] && [ -z "$scope_sha" ] && [ ! -f "$base" ]; then before_sql=true; fi
-  if [ "$have_base" = true ] && [ -n "$cur_sha" ] &&
-     [ "$(sr_body_sha256 "$base")" = "$(sr_body_sha256 "$cur")" ]; then body_same=true; fi
+  if [ "$have_base" = true ] && [ -n "$cur_sha" ] && sr_body_same "$base" "$cur"; then body_same=true; fi
   jq -n --slurpfile scope "$scope" --slurpfile draft "$draft" \
     --rawfile base "$([ "$have_base" = true ] && echo "$base" || echo /dev/null)" \
     --rawfile cur "$([ -n "$cur_sha" ] && echo "$cur" || echo /dev/null)" \
@@ -598,11 +623,12 @@ cmd_carryover() {
           elif lines_same(($i.location | objects | .lines) // null) then {scope_id: $m.id, basis: "lines-unchanged"}
           elif $before_sql then {scope_id: $m.id, basis: "scope-before-sql"}
           elif $m.location == null then {scope_id: $m.id, basis: "intent-unchanged"}
-          else {scope_id: $m.id, basis: null, why: "SQL changed since scope publish and the lines of scope item \($m.id) changed"} end
+          else {scope_id: $m.id, basis: null, why: "SQL changed since scope publish, scope item \($m.id) has a location, and the lines at the draft location differ between the scope baseline and the current SQL"} end
     ] as $rows
     | {scope_revision: $s.revision, sql_unchanged: $unchanged, sql_body_unchanged: $body,
        scope_before_sql: $before_sql,
-       carry_over: [$rows[] | select(.basis != null)],
+       carry_over: [$rows[] | select(.basis == "sql-unchanged" or .basis == "sql-body-unchanged" or .basis == "lines-unchanged")],
+       carry_over_intent: [$rows[] | select(.basis == "scope-before-sql" or .basis == "intent-unchanged")],
        walk: [$rows[] | select(.basis == null) | {kind, id, why}]}'
 }
 
@@ -612,7 +638,7 @@ cmd_carryover() {
 # bytes recorded after that publish (analyse: snapshot → source.sql; bootstrap: scope.source.sql),
 # counted only when its SHA256 equals the prior document's sql_sha256 (when it recorded one).
 # Sets CF_KIND, CF_PRIOR, CF_BASE, CF_CUR (a path or /dev/null), CF_HAVE_BASE, CF_HAVE_CUR, CF_PRIOR_SHA,
-# CF_CUR_SHA and CF_BODY_SAME (baseline and current SQL differ at most in comments/whitespace, #366).
+# CF_CUR_SHA and CF_BODY_SAME (baseline and current SQL differ at most in the leading comment header, #366).
 _carry_context() { # <slug> <scope|review> <sql_path>
   local d="$SR_REVIEWS/$1" base_sha
   CF_KIND="$2" CF_PRIOR=/dev/null CF_CUR=/dev/null CF_HAVE_BASE=false CF_HAVE_CUR=false CF_PRIOR_SHA="" CF_CUR_SHA=""
@@ -631,8 +657,7 @@ _carry_context() { # <slug> <scope|review> <sql_path>
     if [ -z "$CF_PRIOR_SHA" ] || [ "$CF_PRIOR_SHA" = "$base_sha" ]; then CF_HAVE_BASE=true; CF_PRIOR_SHA="$base_sha"; fi
   fi
   [ "$CF_HAVE_BASE" = true ] || CF_BASE=/dev/null
-  if [ "$CF_HAVE_BASE" = true ] && [ "$CF_HAVE_CUR" = true ] &&
-     [ "$(sr_body_sha256 "$CF_BASE")" = "$(sr_body_sha256 "$CF_CUR")" ]; then CF_BODY_SAME=true; fi
+  if [ "$CF_HAVE_BASE" = true ] && [ "$CF_HAVE_CUR" = true ] && sr_body_same "$CF_BASE" "$CF_CUR"; then CF_BODY_SAME=true; fi
 }
 
 # Run a jq filter over a draft with sqlreview-carry.jq included and $ctx bound (see its header).
@@ -667,7 +692,7 @@ cmd_carryforward() {
        sql_unchanged: ($ctx.prior_sha != "" and $ctx.prior_sha == $ctx.cur_sha),
        sql_body_unchanged: (($ctx.prior_sha != "" and $ctx.prior_sha == $ctx.cur_sha) or $ctx.body_unchanged),
        carry: [$rows[] | select(.basis != null) | {kind, id, basis, set}],
-       bulk: [$rows[] | select(.basis == null and .bulk) | {kind, id, text, rationale, why}],
+       bulk: [$rows[] | select(.basis == null and .bulk) | {kind, id, text, rationale, location, why}],
        walk: [$rows[] | select(.basis == null and (.bulk | not)) | {kind, id, why}]}' --arg document "$kind"
 }
 
@@ -891,6 +916,7 @@ case "$cmd" in
   lint) cmd_lint "$@" ;;
   publish) cmd_publish "$@" ;;
   roles) cmd_roles "$@" ;;
+  guard) cmd_guard "$@" ;;
   fingerprint) cmd_fingerprint "$@" ;;
   snapshot) cmd_snapshot "$@" ;;
   delta) cmd_delta "$@" ;;

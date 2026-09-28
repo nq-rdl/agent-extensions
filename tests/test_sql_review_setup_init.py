@@ -69,6 +69,37 @@ class InitReviewsPlaceholder(unittest.TestCase):
             self.assertNotIn(".gitkeep", r.stdout)
 
 
+class GuardHelper(unittest.TestCase):
+    """`guard string-sql on|off` sets only guard.require_lift_for_string_sql, like `roles`."""
+
+    def test_sets_only_the_guard_key(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            p = Project(tmp)
+            cfg = p.root / ".sqlreview" / "config.json"
+            before = json.loads(cfg.read_text())
+            r = run(["guard", "string-sql", "on"], p.root)
+            self.assertEqual(r.returncode, 0, r.stderr)
+            after = json.loads(cfg.read_text())
+            self.assertIs(after["guard"]["require_lift_for_string_sql"], True)
+            self.assertEqual({k: v for k, v in after.items() if k != "guard"},
+                             {k: v for k, v in before.items() if k != "guard"})
+            self.assertEqual(run(["guard", "string-sql", "off"], p.root).returncode, 0)
+            self.assertIs(json.loads(cfg.read_text())["guard"]["require_lift_for_string_sql"], False)
+
+    def test_errors_leave_config_untouched(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            p = Project(tmp)
+            cfg = p.root / ".sqlreview" / "config.json"
+            original = cfg.read_bytes()
+            for args in (["guard", "string-sql", "yes"], ["guard", "other", "on"], ["guard", "string-sql"]):
+                with self.subTest(args=args):
+                    self.assertEqual(run(args, p.root).returncode, 1)
+            cfg.write_text("{not json")
+            self.assertEqual(run(["guard", "string-sql", "on"], p.root).returncode, 4)
+            self.assertEqual(cfg.read_text(), "{not json")
+            cfg.write_bytes(original)
+
+
 class SetupSkillContract(unittest.TestCase):
     def test_non_interactive_form_is_documented(self):
         for path in COPIES[:2]:  # the Codex copy has no argument-hint
@@ -91,6 +122,10 @@ class SetupSkillContract(unittest.TestCase):
                 # the pointer is tied to the trigger: a request that forbids hand-written SQL
                 self.assertRegex(text, re.compile(r"forbids hand-written SQL.{0,300}guard\.require_lift_for_string_sql", re.S))
                 self.assertIn("references/lifts.rst", text)
+                # aligned with lifts.rst, and no hand edit of config.json
+                self.assertIn("same-line", text)
+                self.assertIn("three backlog enquiries", text)
+                self.assertIn('sqlreview.sh" guard string-sql on', text)
 
 
 if __name__ == "__main__":
