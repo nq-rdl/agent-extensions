@@ -21,7 +21,8 @@ except ModuleNotFoundError:
 #   2   SELECT * FROM adm.stays  5 SELECT month, COUNT(*) AS n
 #   3   WHERE discharge_date ... 6 FROM stays
 UNRELATED_EDIT = SQL_V1.replace("adm.stays", "adm.stays_v2")          # line 2 only
-LINE_SHIFT = "-- monthly admissions\n" + SQL_V1                       # every line moves down one
+LINE_SHIFT = "-- monthly admissions\n" + SQL_V1                       # every line moves down one (comment only)
+CODE_SHIFT = "SET NOCOUNT ON;\n" + SQL_V1                             # every line moves down one (executable)
 GOVERNED_EDIT = SQL_V1.replace("IS NOT NULL", "IS NOT NULL AND ward <> 'X'")  # line 3
 
 WHO = {"confirmed_by": "analyst@example", "confirmed_at": "2026-09-15T00:00:00Z"}
@@ -288,13 +289,15 @@ class ScopePublish(Base):
         self.publish(self.scope(2, sql=LINE_SHIFT, assumptions=[fresh(a1, 2), carried(shift(a2, 1), 2)],
                                 limitations=[carried(shift(l1, 1), 2)]))
 
-    def test_null_location_item_with_changed_sql_is_refused(self):
+    def test_null_location_item_with_changed_sql_carries_its_intent(self):
+        # #366: a scope item states intent, not SQL lines (before #366 this was refused).
         self.publish_v1()
         self.sql.write_text(UNRELATED_EDIT)
         a1, a2 = self.v1["assumptions"]
         l1, = self.v1["limitations"]
-        self.refused(self.scope(2, sql=UNRELATED_EDIT, assumptions=[carried(a1, 2), carried(a2, 2)],
-                                limitations=[carried(l1, 2)]), "A1")
+        self.publish(self.scope(2, sql=UNRELATED_EDIT, assumptions=[carried(a1, 2, carried_basis="intent-unchanged"),
+                                                                    carried(a2, 2)],
+                                limitations=[carried(l1, 2)]))
 
     def test_baseline_sha_disagreement_is_refused(self):
         self.publish_v1()
@@ -311,9 +314,10 @@ class ScopePublish(Base):
         a2 = item("A2", "Calendar months", 1, rationale="Dashboard convention.")
         self.publish(self.scope(1, sql=None, assumptions=[a1, a2]))
         self.publish(self.scope(2, sql=None, assumptions=[carried(a1, 2), fresh(dict(a2, text="Calendar months (UTC)"), 2)]))
-        # once the SQL exists, a null-location item has nothing to compare against: walk it
+        # once the SQL exists, an unchanged null-location scope item still carries its intent (#366;
+        # before #366 it was walked, so a scope-first project re-asked every item)
         self.sql = self.p.sql("q.sql", SQL_V1)
-        self.refused(self.scope(3, sql=SQL_V1, assumptions=[carried(a1, 3), fresh(a2, 3)]), "A1")
+        self.publish(self.scope(3, sql=SQL_V1, assumptions=[carried(a1, 3), fresh(dict(a2, text="Calendar months (UTC)"), 3)]))
 
 
 class CarryForwardHelper(Base):
@@ -340,8 +344,9 @@ class CarryForwardHelper(Base):
                           limitations=[self.candidate(shift(l1, by), rationale="Reworded.")])
 
     def test_classification_matches_publish(self):
-        self.sql.write_text(LINE_SHIFT)
-        draft = self.draft_doc(LINE_SHIFT)
+        # CODE_SHIFT, not LINE_SHIFT: a prepended comment is no longer an SQL change (#366).
+        self.sql.write_text(CODE_SHIFT)
+        draft = self.draft_doc(CODE_SHIFT)
         out = self.carryforward("review", draft)
         self.assertEqual(out["prior_revision"], 1)
         self.assertEqual(out["revision"], 2)
@@ -349,10 +354,12 @@ class CarryForwardHelper(Base):
         self.assertEqual([(c["kind"], c["id"], c["basis"]) for c in out["carry"]],
                          [("assumptions", "A2", "lines-unchanged")])
         self.assertEqual(out["carry"][0]["set"], {"status": "confirmed", **WHO, "confirmed_revision": 1,
-                                                  "carried_from_revision": 1})
+                                                  "carried_from_revision": 1, "carried_basis": "lines-unchanged"})
+        # A1 (unchanged wording, no location, SQL changed) is offered in one bulk question (#366)
+        self.assertEqual([(b["id"], b["text"]) for b in out["bulk"]], [("A1", "Only completed stays")])
+        self.assertIn("SQL changed", out["bulk"][0]["why"])
         why = {w["id"]: w["why"] for w in out["walk"]}
-        self.assertEqual(set(why), {"A1", "A3", "L1"})
-        self.assertIn("SQL changed", why["A1"])
+        self.assertEqual(set(why), {"A3", "L1"})
         self.assertIn("A3", why["A3"])
         self.assertIn("rationale", why["L1"])
 
@@ -364,7 +371,7 @@ class CarryForwardHelper(Base):
                 it.update(carry.get((k, it["id"]), {"status": "confirmed", "confirmed_by": "engineer@example",
                                                     "confirmed_at": "2026-09-23T00:00:00Z", "confirmed_revision": 2}))
         bad = json.loads(json.dumps(doc))
-        bad["assumptions"][0].update(out["carry"][0]["set"])  # A1 was walked
+        bad["assumptions"][0].update(out["carry"][0]["set"])  # A1 was offered in bulk, not carried
         self.draft.write_text(json.dumps(bad))
         r = run(["publish", "q", "review", str(self.draft)], self.p.root)
         self.assertEqual(r.returncode, 4, r.stdout + r.stderr)

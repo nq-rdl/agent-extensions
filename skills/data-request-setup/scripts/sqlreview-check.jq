@@ -29,6 +29,13 @@ def items($kind; $rev):
            elif $cr == $rev then (if $cf != null then "\($id): carried_from_revision \($cf) on an item confirmed at revision \($rev) — remove it, or re-confirm for this revision" else empty end)
            elif $cf == null then "\($id): confirmed_revision \($cr) != revision \($rev) — re-confirm for this revision, or carry it forward with carried_from_revision (sqlreview.sh carryforward)"
            elif ($cf | integer | not) or $cf != $rev - 1 or $cf < $cr then "\($id): carried_from_revision \($cf) must be revision - 1 (\($rev - 1)) and >= confirmed_revision \($cr) — re-confirm for this revision"
+           else empty end),
+        # carried_basis (#366) records why publish accepted a carried item; only carried items have one.
+        (.carried_basis as $cb
+         | if $cb == null then empty
+           elif .carried_from_revision == null then "\($id): carried_basis on an item that is not carried — remove it"
+           elif (["sql-unchanged", "sql-absent", "sql-body-unchanged", "intent-unchanged", "lines-unchanged"] | index([$cb])) == null
+           then "\($id): unknown carried_basis \($cb | tojson)"
            else empty end)
     );
 

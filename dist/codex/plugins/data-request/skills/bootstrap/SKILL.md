@@ -77,6 +77,7 @@ Work through these in order, pausing (the host user-question tool) on each scopi
    **Reject**. Each question shows the item's `text` **and** its `rationale`: both are the
    confirmed record, so a rationale the engineer never saw must not be published. Reword may change
    either; a reworded item is asked again with its new text and rationale.
+   Before each batch, run `bash "$S/sqlreview.sh" lint --ste ".sqlreview/reviews/$SLUG/scope.draft.json"` (intent too; exit 10 → one `<id>\t<field>\t<rule>\t<detail>` line per hit) and reword each hit first.
 5. **Open questions** — anything the engineer must take back to the requester. First look for a
    prior version's SQL or delivery (a V2 request's V1 repository or release). When it answers the
    question, ask it as confirm-or-change, quoting the prior answer and its source. Propose a
