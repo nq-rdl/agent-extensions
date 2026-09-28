@@ -380,6 +380,19 @@
       ]
     },
     {
+      "name": "testcontainers",
+      "source": "./plugins/testcontainers",
+      "description": "Testcontainers — integration tests against real services in throwaway containers",
+      "version": "0.35.0",
+      "keywords": [
+        "testcontainers",
+        "testing",
+        "integration-tests",
+        "docker",
+        "containers"
+      ]
+    },
+    {
       "name": "planning",
       "source": "./plugins/planning",
       "description": "Planning — implementation strategy, technical-spike validation, file-level sequencing, API/repo architecture, and ADRs",

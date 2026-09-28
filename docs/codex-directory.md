@@ -42,6 +42,7 @@ This report records missing evidence; it does not attest to publisher identity, 
 | starrocks | 1 | skills-only | No |
 | tech-writing | 2 | skills+hooks | No |
 | terraform | 3 | skills-only | No |
+| testcontainers | 1 | skills-only | No |
 | writerside | 1 | skills-only | No |
 
 ## ansible
@@ -356,6 +357,15 @@ This report records missing evidence; it does not attest to publisher identity, 
 - Publisher must select supported availability regions
 
 ## terraform
+
+- Publisher must supply logo
+- Publisher must supply privacyPolicyURL
+- Publisher must supply termsOfServiceURL
+- Publisher identity and organization submission access are not recorded as verified
+- Record authenticated execution evidence for five positive and three negative task cases
+- Publisher must select supported availability regions
+
+## testcontainers
 
 - Publisher must supply logo
 - Publisher must supply privacyPolicyURL
