@@ -57,10 +57,11 @@ none is committed or run, except exempt probes, until a writable run publishes t
 entry.
 
 Operator probes are outside this gate when each probe is aggregate-only,
-small-cell suppressed, bounded to a single scan, returns no patient or clinician
-identifier, and records any ``NOLOCK`` or ``READ UNCOMMITTED`` use. Such probes
-write nothing to the repository and feed no delivered extract. Codes they return
-are category or type codes, never staff or person keys. A probe that returns rows
+small-cell suppressed, bounded to a single scan, returns no patient identifier,
+and records any ``NOLOCK`` or ``READ UNCOMMITTED`` use. Such probes write nothing
+to the repository and feed no delivered extract. Codes they return are category or
+type codes, never staff or person keys. Clinician and resource names are not
+patient identifiers (guardrails, "Personal information"). A probe that returns rows
 or identifiers, or that feeds an extract, is hand SQL and needs an entry.
 Guardrails' ``references/performance.rst`` gives the probe design rules.
 

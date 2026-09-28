@@ -138,7 +138,8 @@ class MapLiftCapture(unittest.TestCase):
         capture = section(MAP_RAW, "Lift capture")
         for token in ("outside the hand-SQL gate only when", "aggregate-only", "small-cell-suppressed",
                       "single-scan",
-                      "returns no identifying values (no patient or clinician identifiers, no staff or person keys)",
+                      "returns no identifying values (no patient identifiers, no staff or person keys; "
+                      "clinician and resource names are not personal information)",
                       "feeds no delivered extract", "Record any `NOLOCK` use",
                       "Guardrails is the source of truth"):
             with self.subTest(token=token):

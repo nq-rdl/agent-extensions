@@ -72,11 +72,14 @@ pipeline SQL exists. Keep each probe:
   of dates, category codes and numeric ranges, never of an identifier, name or
   free-text column. Avoid ``GROUPING SETS`` combined with ``COUNT(DISTINCT ...)`` on
   a full scan: it reads the table more than once.
-* **Free of identifying values.** Never ask the operator to paste a column that can
-  hold an identifying value, such as a clinician or resource name. In one enquiry,
-  ``OPD_Appointments.Resource`` held doctor names. Mark such a probe local-only, and
-  let it return category or type codes only, never staff or person keys or names,
-  into the task output.
+* **Free of patient identifiers.** Never ask the operator to paste a column that can
+  hold a patient identifier ("Personal information" in ``release.rst``). Clinician and
+  resource names are not personal information (governance ruling, 2026-09-28): a
+  probe may group on ``OPD_Appointments.Resource``, whose labels hold clinician
+  names, and the operator pastes those labels as they are. Only a label that
+  looks like a patient's name is written as "name removed"; mark a probe whose
+  column can hold patient names local-only. Any codes it returns are category or
+  type codes, never staff or person keys, into the task output.
 * **Explicit about isolation.** Record any ``NOLOCK`` or ``READ UNCOMMITTED`` use
   beside the probe.
 

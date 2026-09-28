@@ -2,10 +2,31 @@ Release conventions
 ===================
 
 Read this before delivery, and when a request asks for dates, validation listings,
-study identifiers or aggregate counts. Evidence: two related enquiries whose builder
-had to decide each point from first principles (issue #389). The approval and the
+study identifiers, aggregate counts or clinician names. Evidence: two related
+enquiries whose builder had to decide each point from first principles (issue #389),
+and the governance ruling below (issue #413). The approval and the
 requester's confirmed scope override these conventions. Record each choice you make
 under them as an assumption or a ledger decision.
+
+Personal information
+--------------------
+
+On 2026-09-28 the RDL governance owner ruled that clinician names are not personal
+information for RDL work (issue #413). It applies to clinic, clinician and other
+resource labels in any source.
+
+* Patient identifiers are personal information: name, URN/MRN, date of birth,
+  address, Medicare number and free text.
+* A request may select on or deliver clinician and resource labels, for example the
+  nurse and doctor names in ``BI-Reporting.dbo.OPD_Appointments.Resource``, and a
+  probe may return them (``performance.rst``, "Probe design"). Staff and person keys
+  stay out of probe output, and small-cell suppression still applies.
+* An approval or de-identification assessment that restricts clinician names
+  overrides this ruling.
+* The child's pre-push PII scan (Presidio ``PERSON``, data-analysis-scaffold v0.5.0)
+  can flag such a label in request SQL. Add that exact label to the child's
+  ``.pii-allowlist`` and cite the ruling in the commit or PR. Never allowlist a
+  patient's name.
 
 Raw dates or a derived outcome
 ------------------------------
