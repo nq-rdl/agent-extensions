@@ -313,6 +313,20 @@
       ]
     },
     {
+      "name": "claude-prompting",
+      "source": "./plugins/claude-prompting",
+      "description": "Claude model prompting — model-specific prompt and harness guidance, starting with Claude Opus 5.5",
+      "version": "0.36.1",
+      "keywords": [
+        "claude",
+        "anthropic",
+        "prompting",
+        "opus-5-5",
+        "effort",
+        "agents"
+      ]
+    },
+    {
       "name": "codex",
       "source": "./plugins/codex",
       "description": "Delegate work to the OpenAI Codex CLI — reviews, background tasks, and rescue sessions",

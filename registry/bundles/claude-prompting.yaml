@@ -1,0 +1,34 @@
+schemaVersion: v1
+id: claude-prompting
+displayName: Claude Prompting
+description: Claude model prompting — model-specific prompt and harness guidance, starting with Claude Opus 5.5
+keywords: [claude, anthropic, prompting, opus-5-5, effort, agents]
+owners:
+  - rdl
+channels:
+  - stable
+skills:
+  - {source: opus-5-5-prompting, leaf: opus-5-5}
+hooks: []
+prompts: []
+mcp: []
+targets:
+  claude:
+    enabled: true
+    pluginName: claude-prompting
+    marketplaceName: rdl-agent-extensions
+
+  codex:
+    enabled: true
+    pluginName: claude-prompting
+    marketplaceName: rdl-agent-extensions
+    category: Developer Tools
+    components:
+      skills: true
+      mcp: false
+      hooks: false
+      apps: false
+    interface:
+      shortDescription: Model-specific prompt and harness guidance for Claude Opus 5.5
+      defaultPrompt:
+      - Help me tune my Claude Opus 5.5 prompt.

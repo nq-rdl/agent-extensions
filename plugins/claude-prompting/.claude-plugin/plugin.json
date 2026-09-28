@@ -1,0 +1,10 @@
+{
+  "name": "claude-prompting",
+  "version": "0.36.1",
+  "description": "Claude model prompting — model-specific prompt and harness guidance, starting with Claude Opus 5.5",
+  "author": {
+    "name": "nq-rdl"
+  },
+  "repository": "https://github.com/nq-rdl/agent-extensions",
+  "license": "MIT"
+}
