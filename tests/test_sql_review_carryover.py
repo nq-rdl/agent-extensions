@@ -55,20 +55,25 @@ class CarryOver(unittest.TestCase):
         self.assertEqual(out["carry_over"][0]["rationale"], "Open stays have no discharge date.")
         self.assertEqual([(w["kind"], w["id"]) for w in out["walk"]], [("assumptions", "A3"), ("limitations", "L1")])
 
-    def test_changed_sql_carries_over_only_items_whose_lines_are_unchanged(self):
+    def test_changed_sql_carries_over_located_items_on_lines_and_intent_items_on_intent(self):
         self.scope()
         self.sql.write_text(SQL_V1.replace("adm.stays", "adm.stays_v2"))  # line 2 only
         out = self.carryover()
         self.assertFalse(out["sql_unchanged"])
-        self.assertEqual([(c["id"], c["basis"]) for c in out["carry_over"]], [("A2", "lines-unchanged")])
+        self.assertFalse(out["sql_body_unchanged"])
+        # Before #366 A1 (no location in the scope) was walked on any SQL change.
+        self.assertEqual([(c["id"], c["basis"]) for c in out["carry_over"]],
+                         [("A1", "intent-unchanged"), ("A2", "lines-unchanged")])
         why = {w["id"]: w["why"] for w in out["walk"]}
-        self.assertIn("SQL changed", why["A1"])
+        self.assertEqual(set(why), {"A3", "L1"})
         self.assertIn("differs", why["L1"])
 
     def test_changed_location_lines_are_walked(self):
         self.scope()
         self.sql.write_text(SQL_V1.replace("GROUP BY month", "GROUP BY month, ward"))  # line 7
-        self.assertEqual(self.carryover()["carry_over"], [])
+        out = self.carryover()
+        self.assertEqual([(c["id"], c["basis"]) for c in out["carry_over"]], [("A1", "intent-unchanged")])
+        self.assertIn("A2", {w["id"] for w in out["walk"]})
 
     def test_recorded_scope_sha_is_honoured_and_a_disagreeing_baseline_is_ignored(self):
         self.scope(baseline=None, sql_sha256=hashlib.sha256(SQL_V1.encode()).hexdigest())
@@ -76,11 +81,24 @@ class CarryOver(unittest.TestCase):
         self.scope(baseline="something else\n", sql_sha256="0" * 64)
         out = self.carryover()
         self.assertFalse(out["sql_unchanged"])
-        self.assertEqual(out["carry_over"], [])
+        self.assertFalse(out["sql_body_unchanged"])
+        # no evidence for located A2; A1 states intent (#366)
+        self.assertEqual([(c["id"], c["basis"]) for c in out["carry_over"]], [("A1", "intent-unchanged")])
 
-    def test_without_baseline_nothing_carries_over(self):
+    def test_scope_first_without_baseline_carries_over(self):
+        # sql_sha256 null and no scope.source.sql: the scope was confirmed before the SQL existed.
+        # Before #366 this pinned "nothing carries over", which is the scope-first bug (ENQ1205).
         self.scope(baseline=None)
-        self.assertEqual(self.carryover()["carry_over"], [])
+        out = self.carryover()
+        self.assertTrue(out["scope_before_sql"])
+        self.assertEqual([(c["id"], c["basis"]) for c in out["carry_over"]],
+                         [("A1", "scope-before-sql"), ("A2", "scope-before-sql")])
+
+    def test_recorded_sha_without_baseline_walks_located_items_after_an_edit(self):
+        self.scope(baseline=None, sql_sha256="0" * 64)
+        out = self.carryover()
+        self.assertFalse(out["scope_before_sql"])
+        self.assertEqual([(c["id"], c["basis"]) for c in out["carry_over"]], [("A1", "intent-unchanged")])
 
     def test_without_scope_every_item_is_walked(self):
         out = self.carryover()

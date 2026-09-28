@@ -128,6 +128,44 @@ sr_sha256() { # <file> -> hex digest
   else sr_die 2 "neither sha256sum nor shasum is available"; fi
 }
 
+# The executable body of an SQL file (#366), to tell a comment-only change from an SQL change.
+# Outside string literals and quoted identifiers ('...', "...", [...]) it drops `--` and /* */
+# comments, collapses whitespace runs to one space and drops blank lines; CRLF counts as LF.
+# Literal text is kept byte for byte, blank lines inside it too. Block comments do not nest, so a
+# nested comment ends early and the rest is compared as code (stricter, never looser). A full-line
+# `-- @extract:` marker is kept: query-builder splits extracts on it.
+sr_sql_body() { # <file> -> normalised body on stdout
+  awk '
+    function sp() { if (out != "" && substr(out, length(out), 1) != " ") out = out " " }
+    BEGIN { st = 0; q = sprintf("%c", 39) }   # st: 0 code, 1 quote, 2 double quote, 3 bracket, 4 block comment
+    {
+      line = $0; sub(/\r$/, "", line)
+      if (st == 0 && line ~ /^[ \t]*--[ \t]*@extract:/) { sub(/^[ \t]+/, "", line); sub(/[ \t]+$/, "", line); print line; next }
+      out = ""; lit = (st >= 1 && st <= 3); n = length(line); i = 1
+      while (i <= n) {
+        c = substr(line, i, 1); c2 = substr(line, i, 2)
+        if (st == 4) { if (c2 == "*/") { st = 0; sp(); i += 2 } else i++; continue }
+        if (st == 1) { out = out c; if (c == q) st = 0; i++; continue }
+        if (st == 2) { out = out c; if (c == "\"") st = 0; i++; continue }
+        if (st == 3) { out = out c; if (c == "]") st = 0; i++; continue }
+        if (c2 == "--") break
+        if (c2 == "/*") { st = 4; sp(); i += 2; continue }
+        if (c == " " || c == "\t") { sp(); i++; continue }
+        if (c == q) st = 1; else if (c == "\"") st = 2; else if (c == "[") st = 3
+        out = out c; i++
+      }
+      if (st == 0 || st == 4) { sub(/ $/, "", out); if (out == "" && !lit) next }
+      print out
+    }' "$1"
+}
+sr_body_sha256() { # <file> -> hex digest of sr_sql_body
+  local tmp sha
+  tmp="$(mktemp)" || sr_die 2 "mktemp failed"
+  sr_sql_body "$1" > "$tmp" || { rm -f "$tmp"; sr_die 2 "cannot read $1"; }
+  sha="$(sr_sha256 "$tmp")"; rm -f "$tmp"
+  printf '%s\n' "$sha"
+}
+
 sr_now() { date -u +%Y-%m-%dT%H:%M:%SZ; }
 
 # The authoritative document of a review directory: review.json, else scope.json, else nothing.

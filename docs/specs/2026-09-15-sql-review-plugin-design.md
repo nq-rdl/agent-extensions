@@ -47,6 +47,7 @@ Nothing about the location is customisable.
   templates/
     scope.md                  # bootstrap output layout ({{placeholders}})
     review.md                 # analyse output layout
+  reviews/.gitkeep            # empty placeholder from init, so git keeps reviews/
   reviews/<slug>/
     scope.json  scope.md      # bootstrap: authoritative JSON + rendered doc
     review.json review.md     # analyse:   authoritative JSON + rendered doc
@@ -144,7 +145,8 @@ scripts across a plugin's skills).
 | `status [--json]` | Lists reviews with `slug, sql_path, revision, state ∈ {current, stale, missing, no-baseline, scoped, draft, invalid}`. Exit 3 when not initialised — **setup is the one caller that treats 3 as "proceed to init"**; every other skill stops and points at `/sql-review:setup`. Bundled templates the project lacks are reported as `missing_templates` plus `missing_templates_fix` (`--json`) or one stderr line (text rows unchanged). | 0 · 3 |
 | `slug PATH` | Prints the slug for a project-relative path; exit 5 if `reviews/<slug>/` exists bound to a different `sql_path`. | 0 · 5 |
 | `check FILE [--stdin]` | Validates a scope/review JSON: required keys, item shape, every item `confirmed` with `confirmed_by`/`confirmed_at` and `confirmed_revision == revision`, or a carried item's fields (§12). One line per violation. | 0 valid · 4 invalid |
-| `carryforward SLUG scope\|review DRAFT` | Read-only JSON: which draft items may carry the previous published revision's confirmation (with the exact fields to set) and which must be walked, and why (§12). | 0 · 2 · 4 |
+| `carryforward SLUG scope\|review DRAFT` | Read-only JSON: which draft items may carry the previous published revision's confirmation (with the exact fields to set), which may be asked in one bulk question, and which must be walked, and why (§12). | 0 · 2 · 4 |
+| `lint [--ste] FILE` | Advisory. Plain: confirmed items whose wording is still provisional (`<id>\t<field>\t<phrases>`). `--ste`: STE hits in `intent` and every item's text/rationale, any status — sentence over 25 words, contraction, semicolon, `e.g.`/`i.e.` (`<id>\t<field>\t<rule>\t<detail>`). | 0 · 10 hits · 2 · 4 |
 | `fingerprint SQL` | `{sql_path, sql_sha256, git_commit, git_dirty}` for the skill to embed. | 0 · 2 |
 | `snapshot SLUG SQL` | Copies the current SQL bytes to `reviews/<slug>/source.sql` (called by analyse after the guarded final JSON Write succeeds, verifying its SHA256 and preserving history/<revision>.sql). | 0 · 2 |
 | `delta SLUG` | Unified diff of `source.sql` vs the current file; header lines report both sha256s. | 0 unchanged · 10 changed · 6 no baseline · 2 |
@@ -335,11 +337,21 @@ revision when its confirmed content is unchanged; scope and review items now do 
   copied by bootstrap after each publish). It is evidence only when its SHA256 equals the previous
   document's `sql_sha256` (when one was recorded), as for `carryover`. With a `location`, the previous
   lines in the baseline must equal the new lines in the current SQL (remaps allowed, same length).
-  With `location: null`, the whole SQL must be unchanged (SHA equality) or absent at both revisions.
-  `publish --reconfirm-all` refuses every carried item.
+  With `location: null`, the whole SQL must be unchanged (SHA equality), absent at both revisions,
+  or changed only in comments, blank lines or whitespace (the normalised body, `sr_sql_body`, #366).
+  A **scope** item with `location: null` states intent, so it also carries when the SQL changed
+  (`intent-unchanged`); analyse still checks the SQL against it. A carried item records the
+  evidence as `carried_basis`, which publish re-proves. `publish --reconfirm-all` refuses every carried item.
+- **Bulk (#366).** A **review** item whose wording is unchanged but whose SQL changed under it
+  (`location: null`, or a location added or removed) is listed under `bulk`, not carried: analyse
+  asks one "carry these N forward?" question, and the answer is a fresh confirmation.
 - **`carryforward`** prints the same verdict for a draft, from the same jq definition
   (`sqlreview-carry.jq`) publish enforces, so the two cannot drift. Bootstrap and analyse walk only
-  what it lists under `walk`, plus any carryable item the diff implicates indirectly.
+  what it lists under `walk` (and ask `bulk` once), plus any carryable item the diff implicates indirectly.
+- **`carryover`** (scope → review draft, analyse) matches list, text and rationale and reports the
+  basis: `sql-unchanged`, `sql-body-unchanged`, `lines-unchanged`, `scope-before-sql` (scope
+  confirmed with `sql_sha256: null` and no baseline) or `intent-unchanged`. Every basis is confirmed
+  by the one bulk answer, which also confirms the items' new `location` lines.
 - **Render** marks a carried item's revision cell `N (carried)`; `N` is where it was confirmed.
 
 ## 13. The rendered analysis-notes header as review evidence (#355)

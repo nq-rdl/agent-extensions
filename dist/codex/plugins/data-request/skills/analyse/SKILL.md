@@ -88,14 +88,21 @@ bash "$S/sqlreview.sh" impact "$SLUG"    # HINTS ONLY: identifiers from the chan
 
    ```bash
    bash "$S/sqlreview.sh" carryforward "$SLUG" review ".sqlreview/reviews/$SLUG/review.draft.json"
-   # → {prior_revision, revision, sql_unchanged, carry: [{kind, id, basis, set}], walk: [{kind, id, why}]}
+   # → {prior_revision, revision, sql_unchanged, sql_body_unchanged, carry: [{kind, id, basis, set}],
+   #    bulk: [{kind, id, text, rationale, why}], walk: [{kind, id, why}]}
    ```
 
-   `carry` items are unchanged since the previous review with their governed SQL lines unchanged
-   (`basis`: `sql-unchanged` or `lines-unchanged`); copy each one's `set` fields onto it verbatim
-   and do not ask again. Confirm / reword / drop **only** the `walk` items (hint-flagged first),
-   plus any `carry` item the hunks or hints implicate indirectly, and add new ones. When the human
-   asks for a full re-walk, walk every item and publish with `--reconfirm-all`.
+   `carry` items are unchanged since the previous review with their governed SQL unchanged
+   (`basis`: `sql-unchanged`, `lines-unchanged`, or `sql-body-unchanged` when only comments,
+   blank lines or whitespace changed, such as the header copy of the scope). Copy each one's `set`
+   fields (including `carried_basis`) onto it verbatim and do not ask again. `bulk` items keep
+   their wording but have no location, so the SQL change is not evidence for them (#366). Drop any
+   bulk item the hunks or hints implicate into the walk, then put the rest in **one**
+   the host user-question tool that lists each id, text and rationale: **Carry these N forward
+   (Recommended)** / **Walk each individually**. The answer confirms them afresh for this revision
+   (`confirmed_*` from the answer, never the old values). Confirm / reword / drop the `walk` items
+   (hint-flagged first), plus any `carry` item the hunks or hints implicate indirectly, and add
+   new ones. When the human asks for a full re-walk, walk every item and publish with `--reconfirm-all`.
    Seed new header items as in *Rendered header* below, `--against` the published `review.json`.
 4. Set `revision` to the previous value + 1, append to `changes[]` `{revision, at, by, summary}`.
    Then *Confirm, write, render* below.
@@ -139,21 +146,37 @@ omits; `present: false` is not evidence of no assumptions.
 
 ## Confirm, write, render
 
+Before each batch of questions below, the carry-over question included, check the wording (#394):
+
+```bash
+bash "$S/sqlreview.sh" lint --ste ".sqlreview/reviews/$SLUG/review.draft.json"  # exit 10 → "<id>\t<field>\t<rule>\t<detail>" per hit
+```
+
+Reword each hit (a sentence over 25 words, a contraction, a semicolon, `e.g.` or `i.e.`) before
+the human sees it. A reworded scope item no longer matches its scope text, so it is walked.
+
 The human-in-the-loop trigger (#130 §1.1). On an update, items `carryforward` listed under
 `carry` are already settled: leave them out of everything below. First, when a scope exists,
 find what bootstrap already settled:
 
 ```bash
 bash "$S/sqlreview.sh" carryover "$SLUG" ".sqlreview/reviews/$SLUG/review.draft.json"
-# → {scope_revision, sql_unchanged, carry_over: [{kind, id, scope_id, basis, text, rationale}], walk: [{kind, id, why}]}
+# → {scope_revision, sql_unchanged, sql_body_unchanged, scope_before_sql,
+#    carry_over: [{kind, id, scope_id, basis, text, rationale, location}], walk: [{kind, id, why}]}
 ```
 
-`carry_over` lists draft items whose text and rationale match a confirmed item of the current
-scope revision, on SQL the scope still describes (`basis`: `sql-unchanged` since scope publish, or
-`lines-unchanged` at the item's location). If it is non-empty, put them in **one**
-the host user-question tool that lists every item's id, text, rationale and basis, with options **Carry over
-all (Recommended)** / **Walk each individually**. Carry over confirms them all from that answer;
-Walk moves them to the per-item walk.
+`carry_over` lists draft items whose list, text and rationale match a confirmed item of the
+current scope revision. `basis` is the evidence: `sql-unchanged` (same SHA since scope publish),
+`sql-body-unchanged` (only comments, blank lines or whitespace changed, such as the scope copied
+into the SQL header), `lines-unchanged` (the item's location lines), `scope-before-sql` (the scope
+was confirmed before the SQL existed) or `intent-unchanged` (the SQL changed, but the scope item
+has no location: it states intent). A scope item whose located lines changed is walked (#366).
+Check the SQL against each `carry_over` item first. Move to the walk any item the SQL contradicts
+or, for `intent-unchanged`, any item a changed part of the SQL touches. If items remain, put them
+in **one** the host user-question tool that lists every item's id, text, rationale, basis and `location`
+lines, with options **Carry over all (Recommended)** / **Walk each individually**. Carry over
+confirms them all, their new locations included, from that answer; Walk moves them to the
+per-item walk.
 
 Then put **each** remaining candidate (the `walk` list, or every item when there is no scope) to
 the engineer via the host user-question tool — batches of at most four per call, one question per item
@@ -162,7 +185,7 @@ Reworded items are asked again. Only confirmed items reach `review.json`; reject
 the draft. If the engineer stops, leave the draft and write nothing final — say so.
 
 **Never fill `confirmed_by`, `confirmed_at` or `confirmed_revision` from anything but an answered
-question** (the bulk carry-over answer counts for the items it listed, and only those): `confirmed_by` is the user (`git config user.name` / `user.email`, else ask),
+question** (a bulk answer, carry-over or `bulk`, counts for the items it listed, and only those): `confirmed_by` is the user (`git config user.name` / `user.email`, else ask),
 `confirmed_at` is now (UTC ISO), `confirmed_revision` equals the document `revision` — except an
 item carried forward on an update, which takes exactly the `set` fields `carryforward` printed.
 Never set `carried_from_revision` by hand.

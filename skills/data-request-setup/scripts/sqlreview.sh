@@ -4,7 +4,8 @@
 #   S="${CLAUDE_PLUGIN_ROOT}/skills/setup/scripts"; bash "$S/sqlreview.sh" <command> ...
 # and by the plugin's hooks. Contract: docs/specs/2026-09-15-sql-review-plugin-design.md §4.
 #
-#   init [--diff] [--apply PATH...] [--json]   create .sqlreview/ from the bundled default; never overwrites
+#   init [--diff] [--apply PATH...] [--json]   create .sqlreview/ from the bundled default (plus an empty
+#                                              reviews/.gitkeep so git keeps reviews/); never overwrites
 #   status [--json] [--verbose]                reviews and their state (--verbose: why invalid/missing, and the
 #                                              move that migrates a legacy-encoded slug); exit 3 when not initialised
 #                                              missing bundled templates: JSON missing_templates, else one stderr line
@@ -13,6 +14,8 @@
 #                                              legacy-encoded reviews/sql__cohort%5Fpipeline__x/ is kept
 #   check FILE | check --stdin                 validate a review/scope JSON; exit 4 with one violation per line
 #   lint FILE                                  confirmed items whose wording is still provisional; exit 10 when any
+#   lint --ste FILE                            STE wording in intent and item text/rationale, any status: one
+#                                              "<id>\t<field>\t<rule>\t<detail>" line per hit; exit 10 when any
 #   publish SLUG scope|review|lifts DRAFT             validate a staged copy, then atomically replace the final JSON
 #   publish --reconfirm-all SLUG KIND DRAFT    same, but refuse any carried (carried_from_revision) confirmation
 #   roles ENGINEER ANALYST                     update only the two confirmed role names in config.json
@@ -87,12 +90,16 @@ cmd_init() {
       mkdir -p "$target/$(dirname "$f")" || sr_die 2 "cannot create target directory"
       cp "$SR_ASSETS/$f" "$target/$f" || sr_die 2 "cannot copy $f"
     done
+    # Git does not track an empty directory: a placeholder keeps reviews/ in a committed .sqlreview/
+    # (#379). It is project state, not a bundled default, so --diff/--apply never report it; every
+    # reader of reviews/ iterates slug directories only.
     mkdir -p "$target/reviews" || sr_die 2 "cannot create reviews"
+    [ -e "$target/reviews/.gitkeep" ] || : > "$target/reviews/.gitkeep" || sr_die 2 "cannot create reviews/.gitkeep"
     if [ "$json" = 1 ]; then
-      jq -n --arg root "$root" --arg files "$files" '{root: $root, created: true, files: ($files | split("\n"))}'
+      jq -n --arg root "$root" --arg files "$files" '{root: $root, created: true, files: ($files | split("\n") + ["reviews/.gitkeep"])}'
     else
       printf 'created\t%s\n' "$target"
-      for f in $files; do printf 'file\t%s\n' "$f"; done
+      for f in $files reviews/.gitkeep; do printf 'file\t%s\n' "$f"; done
     fi
     return 0
   fi
@@ -236,11 +243,45 @@ cmd_check() {
 # ---------------------------------------------------------------------------------------------
 # Advisory, not part of check: a confirmed item whose text or rationale still reads as a proposal
 # contradicts its confirmation (#340). Prints "<id>\t<field>\t<phrases>" per hit; exit 10 when any.
+# --ste (#394) checks STE wording instead, whatever the status, so it can run on candidates before
+# the human is asked: intent, and each assumption/limitation text and rationale. One
+# "<id>\t<field>\t<rule>\t<detail>" line per hit (id "-" for intent); exit 10 when any. Rules:
+#   sentence-length  a sentence of more than 25 words (the STE limit for descriptive text);
+#                    detail = its word count. A backtick span or quoted literal counts as one word;
+#                    a hyphenated term is one word; "e.g."/"i.e." do not end a sentence.
+#   contraction      n't, 're, 've, 'll, 'd, 'm, and 's after a pronoun (not a possessive); detail = the words
+#   semicolon        detail = how many
+#   abbreviation     e.g. / i.e.; detail = which
+# It is opt-in: plain lint keeps its 3-column contract for bootstrap's pre-publish check.
 cmd_lint() {
+  local ste=0
+  if [ "${1:-}" = "--ste" ]; then ste=1; shift; fi
   [ $# -eq 1 ] || usage
+  case "$1" in -*) usage ;; esac
   sr_need_jq
   [ -f "$1" ] || sr_die 2 "no such file: $1"
   local out
+  if [ "$ste" = 1 ]; then
+    out="$(jq -r '
+      def words: [splits("\\s+") | select(test("[[:alnum:]]"))] | length;
+      def sentences:
+        gsub("`[^`]*`"; "CODE") | gsub("\"[^\"]*\""; "QUOTE") | gsub("\\b[eE]\\.[gG]\\."; "eg")
+        | gsub("\\b[iI]\\.[eE]\\."; "ie")
+        | [splits("[.!?]+[\"'"'"')\\]]*(\\s+|$)|\\n+")] | map(select(test("[[:alnum:]]")));
+      def hits($id; $field):
+        strings as $t
+        | ($t | sentences[] | words | select(. > 25) | "\($id)\t\($field)\tsentence-length\t\(.)"),
+          ([$t | match("\\b[A-Za-z]+n[\u0027\u2019]t\\b|\\b[A-Za-z]+[\u0027\u2019](re|ve|ll|d|m)\\b|\\b(it|that|there|what|here|he|she|who|where|how|let)[\u0027\u2019]s\\b"; "gi").string]
+           | select(length > 0) | "\($id)\t\($field)\tcontraction\t\(join(", "))"),
+          ([$t | match(";"; "g")] | length | select(. > 0) | "\($id)\t\($field)\tsemicolon\t\(.)"),
+          ([$t | match("\\b[eE]\\.[gG]\\.?|\\b[iI]\\.[eE]\\.?"; "g").string | ascii_downcase | if endswith(".") then . else . + "." end]
+           | unique | .[] | "\($id)\t\($field)\tabbreviation\t\(.)");
+      (.intent // null | hits("-"; "intent")),
+      ((.assumptions // [], .limitations // []) | if type == "array" then .[] else empty end
+       | select(type == "object") | . as $item
+       | ("text", "rationale") as $field | $item[$field] | hits($item.id // "?"; $field))
+    ' "$1")" || sr_die 4 "invalid JSON: $1"
+  else
   out="$(jq -r '
     ("should be confirmed|to be confirmed|needs? (to be )?confirm(ing|ed|ation)?|pending confirmation|awaiting confirmation|unconfirmed|\\bproposed\\b|\\btbc\\b") as $re
     | (.assumptions // [], .limitations // [])[]
@@ -250,6 +291,7 @@ cmd_lint() {
     | select($hits | length > 0)
     | "\($item.id // "?")\t\($field)\t\($hits | join(", "))"
   ' "$1")" || sr_die 4 "invalid JSON: $1"
+  fi
   [ -n "$out" ] || return 0
   printf '%s\n' "$out"
   return 10
@@ -492,13 +534,21 @@ cmd_impact() {
 
 # ---------------------------------------------------------------------------------------------
 # Which review-draft items restate a confirmed item of the current scope revision (same list, same
-# text and rationale) on SQL the scope still describes: the whole SQL unchanged since scope publish,
-# or the item's location lines unchanged. Analyse offers these as one bulk confirmation (#346).
+# text and rationale). Analyse offers these as one bulk confirmation (#346); the basis says why:
+#   sql-unchanged       the whole SQL is unchanged since scope publish (SHA)
+#   sql-body-unchanged  only comments, blank lines or whitespace changed, e.g. the scope copied into
+#                       the SQL header (#366, sr_sql_body)
+#   lines-unchanged     the item's location lines are unchanged
+#   scope-before-sql    the scope was confirmed before the SQL existed (sql_sha256 null, no
+#                       baseline); the bulk answer also confirms the item's new location (#366)
+#   intent-unchanged    the SQL changed, but the scope item has no location: it states intent (#366)
+# A scope item with location lines whose lines changed is walked, as is every new or reworded item.
 cmd_carryover() {
   [ $# -eq 2 ] || usage
   sr_need_jq
   sr_require_root
   local slug="$1" draft="$2" scope base sql cur scope_sha="" base_sha="" cur_sha="" have_base=false
+  local body_same=false before_sql=false
   sr_safe_slug "$slug"
   [ -f "$draft" ] || sr_die 2 "no such draft: $draft"
   jq -e 'type == "object"' "$draft" >/dev/null 2>&1 || sr_die 4 "invalid JSON: $draft"
@@ -524,24 +574,34 @@ cmd_carryover() {
     # A baseline that disagrees with the SHA the scope recorded is not evidence of anything.
     if [ -z "$scope_sha" ] || [ "$scope_sha" = "$base_sha" ]; then have_base=true; scope_sha="$base_sha"; fi
   fi
+  # Scope-first: framed and confirmed before any SQL existed, so there is no SQL to compare with.
+  if [ "$scope" != /dev/null ] && [ -z "$scope_sha" ] && [ ! -f "$base" ]; then before_sql=true; fi
+  if [ "$have_base" = true ] && [ -n "$cur_sha" ] &&
+     [ "$(sr_body_sha256 "$base")" = "$(sr_body_sha256 "$cur")" ]; then body_same=true; fi
   jq -n --slurpfile scope "$scope" --slurpfile draft "$draft" \
     --rawfile base "$([ "$have_base" = true ] && echo "$base" || echo /dev/null)" \
     --rawfile cur "$([ -n "$cur_sha" ] && echo "$cur" || echo /dev/null)" \
-    --argjson have_base "$have_base" --arg scope_sha "$scope_sha" --arg cur_sha "$cur_sha" '
+    --argjson have_base "$have_base" --arg scope_sha "$scope_sha" --arg cur_sha "$cur_sha" \
+    --argjson body_same "$body_same" --argjson before_sql "$before_sql" '
     ($scope[0] // {revision: null, assumptions: [], limitations: []}) as $s | ($draft[0]) as $d
     | ($scope_sha != "" and $cur_sha != "" and $scope_sha == $cur_sha) as $unchanged
+    | ($unchanged or $body_same) as $body
     | ($base | split("\n")) as $b | ($cur | split("\n")) as $c
     | def lines_same($l): $have_base and $cur_sha != "" and ($l | type) == "array" and ($l | length) == 2 and
         ($l | all(type == "number" and . >= 1)) and $l[0] <= $l[1] and $l[1] <= ($b | length) and $l[1] <= ($c | length) and $b[$l[0] - 1:$l[1]] == $c[$l[0] - 1:$l[1]];
     [ ("assumptions", "limitations") as $k | ($d[$k] // [])[] | select(type == "object") | . as $i
       | ([$s[$k][] | select(.text == $i.text and .rationale == $i.rationale)][0]) as $m
-      | {kind: $k, id: $i.id, text: $i.text, rationale: $i.rationale}
+      | {kind: $k, id: $i.id, text: $i.text, rationale: $i.rationale, location: $i.location}
         + if $m == null then {basis: null, why: "new, or text/rationale differs from the scope"}
           elif $unchanged then {scope_id: $m.id, basis: "sql-unchanged"}
+          elif $body then {scope_id: $m.id, basis: "sql-body-unchanged"}
           elif lines_same(($i.location | objects | .lines) // null) then {scope_id: $m.id, basis: "lines-unchanged"}
-          else {scope_id: $m.id, basis: null, why: "SQL changed since scope publish and the item has no unchanged location"} end
+          elif $before_sql then {scope_id: $m.id, basis: "scope-before-sql"}
+          elif $m.location == null then {scope_id: $m.id, basis: "intent-unchanged"}
+          else {scope_id: $m.id, basis: null, why: "SQL changed since scope publish and the lines of scope item \($m.id) changed"} end
     ] as $rows
-    | {scope_revision: $s.revision, sql_unchanged: $unchanged,
+    | {scope_revision: $s.revision, sql_unchanged: $unchanged, sql_body_unchanged: $body,
+       scope_before_sql: $before_sql,
        carry_over: [$rows[] | select(.basis != null)],
        walk: [$rows[] | select(.basis == null) | {kind, id, why}]}'
 }
@@ -551,10 +611,12 @@ cmd_carryover() {
 # carryforward. The previous published <kind>.json is the prior revision; its baseline is the SQL
 # bytes recorded after that publish (analyse: snapshot → source.sql; bootstrap: scope.source.sql),
 # counted only when its SHA256 equals the prior document's sql_sha256 (when it recorded one).
-# Sets CF_PRIOR, CF_BASE, CF_CUR (a path or /dev/null), CF_HAVE_BASE, CF_HAVE_CUR, CF_PRIOR_SHA, CF_CUR_SHA.
+# Sets CF_KIND, CF_PRIOR, CF_BASE, CF_CUR (a path or /dev/null), CF_HAVE_BASE, CF_HAVE_CUR, CF_PRIOR_SHA,
+# CF_CUR_SHA and CF_BODY_SAME (baseline and current SQL differ at most in comments/whitespace, #366).
 _carry_context() { # <slug> <scope|review> <sql_path>
   local d="$SR_REVIEWS/$1" base_sha
-  CF_PRIOR=/dev/null CF_CUR=/dev/null CF_HAVE_BASE=false CF_HAVE_CUR=false CF_PRIOR_SHA="" CF_CUR_SHA=""
+  CF_KIND="$2" CF_PRIOR=/dev/null CF_CUR=/dev/null CF_HAVE_BASE=false CF_HAVE_CUR=false CF_PRIOR_SHA="" CF_CUR_SHA=""
+  CF_BODY_SAME=false
   if [ "$2" = review ]; then CF_BASE="$d/source.sql"; else CF_BASE="$d/scope.source.sql"; fi
   sr_no_symlinks "$d/$2.json" || exit 2
   sr_no_symlinks "$CF_BASE" || exit 2
@@ -569,6 +631,8 @@ _carry_context() { # <slug> <scope|review> <sql_path>
     if [ -z "$CF_PRIOR_SHA" ] || [ "$CF_PRIOR_SHA" = "$base_sha" ]; then CF_HAVE_BASE=true; CF_PRIOR_SHA="$base_sha"; fi
   fi
   [ "$CF_HAVE_BASE" = true ] || CF_BASE=/dev/null
+  if [ "$CF_HAVE_BASE" = true ] && [ "$CF_HAVE_CUR" = true ] &&
+     [ "$(sr_body_sha256 "$CF_BASE")" = "$(sr_body_sha256 "$CF_CUR")" ]; then CF_BODY_SAME=true; fi
 }
 
 # Run a jq filter over a draft with sqlreview-carry.jq included and $ctx bound (see its header).
@@ -577,9 +641,10 @@ _carry_jq() { # <draft> <filter> [jq options...]
   shift 2
   jq -r -L "$SR_SCRIPT_DIR" "$@" --slurpfile prior "$CF_PRIOR" --rawfile base "$CF_BASE" --rawfile cur "$CF_CUR" \
     --argjson have_base "$CF_HAVE_BASE" --argjson have_cur "$CF_HAVE_CUR" --arg prior_sha "$CF_PRIOR_SHA" --arg cur_sha "$CF_CUR_SHA" \
+    --argjson body_same "$CF_BODY_SAME" --arg cf_kind "$CF_KIND" \
     "include \"sqlreview-carry\";
-     {prior: \$prior[0], base: (if \$have_base then \$base else null end), cur: (if \$have_cur then \$cur else null end),
-      prior_sha: \$prior_sha, cur_sha: \$cur_sha} as \$ctx | $filter" "$draft"
+     {kind: \$cf_kind, prior: \$prior[0], base: (if \$have_base then \$base else null end), cur: (if \$have_cur then \$cur else null end),
+      prior_sha: \$prior_sha, cur_sha: \$cur_sha, body_unchanged: \$body_same} as \$ctx | $filter" "$draft"
 }
 
 # Which draft items may keep the confirmation of the previous published revision (#348). Read-only.
@@ -600,8 +665,10 @@ cmd_carryforward() {
     | {document: $document, prior_revision: ($ctx.prior.revision // null),
        revision: (if $ctx.prior == null then 1 else $ctx.prior.revision + 1 end),
        sql_unchanged: ($ctx.prior_sha != "" and $ctx.prior_sha == $ctx.cur_sha),
-       carry: [$rows[] | select(.basis != null)],
-       walk: [$rows[] | select(.basis == null) | {kind, id, why}]}' --arg document "$kind"
+       sql_body_unchanged: (($ctx.prior_sha != "" and $ctx.prior_sha == $ctx.cur_sha) or $ctx.body_unchanged),
+       carry: [$rows[] | select(.basis != null) | {kind, id, basis, set}],
+       bulk: [$rows[] | select(.basis == null and .bulk) | {kind, id, text, rationale, why}],
+       walk: [$rows[] | select(.basis == null and (.bulk | not)) | {kind, id, why}]}' --arg document "$kind"
 }
 
 # ---------------------------------------------------------------------------------------------
