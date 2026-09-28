@@ -4,7 +4,8 @@ Performance, probe and read-isolation fallbacks
 Read this when the operator cannot inspect an execution plan, when a table has no
 usable index, before you propose an operator probe, and before you choose a read
 isolation level. It extends "Performance: shift the anchor" and "Read isolation"
-in ``SKILL.md``. Evidence: ENQ1160, ENQ1204, ENQ1217 and ENQ1219 (issue #370).
+in ``SKILL.md``. Evidence: four enquiries whose operators lacked plan permissions
+(issue #370).
 
 No plan permission
 ------------------
@@ -61,17 +62,21 @@ An operator probe is SQL the operator runs by hand to learn about a source befor
 pipeline SQL exists. Keep each probe:
 
 * **Aggregate-only.** It returns counts, ranges and codes, never patient rows.
-* **Small-cell suppressed.** Apply the threshold from ``release.rst``. When no
-  threshold is known yet, write it as a parameter (for example ``@min_cell``) that
-  the operator sets, and record the value used.
+* **Small-cell suppressed.** Write the threshold as a parameter (for example
+  ``@min_cell``). Its value comes from the request's de-identification assessment
+  ("Cell suppression threshold"); when that states none, ask for it and record the
+  answer (see ``release.rst``). Suppress the MIN and MAX of a small cell as well as
+  its count.
 * **One bounded scan.** Group on a few narrow keys and take MIN and MAX samples per
-  group, instead of a full-table aggregate over many columns. Avoid ``GROUPING SETS``
-  combined with ``COUNT(DISTINCT ...)`` on a full scan: it reads the table more than
-  once.
+  group, instead of a full-table aggregate over many columns. Take MIN and MAX only
+  of dates, category codes and numeric ranges, never of an identifier, name or
+  free-text column. Avoid ``GROUPING SETS`` combined with ``COUNT(DISTINCT ...)`` on
+  a full scan: it reads the table more than once.
 * **Free of identifying values.** Never ask the operator to paste a column that can
-  hold an identifying value, such as a clinician or resource name. In ENQ1204,
+  hold an identifying value, such as a clinician or resource name. In one enquiry,
   ``OPD_Appointments.Resource`` held doctor names. Mark such a probe local-only, and
-  let it return codes only, never names, into the task output.
+  let it return category or type codes only, never staff or person keys or names,
+  into the task output.
 * **Explicit about isolation.** Record any ``NOLOCK`` or ``READ UNCOMMITTED`` use
   beside the probe.
 
@@ -102,7 +107,8 @@ on; ``SNAPSHOT`` when the database allows it and the pipeline does not index
 sys.databases WHERE name = DB_NAME();``.
 
 ``READ UNCOMMITTED`` and ``NOLOCK`` can return rolled-back rows, and can skip or
-double-read rows. Use them for feasibility counts and probes only. A final research
+double-read rows. At most they suit feasibility counts and probes, and every use is
+recorded. A final research
 extract that reads uncommitted data needs DBA and requester agreement, a
 ``record_assumption()`` beside the read that says so, and a label wherever its
 results are reported.

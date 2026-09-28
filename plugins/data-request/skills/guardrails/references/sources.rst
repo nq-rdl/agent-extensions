@@ -4,8 +4,8 @@ Source evidence order and grain
 Read this when dataops has no entry for a table, or its comments are empty; when a
 request crosses HBCIS and ieMR; and when you choose joins for a source other than
 the ieMR clinical-event pattern. It extends "Confirm sources before using a fact"
-and "Join and index patterns" in ``SKILL.md``. Evidence: ENQ1160, ENQ1177, ENQ1194,
-ENQ1204, ENQ1217 and ENQ1219 (issue #371).
+and "Join and index patterns" in ``SKILL.md``. Evidence: six enquiries across ieMR,
+HBCIS and BI-Reporting (issue #371).
 
 Where dataops lives
 -------------------
@@ -34,9 +34,10 @@ path and revision.
    pinned revision. These are ``INFORMATION_SCHEMA`` dumps: names, types and
    nullability. They give no timezone, unit or index. HBCIS evidence starts here.
 3. **query-builder** ``ColumnMeta`` on the pinned ``TypedTable``
-   (``resolvers/iemr/tables.py``, ``resolvers/hbcis/tables.py``). It can state
-   meaning, timezone and unit. For ieMR ``CLINICAL_EVENT`` datetimes, only
-   ``ColumnMeta`` states UTC.
+   (``resolvers/iemr/tables.py``, ``resolvers/hbcis/tables.py``,
+   ``resolvers/bireporting/tables.py``). It can state meaning, timezone and unit.
+   For ieMR ``CLINICAL_EVENT`` datetimes, only ``ColumnMeta`` states UTC; for
+   BI-Reporting ``ED_Extract_THHS`` it states ``Australia/Brisbane``.
 4. **An operator probe** (see ``performance.rst``), tagged ``OBSERVED`` or
    ``INFERRED`` with its scope. An hour-of-day histogram of a datetime column is a
    probe for its timezone. A finding from a sibling repository applies only inside
@@ -70,7 +71,7 @@ Join HBCIS to ieMR through the ``mart_iemr_hbcis_mapping_*`` views in
 ``MartIemrHbcisMappingEpisodeEncounterView`` in ``resolvers/hbcis/tables.py``).
 Guard uniqueness before the join: check that each key you join from maps to exactly
 one row, and stop and report when it does not. A silent fan-out multiplies the
-output grain. ENQ1213 (SSAQHTS-43408) carries a worked guard.
+output grain.
 
 CLINICAL_EVENT currency
 -----------------------

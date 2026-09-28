@@ -71,7 +71,7 @@ belong in `nq-rdl/query-builder`. Request pipelines compose those units:
 `CohortQuery(resolver).add(spec_a).add(spec_b)` with resolver/spec instances.
 A PyPika `TemporaryTableQueryBuilder` pipeline composed over the request's own local
 `TypedTable` definitions is also compliant composition, not hand SQL and not
-evidence of a library gap (ENQ1205 and ENQ1213 use it).
+evidence of a library gap.
 Before SQL outside the composition API, inspect the actual dependency pin's spec,
 resolver and tests. Record a `candidate` in the pipeline's `.sqlreview` lift ledger
 with that pin, inspected paths/revisions, need, shortfall and workaround location.
@@ -83,11 +83,16 @@ The ledger permits a pinned-deadline workaround under this guidance, but does no
 override an explicit repository prohibition. Check the request's dependency pin
 before using an enhancement.
 
-When the task is read-only, or the repository has no `.sqlreview/` and cannot be
-written, use **proposal-only mode**: return the candidate entry as text in the task
-output instead of publishing it; the hand SQL stays a proposal. Aggregate-only,
-small-cell-suppressed, single-scan operator probes with `NOLOCK` use recorded are
-outside the gate. `lifts.rst` gives both rules in full.
+A mapping run never initialises `.sqlreview/`; stages that own the store (setup,
+bootstrap, a writable draft) still `init` a missing one. When the task is read-only, the
+repository cannot be written, or a mapping run finds no `.sqlreview/`, use
+**proposal-only mode**: return the candidate entry as text in the task output instead
+of publishing it. A proposal-only entry authorises no hand SQL: none is committed or
+run, except exempt probes, until a writable run publishes the entry.
+An operator probe is exempt only when it is aggregate-only, small-cell suppressed and
+bounded to a single scan, returns no patient or clinician identifier, feeds no
+delivered extract, and records any `NOLOCK` or `READ UNCOMMITTED` use. `lifts.rst`
+gives both rules in full.
 
 For N related datasets from one cohort, check the pinned `create_temp_table()`,
 `register_result()` and `execute_pipeline_results()` implementations first:
@@ -98,20 +103,23 @@ units make this request-specific composition, not a library enhancement.
 
 The API baseline is `nq-rdl/query-builder` tag `v0.6.0`
 (`clinical/specifications.py`, `clinical/resolver.py`, `clinical/query.py`,
-`pypika_queries/queries.py`). Source resolvers live in the same package, under
-`resolvers/iemr/resolver.py` and `resolvers/hbcis/resolver.py`; the former separate
-plugins package is archived. For a different installed revision, re-check those
+`pypika_queries/queries.py`). Since v0.5.0 the source resolvers live in the same
+package, under `resolvers/iemr/resolver.py` and `resolvers/hbcis/resolver.py`; the
+former separate plugins package is archived. For a different installed revision, re-check those
 implementations and their tests before adapting the examples; the baseline does not
 establish enhancement availability.
 
 Read the request's pin (`framework_ref`, `pyproject.toml`, lock file) before drafting.
 `rdl-service-desk/query-builder` is the retired legacy org. Older scaffold renders
-still pin it (scaffold v0.1.3 defaulted to its `v0.1.1`), and GitHub redirects the old
-path, so an install can still succeed. A pin on that org, or on `nq-rdl/query-builder`
-below `v0.6.0`, is a **blocker**: it lacks APIs this skill relies on, such as
-`record_assumption` and `register_result`. Report the pin and the missing APIs, and
-require a re-pin to `nq-rdl/query-builder` at the baseline before drafting. Agents
-never re-pin or run `copier update` unasked.
+still pin it (scaffold v0.1.3 defaulted to its `v0.1.1`, which also lacks
+`register_result`), and GitHub redirects the old path, so an install can still succeed.
+Below `v0.6.0`, `record_assumption` and `record_limitation` are absent. Flag a pin on
+that org, or on `nq-rdl/query-builder` below `v0.6.0`, as a **blocker**: report the pin
+and the missing APIs, and re-pin to the baseline before drafting new SQL. The latest
+released scaffold (v0.5.0) still defaults to query-builder v0.5.0, so fresh renders
+need the re-pin until that default is bumped. Amending or fixing an already-delivered
+enquiry is exempt: it stays on its delivered pin, with no backport. Agents never
+re-pin or run `copier update` unasked.
 
 Confirm the applicable rules in the current `.specify/memory/constitution.md`:
 
@@ -185,7 +193,8 @@ metadata probes and the probe design rules.
 
 ## Read isolation
 
-`READ UNCOMMITTED` / `NOLOCK` suits feasibility counts and probes, not a final research
+Record any `NOLOCK` or `READ UNCOMMITTED` use, in probes and extracts alike. Uncommitted
+reads are not reproducible, so never make them the default for a final research
 extract. Whenever an extract reads uncommitted data, record an assumption that says so.
 query-builder v0.6.0 sets the level with `isolation_level` (ADR 0001); per-table
 `WITH (NOLOCK)` hints (ADR 0004) postdate v0.6.0. Read
@@ -242,24 +251,21 @@ encode that choice in the request's spec composition, not an implicit resolver d
   with `record_limitation()` where the date is read, or carry it into the task output.
   HBCIS `DeathDate` (`mart_patient_view`, `mart_episodedetail_view`) and the episode's
   separation mode (discharge status) are an alternative source to offer; verify them
-  in the pinned `schema_extracts/` and record which source was used (ENQ1177).
+  in the pinned `schema_extracts/` and record which source was used.
   Turning that date into **30-day mortality**, including the anchor and window boundaries, is the researcher's
   modelling choice, expressed in the request's own spec composition.
 - **Suburb/postcode:** latest address and address at the time of an encounter answer
   different questions. Leave that choice and its temporal anchor to the researcher/spec;
   verify whether the source supports it rather than silently substituting latest data.
-- **Cohort sequence or transition date:** a "first X, then later Y" definition is a
-  modelling choice. ENQ1204 needed the requester to choose the paediatric rule (clinic
-  label, age under 18, or both; hard gate or check only), the transition date (first
-  adult appointment after the first paediatric one, after the last one, or the referral
-  date) and which appointment states count as attended on each side. Supply the dated
+- **Cohort sequence or transition date:** a "first X, then later Y" definition, and
+  which event states count on each side, is a modelling choice. Supply the dated
   events and their states; the researcher sets the ordering and state rules.
 - **Ethnicity:** RDL sources hold no ethnicity field. By RDL convention an "ethnicity"
-  request gets Indigenous status from ieMR `PERSON_INFO` (`WithIndigenousStatus`).
-  Offer country of birth and preferred language as optional surrogates; the requester
-  or engineer decides. Record a limitation that ethnicity is not held. query-builder
-  v0.6.0 has no enrichment for either surrogate; ieMR `PERSON.LANGUAGE_CD` and the HBCIS
-  `mart_patient_view` birth-country and language columns are candidate sources to verify.
+  request gets Indigenous status from ieMR `PERSON_INFO`, with country of birth and
+  preferred language as optional surrogates, and a limitation that ethnicity is not held.
+
+Read [references/modelling.rst](references/modelling.rst) for a worked sequence example
+and the ethnicity sources.
 
 When request logic crosses this boundary, flag the modelling decision and its effect.
 Use an already-confirmed scope choice where available; otherwise ask the researcher
@@ -274,11 +280,13 @@ symptom and a fix. Report each finding with its SQL location.
 
 ## Release conventions
 
-Before delivery, settle raw dates against a derived outcome, internal validation
-listings (`-- @extract: <name> internal`), the study ID pattern and small-cell
-suppression. Read [references/release.rst](references/release.rst). This skill sets no
-suppression threshold: use the governing approval's threshold; if none is stated, ask
-and record it.
+Before delivery, settle raw dates against a derived outcome, validation listings, study
+IDs and small-cell suppression. Read [references/release.rst](references/release.rst).
+Keep validation listings and the study-ID link table out of the delivery run. Use the
+`-- @extract: <name> internal` marker only after confirming that the child's pinned
+`scripts/run_extract.py` supports it: released scaffold runners (v0.5.0 and earlier)
+deliver a batch so marked. This skill sets no suppression threshold: use the request's
+de-identification assessment or approval; if none is stated, ask and record it.
 
 ## Carry evidence into the task
 

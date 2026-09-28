@@ -3,7 +3,7 @@ Hand-SQL review checklist
 
 Read this when you write, lift or review hand SQL, and when you review generated
 SQL that someone edited by hand. Each pattern repeated in the hand SQL behind
-ENQ993, ENQ1160 and ENQ1217 (issue #388). Report each finding with its SQL
+three reviewed enquiries (issue #388). Report each finding with its SQL
 location, the pattern name and the fix. A pattern that does not apply is not a
 finding.
 

@@ -7,9 +7,11 @@ same ``slug`` and ``sql_path`` binding for pipeline paths of any extension; old
 SQL slugs remain unchanged. Schema-1 scope/review files stay readable. New
 scope/review documents may use schema 2 without changing their confirmation rules.
 
-Candidate capture is silent. Initialise a missing record store with
+Candidate capture is silent. A pipeline stage that owns the record store (setup,
+bootstrap, or a writable drafting run) initialises a missing store with
 ``sqlreview.sh init`` (non-destructive); never replace existing config or templates
-mid-draft. Use ``slug PATH`` and write ``reviews/SLUG/lifts.draft.json`` with:
+mid-draft. A mapping run never initialises the store; without one it uses
+proposal-only mode (below). Use ``slug PATH`` and write ``reviews/SLUG/lifts.draft.json`` with:
 
 ::
 
@@ -46,19 +48,20 @@ capture; close-out settles it. A draft alone does not satisfy the hook.
 Proposal-only mode and operator probes
 --------------------------------------
 
-Use proposal-only mode when the task is read-only, or when the child has no
-``.sqlreview/`` and the agent may not write to it (for example a read-only mapping
-or planning run before the scaffold exists). Do not run ``init`` or ``publish``.
-Return the candidate entry, in the draft shape above, as text in the task output.
-Label it ``proposal-only`` and give the reason. Any hand SQL in that output is a
-proposal too: it must not land in the repository until a writable run publishes
-the entry.
+Use proposal-only mode when the task is read-only, when the repository cannot be
+written, or when a mapping run finds no ``.sqlreview/`` (for example a planning run
+before the scaffold exists). Do not run ``init`` or ``publish``. Return the
+candidate entry, in the draft shape above, as text in the task output. Label it
+``proposal-only`` and give the reason. A proposal-only entry authorises no hand SQL:
+none is committed or run, except exempt probes, until a writable run publishes the
+entry.
 
 Operator probes are outside this gate when each probe is aggregate-only,
 small-cell suppressed, bounded to a single scan, returns no patient or clinician
 identifier, and records any ``NOLOCK`` or ``READ UNCOMMITTED`` use. Such probes
-write nothing to the repository and feed no delivered extract. A probe that returns
-rows or identifiers, or that feeds an extract, is hand SQL and needs an entry.
+write nothing to the repository and feed no delivered extract. Codes they return
+are category or type codes, never staff or person keys. A probe that returns rows
+or identifiers, or that feeds an extract, is hand SQL and needs an entry.
 Guardrails' ``references/performance.rst`` gives the probe design rules.
 
 Increment the document revision on each publish. Each entry also has a revision:
