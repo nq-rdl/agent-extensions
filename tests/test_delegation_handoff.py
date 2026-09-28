@@ -39,6 +39,15 @@ DESTRUCTIVE = (
     "resumes after the parent completes it",
 )
 
+# Load-bearing tokens of the rule's scope: without them a worker whose job is
+# deleting (janitor) or tearing down its own fixtures (terratest) would stop.
+SCOPE = (
+    "covers only a step that needs the user's explicit approval",
+    "Routine in-scope work is not such a step",
+    "tearing down the worker's own test fixtures",
+    "the parent names the steps that it will run itself",
+)
+
 RST_UNDERLINE = re.compile(r"^([=\-~^\"'`#*+])\1{2,}$")
 
 
@@ -76,6 +85,14 @@ def packaged_outlines():
         list(REPO.glob(f"plugins/*/skills/*/{OUTLINE}"))
         + list(REPO.glob(f"dist/codex/plugins/*/skills/*/{OUTLINE}"))
     )
+
+
+def execution_section() -> str:
+    text = DOC.read_text()
+    match = re.search(r"^## Direct or delegated execution\n(.*?)(?=^## |\Z)", text, re.M | re.S)
+    if not match:
+        raise AssertionError("docs/delegation.md lost its execution section")
+    return match.group(1)
 
 
 class Inventory(unittest.TestCase):
@@ -118,10 +135,7 @@ class DestructiveStepRule(unittest.TestCase):
             self.assertIn(token, text)
 
     def test_doc_states_the_rule_under_direct_or_delegated_execution(self):
-        text = DOC.read_text()
-        match = re.search(r"^## Direct or delegated execution\n(.*?)(?=^## |\Z)", text, re.M | re.S)
-        self.assertIsNotNone(match, "docs/delegation.md lost its execution section")
-        self.assert_rule(match.group(1))
+        self.assert_rule(execution_section())
 
     def test_every_canonical_outline_states_the_rule(self):
         for path in canonical_outlines():
@@ -136,6 +150,28 @@ class DestructiveStepRule(unittest.TestCase):
     def test_triage_puts_the_rule_in_its_scope_rules(self):
         path = REPO / "skills" / "data-request-triage" / OUTLINE
         self.assert_rule(rst_section(path.read_text(), "Scope rules"))
+
+
+class DestructiveRuleScope(unittest.TestCase):
+    """Review of #398: the rule covers only user-approved steps, not routine work."""
+
+    def assert_scope(self, text: str):
+        text = flat(text)
+        for token in SCOPE:
+            self.assertIn(token, text)
+
+    def test_doc_scopes_the_rule(self):
+        self.assert_scope(execution_section())
+
+    def test_every_canonical_outline_scopes_the_rule(self):
+        for path in canonical_outlines():
+            with self.subTest(path=str(path.relative_to(REPO))):
+                self.assert_scope(path.read_text())
+
+    def test_every_packaged_outline_scopes_the_rule(self):
+        for path in packaged_outlines():
+            with self.subTest(path=str(path.relative_to(REPO))):
+                self.assert_scope(path.read_text())
 
 
 if __name__ == "__main__":

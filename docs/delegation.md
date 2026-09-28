@@ -24,11 +24,17 @@ follow-up clause in every handoff:
 > repositories, or bypasses a guard.
 
 Destructive steps run in the parent. When the user approves a destructive step,
-such as `git rm` of a tree, a force push, a history rewrite, or a delete of
-data or infrastructure, the main agent runs that step itself. Approval given to
-the parent does not transfer to a worker: a host permission check or auto-mode
+such as `git rm` of a tree, a force push, a history rewrite, or deleting data
+or infrastructure, the main agent runs that step itself. Approval given to the
+parent does not transfer to a worker: a host permission check or auto-mode
 classifier can still block the worker. The worker stops before the step, returns
 what the parent needs to run it, and resumes after the parent completes it.
+
+This rule covers only a step that needs the user's explicit approval. Routine
+in-scope work is not such a step: editing or deleting files on the task branch,
+removing temporary files the worker created, and tearing down the worker's own
+test fixtures. The worker does that work. In the handoff, the parent names the
+steps that it will run itself.
 
 Every `references/subagent.rst` outline carries this clause in its Handoff
 section and states the destructive-step rule. `tests/test_delegation_handoff.py`
