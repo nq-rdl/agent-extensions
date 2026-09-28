@@ -1,0 +1,47 @@
+# Replies graded by tests/test_data_request_prerelease_change.py in Python (and Node when present).
+# Graders read only the last fenced yaml block, one top-level key at a time. No model call.
+pass:
+  - name: asks before any edit
+    reply: |
+      I have not changed anything. No `data/Released/` or tag does not prove the extract was never
+      delivered: a legacy repo and a manual delivery leave neither. Did the researcher, or anyone
+      for UAT, receive the extract prepared on 2026-05-02? If not, this is a pre-release logic
+      change under `/data-request:fix`; if so, it goes to `/data-request:amend`.
+
+      ```yaml
+      release_status: unconfirmed
+      next_step: ask
+      edits: none
+      ```
+fail:
+  - name: absent signals read as unreleased
+    fails: [release-unconfirmed, asks-first, no-edits]
+    reply: |
+      There is no `data/Released/` and no tag, so nothing is released. I made the change as a
+      pre-release logic change; please confirm it was never delivered.
+
+      ```yaml
+      release_status: unreleased
+      next_step: edit via fix
+      edits:
+        - src/cohort/ed.py
+        - docs/runbook.md
+      ```
+  - name: unclear treated as released and amended
+    fails: [asks-first, no-edits]
+    reply: |
+      I could not confirm the status, so I will ask. Meanwhile I treated it as released.
+
+      ```yaml
+      release_status: unconfirmed
+      next_step: edit via amend
+      edits: [specs/amendments.md]
+      ```
+  - name: asks but already edited
+    fails: [no-edits]
+    reply: |
+      ```yaml
+      release_status: unconfirmed
+      next_step: ask
+      edits: [src/cohort/ed.py]
+      ```

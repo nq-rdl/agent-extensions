@@ -1,0 +1,122 @@
+# Replies graded by tests/test_data_request_prerelease_change.py in Python (and Node when present).
+# Graders read only the last fenced yaml block, one top-level key at a time. No model call.
+pass:
+  - name: skill-shaped pre-release change
+    reply: |
+      No. You confirmed nothing was delivered, so there is no release and `/data-request:amend`
+      does not apply. This is a pre-release logic change under `/data-request:fix`.
+
+      Change the key in `src/cohort/ed.py`, regenerate `sql/v1/ed_request.sql`, and update
+      `docs/runbook.md`, `specs/uat-checklist.md` and `sql/validation/ed_checks.sql` in the same
+      change. The review is stale in meaning: re-run `/data-request:analyse` and re-walk every item.
+
+      ```yaml
+      workflow: fix
+      amd_entry: none
+      runbook_uat: same change
+      review: stale
+      analyse: rerun --reconfirm-all
+      renamed:
+        - distinct_mrn -> distinct_patient_key
+      ```
+  - name: quoted values, comments and a mapping rename
+    reply: |
+      ```yaml
+      workflow: "fix"   # pre-release logic change
+      amd_entry: 'none'
+      runbook_uat: same change
+      review: stale
+      analyse: "rerun --reconfirm-all"
+      renamed:
+        distinct_mrn: distinct_patient_key
+      ```
+fail:
+  - name: right words, wrong answers
+    fails: [workflow-fix, no-amd-entry, runbook-uat-same-change, review-stale, analyse-full-rewalk, renamed-column]
+    reply: |
+      Yes, this is an amendment for /data-request:amend, not a pre-release fix. Leave the runbook
+      and UAT checklist alone until after release. The review is not stale, so there is no need
+      to run /data-request:analyse.
+
+      ```yaml
+      workflow: amend
+      amd_entry: AMD-001
+      runbook_uat: after release
+      review: current
+      analyse: not needed
+      renamed: []
+      ```
+  - name: prose only, no yaml block
+    fails: [workflow-fix, no-amd-entry, runbook-uat-same-change, review-stale, analyse-full-rewalk, renamed-column]
+    reply: |
+      workflow: fix. amd_entry: none. runbook_uat: same change. review: stale.
+      analyse: rerun --reconfirm-all. renamed: distinct_mrn -> distinct_patient_key.
+  - name: plain re-run keeps carried items
+    fails: [analyse-full-rewalk]
+    reply: |
+      ```yaml
+      workflow: fix
+      amd_entry: none
+      runbook_uat: same change
+      review: stale
+      analyse: rerun
+      renamed: [distinct_mrn -> distinct_patient_key]
+      ```
+  - name: amendment entry added before any release
+    fails: [no-amd-entry]
+    reply: |
+      ```yaml
+      workflow: fix
+      amd_entry: AMD-001 re-key on site code plus MRN
+      runbook_uat: same change
+      review: stale
+      analyse: rerun --reconfirm-all
+      renamed: [distinct_mrn -> distinct_patient_key]
+      ```
+  - name: duplicate workflow key hedges
+    fails: [workflow-fix]
+    reply: |
+      ```yaml
+      workflow: amend
+      workflow: fix
+      amd_entry: none
+      runbook_uat: same change
+      review: stale
+      analyse: rerun --reconfirm-all
+      renamed: [distinct_mrn -> distinct_patient_key]
+      ```
+  - name: rename reversed
+    fails: [renamed-column]
+    reply: |
+      ```yaml
+      workflow: fix
+      amd_entry: none
+      runbook_uat: same change
+      review: stale
+      analyse: rerun --reconfirm-all
+      renamed: [distinct_patient_key -> distinct_mrn]
+      ```
+  - name: right draft, wrong final block
+    fails: [workflow-fix, runbook-uat-same-change, review-stale]
+    reply: |
+      Draft:
+
+      ```yaml
+      workflow: fix
+      amd_entry: none
+      runbook_uat: same change
+      review: stale
+      analyse: rerun --reconfirm-all
+      renamed: [distinct_mrn -> distinct_patient_key]
+      ```
+
+      On reflection:
+
+      ```yaml
+      workflow: amend
+      amd_entry: none
+      runbook_uat: no change
+      review: current
+      analyse: rerun --reconfirm-all
+      renamed: [distinct_mrn -> distinct_patient_key]
+      ```
