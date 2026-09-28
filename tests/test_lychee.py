@@ -123,8 +123,16 @@ class ConfigTests(unittest.TestCase):
         old["cache"] = False
         # #300 narrowed look-alike host prefixes, dropped an unused placeholder
         # prefix and a fixed-fragment pattern, and added commented exclusions
-        # for API endpoints and identifiers. Anything else is an unreviewed drift.
+        # for API endpoints and identifiers. The historical Quarto, Conventional
+        # Commits, Style Manual and Bootstrap icons runner exclusions were then
+        # dropped once CI passed without them. Anything else is unreviewed drift.
         removed = {
+            "^https?://quarto\\.org/docs/",
+            "^https?://quarto\\.org/docs$",
+            "^https?://quarto\\.org/docs/$",
+            "^https://www\\.conventionalcommits\\.org/",
+            "^https?://www\\.stylemanual\\.gov\\.au/",
+            "^https?://icons\\.getbootstrap\\.com",
             "^https?://quarto\\.org/docs/faq/rmarkdown\\.html#quarto-vs.-r-markdown",
             "^https?://localhost",
             "^https?://0\\.0\\.0\\.0",

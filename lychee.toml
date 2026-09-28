@@ -22,12 +22,6 @@ max_retries = 3
 
 # Exclude common false-positive patterns
 exclude = [
-  # Quarto documentation: historical CI failures. An uncached local run on
-  # 2026-09-28 passed every skills/ quarto.org URL once one rotted fragment was
-  # fixed (its dedicated pattern was removed); drop this after a CI dispatch
-  # of link-check.yml confirms GitHub runners pass too.
-  "^https?://quarto\\.org/docs/",
-
   # Localhost/example URLs, anchored at the end of the host so look-alike
   # hosts (example.com.real.org, localhost.company.org) are still checked.
   # lychee itself skips example.net, *.example.{com,org,net}, .example, .test,
@@ -55,17 +49,6 @@ exclude = [
   # nq-rdl/agent-extensions#261) and the API-token page is login-gated — referenced by the redhat skills
   "^https?://docs\\.redhat\\.com/",
   "^https://access\\.redhat\\.com/management/api",
-  # Exclude conventional commits due to rate limiting / connection reset in CI
-  "^https://www\\.conventionalcommits\\.org/",
-  # Australian Government Style Manual — referenced by tech-writing-copyedit. lychee on the
-  # GitHub runner fails with "HTTP/2 protocol error" against this host (curl/browsers are fine).
-  "^https?://www\\.stylemanual\\.gov\\.au/",
-  # Bootstrap icons: historical CI failure exclusion. Passed an uncached local
-  # run on 2026-09-28; drop after a CI dispatch confirms runners pass.
-  "^https?://icons\\.getbootstrap\\.com",
-  # Quarto documentation root: preserve both historical root spellings.
-  "^https?://quarto\\.org/docs$",
-  "^https?://quarto\\.org/docs/$",
   # Remote MCP server endpoints in OpenCode config examples
   # (opencode-tools references/mcp-servers.rst). They speak MCP over POST; a
   # plain GET answers 405 (context7, grep.app) or 401 (sentry).

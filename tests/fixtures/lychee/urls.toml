@@ -81,12 +81,12 @@ builtin = true
 [[cases]]
 url = "https://quarto.org/docs/guide"
 shipped = false
-repository = true
+repository = false
 
 [[cases]]
 url = "https://quarto.org/docs"
 shipped = false
-repository = true
+repository = false
 
 [[cases]]
 url = "https://github.com/nq-rdl/spec-kit-extensions"
@@ -121,17 +121,17 @@ repository = true
 [[cases]]
 url = "https://www.conventionalcommits.org/en/v1.0.0/"
 shipped = false
-repository = true
+repository = false
 
 [[cases]]
 url = "https://www.stylemanual.gov.au/"
 shipped = false
-repository = true
+repository = false
 
 [[cases]]
 url = "https://icons.getbootstrap.com/icons/"
 shipped = false
-repository = true
+repository = false
 
 [[cases]]
 url = "https://your-business.com/"
@@ -296,4 +296,4 @@ repository = false
 [[cases]]
 url = "https://quarto.org/docs/faq/rmarkdown.html#quarto-vs.-r-markdown"
 shipped = false
-repository = true
+repository = false
