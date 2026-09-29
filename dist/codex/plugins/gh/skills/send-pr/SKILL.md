@@ -1,8 +1,9 @@
 ---
 name: send-pr
 license: CC-BY-4.0
-description: Commits, pushes and raises a PR. Use this skill when the user asks to
-  "ship", "commit, push and raise PR", or similar commands.
+description: Commit the pending changes, push a feature branch and open a GitHub pull
+  request with a conventional-commit title, a structured body and requested reviewers.
+  Use when the user asks to "ship", or to commit, push and raise a PR.
 disable-model-invocation: true
 metadata:
   repo: https://github.com/nq-rdl/agent-extensions
@@ -14,75 +15,70 @@ Execute this workflow only on an explicit user request; preserve its review-only
 
 # Commit, Push and Raise PR
 
-This skill handles the complete workflow of committing staged/unstaged changes, pushing to the remote, and raising a Pull Request.
+Invoking this skill authorizes: creating a feature branch when needed,
+committing the pending changes, pushing that branch, opening one pull request,
+and requesting the reviewers the user names. It does not authorize pushing to
+the default branch, force-pushing, merging, or choosing reviewers yourself.
 
-## Workflow
+## Steps
 
-1. **Analyse Changes** - Review all pending changes (staged and unstaged) to understand the scope and nature of the work
-2. **Commit** - Create a well-formed conventional commit
-3. **Push** - Push the current feature branch to origin
-4. **Raise PR** - Create a Pull Request
-5. **Request Review** - Prompt the user for reviewer logins and assign them to the PR
+1. **Inspect.** `git status`, `git diff`, `git diff --staged`, the current
+   branch and `git remote -v`. Derive the commit message and PR text from the
+   changes; do not ask the user to describe them. With nothing to commit and
+   nothing unpushed, stop and say so.
+2. **Branch.** Never commit to or push the default branch
+   (`git symbolic-ref --short refs/remotes/origin/HEAD` prints `origin/<name>`;
+   without it, treat `main` or `master` as the default).
+   If you are on it, create `<type>/<short-slug>` first, for example
+   `fix/negative-totals`, and carry the uncommitted changes onto it.
+3. **Stage by name.** `git add path/to/file …`. Leave out `.env*`, keys,
+   credentials, large binaries and build output, even when untracked, and say
+   what you left out. Use `git add -A` only after confirming none are present.
+4. **Commit.** Conventional Commits subject (types and breaking-change rules:
+   `gh:conventional-commits`), imperative and lowercase, 50 characters or fewer
+   where possible and never more than 72; wrap the body at 72. Follow the
+   repository's commit conventions and hooks. If the changes span several
+   concerns, say so, but make one commit unless told otherwise.
+5. **Push.** `git push -u origin HEAD`. On failure (no remote, authentication,
+   rejected push), stop and report the error; do not force-push.
+6. **Create the PR.** Write the body (template below) to a file from `mktemp`,
+   then:
 
-## Commit Message Format
+   ```bash
+   gh pr create --title "<commit subject>" --body-file "$body_file" \
+     [--base <branch>] [--reviewer <login>[,<login>…]]
+   ```
 
-Use Conventional Commits format:
-```
-<type>: <description>
+   Omit `--base` unless the user named one or the repository documents a
+   different target; `gh pr create` then uses the repository's default branch.
+   Remove the body file afterwards. If `gh` fails, report its error together
+   with the pushed branch name. Do not retry with guessed bases or remotes:
+   when `gh` cannot resolve the repository or authenticate, every `gh` command
+   fails the same way.
+7. **Reviewers.** Use the logins named in the request (`--reviewer` above). If
+   none were named, ask once after creation and add them with
+   `gh pr edit --add-reviewer <login>`; skip if the user declines.
+8. **Verify.** `gh pr view --json url,baseRefName,headRefName,reviewRequests`.
+   Report the PR URL and the reviewers GitHub lists, not the ones you asked
+   for.
 
-[optional body with more detail]
-```
+## PR body
 
-### Types
-- `feat` - new functionality
-- `fix` - bug fixes
-- `refactor` - code restructuring without behaviour change
-- `docs` - documentation only
-- `test` - adding or updating tests
-- `chore` - maintenance tasks, dependency updates
+The PR title is the commit subject.
 
-### Rules
-- First line should be **50 characters or fewer** for `git log --oneline` readability (GitHub itself truncates display at ~72; treat 72 as a hard ceiling)
-- Description should be lowercase, imperative mood ("add feature" not "added feature")
-- Body (if needed) should be wrapped at 72 characters
-
-## Pull Request Format
-
-The PR title should match the first line of the commit message (including the conventional commit prefix).
-
-Use this template for the PR body:
 ```markdown
 ## Summary
-[2-3 sentences describing what this PR accomplishes and why]
+[2-3 sentences: what this PR does and why]
 
 ## Changes
-[Bullet points of the key modifications, grouped logically]
+[Key modifications, grouped logically]
 
 ## Test Plan
-- [ ] [Specific scenario to verify]
-- [ ] [Another test case]
+- [ ] [Specific scenario derived from the change]
 - [ ] [Edge case to check]
 
 ## Notes for Reviewers
-[Any context that will help reviewers: areas of uncertainty, alternative approaches considered, architectures and patterns worthy of note, or specific files to scrutinise]
+[Uncertainties, alternatives considered, files to scrutinise]
 ```
 
-## Execution Steps
-
-1. Run `git status`, `git diff`, and `git diff --staged` to understand all pending changes
-2. Analyse the changes to determine the appropriate commit type and craft a meaningful message
-3. Stage files by name (e.g. `git add path/to/file ...`). Avoid `git add -A`/`git add .` unless step 1's review confirms there are no `.env`, credentials, or large binaries that would be swept in
-4. Commit with the crafted message
-5. Push the branch with `git push -u origin HEAD`
-6. Determine the target (base) branch:
-   - Try `gh repo view --json defaultBranchRef -q .defaultBranchRef.name` first
-   - If that fails, run `git symbolic-ref refs/remotes/origin/HEAD | sed 's|^refs/remotes/origin/||'` to derive the plain branch name (the raw `git symbolic-ref` output is `refs/remotes/origin/<branch>` and cannot be passed directly to `gh pr create --base`)
-   - Only if both fail, fall back to scanning remote branches: `git branch -r | sed 's|^[[:space:]]*origin/||' | grep -E '^(develop|main|master)$' | head -1`
-7. Write the PR body to a temporary file, then create the PR with `gh pr create --base <target branch> --title "<commit first line>" --body-file <path to PR body file>`. Clean up the temp file once the PR is created
-8. Ask the user which GitHub login(s) to request a review from, then run `gh pr edit --add-reviewer <login>[,<login>...]` (no PR identifier needed — `gh pr edit` resolves it from the current branch; skip if the user declines)
-
-## Important Notes
-
-- Derive the commit message and PR content entirely from analysing the actual changes - do not ask the user to describe them
-- The test plan should contain **specific, actionable** test cases derived from the changes, not generic placeholders
-- If changes span multiple concerns and would benefit from separate commits, note this to the user but proceed with a single commit unless instructed otherwise
+Test-plan items must be specific to the change, not generic placeholders.
