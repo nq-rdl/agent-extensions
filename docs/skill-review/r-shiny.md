@@ -201,3 +201,117 @@ Recorded before edits from `skills/skill-audit/SKILL.md`:
 - **shiny-bslib**: MINOR. `compatibility:` says bslib ≥ 0.9.0 while the skill
   documents toasts and the code editor (to be checked). Recommendation: KEEP;
   fix the pin.
+
+---
+
+Everything below was recorded **after** the edits (revised = `c2cf95c`).
+
+## Factual checks
+
+Executed on 2026-09-29 in a scratch pixi environment: conda-forge R 4.5.3
+with cli 3.6.6, rlang 1.3.0, testthat 3.3.2, withr 3.0.3, devtools 2.5.2,
+pkgload 1.5.3, usethis 3.2.1, roxygen2 8.1.0, mirai 2.7.2, nanonext 1.10.3,
+promises 1.5.0, shiny 1.14.0, bslib 0.12.0, lifecycle 1.0.5, Rapp 0.3.0,
+styler 1.11.0, pkgdown 2.2.1, and air 0.11.0. bslib 0.9.0 was installed
+from the CRAN archive. The source documents were fetched the same day.
+
+| Skill | Finding | Source | Action |
+|---|---|---|---|
+| r-lib-mirai | The Shiny `ExtendedTask` example read `input$n`, but no such input existed. Under `testServer()` the task status was `error`, with "Error in rnorm(n): invalid arguments". With the UI fixed the status was `success`, with 50 values | executed | Fixed (`388bde3`) |
+| r-lib-mirai | `.timeout` resolves to errorValue 5 even with `dispatcher = FALSE`. Only cancellation needs dispatcher: `stop_mirai()` returns FALSE without it | executed; `?mirai`, `?stop_mirai` | Fixed |
+| r-lib-mirai | A cancelled mirai is errorValue 20, and `is_mirai_interrupt()` returns FALSE for it | executed; `?is_mirai_error` | Fixed |
+| r-lib-mirai | The nested example failed on the daemon with `could not find function "daemons"`. It works once the calls use `mirai::` | executed | Fixed |
+| r-lib-testing | `setup-*.R` is sourced by `devtools::test()` and `test_dir()` as well as by R CMD check, but not by `load_all()`. Helper files are sourced by both | executed; testthat special-files vignette | Fixed |
+| r-lib-testing | `expect_contains()` and `expect_in()` need testthat 3.1.9, not 3.2.0. `expect_shape(m, c(10, 5))` errors, so the argument must be named (`dim =`). Shuffle and the slow reporter need 3.3.0. `with_mock()` has been defunct since 3.3.0 | testthat NEWS; executed | Fixed |
+| r-lib-lifecycle | Since lifecycle 1.0.5, warnings are issued once per session rather than every 8 hours, and `signal_stage()` does nothing | lifecycle NEWS; executed | Fixed |
+| r-lib-cran-extrachecks | On the fixture, `R CMD check --as-cran` flags the Title (package name, title case), the start of the Description, and the http→https redirect. It does not flag the missing `\value`, the commented-out example, the "toolkit ... in R" wording, the unquoted dplyr, or the missing `cph`. Default `devtools::check()` reports no NOTEs; with `remote = TRUE` it reports them. The file URI to an ignored file appears only with `_R_CHECK_CRAN_INCOMING_CHECK_FILE_URIS_=true` | executed | Labels for which tool catches each item |
+| r-lib-cran-extrachecks | "HTTP rejected" was overstated: the URL check flags redirects. Sole-author `cph` is a reviewer request, not policy. Advice to use `pkg:::fun()` in examples was removed (a 2025 review asked for such examples to be removed, or the function exported) | URL_checks.html; policy revision 6875; extrachecks `a37e1ee`; shapr PR #442 | Fixed |
+| r-lib-cli-app | Rapp 0.3.0 declares no R dependency, so the "R ≥ 4.1.0" claim was unsupported. The help output shown was stale. The first `#|` block becomes the front matter | Rapp DESCRIPTION; executed | Fixed; gotcha added |
+| r-lib-package-dev | The NEWS example broke the skill's own ordering rule. `test_active_file(desc =)`, `use_air()`, styler, pkgdown, and `air format` were executed | executed | Fixed; the rest retained |
+| r-expert | `|>` and `\(x)` need R 4.1, the `_` placeholder needs 4.2, and `_$col` needs 4.3 | R NEWS; executed | Retained |
+| shiny-bslib | 90 of 98 used bslib exports exist in bslib 0.9.0. Toasts, `input_code_editor()`, `input_submit_textarea()`, and their updaters need 0.10.0 | executed | Marked |
+
+## After sizes
+
+| Skill | Body lines | References | Description chars |
+|---|---|---|---|
+| r-lib-cran-extrachecks | 456 → 119 | 0 → 1 | 442 → 336 |
+| r-lib-mirai | 438 → 300 | 0 → 4 | 397 → 343 |
+| r-lib-cli-app | 421 → 298 | 1 | 344 |
+| r-lib-testing | 419 → 175 | 5 | 314 → 335 |
+| r-lib-package-dev | 358 → 166 | 0 | 526 → 371 |
+| r-lib-lifecycle | 242 → 247 | 1 | 452 → 343 |
+| shiny-bslib | 231 → 231 | 13 | 411 → 399 |
+| r-lib-cli | 181 | 5 | 689 → 372 |
+| r-expert | 47 → 54 | 0 | 362 → 354 |
+
+## Behavioural results
+
+Conditions: Claude Code 2.1.284 with `claude-sonnet-5`. Original is `4817a19`
+and revised is `c2cf95c`. There were 54 runs, costing USD 7.27 in total.
+Executed grading covered M1 (inputs defined), M2 (returns 55), A1
+(`Rapp::run()`), and K2 (re-checked with `R CMD check`). K1 labels and M3 were
+checked by reading the answers.
+
+| Case | Orig | Revised | Loaded content (skill body chars + reads) |
+|---|---|---|---|
+| K1 | 0/2 labels correct; 2/2 no edits | 2/2 labels correct; 2/2 no edits | 14.5k → 7.4k + cran-details.rst 9.5k (**more** in total) |
+| K2 | 1/1 (DESCRIPTION only) | 1/1 | 14.5k → 7.4k |
+| K3 | 1/1 | 1/1 | 14.5k → 7.5k |
+| M1 | 2/2 | 2/2 | 12.3k → 9.9k + 2.0k reference read |
+| M2 | 1/1 (no skill) | 1/1 (no skill) | — |
+| M3 | 0/2 | 2/2 | 12.3k → 10.0k; orig made denied web calls |
+| A1, A2 | 1/1 each | 1/1 each | 10.7k → 9.3–9.5k |
+| T1 | 1/1 (read fixtures.rst 8.4k) | 1/1 (no reads) | 19.4k → 7.4k |
+| T2 | 0/2 | 2/2 | 11.0k → 7.2–7.5k |
+| P1 | 1/1 | 1/1 | 12.5k → 6.8k |
+| L1 | 0/2 ("8 hours") | 2/2 | 5.6k → 5.8k |
+| R1 | r:expert | r:expert | ~2.7k |
+| R2 | 0/3 routed to lib-cli | 3/3 routed | 0 → 7–15k |
+| R3 | no skill | no skill | — |
+| R4 | lib-mirai | lib-mirai | 12.0k → 9.8k |
+| S1 | bslib-theming | bslib-theming | ~8.4k + dark-mode.rst |
+| S2 | 0/2 give the version | 2/2 say 0.10.0 | ~9.8k + toasts.rst |
+| S3 (explicit) | 1/1 | 1/1 | not emitted |
+
+## Dispositions
+
+| Issue | Candidate | Disposition |
+|---|---|---|
+| #304 | r-lib-cran-extrachecks | Changed, plus separate factual fixes |
+| #304 | r-lib-mirai | Separate factual fix (`388bde3`), then changed |
+| #304 | r-lib-cli-app | Changed, plus a factual fix |
+| #304 | r-lib-testing | Factual fix (`90d4a00`), then changed |
+| #304 | r-lib-package-dev | Changed; formatter and NEWS policy retained |
+| #304 | r-lib-lifecycle | Structure retained; factual fix and route added |
+| #306 | r-lib-cli, r-lib-package-dev, r-lib-lifecycle, r-lib-mirai, shiny-bslib, r-lib-testing, r-expert | Descriptions changed, all ≤ 400 characters |
+| #306 | Routing: R expert vs specialists; Shiny theming vs bslib | Resolved (R1, R2, R4, S1, S2) |
+| #307 | cran-extrachecks / package-dev authorization | Changed: a review makes no edits, a fix stays in scope without asking again, and nothing is submitted |
+| #308 | R cli/Rapp/mirai/testthat/package tools; Shiny bslib | Changed: verified pins and feature versions |
+| #305 | none for R | Not applicable |
+
+## Limitations
+
+- One model and one host, with 1–3 repetitions per case.
+- K1 loads more content after the change, because the new reference is read.
+- R2 routing now loads 7–15k characters of skill for a task the model already
+  answered correctly without it.
+- In M3 revised run 1 the model invented `m$data$message` for an errorValue.
+  This did not come from the skill.
+- Remote and HPC mirai launchers were not exercised. No `evals/claude` suite
+  was added.
+
+## Status at hand-off
+
+- **Done**: every row in the disposition table is committed on
+  `epic312/r-shiny` and the plugins are synced. At `c2cf95c`, these passed:
+  `validate-plugins.sh`, `asctl repo-check`, the unit tests, the `--check`
+  generators, and the `check_*` scripts.
+- **Not done**: reusable `evals/claude/r` and `evals/claude/shiny` suites,
+  and more repetitions of S1, K2, and A1.
+- **Scratch** (this session's scratchpad, shared with other agents):
+  `harness/` (run_case.sh, batch.sh, summarise.py, grade.py, prompts.py with
+  the verbatim prompts), `runs/<case>-<orig|rev>-<n>/`, `verify/*.R` and
+  `*.out`, `renv/`, `lib-bslib090/`, and `fixtures/tidyclean/`.
+- **Next steps**: port K1, K2, M3, T2, L1, and R2 into `evals/claude/r/` with
+  deterministic graders and a unit test.
