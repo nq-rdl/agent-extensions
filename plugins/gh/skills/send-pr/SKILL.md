@@ -22,7 +22,9 @@ the default branch, force-pushing, merging, or choosing reviewers yourself.
 1. **Inspect.** `git status`, `git diff`, `git diff --staged`, the current
    branch and `git remote -v`. Derive the commit message and PR text from the
    changes; do not ask the user to describe them. With nothing to commit and
-   nothing unpushed, stop and say so.
+   nothing unpushed, stop and say so. A missing remote or an unauthenticated
+   `gh` does not stop the local steps: still create the branch and commit,
+   then report the step that could not run.
 2. **Branch.** Never commit to or push the default branch
    (`git symbolic-ref --short refs/remotes/origin/HEAD` prints `origin/<name>`;
    without it, treat `main` or `master` as the default).
