@@ -5,10 +5,11 @@ compatibility: >-
   (2026-09-28/29). Flags change between releases: the installed `--help` wins.
 description: >-
   Install, list, enable/disable, update, and configure GitHub spec-kit extensions
-  in a project, and manage its catalog stack. Use for `specify extension` or
+  and their catalog stack. Use for `specify extension` or
   `specify extension catalog` commands, wiring a team catalog, installing spec-kit
   itself, or editing .specify/extension-catalogs.yml / extensions.yml. Linting an
-  extension → speckit-dev:validate; releasing one → speckit-dev:publish.
+  extension or testing whether it installs → speckit-dev:validate; releasing one →
+  speckit-dev:publish.
 argument-hint: "What to manage? (e.g. 'install jira from our team catalog', 'add an internal catalog')"
 user-invocable: true
 metadata:
@@ -37,7 +38,9 @@ Run `specify extension --help`, `specify extension <cmd> --help`, and
 Non-obvious semantics:
 
 - `add <path> --dev` — `--dev` is a boolean; the positional is the local
-  directory. `--from <url>` installs from a URL, bypassing catalog lookup.
+  directory. `--from <url>` installs from a URL, bypassing catalog lookup. To
+  test whether an extension would install, don't install it into the user's
+  project: use the isolated installer oracle in `/speckit-dev:validate`.
 - Priority (`add --priority`, `set-priority <name> <N>`, `catalog add --priority`)
   — lower number wins; default 10.
 - `list` shows installed extensions, enabled or disabled; browse catalogs with
