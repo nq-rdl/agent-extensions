@@ -276,7 +276,7 @@ Paid spend: **USD 8.93** total (all runs, including two killed at hand-off).
 | #305 | lefthook repetition | changed (313→89) | `95554ee` |
 | #305 | go-gh vendored references | retained with reason (G2 read `advanced-usage.rst` in both versions; offline/GHES value); factual fixes | `a822873` |
 | #305 | changie repeated policy / release prose | changed (167→73); trailing period = explicit house style (#187 closed, no enforcement) | `7c57ec6` |
-| #306 | husky description | changed; R1n fixed; H1 routing still unmet | `8fe503c`, `518827b` |
+| #306 | husky description | changed; retained after saved grading and matched-fixture H1 repeats (2/2 route) | `8fe503c`, `518827b` |
 | #306 | document-release description | changed (408→337; states publish-only-when-asked) | `cc22708` |
 | #306 | Husky/pre-commit/lefthook routing case | changed in all three skills + decision guide | R1*/R2/R3 table |
 | #307 | document-release | changed (353→93 lines); authorization table; changelog/changie/VERSION/health summary kept | D1–D3 |
@@ -302,3 +302,45 @@ Paid spend: **USD 8.93** total (all runs, including two killed at hand-off).
 **Scratch harness** (not in repo): `/tmp/claude-1001/-home-rudolfjs-dev-rdl-nq-rdl-agent-extensions/15b2cf65-4e02-4635-9f01-fd1df4014e8d/scratchpad/ghw/` — `fixtures.sh`, `run.sh`, `matrix.sh`, `prompts/`, `summ.py`, `show.sh`, `results/*.jsonl|.state`, verification scripts (`husky-dash.sh`, `lh-example.sh`, `pc-install.sh`, `changie-quote.sh`, `gh-fallback*.sh`) and their `.out` files.
 
 **Next steps:** run the full unit suite; grade the ungraded H1/H1x/R1n runs; decide whether H1 routing needs a stronger description cue (e.g. "hook errors under sh/dash") or accept explicit invocation; repeat single-run cases that changed outcome (R1n, H1, P2, G3, D3) once more before claiming gains; wire this doc into zensical nav (coordinator).
+
+## Completion of saved grading and repeats (2026-09-29)
+
+The four saved runs were read in full, including tool traces and final answers:
+
+| Saved run | Grade | Evidence |
+|---|---|---|
+| H1-rev3-r2 | Pass on routing and core mechanism | Invoked `gh:husky`; `sh -e`, ignored shebang and POSIX/explicit-Bash fix; no edits |
+| H1x-orig-r1 | Fail | Explicit skill expansion emitted no Skill event; read the old reference, blamed executable bits or missing Bash, recommended chmod |
+| H1x-rev3-r1 | Pass | Explicit expansion emitted no Skill event; accurate Husky 9 mechanism and explicit Bash handoff; no edits |
+| R1n-rev3-r1 | Pass with qualification | Inspected first, stated no manager exists, recommended Husky and offered plain core.hooksPath as an alternative; no edits. Recommendation is not proof of a required framework |
+
+New repeats use the same original `4817a19` gh plugin and the current plugin
+(the rev3 description is unchanged), Claude Code 2.1.284 / claude-sonnet-5,
+independent fixtures, hooks disabled and no MCP servers. Read-only cases expose
+only Skill/Read/Glob/Grep. D3 also permits Edit/Write and bounded git/gh shell
+commands; credentials, SSH and remotes are absent. Original and revised D3
+fixtures have a real local git history; post-run history/status were checked.
+
+| Case | Original repeat | Revised repeat |
+|---|---|---|
+| R1n | Fails shell/framework guidance: assumes Husky, bash shebang/pipefail, chmod, `.husky` hooksPath | Inspects first, says no manager exists, recommends Husky with Lefthook/pre-commit alternatives, POSIX hook and `.husky/_`; no edits |
+| H1, two matched-fixture repeats | 0/2 invoke husky; both still attribute failure to executable/shebang handling | 2/2 invoke husky; both give `sh -e` mechanism and POSIX/explicit-Bash fix |
+| P2 | Still `pixi add --dev`; stale hook pins | Valid `pixi add pre-commit`, current verified hook pins |
+| G3 | Still says default hashes go.sum | Correct default root go.mod, explicit two-module cache-dependency-path |
+| D3 | Stops at an unsolicited VERSION menu; no commit/push | README-only commit, attempts push, accurately reports no remote; VERSION unchanged |
+
+The first new H1 pair reused a fixture whose hook contained only `npm test`,
+although the prompt contained the failing hook. The original noticed the
+mismatch. That pair is excluded from the matched-fixture comparison; the two
+pairs above put the prompt's exact hook text on disk. The original model still
+invented executable-bit evidence in one run. Skill invocation and shell
+mechanism are scored separately; extra causal explanations are not validated
+merely because a routing criterion passes.
+
+**Decision:** retain the current Husky description. The handover's “0/3” was
+incomplete: the saved fourth automatic run already routed, and both corrected
+new repeats routed. These small samples support the specific repair, not a
+universal routing guarantee. R1n still sometimes recommends Husky first, but
+states the absence of configuration and offers a choice. No stronger trigger
+or language-based framework mandate was added. Other changed cases now have
+repeat evidence; no reusable gh eval suite was added in this follow-up.
