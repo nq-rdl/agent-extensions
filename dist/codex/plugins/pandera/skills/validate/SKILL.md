@@ -4,8 +4,9 @@ description: Build, review, and debug Pandera dataframe validation schemas and p
   checks. Use when adding DataFrameSchema or DataFrameModel contracts, diagnosing
   SchemaErrors, or fixing pandas/Polars validation that silently misses bad data.
 license: CC-BY-4.0
-compatibility: Pandera 0.33.0 API baseline; Python with the target dataframe backend
-  installed in the project's environment
+compatibility: Pandera 0.33.0 API baseline; behaviour verified on 0.33.0 and 0.33.1
+  on 2026-09-29; Python with the target dataframe backend installed in the project's
+  environment
 metadata:
   repo: https://github.com/nq-rdl/agent-extensions
 ---
