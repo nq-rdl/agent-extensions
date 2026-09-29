@@ -10,7 +10,7 @@ permission:             # PREFERRED over the deprecated `tools:` field
   edit: deny            # `edit` gates write + edit + apply_patch
   bash:
     "*": ask            # last matching rule wins → put "*" first
-    "git diff": allow
+    "git diff*": allow    # trailing * so `git diff <args>` matches too
     "git log*": allow
   webfetch: deny
 ---

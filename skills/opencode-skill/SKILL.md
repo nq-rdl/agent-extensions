@@ -1,17 +1,15 @@
 ---
 name: opencode-skill
 license: CC-BY-4.0
-compatibility: opencode
+compatibility: >-
+  OpenCode Agent Skills (SKILL.md) and the `references` config key; checked against
+  v1.18.33 docs and source on 2026-09-29. Skills need no SDK.
 description: >-
-  Author OpenCode Agent Skills (SKILL.md) and wire external References for the
-  SST OpenCode coding agent (opencode.ai, github.com/sst/opencode — NOT OpenAI
-  Codex). Covers the on-demand `skill` tool, the `permission.skill` glob gate vs
-  the `tools.skill: false` kill-switch, the name-matches-directory + regex rule,
-  the six discovery paths, and the `references` config key (named external roots
-  via `@alias`). Use when the user mentions an OpenCode SKILL.md, `.opencode/skills/`,
-  `.claude/skills/` drop-in compatibility, `skill({ name })`, the `skill` permission,
-  `<available_skills>`, the `references` key, `@alias`, or making a Claude Code skill
-  work in OpenCode.
+  Write OpenCode Agent Skills (SKILL.md) and `references` entries, or make an
+  existing Claude Code skill load in OpenCode. Use for `.opencode/skills/`,
+  `.claude/skills/` drop-ins, skill name/frontmatter rules, "skill won't load",
+  the `skill` permission or disabling the skill tool, and `@alias` references.
+  Not Claude Code skill authoring, not OpenAI Codex.
 argument-hint: "What OpenCode skill or reference are you authoring? (e.g. 'add a git-release SKILL.md', 'expose ../docs as @docs', 'why isn't my skill loading')"
 user-invocable: true
 metadata:
@@ -21,9 +19,9 @@ metadata:
 # OpenCode Agent Skills + References
 
 Author OpenCode **Agent Skills** (`SKILL.md` instruction bundles loaded on demand) and
-**References** (external dirs/repos attached via `@alias`). OpenCode is SST's open-source
-coding agent — **not OpenAI Codex** — and its skill format is Claude-Code-compatible by
-design, which is exactly where the wrong assumptions creep in.
+**References** (external dirs/repos attached via `@alias`). OpenCode is the open-source
+coding agent at opencode.ai — **not OpenAI Codex** — and its skill format is
+Claude-Code-compatible by design, which is exactly where the wrong assumptions creep in.
 
 > **Verify-canonical guard.** OpenCode's API moves fast and predates the model's training
 > cutoff — before writing skill code, read `references/skills.rst` (and `references/references.rst`
@@ -116,7 +114,7 @@ description (concrete "use when…" terms), not a title.
 | Goal | Key | Shape | Effect |
 |------|-----|-------|--------|
 | Allow/deny/ask **per skill name** | `permission.skill` | glob map → `allow`\|`deny`\|`ask` | `deny` **hides** the skill from the agent; `ask` prompts the user before load |
-| **Disable the skill tool entirely** | `tools.skill` | `false` | drops the whole `<available_skills>` section from context |
+| **Disable the skill tool entirely** | `tools.skill` (documented form) | `false` | drops the whole `<available_skills>` section from context |
 
 `permission.skill` is a **permission glob map**, not a boolean:
 
@@ -140,8 +138,10 @@ permission:
 { "agent": { "plan": { "permission": { "skill": { "internal-*": "allow" } } } } }
 ```
 
-To kill skills for an agent entirely use `tools: { skill: false }` (frontmatter) or
-`agent.<name>.tools.skill: false` (config) — **not** a permission entry.
+To kill skills for an agent entirely the docs use `tools: { skill: false }` (frontmatter)
+or `agent.<name>.tools.skill: false` (config). v1.18.33 converts that legacy `tools` map
+to `permission: { skill: "deny" }`, so the two forms are equivalent; a per-name glob map
+hides only matching skills. Rule order and defaults: `/opencode-dev:policies`.
 
 ---
 
@@ -185,9 +185,17 @@ Non-inferable traps:
 ## Troubleshooting "my skill won't load"
 
 1. Filename is `SKILL.md` (all caps).
-2. Frontmatter has both `name` and `description`, and `name` == directory name and matches the regex.
-3. The name is unique across all six discovery locations.
+2. Frontmatter parses and has a string `name` (and `description`). The v1.18.33 loader
+   skips a file without a string `name`, but does **not** enforce the regex or the
+   directory match: a mismatched skill loads under its frontmatter `name`. Follow the
+   documented rules anyway so the skill stays portable.
+3. The name is unique across all discovery locations — on a duplicate, the later file
+   replaces the earlier one with only a log warning.
 4. It isn't `deny`'d by `permission.skill` (deny ⇒ hidden), and `tools.skill` isn't `false` for the active agent.
+5. Claude-compatible paths are skipped when `OPENCODE_DISABLE_CLAUDE_CODE` or
+   `OPENCODE_DISABLE_CLAUDE_CODE_SKILLS` is set; `OPENCODE_DISABLE_EXTERNAL_SKILLS`
+   also skips the `.agents/` roots. Extra roots can be added with the
+   `skills.paths` config key (in the v1.18.33 schema, not on the skills page).
 
 ---
 
@@ -199,10 +207,3 @@ Non-inferable traps:
 | [references/references.rst](references/references.rst) | Verbatim References doc — `references` key, `path`/`repository` fields, shorthands, `@alias` usage, alias charset, async git refresh, field table |
 | [assets/SKILL.template.md](assets/SKILL.template.md) | Minimal OpenCode-valid `SKILL.md` skeleton |
 
-## Version pins
-
-OpenCode SDK packages: `@opencode-ai/sdk`, `@opencode-ai/plugin` (JS/TS); official Go module
-`github.com/sst/opencode-sdk-go` (Go SDK **v0.19.2**, **Go 1.22+**) — module path (repo now at
-`github.com/anomalyco/opencode-sdk-go`; import the `sst` path). Skills themselves are plain
-markdown and need no SDK; these pins matter only if
-a skill shells out to OpenCode tooling. Re-verify current versions before pinning.

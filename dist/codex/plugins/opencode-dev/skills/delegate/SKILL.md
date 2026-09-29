@@ -1,16 +1,13 @@
 ---
 name: delegate
 license: CC-BY-4.0
-compatibility: opencode
-description: Build a Claude Code plugin that delegates coding work to OpenCode (SST's
-  open-source agent, opencode.ai) — the OpenCode analog of openai/codex-plugin-cc.
-  Maps the codex-plugin-cc template (thin bash forwarders → a Node `.mjs` companion
-  holding a persistent connection to the OpenCode daemon → a detached background-job
-  store with status/result/cancel) onto OpenCode's three drive paths. Use when building
-  a CC→OpenCode delegation/handoff plugin, porting codex-plugin-cc to OpenCode, or
-  choosing between `opencode acp`, `opencode serve` + `@opencode-ai/sdk` (`createOpencodeClient`),
-  and `opencode run --format json --attach --dangerously-skip-permissions` as the
-  transport for delegated tasks.
+compatibility: 'opencode CLI (`run`, `serve`, `acp` flags checked with `opencode <cmd>
+  --help` on v1.18.33, 2026-09-29); Node.js 18+ for the companion. SDK versions: opencode-sdk.'
+description: Build a Claude Code plugin that hands coding tasks to OpenCode in the
+  background and polls status/result/cancel — the OpenCode port of openai/codex-plugin-cc.
+  Use to choose a transport (`opencode acp`, `opencode serve` + SDK, or headless `opencode
+  run --format json`) and design the detached job companion. SDK call details → opencode-dev:sdk;
+  not for configuring OpenCode itself.
 metadata:
   repo: https://github.com/nq-rdl/agent-extensions
 ---
@@ -23,8 +20,8 @@ This skill describes another host. Claude Code/OpenCode commands, configuration,
 
 # Delegate to OpenCode from Claude Code
 
-Build a Claude Code plugin that hands work to **OpenCode** (SST; `opencode.ai`,
-GitHub `sst/opencode` — **not** OpenAI Codex). This skill teaches *only* OpenCode's
+Build a Claude Code plugin that hands work to **OpenCode** (`opencode.ai`, source
+`github.com/anomalyco/opencode` — **not** OpenAI Codex). This skill teaches *only* OpenCode's
 drive paths and how the codex-plugin-cc architecture maps onto them.
 
 > **Verify-canonical guard.** OpenCode's API moves fast and predates the model's
@@ -42,9 +39,8 @@ drive paths and how the codex-plugin-cc architecture maps onto them.
 This skill is the **delta**: which OpenCode transport to drive, and the
 codex-plugin-cc template mapped onto it.
 
-**Version pins** (verify current before authoring): JS packages `@opencode-ai/sdk`,
-`@opencode-ai/plugin`; Go module `github.com/sst/opencode-sdk-go` **v0.19.2**, Go
-**1.22+** — module path (repo now at `github.com/anomalyco/opencode-sdk-go`; import the `sst` path).
+**Versions.** Check flags against the installed `opencode --version`; SDK package
+versions are owned by `opencode-dev:sdk`.
 
 ---
 
@@ -87,10 +83,12 @@ method names from <https://agentclientprotocol.com>, not from the codex surface.
   `opencode run` spins up its own server (random port via `--port`) and re-boots MCP
   servers. For a delegation plugin doing many runs, **`serve` once + `run --attach`**
   (or the SDK) is the difference between snappy and sluggish.
-- **`--dangerously-skip-permissions` auto-approves only permissions that are NOT
-  explicitly denied** — `deny` rules in config/agent still block. It is not a
-  blanket bypass. A delegated headless run needs this (no TTY to answer prompts), so
-  pair it with a tight `permission` policy on the OpenCode side.
+- **`--auto` auto-approves only permissions that are NOT explicitly denied** —
+  `deny` rules in config/agent still block. It is not a blanket bypass. A delegated
+  headless run needs it (no TTY to answer prompts), so pair it with a tight
+  `permission` policy on the OpenCode side (`opencode-dev:policies`). `--auto` is the
+  documented flag in v1.18.33; `--dangerously-skip-permissions` and `--yolo` survive
+  only as hidden aliases, so don't build on them.
 - **Basic auth:** set `OPENCODE_SERVER_PASSWORD` on `serve`/`web`; the companion
   passes `--password/-p` (or `OPENCODE_SERVER_PASSWORD`) and `--username/-u`
   (default `opencode`). The SDK client needs the matching credential too.
@@ -98,8 +96,7 @@ method names from <https://agentclientprotocol.com>, not from the codex surface.
   caveat. Everything else (tools, MCP, AGENTS.md rules, agents, permissions) works
   identically over ACP.
 - **`createOpencodeClient` (connect-only) vs `createOpencode` (starts server +
-  client).** There is **no `createOpencodeServer`** in the SDK — ignore third-party
-  material that uses it. Full SDK detail lives in `opencode-dev:sdk`.
+  client).** Signatures, entry points, and result shapes live in `opencode-dev:sdk`.
 
 ---
 

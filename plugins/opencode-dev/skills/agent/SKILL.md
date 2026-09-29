@@ -1,16 +1,14 @@
 ---
 license: CC-BY-4.0
-compatibility: opencode
+compatibility: >-
+  OpenCode agent, command, and rules config (markdown frontmatter or opencode.json);
+  checked against v1.18.33 docs and source on 2026-09-29.
 description: >-
-  Author OpenCode (SST's open-source coding agent, opencode.ai — NOT OpenAI
-  Codex) agents, custom commands, and project rules as markdown/JSON config. Use
-  when creating or editing files under `.opencode/agents/`, `.opencode/commands/`,
-  or `AGENTS.md`; setting an agent's `mode` (primary/subagent/all), `model`,
-  `permission`, `steps`, or `temperature`; templating commands with `$ARGUMENTS`,
-  `$1`, shell injection `` !`cmd` ``, or `@file` references; wiring the
-  `instructions` config key; or debugging why a `tools:` field, `maxSteps`, a
-  `/docs/modes/` link, or a `CLAUDE.md` fallback isn't behaving. Triggers: "opencode
-  subagent", "opencode custom command", "AGENTS.md", "opencode agent frontmatter".
+  Write OpenCode agents, custom commands, and AGENTS.md rules — files in
+  `.opencode/agents/` or `.opencode/commands/`, or the `agent`, `command`, and
+  `instructions` keys. Use for `mode`, `steps`, per-agent `permission`,
+  `$ARGUMENTS`/`!cmd`/`@file` templates, the CLAUDE.md fallback, or a stale
+  `tools:`/`maxSteps`/modes setup. Not Claude Code subagents or OpenAI Codex.
 argument-hint: "What agent/command/rule do you want to build? (e.g. 'a read-only review subagent', 'a /test command with args', 'why is my CLAUDE.md ignored')"
 user-invocable: true
 metadata:
@@ -19,7 +17,7 @@ metadata:
 
 # OpenCode agents, commands & rules
 
-OpenCode's config-as-markdown surface: **agents** (specialized assistants),
+OpenCode's (opencode.ai; not OpenAI Codex) config-as-markdown surface: **agents** (specialized assistants),
 **custom commands** (reusable prompt templates), and **rules** (`AGENTS.md`
 project instructions). All three are plain markdown-with-frontmatter or JSON keys
 in `opencode.json` — no code required.
@@ -28,12 +26,10 @@ in `opencode.json` — no code required.
 > training cutoff — before writing agent/command/rule config, read
 > `references/agents.rst`, `references/commands.rst`, or `references/rules.rst` AND
 > re-check <https://opencode.ai/docs/agents/> (and `/docs/commands/`, `/docs/rules/`)
-> for drift. The traps below are the deltas a fresh model gets wrong.
->
-> Three claims here have **no dated vendored reference** and are author-knowledge —
-> re-check the live page before relying on them: the `/docs/modes/` 404 and "singular
-> dirs accepted for back-compat" (no `references/` source), and the config merge-order
-> chain under "Config & precedence" (a `/docs/config/` claim — no `references/config.rst`).
+> for drift. The traps below are the deltas a fresh model gets wrong. The `/docs/modes/`
+> 404, the singular-directory globs, and the config merge order were checked on
+> 2026-09-29 against the live site, v1.18.33 source (`config/agent.ts`,
+> `config/command.ts`), and `/docs/config/`.
 
 ---
 
@@ -41,11 +37,11 @@ in `opencode.json` — no code required.
 
 | Trap | Wrong (don't) | Right (do) |
 |------|---------------|------------|
-| **Modes are gone** | Looking up `/docs/modes/` — it **404s** | `mode` is now an **agent field**: `primary` \| `subagent` \| `all` (default `all`) |
+| **Modes are gone** | Looking up `/docs/modes/` — it **404s** | `mode` is now an **agent field**: `primary` \| `subagent` \| `all` (default `all`). Legacy `.opencode/modes/*.md` still load as primary agents |
 | **`tools:` deprecated** | `tools: { write: false }` per agent | Use `permission:` (`allow`/`ask`/`deny`); `tools` still parses but is legacy |
 | **`maxSteps`** | `maxSteps: 5` | `steps: 5` — `maxSteps` is **deprecated** |
 | **Dir is plural** | `.opencode/agent/`, `.opencode/command/` | `.opencode/agents/`, `.opencode/commands/` (singular accepted for back-compat only) |
-| **Filename = name** | `description:`/`name:` field sets the id | The **markdown filename** is the id: `review.md` → `review` agent; `test.md` → `/test` command |
+| **Filename = name** | `description:` sets the id | The **markdown filename** is the documented id: `review.md` → `review` agent; `test.md` → `/test` command. Don't add a `name:` key: v1.18.33 lets it silently replace the filename id (undocumented) |
 | **No CLAUDE.md fallback awareness** | Assuming only `AGENTS.md` is read | OpenCode falls back to `CLAUDE.md` / `~/.claude/CLAUDE.md` when no `AGENTS.md` |
 
 Read `references/*.rst` before writing — these are the only non-obvious bits.
@@ -73,14 +69,10 @@ Frontmatter fields (see `references/agents.rst` for the full table):
 | `disable` / `hidden` / `color` | Off / hide from `@`-menu (subagents only) / UI color |
 | `tools` | **Deprecated** — migrate to `permission` |
 
-`permission` keys gate tools (not 1:1 with tool names): `edit` covers
-**`write` + `edit` + `apply_patch`**; `todowrite` covers `todowrite` + `todoread`.
-Two disjoint sets (not a positional prefix — verify in `references/agents.rst`):
-**glob-capable** keys accept a shorthand action **or** a `{glob: action}` map —
-`read`, `edit`, `glob`, `grep`, `list`, `bash`, `task`, `external_directory`, `lsp`,
-`skill`; **shorthand-only** keys take the action only — `todowrite`, `webfetch`,
-`websearch`, `question`, `doom_loop`. **Last matching rule wins** —
-put `"*"` first, exceptions after. `permission.task` (a glob map) controls which
+`permission` keys, their shapes, and defaults are owned by `/opencode-dev:policies`.
+Two traps matter while writing an agent: `edit` covers **`write` + `edit` +
+`apply_patch`**, and the **last matching rule wins** — put `"*"` first, exceptions
+after. `permission.task` (a glob map) controls which
 subagents this agent may invoke via the Task tool. Per-agent `permission` overrides
 top-level. Scaffold interactively with `opencode agent create`. See
 `assets/agent.md`.
@@ -99,7 +91,10 @@ subagent even for a `primary` agent; `false` disables the auto-subtask), `model`
 Template syntax (in the body / `template`):
 
 - `$ARGUMENTS` — all args; `$1`, `$2`, `$3`, … — positional args.
-- `` !`command` `` — runs in the **project root**, splices stdout into the prompt.
+- Shell output: an exclamation mark written directly before a backtick-quoted command
+  runs in the **project root** and splices stdout into the prompt. The literal form is in
+  `assets/command.md`; it is spelled out in words here because Claude Code runs that
+  pattern as a shell command when it loads a skill body.
 - `@path/to/file` — includes file content in the prompt.
 
 Built-ins `/init`, `/undo`, `/redo`, `/share`, `/help` are **overridable** by a
@@ -156,4 +151,4 @@ Substitution: `{env:VAR}`, `{file:path}`. Full model: `/docs/config/`.
 | File | What it is |
 |------|------------|
 | [assets/agent.md](assets/agent.md) | A read-only review subagent (markdown, `permission`-based) |
-| [assets/command.md](assets/command.md) | A `/test` command using `$ARGUMENTS`, `` !`cmd` ``, and `@file` |
+| [assets/command.md](assets/command.md) | A `/test` command using `$ARGUMENTS`, shell-output injection, and `@file` |
