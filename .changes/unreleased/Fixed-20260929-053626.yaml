@@ -1,0 +1,3 @@
+kind: Fixed
+body: codex:rescue never forwards --wait as prompt text, adds --write only for edit requests, and asks instead of forwarding a bare 'keep going' with no thread (#310)
+time: 2026-09-29T05:36:26.636076285Z

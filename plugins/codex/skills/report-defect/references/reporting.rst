@@ -39,7 +39,7 @@ Draft the issue
 Never include tokens, credentials, private prompts, or full transcripts. Check
 existing issues before proposing a new report.
 
-Assemble a body from the marker after the privacy gate: ``id``, ``recordedAt``, ``surface``, ``argv`` (already redacted and home-scrubbed), ``exitCode``, ``message``, ``stderrTail``, ``environment`` (``node``, ``codex``, ``plugin``, ``platform``, ``release``, ``repo`` basename, ``isGitRepo``), and ``classification``.
+Assemble a body from the marker after the privacy gate: ``id``, ``recordedAt``, ``surface``, ``argv``, ``exitCode``, ``message``, ``stderrTail``, the ``environment`` object as emitted, and ``classification``. The defect CLI owns these structures, including argv redaction and home-directory scrubbing; copy them without adding fields from elsewhere.
 
 Show the complete draft to the user and get approval before filing. Never file without showing the draft first.
 

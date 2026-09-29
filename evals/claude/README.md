@@ -83,7 +83,9 @@ Things to know before opting in:
 
 The `prompting` suite checks that `/prompting:claude-opus-5-5` supplies Opus 5.5
 facts a model without the plugin may lack. Its graders have fixtures in
-`tests/test_eval_prompting_graders.py`. No scores have been recorded for it yet.
+`tests/test_eval_prompting_graders.py`. First scores (sonnet-5, 5 runs per arm, 2026-09-29):
+`migrate-thinking-disabled` 1.00 / 1.00 (Δ 0, saturated), `unattended-early-stop`
+1.00 / 0.10 (Δ +0.90); details in `docs/skill-review/codex.md`.
 
 The `data-request` cases use fictional enquiry numbers, approval-ID repositories, issue
 and PR numbers, branches, people and facts (`ENQ9001`, `THHSAQUIRE-9901`, `SSAQHTS-99001`,

@@ -38,7 +38,9 @@ itself detach the shell process.
 Run ``node "${PLUGIN_ROOT}/scripts/codex-companion.mjs" review ARGUMENTS``.
 Preserve the user's arguments as one literal argument as required by the companion.
 For background runs, report the job/session identity and use $codex:status only on
-a requested follow-up. Do not claim completion at launch. Custom review focus,
-staged-only or unstaged-only scope requires $codex:adversarial-review.
+a requested follow-up. Do not claim completion at launch. Neither review command
+supports staged-only or unstaged-only scope. Custom focus text needs
+$codex:adversarial-review: if the user supplied it here, return the companion's
+rejection as-is instead of dropping the text and rerunning.
 ``--model <model|alias>`` selects the model for one run; see $codex:model-guide
 for aliases and GPT-6 caveats.

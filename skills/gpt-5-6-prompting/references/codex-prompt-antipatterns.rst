@@ -122,6 +122,7 @@ both the proceed-by-default behavior and the narrow set of stop conditions.
 5.6-specific: steering length with prose
 ----------------------------------------
 
-Do not push length or terseness through repeated prose instructions. Set
-``text.verbosity`` (and reasoning effort) at the API/CLI level; keep the prompt
-body focused on the task and its output contract.
+Do not push length or terseness through repeated or generic prose ("be brief",
+"be thorough"); 5.6 is already more concise than 5.5. The companion ``task`` call
+exposes no verbosity parameter, so state the length a task needs once, in its
+output contract.

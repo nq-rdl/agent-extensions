@@ -58,8 +58,8 @@ Argument handling:
 - For a persistent review model, the user can set `review_model` in `~/.codex/config.toml`. When set, it takes precedence over `--model` for this native review (per the Codex config reference; not verified against a live backend).
 - Do not add extra review instructions or rewrite the user's intent.
 - The companion script parses `--wait` and `--background`, but Claude Code's `Bash(..., run_in_background: true)` is what actually detaches the run.
-- `/codex:review` is native-review only. It does not support staged-only review, unstaged-only review, or extra focus text.
-- If the user needs custom review instructions or more adversarial framing, they should use `/codex:adversarial-review`.
+- `/codex:review` is native-review only. It does not support staged-only review, unstaged-only review, or extra focus text. `/codex:adversarial-review` shares the same targets (no staged-only or unstaged-only scope either) and adds focus text.
+- If the arguments include focus text, still pass them unchanged; the companion rejects them and names `/codex:adversarial-review`. Return that message as-is. Do not drop the focus text and rerun, and do not run `/codex:adversarial-review` unless the user asks for it.
 
 Foreground flow:
 - Run:
