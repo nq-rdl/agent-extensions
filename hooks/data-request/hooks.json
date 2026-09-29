@@ -6,7 +6,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "${CLAUDE_PLUGIN_ROOT}/hooks/data-request-preflight.sh",
+            "command": "\"${CLAUDE_PLUGIN_ROOT}/hooks/data-request-preflight.sh\"",
             "timeout": 5
           }
         ]
@@ -18,7 +18,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "${CLAUDE_PLUGIN_ROOT}/hooks/data-request-guard.sh",
+            "command": "\"${CLAUDE_PLUGIN_ROOT}/hooks/data-request-guard.sh\"",
             "timeout": 10
           }
         ]
