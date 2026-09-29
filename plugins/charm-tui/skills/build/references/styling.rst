@@ -53,10 +53,12 @@ Color Function
 
    lipgloss.Color(s string) color.Color
 
-Accepts: - **ANSI 16:** ``"0"``–``"15"`` (named: black=0, red=1,
-green=2, yellow=3, blue=4, magenta=5, cyan=6, white=7; bright: 8–15) -
-**ANSI 256:** ``"16"``–``"255"`` - **True color hex:** ``"#RRGGBB"``
-e.g. ``"#FF5733"``, ``"#04B575"``
+Accepts:
+
+- **ANSI 16:** ``"0"``–``"15"`` (named: black=0, red=1, green=2,
+  yellow=3, blue=4, magenta=5, cyan=6, white=7; bright: 8–15)
+- **ANSI 256:** ``"16"``–``"255"``
+- **True color hex:** ``"#RRGGBB"`` e.g. ``"#FF5733"``, ``"#04B575"``
 
 Named Constants (ANSI 16)
 ~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -80,14 +82,17 @@ Color Utilities
 
    // Adaptive color: picks light or dark variant based on terminal background
    // AdaptiveColor was removed in v2. Use LightDark() instead:
-   lipgloss.LightDark(hasDark bool)  // returns true if terminal has dark background
+   lipgloss.LightDark(isDark bool) lipgloss.LightDarkFunc
+   // type LightDarkFunc func(light, dark color.Color) color.Color
 
-   // Pattern: choose color based on terminal background
-   fg := lipgloss.Color("#333333")  // light terminal
-   if lipgloss.LightDark(true) {
-       fg = lipgloss.Color("#DDDDDD")  // dark terminal
-   }
-   style.Foreground(fg)
+   // Pattern (standalone): detect the background, then pick a color
+   hasDark := lipgloss.HasDarkBackground(os.Stdin, os.Stdout)
+   lightDark := lipgloss.LightDark(hasDark)
+   fg := lightDark(lipgloss.Color("#333333"), lipgloss.Color("#DDDDDD"))
+   style = style.Foreground(fg)
+
+   // Inside Bubbletea: request tea.RequestBackgroundColor, then in Update
+   //   case tea.BackgroundColorMsg: m.isDark = msg.IsDark()
 
    // Migration: compat.AdaptiveColor is available in the compat package for gradual migration
 
@@ -228,7 +233,7 @@ Style Inspection and Mutation
 
 .. code:: go
 
-   // Copy a style — Copy() is removed in v2 (styles are value types, not pointers)
+   // Copy a style — Copy() is deprecated in v2 (styles are value types, not pointers)
    copy := original  // simple assignment works — no Copy() needed
 
    // Unset a property
