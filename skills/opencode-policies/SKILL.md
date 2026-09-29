@@ -1,7 +1,10 @@
 ---
 name: opencode-policies
 license: CC-BY-4.0
-compatibility: opencode
+compatibility: >-
+  OpenCode `experimental.policies` and `permission` config; checked against v1.18.33
+  docs and config schema (packages/core/src/v1/config) on 2026-09-29. Policies are
+  experimental and may change.
 description: >-
   Author OpenCode enterprise governance — the `experimental.policies` provider
   allow/deny layer and the `permission` per-tool gate — for `opencode.json` /
@@ -60,8 +63,8 @@ The traps that bite, in order of how often a fresh model gets them wrong:
 5. **Last-matching statement wins** (within a list). Order broad → specific. With
    default-allow + last-match-wins, the allowlist idiom is: `deny *` then
    `allow anthropic`.
-6. **Policies REPLACE the deprecated `disabled_providers` / `enabled_providers`.**
-   Don't emit those legacy keys — translate them:
+6. **Policies replace the older `disabled_providers` / `enabled_providers`** (still
+   accepted by the v1.18.33 schema; the docs direct you to policies). Translate them:
    - `disabled_providers: [openai, google]` → one `deny provider.use` per id.
    - `enabled_providers: [anthropic, openai]` → `deny *` then `allow` each id.
 
@@ -126,11 +129,22 @@ are *defaults*, not bugs. To let OpenCode read a secret file you must explicitly
   `grep foo file.txt`; bare `"grep"` matches only the literal word and blocks the
   call. Commands with arguments require the explicit `*`.
 - `~` / `$HOME` expand at the **start** of a pattern.
-- Full key list (matches against): `read, edit, glob, grep, bash, task, skill,
-  lsp, question, webfetch, websearch, external_directory, doom_loop`. `lsp` is
-  non-granular (no object form). See `references/permissions.rst` for what each
-  matches on.
+- **Key vocabulary (this skill owns it).** Keys are tool names matched as wildcard
+  patterns, so custom and MCP tools work too (`"mymcp_*": "deny"`). Built-in keys and
+  their shapes in the v1.18.33 schema:
+  - pattern object **or** shorthand action: `read`, `edit`, `glob`, `grep`, `list`,
+    `bash`, `task`, `external_directory`, `lsp`, `skill` (the permissions page calls
+    `lsp` non-granular, but the schema accepts an object);
+  - shorthand action only: `todowrite` (also gates `todoread`), `question`,
+    `webfetch`, `websearch`, `doom_loop`.
+  `task` matches subagent names; `skill` matches skill names. See
+  `references/permissions.rst` for what each key matches on.
 - Set everything at once with a string: `"permission": "allow"`.
+- **Legacy `tools` map.** `tools: { x: false }` (top level or per agent) is deprecated
+  since v1.1.1 and converted to `permission` (`false` → `deny`, `true` → `allow`;
+  `write`/`patch` map to `edit`). An explicit `permission` entry at the same level wins.
+- **Auto mode.** `opencode --auto` / `opencode run --auto` approves every request that
+  would `ask`; explicit `deny` rules still apply.
 
 ### Per-agent override
 

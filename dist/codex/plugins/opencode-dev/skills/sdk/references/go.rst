@@ -26,6 +26,8 @@ This library requires Go 1.22+.
 
 ## Usage
 
+> NOTE (checked 2026-09-29 against v0.19.2 source): `NewClient()` defaults to `http://localhost:54321/` (`option.WithEnvironmentProduction`) unless `OPENCODE_BASE_URL` is set; pass `option.WithBaseURL("http://127.0.0.1:4096/")` to reach a default `opencode serve`.
+
 The full API of this library can be found in `api.md`.
 
 ```go

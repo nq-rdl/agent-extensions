@@ -14,12 +14,12 @@
       "headers": { "Authorization": "Bearer {env:MY_API_KEY}" }
     }
   },
-  "tools": {
-    "local-srv*": false
+  "permission": {
+    "local-srv_*": "deny"
   },
   "agent": {
     "my-agent": {
-      "tools": { "local-srv*": true }
+      "permission": { "local-srv_*": "allow" }
     }
   }
 }

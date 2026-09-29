@@ -1,7 +1,9 @@
 ---
 name: create
 license: CC-BY-4.0
-compatibility: spec-kit >=0.12 (extension schema_version 1.0); re-verify at github.github.io/spec-kit
+compatibility: spec-kit extensions, manifest schema_version "1.0". Manifest rules
+  read from source at v0.12.0 through v1.0.12 (2026-09-29); version-specific rules
+  are marked. Not tested by running the installer.
 description: Scaffold a new GitHub spec-kit extension — the extension.yml manifest,
   commands/*.md, an optional config template, and .extensionignore — valid by construction.
   Use when creating a spec-kit extension, authoring a speckit.<id>.<cmd> command,
@@ -19,8 +21,8 @@ Here $ARGUMENTS means the user’s supplied skill arguments. Codex does not popu
 
 # Create a spec-kit extension
 
-> **Verify-canonical guard.** spec-kit moves fast (v0.12.x, near-daily releases)
-> and predates the model's training cutoff. Before writing any manifest, read
+> **Verify-canonical guard.** spec-kit moves fast (v0.12.0 to v1.0.12 in three
+> months) and predates the model's training cutoff. Before writing any manifest, read
 > `references/extension-schema.rst` AND re-check the live
 > [extensions reference](https://github.github.io/spec-kit/reference/extensions.html)
 > and [development guide](https://raw.githubusercontent.com/github/spec-kit/main/extensions/EXTENSION-DEVELOPMENT-GUIDE.md)
@@ -70,8 +72,11 @@ phase it hooks). If empty, ask for: the extension **id** (kebab), one-line
 | `provides.commands[].aliases` | free-form (not pattern-enforced) — still keep the `speckit.<id>.*` shape |
 | `hooks.<event>` | one entry or a list; each: `command`, `priority` (int ≥1, default 10), `optional`, `prompt`, `description` |
 
-**Hook events (18):** `before_`/`after_` × `specify`, `plan`, `tasks`,
-`implement`, `analyze`, `checklist`, `clarify`, `constitution`, `taskstoissues`.
+**Hook events (20):** `before_`/`after_` × `specify`, `plan`, `tasks`,
+`implement`, `analyze`, `checklist`, `clarify`, `constitution`, `taskstoissues`,
+`converge`. The development guide lists 18; the core `converge` command also reads
+`before_converge`/`after_converge`. Upstream accepts any key, so a typo installs
+and never fires.
 
 **Traps:** `tags`/`defaults` are read but **not** validated — don't rely on them
 for correctness.

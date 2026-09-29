@@ -44,7 +44,7 @@ Options:
 - `responseStyle` (string: `data` or `fields`)
 - `throwOnError` (boolean)
 
-> NOTE: `createOpencodeServer` does NOT appear on the official SDK page. The canonical surface is `createOpencode` + `createOpencodeClient`.
+> ERRATUM (checked 2026-09-29 against v1.18.33 source): the docs page shows only `createOpencode` + `createOpencodeClient`, but the package also exports `createOpencodeServer` (server only, returns `{ url, close }`) from `packages/sdk/js/src/server.ts`, and a `@opencode-ai/sdk/v2` entry point with flat params.
 
 ## Configuration
 
@@ -102,6 +102,8 @@ const result = await client.session.prompt({
 })
 console.log(result.data.info.structured_output)
 ```
+
+> ERRATUM (checked 2026-09-29 against v1.18.33 source): the page's example does not type-check. `format` exists only on the v2 entry point (`@opencode-ai/sdk/v2`, flat params `{ sessionID, parts, format }`); the parsed object is `info.structured`, and `StructuredOutputError` carries `message`/`retries` under `error.data`. See SKILL.md.
 
 Error handling:
 

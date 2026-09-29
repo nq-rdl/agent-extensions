@@ -1,11 +1,13 @@
 ---
 name: manage
 license: CC-BY-4.0
-compatibility: spec-kit >=0.12; `specify extension` CLI; re-verify at github.github.io/spec-kit
+compatibility: 'spec-kit `specify extension` CLI; semantics read from v1.0.12 source
+  (2026-09-28/29). Flags change between releases: the installed `--help` wins.'
 description: Install, list, enable/disable, update, and configure GitHub spec-kit
-  extensions, and manage the catalog stack. Use when running `specify extension` commands,
-  wiring a team/internal catalog, installing spec-kit itself, configuring .specify/extension-catalogs.yml
-  or extensions.yml, or when the user runs $speckit-dev:manage.
+  extensions and their catalog stack. Use for `specify extension` or `specify extension
+  catalog` commands, wiring a team catalog, installing spec-kit itself, or editing
+  .specify/extension-catalogs.yml / extensions.yml. Linting an extension or testing
+  whether it installs → speckit-dev:validate; releasing one → speckit-dev:publish.
 metadata:
   repo: https://github.com/nq-rdl/agent-extensions
 ---
@@ -32,7 +34,9 @@ Run `specify extension --help`, `specify extension <cmd> --help`, and
 Non-obvious semantics:
 
 - `add <path> --dev` — `--dev` is a boolean; the positional is the local
-  directory. `--from <url>` installs from a URL, bypassing catalog lookup.
+  directory. `--from <url>` installs from a URL, bypassing catalog lookup. To
+  test whether an extension would install, don't install it into the user's
+  project: use the isolated installer oracle in `$speckit-dev:validate`.
 - Priority (`add --priority`, `set-priority <name> <N>`, `catalog add --priority`)
   — lower number wins; default 10.
 - `list` shows installed extensions, enabled or disabled; browse catalogs with
@@ -45,9 +49,11 @@ Non-obvious semantics:
 
 ## Catalog stack (precedence)
 
-`SPECKIT_CATALOG_URL` env → project `.specify/extension-catalogs.yml` → user
-`~/.specify/extension-catalogs.yml` → built-in defaults (official +
-community). Lower `priority` number wins on id conflicts. See
+`SPECKIT_CATALOG_URL` env (replaces the whole stack with one URL) → project
+`.specify/extension-catalogs.yml` (wins when it lists at least one catalog; an empty
+list falls back to the defaults) → user `~/.specify/extension-catalogs.yml` →
+built-in defaults (official + community). Lower `priority` number wins on id
+conflicts. See
 `assets/extension-catalogs.yml` for wiring a team catalog with
 `install_allowed: true`.
 
@@ -58,8 +64,10 @@ extension defaults → `<ext>-config.yml` → `<ext>-config.local.yml` →
 
 ## Commit vs gitignore
 
-Commit `.specify/extensions.yml` + `<ext>-config.yml`. Gitignore
-`.specify/extensions/.cache/`, `.backup/`, `*.local.yml`, `.registry`.
+Commit `.specify/extensions.yml` + `.specify/extensions/*/<ext>-config.yml`.
+Gitignore `.specify/extensions/.cache/`, `.specify/extensions/.backup/`,
+`.specify/extensions/*/*.local.yml`, and `.specify/extensions/.registry`
+(installation state).
 
 ## Canonical sources
 
