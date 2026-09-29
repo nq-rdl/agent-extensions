@@ -7,7 +7,7 @@ description: >-
   templates, Docker-based builds, documentation quality inspections, and prose
   style guides for JetBrains Writerside.
 compatibility: >-
-  Requires JetBrains Writerside or Docker for builds
+  Requires the Writerside plugin for a JetBrains IDE, or Docker for builds
 metadata:
   repo: https://github.com/nq-rdl/agent-extensions
 ---
@@ -41,6 +41,8 @@ It does **not** cover:
 **Procedures** — Step-by-step instruction blocks using `<procedure>` and `<step>` tags. These render as numbered sequences with clear visual separation — the primary pattern for how-to content.
 
 **Inspections** — Built-in quality checks that run in the IDE editor and during Docker builds. They catch invalid markup, broken references, duplicate IDs, and structural issues.
+
+Writerside is a plugin for JetBrains IDEs (the standalone IDE was sunset in March 2025). Builder version and Docker/CI builds: [references/docker-deployment.rst](references/docker-deployment.rst).
 
 ---
 
