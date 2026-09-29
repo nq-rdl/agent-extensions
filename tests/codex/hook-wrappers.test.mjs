@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: Apache-2.0
 
+import fs from "node:fs";
 import path from "node:path";
 import test from "node:test";
 import assert from "node:assert/strict";
@@ -116,3 +117,105 @@ for (const [name, wrapperPath] of WRAPPERS) {
     );
   });
 }
+
+// ── Installed-copy runtime checks (#311) ────────────────────────────────────
+// Copy ONLY plugins/codex into a cache path that contains spaces, run from an
+// unrelated working directory, and execute the command strings from the
+// installed hooks/hooks.json the way Claude Code's shell form does: once with
+// the placeholder left for the shell to expand from the exported
+// CLAUDE_PLUGIN_ROOT, and once textually substituted first. The fake `node`
+// proves which script the wrapper exec'd, that stdin arrived, and that the
+// child's exit status is returned unchanged.
+function installCodexCopy() {
+  const tmp = makeTempDir("codex hook install ");
+  const root = path.join(tmp, "plugin cache", "codex");
+  fs.cpSync(PLUGIN_ROOT, root, { recursive: true });
+  const cwd = path.join(tmp, "unrelated cwd");
+  fs.mkdirSync(cwd);
+  return { root, cwd, bin: makeTempDir() };
+}
+
+function installedCommands(root) {
+  const config = JSON.parse(fs.readFileSync(path.join(root, "hooks", "hooks.json"), "utf8"));
+  const commands = new Set();
+  for (const groups of Object.values(config.hooks)) {
+    for (const group of groups) {
+      for (const hook of group.hooks) commands.add(hook.command);
+    }
+  }
+  return [...commands];
+}
+
+function fakeNodeRecordingScript(exitCode) {
+  return `#!/bin/sh
+case "$1" in
+  -p) echo "22 1" ;;
+  *)
+    [ -f "$1" ] || { printf 'script not found: %s\\n' "$1" >&2; exit 97; }
+    printf 'SCRIPT=%s\\n' "$1"
+    while IFS= read -r line; do printf '%s\\n' "$line"; done
+    exit ${exitCode}
+    ;;
+esac
+`;
+}
+
+function runShellForm(command, { root, cwd, bin }, substitute, input) {
+  const text = substitute ? command.split("${CLAUDE_PLUGIN_ROOT}").join(root) : command;
+  return run("/bin/sh", ["-c", text], {
+    cwd,
+    env: { PATH: bin, HOME: cwd, CLAUDE_PLUGIN_ROOT: root },
+    input
+  });
+}
+
+test("installed codex hooks keep executable wrappers", () => {
+  const { root } = installCodexCopy();
+  for (const name of ["codex-session-lifecycle.sh", "codex-stop-review-gate.sh", "codex-defect-report.sh"]) {
+    const mode = fs.statSync(path.join(root, "scripts", name)).mode;
+    assert.ok(mode & 0o100, `${name} must stay executable in the installed copy`);
+  }
+});
+
+for (const substitute of [false, true]) {
+  const form = substitute ? "textually substituted" : "shell-expanded";
+  test(`installed codex hook commands run from a spaced path (${form})`, () => {
+    const install = installCodexCopy();
+    writeExecutable(path.join(install.bin, "node"), fakeNodeRecordingScript(7));
+    const commands = installedCommands(install.root);
+    assert.equal(commands.length, 3);
+    for (const command of commands) {
+      const result = runShellForm(command, install, substitute, "PING\n");
+      assert.equal(result.status, 7, `${command}: ${result.stderr}`);
+      assert.match(result.stdout, /PING/, "stdin must reach the exec'd hook");
+      const script = /SCRIPT=(.*)/.exec(result.stdout)[1];
+      assert.ok(script.startsWith(install.root + path.sep), `exec'd ${script} outside the installed copy`);
+    }
+  });
+}
+
+for (const [label, source] of [
+  ["missing", null],
+  ["old", fakeNode(18, 17, 0)],
+  ["unparseable", fakeNodeWithUnusableProbe()]
+]) {
+  test(`installed codex hook commands report ${label} Node.js from a spaced path`, () => {
+    const install = installCodexCopy();
+    if (source) writeExecutable(path.join(install.bin, "node"), source);
+    for (const command of installedCommands(install.root)) {
+      const result = runShellForm(command, install, false, "");
+      assert.equal(result.status, 1, command);
+      assert.equal(result.stderr.trim(), NODE_PREFLIGHT_MESSAGE, command);
+    }
+  });
+}
+
+test("the three wrappers share one Node.js preflight and one owned minimum", () => {
+  const extract = (file) => {
+    const text = fs.readFileSync(file, "utf8");
+    return text.slice(text.indexOf("codex_require_node() {"), text.indexOf("\ncodex_require_node\n"));
+  };
+  const [first, ...rest] = WRAPPERS.map(([, file]) => extract(file));
+  assert.ok(first.includes(">=18.18.0") && first.includes('"$minor" -lt 18'), "minimum must be 18.18");
+  for (const body of rest) assert.equal(body, first, "preflight bodies must stay byte-identical");
+});
