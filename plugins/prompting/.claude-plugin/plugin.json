@@ -1,7 +1,7 @@
 {
-  "name": "claude-code",
+  "name": "prompting",
   "version": "0.36.1",
-  "description": "Claude Code — agent-team coordination, hook authoring, and skill-quality auditing",
+  "description": "Prompting — prompt engineering methodology and model-specific prompt and harness guidance",
   "author": {
     "name": "nq-rdl"
   },

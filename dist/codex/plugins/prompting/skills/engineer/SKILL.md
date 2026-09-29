@@ -1,5 +1,5 @@
 ---
-name: engineer-prompts
+name: engineer
 description: Use when asked to engineer, improve, and validate prompts using a dual-persona
   Prompt Builder / Prompt Tester methodology. Analyzes sources, applies imperative-language
   best practices, and runs mandatory validation cycles before finalizing any prompt.

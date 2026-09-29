@@ -76,7 +76,7 @@ Claude uses `/plugin:skill`; Codex uses `$plugin:skill` for bundles enabled in t
 | `platform-sre-kubernetes` | `kubernetes:operate` | `skills/platform-sre-kubernetes/references/subagent.rst` |
 | `playwright-tester` | `playwright:test` | `skills/playwright-tester/references/subagent.rst` |
 | `postgresql-dba` | `postgres:administer` | `skills/postgresql-dba/references/subagent.rst` |
-| `prompt-builder` | `claude-code:engineer-prompts` | `skills/prompt-builder/references/subagent.rst` |
+| `prompt-builder` | `prompting:engineer` | `skills/prompt-builder/references/subagent.rst` |
 | `redhat-docs-fetcher` | `redhat:fetch-docs` | `skills/redhat-docs-fetch/references/subagent.rst` |
 | `repo-architect` | `gh:configure-repo` | `skills/repo-architect/references/subagent.rst` |
 | `research-technical-spike` | `planning:research` | `skills/research-technical-spike/references/subagent.rst` |

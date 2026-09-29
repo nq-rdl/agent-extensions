@@ -1,4 +1,4 @@
-"""Fixture tests for the hand-written graders of evals/claude/claude-prompting/.
+"""Fixture tests for the hand-written graders of evals/claude/prompting/.
 
 `claude plugin eval` applies each regex grader's `pattern` as a JavaScript regex to the
 agent's final message. Each fixture is graded by Python's `re` and, when `node` is on
@@ -16,7 +16,7 @@ from pathlib import Path
 import yaml
 
 REPO = Path(__file__).resolve().parent.parent
-SUITE = REPO / "evals" / "claude" / "claude-prompting"
+SUITE = REPO / "evals" / "claude" / "prompting"
 NODE = shutil.which("node")
 NODE_SCRIPT = """
 const {patterns, reply} = JSON.parse(require('fs').readFileSync(0, 'utf8'));
@@ -123,9 +123,10 @@ class SuiteShape(unittest.TestCase):
             fired = graders(case)["skill-fired"]
             with self.subTest(case=case):
                 self.assertEqual((fired["type"], fired["tool"]), ("tool_used", "Skill"))
-                self.assertRegex('"skill": "claude-prompting:opus-5-5"', fired["input_match"])
-                self.assertRegex('"skill":"opus-5-5"', fired["input_match"])
-                self.assertNotRegex('"skill": "claude-code:engineer-prompts"', fired["input_match"])
+                self.assertRegex('"skill": "prompting:claude-opus-5-5"', fired["input_match"])
+                self.assertRegex('"skill":"claude-opus-5-5"', fired["input_match"])
+                self.assertNotRegex('"skill": "prompting:engineer"', fired["input_match"])
+                self.assertNotRegex('"skill": "prompting:claude-sonnet-5-5"', fired["input_match"])
 
 
 class GraderFixtures(unittest.TestCase):

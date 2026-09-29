@@ -301,26 +301,26 @@
     {
       "name": "claude-code",
       "source": "./plugins/claude-code",
-      "description": "Claude Code — agent-team coordination, hook authoring, skill-quality auditing, and prompt engineering",
+      "description": "Claude Code — agent-team coordination, hook authoring, and skill-quality auditing",
       "version": "0.36.1",
       "keywords": [
         "claude-code",
         "agents",
         "hooks",
         "skills",
-        "audit",
-        "prompts"
+        "audit"
       ]
     },
     {
-      "name": "claude-prompting",
-      "source": "./plugins/claude-prompting",
-      "description": "Claude model prompting — model-specific prompt and harness guidance, starting with Claude Opus 5.5",
+      "name": "prompting",
+      "source": "./plugins/prompting",
+      "description": "Prompting — prompt engineering methodology and model-specific prompt and harness guidance",
       "version": "0.36.1",
       "keywords": [
+        "prompting",
+        "prompt-engineering",
         "claude",
         "anthropic",
-        "prompting",
         "opus-5-5",
         "effort",
         "agents"

@@ -1,17 +1,15 @@
 ---
+name: claude-opus-5-5
 license: MIT
-description: >-
-  Prompting and harness guidance specific to Claude Opus 5.5 (claude-opus-5-5).
-  Use when writing or tuning a system prompt, agent loop, or Messages API
-  request for Opus 5.5, or when migrating prompts from Claude Opus 5. Also use
-  when choosing an effort level, when a request with thinking disabled returns
-  400, when an unattended agent stops after reporting progress, when long
-  agentic turns look silent, when a response has stop_reason "refusal", or when
-  chat replies start slowly.
-compatibility: >-
-  Claude Opus 5.5 (claude-opus-5-5) on the Claude API. Verified 2026-09-28
-  against Anthropic's "Prompting Claude Opus 5.5" guide, the Opus 5.5 migration
-  guide and the effort docs. Beta header names are as of that date.
+description: Prompting and harness guidance specific to Claude Opus 5.5 (claude-opus-5-5).
+  Use when writing or tuning a system prompt, agent loop, or Messages API request
+  for Opus 5.5, or when migrating prompts from Claude Opus 5. Also use when choosing
+  an effort level, when a request with thinking disabled returns 400, when an unattended
+  agent stops after reporting progress, when long agentic turns look silent, when
+  a response has stop_reason "refusal", or when chat replies start slowly.
+compatibility: Claude Opus 5.5 (claude-opus-5-5) on the Claude API. Verified 2026-09-28
+  against Anthropic's "Prompting Claude Opus 5.5" guide, the Opus 5.5 migration guide
+  and the effort docs. Beta header names are as of that date.
 metadata:
   repo: https://github.com/nq-rdl/agent-extensions
 ---
@@ -19,7 +17,7 @@ metadata:
 # Prompting Claude Opus 5.5
 
 This skill covers only what changed from Claude Opus 5. For general prompt
-engineering, use `/claude-code:engineer-prompts`.
+engineering, use `$prompting:engineer`.
 
 **Verify first.** Beta headers, defaults and effort behaviour change between
 releases. Where a wrong answer would mislead, check the canonical sources:

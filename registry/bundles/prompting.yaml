@@ -1,0 +1,36 @@
+schemaVersion: v1
+id: prompting
+displayName: Prompting
+description: Prompting — prompt engineering methodology and model-specific prompt and harness guidance
+keywords: [prompting, prompt-engineering, claude, anthropic, opus-5-5, effort, agents]
+owners:
+  - rdl
+channels:
+  - stable
+skills:
+  - {source: prompt-builder, leaf: engineer}
+  # One leaf per model, named by its API model ID (hyphens only).
+  - {source: opus-5-5-prompting, leaf: claude-opus-5-5}
+hooks: []
+prompts: []
+mcp: []
+targets:
+  claude:
+    enabled: true
+    pluginName: prompting
+    marketplaceName: rdl-agent-extensions
+
+  codex:
+    enabled: true
+    pluginName: prompting
+    marketplaceName: rdl-agent-extensions
+    category: Developer Tools
+    components:
+      skills: true
+      mcp: false
+      hooks: false
+      apps: false
+    interface:
+      shortDescription: Prompt engineering methodology and model-specific prompt guidance
+      defaultPrompt:
+      - Help me write or tune a prompt.

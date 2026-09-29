@@ -39,8 +39,8 @@ Delegation outlines are optional skill references, not registered agent types.
 | [`pixi`](#pixi) | Yes | Yes | Pixi — manage Python projects, environments, and dependencies |
 | [`lychee`](#lychee) | Yes | Yes | Lychee — fast link checking for docs and Markdown |
 | [`charm-tui`](#charm-tui) | Yes | Yes | Charm — build terminal UIs with Bubbletea, Lip Gloss, and Fang |
-| [`claude-code`](#claude-code) | Yes | Yes | Claude Code — agent-team coordination, hook authoring, skill-quality auditing, and prompt engineering |
-| [`claude-prompting`](#claude-prompting) | Yes | Yes | Claude model prompting — model-specific prompt and harness guidance, starting with Claude Opus 5.5 |
+| [`claude-code`](#claude-code) | Yes | Yes | Claude Code — agent-team coordination, hook authoring, and skill-quality auditing |
+| [`prompting`](#prompting) | Yes | Yes | Prompting — prompt engineering methodology and model-specific prompt and harness guidance |
 | [`codex`](#codex) | Yes | Yes | Delegate work to the OpenAI Codex CLI — reviews, background tasks, and rescue sessions |
 | [`opencode-dev`](#opencode-dev) | Yes | Yes | OpenCode development toolkit — author plugins, agents, the SDK, custom tools, skills, governance policies, and delegation harnesses |
 | [`speckit-dev`](#speckit-dev) | Yes | Yes | SpecKit extension toolkit — scaffold, validate, manage, and publish spec-kit extensions |
@@ -489,7 +489,7 @@ Charm — build terminal UIs with Bubbletea, Lip Gloss, and Fang.
 
 ## claude-code
 
-Claude Code — agent-team coordination, hook authoring, skill-quality auditing, and prompt engineering.
+Claude Code — agent-team coordination, hook authoring, and skill-quality auditing.
 
 **Claude Code skills**
 
@@ -502,7 +502,6 @@ Claude Code — agent-team coordination, hook authoring, skill-quality auditing,
 - `/claude-code:skill-review`
 - `/claude-code:skill-report-issue`
 - `/claude-code:discover-plugins`
-- `/claude-code:engineer-prompts`
 
 **Codex skills**
 
@@ -515,7 +514,6 @@ Claude Code — agent-team coordination, hook authoring, skill-quality auditing,
 - `$claude-code:skill-review`
 - `$claude-code:skill-report-issue`
 - `$claude-code:discover-plugins`
-- `$claude-code:engineer-prompts`
 
 **Codex hooks:** Native command hooks; see [coverage and limitations](codex.md#hooks).
 
@@ -523,17 +521,19 @@ Claude Code — agent-team coordination, hook authoring, skill-quality auditing,
 
 ---
 
-## claude-prompting
+## prompting
 
-Claude model prompting — model-specific prompt and harness guidance, starting with Claude Opus 5.5.
+Prompting — prompt engineering methodology and model-specific prompt and harness guidance.
 
 **Claude Code skills**
 
-- `/claude-prompting:opus-5-5`
+- `/prompting:engineer`
+- `/prompting:claude-opus-5-5`
 
 **Codex skills**
 
-- `$claude-prompting:opus-5-5`
+- `$prompting:engineer`
+- `$prompting:claude-opus-5-5`
 
 ---
 

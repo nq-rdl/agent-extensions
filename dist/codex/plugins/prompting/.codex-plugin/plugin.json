@@ -1,32 +1,33 @@
 {
-  "name": "claude-prompting",
+  "name": "prompting",
   "version": "0.36.1",
-  "description": "Claude model prompting — model-specific prompt and harness guidance, starting with Claude Opus 5.5",
+  "description": "Prompting — prompt engineering methodology and model-specific prompt and harness guidance",
   "author": {
     "name": "nq-rdl"
   },
   "repository": "https://github.com/nq-rdl/agent-extensions",
   "license": "MIT",
   "keywords": [
+    "prompting",
+    "prompt-engineering",
     "claude",
     "anthropic",
-    "prompting",
     "opus-5-5",
     "effort",
     "agents"
   ],
   "skills": "./skills/",
   "interface": {
-    "displayName": "Claude Prompting",
-    "shortDescription": "Model-specific prompt and harness guidance for Claude Opus 5.5",
-    "longDescription": "Claude model prompting — model-specific prompt and harness guidance, starting with Claude Opus 5.5",
+    "displayName": "Prompting",
+    "shortDescription": "Prompt engineering methodology and model-specific prompt guidance",
+    "longDescription": "Prompting — prompt engineering methodology and model-specific prompt and harness guidance",
     "developerName": "nq-rdl",
     "category": "Developer Tools",
     "capabilities": [
       "Skills"
     ],
     "defaultPrompt": [
-      "Help me tune my Claude Opus 5.5 prompt."
+      "Help me write or tune a prompt."
     ],
     "websiteURL": "https://github.com/nq-rdl/agent-extensions"
   }
