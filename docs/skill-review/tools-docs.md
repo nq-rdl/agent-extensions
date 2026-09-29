@@ -188,3 +188,98 @@ marketplace is not installed. Observed per run: `Skill` calls, reference
 | W1 | writerside | normal | GitHub Actions step to build the `hi` instance with Docker | pinned builder image from one owner; valid command |
 | R1 | rust | explanation | Explain a closure/iterator ownership snippet, with and without `reading-vocabulary.rst` | equal or better correctness with the reference |
 | P1–P3 | pixi | #309 | New Python env with a C library; update a lockfile in an existing project; build a pixi-pack bundle | correct commands; reference use observed |
+
+---
+
+Everything below was recorded **after** the edits, on branch
+`epic312/tools-docs`.
+
+## Status at hand-off (2026-09-29)
+
+Work stopped on a coordinator wind-down request. Nothing below is claimed
+beyond what is listed as run.
+
+### Behavioural results so far
+
+Harness: `claude -p` 2.1.284, `claude-sonnet-5`, `--plugin-dir` on a temporary
+copy (original = `plugins/<bundle>` at `4817a19`, revised = working tree),
+`--setting-sources project,local --strict-mcp-config`, tools `Skill Read Glob
+Grep`. Graded by the regexes in the scratch `grade.py` plus manual reading.
+Paid spend: **USD 7.02** over 111 recorded runs, plus a few runs aborted
+twice (a staging race, then the wind-down) whose cost was not captured
+(estimate under USD 0.5).
+
+| Case | Original | Revised | Note |
+|---|---|---|---|
+| B1 bitwarden normal | 2/2 hand-rolled functions, `export` prefix left to a `sed` hack | 2/2 route to `scripts/bw-env.sh` | routing `secrets` in all runs |
+| B2 Secrets Manager negative | not routed, answered with `bitwarden/sm-action` | same | grader regex (`bws`) too strict; manual pass |
+| O1 "write an Obsidian note" | routed 2/3 | final wording 3/3 (first rewrite 0/3, fixed) | |
+| O2 docs-site README frontmatter (negative) | 0/2 routed | 0/11 routed across wordings | |
+| O3 vault fixture, no "Obsidian" word | 1/1 | 3/3 (d2), 3/3 (d4) | wikilink, heading link, `%%` in all |
+| O4 table in "my Obsidian vault" | routed 2/6 | 1/6 (final wording) | escaped pipes correct in all 12 without the skill; noise |
+| Q1 quarto cell options | pass 1/1 | pass 1/1 | body 6,908 → 4,883 chars loaded |
+| Q2 alt text, Jupyter doc | **0/3**: multi-line `fig-alt: \|` (breaks under Jupyter) | **3/3** one-line values, all three figures | |
+| Q3 negative | not routed | not routed | |
+| A1 role scaffold | pass, read role-reference | pass, no reference read | |
+| A2 playbook fix | pass, no reference read | pass, no reference read | |
+| G1/G2/G3 go routing | naming / secure / none | same | 1 run each |
+| S1 StarRocks 3.3 export | pass 2/2 | pass 2/2 | model already knew; no regression |
+| W1 Writerside CI | 0/2 avoided `grep ERROR` gate | 2/2 exit code or report | |
+| SO1 sops `.env.enc` decrypt | **0/2** dotenv type flags | **2/2** | |
+| C1 teatest golden test | **0/2** (wrong import path, `KeyRunes`) | **2/2** | |
+| R1/R2 rust-explain with vs without `reading-vocabulary.rst` | original 3/3 (R1) | variant runs **incomplete** (killed at wind-down) | not evidence |
+| P1–P3 pixi with skill vs no plugin | not run | not run | |
+
+### Per-issue dispositions
+
+| Issue | Candidate | Disposition | Evidence |
+|---|---|---|---|
+| #305 | bitwarden | Changed | `bw-env.sh` owner, tests `tests/test_bitwarden_bw_env.py` (12 of 16 failed before the fix; all 18 pass after; also run in zsh 5.9 + BusyBox awk), B1 |
+| #305 | starrocks | Changed | decision tables kept; ANALYZE/MV SQL routed; commit `982cd8c` |
+| #305 | rust-explain | **Deferred** | reference-removal comparison started, variant runs incomplete; references retained unchanged |
+| #305 | quarto-authoring | Changed | body 311 → about 110 lines, routes per task; Q1 |
+| #305 | writerside | Changed | one owner for builder tag; runnable examples; W1 |
+| #305 | obsidian-markdown | Changed | vault gotchas (verified against obsidian-help `bc5b4f2`), generic examples dropped |
+| #306 | ansible, go-secure, go-naming, quarto-authoring, obsidian-markdown | Changed | descriptions 640/573/466/466/262 → 385/370/373/385/395 chars; O1–O4, A1–A2, G1–G3 |
+| #307 | ansible | Changed | role-reference scoped; A1/A2 |
+| #307 | quarto-alt-text | Changed | origin assumptions removed; `scripts/check-alt.sh` + `tests/test_quarto_alt_text_check.py` (failed before, 12 pass); Q2 |
+| #308 | charm-tui | Separate factual fix | compiled against bubbletea v2.0.10 etc.; Go 1.26+; C1 |
+| #308 | Quarto/Obsidian applicability | Changed | tested Quarto 1.9.38/1.10.18; Obsidian 1.9+ properties, CLI 1.12.7+ |
+| #308 | sops/age | Separate factual fix | executed with sops 3.13.3, age 1.3.2, Vault 2.1.1 dev; SO1 |
+| #308 | StarRocks | Separate factual fix | per-feature minimums, v3.3.5+ as written |
+| #308 | argo-cd | Separate factual fix | `install-cli.sh` always failed (no `.sha256` assets); obsolete Helm repo, missing chart version |
+| #308 | Writerside provenance | Changed | builder 2026.09.0357 documented, examples run with 2026.02.8644 |
+| #308 | defuddle, rust-explain | Changed | tested versions recorded; `let … else` example corrected |
+| #308 | pixi | **Not started** (content) | pixi 0.78.0 still needs `preview = ["pixi-build"]` (checked); references: 0 broken links, 76 redirects (lychee, 2026-09-29) |
+| #308 | obsidian-bases follow-up | Changed | guard now covers older version / unreachable help |
+| #309 | pixi and 24 references | **Deferred** | decision record not written; P1–P3 not run; retain until evidence |
+| — | obsidian-bases date subtraction | Deferred | obsidian-help `bc5b4f2`: `Bases syntax.md` (last changed `ed4f6f4`, 2026-03-26) still says milliseconds; `Functions.md` documents `duration()` but no `.days`; needs an Obsidian instance |
+
+### Not done / next steps
+
+1. Rerun R1/R2 (`orig` vs `novocab` variant, 3 each) and record the
+   rust-explain reference decision (#305). R1 is a false-premise case: the
+   snippet does not compile (E0505, checked with rustc 1.97.1).
+2. Run P1–P3 (`orig` = current skill vs `none`), then write the #309 pixi
+   decision record; add `compatibility:` (pixi 0.78.0 checked), provenance
+   (converted pixi.prefix.dev pages, vendored by 2026-04-26 via
+   agent-skills v0.6.0) and a verify-canonical guard.
+3. Fill in the per-run table above with loaded-content numbers for each
+   case (available in the scratch `all-summary.jsonl`).
+4. Codex copies were regenerated by `sync-plugins.sh`; the Codex smoke test
+   was not run.
+
+### Where the scratch material lives
+
+`/tmp/claude-1001/-home-rudolfjs-dev-rdl-nq-rdl-agent-extensions/15b2cf65-4e02-4635-9f01-fd1df4014e8d/scratchpad/`:
+`runs/` (runner `run.py`, `cases.json`, `grade.py`, `out/*.jsonl`,
+`all-summary.jsonl`, fixtures), `verify/` (sops, charm, writerside, misc,
+docs, bw logs and fixtures).
+
+### Known issues
+
+- The bitwarden npm check created `~/.config/Bitwarden CLI/` (an empty
+  data file) on the host; removal was refused by the permission system and is
+  left to the user.
+- A broad `pkill -f run.py` during a restart may have stopped other agents'
+  runner processes that shared the name.
