@@ -7,10 +7,9 @@ https://code.claude.com/docs/en/settings#settings-precedence (managed > project
 local > shared project > user) and the agent-teams docs: a value in any
 settings file beats a shell export, and "0" disables.
 
-The Bash 3.2 class runs the script under docker.io/library/bash:3.2 (bash
-3.2.57, BusyBox userland) with a static jq mounted in. It is skipped unless
-podman, that image, and BASH32_STATIC_JQ (path to a static jq binary, e.g.
-jq 1.7.1 jq-linux-amd64) are available.
+The Bash 3.2 class uses the pinned Docker/Podman BusyBox fixture and verified
+static jq. Discovery may skip it locally; the dedicated CI runner rejects skips.
+This Linux stand-in does not prove native macOS/BSD portability.
 """
 
 import json
@@ -20,6 +19,8 @@ import subprocess
 import tempfile
 import unittest
 from pathlib import Path
+
+from bash32_fixture import container_runtime, run_container, static_jq
 
 REPO = Path(__file__).resolve().parent.parent
 SCRIPT = REPO / "skills" / "cc-agent-teams" / "scripts" / "check-config.sh"
@@ -172,21 +173,12 @@ class Portability(unittest.TestCase):
         self.assertNotRegex(text, r"\bsed\s+(-[a-zA-Z]*\s+)*-i")
 
 
-def podman_bash32():
-    podman = shutil.which("podman")
-    jq = os.environ.get("BASH32_STATIC_JQ")
-    if not podman or not jq or not os.path.isfile(jq):
-        return None
-    probe = subprocess.run([podman, "image", "exists", "docker.io/library/bash:3.2"], capture_output=True)
-    return (podman, jq) if probe.returncode == 0 else None
-
-
-@unittest.skipUnless(podman_bash32(), "needs podman, docker.io/library/bash:3.2, and BASH32_STATIC_JQ")
+@unittest.skipUnless(container_runtime() and static_jq(), "needs pinned Bash 3.2 image and verified BASH32_STATIC_JQ")
 class Bash32BusyBox(unittest.TestCase):
-    """bash 3.2.57 (the macOS /bin/bash version) with BusyBox sed/grep and a static jq."""
+    """Bash 3.2.57 with BusyBox sed/grep and a verified static jq."""
 
     def test_enable_disable_check_under_bash32(self):
-        podman, jq = podman_bash32()
+        jq = static_jq()
         with tempfile.TemporaryDirectory() as tmp:
             t = Path(tmp)
             shutil.copy2(SCRIPT, t / "check-config.sh")
@@ -197,14 +189,12 @@ class Bash32BusyBox(unittest.TestCase):
             script = (
                 "set -e; export HOME=/w/home PATH=/w:$PATH CHECK_CONFIG_MANAGED_FILE=/w/none; cd /w/proj; "
                 "bash /w/check-config.sh --enable >/dev/null; "
-                "bash /w/check-config.sh | grep -q 'Agent teams are ENABLED'; "
+                "bash /w/check-config.sh | grep 'Agent teams are ENABLED' >/dev/null; "
                 "bash /w/check-config.sh --disable >/dev/null; "
                 "jq -e '.env.%s == \"0\" and .model == \"m\"' /w/home/.claude/settings.json >/dev/null; "
-                "bash /w/check-config.sh | grep -q 'Agent teams are NOT ENABLED'; "
-                "bash --version | head -1" % VAR)
-            r = subprocess.run([podman, "run", "--rm", "--network=none", "-v", f"{tmp}:/w:Z",
-                                "docker.io/library/bash:3.2", "bash", "-c", script],
-                               capture_output=True, text=True, timeout=180)
+                "bash /w/check-config.sh | grep 'Agent teams are NOT ENABLED' >/dev/null; "
+                "bash --version | sed -n '1p'" % VAR)
+            r = run_container(tmp, "/w", script)
             self.assertEqual(r.returncode, 0, r.stdout + r.stderr)
             self.assertIn("version 3.2", r.stdout)
 
