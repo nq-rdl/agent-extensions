@@ -1,0 +1,140 @@
+name: Link rot check
+
+# Weekly, advisory external-link monitoring for canonical content (#301). It
+# reports rot in files no PR touched, so it is never attributed to an unrelated
+# PR, and it is not a merge gate. The PR-time `Link Check` (link-check.yml)
+# stays advisory and scans only skill Markdown/RST when those paths change.
+#
+# Scope (enumerated from tracked files by scripts/link_rot.py):
+#   canonical   skills/**/*.{md,rst}, agents/**/*.md, docs/**/*.md, README.md,
+#               CONTRIBUTING.md, AGENTS.md -> drive the tracker issue
+#   report-only hooks/*.sh and skill *.sh/*.yaml/*.yml/*.json/*.py (lychee's
+#               plaintext extraction; templated URLs) -> run report only
+#   never       generated plugins/** and dist/** copies
+#
+# Effective config: exactly one `--config lychee.toml` (the repository policy;
+# lychee 0.24 merges repeated --config files, so no second file is passed)
+# plus the documented overrides in link_rot.py's LYCHEE_OVERRIDES: --cache=false
+# (fresh requests; the root config also sets cache = false), JSON output with
+# --verbose, and --scheme http/https (local references are asctl's job).
+#
+# Classification: only a 404/410 seen in both the main and the confirmation
+# pass, or NXDOMAIN on every DNS lookup, counts as broken. Timeouts, refusals,
+# 403/429, 5xx and ambiguous results are unknown: reported, never used to open,
+# close or resolve anything. A tool/config failure, malformed JSON, incomplete
+# report or zero inputs fails the `scan` job, so `track` never runs on it.
+#
+# Tracker: one issue labelled `link-rot`, state kept in a hidden JSON block in
+# its body; see docs/link-monitoring.md for suppression and closure rules.
+#
+# Dry run (workflow_dispatch, dry_run: true): the scan runs for real, the plan
+# is computed against a read-only snapshot of the tracker, and the `track` job
+# — the only job holding issues: write — is skipped.
+
+on:
+  schedule:
+    - cron: "23 4 * * 1" # Mondays 04:23 UTC
+  workflow_dispatch:
+    inputs:
+      dry_run:
+        description: "Scan and plan tracker changes without writing to GitHub"
+        type: boolean
+        default: false
+
+permissions: {}
+
+# Scheduled and manual runs must not interleave their read-then-write of the
+# tracker state.
+concurrency:
+  group: link-rot-check
+  cancel-in-progress: false
+
+jobs:
+  scan:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    # Read-only: network-facing lychee never holds a write token.
+    permissions:
+      contents: read
+      issues: read
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Install locked Python toolchain
+        uses: prefix-dev/setup-pixi@d3f436a425481402e6a95a1d1fc10331c708cd9e # v0.10.2
+        with:
+          pixi-version: v0.78.0
+          locked: true
+
+      # Same pinned action and binary as link-check.yml. The action's own
+      # report goes to $RUNNER_TEMP so the checkout is not modified.
+      - name: Install lychee
+        uses: lycheeverse/lychee-action@e7477775783ea5526144ba13e8db5eec57747ce8 # v2.9.0
+        with:
+          args: --version
+          lycheeVersion: v0.24.2
+          output: ${{ runner.temp }}/lychee-install/out.md
+          jobSummary: false
+          workingDirectory: ${{ runner.temp }}
+
+      - name: Scan canonical content
+        # lychee reads GITHUB_TOKEN; unauthenticated github.com checks hit
+        # transient 429/503 rate limits at this volume.
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: pixi run --locked python3 scripts/link_rot.py scan --out-dir "$RUNNER_TEMP/link-rot"
+
+      - name: Plan tracker changes (read-only)
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+        run: >-
+          pixi run --locked python3 scripts/link_rot.py track --dry-run
+          --observations "$RUNNER_TEMP/link-rot/observations.json"
+          --out-dir "$RUNNER_TEMP/link-rot"
+
+      - name: Upload observations and reports
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: link-rot-observations
+          path: ${{ runner.temp }}/link-rot/
+          if-no-files-found: warn
+          retention-days: 90
+
+  track:
+    needs: scan
+    if: ${{ github.event_name != 'workflow_dispatch' || !inputs.dry_run }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      contents: read
+      issues: write
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Install locked Python toolchain
+        uses: prefix-dev/setup-pixi@d3f436a425481402e6a95a1d1fc10331c708cd9e # v0.10.2
+        with:
+          pixi-version: v0.78.0
+          locked: true
+
+      - name: Download observations
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          name: link-rot-observations
+          path: ${{ runner.temp }}/link-rot
+
+      # Re-validates the observations (schema, scan_ok) before any write.
+      - name: Update the link-rot tracker issue
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+        run: >-
+          pixi run --locked python3 scripts/link_rot.py track
+          --observations "$RUNNER_TEMP/link-rot/observations.json"
+          --out-dir "$RUNNER_TEMP/link-rot-track"

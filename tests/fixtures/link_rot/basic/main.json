@@ -1,0 +1,134 @@
+{
+ "success_map": {
+  "README.md": [
+   {
+    "url": "https://docs.example.com/ok",
+    "status": {
+     "text": "200 OK",
+     "code": 200
+    },
+    "span": {
+     "line": 3,
+     "column": 1
+    }
+   }
+  ],
+  "docs/guide.md": [
+   {
+    "url": "https://docs.example.com/ok",
+    "status": {
+     "text": "OK (cached)",
+     "code": 200
+    },
+    "span": {
+     "line": 9,
+     "column": 4
+    }
+   }
+  ]
+ },
+ "error_map": {
+  "skills/demo/SKILL.md": [
+   {
+    "url": "https://docs.example.com/gone",
+    "status": {
+     "text": "Rejected status code: 404 Not Found",
+     "code": 404
+    },
+    "span": {
+     "line": 12,
+     "column": 5
+    }
+   },
+   {
+    "url": "https://docs.example.com/flaky",
+    "status": {
+     "text": "Rejected status code: 429 Too Many Requests",
+     "code": 429
+    },
+    "span": {
+     "line": 14,
+     "column": 3
+    }
+   }
+  ],
+  "skills/demo/references/guide.rst": [
+   {
+    "url": "https://nxdomain.invalid/page",
+    "status": {
+     "text": "Network error: Connection failed. Check network connectivity and firewall settings (error sending request)",
+     "details": "Connection failed. Check network connectivity and firewall settings"
+    },
+    "span": {
+     "line": 20,
+     "column": 7
+    }
+   },
+   {
+    "url": "https://api.example.net/forbidden",
+    "status": {
+     "text": "Rejected status code: 403 Forbidden",
+     "code": 403
+    },
+    "span": {
+     "line": 22,
+     "column": 7
+    }
+   }
+  ],
+  "hooks/demo.sh": [
+   {
+    "url": "https://github.com/$repo/raw",
+    "status": {
+     "text": "Rejected status code: 404 Not Found",
+     "code": 404
+    },
+    "span": {
+     "line": 5,
+     "column": 10
+    }
+   }
+  ]
+ },
+ "timeout_map": {
+  "docs/guide.md": [
+   {
+    "url": "https://slow.example.org/",
+    "status": {
+     "text": "Timeout",
+     "details": "Request timed out"
+    },
+    "span": {
+     "line": 30,
+     "column": 2
+    }
+   }
+  ]
+ },
+ "excluded_map": {
+  "AGENTS.md": [
+   {
+    "url": "https://docs.example.com/excluded",
+    "status": {
+     "text": "Excluded",
+     "details": "This is due to your 'exclude' values"
+    },
+    "span": {
+     "line": 7,
+     "column": 1
+    }
+   },
+   {
+    "url": "file:///repo/CONTRIBUTING.md",
+    "status": {
+     "text": "Excluded"
+    },
+    "span": {
+     "line": 8,
+     "column": 1
+    }
+   }
+  ]
+ },
+ "total": 10
+}
