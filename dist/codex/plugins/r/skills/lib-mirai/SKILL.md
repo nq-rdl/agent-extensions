@@ -275,18 +275,21 @@ everywhere({}, api_key = my_key, config = my_config)
 m <- mirai(stop("something went wrong"))
 m[]
 
-is_mirai_error(m$data)       # TRUE for execution errors
-is_mirai_interrupt(m$data)   # TRUE for cancelled tasks
-is_error_value(m$data)       # TRUE for any error/interrupt/timeout
+is_mirai_error(m$data)       # TRUE only for errors raised by your code
+is_mirai_interrupt(m$data)   # TRUE for a user interrupt on the daemon
+is_error_value(m$data)       # TRUE for any error value, incl. timeout (5) and cancel (20)
 
 m$data$message               # Error message
 m$data$stack.trace           # Full stack trace
 m$data$condition.class       # Original error classes
 
-# Timeouts (requires dispatcher)
+# Timeouts work with or without dispatcher: the mirai resolves to errorValue 5.
+# Only with dispatcher is the task also cancelled; without it the daemon
+# keeps running the task to completion.
 m <- mirai(Sys.sleep(60), .timeout = 5000)  # 5-second timeout
 
-# Cancellation (requires dispatcher)
+# Cancellation requires dispatcher (stop_mirai() returns FALSE without it).
+# A cancelled mirai resolves to errorValue 20, not a miraiInterrupt.
 m <- mirai(long_running_task())
 stop_mirai(m)
 ```
@@ -304,6 +307,7 @@ daemons(4)
 onStop(function() daemons(0))
 
 ui <- page_fluid(
+  numericInput("n", "Sample size", value = 100, min = 1),
   input_task_button("run", "Run Analysis"),
   plotOutput("result")
 )
@@ -439,11 +443,12 @@ daemons(4, output = TRUE)
 Inside daemon callbacks (e.g., `mirai_map`), use `local_url()` + `launch_local()` instead of `daemons(n)` to avoid conflicting with the outer daemon pool.
 
 ```r
+# mirai is not attached on the daemon, so qualify every call with mirai::
 mirai_map(1:10, function(x) {
-  daemons(url = local_url())
-  launch_local(2)
-  result <- mirai_map(1:5, function(y, x) x * y, .args = list(x = x))[]
-  daemons(0)
+  mirai::daemons(url = mirai::local_url())
+  mirai::launch_local(2)
+  result <- mirai::mirai_map(1:5, function(y, x) x * y, .args = list(x = x))[]
+  mirai::daemons(0)
   result
 })[]
 ```
