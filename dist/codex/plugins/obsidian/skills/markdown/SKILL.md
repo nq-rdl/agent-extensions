@@ -1,10 +1,11 @@
 ---
 name: markdown
 license: CC-BY-4.0
-description: Create and edit Obsidian Flavored Markdown with wikilinks, embeds, callouts,
-  properties, and other Obsidian-specific syntax. Use when working with .md files
-  in Obsidian, or when the user mentions wikilinks, callouts, frontmatter, tags, embeds,
-  or Obsidian notes.
+description: 'Create and edit Obsidian notes in Obsidian Flavored Markdown: wikilinks,
+  embeds, callouts, block references, properties, tags, and %% comments. Use whenever
+  the user mentions Obsidian, an Obsidian note or vault, or works on .md files in
+  a vault (a .obsidian/ folder) or with wikilinks, embeds, or callouts. Frontmatter
+  or tags in a README or docs site are not, by themselves, an Obsidian signal.'
 compatibility: 'Obsidian 1.9+ for property handling as written: plural tags, aliases
   and cssclasses as lists (singular tag/alias/cssclass deprecated in 1.4, removed
   in 1.9). Syntax checked against obsidian-help commit bc5b4f2 on 2026-09-29.'
@@ -27,7 +28,14 @@ When exact syntax matters and could differ from the tested source, verify it aga
 5. **Add callouts** for highlighted information using `> [!type]` syntax. See [CALLOUTS.rst](references/CALLOUTS.rst) for all callout types.
 6. **Verify** the note renders correctly in Obsidian's reading view.
 
-> When choosing between wikilinks and Markdown links: use `[[wikilinks]]` for notes within the vault (Obsidian tracks renames automatically) and `[text](url)` for external URLs only.
+## Vault Gotchas
+
+- **Follow the vault's link style.** Obsidian writes `[[wikilinks]]` by default, but a vault can turn off *Use [[Wikilinks]]* and use Markdown links. Match what the vault's notes already use. A Markdown internal link needs URL encoding: `[Plan](Q3%20Plan.md)`.
+- **Ambiguous names:** if two notes share a name, link with the folder path from the vault root: `[[Projects/Plan]]`.
+- **Pipes inside tables:** escape the `|` of an alias or image size: `[[Note\|Alias]]`, `![[chart.png\|200]]`.
+- **Links in properties** must be quoted: `related: "[[Other Note]]"`, and list items `- "[[Other Note]]"`.
+- **Tags in properties** are a YAML list without `#` (in YAML, `#` starts a comment).
+- **Title:** the file name is the note title and link target; renaming the file (with *Automatically update internal links* on) updates links.
 
 ## Internal Links (Wikilinks)
 
@@ -130,29 +138,10 @@ Comments are visible only in Editing view.
 ==Highlighted text==                   Highlight syntax
 ```
 
-## Math (LaTeX)
+## Math and Diagrams
 
-```markdown
-Inline: $e^{i\pi} + 1 = 0$
-
-Block:
-$$
-\frac{a}{b} = c
-$$
-```
-
-## Diagrams (Mermaid)
-
-````markdown
-```mermaid
-graph TD
-    A[Start] --> B{Decision}
-    B -->|Yes| C[Do this]
-    B -->|No| D[Do that]
-```
-````
-
-To link Mermaid nodes to Obsidian notes, add `class NodeName internal-link;`. Quote note names that contain special characters (`class "⨳ special character" internal-link`). These links do not appear in Graph view.
+Math uses `$…$` inline and `$$…$$` blocks (MathJax); diagrams use fenced
+`mermaid` code blocks. To link Mermaid nodes to Obsidian notes, add `class NodeName internal-link;`. Quote note names that contain special characters (`class "⨳ special character" internal-link`). These links do not appear in Graph view.
 
 ## Footnotes
 
