@@ -49,7 +49,9 @@ Fixtures
 Each fixture is the minimal valid manifest (``schema_version: "1.0"``, strings
 for ``id``/``name``/``version``/``description``, ``speckit_version: ">=0.12.0"``,
 one command ``speckit.<id>.greet`` with ``commands/greet.md`` carrying a
-``description``) with one change. "Predicted" was read from the v1.0.12 source before execution; The install outcomes were subsequently observed on 2026-09-29.
+``description``) with one change. "Predicted" was read from the v1.0.12
+source before execution; the install outcomes were subsequently observed
+on 2026-09-29.
 
 =====================  ==========================================  ==========================
 Fixture                Change                                      Predicted (v1.0.12)

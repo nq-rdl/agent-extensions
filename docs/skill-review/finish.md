@@ -95,3 +95,86 @@ literal inline syntax. Its negative fixtures failed with the naive matcher
 canonical SKILL.md, replacing the OpenCode-only guard. Combined shell, OpenCode,
 Spec Kit and delegation checks: 35 tests pass. The earlier opencode-agent fix
 remains necessary; no additional triggering body was found.
+
+## Remaining-work dispositions
+
+All five required handover items are complete. The family reports retain the
+original baselines, intermediate failures and final comparisons:
+
+| Item | Final disposition | Evidence |
+|---|---|---|
+| 1: Rust and Pixi | Retain both reference trees; Pixi gains verified provenance and consumer command repairs | [Tools and docs](tools-docs.md) |
+| 2: GitHub workflows | Four saved runs graded; changed cases repeated; corrected H1 fixture routes to Husky in 2/2 revised runs | [GitHub workflows](gh-workflows.md) |
+| 3: New plugins | Author description, host-specific completion claim, Pandera verification date and last two handoff contracts corrected | [New plugins](new-plugins.md) |
+| 4: Shell preprocessing | Live boundary probes and catalog-wide regression test; harmless inline examples retained | Above |
+| 5: Installer oracle | Pinned isolated installer observed on all 15 fixtures, including registration inspection and cleanup | Above; [OpenCode and Spec Kit](opencode-speckit.md) |
+
+The optional R/Shiny cases were not ported into `evals/claude/r/`; their
+behavioural and executable evidence remains in the R/Shiny report.
+
+Applied the checkout's `skills/skill-audit/SKILL.md` rubric directly. The final
+Rust and Pixi decisions are **KEEP**. No critical finding remains in these
+follow-up edits. The Pixi offline recipe corrects observed consumer failures,
+its checked versions and canonical guard are explicit, and routing/packaging
+checks pass. Rust deletion would not reduce observed loading. The rubric's
+generic “could a fresh model write this → cut” rule is insufficient evidence
+for deleting these references: selective loading and consumer outcomes govern
+the decision. Pixi's unknown original snapshot and untested pages remain
+documented maintenance limitations, not claims of current API coverage.
+
+## Deferred work
+
+Each handover deferral has a separate issue and acceptance criteria. No broad
+rewrite or unverified runtime repair is folded into this completion:
+
+| Follow-up | Decision and boundary |
+|---|---|
+| [#426: prompt-builder pilot](https://github.com/nq-rdl/agent-extensions/issues/426) | Retain the untested optional outline pending worker tasks. The handover's 594-line figure referred to this reference, not the 11-line SKILL.md body; the outline is now 606 lines. |
+| [#427: OpenCode failure state](https://github.com/nq-rdl/agent-extensions/issues/427) | Fix rejected companion requests with an executable SDK stub and race coverage in a separate change. Current failed requests can leave persisted `running` / `prompting` state. |
+| [#428: Obsidian duration arithmetic](https://github.com/nq-rdl/agent-extensions/issues/428) | Keep the existing formula until tested in a real application. Source and skill disagree; no application was available. #304 stays open because this is an explicitly required critical invariant. |
+| [#429: Bash 3.2 CI coverage](https://github.com/nq-rdl/agent-extensions/issues/429) | Add pinned image/static-jq provisioning and assert no skips in CI. Both container test classes ran locally; that does not establish native macOS execution. |
+| [#430: live Codex interaction](https://github.com/nq-rdl/agent-extensions/issues/430) | Verify interactive questions and review-model precedence separately. Existing stub/installed-runtime tests do not establish these live paths. |
+
+#305–#311 have their candidate dispositions and scoped acceptance evidence in
+the family reports; PR #320 proposes closure on merge. #304 and epic #312
+remain open. No public skill was retired and no model-tier policy changed.
+
+## Validation after the permissions restart
+
+Run on the completed implementation on 2026-09-29; later edits only tidy this
+evidence and the docs navigation. Push-hook and remote CI outcomes belong in
+PR #320's current validation section.
+
+| Check | Result |
+|---|---|
+| Full Python suite | 1,168 tests, OK, no skips; Podman Bash 3.2 fixtures and `BASH32_STATIC_JQ` supplied |
+| Codex Node suite | 230 passed, no skips |
+| Go validator | Build, vet and `go test ./...` pass; `asctl repo-check --size-report` validates 117 skills |
+| Generated outputs | Plugin sync, manifests, bundles doc, eval graders and Codex directory checks pass; strict Codex package validation passes |
+| Registry and packages | Bundle refs, exposure, grouping, consistency and plugin validation pass |
+| Native Codex smoke | Local CLI 0.158.0: 38 plugins, 109 skills; installation, cache, removal and reinstallation pass. This is not a local run of CI's 0.152.0/0.154.0 matrix. |
+| External skill links | 1,328 total: 1,191 OK, zero errors, 127 excluded, 10 unsupported; 107 redirects |
+| Weekly monitor scan | 391 canonical inputs: 553 healthy, zero broken/unknown, 61 excluded. Report-only asset URLs include eight broken template URLs and one unknown (403); these are not canonical-link failures. |
+| Tracker dry run | `GH_REPO=nq-rdl/agent-extensions` supplied; no changes planned, no tracker mutation |
+| Docs build and whitespace | Zensical build and `git diff --check` pass |
+
+The earlier sandbox run and the first tracker dry run without repository
+context failed; their successful replacements are recorded above. Tests and
+isolated workflows used disposable projects. Generated trees came from the
+repository scripts; VERSION is unchanged and hooks were not bypassed.
+
+## Cost and limits
+
+The nine earlier family streams reported approximately USD 63. Recorded
+follow-up result events total USD 6.21 (including discarded probe attempts),
+approximately USD 69–70 overall. The follow-up includes 50 behavioural runs
+plus load-time probes; zero-turn preprocessing denials cost zero. An early
+timeout without a result has no recorded charge and is not scored as a pass.
+
+Behavioural comparisons use Claude Code 2.1.284 and claude-sonnet-5 with small
+samples, isolated plugins and disabled hooks. They establish the listed case
+outcomes, not universal model reliability. The Spec Kit oracle did not execute
+extension hooks/scripts; only v1.0.12 was executed. GDAL installation, all Pixi
+reference examples, real Obsidian, live credentials and interactive Codex paths
+were not tested in this follow-up. Historical family reports list their own
+additional limitations.

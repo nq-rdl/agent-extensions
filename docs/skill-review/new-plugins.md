@@ -162,9 +162,8 @@ USD 3.1; `claude plugin eval` about USD 2.3).
 | se-technical-writer | Retained: 11 lines; 505-line outline is upstream-derived and loaded only for delegation | Retained: outline already reconciled with house style | Changed (TW-1): grammatical new-writing trigger and explicit copyedit route; original/final positive and negative routing pass | Retained | Retained: upstream link present | Changed: Handoff contract added; canonical and both installed copies pass | Retained |
 | lucid (MCP only) | n/a | n/a | n/a (no skills) | n/a | Retained: hosted URL, no pinned binary | n/a | n/a |
 
-Hook findings (report only): the tech-writing Stop/SubagentStop agent review
-does not run in Codex; the skill text should say so (TW-2). No data-request hook
-finding.
+Hook findings: the tech-writing Stop/SubagentStop agent review does not run
+in Codex; TW-2 now says so. No data-request hook finding.
 
 ## Status at hand-off
 
@@ -178,7 +177,8 @@ Done and committed on `epic312/new-plugins`:
   `tests/test_eval_data_request_graders.py`, two changie fragments. The tests
   failed before the edit and pass after it.
 
-Not started (next steps):
+Unfinished at that hand-off (items 1–3 and their packaging are now complete;
+see the follow-up results below):
 
 1. TW-1: rewrite the `se-technical-writer` description (grammar, content types,
    pointer to `tech-writing:copyedit` for existing prose); routing check with
@@ -200,8 +200,8 @@ Scratch harness and raw results (not committed):
 
 - Trim data-request descriptions over 400 characters (setup, analyse, explain,
   release, bootstrap) with a routing suite, not by line count.
-- Add the #310 delegation contract sentence to every `references/subagent.rst`
-  in one catalog-wide change with `tests/test_delegation_handoff.py`.
+- Completed since hand-off: the #310 delegation contract now covers every
+  `references/subagent.rst`, checked by `tests/test_delegation_handoff.py`.
 - `prerelease-change-routes-to-fix` rarely loads fix, so `analyse-full-rewalk`
   is a guess; make the case require the skill (or score it only under
   `with-without`).

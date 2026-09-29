@@ -358,7 +358,7 @@ fix), and probes USD 0.12.
 | hlbpa | Changed | docs-only writes, caller RFI and resumption, Mermaid keywords (`85c261a`); D7 1/1 both versions. Input/artifact schema kept (behaviour-bearing); the #298 fence fix was already in place |
 | context-architect | Changed | map returned, edits only under implementation authorization, strategy boundary (`85c261a`). Not run behaviourally (R2/R10 routing only) |
 | research-technical-spike | Changed | one update rule, one section rule, experiments need authorization (`85c261a`); D8 as above. No new template companion added: the existing document's sections are used |
-| prompt-builder | Changed (contract only) | Contract maps its direct-user dialogue to the caller. Its 594-line body is deferred: not exercised, and cleanup without a task pilot would be a wholesale rewrite |
+| prompt-builder | Changed (contract only) | Contract maps its direct-user dialogue to the caller. The optional outline (now 606 lines; SKILL.md body is 11) remains untested as a worker; a broader pilot is tracked in [#426](https://github.com/nq-rdl/agent-extensions/issues/426) |
 | address-comments | Changed | `b89e3f4`; D4 unauthorized commits 2/2 → 0/2; D4b authorized commit kept |
 | wg-code-sentinel | Changed | `sops:encrypt` removed, `sops` not added to `go` (`458f46f`); `CompanionSkillsResolve` test; severity/fix/verify kept. Not run behaviourally |
 | plan | Changed | output contract and hand-off boundary; provenance notes the local changes (`85c261a`); R1 routing |
@@ -369,9 +369,9 @@ fix), and probes USD 0.12.
 | go-mcp-expert | Retained with reason (identifiers) + provenance changed | identifiers verified by `go doc` across v1.0.0–v1.8.0; provenance and description grammar fixed (`e3abe61`) |
 | debug | Changed (pilot) | `e3abe61`; D5 2/2 and D6 1/1 revised, equal to original; outline 156 → 95 lines. No word ceiling applied |
 | redhat-docs-fetcher | Changed | preload obsolete (removed by #291; the outline lives inside the owning skill, so the intended skill is the one passed); duplicate route/exit prose removed; credential, extraction, and provenance rules kept (`e3abe61`); `test_redhat_setup` drift guards pass. Not run behaviourally (needs the user's Red Hat credential); R9 blocked-tool behaviour observed |
-| skill-auditor | Skipped | Owned by another #312 agent; its outline is in `CONTRACT_PENDING` |
-| marketplace-scout | Skipped | Owned by another #312 agent; in `CONTRACT_PENDING` |
-| codex-rescue | Skipped | Owned by another #312 agent (#307/#308/#309); in `CONTRACT_PENDING` |
+| skill-auditor | Completed in Claude Code family | Contract and non-recursive rubric loading: [Claude Code report](claude-code.md); no pending exemption |
+| marketplace-scout | Completed in Claude Code family | Contract and owned marketplace asset: [Claude Code report](claude-code.md); no pending exemption |
+| codex-rescue | Completed in Codex family | Argument/resume contract: [Codex report](codex.md); no pending exemption |
 | janitor, platform-sre-kubernetes, arch-linux-expert, github-actions-expert, terratest-module-testing, playwright-tester | Changed (contract only) | No stale residue demonstrated in this review; domain and safety rules untouched |
 | se-gitops-ci-specialist, terraform, terraform-iac-reviewer | Changed (contract only) | `argo-cd:manage` resolves in the home `argo-cd` plugin (guest listing in `gh` keeps "when available"); terraform's "ask the user which backend" maps to a caller question |
 | Tool preloads / `tools:` frontmatter findings | Obsolete — removed by #291 (`60e9801`) | Outlines carry prose "Required capabilities"; the contract states tool permission is not authorization |

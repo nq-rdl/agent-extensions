@@ -54,6 +54,7 @@ nav = [
     { "Link monitoring" = "link-monitoring.md" },
     { "Skill review (epic #312)" = [
         { "Progressive-disclosure pilots" = "progressive-disclosure-pilots.md" },
+        { "Completion record" = "skill-review/finish.md" },
         { "Claude Code" = "skill-review/claude-code.md" },
         { "Codex" = "skill-review/codex.md" },
         { "Delegation" = "skill-review/delegation.md" },

@@ -253,7 +253,7 @@ twice (a staging race, then the wind-down) whose cost was not captured
 | #308 | pixi | **Changed** | 0.78.0 baseline, provenance, canonical/offline guard and executed consumer checks; see decision below |
 | #308 | obsidian-bases follow-up | Changed | guard now covers older version / unreachable help |
 | #309 | pixi and 24 references | **Retained** | P1–P3 with/without comparisons and targeted repeat fixes; offline pack/unpack executed |
-| — | obsidian-bases date subtraction | Deferred | obsidian-help `bc5b4f2`: `Bases syntax.md` (last changed `ed4f6f4`, 2026-03-26) still says milliseconds; `Functions.md` documents `duration()` but no `.days`; needs an Obsidian instance |
+| — | obsidian-bases date subtraction | Deferred to [#428](https://github.com/nq-rdl/agent-extensions/issues/428) | obsidian-help `bc5b4f2`: `Bases syntax.md` (last changed `ed4f6f4`, 2026-03-26) still says milliseconds; `Functions.md` documents `duration()` but no `.days`; needs an Obsidian instance |
 
 ### Not done / next steps
 
@@ -288,7 +288,7 @@ docs, bw logs and fixtures).
 
 **Retain** `reading-vocabulary.rst`; reject deletion in this PR. Compared the
 original `4817a19` plugin with the saved `novocab` variant (file and its routes
-removed). The two original R1/R2 prompts above ran twice per variant in Claude
+removed). The original R1/R2 prompts below ran twice per variant in Claude
 Code 2.1.284 / claude-sonnet-5 with Skill/Read/Glob/Grep, no shell, hooks disabled,
 and independent temporary workspaces. All eight invoked `rust:explain`.
 
@@ -314,6 +314,45 @@ two tasks do not cover its full ownership/closure/iterator content. Retention
 preserves the existing offline resource and public route; no incoming link,
 registry member or grouping changes. A broader deletion needs better task
 coverage, not a line-count argument.
+
+### Rust comparison prompts
+
+These preserve R1's deliberately false “why it compiles” premise.
+
+R1:
+
+Explain what this Rust does and why it compiles, line by line. I come from Python and C++.
+
+```rust
+fn longest_words<'a>(text: &'a str, min: usize) -> impl Iterator<Item = &'a str> + 'a {
+    text.split_whitespace().filter(move |w| w.len() >= min)
+}
+
+fn main() {
+    let s = String::from("the quick brown fox");
+    let long: Vec<&str> = longest_words(&s, 5).collect();
+    drop(s);
+    println!("{:?}", long);
+}
+```
+
+R2:
+
+Why does this not compile, and what is the idiomatic fix?
+
+```rust
+use std::collections::HashMap;
+
+fn bump(counts: &mut HashMap<String, u32>, key: &str) {
+    match counts.get_mut(key) {
+        Some(v) => *v += 1,
+        None => { counts.insert(key.to_string(), 1); }
+    }
+    let first = counts.values().next();
+    counts.clear();
+    println!("{:?}", first);
+}
+```
 
 ## Pixi decision and verification (#308/#309, 2026-09-29)
 
