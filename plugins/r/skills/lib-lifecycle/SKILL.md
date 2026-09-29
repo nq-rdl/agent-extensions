@@ -89,7 +89,7 @@ new_fun(x)
 | Function           | When to Use                                             |
 | ------------------ | ------------------------------------------------------- |
 | `deprecate_soft()` | First stage; warns only direct users and during tests   |
-| `deprecate_warn()` | Standard deprecation; warns once per 8 hours            |
+| `deprecate_warn()` | Standard deprecation; warns once per session           |
 | `deprecate_stop()` | Final stage before removal; errors with helpful message |
 
 **Deprecation workflow for major releases:**
@@ -176,6 +176,9 @@ cool_function <- function() {
   # ...
 }
 ```
+
+Since lifecycle 1.0.5, `signal_stage()` does nothing at run time; it only
+records intent at the call site.
 
 ## Testing Deprecations
 

@@ -27,8 +27,8 @@ This creates `tests/testthat/` directory, adds testthat to `DESCRIPTION` Suggest
 - Use `usethis::use_r("foofy")` and `usethis::use_test("foofy")` to create paired files
 
 **Special files:**
-- `helper-*.R` - Helper functions and custom expectations, sourced before tests
-- `setup-*.R` - Run during `R CMD check` only, not during `load_all()`
+- `helper-*.R` - Helper functions and custom expectations, sourced by `load_all()` and by the test runners
+- `setup-*.R` - Sourced by the test runners (`devtools::test()`, `test_file()`, `R CMD check`), not by `load_all()`
 - `fixtures/` - Static test data files accessed via `test_path()`
 
 ## Test Structure
@@ -136,15 +136,15 @@ expect_type(obj, "list")
 expect_s3_class(model, "lm")
 expect_s4_class(obj, "MyS4Class")
 expect_r6_class(obj, "MyR6Class")      # v3.3.0+
-expect_shape(matrix, c(10, 5))         # v3.3.0+
+expect_shape(matrix, dim = c(10, 5))   # v3.3.0+; argument must be named
 ```
 
 ### Sets and Collections
 
 ```r
 expect_setequal(x, y)           # Same elements, any order
-expect_contains(fruits, "apple") # Subset check (v3.2.0+)
-expect_in("apple", fruits)       # Element in set (v3.2.0+)
+expect_contains(fruits, "apple") # Subset check (v3.1.9+)
+expect_in("apple", fruits)       # Element in set (v3.1.9+)
 expect_disjoint(set1, set2)      # No overlap (v3.3.0+)
 ```
 
@@ -421,6 +421,6 @@ When working with testthat 3 code, prefer modern patterns:
 
 **Accept snapshots:** `testthat::snapshot_accept()`
 
-**Find slow tests:** `devtools::test(reporter = "slow")`
+**Find slow tests:** `devtools::test(reporter = "slow")` (testthat 3.3.0+)
 
-**Shuffle tests:** `devtools::test(shuffle = TRUE)`
+**Shuffle tests:** `devtools::test(shuffle = TRUE)` (testthat 3.3.0+)
