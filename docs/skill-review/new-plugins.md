@@ -44,6 +44,24 @@ fixtures in `tests/test_eval_data_request_graders.py`. Run the case on the
 original skill (baseline), then on the revised skill, and re-run
 `triage-only-read-only` on the revised skill for DR-1.
 
+#### Added after the first revised run (pre-edit for the descriptions)
+
+The first revised run (table rows "Targeted defects, and logic changes before
+the first release → fix" and "Changes to a released extract → amend") routed
+the released `Encounter_id` defect to amend in one of three runs. That run
+read only guardrails; its reply quoted the **fix description**, "A change to a
+released extract goes to amend", as the reason. The first `claude plugin eval`
+baseline (natural-language prompt, triage not loaded, original skills) failed
+the same grader in one of three runs. The amend body already says that output
+contradicting what was agreed is a defect for fix, and the fix body sends only
+a change request on a released extract to amend. The descriptions and the new
+table rows do not carry that distinction.
+
+| ID | Invariant | Where |
+|---|---|---|
+| DR-7 | fix and amend descriptions separate a defect (output that contradicts what was agreed, released or not → fix) from different output requested for a released extract (→ amend); before the first release a logic change still goes to fix | fix, amend frontmatter; triage table |
+| DR-8 | fix and amend bodies are unchanged; the existing `amend-*` and `prerelease-*` cases still pass | fix, amend SKILL.md |
+
 ### tech-writing (#306, #298-style factual fix)
 
 | ID | Invariant | Where |
