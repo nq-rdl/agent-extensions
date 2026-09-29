@@ -2,14 +2,17 @@
 name: shiny-bslib
 license: CC-BY-4.0
 description: >-
-  Build modern Shiny dashboards and applications using bslib (Bootstrap 5).
-  Use when creating new Shiny apps, modernizing legacy apps (fluidPage,
-  fluidRow/column, tabsetPanel, wellPanel, shinythemes), or working with
-  bslib page layouts, grid systems, cards, value boxes, navigation, sidebars,
-  filling layouts, theming, accordions, tooltips, popovers, toasts, or bslib
-  inputs. Assumes familiarity with basic Shiny.
+  Build or modernize Shiny apps with bslib (Bootstrap 5): page_sidebar/
+  page_navbar/page_fillable layouts, cards, value boxes, grids, navigation,
+  sidebars, filling layouts, accordions, tooltips, popovers, toasts, and bslib
+  inputs; convert fluidPage/tabsetPanel/wellPanel/shinythemes apps. Covers
+  theme basics; for Sass variables, fonts, brand.yml, dark mode, or thematic
+  plots use shiny:bslib-theming.
 compatibility: >-
-  Requires R, shiny (>= 1.8.1), bslib (>= 0.9.0)
+  Requires R, shiny (>= 1.8.1), and bslib (>= 0.9.0). Toasts,
+  input_code_editor(), and input_submit_textarea() need bslib >= 0.10.0.
+  Minimum checked by loading bslib 0.9.0 from the CRAN archive; examples
+  verified with bslib 0.12.0 and shiny 1.14.0 on 2026-09-29.
 metadata:
   repo: https://github.com/nq-rdl/agent-extensions
 ---
@@ -136,7 +139,7 @@ dynamic theming, and contrast checks, use the **shiny-bslib-theming** skill
 - **Accordions** -- Collapsible sections, especially useful in sidebars
 - **Tooltips** -- Hover-triggered help text
 - **Popovers** -- Click-triggered containers for secondary UI/inputs
-- **Toasts** -- Temporary notification messages
+- **Toasts** -- Temporary notification messages (bslib >= 0.10.0)
 
 See [accordions.rst](references/accordions.rst), [tooltips-popovers.rst](references/tooltips-popovers.rst), and [toasts.rst](references/toasts.rst).
 
@@ -179,8 +182,8 @@ The `title` should describe the purpose of the trigger (e.g., "More information"
 - **`input_switch()`** -- Toggle switch (modern checkbox alternative)
 - **`input_dark_mode()`** -- Dark mode toggle
 - **`input_task_button()`** -- Button for long-running operations
-- **`input_code_editor()`** -- Code editor with syntax highlighting
-- **`input_submit_textarea()`** -- Textarea with explicit submission
+- **`input_code_editor()`** -- Code editor with syntax highlighting (bslib >= 0.10.0)
+- **`input_submit_textarea()`** -- Textarea with explicit submission (bslib >= 0.10.0)
 
 See [inputs.rst](references/inputs.rst) for detailed guidance.
 
