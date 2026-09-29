@@ -118,12 +118,18 @@ See [filling.rst](references/filling.rst) for detailed guidance.
 
 ### Theming
 
-- **`bs_theme()`** with Bootswatch themes for quick styling
-- **Custom colors**: `bg`, `fg`, `primary` affect hundreds of CSS rules
-- **Fonts**: `font_google()` for typography
-- **Dynamic theming**: `input_dark_mode()` + `session$setCurrentTheme()`
+- **`bs_theme(version = 5)`** uses the `"shiny"` preset, which is not plain
+  Bootstrap; `preset = "<bootswatch>"` gives a different style.
+- **Colors and fonts**: `bg`, `fg`, `primary`, and `font_google()` affect
+  hundreds of CSS rules.
+- **Dashboard background**: `class = "bslib-page-dashboard"` on
+  `page_sidebar()`, or on individual `nav_panel()`s (not `page_navbar()`).
+- **Plots**: call `thematic::thematic_shiny()`; pass `font = "auto"` if plot
+  fonts should match too.
 
-See [theming.rst](references/theming.rst) for detailed guidance.
+For anything beyond this, including Sass variables, brand.yml, dark mode,
+dynamic theming, and contrast checks, use the **shiny-bslib-theming** skill
+(`/shiny:bslib-theming`).
 
 ### UI Components
 
@@ -215,6 +221,10 @@ See [migration.rst](references/migration.rst) for a complete mapping of legacy p
 
 ## Avoid Common Errors
 
+Read [best-practices.rst](references/best-practices.rst) before you finish a
+dashboard, and when a layout does not fill, scroll, or respond as expected. It
+covers layout patterns, mobile behavior, module patterns, and common gotchas.
+
 1. Avoid directly nesting `card()` containers. `navset_card_*()` functions are already cards; `nav_panel()` content goes directly inside them without wrapping in `card()`
 2. Only use `layout_columns()` and `layout_column_wrap()` for laying out multiple elements. Single children should be passed directly to their container functions.
 3. Never nest `page_*()` functions. Only use one top-level page function per app.
@@ -229,7 +239,6 @@ See [migration.rst](references/migration.rst) for a complete mapping of legacy p
 - **[navigation.rst](references/navigation.rst)** -- Navigation containers and patterns
 - **[sidebars.rst](references/sidebars.rst)** -- Sidebar layouts and organization
 - **[filling.rst](references/filling.rst)** -- Fillable containers and fill items
-- **[theming.rst](references/theming.rst)** -- Basic theming (colors, fonts, Bootswatch). See **shiny-bslib-theming** skill for advanced theming
 - **[accordions.rst](references/accordions.rst)** -- Collapsible sections and sidebar organization
 - **[tooltips-popovers.rst](references/tooltips-popovers.rst)** -- Hover tooltips and click-triggered popovers
 - **[toasts.rst](references/toasts.rst)** -- Temporary notification messages

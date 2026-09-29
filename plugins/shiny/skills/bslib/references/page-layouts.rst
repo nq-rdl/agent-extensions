@@ -243,8 +243,8 @@ Theming
 ~~~~~~~
 
 Pass a ``bs_theme()`` object to the ``theme`` parameter of any page
-function to customize appearance. See `theming.rst <theming.rst>`__ for
-comprehensive theming guidance.
+function to customize appearance. For comprehensive theming guidance, use
+the **shiny-bslib-theming** skill (``/shiny:bslib-theming``).
 
 Plot Styling
 ~~~~~~~~~~~~
