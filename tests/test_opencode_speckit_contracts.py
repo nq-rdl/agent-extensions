@@ -87,14 +87,6 @@ class OpenCodeVerifiedFactsTest(unittest.TestCase):
         text = body("opencode-delegate")
         self.assertIn("--auto", text)
 
-    def test_skill_bodies_do_not_trigger_claude_code_shell_injection(self):
-        # Claude Code runs `!` + backtick-quoted text in a loaded skill body as a
-        # shell command; opencode-agent failed to load in a Bash-less session
-        # (2026-09-29 run P6-orig-1). Keep OpenCode's literal syntax in assets.
-        for skill in OPENCODE + SPECKIT:
-            with self.subTest(skill=skill):
-                self.assertNotIn("!`", (SKILLS / skill / "SKILL.md").read_text())
-
     def test_skill_routes_resolve_in_the_bundle(self):
         leaves = {s.removeprefix("opencode-") for s in OPENCODE}
         for skill in OPENCODE:

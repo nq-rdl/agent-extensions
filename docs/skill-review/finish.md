@@ -57,3 +57,35 @@ Added the existing Handoff contract to `data-request-triage` and
 authorisation, destructive-step ownership and verification loops. Removed both
 from `CONTRACT_PENDING`; no outlines remain exempt. After regeneration, all
 21 delegation tests pass, including both target copies.
+
+## Shell-expansion regression guard (#307)
+
+A temporary plugin tested Claude Code 2.1.284 with `Skill,Read` available and
+Bash absent, hooks disabled, `--permission-mode dontAsk`, and model
+`claude-sonnet-5`. A load-time denial is a local result (zero API turns and
+zero model cost), not a model refusal. A successful load proceeds to the model.
+
+| Form | Observed preprocessing |
+|---|---|
+| Raw command at body start | Bash permission denial |
+| Command after a space, including indentation | Bash permission denial |
+| Command inside a fenced block | Bash permission denial |
+| Command inside a double-backtick span with an interior space | Bash permission denial |
+| Command containing a newline | Bash permission denial |
+| Escaped bang | Loaded |
+| Bang preceded by a word character or opening parenthesis | Loaded |
+| Inline bang code span followed by another code span | Loaded |
+| Original bodies of obsidian-bases, obsidian-markdown, redhat-setup, rust-explain and conventional-commits | Loaded; no shell preprocessing denial |
+
+The original five bodies therefore remain unchanged. Red Hat subsequently
+reported unavailable fixture helpers, as expected: this was a load test, not
+an authenticated Red Hat workflow. An early rerun accidentally changed the
+plugin name without changing its invocation; those runs were discarded and
+all forms and original bodies were rerun with matching names.
+
+The test now recognises a whitespace/start-of-body command opener and allows
+literal inline syntax. Its negative fixtures failed with the naive matcher
+(3 tests, 10 failures), then passed with the corrected boundary. It scans every
+canonical SKILL.md, replacing the OpenCode-only guard. Combined shell, OpenCode,
+Spec Kit and delegation checks: 35 tests pass. The earlier opencode-agent fix
+remains necessary; no additional triggering body was found.
