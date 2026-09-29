@@ -270,13 +270,17 @@ disabled. This is a dated observation, not a claim about earlier settings.
 always-run check inventory, and responsibility for keeping check names aligned
 if maintainers enable enforcement. See [GitHub's protected-branch documentation](https://docs.github.com/en/repositories/configuring-branches-and-merges-in-your-repository/managing-protected-branches/about-protected-branches).
 
-External `check-links` remains advisory for merging and uses
-`skills/lychee/lychee.toml`. Its current scan covers skill Markdown and Spec Kit
-RST when those paths change. The deterministic local Markdown/RST reference check and
-broader external coverage in [#300](https://github.com/nq-rdl/agent-extensions/issues/300)
-and advisory weekly monitoring in [#301](https://github.com/nq-rdl/agent-extensions/issues/301)
-are planned, not implemented. Local lefthook checks can still reject a commit;
-that behavior does not establish GitHub merge enforcement.
+External `check-links` remains advisory for merging. It uses the root
+`lychee.toml` repository policy and scans all skill Markdown and RST when those
+paths or its configuration change. The deterministic local Markdown/RST
+reference check runs in `asctl repo-check`
+([#300](https://github.com/nq-rdl/agent-extensions/issues/300)). Weekly
+monitoring (`link-rot-check.yml`,
+[#301](https://github.com/nq-rdl/agent-extensions/issues/301)) covers canonical
+content that no PR touched and maintains one `link-rot` tracker issue, separating
+unknown results and operational failures from confirmed rot; see
+[Link monitoring](link-monitoring.md). Local lefthook checks can still reject a
+commit; that behavior does not establish GitHub merge enforcement.
 
 ### Release
 

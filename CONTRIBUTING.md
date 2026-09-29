@@ -222,8 +222,12 @@ go -C tools/asctl build -o /tmp/asctl ./cmd/asctl/ && /tmp/asctl repo-check
 
 ### Example URLs and placeholders
 
-External links are checked by lychee (`link-check.yml`, advisory) against the
-root [`lychee.toml`](lychee.toml). Keep examples out of its failure list:
+External links are checked by lychee against the root
+[`lychee.toml`](lychee.toml): on PRs that touch skill Markdown/RST
+(`link-check.yml`, advisory), and weekly across skills, `docs/`, `README.md`,
+`CONTRIBUTING.md` and `AGENTS.md` (`link-rot-check.yml`, which keeps one
+`link-rot` tracker issue; see [`docs/link-monitoring.md`](docs/link-monitoring.md)).
+Keep examples out of their failure lists:
 
 - **Illustrative hosts** use RFC 2606/6761 reserved names: `example.com`,
   `example.org`, `example.net`, their subdomains (`docs.example.com`,
@@ -238,7 +242,12 @@ root [`lychee.toml`](lychee.toml). Keep examples out of its failure list:
   cannot verify the URL, such as API endpoints, OIDC issuers, channel roots or
   bot-blocked hosts. Anchor each pattern narrowly, add a comment with the file
   and reason, and add a fixture to `tests/fixtures/lychee/urls.toml`. Do not
-  accept 4xx statuses globally.
+  accept 4xx statuses globally. A 404 from a private resource (GitHub answers
+  404 for private repositories and projects) is an access boundary, so it gets
+  the same narrow exclusion.
+- **Weekly findings** on the `link-rot` tracker are fixed at the source like any
+  other rot. When a URL must stay as it is, suppress it on the tracker with
+  `/link-rot suppress <url> <reason>` rather than widening an exclusion.
 
 Run the external scan locally as CI does:
 

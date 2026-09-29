@@ -177,6 +177,11 @@ pixi run python3 scripts/check_exposure.py .      # every canonical skill/hook/m
 pixi run python3 scripts/check_grouping.py .      # grouping contract: valid member shape, unique leaf + pluginName
 pixi run python3 scripts/check_consistency.py .   # each target's bundle <-> marketplace <-> plugin tree agrees
 
+# Weekly link-rot scan + tracker plan (network; needs lychee 0.24.2). --dry-run
+# snapshots the live tracker read-only; see docs/link-monitoring.md.
+pixi run python3 scripts/link_rot.py scan --out-dir /tmp/link-rot
+pixi run python3 scripts/link_rot.py track --dry-run --observations /tmp/link-rot/observations.json
+
 # Unit tests for the pipeline scripts (deps come from the pixi env)
 pixi run python3 -m unittest discover -s tests -p 'test_*.py'
 
@@ -247,9 +252,20 @@ Markdown/RST reference check runs inside `asctl repo-check`, so it is part of th
 always-run `validate-skills` job and the `asctl-repo-check` pre-commit hook; network
 failures cannot affect it. External HTTP health stays in the advisory `check-links`
 job ([issue #300](https://github.com/nq-rdl/agent-extensions/issues/300)).
-[Issue #301](https://github.com/nq-rdl/agent-extensions/issues/301) plans advisory
-weekly link-rot monitoring, including canonical URLs under `agents/`, `docs/` and
-`hooks/`; it is not implemented yet. Update this description when it lands.
+
+Weekly link-rot monitoring (`link-rot-check.yml`,
+[issue #301](https://github.com/nq-rdl/agent-extensions/issues/301)) runs on
+Mondays at 04:23 UTC and by `workflow_dispatch` (with a `dry_run` input). It is
+not a PR check and not a merge gate. It scans canonical `skills/**/*.{md,rst}`,
+`agents/**/*.md`, `docs/**/*.md`, `README.md`, `CONTRIBUTING.md` and `AGENTS.md`.
+URLs in `hooks/*.sh` and skill shell/YAML/JSON/Python assets are report-only;
+`plugins/**` and `dist/**` are never scanned. It uses the root `lychee.toml` as the
+single config, with `--cache=false`. It maintains one `link-rot` tracker issue.
+Only 404/410 confirmed in two passes, or confirmed NXDOMAIN, counts as rot;
+timeouts, 403/429 and 5xx are *unknown* and never open or close the tracker. An
+operational failure fails the run and leaves the tracker untouched. The logic is
+`scripts/link_rot.py` (tests: `tests/test_link_rot.py`). Classification,
+suppression commands, closure and state storage are in `docs/link-monitoring.md`.
 
 ## Testing instructions
 
