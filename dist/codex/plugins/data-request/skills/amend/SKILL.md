@@ -5,7 +5,8 @@ description: Classify and make an analyst amendment to a released, engineer-prod
   RDL extract. Renames, reorders, dropped already-surfaced columns and presentation
   changes go through query-builder's projection extension points; anything that changes
   rows or meaning becomes a paste-ready engineer hand-off. Use when a released extract
-  needs a change; before the first release, a logic change goes to fix.
+  needs different output than was agreed; a defect in delivered output goes to fix,
+  and before the first release, a logic change goes to fix.
 compatibility: 'RDL enquiry repos. Boundary: query-builder docs/ANALYST_AMENDMENTS.md
   (0.6.0). Amendment record and guard: data-analysis-scaffold 0.5.0 (specs/amendments.md,
   pixi run amend). Verify the installed versions and the repo''s own commands at use

@@ -1,0 +1,3 @@
+kind: Fixed
+body: 'data-request: fix and amend descriptions now route a defect in a released extract to fix and only a request for different output to amend (#306)'
+time: 2026-09-29T06:02:54.971813403Z

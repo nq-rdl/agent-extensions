@@ -286,8 +286,9 @@ class HandOffToReview(unittest.TestCase):
         codev = md_section(body(TRIAGE / "SKILL.md"), "Co-development")
         self.assertIn("](references/handoff.rst)", codev)
         self.assertIn("hand-off", codev)
-        # Fulfilment rules moved to handoff.rst to leave SKILL.md headroom.
-        self.assertLessEqual(len((TRIAGE / "SKILL.md").read_text().splitlines()), 136)
+        # Fulfilment rules moved to handoff.rst to leave SKILL.md headroom; +2 lines for the
+        # amend and release routing rows (#306).
+        self.assertLessEqual(len((TRIAGE / "SKILL.md").read_text().splitlines()), 138)
         fulfilment = flat(rst_section("handoff.rst", "Fulfilment"))
         for token in ("parity", "upstream", "/data-request:lift", "Re-pin", "depends_on", "drafts by default"):
             with self.subTest(token=token):
