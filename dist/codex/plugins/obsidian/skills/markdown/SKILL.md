@@ -5,6 +5,9 @@ description: Create and edit Obsidian Flavored Markdown with wikilinks, embeds, 
   properties, and other Obsidian-specific syntax. Use when working with .md files
   in Obsidian, or when the user mentions wikilinks, callouts, frontmatter, tags, embeds,
   or Obsidian notes.
+compatibility: 'Obsidian 1.9+ for property handling as written: plural tags, aliases
+  and cssclasses as lists (singular tag/alias/cssclass deprecated in 1.4, removed
+  in 1.9). Syntax checked against obsidian-help commit bc5b4f2 on 2026-09-29.'
 metadata:
   repo: https://github.com/nq-rdl/agent-extensions
 ---
@@ -13,9 +16,11 @@ metadata:
 
 Create and edit valid Obsidian Flavored Markdown. Obsidian extends CommonMark and GFM with wikilinks, embeds, callouts, properties, comments, and other syntax. This skill covers only Obsidian-specific extensions -- standard Markdown (headings, bold, italic, lists, quotes, code blocks, tables) is assumed knowledge.
 
+When exact syntax matters and could differ from the tested source, verify it against the canonical docs at https://help.obsidian.md.
+
 ## Workflow: Creating an Obsidian Note
 
-1. **Add frontmatter** with properties (title, tags, aliases) at the top of the file. See [PROPERTIES.rst](references/PROPERTIES.rst) for all property types.
+1. **Add frontmatter** with properties (tags, aliases, plus any custom properties) at the top of the file. The file name is the note title and link target; a `title:` property is an ordinary custom property. See [PROPERTIES.rst](references/PROPERTIES.rst) for all property types.
 2. **Write content** using standard Markdown for structure, plus Obsidian-specific syntax below.
 3. **Link related notes** using wikilinks (`[[Note]]`) for internal vault connections, or standard Markdown links for external URLs.
 4. **Embed content** from other notes, images, or PDFs using the `![[embed]]` syntax. See [EMBEDS.rst](references/EMBEDS.rst) for all embed types.
@@ -40,7 +45,7 @@ Define a block ID by appending `^block-id` to any paragraph:
 This paragraph can be linked to. ^my-block-id
 ```
 
-For lists and quotes, place the block ID on a separate line after the block:
+For lists, quotes, callouts, and tables, place the block ID on a separate line with a blank line before and after it. Block IDs may contain only Latin letters, numbers, and dashes.
 
 ```markdown
 > A quote block
@@ -83,7 +88,6 @@ See [CALLOUTS.rst](references/CALLOUTS.rst) for the full list with aliases, nest
 
 ```yaml
 ---
-title: My Note
 date: 2024-01-15
 tags:
   - project
@@ -95,7 +99,7 @@ cssclasses:
 ---
 ```
 
-Default properties: `tags` (searchable labels), `aliases` (alternative note names for link suggestions), `cssclasses` (CSS classes for styling).
+Default properties: `tags` (searchable labels), `aliases` (alternative note names for link suggestions), `cssclasses` (CSS classes for styling). Any other name, such as `date` or `title`, is a custom property; `title` does not change the note title, which is the file name.
 
 See [PROPERTIES.rst](references/PROPERTIES.rst) for all property types, tag syntax rules, and advanced usage.
 
@@ -106,7 +110,7 @@ See [PROPERTIES.rst](references/PROPERTIES.rst) for all property types, tag synt
 #nested/tag             Nested tag with hierarchy
 ```
 
-Tags can contain letters, numbers (not first character), underscores, hyphens, and forward slashes. Tags can also be defined in frontmatter under the `tags` property.
+Tags can contain letters, numbers, underscores, hyphens, forward slashes, and common Unicode characters including emoji, but no spaces. A tag must contain at least one non-numeric character: `#1984` is invalid, `#y1984` is valid. Tags can also be defined in frontmatter under the `tags` property.
 
 ## Comments
 
@@ -117,6 +121,8 @@ This is visible %%but this is hidden%% text.
 This entire block is hidden in reading view.
 %%
 ```
+
+Comments are visible only in Editing view.
 
 ## Obsidian-Specific Formatting
 
@@ -146,7 +152,7 @@ graph TD
 ```
 ````
 
-To link Mermaid nodes to Obsidian notes, add `class NodeName internal-link;`.
+To link Mermaid nodes to Obsidian notes, add `class NodeName internal-link;`. Quote note names that contain special characters (`class "⨳ special character" internal-link`). These links do not appear in Graph view.
 
 ## Footnotes
 
@@ -158,11 +164,12 @@ Text with a footnote[^1].
 Inline footnote.^[This is inline.]
 ```
 
+Inline footnotes render only in Reading view, not in Live Preview.
+
 ## Complete Example
 
 ````markdown
 ---
-title: Project Alpha
 date: 2024-01-15
 tags:
   - project
