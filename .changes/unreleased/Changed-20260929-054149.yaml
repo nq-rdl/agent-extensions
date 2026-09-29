@@ -1,0 +1,3 @@
+kind: Changed
+body: '`gh:husky` routes by existing hook configuration or an explicit request; a `package.json` alone no longer implies Husky (#306)'
+time: 2026-09-29T05:41:49.959605236Z
