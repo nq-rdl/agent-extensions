@@ -344,13 +344,32 @@ failed Prepare or Finalize run are in [`AGENTS.md`](AGENTS.md) under **"Release"
 
 ## Bundled hooks
 
-A bundle can opt into generated hook packaging with a canonical
-`hooks/<pluginName>/hooks.json`. List its shell hooks by stem in the bundle’s
-`hooks:` array; `sync-plugins.sh` copies the config and `hooks/<name>.sh` files
-into `plugins/<pluginName>/hooks/`, removes stale copies, and checks drift with
-`--check`. This directory is generated once the canonical config exists.
-Commands use `bash "${CLAUDE_PLUGIN_ROOT}/hooks/<name>.sh"` for portable installs.
-Existing bundles without a canonical config retain their current packaging.
+Every bundle with hooks has a canonical Claude config at
+`hooks/<pluginName>/hooks.json`. (The `codex` plugin’s config is
+`hooks/codex/hooks.json`; the subdirectories of `hooks/codex/` hold native
+Codex adapter configs.) List the bundle’s shell hooks by stem in its `hooks:`
+array. Each hook command names its installed path, and the path must be
+quoted so that an install under a path with spaces still runs:
+
+- `bash "${CLAUDE_PLUGIN_ROOT}/hooks/<name>.sh"` for a new hook;
+- `"${CLAUDE_PLUGIN_ROOT}/scripts/<name>.sh"` where an existing plugin
+  already installs hooks beside its runtime, as the `codex` plugin does.
+
+Edit only the canonical files, then run
+`pixi run bash scripts/sync-plugins.sh <bundle>`. The script generates
+`plugins/<pluginName>/hooks/` (config and any hooks installed there) and copies
+each other hook to the directory its command names. It never prunes vendored
+files that share that directory. `sync-plugins.sh --check` (CI and the
+pre-commit hook) fails on stale, missing, content-drifted, or mode-drifted
+copies, and on a copy left at an old location. It also fails on a listed hook
+that no command runs, a command that runs an unlisted script, an unquoted plugin
+root, and a `${CLAUDE_PLUGIN_ROOT}/…` path in a hook that the installed tree
+would not contain. Top-level `hooks/*.sh` files are always hooks. Put a helper
+that is not a hook with its target, as with the Codex adapter
+`hooks/codex/adapter.sh`, or in the owning skill’s `scripts/` directory.
+`tests/test_installed_hooks.py` and `tests/codex/hook-wrappers.test.mjs` run
+installed copies from a path with spaces. See
+[the #311 hook review](docs/skill-review/hooks.md) for the mapping.
 
 The `tech-writing` reminder uses `jq` (silently skips if unavailable) and
 adds advisory context for `PreToolUse` on the `Skill` tool and
