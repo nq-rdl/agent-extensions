@@ -38,9 +38,9 @@ hands a ``/speckit.*`` command back to the human.
 
      {"decision": "generativeMode", "value": "direct", "by": "<who>", "at": "<ISO time>", "scope": "<owner/name>"}
 
-  ``by`` is the human who authorised it and ``at`` is when. Record ``scope``
-  as the repository ``owner/name`` (``nq-rdl/query-builder``), or as the
-  worktree path when a worktree for the work already exists. Keep these five
+  ``by`` is the GitHub login of the human who authorised it, never an email
+  address, and ``at`` is when. Record ``scope`` as the repository
+  ``owner/name`` (``nq-rdl/query-builder``), or as the worktree path when a worktree for the work already exists. Keep these five
   keys exactly. The workflow reuses a decision only when ``scope`` equals the
   unit's ``physicalWorktree``; the main session translates ``owner/name`` into
   that path when it passes the decision on. Do not ask again for the same scope.

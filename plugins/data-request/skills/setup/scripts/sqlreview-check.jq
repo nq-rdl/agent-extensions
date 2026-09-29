@@ -1,8 +1,10 @@
 # Validation rules for a .sqlreview/reviews/<slug>/{review,scope}.json document.
 # Emits one violation per line; no output means the document is valid. Used by
 # `sqlreview.sh check` and, through it, by the PreToolUse guard hook.
-# Run with `jq -L <this directory>`: path_slug/legacy_path_slug live in sqlreview-slug.jq.
+# Run with `jq -L <this directory>`: path_slug/legacy_path_slug live in sqlreview-slug.jq,
+# identity_violations in sqlreview-identity.jq.
 include "sqlreview-slug";
+include "sqlreview-identity";
 def nonempty: type == "string" and length > 0;
 def integer: type == "number" and . >= 1 and . == floor;
 def line_range: type == "array" and length == 2 and all(.[]; integer) and .[0] <= .[1];
@@ -88,7 +90,8 @@ def lift_document($rev):
 if type != "object" then "document is not a JSON object"
 else
   .revision as $rev
-  | (if (.sql_path | path_ok | not) then "sql_path must be a normalized project-relative path" else empty end),
+  | identity_violations,
+    (if (.sql_path | path_ok | not) then "sql_path must be a normalized project-relative path" else empty end),
     (if (.slug | nonempty | not) or (.slug | test("^[A-Za-z0-9_%.-]+$") | not) or .slug == "." or .slug == ".." then "unsafe slug" else empty end),
     (if (.sql_path | path_ok) and .slug != (.sql_path | path_slug) and .slug != (.sql_path | legacy_path_slug) then "slug/sql_path binding mismatch" else empty end),
     ((if .kind == "lifts" then [] else ["inputs", "outputs"] end)[] as $key | if (.[$key] | type) != "array" or (.[$key] | all(.[]; type == "object" and (.name | nonempty) and (.description | type == "string")) | not) then "\($key) must be an array of named descriptions" else empty end),

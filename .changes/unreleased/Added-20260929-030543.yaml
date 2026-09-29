@@ -1,0 +1,3 @@
+kind: Added
+body: 'data-request: sqlreview.sh check, release.sh check and the explain.json guard refuse a by/*_by value containing @ (#419)'
+time: 2026-09-29T03:05:43.04848535Z

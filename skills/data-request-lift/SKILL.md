@@ -131,9 +131,10 @@ yes as a workflow decision in exactly this shape and pass it in the workflow
 {"decision":"generativeMode","value":"direct","by":"<who>","at":"<ISO-8601 time>","scope":"nq-rdl/query-builder"}
 ```
 
-Set `scope` to the owning repository's `owner/name`. If a worktree for the work
-already exists, add the same record with its absolute path as `scope`. The
-workflow matches only the unit's worktree path; the main session translates
+Set `by` to the person's GitHub login, never an email address. Set `scope` to
+the owning repository's `owner/name`. If a worktree for the work already exists,
+add the same record with its absolute path as `scope`. The workflow matches only
+the unit's worktree path; the main session translates
 `owner/name` into the unit's `physicalWorktree`. Without a recorded yes, keep
 `invoke`. Clarify, `analyze` remediations and constitution changes stay with the
 human. Routing `/speckit.*` through another agent (Codex, a subagent) to avoid

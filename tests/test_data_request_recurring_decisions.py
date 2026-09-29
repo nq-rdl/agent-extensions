@@ -76,7 +76,7 @@ def load_list():
 
 def item(id_, text, rationale="because", revision=1, **over):
     d = {"id": id_, "text": text, "rationale": rationale, "location": None,
-         "status": "confirmed", "confirmed_by": "engineer@example",
+         "status": "confirmed", "confirmed_by": "engineer-login",
          "confirmed_at": "2026-09-28T00:00:00Z", "confirmed_revision": revision}
     d.update(over)
     return d
@@ -464,7 +464,7 @@ class MarkerCompatibility(unittest.TestCase):
             a1["carried_from_revision"] = revision - 1
         return {"schemaVersion": 2, "kind": "scope", "slug": "cohort.sql", "sql_path": "cohort.sql",
                 "title": "Cohort", "revision": revision, "recorded_at": "2026-09-28T00:00:00Z",
-                "recorded_by": "engineer@example", "git_commit": None, "sql_sha256": None,
+                "recorded_by": "engineer-login", "git_commit": None, "sql_sha256": None,
                 "intent": "A cohort.", "inputs": [], "outputs": [],
                 "assumptions": [a1], "limitations": [], "open_questions": []}
 

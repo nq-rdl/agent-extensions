@@ -36,7 +36,7 @@ usage() {
 }
 
 # Shared jq definitions: record validation and rendering.
-RL_JQ='
+RL_JQ='include "sqlreview-identity";
 def str: type == "string" and length > 0;
 def arr: if type == "array" then . else [] end;
 def kept: .decision == "accepted" or .decision == "reworded";
@@ -93,7 +93,8 @@ def release_errors:
   if type != "object" then "not a JSON object"
   else
     (.evidence | arr) as $ev
-    | (if .schemaVersion == 1 then empty else "schemaVersion must be 1" end),
+    | identity_violations,
+      (if .schemaVersion == 1 then empty else "schemaVersion must be 1" end),
       (if .kind == "release" then empty else "kind must be release" end),
       (if (.tag | str) and (.tag | test("^[A-Za-z0-9][A-Za-z0-9._-]*$")) and (.tag | contains("..") | not)
        then empty else "tag must be a release tag name (letters, digits, . _ -)" end),
@@ -141,7 +142,7 @@ def render:
 # Validate a record read from $1 (a file) and print its violations; returns 4 when any.
 rl_check_file() {
   local out
-  out="$(jq -r "$RL_JQ"' release_errors' "$1" 2>/dev/null)" || { printf 'not valid JSON\n'; return 4; }
+  out="$(jq -r -L "$SR_SCRIPT_DIR" "$RL_JQ"' release_errors' "$1" 2>/dev/null)" || { printf 'not valid JSON\n'; return 4; }
   [ -z "$out" ] || { printf '%s\n' "$out"; return 4; }
 }
 
@@ -168,7 +169,7 @@ cmd_render() {
   [ -f "$1" ] || sr_die 2 "no such file: $1"
   local errs
   errs="$(rl_check_file "$1")" || { printf '%s\n' "$errs" >&2; exit 4; }
-  jq -r "$RL_JQ"' render' "$1"
+  jq -r -L "$SR_SCRIPT_DIR" "$RL_JQ"' render' "$1"
 }
 
 # One review directory -> one JSON row on stdout.

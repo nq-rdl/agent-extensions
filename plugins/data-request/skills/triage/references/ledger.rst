@@ -41,7 +41,7 @@ Keep one entry per request:
      query-builder: tag or commit
    decisions:
      - date: 2026-09-21
-       who: name of the human who decided
+       who: GitHub login of the human who decided, never an email address
        decision: one sentence
        source: comment or PR link, or "unlinked (verbal)" until a written comment exists
      # spec-kit direct mode, in the exact shape /rdl-team:workflow reuses:

@@ -134,6 +134,8 @@ class GuardHook(unittest.TestCase):
                               ("explain.json", "{}"), ("source.sql", SQL_V1)):
             with self.subTest(name):
                 self.assert_passthrough(run_hook(GUARD, write_event(self.reviews / "s" / name, content, self.root), self.env))
+                if name == "explain.json":  # checked whole for its analyst identity (#419)
+                    continue
                 self.assert_passthrough(run_hook(GUARD, edit_event(self.reviews / "s" / name, self.root), self.env))
 
     def test_rendered_markdown_is_denied(self):

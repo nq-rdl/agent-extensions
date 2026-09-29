@@ -35,7 +35,7 @@ def git(cwd, *args):
 def item(id_, text, revision=1, **over):
     d = {
         "id": id_, "text": text, "rationale": "because", "location": None,
-        "status": "confirmed", "confirmed_by": "analyst@example", "confirmed_at": "2026-09-15T00:00:00Z",
+        "status": "confirmed", "confirmed_by": "analyst-login", "confirmed_at": "2026-09-15T00:00:00Z",
         "confirmed_revision": revision,
     }
     d.update(over)
@@ -46,7 +46,7 @@ def review_doc(slug="reports__monthly", sql_path="reports/monthly.sql", revision
     d = {
         "schemaVersion": 1, "kind": "review", "slug": slug, "sql_path": sql_path,
         "title": "Monthly report", "revision": revision, "recorded_at": "2026-09-15T00:00:00Z",
-        "recorded_by": "engineer@example", "sql_sha256": "0" * 64, "git_commit": None, "git_dirty": False,
+        "recorded_by": "engineer-login", "sql_sha256": "0" * 64, "git_commit": None, "git_dirty": False,
         "purpose": "Counts admissions per month.",
         "inputs": [{"name": "adm.stays", "description": "one row per stay"}],
         "outputs": [{"name": "month", "description": "calendar month"}, {"name": "n", "description": "count"}],
@@ -55,7 +55,7 @@ def review_doc(slug="reports__monthly", sql_path="reports/monthly.sql", revision
         "assumptions": [item("A1", "Discharge date is populated", revision)],
         "limitations": [item("L1", "Excludes transfers", revision)],
         "open_questions": ["Should transfers count?"],
-        "changes": [{"revision": revision, "at": "2026-09-15T00:00:00Z", "by": "engineer@example", "summary": "initial"}],
+        "changes": [{"revision": revision, "at": "2026-09-15T00:00:00Z", "by": "engineer-login", "summary": "initial"}],
     }
     d.update(over)
     return d
@@ -65,7 +65,7 @@ def scope_doc(slug="reports__monthly", sql_path="reports/monthly.sql", revision=
     d = {
         "schemaVersion": 1, "kind": "scope", "slug": slug, "sql_path": sql_path,
         "title": "Monthly report", "revision": revision, "recorded_at": "2026-09-15T00:00:00Z",
-        "recorded_by": "engineer@example", "git_commit": None,
+        "recorded_by": "engineer-login", "git_commit": None,
         "intent": "Monthly admission counts for the ward dashboard.",
         "inputs": [{"name": "adm.stays", "description": "one row per stay"}],
         "outputs": [{"name": "month", "description": "calendar month"}],
