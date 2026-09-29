@@ -307,3 +307,26 @@ repository = false
 url = "https://quarto.org/docs/faq/rmarkdown.html#quarto-vs.-r-markdown"
 shipped = false
 repository = false
+
+# #301: the private RDL Planning board is excluded; other boards and views are
+# still checked.
+[[cases]]
+url = "https://github.com/orgs/nq-rdl/projects/1"
+shipped = false
+repository = true
+
+[[cases]]
+url = "https://github.com/orgs/nq-rdl/projects/10"
+shipped = false
+repository = false
+
+[[cases]]
+url = "https://github.com/orgs/nq-rdl/projects/1/views/2"
+shipped = false
+repository = false
+
+# #301: docs.conda.io is throttled per host, never excluded.
+[[cases]]
+url = "https://docs.conda.io/projects/conda/en/25.1.x/user-guide/configuration/settings.html#add-pip-as-python-dependency-add-pip-as-python-dependency"
+shipped = false
+repository = false

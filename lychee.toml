@@ -43,6 +43,10 @@ exclude = [
   "^https://raw\\.githubusercontent\\.com/nq-rdl/spec-kit-extensions",
   # Private RDL repositories linked by the data-request skills (resolve for org members only)
   "^https://github\\.com/nq-rdl/(query-builder|documentation|data-analysis-scaffold)/",
+  # RDL Planning project board, linked from README.md (weekly link-rot scan, #301).
+  # The project is private (projectV2 public: false), so GitHub answers 404 to
+  # anonymous requests; that is an access boundary, not rot.
+  "^https://github\\.com/orgs/nq-rdl/projects/1/?$",
   # RDL Service Desk (access-controlled) — referenced by the new-service-request skill
   "^https://github\\.com/rdl-service-desk/service-desk",
   # Red Hat: docs.redhat.com bot-blocks non-browser clients (Akamai 403 — see redhat plugin,
@@ -93,3 +97,13 @@ extensions = ["md", "mdx", "txt", "rst", "html", "yaml", "yml", "toml", "json"]
 # Keep HTTP status and fragment checking enabled; do not exclude the guide.
 [hosts."stylepedia.net"]
 headers = { "Accept" = "text/html", "Accept-Language" = "en-US,en;q=0.9" }
+
+# docs.conda.io answered 429 Too Many Requests to GitHub runners on 3 of 5 Link
+# Check attempts during #414 (runs 36407979723, 36408792886 and 36409735793;
+# reruns and local checks pass). The URL is skills/pixi/references/
+# pixi_pack.rst:345. Throttle this host (one request at a time, retries spaced
+# out) instead of excluding it, so the PR check and the weekly link-rot scan
+# (#301) keep checking it; a remaining 429 is reported as unknown, not rot.
+[hosts."docs.conda.io"]
+concurrency = 1
+request_interval = "5s"
