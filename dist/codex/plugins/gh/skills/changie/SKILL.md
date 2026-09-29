@@ -1,177 +1,85 @@
 ---
 name: changie
 license: CC-BY-4.0
-description: Changelog entry creation with Changie. Use when writing a changelog entry,
-  adding a new change fragment, recording what shipped, or following the Keep a Changelog
-  format. Covers non-interactive usage, entry quality rules, and issue linking.
-compatibility: Requires changie CLI
+description: Changelog fragments with Changie. Use when writing a changelog entry,
+  adding a change fragment under `.changes/`, recording what shipped, or checking
+  that fragments follow the project's `.changie.yaml` (kinds, length cap) and Keep
+  a Changelog voice. Covers non-interactive `changie new`, shell-safe bodies, issue
+  links and hand-edited fragments.
+compatibility: changie 1.x (tested 1.26.0, 2026-09-29).
 metadata:
   repo: https://github.com/nq-rdl/agent-extensions
 ---
 
-# Changie Skill
+# Changie
 
-Non-interactive changelog entry authoring for agents. Produces human-readable, Keep a Changelog-compliant fragments every time.
+Write one fragment per logical change, in release-note voice, with the kinds
+and limits the project's `.changie.yaml` defines.
 
----
+## Read the project's config first
 
-## Quick Reference
+- **Kinds** are the `kinds[].label` values in `.changie.yaml`, matched exactly.
+  `changie init` creates the six Keep a Changelog kinds (`Added`, `Changed`,
+  `Deprecated`, `Removed`, `Fixed`, `Security`), but projects rename or replace
+  them; `changie new` rejects others (`invalid kind`). Each kind's `auto:` bump
+  matters only to `changie batch auto`.
+- **Length:** `body.maxLength`, if set, is a hard cap. The issue reference
+  counts toward it.
+- Match the style of existing fragments in `.changes/unreleased/` and recent
+  `.changes/<version>.md` files when they differ from the defaults below.
 
-| Kind | SemVer Bump | When to Use |
-|------|------------|-------------|
-| `Added` | minor | New feature, skill, command, or capability |
-| `Changed` | **major** | Existing behaviour modified in a visible way |
-| `Deprecated` | minor | Something will be removed in a future version |
-| `Removed` | **major** | Feature or capability deleted |
-| `Fixed` | patch | Bug, regression, or broken behaviour repaired |
-| `Security` | patch | Vulnerability addressed |
-
----
-
-## The Command
-
-```bash
-changie new --interactive=false --kind <Kind> --body "<entry text>"
-```
-
-**Dry-run first** (prints the YAML without writing):
-
-```bash
-changie new --dry-run --interactive=false --kind Added --body "New `foo` skill for bar"
-```
-
-- `--interactive=false` is required — without it changie opens a TUI prompt.
-- `--kind` must be one of the six values above, capitalised exactly.
-- `--body` is the complete rendered entry. No trailing period.
-
----
-
-## Writing Rules
-
-Follow all seven rules before running the command.
-
-1. **One entry per logical change.** Two features shipped = two `changie new` calls with two fragments.
-
-2. **Keep it short.** If the project's `.changie.yaml` sets `body.maxLength`, that is the hard cap — changie rejects a longer `--body`; a hand-edited fragment bypasses that check, so stay under it anyway. Without a cap, aim for one line. Cut root cause, internal helper names, and implementation mechanics — they belong in the commit message or PR description.
-
-3. **Lead with what the user can now do.** Write from a release note perspective, not a commit message perspective.
-   - Good: "New `changie` skill teaches agents to write changelog entries in non-interactive mode"
-   - Bad: "Added changie skill implementation with SKILL.md and references directory"
-
-4. **Present tense, active voice.** Use "Adds...", "Fixes...", "Removes...", or noun-first "New `foo`...", "Broken `bar`...".
-
-5. **Backtick-delimit code.** Command names, skill names, agent names, file names, flags — wrap in backticks.
-   - Good: "New `changie` skill"
-   - Bad: "New changie skill"
-
-6. **Em dash for elaboration.** Use ` — ` (space–em-dash–space) to append a "so what" clause.
-   - "Fixes crash when `extract` runs on empty PDFs — previously silently produced an empty file"
-
-7. **No trailing period.** Entries are bullet items, not sentences. Changie renders them as `* <body>`.
-
----
-
-## Issue Linking
-
-Append `(#NNN)` to the body to link a GitHub issue or PR:
-
-```bash
-changie new --interactive=false --kind Fixed \
-  --body "Fixes crash when `extract` runs on empty PDFs (#42)"
-```
-
-- GitHub auto-links bare `#NNN` references in markdown — no full URL needed.
-- Find the relevant issue number with `gh issue list` or `gh pr list`.
-- Read issue context with `gh issue view NNN` before writing the entry.
-- The issue ref counts toward any `body.maxLength` cap — it is part of the body.
-
----
-
-## Good and Bad Examples
-
-| Body | Verdict | Why |
-|------|---------|-----|
-| `New \`changie\` skill teaches agents to write changelog entries in non-interactive mode` | ✅ Good | Noun-first, backticked name, user benefit clear |
-| `New \`copilot-sdk\` skill for building GitHub Copilot extensions in Go — brings the full Copilot SDK API surface into your coding assistant` | ✅ Good | Em-dash elaboration, specific benefit |
-| `Fixes crash when \`extract\` runs on empty PDFs — previously silently produced an empty file (#42)` | ✅ Good | Present tense, backtick, em-dash "so what", issue ref |
-| `Added changie skill with SKILL.md and references dir` | ❌ Bad | Commit message voice, no backtick, no user benefit |
-| `Updated the worker to fix a bug where jobs would not finish correctly.` | ❌ Bad | Passive voice, trailing period, vague |
-| `Fixed bug` | ❌ Bad | No context, not actionable |
-| `Fixes crash when \`extract\` runs on empty PDFs — also fixes broken retry logic in \`upload\`` | ❌ Bad | Two logical fixes fused with "also" — Rule #1 violation; split into two `changie new` calls |
-| `Fixes crash when \`extract\` runs on empty PDFs` (+ separate) `Fixes broken retry logic in \`upload\`` | ✅ Good | Each fix is its own fragment — two calls, two bullets in the release note |
-
----
-
-## Shell Quoting
-
-Bodies containing backticks or apostrophes need careful quoting.
-
-**Backticks in body — use single quotes:**
+## Create the fragment
 
 ```bash
 changie new --interactive=false --kind Added \
-  --body 'New `changie` skill for changelog authoring'
+  --body 'New `report --json` flag prints machine-readable output (#12)'
 ```
 
-**Apostrophes in body — use double quotes:**
+- `--interactive=false` makes a missing value fail instead of waiting for a
+  prompt. `--dry-run` prints the fragment without writing it.
+- **Quote bodies containing backticks with single quotes.** In double quotes the
+  shell runs the backticked text as a command and splices its output into the
+  body. For a body with both backticks and an apostrophe, use `$'…'` and escape
+  the apostrophe as `\'`.
+- Run `changie new` once per change. Split a body that joins two changes with
+  "also" or "and".
 
-```bash
-changie new --interactive=false --kind Fixed \
-  --body "Fixes parser bug when body contains user's input"
-```
+## Write the body
 
-**Both — use `$'...'` syntax (bash):**
+- Lead with what a user can now do or what was fixed, not how it was built:
+  ``New `changie` skill writes fragments non-interactively``, not
+  `Added changie skill with SKILL.md and references dir`.
+- Present tense and active voice (`Adds`, `Fixes`, `Removes`, or noun-first
+  ``New `foo` ``); backticks around commands, flags, files and identifiers;
+  ` — ` (space, em dash, space) to add the "so what".
+- Append `(#NNN)` for the issue or PR; read it with `gh issue view NNN` first.
+  GitHub links bare `#NNN` references.
+- Leave root cause, helper names and mechanics to the commit or PR.
+- **No trailing period** (house style): bodies render as `* <body>` bullets.
+  No tool enforces this, so follow the project's existing fragments if they
+  differ.
 
-```bash
-changie new --interactive=false --kind Added \
-  --body $'New `changie` skill — it\'s the fastest way to ship entries'
-```
+## Hand-edited fragments
 
----
+A fragment is YAML (`kind`, `body`, `time`). Editing one directly bypasses the
+checks in `changie new`:
 
-## Release Workflow
+- Quote the body when it contains `: ` or starts with a backtick or another
+  YAML indicator. An unquoted `body: uses effort: high` fails to parse.
+- `changie batch <version> --dry-run` (for example `batch major --dry-run`)
+  catches invalid YAML and unknown kinds but **not** `body.maxLength`; check the
+  length yourself or use the project's own linter.
 
-**Context only — do not run these commands unless explicitly asked.**
+## Releases
 
-```bash
-# Batch unreleased fragments into a versioned release file
-changie batch <version>          # e.g., changie batch 0.2.0
+Run `changie batch` and `changie merge` only when the user asks for a release,
+and follow the project's release process (many batch in CI from an explicit
+version). `changie batch v0.2.0` keeps the `v` and writes `.changes/v0.2.0.md`;
+use whatever naming the existing `.changes/<version>.md` files use.
 
-# Merge all versioned release files into CHANGELOG.md
-changie merge
-```
+## References
 
-> **WARNING: Do NOT use the `v` prefix with `changie batch`.**
->
-> | Command | File created | Result |
-> |---------|-------------|--------|
-> | `changie batch 0.2.0` | `.changes/0.2.0.md` | ✅ Correct |
-> | `changie batch v0.2.0` | `.changes/v0.2.0.md` | ❌ Wrong |
->
-> Changie keeps the prefix in the filename, so release tooling that looks up
-> `.changes/0.2.0.md` will not find it. Match the naming of the project's existing
-> `.changes/<version>.md` files, and follow the project's own release process (which may
-> batch in CI from an explicit version input) rather than batching by hand.
-
-These commands are reserved for release managers. Agents must not run them unless the user explicitly requests a release.
-
----
-
-## Validation Checklist
-
-Run through this before executing `changie new`:
-
-- [ ] Exactly one logical change — if body contains "also", "and also", "additionally", or ", also" stop and split into separate `changie new` calls
-- [ ] Kind matches what changed (Added/Changed/Deprecated/Removed/Fixed/Security)
-- [ ] Body fits the project's `body.maxLength` in `.changie.yaml` (if set) — if it is long, ask "what can be cut?" and trim, or split into more fragments
-- [ ] Body uses present tense, active voice
-- [ ] Code names are wrapped in backticks
-- [ ] Em dash used for elaboration (not comma or semicolon)
-- [ ] No trailing period
-- [ ] Issue number appended as `(#NNN)` if a relevant issue exists
-
----
-
-## Reference Files
-
-- [`references/keep-a-changelog.rst`](references/keep-a-changelog.rst) — Keep a Changelog 1.1.0 spec condensed: the six kinds, what not to include, SemVer mapping, and the "Unreleased" concept.
+- [references/keep-a-changelog.rst](references/keep-a-changelog.rst): what
+  belongs in a changelog and what does not.
+- [references/ci-integration.rst](references/ci-integration.rst): validating
+  fragments in CI with `changie-action`.
