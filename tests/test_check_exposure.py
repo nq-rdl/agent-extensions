@@ -158,6 +158,17 @@ class TestUnreferencedHooks(unittest.TestCase):
             )
             self.assertEqual(check_exposure.find_unexposed(repo), [])
 
+    def test_nested_target_helpers_are_not_hooks(self):
+        # hooks/<dir>/*.sh (e.g. the Codex adapter hooks/codex/adapter.sh) are
+        # helpers packaged by their target, not independently invokable hooks,
+        # so they never need a bundle `hooks:` entry or an allowlist reason.
+        with tempfile.TemporaryDirectory() as tmp:
+            repo = make_repo(tmp)
+            (repo / "hooks" / "codex").mkdir()
+            (repo / "hooks" / "codex" / "adapter.sh").write_text("#!/usr/bin/env bash\n")
+            self.assertEqual(check_exposure.collect_canonical(repo)["hook"], {})
+            self.assertEqual(check_exposure.find_unexposed(repo), [])
+
 
 class TestMcpAndPromptIdentity(unittest.TestCase):
     def test_mcp_dir_go_suffix_matches_bare_server_name_ref(self):
