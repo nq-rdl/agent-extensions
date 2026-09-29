@@ -1,0 +1,3 @@
+kind: Changed
+body: 'shiny-bslib: description is trigger-first under 400 characters and hands Sass, fonts, brand.yml, dark mode and thematic to shiny:bslib-theming (#306)'
+time: 2026-09-29T05:48:58.170352702Z

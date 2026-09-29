@@ -2,13 +2,14 @@
 name: r-expert
 license: CC-BY-4.0
 description: >-
-  R language expert skill. Use when writing, reviewing, or debugging R code,
-  or when the user asks for R best practices, idiomatic R, or guidance on the
-  R ecosystem. Covers base R, tidyverse style, vectorization, pipe usage,
-  error handling, and performance patterns. Complements r-lib (package dev)
-  and shiny (web apps) — this skill focuses on the language itself.
+  Idiomatic R for general scripts and analysis code: base R and tidyverse
+  style, vectorization, the native pipe and \(x) lambdas (with R version
+  conditions), cli-based errors, formatter choice, and performance/IO tools.
+  Use for writing, reviewing, or debugging R code that is not specifically a
+  package, testing, cli, lifecycle, mirai, CRAN, or Shiny task.
 compatibility: >-
-  Requires R runtime
+  Requires an R runtime. Version conditions checked against the R NEWS for
+  4.1.0-4.3.0 and executed on R 4.5.3, 2026-09-29.
 metadata:
   repo: https://github.com/nq-rdl/agent-extensions
 ---
@@ -42,15 +43,22 @@ do not restate it here.
   present → `air format .`; otherwise keep the project's convention (e.g.
   `styler`). Do not switch formatters unasked. Lint with `lintr`.
 - Performance / IO stack: `bench` (benchmarking), `data.table` / `arrow` /
-  `vroom` (large data + fast IO), `future` + `furrr` (embarrassingly parallel).
+  `vroom` (large data + fast IO); for parallel or async work use mirai
+  (`r:lib-mirai`).
 
 ## Delegation
 
-- Package development → `r-lib-package-dev`, with deep dives in `r-lib-testing`
-  (testthat), `r-lib-cli` (user-facing messages), and `r-lib-lifecycle`
-  (deprecation / versioning).
-- Shiny apps → `shiny-bslib` (layouts, components) and `shiny-bslib-theming`
-  (theming, dark mode, brand.yml).
+Skills in this `r` plugin (Claude Code names; Codex lists the leaf after the
+colon):
+
+- Package development → `r:lib-package-dev`, with deep dives in
+  `r:lib-testing` (testthat), `r:lib-cli` (user-facing messages),
+  `r:lib-lifecycle` (deprecation), and `r:lib-cran-extrachecks` (CRAN).
+- Parallel and async code → `r:lib-mirai`; command-line apps →
+  `r:lib-cli-app`.
+- Shiny apps are in the separate `shiny` plugin, when installed:
+  `shiny:bslib` (layouts, components) and `shiny:bslib-theming` (theming,
+  dark mode, brand.yml).
 - Style-guide details (naming, spacing, pipes, vectorization): the tidyverse
   style guide — do not restate here.
 

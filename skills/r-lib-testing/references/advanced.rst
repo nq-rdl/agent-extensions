@@ -319,7 +319,7 @@ Enable parallel test execution in ``DESCRIPTION``:
 
 **Requirements for parallel tests:** - Tests must be independent - No
 shared state between tests - Use ``local_*()`` functions for all side
-effects - Snapshot tests work correctly in parallel (testthat 3.2.0+)
+effects
 
 Testing Edge Cases
 ------------------

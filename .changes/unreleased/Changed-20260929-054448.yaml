@@ -1,0 +1,3 @@
+kind: Changed
+body: 'r-lib-cran-extrachecks: review requests get findings without edits, fix requests edit within scope without re-approval, and the skill never submits to CRAN (#307)'
+time: 2026-09-29T05:44:48.384022231Z

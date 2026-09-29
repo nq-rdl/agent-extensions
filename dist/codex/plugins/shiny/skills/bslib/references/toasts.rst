@@ -5,6 +5,8 @@ Toasts are lightweight, temporary notification messages that appear in a
 corner of the screen. Based on `Bootstrap 5.3’s toast
 component <https://getbootstrap.com/docs/5.3/components/toasts/>`__. Try
 ``shiny::runExample("toast", package = "bslib")`` for a complete demo.
+Toasts need bslib >= 0.10.0 (``toast()``, ``show_toast()``, ``hide_toast()``,
+``toast_header()``); they do not exist in bslib 0.9.0.
 
 Table of Contents
 -----------------
