@@ -33,17 +33,12 @@ Pattern 2: Generate .env File on Demand (for tools that require files)
 Some tools (Docker Compose, ``dotenv`` libraries) require an actual ``.env``
 file. Generate it on demand from the vault, use it, then delete it.
 
-.. code-block:: bash
+Use ``bwdotenv`` from ``scripts/bw-env.sh``. It writes ``NAME='value'`` lines
+(mode 600), which Docker Compose and python-dotenv read as literal values. A
+value that itself contains a single quote is stored as ``'\''``, which those
+parsers do not understand; keep such values out of file-based workflows.
 
-   bwdotenv() {
-     bwss
-     local item="$1"
-     local out="${2:-.env}"
-     bw get notes "$item" --session "$BW_SESSION" \
-       | sed 's/^export //' \
-       > "$out"
-     >&2 echo "bwdotenv: wrote '$out' (remember to delete after use)"
-   }
+.. code-block:: bash
 
    # Usage — generate, run, delete
    bwdotenv "myapp-dev"
@@ -76,11 +71,18 @@ repository/pipeline secrets in your CI platform.
        BW_CLIENTSECRET: ${{ secrets.BW_CLIENTSECRET }}
        BW_PASSWORD: ${{ secrets.BW_PASSWORD }}
      run: |
+       source "${PLUGIN_ROOT}/skills/secrets/scripts/bw-env.sh"          # the skill's bw-env.sh, vendored in the repo
        bw login --apikey
        export BW_SESSION="$(bw unlock --passwordenv BW_PASSWORD --raw)"
-       bw get notes "myapp-ci" | sed 's/^export //' >> "$GITHUB_ENV"
+       bwe myapp-ci
+       for v in $(bw get notes myapp-ci | sed -n 's/^export \([A-Za-z_][A-Za-z0-9_]*\)=.*/\1/p'); do
+         echo "::add-mask::${!v}"             # GITHUB_ENV values are not masked otherwise
+         printf '%s=%s\n' "$v" "${!v}" >> "$GITHUB_ENV"
+       done
 
 The ``>> $GITHUB_ENV`` pattern makes variables available to subsequent steps.
+Values written there are not masked in later logs unless you add
+``::add-mask::`` first. Multi-line values need GitHub's delimiter syntax.
 
 **Note:** This bootstraps Bitwarden with a small set of CI platform secrets.
 The tradeoff: you still need 3 CI secrets, but in return you can store
@@ -99,10 +101,10 @@ Use it to trigger Bitwarden loading automatically per project.
 .. code-block:: bash
 
    # .envrc — committed to git (contains no secrets)
-   # Requires: bwss function in ~/.zshrc, bw installed
-   if command -v bw &>/dev/null; then
-     bwss
-     eval "$(bw get notes "myapp-dev" --session "$BW_SESSION")"
+   # direnv runs .envrc in bash, so functions from ~/.zshrc are not defined here.
+   if command -v bw >/dev/null 2>&1; then
+     source ~/.config/bw-env.sh    # wherever you keep scripts/bw-env.sh
+     bwe myapp-dev
    fi
 
 Approve once with ``direnv allow``. Secrets load on ``cd``, unload on ``cd`` out.
@@ -175,21 +177,24 @@ Pattern 7: Rotating Secrets
    # bwu "myapp-dev" new.env       — updates from a new .env file
    # Or edit inline:
 
+   # Usage: bwrotate "github-credentials" "GITHUB_TOKEN"   (prompts for the value)
    bwrotate() {
-     bwss
+     bwss || return 1
      local item_name="$1"
      local field_name="$2"
-     local new_value="$3"
-     local id
+     local new_value id
+     read -rs -p "New value for $field_name: " new_value; echo >&2
      id="$(bw get item "$item_name" --session "$BW_SESSION" | jq -r '.id')"
      bw get item "$id" --session "$BW_SESSION" \
        | jq --arg f "$field_name" --arg v "$new_value" \
             '(.fields[] | select(.name == $f) | .value) = $v' \
-       | bw encode | bw edit item "$id" --session "$BW_SESSION"
+       | bw encode | bw edit item "$id" --session "$BW_SESSION" >/dev/null
      bw sync
    }
 
-   # Usage: bwrotate "github-credentials" "GITHUB_TOKEN" "ghp_newvalue"
+The new value is read with ``read -rs`` so it stays out of shell history, and
+the ``bw edit`` output (the whole item) is discarded. ``read -p`` is bash
+syntax; in zsh use ``read -rs "new_value?New value: "``.
 
 --------------
 

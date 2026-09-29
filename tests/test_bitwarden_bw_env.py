@@ -194,6 +194,11 @@ class BwEnvRoundTrip(unittest.TestCase):
         self.assertNotEqual(proc.returncode, 0)
         self.assertIn("no-such-item", proc.stderr)
 
+    def test_documented_note_format_is_accepted(self):
+        asset = self.script.parent.parent / "assets" / "bw-env-format.env"
+        proc = self.sh(f'_bw_env_check "$(cat "{asset}")"')
+        self.assertEqual(proc.returncode, 0, proc.stderr)
+
     def test_bwe_refuses_note_with_non_assignment_lines(self):
         payload = {"type": 2, "name": "hostile", "notes": "export OK=1\ntouch \"$HOME/pwned\"\n",
                    "secureNote": {"type": 0}, "id": str(uuid.uuid4())}
