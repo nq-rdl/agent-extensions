@@ -409,3 +409,40 @@ The previously blocked oracle now ran in the approved isolation at v1.0.12.
 All 15 predicted install/rejection outcomes matched, including short-command
 renaming and missing-file non-registration. Other tags and actual hook
 dispatch remain source-only. See [the completion record](finish.md#spec-kit-oracle-307).
+
+## Companion execution follow-up (#427)
+
+The earlier review checked assets against upstream source without executing
+them. Its content tests could not detect worker failures, SDK returned errors,
+lost prompt results, concurrent store writes or cancellation races.
+
+`tests/test_opencode_companion.py` now runs the actual canonical companion and
+both generated Claude/Codex copies from temporary install paths with spaces.
+A local SDK stub supplies rejected requests, returned SDK errors, assistant
+permission errors, malformed responses and delayed creation/prompt completion.
+No SDK download, live server, provider credentials or model calls are needed.
+A delayed filesystem preloader exposes the parent/worker dispatch race, and
+eight parallel detached tasks exercise shared-store updates and job IDs.
+
+**TDD evidence (2026-09-29).** Before changing the asset, rejected creation and
+prompt requests remained `running`/`prompting`; successful results lacked the
+answer; delayed parent writes overwrote worker state; concurrent updates lost
+jobs; and late success replaced cancellation. The initial executable regression
+run failed. After the canonical fix and regeneration, all 19 tests pass against
+all three copies, including cancellation before startup, during creation and
+prompting, repeated cancellation, terminal-state protection, persisted abort
+errors (including abort after a cancelled create), and preservation of server
+selection and permission policy.
+
+The companion initializes dispatch before spawning, retains `detached: true`
+and `unref()`, serializes store/result updates under a bounded lock, and publishes
+atomic JSON snapshots. Worker failure and actual prompt output are persisted
+before terminal status. Cancellation is claimed before the abort request; an
+in-flight create may return only to abort the new session without prompting it.
+
+**Limits.** This is a skeleton, not a live OpenCode integration test. The harness
+runs on the available Node.js 22 runtime; Node.js 18 is the documented minimum
+but was not separately exercised. Forced process death, stale-lock recovery,
+filesystem durability across power loss, remote-request timeouts and retention
+remain deployment responsibilities. Server credentials and OpenCode permissions
+are still supplied by the caller; the fix adds no approval bypass.

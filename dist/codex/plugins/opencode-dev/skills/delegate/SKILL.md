@@ -153,8 +153,17 @@ const child = spawn(process.execPath, [worker, jobId], {
 child.unref();       // REQUIRED — without unref the parent won't exit / job isn't detached
 ```
 
-Then `status` reads the job-store file; `result` tails `logFile`; `cancel` calls
+Then `status` reads the job-store file; `result` reads `logFile`; `cancel` calls
 `client.session.abort(...)` (serve+SDK) or `process.kill(job.pid)` (run path).
+
+Persist dispatch before spawning, serialize store updates, and publish a result
+before marking a job terminal. SDK failures may reject or return `error`; prompt
+responses may also contain `data.info.error`. Persist each failure as `failed`.
+Cancellation must win over late success/failure and remain idempotent; when
+creation returns after cancellation, abort that session without prompting it.
+The skeleton records abort failures on the cancelled job and exits nonzero.
+It leaves credentials and permissions to the caller. Add deployment-specific
+request timeouts, stale-lock recovery and job retention before production use.
 
 See `assets/companion.skeleton.mjs` for a minimal serve+SDK companion and
 `assets/delegate-command.md` for a starter forwarder command.
