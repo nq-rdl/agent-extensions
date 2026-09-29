@@ -154,10 +154,15 @@ class ConfigTests(unittest.TestCase):
             "^https://api\\.access\\.redhat\\.com/(support|support/search/kcs|rs/solutions/)$",
             "^https://access\\.redhat\\.com/hydra/rest/search/kcs$",
             "^https://sso\\.redhat\\.com/auth/realms/redhat-external/protocol/openid-connect/token$",
+            # #301: the private RDL Planning board (README.md) answers 404 anonymously.
+            "^https://github\\.com/orgs/nq-rdl/projects/1/?$",
         }
         self.assertEqual(set(old["exclude"]) - set(current["exclude"]), removed)
         self.assertEqual(set(current["exclude"]) - set(old["exclude"]), added)
         del old["exclude"], current["exclude"]
+        # #301 throttles docs.conda.io (429 on runners) instead of excluding it.
+        self.assertEqual(current["hosts"].pop("docs.conda.io"),
+                         {"concurrency": 1, "request_interval": "5s"})
         self.assertEqual(current, old)
 
     def test_exclusion_fixtures(self):
