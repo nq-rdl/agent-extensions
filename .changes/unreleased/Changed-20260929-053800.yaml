@@ -1,0 +1,3 @@
+kind: Changed
+body: 'r-lib-mirai: description is now trigger-first and names mirai(), daemons(), mirai_map() and loop parallelisation for routing (#306)'
+time: 2026-09-29T05:38:00.412683679Z

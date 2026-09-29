@@ -1,19 +1,35 @@
 ---
 license: CC-BY-4.0
 description: >-
-  Help users write correct R code for async, parallel, and distributed
-  computing using mirai. Use when users need to: run R code asynchronously
-  or in parallel, write mirai code with correct dependency passing, set up
-  local or remote parallel workers, convert code from future or parallel,
-  use parallel map operations, integrate async tasks with Shiny or promises,
-  or configure cluster/HPC computing.
+  Write and fix async, parallel, and distributed R code with the mirai
+  package: mirai(), daemons(), mirai_map(), everywhere(), explicit dependency
+  passing, error values, Shiny ExtendedTask and promises, remote/HPC daemons,
+  and migration from future, furrr, or parallel. Use for parallelising R
+  loops or lapply/purrr maps across worker processes.
+compatibility: >-
+  Requires R and the mirai package. Examples verified with mirai 2.7.2
+  (nanonext 1.10.3), shiny 1.14.0, bslib 0.12.0, and promises 1.5.0 on
+  R 4.5.3, 2026-09-29.
 metadata:
   repo: https://github.com/nq-rdl/agent-extensions
 ---
 
-Expert guidance for the mirai R package for async, parallel, and distributed computing in R. Covers writing correct mirai code, fixing common mistakes, and converting from other parallel frameworks.
+# mirai: async and parallel R
 
-When the user provides code, analyze it and either fix it or convert it to correct mirai code. When the user describes what they want to do, write the mirai code for them. Always explain the key mirai concepts that apply to their situation.
+mirai evaluates R expressions in separate processes (daemons). When the user
+gives code, fix it or convert it to correct mirai code; when they describe a
+task, write the code. Verify against https://mirai.r-lib.org when an installed
+mirai is older or newer than 2.7.2 or an API detail matters; say so if you
+cannot check.
+
+## Choose a reference
+
+| Read | When you need |
+|---|---|
+| [references/shiny-promises.rst](references/shiny-promises.rst) | A complete Shiny `ExtendedTask` app, `input_task_button()`, or promise piping with `%...>%`/`then()` |
+| [references/remote-hpc.rst](references/remote-hpc.rst) | Daemons on other machines: SSH (direct or tunnelled), Slurm/SGE/PBS/LSF, or an HTTP launcher such as Posit Workbench |
+| [references/migration.rst](references/migration.rst) | Converting from future, furrr, or parallel, or a drop-in `parallel` cluster (`make_cluster()`, `makeCluster(type = "MIRAI")`) |
+| [references/advanced.rst](references/advanced.rst) | Switching compute profiles with `local_daemons()`/`with_daemons()`, or nested parallelism inside daemons |
 
 ## Core Principle: Explicit Dependency Passing
 
@@ -103,25 +119,19 @@ everywhere(library(dplyr))
 m <- mirai(filter(df, x > 5), .args = list(df = my_df))
 ```
 
+The same applies inside `mirai_map()` callbacks: write
+`function(x) dplyr::filter(x, val > 0)`, or call `everywhere()` first.
+
 ### Mistake 3: Expecting results immediately
 
 `m$data` accesses the mirai's value — but it may still be unresolved. Use `m[]` to block until done, or check with `unresolved(m)` first.
 
 ```r
-# WRONG: m$data may still be an unresolved value
 m <- mirai(slow_computation())
-result <- m$data  # may return an 'unresolved' logical value
-
-# CORRECT: Use [] to wait for the result
-m <- mirai(slow_computation())
-result <- m[]  # blocks until resolved, returns the value directly
-
-# CORRECT: Or use call_mirai() then access $data
-call_mirai(m)
-result <- m$data
-
-# CORRECT: Non-blocking check
-if (!unresolved(m)) result <- m$data
+result <- m$data                     # WRONG: may be an 'unresolvedValue'
+result <- m[]                        # CORRECT: blocks, returns the value
+call_mirai(m); result <- m$data      # CORRECT: wait, then read $data
+if (!unresolved(m)) result <- m$data # CORRECT: non-blocking check
 ```
 
 ### Mistake 4: Mixing up .args names and expression names
@@ -134,18 +144,6 @@ m <- mirai(process(input), .args = list(fn = process, data = input))
 m <- mirai(process(input), .args = list(process = process, input = input))
 ```
 
-### Mistake 5: Unqualified package functions in mirai_map callbacks
-
-The same namespace issue from Mistake 2 applies to `mirai_map()` — each callback runs on a daemon with no packages loaded by default.
-
-```r
-# WRONG: dplyr not available on daemons
-results <- mirai_map(data_list, function(x) filter(x, val > 0))[]
-
-# CORRECT: Namespace-qualify, or use everywhere() first
-results <- mirai_map(data_list, function(x) dplyr::filter(x, val > 0))[]
-```
-
 ## Setting Up Daemons
 
 ### No daemons required
@@ -155,17 +153,10 @@ results <- mirai_map(data_list, function(x) dplyr::filter(x, val > 0))[]
 ### Local daemons
 
 ```r
-# Start 4 local daemon processes (with dispatcher, the default)
-daemons(4)
-
-# Direct connection (no dispatcher) — lower overhead, round-robin scheduling
-daemons(4, dispatcher = FALSE)
-
-# Check daemon status
-info()
-
-# Daemons persist until explicitly reset
-daemons(0)
+daemons(4)                      # 4 local daemons with dispatcher (default)
+daemons(4, dispatcher = FALSE)  # direct: lower overhead, round-robin, no cancellation
+info()                          # status
+daemons(0)                      # daemons persist until reset
 ```
 
 ### Scoped daemons (auto-cleanup)
@@ -179,25 +170,8 @@ with(daemons(4), {
 })
 ```
 
-### Scoped compute profile switching
-
-`local_daemons()` and `with_daemons()` **switch** the active compute profile to one that already exists — they do not create daemons.
-
-```r
-daemons(4, .compute = "workers")
-
-# Switch active profile for the duration of the calling function
-my_func <- function() {
-  local_daemons("workers")
-  mirai(task())[]  # uses "workers" profile
-}
-
-# Switch active profile for a block
-with_daemons("workers", {
-  m <- mirai(task())
-  m[]
-})
-```
+To switch between existing profiles with `local_daemons()` or
+`with_daemons()`, read [references/advanced.rst](references/advanced.rst).
 
 ### Compute profiles (multiple independent pools)
 
@@ -211,7 +185,8 @@ m2 <- mirai(gpu_work(), .compute = "gpu")
 
 ## mirai_map: Parallel Map
 
-Requires daemons to be set. Maps `.x` element-wise over a function, distributing across daemons.
+Requires daemons; without them it errors with "No daemons set". Maps `.x`
+element-wise over a function, distributing across daemons.
 
 ```r
 daemons(4)
@@ -244,12 +219,8 @@ results <- mirai_map(1:100, risky_task)[.stop]
 
 # Combine options
 results <- mirai_map(1:100, task)[.stop, .progress]
-```
 
-### Mapping over multiple arguments (data frame rows)
-
-```r
-# Each row becomes arguments to the function
+# Data frame: each row becomes the function's arguments
 params <- data.frame(mean = 1:5, sd = c(0.1, 0.5, 1, 2, 5))
 results <- mirai_map(params, function(mean, sd) rnorm(100, mean, sd))[]
 ```
@@ -295,161 +266,50 @@ m <- mirai(long_running_task())
 stop_mirai(m)
 ```
 
-## Shiny / Promises Integration
+## Shiny and promises
 
-### ExtendedTask pattern
+A mirai is a promise, so it plugs into Shiny `ExtendedTask` and the promises
+package directly. The essentials:
+
+- Call `daemons(n)` once at start-up and `onStop(function() daemons(0))`.
+- The `ExtendedTask` function takes plain values and passes them to `mirai()`
+  through `.args`; reactive values cannot be read on the daemon.
+- Every `input$...` the server reads must be defined in the UI; a missing
+  input is `NULL` and the task fails (for example `rnorm(NULL)` gives
+  "invalid arguments").
 
 ```r
-library(shiny)
-library(bslib)
-library(mirai)
-
-daemons(4)
-onStop(function() daemons(0))
-
-ui <- page_fluid(
-  numericInput("n", "Sample size", value = 100, min = 1),
-  input_task_button("run", "Run Analysis"),
-  plotOutput("result")
-)
-
-server <- function(input, output, session) {
-  task <- ExtendedTask$new(
-    function(n) mirai(rnorm(n), .args = list(n = n))
-  ) |> bind_task_button("run")
-
-  observeEvent(input$run, task$invoke(input$n))
-  output$result <- renderPlot(hist(task$result()))
-}
+task <- ExtendedTask$new(
+  function(n) mirai(rnorm(n), .args = list(n = n))
+) |> bind_task_button("run")
+observeEvent(input$run, task$invoke(input$n))  # UI defines numericInput("n", ...)
 ```
 
-### Promise piping
+For the complete app and promise piping, read
+[references/shiny-promises.rst](references/shiny-promises.rst).
+
+## Random number generation
 
 ```r
-library(promises)
-mirai({Sys.sleep(1); "done"}) %...>% cat()
-```
-
-## Remote / Distributed Computing
-
-### SSH (direct connection)
-
-```r
-daemons(
-  url = host_url(tls = TRUE),
-  remote = ssh_config(c("ssh://user@node1", "ssh://user@node2"))
-)
-```
-
-### SSH (tunnelled, for firewalled environments)
-
-```r
-daemons(
-  n = 4,
-  url = local_url(tcp = TRUE),
-  remote = ssh_config("ssh://user@node1", tunnel = TRUE)
-)
-```
-
-### HPC cluster (Slurm/SGE/PBS/LSF)
-
-```r
-daemons(
-  n = 1,
-  url = host_url(),
-  remote = cluster_config(
-    command = "sbatch",
-    options = "#SBATCH --job-name=mirai\n#SBATCH --mem=8G\n#SBATCH --array=1-50",
-    rscript = file.path(R.home("bin"), "Rscript")
-  )
-)
-```
-
-### HTTP launcher (e.g., Posit Workbench)
-
-```r
-daemons(n = 2, url = host_url(), remote = http_config())
-```
-
-## Converting from future
-
-| future | mirai |
-|--------|-------|
-| Auto-detects globals | Must pass all dependencies explicitly |
-| `future({expr})` | `mirai({expr}, .args = list(...))` |
-| `value(f)` | `m[]` or `call_mirai(m); m$data` |
-| `plan(multisession, workers = 4)` | `daemons(4)` |
-| `plan(sequential)` / reset | `daemons(0)` |
-| `future_lapply(X, FUN)` | `mirai_map(X, FUN)[]` |
-| `future_map(X, FUN)` (furrr) | `mirai_map(X, FUN)[]` |
-| `future_promise(expr)` | `mirai(expr, ...)` (auto-converts to promise) |
-
-The key conversion step: identify all objects the expression uses from the calling environment and pass them explicitly via `.args` or `...`.
-
-## Converting from parallel
-
-| parallel | mirai |
-|----------|-------|
-| `makeCluster(4)` | `daemons(4)` or `make_cluster(4)` |
-| `clusterExport(cl, "x")` | Pass via `.args` / `...`, or use `everywhere()` |
-| `clusterEvalQ(cl, library(pkg))` | `everywhere(library(pkg))` |
-| `parLapply(cl, X, FUN)` | `mirai_map(X, FUN)[]` |
-| `parSapply(cl, X, FUN)` | `mirai_map(X, FUN)[.flat]` |
-| `mclapply(X, FUN, mc.cores = 4)` | `daemons(4); mirai_map(X, FUN)[]` |
-| `stopCluster(cl)` | `daemons(0)` |
-
-### Drop-in replacement via make_cluster
-
-For code that already uses the parallel package extensively, `make_cluster()` provides a drop-in backend:
-
-```r
-cl <- mirai::make_cluster(4)
-# Use with all parallel::par* functions as normal
-parallel::parLapply(cl, 1:100, my_func)
-mirai::stop_cluster(cl)
-
-# R >= 4.5: native integration
-cl <- parallel::makeCluster(4, type = "MIRAI")
-```
-
-## Random Number Generation
-
-```r
-# Default: L'Ecuyer-CMRG stream per daemon (statistically safe, non-reproducible)
+# Default: an L'Ecuyer-CMRG stream per daemon (statistically safe, not reproducible)
 daemons(4)
 
-# Reproducible: L'Ecuyer-CMRG stream per mirai call
-# Results are the same regardless of daemon count or scheduling
+# Reproducible: a stream per mirai call; results do not depend on daemon
+# count or scheduling
 daemons(4, seed = 42)
 ```
 
 ## Debugging
 
 ```r
-# Synchronous mode — runs in the host process, supports browser()
+# Synchronous mode runs in the host process and supports browser()
 daemons(sync = TRUE)
 m <- mirai({
   browser()
-  result <- tricky_function(x)
-  result
+  tricky_function(x)
 }, .args = list(tricky_function = tricky_function, x = my_x))
 daemons(0)
 
-# Capture daemon stdout/stderr
+# Show daemon stdout/stderr in the host
 daemons(4, output = TRUE)
-```
-
-## Advanced Pattern: Nested Parallelism
-
-Inside daemon callbacks (e.g., `mirai_map`), use `local_url()` + `launch_local()` instead of `daemons(n)` to avoid conflicting with the outer daemon pool.
-
-```r
-# mirai is not attached on the daemon, so qualify every call with mirai::
-mirai_map(1:10, function(x) {
-  mirai::daemons(url = mirai::local_url())
-  mirai::launch_local(2)
-  result <- mirai::mirai_map(1:5, function(y, x) x * y, .args = list(x = x))[]
-  mirai::daemons(0)
-  result
-})[]
 ```
