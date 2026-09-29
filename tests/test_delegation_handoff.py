@@ -199,12 +199,8 @@ CONTRACT_TOKENS = (
 # yet. Remove a name when its outline carries the contract; the inventory test
 # below fails on a stale name.
 CONTRACT_PENDING = {
-    "codex-rescue",
     "data-request-triage",
-    "marketplace-scout",
     "se-technical-writer",
-    "skill-audit",
-    "skill-review",
 }
 
 COMPANION_LINE = re.compile(r"companion skills when available:(.*)", re.I)
