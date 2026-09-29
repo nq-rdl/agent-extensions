@@ -6,6 +6,8 @@ import tempfile
 import unittest
 from pathlib import Path
 
+import yaml
+
 try:
     from test_sql_review_scripts import Project, REPO, run, scope_doc
 except ModuleNotFoundError:
@@ -102,6 +104,72 @@ class Intake(unittest.TestCase):
             self.assertEqual((final["confirmed_revision"], final["carried_from_revision"]), (1, 1))
             self.assertEqual(final["confirmed_by"], "analyst-login")
 
+    def test_grain_and_finer_outputs_survive_import_publish_and_carry(self):
+        for tree in ("skills/data-request-setup", "plugins/data-request/skills/setup",
+                     "dist/codex/plugins/data-request/skills/setup"):
+            with self.subTest(tree=tree), tempfile.TemporaryDirectory() as tmp:
+                p = Project(tmp)
+                helper = REPO / tree / "scripts/sqlreview.sh"
+
+                def invoke(*args):
+                    result = subprocess.run(["bash", str(helper), *args], cwd=p.root,
+                                            capture_output=True, text=True, timeout=30)
+                    self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+                    return result.stdout
+
+                value = intake()
+                grain = copy.deepcopy(value["decisions"][0])
+                grain.update(id="grain", topic="grain", unit="admission",
+                             text="One cohort row per admission.",
+                             rationale="The requester studies admissions.",
+                             finer_outputs=[{"name": "procedures", "unit": "procedure",
+                                             "description": "Procedure rows linked by admission key."}])
+                grain["decided"]["at"] = "2026-09-28"
+                value["decisions"].append(grain)
+                source = p.root / "answers.intake.json"
+                original = json.dumps(value)
+                source.write_text(original)
+                d = scope_doc(sql_sha256=None, approval_number=value["approval_number"])
+                d["assumptions"][0]["confirmed_by"] = "engineer-login"
+                draft = p.write_json(d["slug"], "scope.draft.json", d)
+                draft.write_text(invoke("intake", str(source), "1", str(draft)))
+                merged = json.loads(draft.read_text())
+                imported = next(a for a in merged["assumptions"] if a["id"] == "A-intake-grain")
+                self.assertEqual(imported["upstream"]["unit"], "admission")
+                self.assertEqual(imported["upstream"]["finer_outputs"], grain["finer_outputs"])
+                self.assertEqual(imported["decided"], grain["decided"])
+                self.assertEqual(imported["confirmed_at"], grain["confirmed_at"])
+                self.assertEqual(imported["confirmed_by"], "analyst-login")
+                # Engineer and analyst confirmations coexist; config labels identify neither.
+                engineer_item = next(a for a in merged["assumptions"] if a["id"] == "A1")
+                self.assertEqual(engineer_item["confirmed_by"], "engineer-login")
+                invoke("publish", d["slug"], "scope", str(draft))
+                published = json.loads((draft.parent / "scope.json").read_text())
+                self.assertEqual(published, merged)
+                published["revision"] = 2
+                draft.write_text(json.dumps(published))
+                carried = json.loads(invoke("carryforward", d["slug"], "scope", str(draft)))
+                self.assertEqual(carried["walk"], [])
+                by_id = {row["id"]: row["set"] for row in carried["carry"]}
+                self.assertEqual(by_id[imported["id"]]["upstream"], imported["upstream"])
+                self.assertEqual(by_id[imported["id"]]["decided"], grain["decided"])
+                for item in published["assumptions"]:
+                    item.update(by_id[item["id"]])
+                draft.write_text(json.dumps(published))
+                again = invoke("intake", str(source), "2", str(draft))
+                self.assertEqual(json.loads(again), published)
+                draft.write_text(again)
+                invoke("publish", d["slug"], "scope", str(draft))
+                final = json.loads((draft.parent / "scope.json").read_text())
+                final_grain = next(a for a in final["assumptions"] if a["id"] == imported["id"])
+                self.assertEqual(final_grain, imported | by_id[imported["id"]])
+                self.assertEqual((final_grain["confirmed_revision"], final_grain["carried_from_revision"]), (1, 1))
+                invoke("render", d["slug"], "scope")
+                rendered = (draft.parent / "scope.md").read_text()
+                for token in ("One cohort row per admission", "analyst-login", "engineer-login", "analyst-intake"):
+                    self.assertIn(token, rendered)
+                self.assertEqual(source.read_text(), original)
+
     def test_date_only_origin_is_preserved(self):
         with tempfile.TemporaryDirectory() as tmp:
             p = Project(tmp)
@@ -159,11 +227,25 @@ class Intake(unittest.TestCase):
 
     def test_role_and_handoff_contracts(self):
         for tree in ("skills", "plugins/data-request/skills", "dist/codex/plugins/data-request/skills"):
-            for stage in ("setup", "bootstrap", "draft", "analyse"):
-                leaf = "data-request-" + stage if tree == "skills" else stage
-                text = (REPO / tree / leaf / "SKILL.md").read_text()
-                self.assertIn("Data Engineer", text)
-                self.assertIn("analyst", text.lower())
+            owners = {
+                "setup": ("Data Engineer",), "bootstrap": ("Data Engineer",),
+                "draft": ("Data Engineer",), "analyse": ("Data Engineer",),
+                "map": ("Data Engineer",), "validate": ("Data Engineer",),
+                "fix": ("Data Engineer",), "lift": ("Data Engineer",),
+                "explain": ("Data Analyst",), "release": ("Data Analyst",),
+                "amend": ("Data Analyst",),
+                "triage": ("Data Analyst", "Data Engineer"),
+                "guardrails": ("Data Engineer", "Data Analyst"),
+            }
+            registry = yaml.safe_load((REPO / "registry/bundles/data-request.yaml").read_text())
+            self.assertEqual(set(owners), {member["leaf"] for member in registry["skills"]})
+            for stage, roles in owners.items():
+                with self.subTest(tree=tree, stage=stage):
+                    leaf = "data-request-" + stage if tree == "skills" else stage
+                    body = (REPO / tree / leaf / "SKILL.md").read_text().split("\n# Data Request", 1)[1]
+                    opening = " ".join(body.split("\n## ", 1)[0].split())[:500]
+                    for role in roles:
+                        self.assertIn(role, opening)
             bootstrap = (REPO / tree / ("data-request-bootstrap" if tree == "skills" else "bootstrap") / "SKILL.md").read_text()
             self.assertIn("answers.intake.json", bootstrap)
             self.assertIn("Do not ask the engineer", bootstrap)

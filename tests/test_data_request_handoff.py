@@ -67,6 +67,18 @@ class HandoffContracts(unittest.TestCase):
             self.assertIn(token, amend)
         self.assertNotIn("applies only to a released extract", amend)
 
+    def test_amend_role_opening_preserves_pre_and_post_release_routing(self):
+        # Read the role opening, not the later boundary paragraph: both must agree.
+        for tree in ("skills/data-request-amend", "plugins/data-request/skills/amend",
+                     "dist/codex/plugins/data-request/skills/amend"):
+            with self.subTest(tree=tree):
+                body = (REPO / tree / "SKILL.md").read_text().split("\n# Data Request", 1)[1]
+                opening = " ".join(body.split("Arguments:", 1)[0].replace("**", "").split())
+                self.assertIn("Data Analyst", opening)
+                self.assertRegex(opening, r"before (?:or|and) after release")
+                self.assertIn("Data Engineer", opening)
+                self.assertNotIn("runs amend after release", opening)
+
     def test_analyst_send_back_is_a_paste_ready_outcome_without_approval(self):
         explain = text("explain")
         for token in ("Accept for release preparation", "Send back", "Presentation amendment",
