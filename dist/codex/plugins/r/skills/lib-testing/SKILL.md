@@ -1,265 +1,135 @@
 ---
 name: lib-testing
 license: CC-BY-4.0
-description: Best practices for writing R package tests using testthat version 3+.
-  Use when writing, organizing, or improving tests for R packages. Covers test structure,
-  expectations, fixtures, snapshots, mocking, and modern testthat 3 patterns including
-  self-sufficient tests, proper cleanup with withr, and snapshot testing.
+description: 'Write, organize, and debug testthat (3rd edition) tests for R packages:
+  test_that()/describe(), expectations, snapshot tests, fixtures and test_path(),
+  helper vs setup files, mocking with local_mocked_bindings(), withr cleanup, skips,
+  and which testthat version a feature needs. Use for tests/testthat/ work or failing
+  R package tests.'
+compatibility: Requires R, testthat >= 3.0.0 (third edition), and withr. Newer expectations
+  need the versions marked beside them. Examples verified with testthat 3.3.2, withr
+  3.0.3, devtools 2.5.2, and pkgload 1.5.3 on 2026-09-29.
 metadata:
   repo: https://github.com/nq-rdl/agent-extensions
 ---
 
 # Testing R Packages with testthat
 
-Modern best practices for R package testing using testthat 3+.
+This file holds the decisions that most often go wrong: which files run when,
+which testthat version a feature needs, and how to keep tests self-contained.
+Check the installed version with `packageVersion("testthat")` and the testthat
+NEWS (https://testthat.r-lib.org/news/) before using a feature marked with a
+version; if the package's `Suggests: testthat (>= x.y.z)` is lower, raise it
+or avoid the feature.
 
-## Initial Setup
+## Choose a reference
 
-Initialize testing with testthat 3rd edition:
+| Read | When you need |
+|---|---|
+| [references/snapshots.rst](references/snapshots.rst) | Snapshot workflow, `transform`, variants, snapshot files, or CI behaviour |
+| [references/fixtures.rst](references/fixtures.rst) | Constructor and `local_*()` fixtures, static files, helper and setup files in depth, temporary files, database fixtures |
+| [references/mocking.rst](references/mocking.rst) | `local_mocked_bindings()`/`with_mocked_bindings()` details, S3/S4/R6 mocking, databases, APIs, files, random numbers, webfakes/httptest2 |
+| [references/bdd.rst](references/bdd.rst) | `describe()`/`it()` specifications, nesting, pending specs, or mixing BDD with `test_that()` |
+| [references/advanced.rst](references/advanced.rst) | Skips (including `skip_unless_r()`), flaky tests, secrets, custom expectations, CRAN constraints, parallel tests |
+
+## Setup
 
 ```r
-usethis::use_testthat(3)
+usethis::use_testthat(3)   # tests/testthat/, tests/testthat.R, Config/testthat/edition: 3
+usethis::use_test("foofy") # tests/testthat/test-foofy.R, paired with R/foofy.R
 ```
 
-This creates `tests/testthat/` directory, adds testthat to `DESCRIPTION` Suggests with `Config/testthat/edition: 3`, and creates `tests/testthat.R`.
+## Which files run when
 
-## File Organization
+| File in `tests/testthat/` | `devtools::load_all()` | Test runners: `devtools::test()`, `test_file()`, `test_dir()`, `R CMD check` |
+|---|---|---|
+| `helper-*.R` | sourced | sourced |
+| `setup-*.R` | **not** sourced | sourced |
+| `test-*.R` | not sourced | run |
+| `fixtures/` (convention) | not sourced | read with `test_path("fixtures", ...)` |
 
-**Mirror package structure:**
-- Code in `R/foofy.R` → tests in `tests/testthat/test-foofy.R`
-- Use `usethis::use_r("foofy")` and `usethis::use_test("foofy")` to create paired files
+- Put reusable test code (constructors, custom expectations, skip helpers) in
+  `helper-*.R` so it is also available interactively after `load_all()`.
+- Put global test-only side effects (options, connections, caches) in
+  `setup-*.R`. Register cleanup with `withr::defer(..., teardown_env())` or
+  `.local_envir = teardown_env()`.
+- Verified with testthat 3.3.2: after `load_all()` a helper object exists and a
+  setup side effect does not; `devtools::test()` and `test_dir()` see both.
 
-**Special files:**
-- `helper-*.R` - Helper functions and custom expectations, sourced by `load_all()` and by the test runners
-- `setup-*.R` - Sourced by the test runners (`devtools::test()`, `test_file()`, `R CMD check`), not by `load_all()`
-- `fixtures/` - Static test data files accessed via `test_path()`
-
-## Test Structure
-
-Tests follow a three-level hierarchy: **File → Test → Expectation**
-
-### Standard Syntax
+## Test structure
 
 ```r
-test_that("descriptive behavior", {
-  result <- my_function(input)
-  expect_equal(result, expected_value)
+test_that("str_trunc() truncates from the right", {
+  expect_equal(str_trunc("This string is moderately long", 20), "This string is mo...")
 })
 ```
 
-**Test descriptions** should read naturally and describe behavior, not implementation.
+Descriptions state behaviour, not implementation. `describe()`/`it()` is an
+alternative syntax; `it()` with no body is a pending (skipped) spec. Since
+testthat 3.3.0, `test_that()`, `describe()`, and `it()` nest arbitrarily.
 
-### BDD Syntax (describe/it)
-
-For behavior-driven development, use `describe()` and `it()`:
+## Expectations and version conditions
 
 ```r
-describe("matrix()", {
-  it("can be multiplied by a scalar", {
-    m1 <- matrix(1:4, 2, 2)
-    m2 <- m1 * 2
-    expect_equal(matrix(1:4 * 2, 2, 2), m2)
-  })
+# Equality
+expect_equal(10, 10 + 1e-7)              # numeric tolerance
+expect_identical(10L, 10L)               # exact
+expect_equal(x, y, ignore_attr = TRUE)   # replaces expect_equivalent()
 
-  it("can be transposed", {
-    m <- matrix(1:4, 2, 2)
-    expect_equal(t(m), matrix(c(1, 3, 2, 4), 2, 2))
-  })
-})
+# Conditions
+expect_error(f(), class = "mypkg_error") # prefer class over message regex
+expect_no_error(f()); expect_warning(g()); expect_no_message(h())
+
+# Types and structure
+expect_type(obj, "list"); expect_s3_class(model, "lm"); expect_length(x, 10)
+
+# Sets (testthat >= 3.1.9)
+expect_contains(fruits, "apple")
+expect_in("apple", fruits)
+
+# testthat >= 3.3.0
+expect_all_equal(x, 1)                   # every element equals the value
+expect_all_true(x > 0); expect_all_false(x < 0)
+expect_disjoint(set1, set2)
+expect_r6_class(obj, "MyR6Class")
+expect_shape(m, dim = c(10, 5))          # name the argument: nrow =, ncol =, or dim =
 ```
 
-**Key features:**
-- `describe()` groups related specifications for a component
-- `it()` defines individual specifications (like `test_that()`)
-- Supports nesting for hierarchical organization
-- `it()` without code creates pending test placeholders
+`expect_shape(m, c(10, 5))` fails with "`...` must be empty" because the shape
+must be passed by name.
 
-**Use `describe()` to verify you implement the right things, use `test_that()` to ensure you do things right.**
+| Feature | Needs testthat |
+|---|---|
+| Third edition, `expect_snapshot()`, `local_edition()` | 3.0.0 |
+| `expect_contains()`, `expect_in()` | 3.1.9 |
+| `local_mocked_bindings()`/`with_mocked_bindings()` (experimental in 3.1.7) | 3.2.0 |
+| `expect_all_*()`, `expect_disjoint()`, `expect_r6_class()`, `expect_shape()`, `skip_unless_r()`, `test_file(desc =)` with `it()`, arbitrary nesting | 3.3.0 |
+| `devtools::test(shuffle = TRUE)`, `devtools::test(reporter = "slow")` | 3.3.0 |
+| New snapshots fail on CI instead of being written | 3.3.0 |
 
-See [references/bdd.rst](references/bdd.rst) for comprehensive BDD patterns, nested specifications, and test-first workflows.
+## Self-contained tests
 
-## Running Tests
-
-Three scales of testing:
-
-**Micro** (interactive development):
-```r
-devtools::load_all()
-expect_equal(foofy(...), expected)
-```
-
-**Mezzo** (single file):
-```r
-testthat::test_file("tests/testthat/test-foofy.R")
-# RStudio: Ctrl/Cmd + Shift + T
-```
-
-**Macro** (full suite):
-```r
-devtools::test()    # Ctrl/Cmd + Shift + T
-devtools::check()   # Ctrl/Cmd + Shift + E
-```
-
-## Core Expectations
-
-### Equality
+Each test creates its own inputs and undoes its own side effects. Repeat setup
+code rather than sharing top-level objects between tests; a test that relies on
+an object created outside `test_that()` breaks when run alone or shuffled.
 
 ```r
-expect_equal(10, 10 + 1e-7)      # Allows numeric tolerance
-expect_identical(10L, 10L)       # Exact match required
-expect_all_equal(x, expected)    # Every element matches (v3.3.0+)
-```
-
-### Errors, Warnings, Messages
-
-```r
-expect_error(1 / "a")
-expect_error(bad_call(), class = "specific_error_class")
-expect_no_error(valid_call())
-
-expect_warning(deprecated_func())
-expect_no_warning(safe_func())
-
-expect_message(informative_func())
-expect_no_message(quiet_func())
-```
-
-### Pattern Matching
-
-```r
-expect_match("Testing is fun!", "Testing")
-expect_match(text, "pattern", ignore.case = TRUE)
-```
-
-### Structure and Type
-
-```r
-expect_length(vector, 10)
-expect_type(obj, "list")
-expect_s3_class(model, "lm")
-expect_s4_class(obj, "MyS4Class")
-expect_r6_class(obj, "MyR6Class")      # v3.3.0+
-expect_shape(matrix, dim = c(10, 5))   # v3.3.0+; argument must be named
-```
-
-### Sets and Collections
-
-```r
-expect_setequal(x, y)           # Same elements, any order
-expect_contains(fruits, "apple") # Subset check (v3.1.9+)
-expect_in("apple", fruits)       # Element in set (v3.1.9+)
-expect_disjoint(set1, set2)      # No overlap (v3.3.0+)
-```
-
-### Logical
-
-```r
-expect_true(condition)
-expect_false(condition)
-expect_all_true(vector > 0)      # All elements TRUE (v3.3.0+)
-expect_all_false(vector < 0)     # All elements FALSE (v3.3.0+)
-```
-
-## Design Principles
-
-### 1. Self-Sufficient Tests
-
-Each test should contain all setup, execution, and teardown code:
-
-```r
-# Good: self-contained
-test_that("foofy() works", {
-  data <- data.frame(x = 1:3, y = letters[1:3])
-  result <- foofy(data)
-  expect_equal(result$x, 1:3)
-})
-
-# Bad: relies on ambient state
-dat <- data.frame(x = 1:3, y = letters[1:3])
-test_that("foofy() works", {
-  result <- foofy(dat)  # Where did 'dat' come from?
-  expect_equal(result$x, 1:3)
-})
-```
-
-### 2. Self-Contained Tests (Cleanup Side Effects)
-
-Use `withr` to manage state changes:
-
-```r
-test_that("function respects options", {
+test_that("my_function() respects options", {
   withr::local_options(my_option = "test_value")
   withr::local_envvar(MY_VAR = "test")
-  withr::local_package("jsonlite")
+  path <- withr::local_tempfile(lines = c("a", "b", "c"))
 
-  result <- my_function()
-  expect_equal(result$setting, "test_value")
-  # Automatic cleanup after test
-})
+  expect_equal(my_function(path)$setting, "test_value")
+})  # everything above is restored or deleted here
 ```
 
-**Common withr functions:**
-- `local_options()` - Temporarily set options
-- `local_envvar()` - Temporarily set environment variables
-- `local_tempfile()` - Create temp file with automatic cleanup
-- `local_tempdir()` - Create temp directory with automatic cleanup
-- `local_package()` - Temporarily attach package
+Write only to temporary paths (`withr::local_tempfile()`,
+`withr::local_tempdir()`), never into the package directory. Read fixtures with
+`test_path("fixtures", "data.rds")`, which works from `devtools::test()`,
+`R CMD check`, and interactive runs; a bare relative path does not.
 
-### 3. Plan for Test Failure
+A reusable fixture that cleans up after the calling test takes an environment:
 
-Write tests assuming they will fail and need debugging:
-- Tests should run independently in fresh R sessions
-- Avoid hidden dependencies on earlier tests
-- Make test logic explicit and obvious
-
-### 4. Repetition is Acceptable
-
-Repeat setup code in tests rather than factoring it out. Test clarity is more important than avoiding duplication.
-
-### 5. Use `devtools::load_all()` Workflow
-
-During development:
-- Use `devtools::load_all()` instead of `library()`
-- Makes all functions available (including unexported)
-- Automatically attaches testthat
-- Eliminates need for `library()` calls in tests
-
-## Snapshot Testing
-
-For complex output that's difficult to verify programmatically, use snapshot tests. See [references/snapshots.rst](references/snapshots.rst) for complete guide.
-
-**Basic pattern:**
-
-```r
-test_that("error message is helpful", {
-  expect_snapshot(
-    error = TRUE,
-    validate_input(NULL)
-  )
-})
-```
-
-Snapshots stored in `tests/testthat/_snaps/`.
-
-**Workflow:**
-```r
-devtools::test()                    # Creates new snapshots
-testthat::snapshot_review('name')   # Review changes
-testthat::snapshot_accept('name')   # Accept changes
-```
-
-## Test Fixtures and Data
-
-Three approaches for test data:
-
-**1. Constructor functions** - Create data on-demand:
-```r
-new_sample_data <- function(n = 10) {
-  data.frame(id = seq_len(n), value = rnorm(n))
-}
-```
-
-**2. Local functions with cleanup** - Handle side effects:
 ```r
 local_temp_csv <- function(data, env = parent.frame()) {
   path <- withr::local_tempfile(fileext = ".csv", .local_envir = env)
@@ -268,162 +138,52 @@ local_temp_csv <- function(data, env = parent.frame()) {
 }
 ```
 
-**3. Static fixture files** - Store in `fixtures/` directory:
+## Snapshots
+
+Use snapshots for output that is hard to assert programmatically, especially
+user-facing errors, warnings, and messages. Snapshot the error, not a regex of
+it:
+
 ```r
-data <- readRDS(test_path("fixtures", "sample_data.rds"))
+test_that("validate_input() explains a NULL input", {
+  expect_snapshot(validate_input(NULL), error = TRUE)
+})
 ```
 
-See [references/fixtures.rst](references/fixtures.rst) for detailed fixture patterns.
+Snapshots live in `tests/testthat/_snaps/`. Review changes with
+`testthat::snapshot_review("file")` and accept with
+`testthat::snapshot_accept("file")`; never accept automatically in CI.
 
 ## Mocking
 
-Replace external dependencies during testing using `local_mocked_bindings()`. See [references/mocking.rst](references/mocking.rst) for comprehensive mocking strategies.
-
-**Basic pattern:**
+Replace a dependency for the duration of one test. The mocked binding must
+exist in the package namespace (or be named with `.package`).
 
 ```r
-test_that("function works with mocked dependency", {
+test_that("my_function() handles the API response", {
   local_mocked_bindings(
     external_api = function(...) list(status = "success", data = "mocked")
   )
-
-  result <- my_function_that_calls_api()
-  expect_equal(result$status, "success")
+  expect_equal(my_function_that_calls_api()$status, "success")
 })
 ```
 
-## Common Patterns
+`with_mock()` and `local_mock()` were deprecated in testthat 3.0.0 and are
+defunct since 3.3.0; replace them with `local_mocked_bindings()`.
 
-### Testing Errors with Specific Classes
+## Modernizing older tests
 
-```r
-test_that("validation catches errors", {
-  expect_error(
-    validate_input("wrong_type"),
-    class = "vctrs_error_cast"
-  )
-})
-```
-
-### Testing with Temporary Files
-
-```r
-test_that("file processing works", {
-  temp_file <- withr::local_tempfile(
-    lines = c("line1", "line2", "line3")
-  )
-
-  result <- process_file(temp_file)
-  expect_equal(length(result), 3)
-})
-```
-
-### Testing with Modified Options
-
-```r
-test_that("output respects width", {
-  withr::local_options(width = 40)
-
-  output <- capture_output(print(my_object))
-  expect_lte(max(nchar(strsplit(output, "\n")[[1]])), 40)
-})
-```
-
-### Testing Multiple Related Cases
-
-```r
-test_that("str_trunc() handles all directions", {
-  trunc <- function(direction) {
-    str_trunc("This string is moderately long", direction, width = 20)
-  }
-
-  expect_equal(trunc("right"), "This string is mo...")
-  expect_equal(trunc("left"), "...erately long")
-  expect_equal(trunc("center"), "This stri...ely long")
-})
-```
-
-### Custom Expectations in Helper Files
-
-```r
-# In tests/testthat/helper-expectations.R
-expect_valid_user <- function(user) {
-  expect_type(user, "list")
-  expect_named(user, c("id", "name", "email"))
-  expect_type(user$id, "integer")
-  expect_match(user$email, "@")
-}
-
-# In test file
-test_that("user creation works", {
-  user <- create_user("test@example.com")
-  expect_valid_user(user)
-})
-```
-
-## File System Discipline
-
-**Always write to temp directory:**
-
-```r
-# Good
-output <- withr::local_tempfile(fileext = ".csv")
-write.csv(data, output)
-
-# Bad - writes to package directory
-write.csv(data, "output.csv")
-```
-
-**Access test fixtures with `test_path()`:**
-
-```r
-# Good - works in all contexts
-data <- readRDS(test_path("fixtures", "data.rds"))
-
-# Bad - relative paths break
-data <- readRDS("fixtures/data.rds")
-```
-
-## Advanced Topics
-
-For advanced testing scenarios, see:
-
-- **[references/bdd.rst](references/bdd.rst)** - BDD-style testing with describe/it, nested specifications, test-first workflows
-- **[references/snapshots.rst](references/snapshots.rst)** - Snapshot testing, transforms, variants
-- **[references/mocking.rst](references/mocking.rst)** - Mocking strategies, webfakes, httptest2
-- **[references/fixtures.rst](references/fixtures.rst)** - Fixture patterns, database fixtures, helper files
-- **[references/advanced.rst](references/advanced.rst)** - Skipping tests, secrets management, CRAN requirements, custom expectations, parallel testing
-
-## testthat 3 Modernizations
-
-When working with testthat 3 code, prefer modern patterns:
-
-**Deprecated → Modern:**
-- `context()` → Remove (duplicates filename)
+- `context()` → delete (the file name is the context)
 - `expect_equivalent()` → `expect_equal(ignore_attr = TRUE)`
 - `with_mock()` → `local_mocked_bindings()`
-- `is_null()`, `is_true()`, `is_false()` → `expect_null()`, `expect_true()`, `expect_false()`
+- `expect_is()` → `expect_type()`, `expect_s3_class()`, or `expect_s4_class()`
+- `setup()`/`teardown()` → `setup-*.R` files or `withr::defer()`
 
-**New in testthat 3:**
-- Edition system (`Config/testthat/edition: 3`)
-- Improved snapshot testing
-- `waldo::compare()` for better diff output
-- Unified condition handling
-- `local_mocked_bindings()` works with byte-compiled code
-- Parallel test execution support
+## Running tests
 
-## Quick Reference
-
-**Initialize:** `usethis::use_testthat(3)`
-
-**Run tests:** `devtools::test()` or Ctrl/Cmd + Shift + T
-
-**Create test file:** `usethis::use_test("name")`
-
-**Review snapshots:** `testthat::snapshot_review()`
-
-**Accept snapshots:** `testthat::snapshot_accept()`
-
-**Find slow tests:** `devtools::test(reporter = "slow")` (testthat 3.3.0+)
-
-**Shuffle tests:** `devtools::test(shuffle = TRUE)` (testthat 3.3.0+)
+```r
+devtools::test()                                  # whole suite
+devtools::test(filter = "foofy")                  # test-foofy.R
+testthat::test_file("tests/testthat/test-foofy.R")
+devtools::check()                                 # includes tests, as CRAN runs them
+```
