@@ -83,5 +83,15 @@
     "name": "bom conservative",
     "sql": "﻿-- notes\nSELECT 1;\n",
     "body": "﻿-- notes\nSELECT 1;\n"
+  },
+  {
+    "name": "uppercase extract marker",
+    "sql": "-- notes\n-- @EXTRACT: patients\nSELECT 1;\n",
+    "body": "-- @EXTRACT: patients\nSELECT 1;\n"
+  },
+  {
+    "name": "mixed case block extract marker",
+    "sql": "/* notes\n@ExTrAcT: patients\n*/\nSELECT 1;\n",
+    "body": "/* notes\n@ExTrAcT: patients\n*/\nSELECT 1;\n"
   }
 ]
