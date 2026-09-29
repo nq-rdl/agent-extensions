@@ -550,11 +550,13 @@ Use testthat’s snapshot tests to verify condition messages:
      expect_snapshot(error = TRUE, {
        validate_email("")
        validate_email("not-an-email")
-       validate_email("user@example.com@extra")
      })
    })
 
-Snapshot file (``tests/testthat/_snaps/validation.md``):
+Snapshot file (``tests/testthat/_snaps/validation.md``), as written by
+testthat 3.3.2 with cli 3.6.6. Snapshots use ASCII bullets and no colour,
+and the call shown is the function that called ``cli_abort()`` unless you
+pass ``call =``:
 
 .. code:: md
 
@@ -562,15 +564,16 @@ Snapshot file (``tests/testthat/_snaps/validation.md``):
 
        Code
          validate_email("")
-       Error <rlang_error>
-         Invalid email address
+       Condition
+         Error in `validate_email()`:
+         ! Invalid email address
          x "" is not a valid email
          i Email must contain an @ symbol
-
        Code
          validate_email("not-an-email")
-       Error <rlang_error>
-         Invalid email address
+       Condition
+         Error in `validate_email()`:
+         ! Invalid email address
          x "not-an-email" is not a valid email
          i Email must contain an @ symbol
 

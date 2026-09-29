@@ -697,20 +697,22 @@ Specify singular/plural forms:
 Three Alternative Pattern
 ~~~~~~~~~~~~~~~~~~~~~~~~~
 
-Handle zero/one/many:
+Handle zero/one/many. The string must contain a quantity: here ``qty(n)``
+sets it without printing it. With three alternatives, zero picks the first
+form, so the verb needs its own zero form:
 
 .. code:: r
 
    n <- 0
-   cli_text("{?No/One/Some} file{?s} {?is/is/are} ready")
+   cli_text("{qty(n)}{?No/One/Some} file{?s} {?are/is/are} ready")
    #> No files are ready
 
    n <- 1
-   cli_text("{?No/One/Some} file{?s} {?is/is/are} ready")
+   cli_text("{qty(n)}{?No/One/Some} file{?s} {?are/is/are} ready")
    #> One file is ready
 
    n <- 5
-   cli_text("{?No/One/Some} file{?s} {?is/is/are} ready")
+   cli_text("{qty(n)}{?No/One/Some} file{?s} {?are/is/are} ready")
    #> Some files are ready
 
 Setting Quantity with qty()
@@ -780,28 +782,30 @@ Advanced Pluralization Patterns
    )
    #> 3 files in 1 directory
 
-**Verb agreement:**
+**Verb agreement** (a variable that is not interpolated is not a quantity;
+use ``qty()``):
 
 .. code:: r
 
    n <- 1
-   cli_text("File {?was/were} modified")
+   cli_text("{qty(n)}File{?s} {?was/were} modified")
    #> File was modified
 
    n <- 3
-   cli_text("Files {?was/were} modified")
+   cli_text("{qty(n)}File{?s} {?was/were} modified")
    #> Files were modified
 
-**Possessives:**
+**Possessives** (an odd number of ASCII apostrophes inside ``{?...}``
+fails with "Unterminated quote"; ``{?'s/'s'}`` is an example):
 
 .. code:: r
 
    n <- 1
-   cli_text("User{?'s/'s'} setting{?s}")
+   cli_text("{qty(n)}User{?'s/s'} setting{?s}")
    #> User's setting
 
    n <- 3
-   cli_text("Users{?'s/'s'} settings")
+   cli_text("{qty(n)}User{?'s/s'} setting{?s}")
    #> Users' settings
 
 Performance Considerations

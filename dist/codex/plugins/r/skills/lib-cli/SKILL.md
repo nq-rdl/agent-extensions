@@ -10,463 +10,185 @@ description: 'Comprehensive R package for command-line interface styling, semant
   in user-facing text, (7) Work with ANSI strings, hyperlinks, or custom containers.
   Also use when migrating from base R message/warning/stop, debugging cli code, or
   improving existing cli usage.'
+compatibility: Requires R and the cli package; cli_abort(), cli_warn(), and cli_inform()
+  also need rlang. Examples verified with cli 3.6.6, rlang 1.3.0, and testthat 3.3.2
+  (third edition) on 2026-09-29.
 metadata:
   repo: https://github.com/nq-rdl/agent-extensions
 ---
 
 # CLI for R Packages
 
-## When to Use What
+cli formats console output with glue-style `{}` interpolation, inline markup
+(`{.cls value}`), pluralization (`{?}`), and semantic conditions. This file
+holds the rules that most often break real code. The catalogues are in
+`references/`. Verify against https://cli.r-lib.org when output format or an
+API detail matters.
 
-task: Display error with context and formatting
-use: `cli_abort()` with inline markup and bullet lists
+## Choose a reference
 
-task: Show warning with formatting
-use: `cli_warn()` with inline markup
+| Read | When you need |
+|---|---|
+| [references/inline-markup.rst](references/inline-markup.rst) | An inline class beyond the common ones below, vector collapsing and truncation, custom collapse separators, or advanced pluralization |
+| [references/conditions.rst](references/conditions.rst) | Error design, condition classes, rlang integration, warning frequency, base R migration (`stop()`, `warning()`, `message()`, `sprintf()`, `paste()`), or anti-patterns |
+| [references/progress.rst](references/progress.rst) | Progress bars beyond a simple loop: custom formats, progress variables, nested or parallel progress, Shiny, C-level progress |
+| [references/themes.rst](references/themes.rst) | Themes, selectors, containers (`cli_div()`, `cli_par()`), palettes, or accessibility |
+| [references/ansi-operations.rst](references/ansi-operations.rst) | `ansi_*()` string functions, hyperlinks, colour and symbol detection, `test_that_cli()`, performance, or debugging |
 
-task: Display informative message
-use: `cli_inform()` with inline markup
+## Common calls
 
-task: Show progress for counted operations
-use: `cli_progress_bar()` with total count
+- Conditions: `cli_abort()`, `cli_warn()`, `cli_inform()` with a named
+  character vector of bullets.
+- Inline classes: `{.arg x}`, `{.cls data.frame}`, `{.code expr}`,
+  `{.field name}`, `{.file path}`, `{.fn pkg::fun}`, `{.pkg name}`,
+  `{.val {x}}`, `{.var name}`, `{.obj_type_friendly {x}}`, `{.emph}`,
+  `{.strong}`.
+- Semantic output: `cli_h1()`/`cli_h2()`/`cli_h3()`, `cli_text()`,
+  `cli_alert_success()`/`_danger()`/`_warning()`/`_info()`, `cli_ul()`/`cli_ol()`/`cli_dl()`
+  with `cli_li()` and `cli_end()`, `cli_code()`, `cli_verbatim()` (no
+  interpolation).
+- Progress: `cli_progress_step("Loading data")` for sequential steps;
+  `cli_progress_bar("Processing", total = n)` plus `cli_progress_update()` in
+  the loop. A bar closes automatically when the function that created it
+  exits.
 
-task: Show simple progress steps
-use: `cli_progress_step()` with status messages
+Bullet names: `"x"` problem, `"!"` warning, `"i"` information, `"v"` success,
+`"*"` bullet, `">"` arrow, `" "` indented continuation.
 
-task: Format code or function names
-use: `{.code ...}` or `{.fn package::function}`
+## Rule 1: interpolate data; never paste it into the format string
 
-task: Format file paths
-use: `{.file path/to/file}`
-
-task: Format package names
-use: `{.pkg packagename}`
-
-task: Format variable names
-use: `{.var variable_name}`
-
-task: Format values
-use: `{.val value}`
-
-task: Handle singular/plural text
-use: `{?s}` or `{?y/ies}` with pluralization
-
-task: Create headers
-use: `cli_h1()`, `cli_h2()`, `cli_h3()`
-
-task: Create alerts
-use: `cli_alert_success()`, `cli_alert_danger()`, `cli_alert_warning()`, `cli_alert_info()`
-
-task: Create lists
-use: `cli_ul()`, `cli_ol()`, `cli_dl()` with `cli_li()`
-
-## Inline Markup Essentials
-
-Use inline markup with `{.class content}` syntax to format text:
+The format string is evaluated as glue. A value inserted with `{x}` is not
+evaluated again, but text pasted into the format string is. Pasted user
+input that contains braces raises "Could not evaluate cli `{}` expression".
 
 ```r
-# Basic formatting
-cli_text("Function {.fn mean} calculates averages")
-cli_text("Install package {.pkg dplyr}")
-cli_text("See file {.file ~/.Rprofile}")
-cli_text("{.var x} must be numeric, not {.obj_type_of {x}}")
-cli_text("Got value {.val {x}}")
-
-# Code formatting
-cli_text("Use {.code sum(x, na.rm = TRUE)}")
-
-# Paths and arguments
-cli_text("Reading from {.path /data/file.csv}")
-cli_text("Set {.arg na.rm} to TRUE")
-
-# Types and classes
-cli_text("Object is {.cls data.frame}")
-
-# Emphasis
-cli_text("This is {.emph important}")
-cli_text("This is {.strong critical}")
-
-# Fields
-cli_text("The {.field name} field is required")
+tmpl <- "{name}.csv"
+cli_abort(paste0("Invalid template: ", tmpl))   # WRONG: evaluates `name`
+cli_abort("Invalid template: {.val {tmpl}}")     # Right: Invalid template: "{name}.csv"
 ```
 
-### Vector Collapsing
-
-Vectors are automatically collapsed with commas and "and":
-
-```r
-pkgs <- c("dplyr", "tidyr", "ggplot2")
-cli_text("Installing packages: {.pkg {pkgs}}")
-#> Installing packages: dplyr, tidyr, and ggplot2
-
-files <- c("data.csv", "script.R")
-cli_text("Found {length(files)} file{?s}: {.file {files}}")
-#> Found 2 files: data.csv and script.R
-```
-
-### Escaping Braces
-
-Use double braces `{{` and `}}` to escape literal braces:
+Double braces print literal braces:
 
 ```r
 cli_text("Use {{variable}} syntax in glue")
 #> Use {variable} syntax in glue
 ```
 
-**For complete markup reference**: See [references/inline-markup.rst](references/inline-markup.rst) for all 50+ inline classes, edge cases, nesting rules, and advanced patterns.
+## Rule 2: every `{?}` needs a quantity in the same string
 
-## Pluralization Basics
-
-Use `{?}` for pluralization with three patterns:
-
-### Single Alternative
-
-```r
-nfile <- 1
-cli_text("Found {nfile} file{?s}")
-#> Found 1 file
-
-nfile <- 3
-cli_text("Found {nfile} file{?s}")
-#> Found 3 files
-```
-
-### Two Alternatives
-
-```r
-ndir <- 1
-cli_text("Found {ndir} director{?y/ies}")
-#> Found 1 directory
-
-ndir <- 5
-cli_text("Found {ndir} director{?y/ies}")
-#> Found 5 directories
-```
-
-### Three Alternatives (zero/one/many)
+- The quantity is the nearest interpolated value **before** the `{?}`. If
+  none comes before it, cli uses the next one after it.
+- A **numeric** value is used as the count and must be length 1. Any other
+  value (character vector, list) counts by its length. A length-2 numeric
+  vector (for example the result of `which()`) fails with
+  `length(object) == 1 is not TRUE`.
+- Each element of a `cli_abort()`/`cli_warn()`/`cli_inform()` vector is a
+  separate string. A bullet with `{?s}` and no quantity fails with "Cannot
+  pluralize without a quantity".
+- `qty(n)` sets the quantity without printing it. `no(n)` prints "no" for
+  zero. Three alternatives are zero/one/many: `{?no/the/the}`.
+- In package code, helpers used inside the string are found in the calling
+  environment: import `qty` and `no` (`@importFrom cli qty no`) or write
+  `cli::qty()`.
 
 ```r
 nfile <- 0
-cli_text("Found {nfile} file{?s}: {?no/the/the} file{?s}")
-#> Found 0 files: no files
+cli_text("Found {no(nfile)} file{?s}")                     #> Found no files
+cli_text("Found {nfile} file{?s}: {?no/the/the} file{?s}")  #> Found 0 files: no files
 
-nfile <- 1
-cli_text("Found {nfile} file{?s}: {?no/the/the} file{?s}")
-#> Found 1 file: the file
-
-nfile <- 3
-cli_text("Found {nfile} file{?s}: {?no/the/the} file{?s}")
-#> Found 3 files: the files
-```
-
-### Helpers: qty() and no()
-
-Use `no()` to display "no" instead of zero:
-
-```r
-nfile <- 0
-cli_text("Found {no(nfile)} file{?s}")
-#> Found no files
-```
-
-Use `qty()` to set quantity explicitly:
-
-```r
-nupd <- 3
-ntotal <- 10
+nupd <- 3; ntotal <- 10
 cli_text("{nupd}/{ntotal} {qty(nupd)} file{?s} {?needs/need} updates")
 #> 3/10 files need updates
+
+bad <- which(c(1, -1, -2) <= 0)                             # c(2L, 3L)
+cli_text("Element{?s} {bad} {?is/are} not positive.")       # WRONG: numeric length 2
+cli_text("Element{?s} {as.character(bad)} {?is/are} not positive.")
+#> Elements 2 and 3 are not positive.
 ```
 
-**For advanced pluralization**: See [references/inline-markup.rst](references/inline-markup.rst) for edge cases and complex patterns.
+## Rule 3: attribute errors to the user's call
 
-## CLI Conditions: Core Patterns
-
-Use cli conditions instead of base R for better formatting:
-
-### cli_abort() - Formatted Errors
+By default the error names the function that called `cli_abort()`. An input
+checker called from user-facing functions should report the caller instead.
+Take `call = caller_env()` (and `arg = caller_arg(x)` for the argument
+name), pass `call` to `cli_abort()`, and pass it on through nested helpers.
+Use `call = NULL` to show no call.
 
 ```r
-# Before (base R)
-stop("File not found: ", path)
-
-# After (cli)
-cli_abort("File {.file {path}} not found")
-
-# With bullets for context
-check_file <- function(path) {
-  if (!file.exists(path)) {
-    cli_abort(c(
-      "File not found",
-      "x" = "Cannot read {.file {path}}",
-      "i" = "Check that the file exists"
-    ))
+check_positive <- function(x, arg = rlang::caller_arg(x),
+                           call = rlang::caller_env()) {
+  bad <- which(x <= 0)
+  if (length(bad) > 0) {
+    cli::cli_abort(c(
+      "{.arg {arg}} must be positive.",
+      "x" = "Element{?s} {as.character(bad)} {?is/are} not positive."
+    ), call = call)
   }
+  invisible(x)
+}
+
+fit <- function(weights) {
+  check_positive(weights)
+  # ...
 }
 ```
 
-### cli_warn() - Formatted Warnings
+## Rule 4: test condition output with snapshots
+
+Use `expect_snapshot(error = TRUE)` and cover both the singular and the
+plural wording. Snapshots record ASCII bullets without colour.
 
 ```r
-# Before (base R)
-warning("Column ", col, " has missing values")
+test_that("fit() reports non-positive weights", {
+  expect_snapshot(error = TRUE, {
+    fit(c(1, -1))
+    fit(c(-1, -2))
+  })
+})
+```
 
-# After (cli)
-cli_warn("Column {.field {col}} has missing values")
+testthat 3.3.2 writes this to `tests/testthat/_snaps/<file>.md`:
 
-# With context
-cli_warn(c(
-  "Data quality issues detected",
-  "!" = "Column {.field {col}} has {n_missing} missing value{?s}",
-  "i" = "Consider using {.fn tidyr::drop_na}"
+```
+    Code
+      fit(c(1, -1))
+    Condition
+      Error in `fit()`:
+      ! `weights` must be positive.
+      x Element 2 is not positive.
+    Code
+      fit(c(-1, -2))
+    Condition
+      Error in `fit()`:
+      ! `weights` must be positive.
+      x Elements 1 and 2 are not positive.
+```
+
+The snapshot shows `fit()`, not `check_positive()`, and the user's argument
+name `weights`. For more condition tests (classes, warning frequency, mocking),
+read [references/conditions.rst](references/conditions.rst).
+
+## Migrating from base R
+
+Replace `stop()`, `warning()`, and `message()` with `cli_abort()`,
+`cli_warn()`, and `cli_inform()`. Turn `paste()`/`sprintf()` concatenation
+into interpolation (Rule 1), add pluralization (Rule 2) and `call`
+(Rule 3), then update snapshots (Rule 4). For side-by-side conversions, read
+"Migration Guide" in [references/conditions.rst](references/conditions.rst).
+
+```r
+# Before
+stop("x must be numeric")
+# After
+cli_abort(c(
+  "{.arg x} must be numeric.",
+  "x" = "You supplied {.obj_type_friendly {x}}.",
+  "i" = "Use {.fn as.numeric} to convert."
 ))
 ```
 
-### cli_inform() - Formatted Messages
+## Related packages
 
-```r
-# Before (base R)
-message("Processing ", n, " files")
-
-# After (cli)
-cli_inform("Processing {n} file{?s}")
-
-# With structure
-cli_inform(c(
-  "v" = "Successfully loaded {.pkg dplyr}",
-  "i" = "Version {packageVersion('dplyr')}"
-))
-```
-
-### Bullet Types
-
-- `"x"` - Error/problem (red X)
-- `"!"` - Warning (yellow !)
-- `"i"` - Information (blue i)
-- `"v"` - Success (green checkmark)
-- `"*"` - Bullet point
-- `">"` - Arrow/pointer
-
-**For advanced error design**: See [references/conditions.rst](references/conditions.rst) for error design principles, rlang integration, testing strategies, and real-world patterns.
-
-## Basic Progress Indicators
-
-### Simple Progress Steps
-
-```r
-process_data <- function() {
-  cli_progress_step("Loading data")
-  data <- load_data()
-
-  cli_progress_step("Cleaning data")
-  clean <- clean_data(data)
-
-  cli_progress_step("Analyzing data")
-  analyze(clean)
-}
-```
-
-### Basic Progress Bar
-
-```r
-process_files <- function(files) {
-  cli_progress_bar("Processing files", total = length(files))
-
-  for (file in files) {
-    process_file(file)
-    cli_progress_update()
-  }
-}
-```
-
-### Auto-Cleanup
-
-Progress bars auto-close when the function exits:
-
-```r
-process <- function() {
-  cli_progress_bar("Working", total = 100)
-  for (i in 1:100) {
-    Sys.sleep(0.01)
-    cli_progress_update()
-  }
-  # No need to call cli_progress_done() - auto-closes
-}
-```
-
-**For advanced progress**: See [references/progress.rst](references/progress.rst) for nested progress, custom formats, parallel processing, all progress variables, and Shiny integration.
-
-## Semantic CLI Elements
-
-### Headers
-
-```r
-cli_h1("Main Section")
-cli_h2("Subsection")
-cli_h3("Detail")
-```
-
-### Alerts
-
-```r
-cli_alert_success("Operation completed successfully")
-cli_alert_danger("Critical error occurred")
-cli_alert_warning("Potential issue detected")
-cli_alert_info("Additional information available")
-```
-
-### Text and Code
-
-```r
-# Regular text with markup
-cli_text("This is formatted text with {.emph emphasis}")
-
-# Code blocks
-cli_code(c(
-  "library(dplyr)",
-  "mtcars %>% filter(mpg > 20)"
-))
-
-# Verbatim text (no formatting)
-cli_verbatim("This is displayed exactly as-is: {not interpolated}")
-```
-
-### Lists
-
-```r
-# Unordered list
-cli_ul()
-cli_li("First item")
-cli_li("Second item")
-cli_end()
-
-# Ordered list
-cli_ol()
-cli_li("First step")
-cli_li("Second step")
-cli_end()
-
-# Definition list
-cli_dl()
-cli_li(c(name = "The name field"))
-cli_li(c(email = "The email address"))
-cli_end()
-```
-
-## Common Workflows
-
-### Base R to CLI Migration
-
-```r
-# Before: Base R error handling
-validate_input <- function(x, y) {
-  if (!is.numeric(x)) {
-    stop("x must be numeric")
-  }
-  if (length(y) == 0) {
-    stop("y cannot be empty")
-  }
-  if (length(x) != length(y)) {
-    stop("x and y must have the same length")
-  }
-}
-
-# After: CLI error handling
-validate_input <- function(x, y) {
-  if (!is.numeric(x)) {
-    cli_abort(c(
-      "{.arg x} must be numeric",
-      "x" = "You supplied a {.cls {class(x)}} vector",
-      "i" = "Use {.fn as.numeric} to convert"
-    ))
-  }
-
-  if (length(y) == 0) {
-    cli_abort(c(
-      "{.arg y} cannot be empty",
-      "i" = "Provide at least one element"
-    ))
-  }
-
-  if (length(x) != length(y)) {
-    cli_abort(c(
-      "{.arg x} and {.arg y} must have the same length",
-      "x" = "{.arg x} has length {length(x)}",
-      "x" = "{.arg y} has length {length(y)}"
-    ))
-  }
-}
-```
-
-### Error Message with Rich Context
-
-```r
-check_required_columns <- function(data, required_cols) {
-  actual_cols <- names(data)
-  missing_cols <- setdiff(required_cols, actual_cols)
-
-  if (length(missing_cols) > 0) {
-    cli_abort(c(
-      "Required column{?s} missing from data",
-      "x" = "Missing {length(missing_cols)} column{?s}: {.field {missing_cols}}",
-      "i" = "Data has {length(actual_cols)} column{?s}: {.field {actual_cols}}",
-      "i" = "Add the missing column{?s} or check for typos"
-    ))
-  }
-
-  invisible(data)
-}
-```
-
-### Function with Progress Bar
-
-```r
-process_files <- function(files, verbose = TRUE) {
-  n <- length(files)
-
-  if (verbose) {
-    cli_progress_bar(
-      format = "Processing {cli::pb_bar} {cli::pb_current}/{cli::pb_total} [{cli::pb_eta}]",
-      total = n
-    )
-  }
-
-  results <- vector("list", n)
-
-  for (i in seq_along(files)) {
-    results[[i]] <- process_file(files[[i]])
-
-    if (verbose) {
-      cli_progress_update()
-    }
-  }
-
-  results
-}
-```
-
-## Resources & Advanced Topics
-
-### Reference Files
-
-- **[references/inline-markup.rst](references/inline-markup.rst)** - Complete catalog of inline classes organized by category, advanced patterns, nesting rules, and real-world examples
-
-- **[references/conditions.rst](references/conditions.rst)** - Advanced error design patterns, rlang integration, testing with testthat snapshots, migration guide, and anti-patterns
-
-- **[references/progress.rst](references/progress.rst)** - Nested progress bars, custom formats, all progress variables, parallel processing, Shiny integration, and debugging
-
-- **[references/themes.rst](references/themes.rst)** - Complete theming system with CSS-like selectors, container functions, color palettes, custom themes, and accessibility
-
-- **[references/ansi-operations.rst](references/ansi-operations.rst)** - ANSI string operations (align, columns, nchar, etc.), hyperlinks, color detection, testing CLI output, and troubleshooting
-
-### External Resources
-
-- [cli package documentation](https://cli.r-lib.org)
-- [cli GitHub repository](https://github.com/r-lib/cli)
-- [Building a semantic CLI (article)](https://cli.r-lib.org/articles/semantic-cli.html)
-
-### Related Packages
-
-- **rlang** - Condition handling and error objects integrate with cli
-- **glue** - String interpolation powers cli's `{}` syntax
-- **testthat** - Snapshot testing for cli output
+- **rlang**: condition objects, `caller_env()`, `caller_arg()`.
+- **glue**: the `{}` syntax that cli builds on.
+- **testthat**: snapshot tests for cli output.
