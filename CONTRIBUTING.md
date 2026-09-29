@@ -80,6 +80,18 @@ available subagent mechanism; the filename does not register an agent type.
 Tool restrictions expressed in prose do not create runtime permission controls.
 Preserve upstream attribution and licenses in the skill and adapted reference.
 
+Put the delegation contract in the outline's Handoff section:
+
+> Complete the delegated scope using available tools. If blocked by missing
+> information or authorization, return the blocker and questions to the
+> caller. Do not perform unauthorized actions. The caller may provide answers
+> and resume the work.
+
+Keep verification loops and existing authorization; tool permission is not
+task authorization. Name companion skills only when a plugin that ships the
+outline also ships them. [`docs/delegation.md`](docs/delegation.md) has the
+full rules, and `tests/test_delegation_handoff.py` checks them.
+
 Each skill has one home subject. Existing guest listings carried over from the
 agent migration remain supported: GitHub Actions in `go` (home `gh`), delivery
 debugging in `gh` (home `argo-cd`), and plugin discovery in `rdl-team` (home

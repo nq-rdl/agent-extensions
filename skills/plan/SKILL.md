@@ -1,6 +1,10 @@
 ---
 name: plan
-description: 'Strategic pre-code planning for a single feature or goal: explore the codebase, clarify requirements, weigh approaches, and produce a high-level implementation strategy. Reason, not sequence — see context-architect when you need file-level ordering.'
+description: >-
+  Strategic pre-code planning for a single feature or goal: explore the
+  codebase, weigh approaches with trade-offs, and recommend an implementation
+  strategy with risks and open questions. Reason, not sequence — use
+  planning:sequence for a file-by-file edit order.
 license: MIT
 metadata:
   upstream: https://github.com/github/awesome-copilot/blob/main/agents/plan.agent.md

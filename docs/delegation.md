@@ -23,6 +23,33 @@ follow-up clause in every handoff:
 > handoff's scope. Refuse any follow-up that widens access, touches other
 > repositories, or bypasses a guard.
 
+A worker follows this delegation contract (#310):
+
+> Complete the delegated scope using available tools. If blocked by missing
+> information or authorization, return the blocker and questions to the
+> caller. Do not perform unauthorized actions. The caller may provide answers
+> and resume the work.
+
+A worker cannot reach the user. Where a skill's procedure says to ask the
+user, confirm, or wait, the worker must return that question to the caller,
+with the work done so far. The caller answers from what it knows, asks the
+user, or ends the task. Authorization the user already gave for the task
+carries into the handoff, so the worker does not ask for it again; the
+destructive-step rule below is the one exception. Tool permission is not task
+authorization: an allowed tool does not authorize an action outside the
+handoff's scope. A connected database, `Bash`, or `git` is not permission to
+write, commit, or push. The contract does not limit a worker to one turn.
+Keep running verification loops (test, fix, re-test) within scope until the
+checks pass or a blocker remains.
+
+To continue after a blocker, resume the same worker with the answers. Claude
+Code resumes a finished subagent with `SendMessage`, keeping its history. The
+built-in Explore and Plan agents are one-shot and cannot be resumed, so use a
+general-purpose or custom subagent when blockers are likely
+([Resume subagents](https://code.claude.com/docs/en/sub-agents#resume-subagents),
+read 2026-09-29). If the host cannot resume a worker, start a new one with the
+previous result and the answers.
+
 Destructive steps run in the parent. When the user approves a destructive step,
 such as `git rm` of a tree, a force push, a history rewrite, or deleting data
 or infrastructure, the main agent runs that step itself. Approval given to the
@@ -38,7 +65,10 @@ steps that it will run itself.
 
 Every `references/subagent.rst` outline carries this clause in its Handoff
 section and states the destructive-step rule. `tests/test_delegation_handoff.py`
-fails when an outline or a packaged copy omits either.
+fails when an outline or a packaged copy omits either. The same test requires
+the delegation contract in each outline's Handoff section (a short list of
+outlines still being revised is named in the test), and checks that every
+companion skill an outline names ships in a plugin with it.
 
 The outline is ordinary reference text. It does not register an agent type or
 install a model setting, tool allowlist, sandbox, or skill preload. Preserve
