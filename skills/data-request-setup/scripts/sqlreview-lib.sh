@@ -202,6 +202,7 @@ sr_body_same() { # <file> <file>
 # document before it can support a binding (including legacy records without a body hash).
 sr_binding() { # <document> <current SQL> <optional baseline>; 0 full, 10 header-only, 1 changed
   local doc="$1" cur="$2" base="$3" full body current
+  sr_no_symlinks "$base" || return 1
   full="$(jq -r '.sql_sha256 // ""' "$doc")"
   body="$(jq -r '.sql_body_sha256 // ""' "$doc")"
   if [ -f "$base" ]; then

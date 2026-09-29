@@ -160,6 +160,17 @@ class ScopeBodyState(unittest.TestCase):
             baseline.write_text(NEW)
             self.assertIn("stale", run(["status"], p.root).stdout)
 
+    def test_scope_baseline_symlink_is_not_binding_evidence(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            p = Project(tmp)
+            p.sql("q.sql", NEW)
+            d = p.review_dir("q")
+            p.write_json("q", "scope.json", scope_doc("q", "q.sql", sql_sha256=sha(OLD), sql_body_sha256=sha(BODY)))
+            outside = Path(tmp) / "outside.sql"
+            outside.write_text(OLD)
+            (d / "scope.source.sql").symlink_to(outside)
+            self.assertIn("stale", run(["status"], p.root).stdout)
+
     def test_header_body_match_cannot_create_a_historical_snapshot_without_original_bytes(self):
         with tempfile.TemporaryDirectory() as tmp:
             p = Project(tmp)
