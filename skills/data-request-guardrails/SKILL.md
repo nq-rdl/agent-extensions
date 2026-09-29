@@ -21,11 +21,7 @@ metadata:
   repo: https://github.com/nq-rdl/agent-extensions
 ---
 
-# Data Request — guardrails
-
-The **Data Engineer** applies technical guardrails. The **Data Analyst** uses
-them when preparing research intake or reviewing delivery; advisory guidance
-does not replace either role's recorded confirmation.
+# Data Request — guardrails (Data Engineer / Data Analyst)
 
 The shared advisory spine for RDL request repos and query-builder. Apply it to the
 request composition and SQL being worked on, including work outside a formal review.
