@@ -7,29 +7,29 @@ description: >-
   script into a command-line app, shipping CLIs in an R package, or
   using Rapp (the alternative Rscript front-end). Also use for shebang
   scripts, exec/ directory in R packages, or subcommand-based R tools.
+compatibility: >-
+  Requires R and the Rapp package (Rapp declares no minimum R version).
+  Examples executed with Rapp 0.3.0 on R 4.5.3, 2026-09-29.
 metadata:
   repo: https://github.com/nq-rdl/agent-extensions
 ---
 
 # Building CLI Apps with Rapp
 
-Rapp (v0.3.0) is an R package that provides a drop-in replacement for `Rscript`
-that automatically parses command-line arguments into R values. It turns simple
-R scripts into polished CLI apps with argument parsing, help text, and subcommand
-support — with zero boilerplate.
+Rapp is a drop-in replacement for `Rscript` that parses command-line
+arguments into R values from the script's own top-level assignments, and
+generates `--help`. Install it with `install.packages("Rapp")`, then put the
+`Rapp` launcher on PATH with `Rapp::install_pkg_cli_apps("Rapp")`
+(`~/.local/bin` on macOS/Linux unless `RAPP_BIN_DIR` or `XDG_BIN_HOME` is set;
+`%LOCALAPPDATA%\Programs\R\Rapp\bin` on Windows). Positional arguments became
+required by default in Rapp 0.3.0; check `packageVersion("Rapp")` and
+https://github.com/r-lib/Rapp when behaviour differs.
 
-**R ≥ 4.1.0** | **CRAN:** `install.packages("Rapp")` | **GitHub:** `r-lib/Rapp`
+## Choose a reference
 
-After installing, put the `Rapp` launcher on PATH:
-
-```r
-Rapp::install_pkg_cli_apps("Rapp")
-```
-
-This places the `Rapp` executable in `~/.local/bin` (macOS/Linux) or
-`%LOCALAPPDATA%\Programs\R\Rapp\bin` (Windows).
-
----
+| Read | When you need |
+|---|---|
+| [references/advanced.rst](references/advanced.rst) | The full `run()`/`install_pkg_cli_apps()`/`uninstall_pkg_cli_apps()` API, launcher customization (`launcher:` front matter), PATH setup, or longer examples: a todo manager with subcommands, a stdin/stdout filter, variadic arguments, an interactive fallback |
 
 ## Core Concept: Scripts Are the Spec
 
@@ -42,8 +42,6 @@ patterns into CLI constructs. This means:
 
 Only top-level assignments are recognized. Assignments inside functions,
 loops, or conditionals are not parsed as CLI arguments.
-
----
 
 ## Pattern Recognition: R → CLI Mapping
 
@@ -73,8 +71,6 @@ CLI surface:
 - **Snake case** variable names map to kebab-case: `n_flips` → `--n-flips`.
 - **Positional args** always arrive as character strings — convert manually.
 
----
-
 ## Script Structure
 
 ### Shebang line
@@ -100,6 +96,9 @@ Hash-pipe comments (`#|`) before any code set script-level metadata:
 ```
 
 The `name:` field sets the app name in help output (defaults to filename).
+The first `#|` block in the file is always the front matter. If the script has
+no front matter, an annotation on the first assignment is used for both the app
+description and that option; start with a front-matter block and a blank line.
 
 ### Per-argument annotations
 
@@ -126,66 +125,31 @@ Available annotation fields:
 Add `#| short:` for frequently-used options — users expect single-letter
 shortcuts for common flags like verbose (`-v`), output (`-o`), or count (`-n`).
 
----
-
-## Named Options
-
-Scalar literal assignments become named options:
+## Options, switches, and positionals
 
 ```r
-name <- "world"          # --name <value>    (string, default "world")
-count <- 1L              # --count <int>     (integer, default 1)
-threshold <- 0.5         # --threshold <flt> (float, default 0.5)
-seed <- NA_integer_      # --seed <int>      (optional, NA if omitted)
-output <- NA_character_  # --output <str>    (optional, NA if omitted)
+name <- "world"          # --name <value>   string, default "world"
+count <- 1L              # --count <int>    integer, default 1
+seed <- NA_integer_      # --seed <int>     optional: NA when omitted
+output <- NA_character_  # --output <str>   optional: NA when omitted
+verbose <- FALSE         # --verbose / --no-verbose; also --verbose=yes|true|1|no|false|0
+pattern <- c()           # --pattern a --pattern b  -> character vector (NULL when omitted)
+threshold <- list()      # --threshold 5 --threshold '[10,20]' -> list of parsed values
+#| description: The input file to process.
+input_file <- NULL       # positional, required ("Missing required argument: INPUT_FILE")
+pkgs... <- c()           # variadic positional: zero or more values
 ```
 
-For optional arguments, test whether the user supplied them:
+**NA versus NULL.** An optional *named option* uses an `NA` default of the
+right type; test it with `!is.na(x)`. `NULL` always declares a *positional*
+argument, required unless annotated `#| required: false`; test that with
+`!is.null(x)`. So `out <- NULL` never gives an optional `--out`: use
+`out <- NA_character_`.
 
 ```r
 seed <- NA_integer_
 if (!is.na(seed)) set.seed(seed)
 ```
-
-## Boolean Switches
-
-`TRUE`/`FALSE` assignments become toggles:
-
-```r
-verbose <- FALSE   # --verbose or --no-verbose
-wrap <- TRUE       # --wrap (default) or --no-wrap
-```
-
-Values `yes`/`true`/`1` set TRUE; `no`/`false`/`0` set FALSE.
-
-## Repeatable Options
-
-```r
-pattern <- c()     # --pattern '*.csv' --pattern 'sales-*'  → character vector
-threshold <- list() # --threshold 5 --threshold '[10,20]'   → list of parsed values
-```
-
-## Positional Arguments
-
-Assign `NULL` for positional args (required by default):
-
-```r
-#| description: The input file to process.
-input_file <- NULL
-```
-
-Make optional with `#| required: false`. Test with `is.null(myvar)`.
-
-### Variadic positional args
-
-Use `...` suffix to collect multiple positional values:
-
-```r
-pkgs... <- c()
-# install-pkgs dplyr ggplot2 tidyr → pkgs... = c("dplyr", "ggplot2", "tidyr")
-```
-
----
 
 ## Subcommands
 
@@ -222,16 +186,13 @@ switch(
 
 Help is scoped: `myapp --help` lists commands; `myapp list --help` shows
 list-specific options plus globals. Subcommands can nest by placing another
-`switch()` inside a branch.
-
----
+`switch()` inside a branch. For a complete todo manager with `list`, `add`,
+and `done`, read [references/advanced.rst](references/advanced.rst).
 
 ## Built-in Help
 
 Every Rapp automatically gets `--help` (human-readable) and `--help-yaml`
 (machine-readable). These work with subcommands too.
-
----
 
 ## Development and Testing
 
@@ -244,8 +205,6 @@ Rapp::run("path/to/myapp.R", c("--name", "Alice", "--count", "5"))
 
 It returns the evaluation environment (invisibly) for inspection, and
 supports `browser()` for interactive debugging.
-
----
 
 ## Complete Example: Coin Flipper
 
@@ -277,7 +236,7 @@ flip-coin --seed 42 -n 5
 flip-coin --help
 ```
 
-Generated help:
+Generated help (Rapp 0.3.0):
 ```
 Usage: flip-coin [OPTIONS]
 
@@ -285,71 +244,10 @@ Flip a coin.
 
 Options:
   -n, --flips <FLIPS>  Number of coin flips [default: 1] [type: integer]
-      --sep <SEP>      [default: " "] [type: string]
-      --wrap / --no-wrap  [default: true]
-      --seed <SEED>    [default: NA] [type: integer]
+  --sep <SEP>          [default: " "] [type: string]
+  --wrap / --no-wrap   [default: true] Disable with `--no-wrap`.
+  --seed <SEED>        [default: NA] [type: integer]
 ```
-
-## Complete Example: Todo Manager (Subcommands)
-
-```r
-#!/usr/bin/env Rapp
-#| name: todo
-#| description: Manage a simple todo list.
-
-#| description: Path to the todo list file.
-#| short: s
-store <- ".todo.yml"
-
-switch(
-  command <- "",
-
-  list = {
-    #| description: Max entries to display (-1 for all).
-    limit <- 30L
-
-    tasks <- if (file.exists(store)) yaml::read_yaml(store) else list()
-    if (!length(tasks)) {
-      cat("No tasks yet.\n")
-    } else {
-      if (limit >= 0L) tasks <- head(tasks, limit)
-      writeLines(sprintf("%2d. %s\n", seq_along(tasks), tasks))
-    }
-  },
-
-  add = {
-    #| description: Task description to add.
-    task <- NULL
-
-    tasks <- if (file.exists(store)) yaml::read_yaml(store) else list()
-    tasks[[length(tasks) + 1L]] <- task
-    yaml::write_yaml(tasks, store)
-    cat("Added:", task, "\n")
-  },
-
-  done = {
-    #| description: Index of the task to complete.
-    #| short: i
-    index <- 1L
-
-    tasks <- if (file.exists(store)) yaml::read_yaml(store) else list()
-    task <- tasks[[as.integer(index)]]
-    tasks[[as.integer(index)]] <- NULL
-    yaml::write_yaml(tasks, store)
-    cat("Completed:", task, "\n")
-  }
-)
-```
-
-```sh
-todo add "Write quarterly report"
-todo list
-todo list --limit 5
-todo done 1
-todo --store /tmp/work.yml list
-```
-
----
 
 ## Shipping CLIs in an R Package
 
@@ -384,16 +282,7 @@ install_mypkg_cli <- function(destdir = NULL) {
 By default, launchers set `--default-packages=base,<pkg>`, so only `base`
 and the package are auto-loaded. Use `library()` for other dependencies.
 
----
-
 ## Quick Reference: Common Patterns
-
-### NA vs NULL for optional arguments
-
-- **NA** (`NA_integer_`, `NA_character_`) → optional **named option**.
-  Test: `!is.na(x)`.
-- **NULL** + `#| required: false` → optional **positional arg**.
-  Test: `!is.null(x)`.
 
 ### stdin/stdout
 
@@ -422,12 +311,3 @@ tryCatch({
   quit(status = 1)
 })
 ```
-
----
-
-## Additional Reference
-
-For less common topics — launcher customization (`#| launcher:` front matter),
-detailed `Rapp::install_pkg_cli_apps()` API options, and more complete examples
-(deduplication filter, variadic install-pkg, interactive fallback) — read
-`references/advanced.rst`.
