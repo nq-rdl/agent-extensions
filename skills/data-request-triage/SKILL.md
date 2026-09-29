@@ -22,6 +22,10 @@ metadata:
 
 # Data Request — triage
 
+The **Data Analyst** triages request intake; the **Data Engineer** may also run
+this read-only queue check and uses its delivery handoff. Name the acting role
+and branch owner rather than inferring them from the branch name.
+
 The queue entrypoint for service-desk data requests: it decides what to work on next and
 in what order. The stage skills do the work, so this skill routes to them and does not
 restate their procedures. Arguments: `$ARGUMENTS`. Read

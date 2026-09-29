@@ -14,6 +14,9 @@ metadata:
 
 # Data Request — validate
 
+The **Data Engineer** runs technical validation. Research questions belong to
+the Data Analyst and retain analyst attribution through the scope handoff.
+
 Read `${CLAUDE_PLUGIN_ROOT}/skills/guardrails/SKILL.md` first. Arguments: `$ARGUMENTS`.
 Read the SQL, request and available scope; validate the actual SQL bytes, not a stale
 review snapshot. This action needs no `.sqlreview/` setup and creates no review record.

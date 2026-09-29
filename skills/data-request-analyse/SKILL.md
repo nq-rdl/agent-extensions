@@ -20,6 +20,13 @@ metadata:
 
 # Data Request — analyse (Data Engineer)
 
+The **Data Engineer** runs analyse. Keep the Data Analyst's imported research
+decisions and provenance visible; confirm technical SQL findings with the
+engineer. Any research question missed by intake belongs to the analyst:
+prefix its `open_questions` entry `Analyst question:` and send it back through
+the handoff for the analyst to consult the requester. Do not relabel an
+engineer confirmation as an analyst confirmation.
+
 For RDL cohort SQL, read `${CLAUDE_PLUGIN_ROOT}/skills/guardrails/SKILL.md` before
 scoping or reviewing. Consult its dataops/column-spec sources and carry evidence or
 unverified facts into the discussion; advisory findings do not replace human confirmation.

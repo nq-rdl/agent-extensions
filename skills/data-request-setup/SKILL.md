@@ -20,6 +20,11 @@ metadata:
 
 # Data Request — setup
 
+The **Data Engineer** runs setup once per project. The **Data Analyst** fills
+`answers.yaml` and its optional `answers.intake.json` sidecar in one pass, then
+hands the research decisions to the engineer for bootstrap and draft.
+See [analyst intake contract](references/analyst-intake.rst).
+
 Creates the `.sqlreview/` contract used by bootstrap, analyse, explain and lift.
 Ordinary composition can run without setup; recording a hand-SQL candidate silently
 initialises the default store when absent. **Among the record stages, setup alone accepts an
