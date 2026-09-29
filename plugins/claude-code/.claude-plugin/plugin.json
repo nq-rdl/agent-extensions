@@ -1,6 +1,6 @@
 {
   "name": "claude-code",
-  "version": "0.36.1",
+  "version": "0.36.2",
   "description": "Claude Code — agent-team coordination, hook authoring, and skill-quality auditing",
   "author": {
     "name": "nq-rdl"
