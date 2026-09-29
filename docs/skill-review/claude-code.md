@@ -372,7 +372,7 @@ gain. No migration or deprecation is needed. The auditor recursion concern
 | cc-hook contradictory copies | Changed | Factual checks table. SKILL.md, output.rst, lifecycle.rst, and prompt-injection.rst now state one exit-code, stdout, and suppressOutput rule. R1 passes in both versions |
 | cc-hook event-specific contracts | Changed (verified). The per-event matrix stays in output.rst and lifecycle.rst; no generic rule replaces it | hooks reference, as cited in the table |
 | cc-agent-teams stale material | Changed | Factual checks; R3 |
-| cc-agent-teams `scripts/check-config.sh` | Deferred with reason | The fact-check found a nonexistent "user local" scope, no precedence handling, a `--disable` that can leave invalid JSON, and GNU-only `sed -i`. The fix is a script rewrite (jq, precedence) that needs its own TDD harness; recorded for a follow-up |
+| cc-agent-teams `scripts/check-config.sh` | Changed (follow-up commit) | Rewritten with `jq` for Bash 3.2. It drops the nonexistent user-local scope and reports the effective value by settings precedence (managed > project local > project > user; any settings file beats a shell export). `--disable` sets `"0"` through `jq` and keeps valid JSON; invalid JSON is left untouched; no `sed -i`. `tests/test_cc_agent_teams_check_config.py` (17 tests, temporary HOME and project) had 8 failures and 2 errors on the old script and passes now, including a run under `docker.io/library/bash:3.2` (bash 3.2.57, BusyBox) with static jq 1.7.1 (sha256 `5942c9b0…c8ff5`); host jq is 1.6 |
 | cc-create-workflow stale material | Changed | Factual checks |
 | cc-setup one asset and one example | Changed | C1–C4; `tests/test_claude_code_family.py` |
 
@@ -448,4 +448,14 @@ skill-review and skill-audit: **retain both** (see the decision record).
   with network access was not measured.
 - The delegated audit (D2) never loaded the outline, so no run exercised the
   new worker wording.
-- The `check-config.sh` defects are recorded but not fixed.
+- The Bash 3.2 container test is skipped unless podman, the `bash:3.2` image, and `BASH32_STATIC_JQ` are available, so CI does not run it. BSD tools were not run; the script no longer uses `sed` and calls `mktemp` only with a template.
+
+## Status at hand-off
+
+`check-config.sh` follow-up: **done.** The script is rewritten with `jq`
+for Bash 3.2, and `tests/test_cc_agent_teams_check_config.py` passes: 17
+tests on the host (jq 1.6), plus the `bash:3.2` container run with
+`BASH32_STATIC_JQ` pointing at a static jq 1.7.1. The full unit suite passes
+(1112 tests, 1 skipped: the container class without `BASH32_STATIC_JQ`).
+Next step (optional): make the container test runnable without a manual
+jq download, for example with a pinned image that includes jq.

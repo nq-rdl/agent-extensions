@@ -117,17 +117,19 @@ and CLI flags):
 
 ### Verify or toggle configuration
 
-Run the bundled config script:
+Run the bundled script from the project root (it needs `jq`). It reads the
+settings files in precedence order and reports the effective value; a value
+in any settings file overrides a shell export:
 
 ```bash
 # Check current status
-bash scripts/check-config.sh
+bash "${CLAUDE_SKILL_DIR}/scripts/check-config.sh"
 
-# Enable agent teams (writes to user settings)
-bash scripts/check-config.sh --enable
+# Enable agent teams (sets the flag to "1" in user settings; add --project for .claude/settings.json)
+bash "${CLAUDE_SKILL_DIR}/scripts/check-config.sh" --enable
 
-# Disable agent teams
-bash scripts/check-config.sh --disable
+# Disable agent teams (sets the flag to "0")
+bash "${CLAUDE_SKILL_DIR}/scripts/check-config.sh" --disable
 ```
 
 ## When to Use Teams (Not Subagents)
@@ -356,4 +358,4 @@ worthwhile. For routine tasks, a single session is more cost-effective.
 |---------|-------------|
 | `bash scripts/check-config.sh` | Check if agent teams are enabled |
 | `bash scripts/check-config.sh --enable` | Enable agent teams in user settings |
-| `bash scripts/check-config.sh --disable` | Disable agent teams in user settings |
+| `bash scripts/check-config.sh --disable` | Set the flag to "0" in user settings |
