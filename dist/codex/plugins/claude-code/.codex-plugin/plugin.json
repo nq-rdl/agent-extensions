@@ -1,7 +1,7 @@
 {
   "name": "claude-code",
   "version": "0.36.1",
-  "description": "Claude Code — agent-team coordination, hook authoring, skill-quality auditing, and prompt engineering",
+  "description": "Claude Code — agent-team coordination, hook authoring, and skill-quality auditing",
   "author": {
     "name": "nq-rdl"
   },
@@ -12,14 +12,13 @@
     "agents",
     "hooks",
     "skills",
-    "audit",
-    "prompts"
+    "audit"
   ],
   "skills": "./skills/",
   "interface": {
     "displayName": "Claude Code",
     "shortDescription": "Author Claude Code workflows and audit reusable skills",
-    "longDescription": "Claude Code — agent-team coordination, hook authoring, skill-quality auditing, and prompt engineering",
+    "longDescription": "Claude Code — agent-team coordination, hook authoring, and skill-quality auditing",
     "developerName": "nq-rdl",
     "category": "Developer Tools",
     "capabilities": [

@@ -20,7 +20,7 @@ metadata:
 # Prompting Claude Opus 5.5
 
 This skill covers only what changed from Claude Opus 5. For general prompt
-engineering, use `/claude-code:engineer-prompts`.
+engineering, use `/prompting:engineer`.
 
 **Verify first.** Beta headers, defaults and effort behaviour change between
 releases. Where a wrong answer would mislead, check the canonical sources:

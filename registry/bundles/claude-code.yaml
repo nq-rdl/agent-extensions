@@ -1,8 +1,8 @@
 schemaVersion: v1
 id: claude-code
 displayName: Claude Code
-description: Claude Code — agent-team coordination, hook authoring, skill-quality auditing, and prompt engineering
-keywords: [claude-code, agents, hooks, skills, audit, prompts]
+description: Claude Code — agent-team coordination, hook authoring, and skill-quality auditing
+keywords: [claude-code, agents, hooks, skills, audit]
 owners:
   - rdl
 channels:
@@ -17,7 +17,6 @@ skills:
   - {source: skill-review, leaf: skill-review}
   - {source: report-skill-issue, leaf: skill-report-issue}
   - {source: marketplace-scout, leaf: discover-plugins}
-  - {source: prompt-builder, leaf: engineer-prompts}
 hooks: [skill-audit-nudge]
 prompts: []
 mcp: []

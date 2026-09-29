@@ -305,10 +305,10 @@
       "category": "Developer Tools"
     },
     {
-      "name": "claude-prompting",
+      "name": "prompting",
       "source": {
         "source": "local",
-        "path": "./dist/codex/plugins/claude-prompting"
+        "path": "./dist/codex/plugins/prompting"
       },
       "policy": {
         "installation": "AVAILABLE",

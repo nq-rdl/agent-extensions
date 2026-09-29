@@ -12,8 +12,7 @@ This report records missing evidence; it does not attest to publisher identity, 
 | argo-cd | 2 | skills-only | No |
 | bitwarden | 1 | skills-only | No |
 | charm-tui | 1 | skills-only | No |
-| claude-code | 10 | skills+hooks | No |
-| claude-prompting | 1 | skills-only | No |
+| claude-code | 9 | skills+hooks | No |
 | codex | 13 | skills+hooks | No |
 | data-request | 13 | skills+hooks | No |
 | debug | 2 | skills-only | No |
@@ -32,6 +31,7 @@ This report records missing evidence; it does not attest to publisher identity, 
 | planning | 5 | skills-only | No |
 | playwright | 1 | local-mcp | No |
 | postgres | 1 | skills-only | No |
+| prompting | 2 | skills-only | No |
 | quarto | 2 | skills-only | No |
 | r | 8 | skills-only | No |
 | rdl-team | 4 | skills-only | No |
@@ -92,15 +92,6 @@ This report records missing evidence; it does not attest to publisher identity, 
 - Publisher must select supported availability regions
 
 ## claude-code
-
-- Publisher must supply logo
-- Publisher must supply privacyPolicyURL
-- Publisher must supply termsOfServiceURL
-- Publisher identity and organization submission access are not recorded as verified
-- Record authenticated execution evidence for five positive and three negative task cases
-- Publisher must select supported availability regions
-
-## claude-prompting
 
 - Publisher must supply logo
 - Publisher must supply privacyPolicyURL
@@ -268,6 +259,15 @@ This report records missing evidence; it does not attest to publisher identity, 
 - Publisher must select supported availability regions
 
 ## postgres
+
+- Publisher must supply logo
+- Publisher must supply privacyPolicyURL
+- Publisher must supply termsOfServiceURL
+- Publisher identity and organization submission access are not recorded as verified
+- Record authenticated execution evidence for five positive and three negative task cases
+- Publisher must select supported availability regions
+
+## prompting
 
 - Publisher must supply logo
 - Publisher must supply privacyPolicyURL
