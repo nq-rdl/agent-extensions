@@ -198,10 +198,7 @@ CONTRACT_TOKENS = (
 # Outlines owned by other #312 work streams that have not adopted the contract
 # yet. Remove a name when its outline carries the contract; the inventory test
 # below fails on a stale name.
-CONTRACT_PENDING = {
-    "data-request-triage",
-    "se-technical-writer",
-}
+CONTRACT_PENDING = set()
 
 COMPANION_LINE = re.compile(r"companion skills when available:(.*)", re.I)
 COMPANION = re.compile(r"``([a-z0-9-]+):([a-z0-9-]+)``")

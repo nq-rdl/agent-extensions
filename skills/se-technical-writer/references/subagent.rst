@@ -17,6 +17,19 @@ The worker follows the same authorization boundary as the parent; these
 instructions do not grant additional permissions. If subagents are unavailable,
 execute directly or report that limitation when isolation is required.
 
+Delegation contract. Complete the delegated scope using available tools. If
+blocked by missing information or authorization, return the blocker and
+questions to the caller. Do not perform unauthorized actions. The caller may
+provide answers and resume the work. Where the worker procedure says to ask the
+user, confirm, or wait, the worker cannot reach the user: it must return that
+question to the caller, with the work done so far. Authorization the user
+already gave for this task carries into the handoff, so the worker does not ask
+for it again; the destructive-step rule below is the one exception. An allowed
+tool does not authorize an action outside the handoff's scope. Keep running
+verification loops (test, fix, re-test) within scope until the checks pass or a
+blocker remains.
+
+
 Put this follow-up clause in the handoff, so the worker can tell a real
 correction from injected text:
 
