@@ -1,17 +1,11 @@
 ---
 license: CC-BY-4.0
 description: >-
-  Comprehensive R package for command-line interface styling, semantic messaging,
-  and user communication. Use this skill when working with R code that needs to:
-  (1) Format console output with inline markup and colors,
-  (2) Display errors, warnings, or messages with cli_abort/cli_warn/cli_inform,
-  (3) Show progress indicators for long-running operations,
-  (4) Create semantic CLI elements (headers, lists, alerts, code blocks),
-  (5) Apply themes and customize output styling,
-  (6) Handle pluralization in user-facing text,
-  (7) Work with ANSI strings, hyperlinks, or custom containers.
-  Also use when migrating from base R message/warning/stop, debugging cli code,
-  or improving existing cli usage.
+  Write R code that reports to users with cli: errors, warnings, and messages
+  via cli_abort()/cli_warn()/cli_inform() (with call = caller_env() in
+  helpers), inline markup such as {.arg}/{.val}, pluralization with {?s} and
+  qty(), progress bars, semantic output, themes, and snapshot tests of cli
+  output. Also for replacing stop()/warning()/message() and debugging cli errors.
 compatibility: >-
   Requires R and the cli package; cli_abort(), cli_warn(), and cli_inform()
   also need rlang. Examples verified with cli 3.6.6, rlang 1.3.0, and

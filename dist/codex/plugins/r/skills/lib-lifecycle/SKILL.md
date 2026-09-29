@@ -1,12 +1,14 @@
 ---
 name: lib-lifecycle
 license: CC-BY-4.0
-description: 'Guidance for managing R package lifecycle according to tidyverse principles
-  using the lifecycle package. Use when: (1) Setting up lifecycle infrastructure in
-  a package, (2) Deprecating functions or arguments, (3) Renaming functions or arguments,
-  (4) Superseding functions, (5) Marking functions as experimental, (6) Understanding
-  lifecycle stages (stable, experimental, deprecated, superseded), or (7) Writing
-  deprecation helpers for complex scenarios.'
+description: 'Deprecate, rename, supersede, or mark R package functions and arguments
+  as experimental with the lifecycle package: deprecate_soft()/deprecate_warn()/ deprecate_stop(),
+  deprecated() and is_present(), lifecycle badges, the release-time deprecation sweep,
+  and testing deprecation warnings. Use for any tidyverse-style API change in an R
+  package.'
+compatibility: Requires an R package using lifecycle and roxygen2 (badges via usethis).
+  Behaviour verified with lifecycle 1.0.5, usethis 3.2.1, and testthat 3.3.2 on R
+  4.5.3, 2026-09-29.
 metadata:
   repo: https://github.com/nq-rdl/agent-extensions
 ---
@@ -68,9 +70,8 @@ Only badge functions/arguments whose stage differs from the package's overall st
 
 ```r
 old_fun <- function(x) {
-
-lifecycle::deprecate_warn("1.0.0", "old_fun()", "new_fun()")
-new_fun(x)
+  lifecycle::deprecate_warn("1.0.0", "old_fun()", "new_fun()")
+  new_fun(x)
 }
 ```
 
@@ -109,14 +110,14 @@ Move implementation to new name, call from old name with deprecation:
 #' @keywords internal
 #' @export
 add_two <- function(x, y) {
-lifecycle::deprecate_warn("1.0.0", "add_two()", "number_add()")
-number_add(x, y)
+  lifecycle::deprecate_warn("1.0.0", "add_two()", "number_add()")
+  number_add(x, y)
 }
 
 #' Add two numbers
 #' @export
 number_add <- function(x, y) {
-x + y
+  x + y
 }
 ```
 
@@ -254,4 +255,7 @@ The `what` fragment must work with "was deprecated in..." appended.
 
 ## Reference
 
-See `references/lifecycle-stages.rst` for detailed stage definitions and transitions.
+Read [references/lifecycle-stages.rst](references/lifecycle-stages.rst) when
+you need the full definition of a stage, the allowed transitions between
+stages, or the retired stages (questioning, maturing) that appear in older
+packages.
