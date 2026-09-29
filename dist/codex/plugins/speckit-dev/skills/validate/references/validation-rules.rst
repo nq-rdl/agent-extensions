@@ -1,4 +1,4 @@
-<!-- Source: src/specify_cli/extensions/__init__.py (ExtensionManifest._validate, _collect_manifest_command_names, check_compatibility), src/specify_cli/agents.py, templates/commands/*.md, and extensions/EXTENSION-DEVELOPMENT-GUIDE.md at github/spec-kit tags v0.12.0, v0.14.0, v0.15.0, v0.16.2, v1.0.0 and v1.0.12 — read 2026-09-29. The installer was not run (see installer-oracle.rst). -->
+<!-- Source: src/specify_cli/extensions/__init__.py (ExtensionManifest._validate, _collect_manifest_command_names, check_compatibility), src/specify_cli/agents.py, templates/commands/*.md, and extensions/EXTENSION-DEVELOPMENT-GUIDE.md at github/spec-kit tags v0.12.0, v0.14.0, v0.15.0, v0.16.2, v1.0.0 and v1.0.12 — read 2026-09-29. The 15-fixture isolated installer oracle ran on v1.0.12 on 2026-09-29 (see installer-oracle.rst); other tags and hook dispatch remain source-reviewed only. -->
 
 spec-kit Extension — Validation Rule Catalog
 ============================================

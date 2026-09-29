@@ -3,8 +3,8 @@ name: validate
 license: CC-BY-4.0
 compatibility: spec-kit extension manifests, schema_version "1.0". Rules read from
   the ExtensionManifest source at v0.12.0, v0.14.0, v0.15.0, v0.16.2, v1.0.0 and v1.0.12
-  on 2026-09-29; other releases were not checked. The upstream-installer oracle has
-  not been run for these rules.
+  on 2026-09-29; other releases were not checked. The isolated installer oracle passed
+  its 15-fixture matrix on v1.0.12 only, on 2026-09-29.
 description: Lint a GitHub spec-kit extension (extension.yml, commands/*.md) and say,
   per finding, whether `specify extension add` would reject it or it is only a local
   convention. Use before install or publish, when debugging an install rejection,
@@ -21,8 +21,9 @@ Here $ARGUMENTS means the user’s supplied skill arguments. Codex does not popu
 # Validate a spec-kit extension
 
 > **Verify-canonical guard.** The labels below come from reading spec-kit's
-> `ExtensionManifest` and install code at the tags in `compatibility:`; the
-> installer itself was not run. If the user's `specify version` is outside those
+> `ExtensionManifest` and install code at the tags in `compatibility:`. The
+> 15-fixture installer oracle confirmed install outcomes on v1.0.12 only; it
+> did not execute extension hooks. If the user's `specify version` is outside those
 > tags, or a finding decides whether to block a release, re-read
 > `src/specify_cli/extensions/__init__.py` at their tag (or run the oracle below)
 > before calling it a rejection. Details: `references/validation-rules.rst`.

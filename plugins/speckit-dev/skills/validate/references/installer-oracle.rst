@@ -6,10 +6,15 @@ installer. It confirms what the pinned ``specify`` CLI does with an extension,
 without touching the user's project. The requirements are in ``SKILL.md``; this
 file gives commands and a fixture set.
 
-Status: **not run** by this repository. On 2026-09-29 the session's permission
-policy refused to execute the fetched installer, so every label in ``SKILL.md``
-is source-derived. Record your own run (tag, commands, exit codes, cleanup)
-before relying on it.
+Status: **run on 2026-09-29** with specify-cli 1.0.12, tag ``v1.0.12``
+(commit ``e77daa9021d20db26b878f7dfa5640fe5a42d04e``), Python 3.14.3, Linux.
+``version`` and isolated ``init`` both exited 0. Every fixture below matched
+its predicted install/rejection outcome; the temporary HOME/XDG/uv/project
+root was removed and cleanup confirmed. An earlier sandbox attempt failed at
+DNS resolution before installation; this successful run supersedes it.
+
+The oracle checks installation only. It does not execute extension commands,
+scripts or hooks, or verify the other source-reviewed CLI tags.
 
 Isolated run
 ------------
@@ -44,8 +49,7 @@ Fixtures
 Each fixture is the minimal valid manifest (``schema_version: "1.0"``, strings
 for ``id``/``name``/``version``/``description``, ``speckit_version: ">=0.12.0"``,
 one command ``speckit.<id>.greet`` with ``commands/greet.md`` carrying a
-``description``) with one change. "Predicted" is read from the v1.0.12 source,
-not observed.
+``description``) with one change. "Predicted" was read from the v1.0.12 source before execution; The install outcomes were subsequently observed on 2026-09-29.
 
 =====================  ==========================================  ==========================
 Fixture                Change                                      Predicted (v1.0.12)
@@ -69,3 +73,24 @@ alias-traversal        ``aliases: ["../evil"]``                    rejects
 
 If an observed result differs from the prediction, the observation wins: update
 ``SKILL.md`` and ``validation-rules.rst`` and record the tag.
+
+Observed results
+----------------
+
+* Exit 0: ``valid``, ``short-command``, ``hook-unknown``, ``hook-converge``,
+  ``loose-version``, ``missing-file``, ``no-description``.
+* Exit 1: ``effect-typo`` (invalid effect), ``wrong-namespace`` (must use
+  extension namespace), ``unquoted-version`` (expected string, got float),
+  ``core-id`` (core namespace conflict), ``priority-zero`` (must be >= 1),
+  ``schema-float`` (unsupported schema), ``future-speckit`` (compatibility
+  error), ``alias-traversal`` (invalid alias).
+* ``short-command`` printed a compatibility warning and registered the name
+  ``speckit.oracle.greet``. The other successful fixtures printed the normal
+  configuration reminder, not a validation warning.
+* The Claude integration used ``.claude/skills/speckit-oracle-greet``, not
+  ``.claude/commands``. It was registered for ``valid`` and
+  ``no-description`` and absent for ``missing-file``. The CLI's printed
+  "Provided commands" list alone does not prove registration: it listed the
+  missing-file command too.
+* Unknown-hook non-dispatch remains a source-derived claim: hooks were not
+  fired. The initializer used no user configuration or credentials.

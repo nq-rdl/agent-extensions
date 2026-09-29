@@ -402,3 +402,10 @@ pass after the edits.
   (conventional-commits, obsidian-bases, obsidian-markdown, redhat-setup).
   Whether Claude Code treats those as commands was not tested here.
 - The opencode-doc-review hook (#311) still injects the Go SDK pin.
+
+## Installer oracle follow-up (2026-09-29)
+
+The previously blocked oracle now ran in the approved isolation at v1.0.12.
+All 15 predicted install/rejection outcomes matched, including short-command
+renaming and missing-file non-registration. Other tags and actual hook
+dispatch remain source-only. See [the completion record](finish.md#spec-kit-oracle-307).

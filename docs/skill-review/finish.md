@@ -38,17 +38,23 @@ These results are superseded by validation after the restart.
 
 ## Spec Kit oracle (#307)
 
-Attempted the approved `installer-oracle.rst` isolation on 2026-09-29: fresh
-temporary HOME, XDG and uv directories; `env -i`; `/usr/bin:/bin` PATH;
-`UV_NO_CONFIG=1`; `UV_PYTHON_DOWNLOADS=never`; `GIT_TERMINAL_PROMPT=0`;
-the existing pixi Python; and the exact upstream tag `v1.0.12`.
+The first attempt failed DNS resolution in the restricted sandbox (uv exit 1,
+git fetch exit 128) and cleaned up. After permissions were restored, the exact
+isolated v1.0.12 oracle ran successfully, twice (the second run also inspected
+registered skill paths): tag commit `e77daa9021d20db26b878f7dfa5640fe5a42d04e`,
+Python 3.14.3, `version` and `init` exit 0. All 15 fixtures matched the predicted
+installation/rejection outcome. Seven installed (exit 0), eight rejected
+(exit 1); short-command printed its rename warning. The missing-file fixture
+printed a provided-command entry but did not register the Claude skill. The
+no-description fixture registered it. Unknown hook dispatch is still verified
+only from source; the oracle never executed hooks or extension scripts.
 
-`uv tool run --python <pixi-python> --from
-git+https://github.com/github/spec-kit@v1.0.12 specify version` exited 1.
-The nested git fetch exited 128: “Could not resolve host: github.com”.
-Initialization and all 15 extension fixtures were **not run**. The EXIT trap
-removed the temporary directory and confirmed `cleaned up`. No user project
-was touched. Predictions remain source-derived, not installer observations.
+Used a fresh temporary HOME, all three XDG directories, uv cache/tool dirs,
+`env -i`, `/usr/bin:/bin` PATH, `UV_NO_CONFIG=1`,
+`UV_PYTHON_DOWNLOADS=never`, `GIT_TERMINAL_PROMPT=0`, and fresh project and
+extension copies per fixture. Cleanup confirmed after both runs. No user
+project or configuration changed. Commands and outcomes are recorded in
+`skills/speckit-validate/references/installer-oracle.rst`.
 
 ## Last two delegation contracts (#310)
 
