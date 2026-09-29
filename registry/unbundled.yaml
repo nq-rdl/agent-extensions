@@ -9,10 +9,8 @@
 # or that a bundle now references anyway — is itself a check_exposure.py
 # failure, so this file cannot silently rot.
 schemaVersion: v1
-unbundled:
-  - kind: hook
-    name: changie-fragment-lint
-    reason: >-
-      Repo-internal PreToolUse dev hook that lints 'changie new' in THIS repo; its command is a
-      repo-relative path (bash hooks/changie-fragment-lint.sh), not a shipped ${CLAUDE_PLUGIN_ROOT} asset.
-      Not distributed through any plugin.
+#
+# Empty since #311 removed the dormant changie-fragment-lint dev hook: nothing
+# wired it after .claude/ was removed, and scripts/check_changie_length.py
+# enforces the current changie policy (200-character body cap, parseable YAML).
+unbundled: []

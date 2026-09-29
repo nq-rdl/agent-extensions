@@ -9,21 +9,29 @@
 # writing plugin / agent / config / SDK code. Silent no-op otherwise.
 #
 # Framing is DECLARATIVE and fenced (<opencode-dev-guidance>) so it reads as
-# hook-provided context, not an injected instruction (see AGENTS.md / cc-hook's
-# safe-context-injection pattern). Emitted via the UserPromptSubmit
-# additionalContext channel (jq); falls back to plain stdout when jq is absent.
+# hook-provided context, not an injected instruction (see the claude-code:hook
+# skill, references/prompt-injection.rst). Emitted via the UserPromptSubmit
+# additionalContext channel (jq); falls back to plain stdout when jq is absent,
+# which UserPromptSubmit also adds to context.
 
 set -euo pipefail
 
 input=$(cat)
 
-# Extract the prompt text (jq → python3 → grep), mirroring forced-eval-hook.sh.
+# Extract the prompt text: jq, then python3, then a POSIX `sed -E` scrape. Any
+# parse failure yields an empty prompt, so malformed input is a silent no-op.
+# The scrape runs on bash 3.2 with BSD/BusyBox sed (no grep -P). It keeps JSON
+# escapes except \n \r \t, which become spaces; the gate below only needs markers.
 if command -v jq >/dev/null 2>&1; then
-  prompt=$(printf '%s' "$input" | jq -r '.prompt // empty')
+  prompt=$(printf '%s' "$input" | jq -r 'if type == "object" then (.prompt | strings) else empty end' 2>/dev/null || true)
 elif command -v python3 >/dev/null 2>&1; then
-  prompt=$(printf '%s' "$input" | python3 -c 'import sys, json; print(json.load(sys.stdin).get("prompt") or "")' 2>/dev/null || true)
+  prompt=$(printf '%s' "$input" | python3 -c 'import sys, json
+try: d = json.load(sys.stdin)
+except Exception: sys.exit(0)
+p = d.get("prompt") if isinstance(d, dict) else None
+print(p if isinstance(p, str) else "")' 2>/dev/null || true)
 else
-  prompt=$(printf '%s' "$input" | grep -oP '"prompt"\s*:\s*"\K[^"]+' || true)
+  prompt=$(printf '%s' "$input" | tr '\n' ' ' | sed -nE 's/.*"prompt"[[:space:]]*:[[:space:]]*"(([^"\\]|\\.)*)".*/\1/p' | sed -E 's/\\[nrt]/ /g' || true)
 fi
 
 # Gate: fire only on OpenCode markers. Match `opencode` as a standalone token (not "open code"),
@@ -51,7 +59,8 @@ The opencode-dev plugin ships skills for each surface — invoke the matching on
 Before writing any plugin / agent / config / SDK code, the reliable path is:
   - load the matching skill and read its references/ (verbatim canonical docs),
   - re-check the cited opencode.ai/docs/<page> for drift,
-  - prefer primary sources over recall; record version pins (Go SDK v0.19.2, Go 1.22+).
+  - prefer primary sources over recall; take SDK and toolchain version pins
+    from /opencode-dev:sdk, which owns them.
 Advisory only.
 </opencode-dev-guidance>
 CTX

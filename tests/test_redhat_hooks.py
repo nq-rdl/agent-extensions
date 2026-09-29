@@ -1,6 +1,6 @@
 """Behavioural tests for the redhat plugin's guardrail hooks and credential scripts.
 
-The hooks are shell (hooks/redhat-docs-*.sh, hand-copied to plugins/redhat/scripts/ — a test
+The hooks are shell (hooks/redhat-docs-*.sh, generated into plugins/redhat/scripts/ by sync-plugins.sh — a test
 asserts the copies are byte-identical).
 Each test pipes a Claude Code event JSON through the hook with a sanitised environment
 (no RH_* variables, a throwaway HOME, credential sources restricted to `env`) and asserts
@@ -250,7 +250,7 @@ class GuardHook(unittest.TestCase):
 
 class PluginCopies(unittest.TestCase):
     def test_hook_copies_match_canonical(self):
-        # hooks.json points at plugins/redhat/scripts/; those are hand-copied from hooks/.
+        # hooks.json points at plugins/redhat/scripts/; sync-plugins.sh generates them from hooks/.
         for name in ("redhat-docs-guard.sh", "redhat-docs-preflight.sh"):
             with self.subTest(name=name):
                 self.assertEqual((REPO / "hooks" / name).read_bytes(), (PLUGIN / "scripts" / name).read_bytes())

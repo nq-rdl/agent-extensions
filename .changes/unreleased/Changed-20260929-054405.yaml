@@ -1,0 +1,3 @@
+kind: Changed
+body: OpenCode hook routes SDK and toolchain version pins to /opencode-dev:sdk instead of copying them (#311)
+time: 2026-09-29T05:44:05.297546394Z
