@@ -62,8 +62,9 @@ narrow; write for a reader who has not seen the code.
 ## 4. Changelog, version, TODOs
 
 - **Never clobber the changelog.** Do not delete, reorder or regenerate
-  entries, and never rewrite `CHANGELOG.md` as a whole file. Wording polish
-  only, as a narrow edit; ask before changing meaning.
+  entries; polish wording only and ask before changing meaning. Apply a narrow
+  patch with exact current text as context, and inspect the diff afterwards.
+  Never overwrite CHANGELOG.md as a whole file.
 - **Changie projects** (`.changie.yaml`): leave `CHANGELOG.md` alone and do not
   create fragments. You may polish the `body` of existing unreleased fragments
   within the project's kinds and `body.maxLength`. Report a user-visible change
