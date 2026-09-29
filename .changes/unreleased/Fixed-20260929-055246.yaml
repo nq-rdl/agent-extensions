@@ -1,0 +1,3 @@
+kind: Fixed
+body: go:review-security no longer names the sops:encrypt companion, which the go plugin does not ship (#310)
+time: 2026-09-29T05:52:46.055783442Z
