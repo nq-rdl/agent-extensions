@@ -880,11 +880,11 @@ def render_body(state: dict, obs_doc: dict) -> str:
 
     out = [
         TRACKER_MARKER,
-        "Maintained by the **Link rot check** workflow (`.github/workflows/link-rot-check.yml`, "
-        "#301). It tracks only confirmed rot in canonical content: HTTP 404/410 in two passes, or "
-        "NXDOMAIN on every DNS lookup. Timeouts, refusals, 403/429, 5xx and other ambiguous "
-        "results are *unknown*: they appear in the run report and never open, close or resolve "
-        "anything here.",
+        ("Maintained by the **Link rot check** workflow (`.github/workflows/link-rot-check.yml`, "
+         "#301). It tracks only confirmed rot in canonical content: HTTP 404/410 in two passes, or "
+         "NXDOMAIN on every DNS lookup. Timeouts, refusals, 403/429, 5xx and other ambiguous "
+         "results are *unknown*: they appear in the run report and never open, close or resolve "
+         "anything here."),
         "",
         f"Last complete scan: {last.get('observed_at', '—')}{run} — canonical URLs: "
         + ", ".join(f"{k} {v}" for k, v in summary.items()),
@@ -909,13 +909,13 @@ def render_body(state: dict, obs_doc: dict) -> str:
         "### Commands",
         "Maintainers (owner/member/collaborator) can comment:",
         "",
-        "- `/link-rot suppress <url> <reason>` — stop reporting one URL; the reason is required. "
-        "A suppression ends when the URL is confirmed healthy or removed.",
+        ("- `/link-rot suppress <url> <reason>` — stop reporting one URL; the reason is required. "
+         "A suppression ends when the URL is confirmed healthy or removed."),
         "- `/link-rot unsuppress <url>` or `/link-rot unsuppress all`",
         "",
-        "Closing this issue by hand suppresses every finding listed as active at that moment. "
-        "A new broken URL reopens it; suppressed ones stay suppressed. Do not edit the state "
-        "block below.",
+        ("Closing this issue by hand suppresses every finding listed as active at that moment. "
+         "A new broken URL reopens it; suppressed ones stay suppressed. Do not edit the state "
+         "block below."),
         "",
         f"<!-- link-rot-state:v{STATE_VERSION}\n{dump_state(state)}\n-->",
     ]
@@ -1102,8 +1102,8 @@ def render_report(doc: dict, plan: Plan | None = None, applied: list[dict] | Non
                   dry_run: bool = False) -> str:
     lines = ["# Link rot report", ""]
     if not doc.get("scan_ok"):
-        lines += ["**Operational failure — the scan is incomplete. The tracker issue was not "
-                  "changed.**", ""] + [f"- {e}" for e in doc.get("errors", [])] + [""]
+        lines += [("**Operational failure — the scan is incomplete. The tracker issue was not "
+                   "changed.**"), ""] +[f"- {e}" for e in doc.get("errors", [])] + [""]
     lines += [f"Observed at {doc.get('observed_at')} with lychee {doc.get('lychee_version')}; "
               f"config `{(doc.get('config') or {}).get('path')}` "
               f"(sha256 `{((doc.get('config') or {}).get('sha256') or '—')[:12]}`), "
