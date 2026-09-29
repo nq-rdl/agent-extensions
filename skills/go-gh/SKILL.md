@@ -2,12 +2,14 @@
 name: go-gh
 license: CC-BY-4.0
 description: >-
-  GitHub Actions CI/CD for Go projects. Use when writing or reviewing GitHub
-  Actions workflows that build, test, lint, or release Go code — including
-  actions/setup-go configuration, Go version matrix, dependency caching,
-  go.mod/go.work version files, artifact uploads, and monorepo cache strategies.
-  Also trigger when the user asks about CI for Go, GitHub Actions Go templates,
-  or how to test Go on multiple versions in CI.
+  GitHub Actions CI for Go: workflows that build, test, lint or release Go code
+  with actions/setup-go, including go.mod/go.work version files, version
+  matrices, module and build caching, multi-module repositories, test
+  artifacts, and runners without github.com access. Use when writing or
+  reviewing a Go workflow or asking how to test Go in CI.
+compatibility: >-
+  Examples use actions/setup-go v7, actions/checkout v7 and
+  actions/upload-artifact v7 (latest majors on 2026-09-29).
 metadata:
   repo: https://github.com/nq-rdl/agent-extensions
 ---
@@ -15,11 +17,16 @@ metadata:
 # GitHub Actions for Go
 
 Set up, build, test, and ship Go projects in GitHub Actions using
-[`actions/setup-go`](https://github.com/actions/setup-go) (v5+).
+[`actions/setup-go`](https://github.com/actions/setup-go). Check its
+[releases](https://github.com/actions/setup-go/releases) for the current major
+before pinning; the cache and `go.mod` behaviour below changed in v6.
 
 > **Reference docs** — detailed examples live in `references/`:
-> - `advanced-usage.rst` — version strategies, caching, custom mirrors
-> - `build-test.rst` — full workflow patterns, matrix, artifacts
+> - [references/advanced-usage.rst](references/advanced-usage.rst) — version
+>   syntax, caching variants, restore-only caches, outputs, custom download
+>   URLs, GHES and runners without github.com access
+> - [references/build-test.rst](references/build-test.rst) — full workflow
+>   patterns, matrix, artifacts
 
 ## Quick Start
 
@@ -32,8 +39,8 @@ jobs:
   build:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v5
-      - uses: actions/setup-go@v5
+      - uses: actions/checkout@v7
+      - uses: actions/setup-go@v7
         with:
           go-version-file: go.mod
       - run: go build -v ./...
@@ -47,9 +54,9 @@ jobs:
 Let `go.mod` (or `go.work`, `.go-version`) be the single source of truth:
 
 ```yaml
-- uses: actions/setup-go@v5
+- uses: actions/setup-go@v7
   with:
-    go-version-file: go.mod   # reads toolchain or go directive
+    go-version-file: go.mod   # v6+: `toolchain` directive if present, else `go`
 ```
 
 Only hardcode for matrix strategies or versions not tracked in module files.
@@ -70,30 +77,31 @@ Only hardcode for matrix strategies or versions not tracked in module files.
 ```yaml
 strategy:
   matrix:
-    go-version: ['1.24', '1.25']
+    go-version: [oldstable, stable]   # or explicit minors such as '1.26'
     os: [ubuntu-latest, macos-latest, windows-latest]
 steps:
-  - uses: actions/checkout@v5
-  - uses: actions/setup-go@v5
+  - uses: actions/checkout@v7
+  - uses: actions/setup-go@v7
     with:
       go-version: ${{ matrix.go-version }}
   - run: go test -v ./...
 ```
 
-### 4. Caching is automatic
+### 4. Caching is on by default
 
-`actions/setup-go` v5+ caches `~/go/pkg/mod` and `~/.cache/go-build` automatically
-using `go.sum` as the cache key. Override for special cases:
+setup-go caches the module and build caches by default (since v4). From v6 the
+key hashes the root `go.mod`, not `go.sum`; a module elsewhere, or a
+`go.sum`-only change, needs `cache-dependency-path`:
 
 ```yaml
 # Monorepo — point to the right go.sum
-- uses: actions/setup-go@v5
+- uses: actions/setup-go@v7
   with:
     go-version-file: go.mod
     cache-dependency-path: subdir/go.sum
 
 # Multi-module — glob or multi-line
-- uses: actions/setup-go@v5
+- uses: actions/setup-go@v7
   with:
     go-version-file: go.mod
     cache-dependency-path: |
@@ -101,7 +109,7 @@ using `go.sum` as the cache key. Override for special cases:
       tools/go.sum
 
 # Disable cache entirely
-- uses: actions/setup-go@v5
+- uses: actions/setup-go@v7
   with:
     go-version-file: go.mod
     cache: false
@@ -113,8 +121,8 @@ Standard CI job structure:
 
 ```yaml
 steps:
-  - uses: actions/checkout@v5
-  - uses: actions/setup-go@v5
+  - uses: actions/checkout@v7
+  - uses: actions/setup-go@v7
     with:
       go-version-file: go.mod
   - name: Install dependencies
@@ -124,7 +132,7 @@ steps:
   - name: Test
     run: go test -v -race -coverprofile=coverage.out ./...
   - name: Upload coverage
-    uses: actions/upload-artifact@v4
+    uses: actions/upload-artifact@v7
     with:
       name: coverage
       path: coverage.out
@@ -138,7 +146,7 @@ Export JSON test output for downstream analysis:
 - name: Test with JSON output
   run: go test -json ./... > test-results.json
 - name: Upload test results
-  uses: actions/upload-artifact@v4
+  uses: actions/upload-artifact@v7
   with:
     name: test-results-${{ matrix.go-version }}
     path: test-results.json
@@ -147,7 +155,7 @@ Export JSON test output for downstream analysis:
 ### 7. Use outputs for downstream steps
 
 ```yaml
-- uses: actions/setup-go@v5
+- uses: actions/setup-go@v7
   id: setup
   with:
     go-version: '^1.24'
@@ -163,7 +171,7 @@ Export JSON test output for downstream analysis:
 | Running `go get .` for dependencies | Use `go mod download` (doesn't modify go.mod) |
 | No `-race` flag in CI tests | Add `-race` — CI has the CPU budget |
 | Caching `vendor/` manually | Let setup-go handle module cache automatically |
-| Using `actions/setup-go@v4` | Upgrade to v5+ for automatic caching |
+| Pinning an old major (`setup-go@v4`, `@v5`) | Use the current major; v6+ runs on Node 24 and reads the `toolchain` directive |
 | No `actions/checkout` before setup-go | Always checkout first |
 
 ## External References

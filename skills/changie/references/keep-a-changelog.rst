@@ -29,8 +29,8 @@ Kind           Definition                       Maps to SemVer
 **Security**   Vulnerabilities addressed        patch
 ============== ================================ ==============
 
-These map directly to the ``kinds`` in ``.changie.yaml`` — use them
-verbatim.
+These are the kinds ``changie init`` creates. A project's ``.changie.yaml``
+may rename or replace them; use its labels verbatim.
 
 --------------
 
