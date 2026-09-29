@@ -1,0 +1,89 @@
+<!doctype html>
+<html><head><meta charset="utf-8"></head><body>
+<!-- Every figure image has alt text: labelled and unlabelled cells, a Markdown figure, computational subfigures. Cut from a Quarto 1.10.18 HTML render (Jupyter engine, 2026-09-29). -->
+<main class="content" id="quarto-document-content">
+<p>Case A: labelled cell with fig-alt and fig-cap.</p>
+<div id="cell-fig-a" class="cell" data-execution_count="2">
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb2"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb2-1"><a href="#cb2-1" aria-hidden="true" tabindex="-1"></a>plt.plot([<span class="dv">1</span>, <span class="dv">2</span>, <span class="dv">3</span>])<span class="op">;</span> plt.show()</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<div class="cell-output cell-output-display">
+<div id="fig-a" class="quarto-float quarto-figure quarto-figure-center anchored" alt="ALT-A line chart rising.">
+<figure class="quarto-float quarto-float-fig figure">
+<div aria-describedby="fig-a-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
+<img src="alttext_files/figure-html/fig-a-output-1.png" alt="ALT-A line chart rising." width="579" height="411" class="figure-img">
+</div>
+<figcaption class="quarto-float-caption-bottom quarto-float-caption quarto-float-fig" id="fig-a-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
+Figure&nbsp;1: Caption A.
+</figcaption>
+</figure>
+</div>
+</div>
+</div>
+<p>Case B: unlabelled cell with fig-alt, no label.</p>
+<div id="202198cc" class="cell" data-execution_count="3">
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb3"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb3-1"><a href="#cb3-1" aria-hidden="true" tabindex="-1"></a>plt.plot([<span class="dv">3</span>, <span class="dv">2</span>, <span class="dv">1</span>])<span class="op">;</span> plt.show()</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<div class="cell-output cell-output-display">
+<div>
+<figure class="figure">
+<p><img src="alttext_files/figure-html/cell-4-output-1.png" alt="ALT-B unlabelled." width="579" height="411" class="figure-img"></p>
+</figure>
+</div>
+</div>
+</div>
+<p>Case D: Markdown image with id and fig-alt.</p>
+<div id="fig-d" class="quarto-float quarto-figure quarto-figure-center anchored" alt="ALT-D markdown alt">
+<figure class="quarto-float quarto-float-fig figure">
+<div aria-describedby="fig-d-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
+<img src="img.png" class="img-fluid figure-img" alt="ALT-D markdown alt">
+</div>
+<figcaption class="quarto-float-caption-bottom quarto-float-caption quarto-float-fig" id="fig-d-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
+Figure&nbsp;3: Caption D
+</figcaption>
+</figure>
+</div>
+<p>Case F2: computational subfigures.</p>
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb5"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb5-1"><a href="#cb5-1" aria-hidden="true" tabindex="-1"></a>plt.plot([<span class="dv">1</span>, <span class="dv">2</span>])<span class="op">;</span> plt.show()</span>
+<span id="cb5-2"><a href="#cb5-2" aria-hidden="true" tabindex="-1"></a>plt.plot([<span class="dv">2</span>, <span class="dv">1</span>])<span class="op">;</span> plt.show()</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<div id="fig-g" class="quarto-layout-panel">
+<figure class="quarto-float quarto-float-fig figure">
+<div aria-describedby="fig-g-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
+<div class="quarto-layout-row">
+<div class="cell-output cell-output-display quarto-layout-cell-subref quarto-layout-cell" data-ref-parent="fig-g" style="flex-basis: 50.0%;justify-content: flex-start;">
+<div id="fig-g-1" class="quarto-float quarto-figure quarto-figure-center anchored" alt="ALT-G1">
+<figure class="quarto-float quarto-subfloat-fig figure">
+<div aria-describedby="fig-g-1-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
+<img src="alttext_files/figure-html/fig-g-output-1.png" data-ref-parent="fig-g" alt="ALT-G1" width="571" height="411" class="figure-img">
+</div>
+<figcaption class="quarto-float-caption-bottom quarto-subfloat-caption quarto-subfloat-fig" id="fig-g-1-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
+(a) Sub G1
+</figcaption>
+</figure>
+</div>
+</div>
+<div class="cell-output cell-output-display quarto-layout-cell-subref quarto-layout-cell" data-ref-parent="fig-g" style="flex-basis: 50.0%;justify-content: flex-start;">
+<div id="fig-g-2" class="quarto-float quarto-figure quarto-figure-center anchored" alt="ALT-G2">
+<figure class="quarto-float quarto-subfloat-fig figure">
+<div aria-describedby="fig-g-2-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
+<img src="alttext_files/figure-html/fig-g-output-2.png" data-ref-parent="fig-g" alt="ALT-G2" width="571" height="411" class="figure-img">
+</div>
+<figcaption class="quarto-float-caption-bottom quarto-subfloat-caption quarto-subfloat-fig" id="fig-g-2-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
+(b) Sub G2
+</figcaption>
+</figure>
+</div>
+</div>
+</div>
+</div>
+<figcaption class="quarto-float-caption-bottom quarto-float-caption quarto-float-fig" id="fig-g-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
+Figure&nbsp;6: Caption G.
+</figcaption>
+</figure>
+</div>
+<p>Case K: unlabelled markdown image with fig-alt only.</p>
+<div class="quarto-figure quarto-figure-center">
+<figure class="figure">
+<p><img src="img.png" class="img-fluid figure-img" alt="ALT-K"></p>
+<figcaption>Caption K</figcaption>
+</figure>
+</div>
+</main>
+</body></html>

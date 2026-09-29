@@ -1,0 +1,36 @@
+<!doctype html>
+<html><head><meta charset="utf-8"></head><body>
+<!-- A multi-line '#| fig-alt: |' block under the Jupyter engine: the caption leaks into alt and the attribute text into the page. Cut from a Quarto 1.10.18 HTML render (Jupyter engine, 2026-09-29). -->
+<main class="content" id="quarto-document-content">
+<p>Case A: labelled cell with fig-alt and fig-cap.</p>
+<div id="cell-fig-a" class="cell" data-execution_count="2">
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb2"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb2-1"><a href="#cb2-1" aria-hidden="true" tabindex="-1"></a>plt.plot([<span class="dv">1</span>, <span class="dv">2</span>, <span class="dv">3</span>])<span class="op">;</span> plt.show()</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<div class="cell-output cell-output-display">
+<div id="fig-a" class="quarto-float quarto-figure quarto-figure-center anchored" alt="ALT-A line chart rising.">
+<figure class="quarto-float quarto-float-fig figure">
+<div aria-describedby="fig-a-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
+<img src="alttext_files/figure-html/fig-a-output-1.png" alt="ALT-A line chart rising." width="579" height="411" class="figure-img">
+</div>
+<figcaption class="quarto-float-caption-bottom quarto-float-caption quarto-float-fig" id="fig-a-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
+Figure&nbsp;1: Caption A.
+</figcaption>
+</figure>
+</div>
+</div>
+</div>
+<p>Case H: multi-line fig-alt block.</p>
+<div id="cell-fig-h" class="cell" data-execution_count="6">
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb6"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb6-1"><a href="#cb6-1" aria-hidden="true" tabindex="-1"></a>plt.plot([<span class="dv">0</span>, <span class="dv">1</span>])<span class="op">;</span> plt.show()</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<div class="cell-output cell-output-display">
+<div>
+<figure class="figure">
+<p><img src="alttext_files/figure-html/fig-h-output-1.png" class="img-fluid figure-img" alt="Caption H.">{#fig-h width=571 height=411 fig-alt=’</p>
+</figure>
+</div>
+<p>ALT-H line one of a multi-line</p>
+<p>description spanning two lines. ’}</p>
+</div>
+</div>
+<p>Refs: <a href="#fig-a" class="quarto-xref">Figure&nbsp;1</a> <strong>?@fig-h</strong></p>
+</main>
+</body></html>
