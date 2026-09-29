@@ -116,12 +116,13 @@ class Intake(unittest.TestCase):
     def test_invalid_intake_does_not_print_sensitive_values(self):
         with tempfile.TemporaryDirectory() as tmp:
             p = Project(tmp)
-            for fault in ("confirmer", "duplicate", "date", "schema", "shape"):
+            for fault in ("confirmer", "duplicate", "date", "schema", "shape", "finer-null"):
                 value = copy.deepcopy(intake())
                 if fault == "confirmer": value["decisions"][0]["confirmed_by"] = "secret@example.com"
                 elif fault == "duplicate": value["decisions"].append(value["decisions"][0])
                 elif fault == "date": value["decisions"][0]["confirmed_at"] = "SECRET"
                 elif fault == "schema": value["schemaVersion"] = 99
+                elif fault == "finer-null": value["decisions"][0].update(topic="grain", unit="patient", finer_outputs=None)
                 else: value["decisions"] = "SECRET"
                 source = p.root / "answers.intake.json"
                 source.write_text(json.dumps(value))

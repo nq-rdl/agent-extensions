@@ -19,7 +19,7 @@ def idecision:
   and .confirmed_role == "analyst" and (.confirmed_at | iutc)
   and (if has("decided") then .decided | type == "object" and (.by | iactor) and (.role | ine) and (.at | iorigin) and (.source | ine) else true end)
   and (if .topic == "grain" then (.unit | ine) and
-    ((.finer_outputs // []) | type == "array" and all(.[]; type == "object" and (.name | ine) and (.unit | ine) and (.description | ine)) and
+    ((if has("finer_outputs") then .finer_outputs else [] end) | type == "array" and all(.[]; type == "object" and (.name | ine) and (.unit | ine) and (.description | ine)) and
       (map(.name) | length == (unique | length))) else true end);
 def intake_valid:
   type == "object" and .schemaVersion == 1 and (.approval_number | ine)
