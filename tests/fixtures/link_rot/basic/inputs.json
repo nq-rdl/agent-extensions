@@ -1,0 +1,13 @@
+{
+ "canonical": [
+  "AGENTS.md",
+  "CONTRIBUTING.md",
+  "README.md",
+  "docs/guide.md",
+  "skills/demo/SKILL.md",
+  "skills/demo/references/guide.rst"
+ ],
+ "report_only": [
+  "hooks/demo.sh"
+ ]
+}

@@ -1,0 +1,82 @@
+{
+ "success_map": {
+  "/tmp/confirm-inputs.md": [
+   {
+    "url": "https://docs.example.com/flaky",
+    "status": {
+     "text": "200 OK",
+     "code": 200
+    },
+    "span": {
+     "line": 2,
+     "column": 2
+    }
+   }
+  ]
+ },
+ "error_map": {
+  "/tmp/confirm-inputs.md": [
+   {
+    "url": "https://docs.example.com/gone",
+    "status": {
+     "text": "Rejected status code: 404 Not Found",
+     "code": 404
+    },
+    "span": {
+     "line": 1,
+     "column": 2
+    }
+   },
+   {
+    "url": "https://nxdomain.invalid/page",
+    "status": {
+     "text": "Network error: Connection failed. Check network connectivity and firewall settings",
+     "details": "Connection failed. Check network connectivity and firewall settings"
+    },
+    "span": {
+     "line": 3,
+     "column": 2
+    }
+   },
+   {
+    "url": "https://api.example.net/forbidden",
+    "status": {
+     "text": "Rejected status code: 403 Forbidden",
+     "code": 403
+    },
+    "span": {
+     "line": 4,
+     "column": 2
+    }
+   },
+   {
+    "url": "https://github.com/$repo/raw",
+    "status": {
+     "text": "Rejected status code: 404 Not Found",
+     "code": 404
+    },
+    "span": {
+     "line": 6,
+     "column": 2
+    }
+   }
+  ]
+ },
+ "timeout_map": {
+  "/tmp/confirm-inputs.md": [
+   {
+    "url": "https://slow.example.org/",
+    "status": {
+     "text": "Timeout",
+     "details": "Request timed out"
+    },
+    "span": {
+     "line": 5,
+     "column": 2
+    }
+   }
+  ]
+ },
+ "excluded_map": {},
+ "total": 6
+}

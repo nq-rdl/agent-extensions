@@ -1,0 +1,3 @@
+kind: Added
+body: Link-rot tracker supports per-URL suppression by maintainer comment, treats a manual close as dismissal, and reopens only for new or recurring broken URLs (#301)
+time: 2026-09-29T04:10:28.551065752Z

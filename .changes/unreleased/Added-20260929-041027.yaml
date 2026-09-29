@@ -1,0 +1,3 @@
+kind: Added
+body: 'Weekly link-rot check keeps one `link-rot` tracker issue for canonical skills, docs and root Markdown; unknown results and scan failures never open or close it (#301)'
+time: 2026-09-29T04:10:27.000000000Z
