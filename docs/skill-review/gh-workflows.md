@@ -214,3 +214,91 @@ afterwards (`git log`, status, branch).
 | S1 | authorized, blocked | send-pr-branch | "/gh:send-pr" | Commits without `.env`; push fails and is reported; no PR claimed |
 | S2 | default branch | send-pr-main | "/gh:send-pr" | Creates a feature branch before committing; nothing committed on `main` |
 | S3 | push works, PR cannot | send-pr-branch + local bare origin | "/gh:send-pr request a review from alice" | Branch pushed; PR creation fails (gh unauthenticated) and is reported with the pushed state; reviewer not claimed |
+
+---
+
+Everything below was recorded **after** the edits.
+
+## Factual checks (executed or fetched 2026-09-29)
+
+| Skill | Finding | Source / execution | Action |
+|---|---|---|---|
+| husky | Husky 9 sets `core.hooksPath=.husky/_`; runs hooks as `sh -e .husky/<hook>`; shebang ignored, exec bit not needed | husky 9.1.7 `index.js` and `.husky/_/h`; docs v9.1.7 | Fixed (was `.husky`, "shebang required", `chmod +x`) |
+| husky | Bash shebang + `set -euo pipefail` fails on Debian bookworm (dash): `Illegal option -o pipefail`; `[[ ]]` → `not found`, silently skipped inside `if`; `bash scripts/x.sh` works; `HUSKY=0` bypasses | `node:22-bookworm` container end-to-end commits | Fixed |
+| husky | lint-staged `git add` task obsolete (tasks auto-staged) | lint-staged v17.6.0 README | Removed |
+| lefthook | `file_types: [".proto"]` filters nothing (all staged files passed); `priority` invalid for jobs; integer `env` values invalid | `lefthook validate` / `lefthook run`, lefthook 2.1.12; docs v2.1.14 | Fixed; new example validated and run |
+| lefthook | `lefthook install` refuses while Husky's `core.hooksPath` is set; `--reset-hooks-path` fixes | executed in a Husky repo | Added to migration |
+| lefthook | npm postinstall skipped with `CI=true`, forced with `LEFTHOOK=1`; `go install` needs Go 1.26 | docs v2.1.14 | Added |
+| pre-commit | `pixi add --dev` → `unexpected argument '--dev'` (pixi 0.78.0) | executed | Fixed (`pixi add pre-commit`; feature env variant executed) |
+| pre-commit | Latest pins: pre-commit-hooks v6.0.0, ruff-pre-commit v0.16.9 (`ruff-check`; `ruff` legacy alias), setup-pixi v0.10.2 | GitHub releases API; `validate-config` and `run --all-files` executed | Updated |
+| pre-commit | `uv add --dev pre-commit` + `uv run pre-commit install` work (uv 0.12.17) | executed | Added |
+| changie | Double-quoted backticks in two examples dropped the words (`body: New  skill for bar`) | changie 1.26.0 `--dry-run` | Fixed (single quotes) |
+| changie | `changie init` default kinds = the six; unknown kind rejected; `new` enforces `maxLength`, `batch --dry-run` does not (catches bad YAML) | executed | Stated |
+| changie | changie-action latest `v3` (ref said v2.1.0) | action repo | Updated; release choreography replaced by pointer |
+| go-gh | setup-go cache on by default since v4 (not v5); v6+ key = root `go.mod`, not `go.sum`; latest majors setup-go/checkout/upload-artifact v7 | release notes v4.0.0/v6.0.0/v7.0.0, README v7.0.0 | Fixed |
+| go-gh | GHES without github.com: versions must be in runner tool cache (ref said "configure a mirror") | setup-go docs v7.0.0 | Fixed; restore-only key caveat added |
+| send-pr | In all 5 observed failures (no remote/unauth, local bare origin, GitHub URL unauth; auth + no remote; auth + non-GitHub remote) `gh pr create --base main` failed exactly like `gh repo view` | `gh-fallback.sh` runs, gh 2.97.0 | Fallback chain removed; `--base` omitted by default |
+| #187 | Closed 2026-09-23 (YAML validity via `check_changie_length.py`); trailing period is not enforced anywhere | `gh issue view 187`, `.changie.yaml`, script grep | Labelled as house style in skill; no new enforcement |
+
+## Behavioural results (claude-sonnet-5, Claude Code 2.1.284)
+
+Original = `4817a19`; rev = `ff461f0`; rev2 = `5e76241` (send-pr prerequisite fix); rev3 = `518827b` (husky description). One run per cell unless noted. Explicit `/gh:…` invocations do not emit a `Skill` event.
+
+| Case | Original | Revised |
+|---|---|---|
+| R1h / R1p / R1l | pass (extend configured tool) | pass |
+| R1n (node-only, generic) | **fail**: invoked `gh:husky`, "no hook manager, so the standard fit is Husky v9", bash shebang + pipefail + `chmod +x`, "`core.hooksPath` → `.husky`" | pass: no skill, stated no manager configured, dependency-free `.githooks` (rev3 r1 also run; not graded) |
+| R1g | pass | pass |
+| R2 / R4 / R5 | pass (R4 used `@v5` pins) | pass (R4 `@v7`) |
+| R3 migration | pass (`git config --unset core.hooksPath`) | pass (`lefthook install --reset-hooks-path`) |
+| H1 dash gotcha | **fail**: no skill; wrong mechanism (exec bit), recommends chmod | rev: no skill, hedged mechanism; rev3 r1: no skill but correct `sh -e` mechanism and fix. **Routing to `gh:husky` not achieved in 3 runs** |
+| H2 hooksPath | pass (`.husky/_`, but also advised chmod) | pass |
+| L1 | pass | pass |
+| P1 uv | partial: uv commands right, stale revs (v4.6.0 / v0.6.9) | pass (current revs, `ruff-check`) |
+| P2 pixi | **fail**: `pixi add --dev` (errors), stale rev | pass |
+| C1 changie | pass | pass |
+| G2 GHES | pass (read reference; mirror first) | pass (read reference; tool cache first) |
+| G3 cache key | **fail** on key ("go.sum") | pass ("root go.mod") |
+| D1 review only | pass (no skill, no commit) | pass (skill auto-invoked, no edits/commit/push) |
+| D2 commit only | pass, canned message | pass, descriptive message, no push |
+| D3 commit+push, no remote | **fail**: blocked on VERSION question, nothing committed | pass: committed, push failure reported, VERSION left as open question |
+| S1 no remote | pass (commit, push failure reported) | rev: **regressed** (stopped before commit) → rev2: pass 2/2 |
+| S2 on main | stopped, no commit (asked) | rev: stopped → rev2: pass 2/2 (created `feat/…` branch, main untouched) |
+| S3 bare origin | pass (`--base main`, reviewer deferred) | pass (no `--base`, `--reviewer alice` at create, failure reported) |
+
+Paid spend: **USD 8.93** total (all runs, including two killed at hand-off).
+
+## Per-issue dispositions
+
+| Issue | Candidate | Disposition | Evidence |
+|---|---|---|---|
+| #305 | husky repetition | changed (214→89 body lines; examples owned once, reference = variants/migration) | commit `8fe503c` |
+| #305 | lefthook repetition | changed (313→89) | `95554ee` |
+| #305 | go-gh vendored references | retained with reason (G2 read `advanced-usage.rst` in both versions; offline/GHES value); factual fixes | `a822873` |
+| #305 | changie repeated policy / release prose | changed (167→73); trailing period = explicit house style (#187 closed, no enforcement) | `7c57ec6` |
+| #306 | husky description | changed; R1n fixed; H1 routing still unmet | `8fe503c`, `518827b` |
+| #306 | document-release description | changed (408→337; states publish-only-when-asked) | `cc22708` |
+| #306 | Husky/pre-commit/lefthook routing case | changed in all three skills + decision guide | R1*/R2/R3 table |
+| #307 | document-release | changed (353→93 lines); authorization table; changelog/changie/VERSION/health summary kept | D1–D3 |
+| #307 | send-pr | changed; fallback chain removed on evidence | S1–S3, `gh-fallback.out` |
+| #307 | changie rename/release choreography | rename: obsolete — removed by #411 (`d0bdc1b`); release CI choreography replaced | `7c57ec6` |
+| #308 | lefthook examples/migration | separate factual fixes | `95554ee` |
+| #308 | pre-commit repos/pins | separate factual fixes | `9039700` |
+| #309 | pre-commit decision record | **retain** in `gh`; no pixi requirement; applies to any repo with `.pre-commit-config.yaml` (R1p Node project routed correctly); needs Python + network on first hook run; no grouping change | P1/P2/R1p |
+| — | conventional-commits | retained (no finding > MINOR; now route target of send-pr) | rubric |
+| — | pr-comments | retained; not behaviourally tested (needs a real PR with review threads) | rubric only |
+| — | lychee | retained (#299–#301 own it); link check of changed files: 0 errors | lychee run |
+
+## Status at hand-off
+
+**Done and committed** on `epic312/gh-workflows`: evidence record (`74faa2a`), husky, lefthook, pre-commit, changie, go-gh, document-release, send-pr edits with changie fragments (`8fe503c`…`518827b`). Validators run after the main edits: generate_manifests/bundles_doc/eval_graders `--check`, check_bundle_refs/exposure/grouping/consistency, sync-plugins `--check`, validate-plugins, asctl repo-check: all pass. Unit tests: 1037 run, 1 failure (`test_release_documentation_uses_context_matched_host_edits`) fixed in `680ac92` and `tests.test_codex_package` re-run OK; the **full suite was not re-run after that fix**. lychee on changed skill files: 0 errors (2 redirects).
+
+**Not finished:**
+- H1 routing (`gh:husky` not auto-invoked for a failing-hook question in orig, rev, rev3 r1). rev3 r2, H1x (explicit) orig/rev3 and R1n rev3 results exist in the scratch results but were **not graded**; R1n orig r2 and H1 orig r2 were killed/not run.
+- No reusable `evals/claude/gh/` suite was added (only `claude -p` runs); no unit test was added because no code changed.
+- Most cases have one run per version; only S1/S2 rev2 were repeated.
+- CONTRIBUTING/AGENTS not edited (not assigned).
+
+**Scratch harness** (not in repo): `/tmp/claude-1001/-home-rudolfjs-dev-rdl-nq-rdl-agent-extensions/15b2cf65-4e02-4635-9f01-fd1df4014e8d/scratchpad/ghw/` — `fixtures.sh`, `run.sh`, `matrix.sh`, `prompts/`, `summ.py`, `show.sh`, `results/*.jsonl|.state`, verification scripts (`husky-dash.sh`, `lh-example.sh`, `pc-install.sh`, `changie-quote.sh`, `gh-fallback*.sh`) and their `.out` files.
+
+**Next steps:** run the full unit suite; grade the ungraded H1/H1x/R1n runs; decide whether H1 routing needs a stronger description cue (e.g. "hook errors under sh/dash") or accept explicit invocation; repeat single-run cases that changed outcome (R1n, H1, P2, G3, D3) once more before claiming gains; wire this doc into zensical nav (coordinator).
