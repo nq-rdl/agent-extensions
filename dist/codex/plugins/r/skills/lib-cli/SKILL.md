@@ -102,9 +102,14 @@ cli_text("{nupd}/{ntotal} {qty(nupd)} file{?s} {?needs/need} updates")
 
 bad <- which(c(1, -1, -2) <= 0)                             # c(2L, 3L)
 cli_text("Element{?s} {bad} {?is/are} not positive.")       # WRONG: numeric length 2
+cli_text("{qty(length(bad))}Element{?s} {bad} {?is/are} not positive.")  # WRONG too
 cli_text("Element{?s} {as.character(bad)} {?is/are} not positive.")
 #> Elements 2 and 3 are not positive.
 ```
+
+`qty()` does not rescue a numeric vector interpolated later in the string:
+that value becomes the quantity for the next `{?}` and fails the same way
+(`{.val {bad}}` too). Convert the displayed value with `as.character()`.
 
 ## Rule 3: attribute errors to the user's call
 
