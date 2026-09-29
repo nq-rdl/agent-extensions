@@ -22,8 +22,10 @@ lesson – your default grammar is fine. Long form, tables, and examples live in
 ## Mandatory STE review
 
 Before delivering documentation, apply the simplified STE profile in
-`references/ste-review.rst` and correct its findings. The plugin’s completion
-hook independently reviews the deliverable and blocks completion on findings.
+`references/ste-review.rst` and correct its findings on every host. In Claude
+Code, the plugin’s completion hook also reviews the deliverable and blocks
+completion on findings. Codex does not run that completion hook; apply the
+review directly before delivery.
 The profile takes precedence over the general house rules for sentence
 limits, contractions, and semicolons. It does not change project spelling or
 normative requirements. Blog posts and status-only replies are outside scope.
