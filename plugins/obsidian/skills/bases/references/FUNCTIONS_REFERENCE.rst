@@ -1,5 +1,17 @@
 # Functions Reference
 
+Functions and fields for Bases formulas and filters, plus the default summary
+formulas. Function names were compared with https://help.obsidian.md/bases/functions
+on 2026-09-29.
+
+Contents: [Global](#global-functions) · [Any](#any-type-functions) ·
+[Date](#date-functions--fields) · [Duration](#duration-type) ·
+[Date arithmetic](#date-arithmetic) · [String](#string-functions) ·
+[Number](#number-functions) · [List](#list-functions) ·
+[File](#file-functions) · [Link](#link-functions) ·
+[Object](#object-functions) · [RegExp](#regular-expression-functions) ·
+[Summaries](#default-summary-formulas)
+
 ## Global Functions
 
 | Function | Signature | Description |
@@ -19,6 +31,7 @@
 | `icon()` | `icon(name): icon` | Lucide icon by name |
 | `html()` | `html(string): html` | Render as HTML |
 | `escapeHTML()` | `escapeHTML(string): string` | Escape HTML characters |
+| `random()` | `random(): number` | Random number between 0 and 1; refreshes when a view loads |
 
 ## Any Type Functions
 
@@ -171,3 +184,27 @@ When subtracting two dates, the result is a **Duration** type (not a number). Du
 | Function | Signature | Description |
 |----------|-----------|-------------|
 | `matches()` | `regexp.matches(string): boolean` | Test if matches |
+
+## Default Summary Formulas
+
+Assign these by name in a view's `summaries` map. Define custom ones in the
+top-level `summaries` section, where `values` is the list of the column's
+values (for example `'values.mean().round(3)'`).
+
+| Name | Input Type | Description |
+|------|------------|-------------|
+| `Average` | Number | Mathematical mean |
+| `Min` | Number | Smallest number |
+| `Max` | Number | Largest number |
+| `Sum` | Number | Sum of all numbers |
+| `Range` | Number | Max - Min |
+| `Median` | Number | Mathematical median |
+| `Stddev` | Number | Standard deviation |
+| `Earliest` | Date | Earliest date |
+| `Latest` | Date | Latest date |
+| `Range` | Date | Latest - Earliest |
+| `Checked` | Boolean | Count of true values |
+| `Unchecked` | Boolean | Count of false values |
+| `Empty` | Any | Count of empty values |
+| `Filled` | Any | Count of non-empty values |
+| `Unique` | Any | Count of unique values |
