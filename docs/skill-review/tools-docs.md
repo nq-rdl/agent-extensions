@@ -236,7 +236,7 @@ twice (a staging race, then the wind-down) whose cost was not captured
 |---|---|---|---|
 | #305 | bitwarden | Changed | `bw-env.sh` owner, tests `tests/test_bitwarden_bw_env.py` (12 of 16 failed before the fix; all 18 pass after; also run in zsh 5.9 + BusyBox awk), B1 |
 | #305 | starrocks | Changed | decision tables kept; ANALYZE/MV SQL routed; commit `982cd8c` |
-| #305 | rust-explain | **Deferred** | reference-removal comparison started, variant runs incomplete; references retained unchanged |
+| #305 | rust-explain | **Retained** | completed R1/R2 comparison below; no demonstrated task/loading benefit from removal |
 | #305 | quarto-authoring | Changed | body 311 → about 110 lines, routes per task; Q1 |
 | #305 | writerside | Changed | one owner for builder tag; runnable examples; W1 |
 | #305 | obsidian-markdown | Changed | vault gotchas (verified against obsidian-help `bc5b4f2`), generic examples dropped |
@@ -283,3 +283,34 @@ docs, bw logs and fixtures).
   left to the user.
 - A broad `pkill -f run.py` during a restart may have stopped other agents'
   runner processes that shared the name.
+
+## Rust vocabulary decision (#305, 2026-09-29)
+
+**Retain** `reading-vocabulary.rst`; reject deletion in this PR. Compared the
+original `4817a19` plugin with the saved `novocab` variant (file and its routes
+removed). The two original R1/R2 prompts above ran twice per variant in Claude
+Code 2.1.284 / claude-sonnet-5 with Skill/Read/Glob/Grep, no shell, hooks disabled,
+and independent temporary workspaces. All eight invoked `rust:explain`.
+
+| Task | Original | Without vocabulary | Reference loading |
+|---|---|---|---|
+| R1: borrowed word slices used after `drop(s)` | 2/2 identify E0505 and give a valid lifetime/owned-string fix | 2/2 same core diagnosis/fix | Vocabulary read 0/2 in both; tooling read 1/2 original, 0/2 variant |
+| R2: map value reference used after `clear()` | 2/2 identify E0502 and use `.copied()` | 2/2 same core diagnosis/fix | Tooling read 2/2 in both; vocabulary read 0/2 |
+
+The archived, previously ungraded R2 variant runs 1 and 3 also give the right
+E0502 diagnosis and `.copied()` fix; variant run 2 and all archived R1 variant
+runs were incomplete and are not successes. The new run replaces that missing
+comparison. Rustc 1.97.1, edition 2021, `--crate-type lib` reproduced both errors
+and compiled the minimal fixes. These were trusted, self-contained snippets;
+no Cargo build scripts or runtime execution were involved.
+
+The comparison does **not** demonstrate that removing the reference reduces
+loaded context: the originals never read it. Some R1 answers in both variants
+also overstate the need for an explicit `+ 'a` bound: the item type already
+mentions `'a`, and the fixed example compiled without that bound. The core
+borrow-diagnostic score is not a claim that every explanatory aside is correct.
+The reference's removal has no demonstrated task or loading benefit and these
+two tasks do not cover its full ownership/closure/iterator content. Retention
+preserves the existing offline resource and public route; no incoming link,
+registry member or grouping changes. A broader deletion needs better task
+coverage, not a line-count argument.
