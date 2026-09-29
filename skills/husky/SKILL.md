@@ -3,8 +3,9 @@ name: husky
 license: CC-BY-4.0
 description: >-
   Husky v9 Git hooks: set up or fix `.husky/` hooks, the `prepare` script,
-  lint-staged or commitlint hooks, CI and production installs, and hooks that do
-  not run. Use when the repository has `.husky/` or the user asks for Husky. A
+  lint-staged or commitlint hooks, CI and production installs, and hooks that
+  fail or do not run. Use when the repository has `.husky/` or the user
+  mentions Husky. A
   `package.json` alone does not mean Husky; for `lefthook.yml` or
   `.pre-commit-config.yaml` use the lefthook or pre-commit skill.
 compatibility: >-
