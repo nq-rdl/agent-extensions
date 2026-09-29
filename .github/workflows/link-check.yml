@@ -3,8 +3,9 @@ name: Link Check
 # Advisory external (HTTP) link health for canonical skill docs. Local
 # Markdown/RST file references are checked offline and deterministically by
 # `asctl repo-check` in validate.yml; this job only covers network targets.
-# Generated plugins/** and dist/** copies are not scanned. agents/, docs/ and
-# hooks/ URLs are left to the weekly report (#301).
+# Generated plugins/** and dist/** copies are not scanned. docs/, the root
+# Markdown files, and hooks/skill assets are covered by the weekly
+# link-rot-check.yml report (#301; docs/link-monitoring.md).
 on:
   pull_request:
     paths:
