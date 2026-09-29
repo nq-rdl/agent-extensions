@@ -14,8 +14,9 @@ metadata:
 # Skill Audit
 
 Run the non-inferable-value rubric over a target `SKILL.md` (or the session's
-skill diff). See CONTRIBUTING.md → "Skill content conventions" for the authoring
-rules this enforces.
+skill diff). The rubric below is self-contained. In the agent-extensions
+repository, CONTRIBUTING.md → "Skill content conventions" holds the authoring
+rules it enforces; elsewhere, do not search for that file.
 
 ## Rubric
 1. **Non-inferable value (Biggs):** could a fresh model write this verbatim? If yes → cut.
@@ -38,3 +39,5 @@ This is a read-only audit; do not edit the target files.
 handoff inputs, execution boundaries, and expected result. Read it when delegating
 would help or the user asks to “create a subagent to execute this.” Otherwise,
 work directly from this skill; the reference does not need to be loaded.
+A worker that received this skill in a handoff is the auditor: it applies the
+rubric itself and does not delegate again.
