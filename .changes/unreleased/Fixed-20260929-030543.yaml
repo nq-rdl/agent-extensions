@@ -1,3 +1,0 @@
-kind: Fixed
-body: 'data-request: skills record people by handle (GitHub login, else git user.name), never git user.email (#419)'
-time: 2026-09-29T03:05:43.044965474Z
