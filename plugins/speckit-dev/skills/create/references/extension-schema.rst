@@ -43,10 +43,13 @@ template/script/event shapes.
 hooks (optional)
 ----------------
 
-Events (18): before_/after_ x {specify, plan, tasks, implement, analyze,
-checklist, clarify, constitution, taskstoissues}. Each entry (single or list):
+Events (20): before_/after_ x {specify, plan, tasks, implement, analyze,
+checklist, clarify, constitution, taskstoissues, converge}. The Development Guide
+lists 18; ``converge`` hooks are read by the core ``converge`` command template. Each entry (single or list):
 ``command``, ``priority`` (int >= 1, default 10), ``optional``, ``prompt``,
-``description``, ``condition`` (future).
+``description``, ``condition`` (evaluated when the hook would run:
+``config.<key> is set``, ``==``/``!=``, ``env.<VAR> is set``/``==``; not validated
+at install).
 
 Command file frontmatter
 ------------------------
