@@ -20,9 +20,10 @@ Go's "errors are values" design means every error is explicitly handled at the c
 site. This is powerful — but it also means every error is a potential data leak if it
 crosses a trust boundary without sanitization.
 
-Real-world impact: CVE-2025-7445 in Kubernetes exposed service account tokens through
-error-marshalling code paths. Verbose errors in production have leaked SQL queries,
-file paths, credentials, and infrastructure topology.
+Real-world impact: [CVE-2025-7445](https://github.com/kubernetes/kubernetes/issues/133897): the
+Kubernetes secrets-store-sync-controller (before v0.0.2) wrote service account tokens to
+its logs when marshalling the provider `parameters` failed. Verbose errors in production
+have leaked SQL queries, file paths, credentials, and infrastructure topology.
 
 ## The Core Rule
 
