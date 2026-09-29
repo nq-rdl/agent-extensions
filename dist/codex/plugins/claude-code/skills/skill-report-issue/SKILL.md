@@ -1,12 +1,11 @@
 ---
 name: skill-report-issue
 license: CC-BY-4.0
-description: Report issues with skills to their upstream repository. Use when a skill
-  produces errors, unexpected behavior, incorrect output, or fails silently. Also
-  trigger when the user says things like "this skill is broken", "file a bug for this
-  skill", "report this to the skill author", or when you notice a skill behaving incorrectly
-  during normal use. Even if the user doesn't explicitly ask, offer to report the
-  issue if you observe a clear skill defect.
+description: Report a defect in an installed skill to the skill's upstream GitHub
+  repository. Use when a skill gives wrong instructions, errors, or fails silently,
+  or when the user says "this skill is broken", "file a bug for this skill", or "report
+  this to the skill author". Searches for duplicates, drafts one issue per problem,
+  and files it when the user asks.
 metadata:
   repo: https://github.com/nq-rdl/agent-extensions
 ---
@@ -36,12 +35,12 @@ available GitHub integration or authenticated `gh` CLI.
 ## Review and publish
 
 Read and follow [references/reporting.rst](references/reporting.rst), the required
-shared procedure for duplicate search, diagnosis, draft approval, publication,
+shared procedure for duplicate search, diagnosis, authorization, publication,
 and failure handling. Discover the GitHub tools actually available in this host;
 do not assume Claude-specific MCP tool names exist. Use `gh` with a body file
 when no suitable integration is available. If neither route works, prepare the
 manual report and state that it was not filed.
 
-Present the complete destination, title, and body for the user's review before
-publishing. Do not publish without the explicit confirmation required by the
-shared procedure. An observed defect alone does not authorize filing an issue.
+A user's request to file the report authorizes filing it; otherwise present
+the complete draft and wait for explicit confirmation, as the shared procedure
+states. An observed defect alone does not authorize filing an issue.

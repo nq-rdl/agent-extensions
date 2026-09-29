@@ -1,0 +1,3 @@
+kind: Changed
+body: new-service-request reads the chosen template when reachable, passes the body by file, and reports a failed create without claiming an issue (#307)
+time: 2026-09-29T05:42:58.880490351Z
