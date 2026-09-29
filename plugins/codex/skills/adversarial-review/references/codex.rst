@@ -9,7 +9,9 @@ variable. Use the host shell tool and its background-session support. Never call
 Claude's Bash, BashOutput, Agent, or AskUserQuestion tools from Codex.
 
 Run an independent adversarial review; do not fix the findings. Inspect git
-status including untracked files, preserve the user's target and focus. Honor
+status including untracked files, preserve the user's target and focus text.
+Targets match $codex:review: working tree, branch, or --base; no staged-only or
+unstaged-only scope. Honor
 --wait or --background. Without either flag, ask once whether to wait or use the
 host's background shell session. The companion parses flags; the host detaches.
 

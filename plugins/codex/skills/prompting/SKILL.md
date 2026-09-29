@@ -12,6 +12,8 @@ Derived from openai/codex-plugin-cc v1.0.6 (db52e28), Apache-2.0. Modified for r
 Rewritten from the GPT-5.4 guide against OpenAI's GPT-5.6 prompting guidance.
 -->
 
+Source: OpenAI, [Prompting guidance for GPT-5.6 Sol](https://developers.openai.com/api/docs/guides/prompt-guidance-gpt-5p6), verified 2026-09-29. That guide targets the API; this skill keeps only what a `codex:rescue` prompt can use. Re-check it when OpenAI ships a new model family. If it and this skill disagree, follow the guide for prompt wording and this skill for companion flags.
+
 # GPT-5.6 Prompting
 
 Use this skill when `codex:rescue` needs to ask Codex or another GPT-5.6-based workflow for help.
@@ -21,7 +23,7 @@ GPT-5.6 rewards leaner prompts than 5.4/5.5. Prompt Codex like an operator: stat
 Core rules (5.6-specific):
 - **State instructions once.** 5.6 follows a single clear instruction; repeating it degrades quality. Pruning redundant tools, examples, and restated rules improves both quality and token cost.
 - **One autonomy / approval-boundary policy.** 5.6 is proactive. Repeated "ask first" instructions cause over-asking. Give one consolidated policy block that says when to proceed and when to stop for high-risk missing context.
-- **Steer length and style with `text.verbosity`, not prose.** 5.6 is more concise than 5.5 by default. Set the parameter rather than restating "be brief" / "be thorough".
+- **Do not add generic length prose.** 5.6 is more concise than 5.5 by default, so "be brief" / "be thorough" lines over-correct. The companion exposes no verbosity parameter (the guide's `text.verbosity` is an API setting); put task-specific length in the output contract.
 - Prefer one clear task per Codex run. Split unrelated asks into separate runs.
 - Tell Codex what done looks like. Do not assume it will infer the desired end state.
 - Add explicit grounding and verification rules only where unsupported guesses would hurt quality.
@@ -47,9 +49,8 @@ How to choose prompt shape:
 - Use `task --resume-last` for follow-ups on the same Codex thread. Send only the delta instruction unless the direction changed materially.
 
 Migration from 5.4/5.5:
-- Keep your current effort baseline, then test one step lower — 5.6 often matches the old tier at less cost. See `codex:model-guide` for the ladder and per-model defaults.
-- Remove step-by-step scaffolding and "think carefully" boilerplate; 5.6 does not need it.
-- New-capability callouts (API-level, independent of Codex effort): prompt caching (`prompt_cache_options`), persisted reasoning (`reasoning.context`), `reasoning.mode: "pro"`, `max` effort, and the multi-agent beta (`ultra`). None of these replace a tight prompt contract.
+- Keep the current effort as the baseline, then test the same setting and one level lower. See `codex:model-guide` for the ladder and per-model defaults.
+- Remove obsolete step-by-step scaffolding; add targeted fixes only where a task fails.
 
 Prompt assembly checklist:
 1. Define the exact task and scope in `<task>`.

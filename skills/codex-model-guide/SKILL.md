@@ -20,31 +20,30 @@ The delegation decision guide used by Claude Code and the `codex:rescue` executo
 
 `codex debug models` is the authority for what is actually available in the installed Codex. When a value below differs from `codex debug models`, trust the live catalog and prefer it over this static table. The catalog is server-fetched, so defaults can change without a CLI upgrade.
 
-Pin: GPT-5.6 rows recorded against Codex CLI 0.144.6. GPT-6 rows recorded against Codex CLI 0.156.1 (nq-rdl/agent-extensions#393) and re-checked on 0.157.0.
+Provenance, not a supported-version range: GPT-5.6 rows recorded against Codex CLI 0.144.6. GPT-6 rows recorded against Codex CLI 0.156.1 (nq-rdl/agent-extensions#393) and re-checked on 0.157.0. All rows re-checked on 2026-09-29 against the model catalog cached by `codex-cli 0.158.0`.
 
 ## Models and aliases
 
 The companion maps each alias to its full id (`MODEL_ALIASES` in `scripts/codex-companion.mjs`). Aliases are case-insensitive. Any other value passes through to Codex unchanged.
 
-| Aliases (`--model`) | Full id | Default effort | `ultra` | API price in/out (per 1M tok) | Position |
-|---|---|---|---|---|---|
-| `sol`, `sol-5.6` | `gpt-5.6-sol` | low | yes | $5 / $30 | GPT-5.6 flagship; deepest reasoning |
-| `terra`, `terra-5.6` | `gpt-5.6-terra` | medium | yes | $2.50 / $15 | GPT-5.6 balanced default |
-| `luna`, `luna-5.6` | `gpt-5.6-luna` | medium | no | $1 / $6 | GPT-5.6 fast / cheap |
-| `astra`, `astra-6` | `gpt-6-astra` | medium | yes | not recorded | GPT-6 frontier tier |
-| `sol-6` | `gpt-6-sol` | medium | yes | not recorded | GPT-6 workhorse for coding |
-| `luna-6` | `gpt-6-luna` | medium | no | not recorded | GPT-6 fast / cheap |
-| `spark` | `gpt-5.3-codex-spark` | — | — | — | Unverified: absent from `codex debug models` on 0.157.0 |
+| Aliases (`--model`) | Full id | Default effort | `ultra` | Position |
+|---|---|---|---|---|
+| `sol`, `sol-5.6` | `gpt-5.6-sol` | low | yes | GPT-5.6 flagship; deepest reasoning |
+| `terra`, `terra-5.6` | `gpt-5.6-terra` | medium | yes | GPT-5.6 balanced default |
+| `luna`, `luna-5.6` | `gpt-5.6-luna` | medium | no | GPT-5.6 fast / cheap |
+| `astra`, `astra-6` | `gpt-6-astra` | medium | yes | GPT-6 frontier tier |
+| `sol-6` | `gpt-6-sol` | medium | yes | GPT-6 workhorse for coding |
+| `luna-6` | `gpt-6-luna` | medium | no | GPT-6 fast / cheap |
+| `spark` | `gpt-5.3-codex-spark` | — | — | Unverified: absent from `codex debug models` on 0.157.0 and 0.158.0 |
 
 Alias decision:
-- Bare `sol`, `terra`, and `luna` mean **GPT-5.6**. GPT-5.6 runs on every account and every supported CLI. There is **no** `gpt-6-terra`, so a GPT-6 meaning for bare names would split the family.
+- Bare `sol`, `terra`, and `luna` mean **GPT-5.6**. No GPT-5.6 account restriction is recorded here (compare the GPT-6 caveats below). There is **no** `gpt-6-terra`, so a GPT-6 meaning for bare names would split the family.
 - The catalog now describes the GPT-5.6 models as "Older…". Bare aliases still map to GPT-5.6 by design; use `sol-6` (or `luna-6`, `astra`) for GPT-6.
 - GPT-6 needs an explicit form: `sol-6`, `luna-6`, or `astra` (`astra` exists only in GPT-6). Use `sol-5.6`, `terra-5.6`, or `luna-5.6` to state GPT-5.6 without ambiguity.
 - `terra-6` is not an alias. Do not map it to another model.
-- `gpt-5.6` (bare) aliases to Sol. There is **no** `gpt-5.6-codex`.
-- GPT-5.6 context: API 1.05M in / 128K out; Codex harness context 272,000 tokens. GPT-6: Codex harness context 272,000 tokens (`context_window`, `codex debug models` on 0.157.0). GPT-6 API limits are not recorded here.
-- Prices are OpenAI API input/output rates per million tokens. A ChatGPT-subscription Codex user is not necessarily billed these amounts; treat them as relative cost signal, not a quote.
-- GPT-6 positions paraphrase the `codex debug models` descriptions. No benchmark or capability claim is made here.
+- `gpt-5.6` (bare) is not a companion alias and is absent from the local catalog; it passes through unchanged. There is **no** `gpt-5.6-codex`.
+- GPT-5.6: Codex harness context 272,000 tokens. GPT-6: Codex harness context 272,000 tokens (`context_window`, `codex debug models` on 0.157.0 and 0.158.0). API limits are not recorded here.
+- Positions paraphrase the `codex debug models` descriptions. No price, benchmark, or capability claim is made here; check OpenAI's current pricing when cost matters.
 
 ## GPT-6 availability caveats
 

@@ -40,8 +40,8 @@ Use when the response shape matters.
 ``compact_output_contract``
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-Use when you want concise prose instead of a schema. On 5.6, prefer setting
-``text.verbosity`` over restating "be brief" in the prompt body.
+Use when you want concise prose instead of a schema. State it once; do not
+also restate "be brief" elsewhere in the prompt body.
 
 .. code-block:: xml
 

@@ -37,7 +37,7 @@ Execution mode:
 - If the request includes `--background`, run the forwarding task using the host’s background execution support.
 - If the request includes `--wait`, run the forwarding task in the foreground.
 - If neither flag is present, default to foreground.
-- `--background` and `--wait` are execution flags for Claude Code. Do not forward them to `task`, and do not treat them as part of the natural-language task text.
+- `--background` and `--wait` are execution flags for Claude Code. Never pass them to `task`: `task` does not parse `--wait`, so a forwarded `--wait` becomes prompt text.
 - `--model` and `--effort` are runtime-selection flags. Preserve them for the forwarded `task` call, but do not treat them as part of the natural-language task text.
 - If the request includes `--resume`, do not ask whether to continue. The user already chose.
 - If the request includes `--fresh`, do not ask whether to continue. The user already chose.
@@ -55,18 +55,27 @@ node "${CLAUDE_PLUGIN_ROOT}/scripts/codex-companion.mjs" task-resume-candidate -
 - Otherwise put `Start a new Codex thread (Recommended)` first.
 - If the user chooses continue, add `--resume` before forwarding the task.
 - If the user chooses a new thread, add `--fresh` before forwarding the task.
-- If the helper reports `available: false`, do not ask. Route normally.
+- If the helper reports `available: false`, do not ask. Route normally, except for a request that only says to continue ("keep going", "continue", "resume") with no task of its own: there is no Codex thread to continue in this session, so do not start a task. Tell the user and ask what Codex should do.
+
+Forwarded command:
+
+```bash
+node "${CLAUDE_PLUGIN_ROOT}/scripts/codex-companion.mjs" task [--write] [--resume-last] [--model <model>] [--effort <effort>] "<task text>"
+```
+
+- `--write` only when the request asks Codex to fix, implement, or otherwise change files. Omit it for investigation, diagnosis, review, research, or an explicit read-only request (the runtime then uses a read-only sandbox). Continuing a thread does not authorize edits by itself; apply the current request's scope.
+- `--resume-last` only for `--resume` or the user's "continue" answer. `--fresh` and phrasing alone never add it.
+- The task text is the user's request with every flag above removed.
 
 Operating rules:
 
-- The executor is a thin forwarder only. Use one `Bash` call to invoke `node "${CLAUDE_PLUGIN_ROOT}/scripts/codex-companion.mjs" task ...` and return that command's stdout as-is.
+- The executor is a thin forwarder only. Use one `Bash` call to invoke the forwarded command and return that command's stdout as-is.
 - Return the Codex companion stdout verbatim to the user.
 - Do not paraphrase, summarize, rewrite, or add commentary before or after it.
 - The executor must not inspect files, monitor progress, poll `/codex:status`, fetch `/codex:result`, call `/codex:cancel`, summarize output, or do follow-up work of its own.
 - Leave `--effort` unset unless the user explicitly asks for a specific reasoning effort. Accepted efforts are `low`, `medium`, `high`, `xhigh`, `max`, and `ultra` (`ultra` is not available on either Luna); unknown values warn and pass through to Codex.
-- Leave the model unset unless the user explicitly asks for one. If they ask for `spark`, map it to `gpt-5.3-codex-spark`. Bare `sol`, `terra`, or `luna` map to `gpt-5.6-sol`, `gpt-5.6-terra`, or `gpt-5.6-luna`. GPT-6 needs an explicit form: `sol-6` or "sol 6" map to `gpt-6-sol`, `luna-6` or "luna 6" to `gpt-6-luna`, `astra` to `gpt-6-astra`. There is no GPT-6 Terra; ask instead of substituting. Full alias table: `codex:model-guide`.
-- Leave `--resume` and `--fresh` in the forwarded request. The runtime contract handles that routing when it builds the `task` command.
-- If the helper reports that Codex is missing or unauthenticated, stop and tell the user to run `/codex:setup`.
+- Leave the model unset unless the user explicitly asks for one. The companion resolves aliases, so pass an alias as given; convert spoken forms first. If they ask for `spark`, map it to `gpt-5.3-codex-spark`. Bare `sol`, `terra`, or `luna` map to `gpt-5.6-sol`, `gpt-5.6-terra`, or `gpt-5.6-luna`. GPT-6 needs an explicit form: `sol-6` or "sol 6" map to `gpt-6-sol`, `luna-6` or "luna 6" to `gpt-6-luna`, `astra` to `gpt-6-astra`. There is no GPT-6 Terra; ask instead of substituting. Full alias table: `codex:model-guide`.
+- If the companion fails, report the failure with its most actionable stderr lines and stop. If Codex is missing or unauthenticated, tell the user to run `/codex:setup`. Do not write a substitute answer or attempt the task yourself.
 - If the user did not supply a request, ask what Codex should investigate or fix.
 
 ## Optional delegation

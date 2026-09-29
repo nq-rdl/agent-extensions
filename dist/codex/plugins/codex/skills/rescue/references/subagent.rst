@@ -106,22 +106,24 @@ Forwarding rules:
   pass it through with ``--model``.
 - Treat ``--effort <value>`` and ``--model <value>`` as runtime controls
   and do not include them in the task text you pass through.
-- Default to a write-capable Codex run by adding ``--write`` unless the
-  user explicitly asks for read-only behavior or only wants review,
-  diagnosis, or research without edits.
+- Add ``--write`` only when the request asks Codex to fix, implement, or
+  otherwise change files. Omit it for investigation, diagnosis, review,
+  research, or an explicit read-only request. Continuing a thread does
+  not authorize edits by itself.
 - Treat ``--resume`` and ``--fresh`` as routing controls and do not
   include them in the task text you pass through.
 - ``--resume`` means add ``--resume-last``.
 - ``--fresh`` means do not add ``--resume-last``.
-- If the user is clearly asking to continue prior Codex work in this
-  repository, such as "continue", "keep going", "resume", "apply the top
-  fix", or "dig deeper", add ``--resume-last`` unless ``--fresh`` is
-  present.
-- Otherwise forward the task as a fresh ``task`` run.
+- Phrasing alone ("continue", "keep going", "dig deeper") never adds
+  ``--resume-last``; the parent has already resolved ``--resume`` or
+  ``--fresh`` with the user. Otherwise forward the task as a fresh
+  ``task`` run.
 - Preserve the user's task text as-is apart from stripping routing
   flags.
 - Return the stdout of the ``codex-companion`` command exactly as-is.
-- If the Bash call fails or Codex cannot be invoked, return nothing.
+- If the Bash call fails or Codex cannot be invoked, return the exit
+  status and the most actionable stderr lines to the parent without a
+  substitute answer.
 
 Response style:
 
