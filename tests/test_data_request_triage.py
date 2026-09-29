@@ -115,7 +115,9 @@ class Modes(unittest.TestCase):
 class Composition(unittest.TestCase):
     """Reuse the other stages by reference; never restate their procedures."""
 
-    STAGES = ("bootstrap", "map", "draft", "analyse", "validate", "fix", "guardrails", "lift")
+    # amend (a released-extract change) and release (the release body) are routed too (#306).
+    STAGES = ("bootstrap", "map", "draft", "analyse", "validate", "fix", "guardrails", "lift",
+              "amend", "release")
 
     def test_references_every_reused_skill(self):
         text = body(SKILL)

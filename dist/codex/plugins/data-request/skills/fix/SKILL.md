@@ -3,9 +3,9 @@ name: fix
 license: CC-BY-4.0
 description: 'Fix a defect or make a decided pre-release logic change in RDL request
   SQL and Python: query results, transformations, identifier types, export formatting,
-  keys, joins and filters. Use for targeted corrections with a concrete expected result,
-  and for logic changes confirmed to come before an extract''s first release. A change
-  to a released extract goes to amend.'
+  keys, joins and filters. Use for a defect with a concrete expected result, released
+  or not, and for a logic change confirmed to come before an extract''s first release.
+  A request for different output from a released extract goes to amend.'
 compatibility: RDL request repos; verify the repository's SQL dialect, Python environment
   and installed library versions at use time. record_assumption/record_limitation
   need query-builder 0.6.0 or later.

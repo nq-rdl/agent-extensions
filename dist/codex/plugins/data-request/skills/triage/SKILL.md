@@ -113,7 +113,9 @@ Choose one request from the queue with the human, then route each agreed task:
 | Compose or revise the pipeline and its SQL | `$data-request:draft` |
 | Static checks against the request | `$data-request:validate` |
 | Human-confirmed handoff | `$data-request:analyse` |
-| Targeted defects | `$data-request:fix` |
+| Defects, released or not, and logic changes before the first release | `$data-request:fix` |
+| A released extract that needs different output than was agreed | `$data-request:amend` |
+| Researcher-facing release body | `$data-request:release` |
 | Library shortfalls and upstream issues | `$data-request:lift` |
 | Comments, reports and PR bodies | `$tech-writing:copyedit` |
 

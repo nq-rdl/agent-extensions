@@ -84,4 +84,126 @@ unrelated Python bug (expect neither).
 
 ## Results
 
-Pending.
+### Harness
+
+- Host: Claude Code 2.1.284, model under test `claude-sonnet-5`, judge
+  `claude-haiku-4-5`, 2026-09-29.
+- `claude -p` runs: `--plugin-dir` on temporary copies of `plugins/data-request/`
+  (original = `593351e`, revised = working tree after the change), scratch cwd,
+  `--permission-mode dontAsk`, `--allowedTools "Skill Read Glob Grep"`,
+  `--settings '{"disableAllHooks": true}'`, `--max-turns 8`.
+- `claude plugin eval` runs: `scripts/eval-claude-plugin.sh data-request --case <c>
+  --ablation none`, original via `EVAL_REV=593351e`.
+
+### data-request routing (DR-6, DR-7)
+
+Prompt: `evals/claude/data-request/triage-codev-routes-stages/prompt.md`. Answers
+are `rename_stage, identifier_stage, release_body_stage`; the expected answer is
+`amend, fix, release`.
+
+| Variant | Skills | Runs | Correct | Wrong answers |
+|---|---|---|---|---|
+| Natural prompt, triage not loaded | original | 4 | 1 | 3 × `identifier_stage: amend` |
+| Natural prompt, triage not loaded | revised (DR-7) | 4 | 4 | – |
+| `/data-request:triage … --co-develop` | original | 3 | 3 | – (5, 1 and 7 tool calls: it listed and read sibling SKILL.md files) |
+| `/data-request:triage … --co-develop` | first table wording only | 3 | 2 | 1 × `identifier_stage: amend` (quoted the fix description) |
+| `/data-request:triage … --co-develop` | revised (DR-7) | 6 | 6 | – |
+| `claude plugin eval`, natural prompt | original | 3 | 2 | 1 × identifier-to-fix failed |
+| `claude plugin eval`, natural prompt | revised | 3 | 3 | – |
+
+The `skill-fired` indicator failed in every `claude plugin eval` run: the model
+answered from the skill list without loading triage. It is a with-only
+indicator under the default `with-without` ablation.
+
+Regression checks (`claude plugin eval`, revised skills):
+
+- `amend-rename-safe`: 3/3 runs score 1.0.
+- `prerelease-change-routes-to-fix`: `workflow-fix`, `no-amd-entry`,
+  `runbook-uat-same-change`, `review-stale`, `renamed-column` pass in 9/9
+  revised and 9/9 original runs. `analyse-full-rewalk` passes 4/9 revised and
+  5/9 original. Most runs answer in one turn without loading fix, so the
+  `analyse` value is a guess from the prompt's option list. The difference is
+  within run-to-run noise; not a regression claim either way.
+
+Paid spend recorded in the run outputs: about USD 5.4 (claude -p about
+USD 3.1; `claude plugin eval` about USD 2.3).
+
+### Verified facts (no edit made)
+
+- **pandera (PA-1):** a probe script (`import pandera.pandas`, `required` vs
+  `nullable`, `int64` nulls vs `pd.Int64Dtype()`, schema-level `coerce`,
+  `strict="filter"`, Series vs DataFrame null masking and `ignore_na=False`,
+  non-lazy coercion raising `SchemaErrors`, Polars `LazyFrame` schema-only
+  default, `DataFrameModel` annotation alone vs `@pa.check_types`) gave the
+  documented result on pandera 0.33.0 and 0.33.1 (pandas 3.0.6, polars 1.44.2),
+  2026-09-29. PyPI latest: 0.33.1 (2026-09-01).
+- **testcontainers:** GitHub latest releases on 2026-09-29: java 2.0.5, go
+  v0.44.0, dotnet 4.15.0, node **v12.2.0 (2026-09-28, after the skill's
+  2026-09-26 check)**, python 4.15.0, rs 0.28.0, rs modules v0.15.0. Node
+  12.1.0 and 12.2.0 both declare `engines.node >= 22.22`. Python 4.15.0:
+  `testcontainers.postgres` emits `DeprecationWarning` pointing to
+  `testcontainers.community.postgres`; `wait_container_is_ready` warns;
+  `testcontainers.core.wait_strategies` exists. Maven Central:
+  `testcontainers-postgresql` 2.0.5 exists; the old `postgresql` artifact ends
+  at 1.21.4.
+- **Local references (#300):** `asctl repo-check` passes; every
+  `${CLAUDE_PLUGIN_ROOT}/…` path used by data-request exists in the Claude and
+  Codex packages; every `/data-request:*`, `/rdl-team:workflow` and
+  `/tech-writing:copyedit` route resolves to a registered leaf.
+
+## Per-issue disposition
+
+| Plugin / skill | #303 size | #304/#305 disclosure, duplication | #306 description, routing | #307 outcomes, authorization | #308 versions, guards | #310 delegation | #300/#301 refs, links |
+|---|---|---|---|---|---|---|---|
+| data-request (13 skills) | Retained: largest body guardrails 277 lines, all ≤300 | Retained with reason: repeated text (released-extract test in fix/amend, runbook+UAT same change, stale-review full re-walk, exempt probes in guardrails/map/lifts.rst, ethnicity convention, handle-not-email beside each record-writing step) sits in independently loaded entry points beside the action it governs; map defers to guardrails as owner; wording is consistent, #413/#419 intact | **Changed** fix/amend descriptions and triage table (DR-6, DR-7). Other siblings retained: analyse/explain/validate/release/draft/map separate by stage and role. Over the 400-char target, retained as justified: setup 515, analyse 477, amend 464, explain 453, release 448, bootstrap 442 | Retained: every workflow ends with a report and done-check; governance, PII and approval gates unchanged | Retained: query-builder 0.6.0 / scaffold 0.5.0 baselines carry "verify at use time" guards; not re-verified against the private repos in this review | Deferred to the #310 owner: triage outline has the #391/#395 clauses but not the #310 contract sentence; catalog-wide boilerplate change | Retained: passes; covered by link-rot scan of `skills/**` |
+| pandera-validate | Retained: 80 lines | Retained: no duplication | Retained: 234 chars, single skill | Retained: fixture-based done-check present | Retained: all claims verified on 0.33.0/0.33.1. PA-2 (add verification date to `compatibility`) **not started** | n/a | Retained |
+| testcontainers | Retained: 118 lines | Retained: languages/guides in references | Retained with reason: 666 chars over target, but single-skill plugin with no sibling; product identifiers are routing cues | Retained | Retained: dated check (2026-09-26) is accurate; node moved to v12.2.0 after it (follow-up) | n/a | Retained |
+| tech-writing-copyedit | Retained: 176 lines | Retained | Retained: 422 chars | Retained | **Defect found, not fixed (not started):** says the completion hook "independently reviews the deliverable and blocks completion" in every copy; Codex runs only the reminder hook (`docs/codex.md`) (TW-2) | n/a | Retained |
+| se-technical-writer | Retained: 11 lines; 505-line outline is upstream-derived and loaded only for delegation | Retained: outline already reconciled with house style | **Defect found, not fixed (not started):** description is ungrammatical ("Use when asked to technical writing tasks") (TW-1) | Retained | Retained: upstream link present | Deferred to #310 owner (same as triage) | Retained |
+| lucid (MCP only) | n/a | n/a | n/a (no skills) | n/a | Retained: hosted URL, no pinned binary | n/a | n/a |
+
+Hook findings (report only): the tech-writing Stop/SubagentStop agent review
+does not run in Codex; the skill text should say so (TW-2). No data-request hook
+finding.
+
+## Status at hand-off
+
+Done and committed on `epic312/new-plugins`:
+
+- Pre-edit record (`5477e7d`, `593351e`).
+- DR-6/DR-7: fix and amend descriptions, triage co-development table, unit tests
+  (`tests/test_data_request_prerelease_change.py::DefectVersusReleasedChange`,
+  `tests/test_data_request_triage.py` stages), eval case
+  `triage-codev-routes-stages` with fixtures in
+  `tests/test_eval_data_request_graders.py`, two changie fragments. The tests
+  failed before the edit and pass after it.
+
+Not started (next steps):
+
+1. TW-1: rewrite the `se-technical-writer` description (grammar, content types,
+   pointer to `tech-writing:copyedit` for existing prose); routing check with
+   `claude -p` on temporary copies of `plugins/tech-writing/`, hooks disabled.
+2. TW-2: limit the completion-hook sentence in `tech-writing-copyedit` to Claude
+   Code; keep the STE review mandatory everywhere.
+3. PA-2: add the 2026-09-29 verification (0.33.0 and 0.33.1) to
+   `pandera-validate` `compatibility:`.
+4. Optional: note testcontainers-node v12.2.0 in the skill's dated check.
+5. Each needs a changie fragment and `sync-plugins.sh <bundle>`.
+
+Scratch harness and raw results (not committed):
+`/tmp/claude-1001/-home-rudolfjs-dev-rdl-nq-rdl-agent-extensions/15b2cf65-4e02-4635-9f01-fd1df4014e8d/scratchpad/dr/`
+(`run.sh`, `batch.sh`, `evalcases.sh`, `*.jsonl` traces, `natural.md`) and
+`…/scratchpad/eval-*` (`result.json` per `claude plugin eval` run),
+`…/scratchpad/pandera/probe.py`, `tc_probe.py`.
+
+## Recommended follow-up issues (not filed)
+
+- Trim data-request descriptions over 400 characters (setup, analyse, explain,
+  release, bootstrap) with a routing suite, not by line count.
+- Add the #310 delegation contract sentence to every `references/subagent.rst`
+  in one catalog-wide change with `tests/test_delegation_handoff.py`.
+- `prerelease-change-routes-to-fix` rarely loads fix, so `analyse-full-rewalk`
+  is a guess; make the case require the skill (or score it only under
+  `with-without`).
+- The `claude plugin eval` harness does not expand a leading slash command in
+  `prompt.md`; explicit-invocation cases need `claude -p` or harness support.
