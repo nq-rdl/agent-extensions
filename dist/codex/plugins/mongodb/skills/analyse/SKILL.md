@@ -1,8 +1,8 @@
 ---
 name: analyse
-description: Analyse MongoDB database performance, offer query and index optimisation
-  insights, and provide actionable recommendations to improve overall database usage.
-  Operates in read-only mode against a connected MongoDB cluster.
+description: 'Analyse MongoDB performance: slow queries, explain plans, index and
+  aggregation-pipeline optimisation, and Atlas Performance Advisor findings. Read-only
+  by default; recommends index changes instead of applying them.'
 license: MIT
 metadata:
   upstream: https://github.com/github/awesome-copilot/blob/main/agents/mongodb-performance-advisor.agent.md

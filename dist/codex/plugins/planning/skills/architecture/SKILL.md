@@ -1,7 +1,8 @@
 ---
 name: architecture
-description: 'Produce high-level architecture documentation: interfaces, data flows,
-  contracts, failure modes, and big-picture reviews. Never writes implementation code.'
+description: 'Use when asked for high-level architecture documentation or a big-picture
+  review: interfaces, data flows, contracts, failure modes, and accessible Mermaid
+  diagrams. Writes documentation only; never changes code or tests.'
 license: MIT
 metadata:
   upstream: https://github.com/github/awesome-copilot/blob/main/agents/hlbpa.agent.md
