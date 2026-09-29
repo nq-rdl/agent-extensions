@@ -127,7 +127,7 @@ class ReviewRegressions(unittest.TestCase):
         md = (self.d / 'review.md').read_text()
         self.assertIn('a&#124;b<br>c', md)
         row = next(line for line in md.splitlines() if line.startswith('| A1 |'))
-        self.assertEqual(row.count('|'), 7)
+        self.assertEqual(row.count('|'), 8)  # seven columns, including decision origin
 
     def test_drafts_are_resumable_and_missing_cwd_is_silent(self):
         (self.d / 'scope.draft.json').write_text('{}')

@@ -13,7 +13,7 @@
 #                                              sql/cohort_pipeline/x.sql -> sql__cohort_pipeline__x; an existing
 #                                              legacy-encoded reviews/sql__cohort%5Fpipeline__x/ is kept
 #   check FILE | check --stdin                 validate a review/scope JSON; exit 4 with one violation per line
-#   lint FILE                                  confirmed items whose wording is still provisional; exit 10 when any
+#   lint FILE                                  provisional confirmed wording or unlinked decision sources; exit 10 when any
 #   lint --ste FILE                            STE wording in intent and item text/rationale, any status: one
 #                                              "<id>\t<field>\t<rule>\t<detail>" line per hit; exit 10 when any
 #   publish SLUG scope|review|lifts DRAFT             validate a staged copy, then atomically replace the final JSON
@@ -243,7 +243,7 @@ cmd_check() {
 
 # ---------------------------------------------------------------------------------------------
 # Advisory, not part of check: a confirmed item whose text or rationale still reads as a proposal
-# contradicts its confirmation (#340). Prints "<id>\t<field>\t<phrases>" per hit; exit 10 when any.
+# contradicts its confirmation (#340), or decision provenance lacks a written source (#434). Prints "<id>\t<field>\t<phrases>" per hit; exit 10 when any.
 # --ste (#394) checks STE wording instead, whatever the status, so it can run on candidates before
 # the human is asked: intent, and each assumption/limitation text and rationale. One
 # "<id>\t<field>\t<rule>\t<detail>" line per hit (id "-" for intent); exit 10 when any. Rules:
@@ -253,7 +253,7 @@ cmd_check() {
 #   contraction      n't, 're, 've, 'll, 'd, 'm, and 's after a pronoun (not a possessive); detail = the words
 #   semicolon        detail = how many
 #   abbreviation     e.g. / i.e.; detail = which
-# It is opt-in: plain lint keeps its 3-column contract for bootstrap's pre-publish check.
+# --ste uses four columns, including decision-source warnings; plain lint keeps three columns.
 cmd_lint() {
   local ste=0
   if [ "${1:-}" = "--ste" ]; then ste=1; shift; fi
@@ -293,8 +293,16 @@ cmd_lint() {
     | "\($item.id // "?")\t\($field)\t\($hits | join(", "))"
   ' "$1")" || sr_die 4 "invalid JSON: $1"
   fi
-  [ -n "$out" ] || return 0
-  printf '%s\n' "$out"
+  local decisions
+  decisions="$(jq -L "$SR_SCRIPT_DIR" -r --argjson ste "$ste" '
+    include "sqlreview-decision";
+    decision_source_warnings
+    | if $ste == 1 then "\(.id)\t\(.field)\tdecision-source\t\(.detail)"
+      else "\(.id)\t\(.field)\t\(.detail)" end
+  ' "$1")" || sr_die 4 "invalid JSON: $1"
+  [ -n "$out" ] || [ -n "$decisions" ] || return 0
+  [ -z "$out" ] || printf '%s\n' "$out"
+  [ -z "$decisions" ] || printf '%s\n' "$decisions"
   return 10
 }
 
@@ -615,9 +623,10 @@ cmd_carryover() {
     | def lines_same($l): $have_base and $cur_sha != "" and ($l | type) == "array" and ($l | length) == 2 and
         ($l | all(type == "number" and . >= 1)) and $l[0] <= $l[1] and $l[1] <= ($b | length) and $l[1] <= ($c | length) and $b[$l[0] - 1:$l[1]] == $c[$l[0] - 1:$l[1]];
     [ ("assumptions", "limitations") as $k | ($d[$k] // [])[] | select(type == "object") | . as $i
-      | ([$s[$k][] | select(.text == $i.text and .rationale == $i.rationale)][0]) as $m
+      | ([$s[$k][] | select(.text == $i.text and .rationale == $i.rationale and .decided == $i.decided)][0]) as $m
       | {kind: $k, id: $i.id, text: $i.text, rationale: $i.rationale, location: $i.location}
-        + if $m == null then {basis: null, why: "new, or text/rationale differs from the scope"}
+        + (if $i | has("decided") then {decided: $i.decided} else {} end)
+        + if $m == null then {basis: null, why: "new, or text/rationale/decided provenance differs from the scope"}
           elif $unchanged then {scope_id: $m.id, basis: "sql-unchanged"}
           elif $body then {scope_id: $m.id, basis: "sql-body-unchanged"}
           elif lines_same(($i.location | objects | .lines) // null) then {scope_id: $m.id, basis: "lines-unchanged"}

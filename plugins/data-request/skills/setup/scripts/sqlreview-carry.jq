@@ -3,7 +3,7 @@
 # `sqlreview.sh carryforward` (which tells the skills what to carry), so the two cannot drift.
 #
 # An item qualifies when the previous published document of the same kind has an item with the same
-# id in the same list, identical text and rationale, and one of these holds (the basis):
+# id in the same list, identical text, rationale and decided provenance, and one of these holds (the basis):
 #   location null  → sql-unchanged      the whole SQL is unchanged (SHA evidence)
 #                    sql-absent         the SQL is absent at both revisions
 #                    sql-body-unchanged only the leading comment header changed; the rest of the
@@ -49,6 +49,7 @@ def carry_rows($ctx):
            elif $m == null then {why: "no item \($i.id) in \($k) at revision \($pr)"}
            elif $m.text != $i.text then {why: "text differs from revision \($pr)"}
            elif $m.rationale != $i.rationale then {why: "rationale differs from revision \($pr)"}
+           elif $m.decided != $i.decided then {why: "decided provenance differs from revision \($pr)"}
            elif ($m.location == null) != ($i.location == null) then
              {why: "location added or removed since revision \($pr)", bulk: ($doc == "review")}
            elif $i.location == null then

@@ -55,6 +55,16 @@ Interpretation checks
   newest written comment, ask the decider for a written, dated comment. Until it
   exists, record the decision as unlinked in the ledger, and show both values in
   the triage comment as a conflict to settle.
+* **Recorded decision origin.** Read current ``scope.json`` and ``review.json``
+  items when present. An absent or ``unlinked (verbal)`` ``decided.source`` for
+  an attributed requester or other third-party decision is a clarification blocker:
+  name the item, decider and reported date, and ask for a dated written source.
+  An engineer confirmation does not supply that source or establish the requester's
+  authority. Copy the evidence to the ledger without marking the decision linked.
+  An engineer's own technical choice is not an unanswered governance blocker;
+  governance requires a known approval restriction or custodian decision.
+  Legacy items without ``decided`` remain readable: check attributed rationales
+  against written evidence rather than inventing an origin or blocking every item.
 * **Unanswered question.** Silence, a pending request for information or an
   assumption nobody contradicted is not approval.
 
