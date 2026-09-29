@@ -2,14 +2,12 @@
 name: go-secure
 license: CC-BY-4.0
 description: >-
-  Secure Go error handling and information leakage prevention. Use whenever
-  writing Go code that handles errors in APIs, services, or any code that
-  crosses trust boundaries — HTTP handlers, gRPC services, CLI tools with
-  user-facing output. Also trigger when reviewing Go error handling,
-  implementing structured logging, or when the user mentions security, error
-  sanitization, or preventing data leaks through error messages — even if they
-  don't explicitly say "security". Covers domain error types, trust boundary
-  translation, log redaction with slog, and safe API responses.
+  Secure Go error handling across trust boundaries: never return err.Error()
+  to external callers, translate domain errors at HTTP, gRPC, and CLI
+  boundaries, redact secrets in slog logs, and return safe API error
+  responses. Use when writing or reviewing Go handlers, services, or error and
+  logging code whose output reaches users or logs, even if security is not
+  mentioned.
 metadata:
   repo: https://github.com/nq-rdl/agent-extensions
 ---
@@ -20,9 +18,10 @@ Go's "errors are values" design means every error is explicitly handled at the c
 site. This is powerful — but it also means every error is a potential data leak if it
 crosses a trust boundary without sanitization.
 
-Real-world impact: CVE-2025-7445 in Kubernetes exposed service account tokens through
-error-marshalling code paths. Verbose errors in production have leaked SQL queries,
-file paths, credentials, and infrastructure topology.
+Real-world impact: [CVE-2025-7445](https://github.com/kubernetes/kubernetes/issues/133897): the
+Kubernetes secrets-store-sync-controller (before v0.0.2) wrote service account tokens to
+its logs when marshalling the provider `parameters` failed. Verbose errors in production
+have leaked SQL queries, file paths, credentials, and infrastructure topology.
 
 ## The Core Rule
 

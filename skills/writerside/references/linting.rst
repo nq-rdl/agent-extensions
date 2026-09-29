@@ -47,14 +47,19 @@ Writerside’s IDE plugin provides real-time linting as you type:
 | resolution         |                                                 |
 +--------------------+-------------------------------------------------+
 
-**How to use:** Open topics in IntelliJ IDEA / Writerside IDE. Problems
-appear as underlines and in the Problems tool window.
+**How to use:** Open topics in a JetBrains IDE (for example IntelliJ
+IDEA) with the Writerside plugin installed. Problems appear as
+underlines and in the Problems tool window. (JetBrains sunset the
+standalone Writerside IDE in March 2025; see
+`docker-deployment.rst <docker-deployment.rst>`__.)
 
 Layer 2: Build-Time Checks (CI/CD)
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 The Docker builder runs the same inspections during builds and reports
-all problems to console output:
+all problems to console output. ``WRS_BUILDER`` is the pinned image
+defined in `docker-deployment.rst <docker-deployment.rst>`__ → Builder
+image and version:
 
 .. code:: bash
 
@@ -64,10 +69,10 @@ all problems to console output:
      -e MODULE_INSTANCE=Writerside/hi \
      -e OUTPUT_DIR=/opt/sources/output \
      -e RUNNER=other \
-     jetbrains/writerside-builder:2026.02.8644
+     "$WRS_BUILDER"
 
-Build errors produce a non-zero exit code — use this as a CI quality
-gate.
+Build errors produce a non-zero exit code (255) — use this as a CI
+quality gate. Warnings alone exit 0.
 
 Layer 3: Optional External Tools
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -93,9 +98,10 @@ checks:
 
 **When to add external tools:** - Add **Vale** if your team has a style
 guide (e.g., Microsoft Style Guide, Google Developer Docs) - Add
-**xmllint** if contributors edit ``.topic`` files outside the Writerside
-IDE - Add **linkchecker** if your docs reference many external URLs -
-Skip external tools if your team works exclusively in the Writerside IDE
+**xmllint** if contributors edit ``.topic`` files outside a JetBrains
+IDE with the Writerside plugin - Add **linkchecker** if your docs
+reference many external URLs - Skip external tools if your team works
+exclusively in a JetBrains IDE with the Writerside plugin
 
 --------------
 
@@ -125,7 +131,8 @@ Recommended Workflow
 For Authors
 ~~~~~~~~~~~
 
-1. **Write in the Writerside IDE** — inspections run in real-time
+1. **Write in a JetBrains IDE with the Writerside plugin** — inspections
+   run in real-time
 2. **Fix all red underlines** before committing (errors)
 3. **Review yellow underlines** and fix where appropriate (warnings)
 4. **Preview locally** to catch cross-topic issues
@@ -134,33 +141,20 @@ For Authors
 For CI/CD
 ~~~~~~~~~
 
+Use JetBrains' documented GitHub Actions pattern in
+`docker-deployment.rst <docker-deployment.rst>`__ → GitHub Actions:
+``JetBrains/writerside-github-action@v4`` builds with the tag in
+``DOCKER_VERSION`` (see Builder image and version), and
+``JetBrains/writerside-checker-action@v1`` fails the job when
+``report.json`` contains errors. Optionally add a prose linting job:
+
 .. code:: yaml
 
-   # GitHub Actions example
-   name: Docs Lint
-   on: [pull_request]
-
-   jobs:
-     lint-docs:
-       runs-on: ubuntu-latest
-       steps:
-         - uses: actions/checkout@v4
-
-         - name: Build and lint documentation
-           run: |
-             docker run --rm \
-               -v ${{ github.workspace }}:/opt/sources \
-               -e SOURCE_DIR=/opt/sources \
-               -e MODULE_INSTANCE=Writerside/hi \
-               -e OUTPUT_DIR=/opt/sources/output \
-               -e RUNNER=github \
-               jetbrains/writerside-builder:2026.02.8644
-
-         # Optional: Vale prose linting
-         # - name: Prose style check
-         #   uses: errata-ai/vale-action@v2
-         #   with:
-         #     files: Writerside/topics/
+   # Optional: Vale prose linting
+   - name: Prose style check
+     uses: errata-ai/vale-action@v2
+     with:
+       files: Writerside/topics/
 
 For Reviewers
 ~~~~~~~~~~~~~
@@ -190,7 +184,8 @@ Summary
 +---------------------------------------+----------------------------------+
 | How do we lint in CI?                 | Docker build with                |
 |                                       | ``jetbrains/writerside-builder`` |
-|                                       | — errors fail the build          |
+|                                       | plus the checker action —        |
+|                                       | errors fail the build            |
 +---------------------------------------+----------------------------------+
 | How do we suppress false positives?   | ``<ignore-problems>`` in         |
 |                                       | ``buildprofiles.xml``            |

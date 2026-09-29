@@ -93,7 +93,7 @@ fi
 
 # 2. Direct SSO call — before the script exemption, so "curl sso… ; bash rh-token.sh" still asks.
 if has "(^|//|[[:space:]\"'])sso\\.redhat\\.com([/:?#[:space:]\"']|\$)"; then
-  decide ask "Direct call to Red Hat SSO. rh-token.sh does this exchange with the offline token kept out of argv and caches the 15-minute access token — prefer: rh-token.sh --check"
+  decide ask "Direct call to Red Hat SSO. rh-token.sh does this exchange with the offline token kept out of argv and caches the short-lived access token until the expiry SSO reports — prefer: rh-token.sh --check"
 fi
 
 # Patterns shared by steps 3–5.

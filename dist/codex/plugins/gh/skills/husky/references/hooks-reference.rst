@@ -1,246 +1,154 @@
-Git Hooks Reference for Husky v9
-================================
+Husky v9 reference
+==================
 
-Quick reference for all git hook types, script patterns, and migration
-notes.
+Verified against husky 9.1.7 (package source and
+`typicode/husky docs <https://typicode.github.io/husky/>`__) on 2026-09-29.
+``SKILL.md`` owns hook execution, CI installs and troubleshooting; this file
+holds setup variants and migrations.
 
---------------
+Contents: migration, package managers, monorepos, CI install script,
+lint-staged, commitlint, hook arguments, disabling hooks.
 
-All 13 Client-Side Git Hooks
-----------------------------
+Migrating to v9
+---------------
 
-+------------------------+-------------------+----------------------+------------------+
-| Hook                   | When it runs      | Exit 1 effect        | Common use       |
-+========================+===================+======================+==================+
-| ``pre-commit``         | Before commit     | Aborts commit        | Lint, format,    |
-|                        | object created    |                      | test staged      |
-|                        |                   |                      | files            |
-+------------------------+-------------------+----------------------+------------------+
-| ``prepare-commit-msg`` | Before commit msg | Aborts commit        | Inject branch    |
-|                        | editor opens      |                      | name or template |
-+------------------------+-------------------+----------------------+------------------+
-| ``commit-msg``         | After user writes | Aborts commit        | commitlint,      |
-|                        | commit message    |                      | message          |
-|                        |                   |                      | validation       |
-+------------------------+-------------------+----------------------+------------------+
-| ``post-commit``        | After commit is   | No effect            | Notifications,   |
-|                        | created           |                      | logging          |
-+------------------------+-------------------+----------------------+------------------+
-| ``pre-rebase``         | Before rebase     | Aborts rebase        | Warn on rebase   |
-|                        | starts            |                      | of published     |
-|                        |                   |                      | branches         |
-+------------------------+-------------------+----------------------+------------------+
-| ``post-rewrite``       | After             | No effect            | Invalidate       |
-|                        | rebase/amend      |                      | caches           |
-|                        | rewrites          |                      |                  |
-+------------------------+-------------------+----------------------+------------------+
-| ``post-checkout``      | After             | No effect            | ``npm install``, |
-|                        | ``git checkout``  |                      | generate files   |
-|                        | or ``git switch`` |                      |                  |
-+------------------------+-------------------+----------------------+------------------+
-| ``post-merge``         | After successful  | No effect            | ``npm install``, |
-|                        | merge             |                      | sync lockfiles   |
-+------------------------+-------------------+----------------------+------------------+
-| ``pre-push``           | Before push to    | Aborts push          | Full test suite, |
-|                        | remote            |                      | build            |
-|                        |                   |                      | verification     |
-+------------------------+-------------------+----------------------+------------------+
-| ``pre-receive``        | Server-side:      | —                    | (server-side     |
-|                        | before refs       |                      | only)            |
-|                        | updated           |                      |                  |
-+------------------------+-------------------+----------------------+------------------+
-| ``post-receive``       | Server-side:      | —                    | (server-side     |
-|                        | after refs        |                      | only)            |
-|                        | updated           |                      |                  |
-+------------------------+-------------------+----------------------+------------------+
-| ``pre-auto-gc``        | Before git        | Aborts gc            | Prevent gc at    |
-|                        | garbage           |                      | bad times        |
-|                        | collection        |                      |                  |
-+------------------------+-------------------+----------------------+------------------+
-| ``post-index-change``  | After index is    | No effect            | Trigger rebuilds |
-|                        | written           |                      |                  |
-+------------------------+-------------------+----------------------+------------------+
+From v8 (``husky install``, ``husky add``):
 
---------------
+1. Change ``"prepare": "husky install"`` to ``"prepare": "husky"``.
+   ``husky add``, ``set`` and ``uninstall`` now exit with an error;
+   ``husky install`` prints a deprecation warning.
+2. Remove these two lines from the top of every ``.husky/<hook>`` file.
+   Husky 9 prints a warning when they run, and they will fail in v10:
 
-Hook Script Template
---------------------
+   .. code:: sh
 
-.. code:: bash
+      #!/usr/bin/env sh
+      . "$(dirname -- "$0")/_/husky.sh"
 
-   #!/usr/bin/env bash
-   # .husky/<hook-name>
-   set -euo pipefail
+3. Run ``npx husky`` (or the project's install) once. ``.husky/_/`` is
+   regenerated and git-ignored; do not commit it.
 
-   # Guard: skip if tool not installed
-   command -v npx >/dev/null 2>&1 || { echo "SKIP: npx not found"; exit 0; }
+From v4 (``"husky": {"hooks": …}`` in ``package.json`` or ``.huskyrc``):
 
-   # Your hook logic here
-   npm test
+- Copy each hook command into ``.husky/<hook-name>``. Commands can span
+  several lines. Call locally installed binaries directly (``jest``) or
+  through the package manager.
+- ``HUSKY_GIT_PARAMS`` is gone; use ``$1``, ``$2``:
+  ``commitlint -E HUSKY_GIT_PARAMS`` becomes ``commitlint --edit "$1"``.
+- ``HUSKY_SKIP_HOOKS`` and ``HUSKY_SKIP_INSTALL`` are replaced by ``HUSKY=0``.
 
-Key lines: - ``#!/usr/bin/env bash`` — portable shebang (works on macOS
-and Linux) - ``set -euo pipefail`` — exit on error (``-e``), unset
-variable (``-u``), pipe failure (``-o pipefail``) -
-``command -v <tool>`` — check tool exists before calling it
-
---------------
-
-commit-msg Hook: Accessing the Message
---------------------------------------
-
-The commit message file path is passed as ``$1``:
-
-.. code:: bash
-
-   #!/usr/bin/env bash
-   # .husky/commit-msg
-   set -euo pipefail
-
-   # commitlint
-   npx commitlint --edit "$1"
-
-   # Manual check example
-   MSG=$(cat "$1")
-   if [[ "$MSG" =~ ^WIP ]]; then
-     echo "ERROR: WIP commits are not allowed"
-     exit 1
-   fi
-
---------------
-
-pre-push Hook: Accessing Push Context
--------------------------------------
-
-Push info is passed via stdin (oldrev, newrev, refname):
-
-.. code:: bash
-
-   #!/usr/bin/env bash
-   # .husky/pre-push
-   set -euo pipefail
-
-   while read local_ref local_sha remote_ref remote_sha; do
-     echo "Pushing $local_ref to $remote_ref"
-   done
-
-   npm test
-
---------------
-
-v8 → v9 Migration Notes
------------------------
-
-+-----------------------------------+-----------------------+-------------------------+
-| Change                            | v8                    | v9                      |
-+===================================+=======================+=========================+
-| Hook directory                    | ``.husky/`` with      | ``.husky/`` — direct    |
-|                                   | ``_/husky.sh``        | shell scripts, no       |
-|                                   | sourced               | ``_/`` sourcing         |
-+-----------------------------------+-----------------------+-------------------------+
-| Config location                   | ``package.json``      | Individual files in     |
-|                                   | ``husky`` key         | ``.husky/``             |
-+-----------------------------------+-----------------------+-------------------------+
-| Environment variable              | ``HUSKY_SKIP_HOOKS``  | ``HUSKY=0``             |
-+-----------------------------------+-----------------------+-------------------------+
-| Git params                        | ``HUSKY_GIT_PARAMS``  | Native shell params     |
-|                                   |                       | (``$1``, ``$2``)        |
-+-----------------------------------+-----------------------+-------------------------+
-| Require shebang                   | No                    | Yes —                   |
-|                                   |                       | ``#!/usr/bin/env bash`` |
-|                                   |                       | or ``#!/bin/sh``        |
-|                                   |                       | required                |
-+-----------------------------------+-----------------------+-------------------------+
-| Init command                      | ``npx husky install`` | ``npx husky init``      |
-+-----------------------------------+-----------------------+-------------------------+
-
-**Removing the old ``_/`` directory:**
-
-.. code:: bash
-
-   rm -rf .husky/_
-   # Remove any ". "$(dirname -- "$0")/_/husky.sh"" lines from hook files
-
---------------
-
-Monorepo Pattern
+Package managers
 ----------------
 
-When the Node project is not at the git root:
+.. code:: sh
+
+   npm install --save-dev husky && npx husky init
+   pnpm add --save-dev husky && pnpm exec husky init
+   bun add --dev husky && bunx husky init
+
+Yarn (Berry) does not run ``prepare``. Use ``postinstall`` instead, and add
+``pinst`` only for packages published to npm, so consumers do not run it:
+
+.. code:: json
+
+   {
+     "scripts": {
+       "postinstall": "husky",
+       "prepack": "pinst --disable",
+       "postpack": "pinst --enable"
+     }
+   }
+
+Package not at the repository root
+----------------------------------
+
+Husky refuses a hooks directory containing ``..`` and must run where ``.git``
+is. Change directory in ``prepare`` and back in each hook:
 
 .. code:: json
 
    // frontend/package.json
-   {
-     "scripts": {
-       "prepare": "cd .. && husky frontend/.husky"
-     }
-   }
+   { "scripts": { "prepare": "cd .. && husky frontend/.husky" } }
 
-Hook scripts must change back to the package directory:
+.. code:: sh
 
-.. code:: bash
-
-   #!/usr/bin/env bash
    # frontend/.husky/pre-commit
    cd frontend
    npm test
 
---------------
+Silent CI and production install
+--------------------------------
 
-lint-staged Integration
------------------------
+``"prepare": "husky || true"`` still prints ``command not found`` when
+devDependencies are absent. To stay silent, import Husky only after the check:
 
-.. code:: bash
+.. code:: js
+
+   // .husky/install.mjs
+   if (process.env.NODE_ENV === 'production' || process.env.CI === 'true') {
+     process.exit(0)
+   }
+   const husky = (await import('husky')).default
+   console.log(husky())
+
+.. code:: json
+
+   { "scripts": { "prepare": "node .husky/install.mjs" } }
+
+lint-staged
+-----------
+
+.. code:: sh
 
    npm install --save-dev lint-staged
-
-.. code:: bash
-
-   # .husky/pre-commit
-   npx lint-staged
+   echo "npx lint-staged" > .husky/pre-commit
 
 .. code:: json
 
    // package.json
    {
      "lint-staged": {
-       "*.{js,ts,tsx}": ["eslint --fix", "git add"],
-       "*.{css,scss}": "prettier --write",
-       "*.md": "markdownlint"
+       "*.{js,ts,tsx}": "eslint --fix",
+       "*.{css,md}": "prettier --write"
      }
    }
 
---------------
+lint-staged stages task changes itself; do not add ``git add`` as a task.
 
-commitlint Integration
-----------------------
+commitlint
+----------
 
-.. code:: bash
+.. code:: sh
 
    npm install --save-dev @commitlint/cli @commitlint/config-conventional
    echo "export default { extends: ['@commitlint/config-conventional'] };" > commitlint.config.mjs
+   echo 'npx --no -- commitlint --edit "$1"' > .husky/commit-msg
 
-.. code:: bash
-
-   # .husky/commit-msg
-   npx commitlint --edit "$1"
-
+Hook arguments
 --------------
 
-Disabling Hooks
+- ``commit-msg``: ``$1`` is the path of the message file. Read it with
+  ``head -n1 "$1"`` and test it with ``grep -E`` or ``case`` (no ``[[ =~ ]]``
+  in POSIX sh).
+- ``prepare-commit-msg``: ``$1`` message file, ``$2`` source, ``$3`` SHA.
+- ``pre-push``: ``$1`` remote name, ``$2`` URL; stdin lines are
+  ``<local ref> <local sha> <remote ref> <remote sha>``.
+- ``post-checkout``: ``$1`` previous HEAD, ``$2`` new HEAD, ``$3`` is ``1``
+  for a branch checkout.
+
+Disabling hooks
 ---------------
 
-+--------------------------------+-------------------------------------+
-| Scope                          | Method                              |
-+================================+=====================================+
-| Single command                 | ``git commit --no-verify`` or       |
-|                                | ``HUSKY=0 git commit``              |
-+--------------------------------+-------------------------------------+
-| Current shell session          | ``export HUSKY=0`` then             |
-|                                | ``unset HUSKY`` when done           |
-+--------------------------------+-------------------------------------+
-| CI environment                 | Set ``HUSKY: 0`` in CI env vars     |
-+--------------------------------+-------------------------------------+
-| Globally (GUI)                 | Add ``export HUSKY=0`` to           |
-|                                | ``~/.config/husky/init.sh``         |
-+--------------------------------+-------------------------------------+
++-------------------------------+------------------------------------------+
+| Scope                         | Method                                   |
++===============================+==========================================+
+| One command                   | ``git commit -n`` / ``--no-verify``;     |
+|                               | otherwise ``HUSKY=0 git …``              |
++-------------------------------+------------------------------------------+
+| Several commands              | ``export HUSKY=0`` … ``unset HUSKY``     |
++-------------------------------+------------------------------------------+
+| CI or Docker                  | ``HUSKY: 0`` in the job environment      |
++-------------------------------+------------------------------------------+
+| One machine or a GUI client   | ``export HUSKY=0`` in                    |
+|                               | ``~/.config/husky/init.sh``              |
++-------------------------------+------------------------------------------+

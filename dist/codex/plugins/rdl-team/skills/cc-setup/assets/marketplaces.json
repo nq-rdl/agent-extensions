@@ -96,6 +96,6 @@
         "purpose": "gopls language-server integration for Go repos"
       }
     ],
-    "lspNote": "The official marketplace (anthropics/claude-plugins-official) ships per-language LSP plugins; gopls-lsp is the one the team pins. The marketplace-scout agent should enumerate that marketplace live for other *-lsp plugins (e.g. pyright/ty, typescript, rust-analyzer) and offer the one matching a detected language."
+    "lspNote": "The official marketplace (anthropics/claude-plugins-official) ships per-language LSP plugins; gopls-lsp is the one the team pins. The discover-plugins skill (canonical marketplace-scout) should enumerate that marketplace live for other *-lsp plugins (e.g. pyright/ty, typescript, rust-analyzer) and offer the one matching a detected language."
   }
 }

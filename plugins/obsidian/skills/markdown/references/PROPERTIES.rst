@@ -4,7 +4,6 @@ Properties use YAML frontmatter at the start of a note:
 
 ```yaml
 ---
-title: My Note Title
 date: 2024-01-15
 tags:
   - project
@@ -25,7 +24,7 @@ due: 2024-02-01T14:30:00
 
 | Type | Example |
 |------|---------|
-| Text | `title: My Title` |
+| Text | `status: in-progress` |
 | Number | `rating: 4.5` |
 | Checkbox | `completed: true` |
 | Date | `date: 2024-01-15` |
@@ -39,6 +38,11 @@ due: 2024-02-01T14:30:00
 - `aliases` - Alternative names for the note (used in link suggestions)
 - `cssclasses` - CSS classes applied to the note in reading/editing view
 
+All other names (for example `title`, `date`, `status`) are custom properties. A
+`title` property does not change the note title, which is the file name. The
+singular `tag`, `alias`, and `cssclass` keys were deprecated in 1.4 and are no
+longer recognized from 1.9; these three properties must be lists.
+
 ## Tags
 
 ```markdown
@@ -48,7 +52,7 @@ due: 2024-02-01T14:30:00
 #tag_with_underscores
 ```
 
-Tags can contain: letters (any language), numbers (not first character), underscores `_`, hyphens `-`, forward slashes `/` (for nesting).
+Tags can contain: letters, numbers, underscores `_`, hyphens `-`, forward slashes `/` (for nesting), and common Unicode characters including emoji. No spaces. A tag must contain at least one non-numeric character: `#1984` is invalid, `#y1984` is valid.
 
 In frontmatter:
 

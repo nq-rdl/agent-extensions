@@ -3,7 +3,7 @@ license: CC-BY-4.0
 metadata:
   repo: https://github.com/nq-rdl/agent-extensions
 description: Prepare, resume and handle human gates for the executable RDL house-style Workflow from brainstorming through spec-kit, SDD, review, PR and MADR archival.
-compatibility: Claude Code 2.1.274 Workflow runtime; installed spec-kit, Superpowers and GitHub workflow skills
+compatibility: Requires Claude Code dynamic workflows (2.1.154+) with plugin workflow support; written for the 2.1.274 Workflow runtime. Needs installed spec-kit, Superpowers and GitHub workflow skills.
 ---
 
 The executable orchestrator is `/rdl-team:house-style`, registered from

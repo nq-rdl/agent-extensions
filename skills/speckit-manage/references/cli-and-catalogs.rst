@@ -42,10 +42,12 @@ Catalog Configuration
 
 The catalog stack is resolved in strict precedence order, highest first:
 
-1. ``SPECKIT_CATALOG_URL`` environment variable — an ad-hoc override catalog
-   URL, useful for CI or one-off testing without touching any config file.
+1. ``SPECKIT_CATALOG_URL`` environment variable — replaces the whole catalog
+   stack with a single URL, useful for CI or one-off testing without touching
+   any config file.
 2. Project catalog — ``.specify/extension-catalogs.yml`` in the repo. A
-   non-empty project file takes full precedence over the user-level file.
+   project file listing at least one catalog takes full precedence over the
+   user-level file; ``catalogs: []`` falls back to the built-in defaults.
 3. User catalog — ``~/.specify/extension-catalogs.yml``, shared across all
    of a developer's projects.
 4. Built-in defaults — the official catalog plus the community catalog
@@ -86,7 +88,10 @@ Commit:
 
 Gitignore:
 
-- ``.specify/extensions/.cache/`` — downloaded catalog/extension artifacts.
-- ``.backup/`` — pre-update/pre-remove backups kept for rollback.
-- ``*.local.yml`` — developer-local config overrides (``<ext>-config.local.yml``).
-- ``.registry`` — the resolved/materialized view of the catalog stack.
+- ``.specify/extensions/.cache/`` — catalog cache.
+- ``.specify/extensions/.backup/`` — config backups.
+- ``.specify/extensions/*/*.local.yml`` — developer-local config overrides
+  (``<ext>-config.local.yml``).
+- ``.specify/extensions/.registry`` — installation state.
+
+(User Guide "Version Control", re-read at v1.0.12 on 2026-09-29.)

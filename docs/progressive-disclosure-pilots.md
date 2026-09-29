@@ -308,6 +308,8 @@ Notes:
    difference, but the skill and upstream describe a Duration with `.days`.
    Someone with Obsidian should run `(now() - file.ctime).days` and
    `((now() - file.ctime) / 86400000).round(0)` in a base and record the
-   app version.
+   app version. Tracked in [#428](https://github.com/nq-rdl/agent-extensions/issues/428);
+   #304 remains open for this critical invariant.
 2. **r:lib-cli routing.** The skill was never auto-selected for a "write a
-   cli error helper" task (C1). Consider for #306.
+   cli error helper" task (C1). Subsequently resolved in the
+   [R/Shiny review](skill-review/r-shiny.md): revised routing passed 3/3.

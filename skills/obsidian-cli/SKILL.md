@@ -9,13 +9,17 @@ description: >-
   with their Obsidian vault, manage notes, search vault content, perform vault
   operations from the command line, or develop and debug Obsidian plugins and
   themes.
+compatibility: >-
+  Obsidian desktop 1.12.7+ installer with the CLI enabled in Settings > General >
+  Command line interface. The app must be running (the first command launches
+  it). Checked 2026-09-29 against obsidian-help commit bc5b4f2.
 metadata:
   repo: https://github.com/nq-rdl/agent-extensions
 ---
 
 # Obsidian CLI
 
-Use the `obsidian` CLI to interact with a running Obsidian instance. Requires Obsidian to be open.
+Use the `obsidian` CLI to interact with a running Obsidian instance. If Obsidian is not running, the first command launches it.
 
 ## Command reference
 
@@ -32,7 +36,7 @@ obsidian create name="My Note" content="Hello world"
 **Flags** are boolean switches with no value:
 
 ```bash
-obsidian create name="My Note" silent overwrite
+obsidian create name="My Note" open overwrite
 ```
 
 For multiline content use `\n` for newline and `\t` for tab.
@@ -46,7 +50,7 @@ Many commands accept `file` or `path` to target a file. Without either, the acti
 
 ## Vault targeting
 
-Commands target the most recently focused vault by default. Use `vault=<name>` as the first parameter to target a specific vault:
+If the current working directory is a vault folder, that vault is used; otherwise the active vault is used. To target a specific vault, pass `vault=<name>` or `vault=<id>`; it must be the first parameter:
 
 ```bash
 obsidian vault="My Vault" search query="test"
@@ -56,7 +60,7 @@ obsidian vault="My Vault" search query="test"
 
 ```bash
 obsidian read file="My Note"
-obsidian create name="New Note" content="# Hello" template="Template" silent
+obsidian create name="New Note" content="# Hello" template="Template"
 obsidian append file="My Note" content="New line"
 obsidian search query="search term" limit=10
 obsidian daily:read
@@ -67,7 +71,7 @@ obsidian tags sort=count counts
 obsidian backlinks file="My Note"
 ```
 
-Use `--copy` on any command to copy output to clipboard. Use `silent` to prevent files from opening. Use `total` on list commands to get a count.
+Use `--copy` on any command to copy output to clipboard. Created files do not open by default; add `open` (or `newtab`) to open them. Use `total` on list commands to get a count.
 
 ## Plugin development
 

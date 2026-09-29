@@ -1,0 +1,3 @@
+kind: Changed
+body: 'cc-setup: one install and one settings example; an authorized setup is not re-confirmed; idempotent merge skips any existing forced-eval hook (#305, #307)'
+time: 2026-09-29T05:43:15.337203554Z

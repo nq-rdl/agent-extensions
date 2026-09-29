@@ -136,6 +136,7 @@ Auto-discovers and loads new files from S3 (v3.2+).
    SELECT * FROM FILES (
        "path" = "s3://bucket/incoming/",
        "format" = "parquet",
+       "aws.s3.region" = "us-west-2",
        "aws.s3.access_key" = "...",
        "aws.s3.secret_key" = "..."
    );
@@ -194,12 +195,20 @@ Data Unloading
 INSERT INTO FILES (Recommended)
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
+Unloading with ``FILES()`` needs v3.2+ (Parquet); ORC and CSV output need
+v3.3+. ``compression`` is required (``uncompressed``, ``gzip``,
+``snappy``, ``zstd``, ``lz4``; CSV must be ``uncompressed``), and S3
+paths require ``aws.s3.region``. ``partition_by`` writes one sub-path per
+column value.
+
 .. code:: sql
 
    INSERT INTO FILES (
        "path" = "s3://bucket/export/",
        "format" = "parquet",
+       "compression" = "zstd",
        "partition_by" = "dt",
+       "aws.s3.region" = "us-west-2",
        "aws.s3.access_key" = "...",
        "aws.s3.secret_key" = "..."
    )
@@ -225,8 +234,10 @@ EXPORT
 Arrow Flight SQL
 ~~~~~~~~~~~~~~~~
 
-High-throughput programmatic access (v3.5+). Connect via any Arrow
-Flight SQL client on port 8040 (default). Useful for data science tools
+High-throughput programmatic access (v3.5.1+). Enable it by setting
+``arrow_flight_port`` in both ``fe.conf`` and ``be.conf`` (different
+ports; the docs use 9408 for FE and 9419 for BE), restart, then connect
+any Arrow Flight SQL client to the FE port. Useful for data science tools
 (Pandas, Polars, DuckDB).
 
 Strict Mode

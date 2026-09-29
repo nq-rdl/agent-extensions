@@ -52,6 +52,19 @@ nav = [
     { "Delegation" = "delegation.md" },
     { "External marketplaces" = "external-marketplaces.md" },
     { "Link monitoring" = "link-monitoring.md" },
+    { "Skill review (epic #312)" = [
+        { "Progressive-disclosure pilots" = "progressive-disclosure-pilots.md" },
+        { "Completion record" = "skill-review/finish.md" },
+        { "Claude Code" = "skill-review/claude-code.md" },
+        { "Codex" = "skill-review/codex.md" },
+        { "Delegation" = "skill-review/delegation.md" },
+        { "GitHub workflows" = "skill-review/gh-workflows.md" },
+        { "Hooks" = "skill-review/hooks.md" },
+        { "New plugins" = "skill-review/new-plugins.md" },
+        { "OpenCode and Spec Kit" = "skill-review/opencode-speckit.md" },
+        { "R and Shiny" = "skill-review/r-shiny.md" },
+        { "Tools and docs" = "skill-review/tools-docs.md" },
+    ] },
 ]
 
 # With the "extra_css" option you can add your own CSS styling to customize

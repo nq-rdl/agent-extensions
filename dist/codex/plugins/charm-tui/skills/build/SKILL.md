@@ -6,7 +6,9 @@ description: Build terminal user interfaces with the Go Charm ecosystem (Bubblet
   interactive terminal components, styling terminal output, building CLI tools with
   polished help screens, or when the user asks about Bubbletea, Bubbles, Lip Gloss,
   or Fang. Also trigger when reviewing or refactoring existing Charm-based code.
-compatibility: Requires Go 1.25+
+compatibility: Requires Go 1.26+ for the latest set (bubbletea v2.0.10, bubbles v2.2.1,
+  lipgloss v2.0.6, fang v2.0.1, teatest v2 pseudo-version v2.0.0-20260927004216-9c77d672503d);
+  checked 2026-09-29. Pinning bubbletea <= v2.0.9 allows Go 1.25.
 metadata:
   repo: https://github.com/nq-rdl/agent-extensions
 ---
@@ -19,17 +21,24 @@ Build correct, idiomatic terminal UIs with the Charm ecosystem.
 
 ## Import Paths — Anti-Hallucination Guard
 
-> **WARNING:** All Charm v2 libraries moved to the `charm.land` vanity domain.
-> **Do NOT use** `github.com/charmbracelet/*` paths — those are v0/v1.
+> **WARNING:** Bubbletea, Bubbles, Lip Gloss, and Fang v2 moved to the `charm.land`
+> vanity domain. **Do NOT use** `github.com/charmbracelet/{bubbletea,bubbles,lipgloss,fang}`
+> — those are v0/v1. **Exception:** teatest v2 lives at
+> `github.com/charmbracelet/x/exp/teatest/v2` (there is no `charm.land` teatest).
 
-| Library         | Correct v2 Import Path            |
-|-----------------|-----------------------------------|
-| Bubbletea       | `charm.land/bubbletea/v2`         |
-| Bubbles         | `charm.land/bubbles/v2/<name>`    |
-| Lip Gloss       | `charm.land/lipgloss/v2`          |
-| Fang            | `charm.land/fang/v2`              |
+| Library         | Correct v2 Import Path                        |
+|-----------------|-----------------------------------------------|
+| Bubbletea       | `charm.land/bubbletea/v2`                     |
+| Bubbles         | `charm.land/bubbles/v2/<name>`                |
+| Lip Gloss       | `charm.land/lipgloss/v2`                      |
+| Fang            | `charm.land/fang/v2`                          |
+| teatest         | `github.com/charmbracelet/x/exp/teatest/v2`   |
 
 Always alias bubbletea: `tea "charm.land/bubbletea/v2"`.
+
+**Verify canonical API:** if the project's `go.mod` pins other versions or a symbol
+differs from these references, check `go doc charm.land/bubbletea/v2 <Symbol>` (or
+pkg.go.dev) instead of trusting the references. Do not silently upgrade the user's modules.
 
 ---
 
@@ -86,7 +95,7 @@ Key v2 patterns shown:
 - `Update(tea.Msg) (tea.Model, tea.Cmd)` — type-switch on message
 - `View() tea.View` — returns `tea.NewView(string)`, **not** a raw string
 - `tea.Quit` — the function reference itself, **no parentheses**
-- `tea.KeyPressMsg` — v2 key type (not `tea.KeyMsg`)
+- `tea.KeyPressMsg` — v2 key-press type (`tea.KeyMsg` is an interface matching press and release)
 - `msg.String()` — easiest way to match key combinations like `"ctrl+c"`
 
 ---
@@ -153,7 +162,7 @@ Fang wraps a Cobra command with styled help, errors, man pages, and shell comple
 | `View() string` | `View() tea.View` |
 | `return tea.NewView(s)` (string) → `return s` | Always return `tea.NewView(s)` |
 | `case " ":` for space | `case "space":` |
-| `case tea.KeyMsg:` (v1 type) | `case tea.KeyPressMsg:` (v2 type) |
+| `case tea.KeyMsg:` for key presses (in v2 an interface matching press and release) | `case tea.KeyPressMsg:` |
 | `tea.WithAltScreen()` in NewProgram | `v.AltScreen = true` in View() |
 | Blocking I/O in Update | Return a `tea.Cmd` for async I/O |
 | Raw goroutines | `tea.Cmd` functions |

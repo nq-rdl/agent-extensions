@@ -19,7 +19,9 @@ the notes in a vault. Bases syntax changes between Obsidian releases. When a
 formula or view fails and being wrong would mislead, check the canonical pages:
 [syntax](https://help.obsidian.md/bases/syntax),
 [functions](https://help.obsidian.md/bases/functions), and
-[views](https://help.obsidian.md/bases/views).
+[views](https://help.obsidian.md/bases/views). If the user's Obsidian version
+is older than the compatibility note, or those pages are unreachable, say
+which syntax you could not confirm instead of presenting it as certain.
 
 ## Workflow
 

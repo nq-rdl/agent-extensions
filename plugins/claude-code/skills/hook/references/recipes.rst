@@ -15,6 +15,8 @@ https://code.claude.com/docs/en/hooks-guide#what-you-can-automate
 
 Deny ``rm -rf /``, force push, and ``dd`` to a device. Uses
 ``permissionDecision: "deny"`` so it blocks even under ``bypassPermissions``.
+The pattern is a starting point, not a complete guard: it does not catch
+``rm -fr``, ``rm -r -f``, or ``git push -f``. Extend it for real use.
 
 Script — ``block-destructive.sh``
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -116,7 +118,7 @@ tool, so the file is already on disk.
          {
            "matcher": "Edit|Write",
            "hooks": [
-             { "type": "command", "command": "path=$(jq -r '.tool_input.file_path // empty'); [ -n \"$path\" ] && npx prettier --write -- \"$path\"" }
+             { "type": "command", "command": "path=$(jq -r '.tool_input.file_path // empty'); if [ -n \"$path\" ]; then npx prettier --write -- \"$path\"; fi" }
            ]
          }
        ]
@@ -255,8 +257,9 @@ matcher narrow; an empty matcher auto-approves everything.
      }
    }
 
-``PermissionRequest`` hooks do **not** fire in non-interactive ``-p`` mode — use
-``PreToolUse`` with ``permissionDecision: "allow"`` there.
+In ``-p`` mode a permission prompt exists only when an Agent SDK
+``canUseTool`` callback supplies it; in plain ``-p`` runs use ``PreToolUse``
+with ``permissionDecision: "allow"`` instead.
 
 --------------
 
@@ -315,7 +318,7 @@ to fire only on those.
          {
            "matcher": "",
            "hooks": [
-             { "type": "command", "command": "jq -c '{timestamp: now | todate, source: .config_source, keys: .changed_keys}' >> ~/claude-config-audit.log" }
+             { "type": "command", "command": "jq -c '{timestamp: now | todate, source: .source, file: .file_path}' >> ~/claude-config-audit.log" }
            ]
          }
        ]

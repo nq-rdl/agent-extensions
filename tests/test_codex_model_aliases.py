@@ -55,21 +55,26 @@ def section(text: str, heading: str) -> str:
     return match.group(1)
 
 
-def guide_rows(path: Path) -> list[list[str]]:
-    """Rows of the alias table under '## Models and aliases', split into cells."""
+def guide_table(path: Path) -> tuple[list[str], list[dict]]:
+    """Header and rows (dicts keyed by header cell) of the '## Models and aliases' table."""
     body = section(path.read_text(), "Models and aliases")
     lines = [line for line in body.splitlines() if line.startswith("|")]
-    header, rows = lines[0], lines[2:]
-    assert "Aliases" in header and "Full id" in header, header
-    return [[cell.strip() for cell in line.strip("|").split("|")] for line in rows]
+    split = lambda line: [cell.strip() for cell in line.strip("|").split("|")]
+    header = split(lines[0])
+    assert "Aliases (`--model`)" in header and "Full id" in header, header
+    return header, [dict(zip(header, split(line))) for line in lines[2:]]
+
+
+def guide_rows(path: Path) -> list[dict]:
+    return guide_table(path)[1]
 
 
 def guide_aliases(path: Path) -> dict:
     mapping = {}
-    for cells in guide_rows(path):
-        full = re.fullmatch(r"`([^`]+)`", cells[1])
-        assert full, f"full-id cell must be one code span: {cells[1]!r}"
-        for alias in re.findall(r"`([^`]+)`", cells[0]):
+    for row in guide_rows(path):
+        full = re.fullmatch(r"`([^`]+)`", row["Full id"])
+        assert full, f"full-id cell must be one code span: {row['Full id']!r}"
+        for alias in re.findall(r"`([^`]+)`", row["Aliases (`--model`)"]):
             assert alias not in mapping, f"alias {alias} listed twice"
             mapping[alias] = full.group(1)
     return mapping
@@ -172,26 +177,29 @@ class AliasDecision(unittest.TestCase):
         self.assertIn("no** `gpt-6-terra`", GUIDE.read_text())
         self.assertIn("no GPT-6 Terra", OUTLINE.read_text())
 
-    def test_rescue_and_runtime_skills_name_gpt6_forms(self):
-        for path in [SKILLS / "codex-rescue" / "SKILL.md", SKILLS / "codex-cli-runtime" / "SKILL.md"]:
-            text = path.read_text()
-            with self.subTest(path=path.name):
-                for token in ("gpt-5.6-luna", "sol-6", "luna-6", "astra", "gpt-6-luna", "codex:model-guide"):
-                    self.assertIn(token, text)
+    def test_rescue_skill_names_gpt6_forms(self):
+        # codex:rescue owns the spoken-form mapping; codex:cli-runtime is loaded in
+        # the same context and defers to it and to codex:model-guide (#310).
+        text = (SKILLS / "codex-rescue" / "SKILL.md").read_text()
+        for token in ("gpt-5.6-luna", "sol-6", "luna-6", "astra", "gpt-6-luna", "codex:model-guide"):
+            self.assertIn(token, text)
+        runtime = (SKILLS / "codex-cli-runtime" / "SKILL.md").read_text()
+        self.assertIn("codex:model-guide", runtime)
+        self.assertNotIn("gpt-6-luna", runtime)
 
 
 class ModelGuideFacts(unittest.TestCase):
     def rows(self) -> dict:
-        return {cells[1].strip("`"): cells for cells in guide_rows(GUIDE)}
+        return {row["Full id"].strip("`"): row for row in guide_rows(GUIDE)}
 
     def test_gpt6_rows_and_default_efforts(self):
         rows = self.rows()
         for model in ("gpt-6-astra", "gpt-6-sol", "gpt-6-luna"):
             self.assertIn(model, rows)
-        self.assertEqual(rows["gpt-6-sol"][2], "medium")
-        self.assertEqual(rows["gpt-6-luna"][2], "medium")
+        self.assertEqual(rows["gpt-6-sol"]["Default effort"], "medium")
+        self.assertEqual(rows["gpt-6-luna"]["Default effort"], "medium")
         # Sol's `low` default is a GPT-5.6-only fact (#393).
-        self.assertEqual(rows["gpt-5.6-sol"][2], "low")
+        self.assertEqual(rows["gpt-5.6-sol"]["Default effort"], "low")
         effort = section(GUIDE.read_text(), "Reasoning effort ladder")
         self.assertIn("`gpt-5.6-sol` defaults to `low`", effort)
         self.assertNotIn("Sol defaults to `low`", effort)
@@ -202,7 +210,7 @@ class ModelGuideFacts(unittest.TestCase):
             "gpt-5.6-sol": "yes", "gpt-5.6-terra": "yes", "gpt-5.6-luna": "no",
             "gpt-6-astra": "yes", "gpt-6-sol": "yes", "gpt-6-luna": "no",
         }.items():
-            self.assertEqual(rows[model][3], ultra, model)
+            self.assertEqual(rows[model]["`ultra`"], ultra, model)
         # The old "Sol/Terra only" wording is wrong once Astra exists.
         for path in SKILLS.glob("codex-*/**/*"):
             if path.is_file():
@@ -210,7 +218,7 @@ class ModelGuideFacts(unittest.TestCase):
 
     def test_spark_and_context_facts(self):
         rows = self.rows()
-        self.assertRegex(rows["gpt-5.3-codex-spark"][5], r"Unverified.*0\.157\.0")
+        self.assertRegex(rows["gpt-5.3-codex-spark"]["Position"], r"Unverified.*0\.157\.0")
         aliases = section(GUIDE.read_text(), "Models and aliases")
         self.assertRegex(aliases, r"GPT-6: Codex harness context 272,000 tokens.*0\.157\.0")
         self.assertIn("by design", aliases)
@@ -221,6 +229,14 @@ class ModelGuideFacts(unittest.TestCase):
             section(GUIDE.read_text(), "Review commands"),
         ):
             self.assertIn("not verified against a live backend", text)
+
+    def test_no_unmaintained_prices(self):
+        # #308: no price source or maintenance process exists in this repo.
+        header, _ = guide_table(GUIDE)
+        self.assertFalse([cell for cell in header if "price" in cell.lower()], header)
+        text = GUIDE.read_text()
+        self.assertNotRegex(text, r"\$\d")
+        self.assertNotIn("relative cost signal", text)
 
     def test_pin_and_gpt6_caveats(self):
         text = GUIDE.read_text()

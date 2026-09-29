@@ -73,6 +73,8 @@ See [`CONTRIBUTING.md`](CONTRIBUTING.md) for how skills are grouped into plugins
 skill directory layout, content conventions, and the packaging loop. See
 [`AGENTS.md`](AGENTS.md) for repo commands, CI checks, local hooks, and the changelog and
 release flow. Design decisions live in [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md).
+Contributor validation and the skill-size report are documented in
+[asctl](tools/asctl/README.md).
 
 ## Roadmap
 

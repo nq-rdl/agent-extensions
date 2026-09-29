@@ -1,5 +1,9 @@
 ---
-description: Terraform infrastructure specialist that generates compliant HCL using current provider/module versions that fit existing constraints, manages HCP Terraform workspaces when used, orchestrates plan/apply workflows, and enforces security and formatting best practices.
+description: >-
+  Use when writing or changing Terraform HCL: resources, modules, provider and
+  module version constraints, backends or HCP Terraform workspaces, and the
+  fmt/validate/plan/apply workflow. For a security review of existing Terraform
+  use terraform:review; for Terratest, terraform:test.
 license: MIT
 metadata:
   upstream: https://github.com/github/awesome-copilot/blob/main/agents/terraform.agent.md

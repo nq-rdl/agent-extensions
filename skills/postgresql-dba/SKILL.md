@@ -9,7 +9,7 @@ metadata:
 
 # Administer
 
-Use an available PostgreSQL client or MCP tool to inspect the target database directly. Establish the database, requested operation, and allowed mutations before execution. Base schema, tuning, backup, and security recommendations on observed state and report verification.
+Use an available PostgreSQL client or MCP tool to inspect the target database directly. Establish the database, requested operation, and allowed mutations before execution. Inspection is read-only by default: writing a migration file does not apply it, and DDL, DML, or maintenance runs against a database only when the user authorized that change for that database. Base schema, tuning, backup, and security recommendations on observed state and report verification.
 
 ## Optional delegation
 

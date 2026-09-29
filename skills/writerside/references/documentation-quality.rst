@@ -86,24 +86,29 @@ output (e.g., broken cross-topic links).
 In Docker Builds
 ~~~~~~~~~~~~~~~~
 
-The Docker builder reports all problems to console output. In CI/CD
-pipelines, you can parse this output to fail builds on errors:
+The Docker builder reports problems to console output as
+``Test failed: <ID>: …`` (errors) and ``Inspection failed: <ID> …``
+(warnings), and writes them to ``report.json`` in the output directory.
+The container exits non-zero (255) on errors and 0 on warnings only.
+Do not grep the log for ``ERROR``: inspection errors do not use that
+word, while normal startup logs print ``SEVERE`` plugin messages.
+``WRS_BUILDER`` is defined in `docker-deployment.rst <docker-deployment.rst>`__
+→ Builder image and version:
 
 .. code:: bash
 
+   set -o pipefail   # keep docker's exit code through tee
    docker run --rm \
      -v .:/opt/sources \
      -e SOURCE_DIR=/opt/sources \
      -e MODULE_INSTANCE=Writerside/hi \
      -e OUTPUT_DIR=/opt/sources/output \
      -e RUNNER=other \
-     jetbrains/writerside-builder:2026.02.8644 2>&1 | tee build.log
+     "$WRS_BUILDER" 2>&1 | tee build.log \
+     || { echo "Documentation build has errors"; exit 1; }
 
-   # Check for errors in build output
-   if grep -q "ERROR" build.log; then
-     echo "Documentation build has errors"
-     exit 1
-   fi
+   # Alternatively, read the error count from the report
+   jq -e '.testsErrorsCount == 0' output/report.json
 
 --------------
 
@@ -144,7 +149,8 @@ Quality Workflow
 Recommended Process
 ~~~~~~~~~~~~~~~~~~~
 
-1. **Author with IDE inspections active** — Fix errors and warnings as
+1. **Author with inspections active** (Writerside plugin in a JetBrains
+   IDE) — Fix errors and warnings as
    you write
 2. **Preview locally** — Check the rendered output and review the
    problems list
@@ -170,35 +176,13 @@ CI/CD Integration
 GitHub Actions Example
 ~~~~~~~~~~~~~~~~~~~~~~
 
-.. code:: yaml
-
-   name: Docs Quality
-   on: [pull_request]
-
-   jobs:
-     build-docs:
-       runs-on: ubuntu-latest
-       steps:
-         - uses: actions/checkout@v4
-
-         - name: Build and check documentation
-           run: |
-             docker run --rm \
-               -v ${{ github.workspace }}:/opt/sources \
-               -e SOURCE_DIR=/opt/sources \
-               -e MODULE_INSTANCE=Writerside/hi \
-               -e OUTPUT_DIR=/opt/sources/output \
-               -e RUNNER=github \
-               jetbrains/writerside-builder:2026.02.8644
-
-         - name: Upload artifacts
-           uses: actions/upload-artifact@v4
-           with:
-             name: docs
-             path: output/
-
-Build errors will cause the Docker container to exit with a non-zero
-code, failing the CI step automatically.
+Use JetBrains' documented workflow, shown in
+`docker-deployment.rst <docker-deployment.rst>`__ → GitHub Actions: the
+``build`` job runs ``JetBrains/writerside-github-action@v4`` with the
+builder tag in ``DOCKER_VERSION`` (see Builder image and version) and
+uploads the website archive plus ``report.json``; the ``test`` job runs
+``JetBrains/writerside-checker-action@v1``, which fails when
+``report.json`` contains errors.
 
 --------------
 

@@ -1,8 +1,8 @@
 Canonical spec-kit Extension Sources — Validation
 =================================================
 
-spec-kit evolves fast (v0.12.x, near-daily releases; extension schema_version
-"1.0"). A remembered field name or CLI flag can be a release stale. When
+spec-kit evolves fast (v0.12.0 to v1.0.12 shipped between late June and September
+2026; extension schema_version "1.0"). A remembered field name or CLI flag can be a release stale. When
 correctness depends on a detail you are not certain of, **fetch the page below
 and read the current wording** instead of asserting from memory.
 
@@ -32,5 +32,8 @@ Context
 Version pin
 -----------
 
-Schema ``schema_version: "1.0"``; facts verified against release line v0.12.x on
-2026-07-04. Re-check the Development Guide before emitting a manifest.
+Schema ``schema_version: "1.0"``. First written against the v0.12.x line
+(2026-07-04); re-checked on 2026-09-29 against source at v0.12.0, v0.14.0,
+v0.15.0, v0.16.2, v1.0.0 and v1.0.12 (latest release). Releases between those
+tags were not read, and nothing here was tested by running the installer.
+Re-check the Development Guide before emitting a manifest.

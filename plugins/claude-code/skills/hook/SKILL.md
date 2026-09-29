@@ -1,17 +1,16 @@
 ---
 license: CC-BY-4.0
 description: >-
-  Create, manage, and debug Claude Code hooks — user-defined commands that run
-  at specific points in Claude Code's lifecycle for deterministic control. Use
-  when the user asks about hooks, guardrails, pre/post tool execution, safety
-  rules, command blocking, context injection, auto-formatting, permission
-  auto-approval, or completion checklists for Claude Code. Also trigger on
-  mentions of PreToolUse, PostToolUse, PermissionRequest, SessionStart, Stop,
-  UserPromptSubmit, settings.json hooks, prompt-based or agent-based hooks, or
-  when the user worries that hook output looks like prompt injection. Covers all
-  five hook types (command, http, mcp_tool, prompt, agent), the full event
-  lifecycle, the JSON output contract (permissionDecision / decision /
-  hookSpecificOutput), exit codes, and safe context-injection patterns.
+  Create, debug, and audit Claude Code hooks in settings.json, plugins, or
+  skill frontmatter. Use for PreToolUse, PostToolUse, PermissionRequest, Stop,
+  SessionStart, or UserPromptSubmit hooks; command blocking, auto-formatting,
+  auto-approval, context injection, or completion checks; or when hook output
+  is ignored or looks like prompt injection. Not for Git hooks such as
+  pre-commit.
+compatibility: >-
+  Claude Code 2.1.x; the hook `if` field requires v2.1.85+. Event contracts
+  checked against the hooks reference with Claude Code 2.1.284 on 2026-09-29;
+  re-check https://code.claude.com/docs/en/hooks when behavior differs.
 argument-hint: "What hook do you want to create or debug? (e.g. 'block rm -rf', 'format on save', 'why is my Stop hook ignored')"
 user-invocable: true
 metadata:
@@ -26,7 +25,7 @@ happens, rather than relying on the model to choose to run it. Use them to enfor
 project rules, automate repetitive tasks (formatting, logging), block dangerous
 operations, and inject context.
 
-> Authoritative sources, kept verbatim with links, live in `references/`. Read the
+> Summaries of the official docs, with source links, live in `references/`. Read the
 > matching reference before writing or debugging a hook — the I/O contract has
 > changed across Claude Code versions and getting it wrong is the most common bug.
 
@@ -39,7 +38,7 @@ operations, and inject context.
 | Run a deterministic check/script (block, format, log) | `type: "command"` | `references/claude-code.rst` |
 | Call a web service / shared endpoint | `type: "http"` | `references/claude-code.rst` |
 | Call a tool on a connected MCP server | `type: "mcp_tool"` | `references/claude-code.rst` |
-| Make a yes/no judgment with a small model | `type: "prompt"` | `references/prompt-and-agent-hooks.rst` |
+| Make a yes/no judgment with a model | `type: "prompt"` | `references/prompt-and-agent-hooks.rst` |
 | Verify against real codebase state (run tests, read files) | `type: "agent"` *(experimental)* | `references/prompt-and-agent-hooks.rst` |
 
 > **`prompt` hooks are NOT static text.** A common misconception (and a bug in old
@@ -56,7 +55,8 @@ operations, and inject context.
 | `.claude/settings.local.json` | One project | No — gitignored |
 | Managed policy settings | Organization-wide | Admin-controlled |
 | Plugin `hooks/hooks.json` | When plugin enabled | Bundled with plugin |
-| Skill / agent frontmatter | While that component is active | In the component |
+| Skill frontmatter | From invocation to session end | In the skill |
+| Subagent frontmatter | While that subagent runs | In the agent |
 
 Run `/hooks` in Claude Code to browse configured hooks (read-only; edit the JSON or
 ask Claude to change them). Set `"disableAllHooks": true` to turn them all off.
@@ -90,7 +90,7 @@ ask Claude to change them). Set `"disableAllHooks": true` to turn them all off.
   syntax (`"Bash(git *)"`, `"Edit(*.ts)"`). Tool events only.
 - **type** — `command` (default), `http`, `mcp_tool`, `prompt`, or `agent`.
 - **timeout** — seconds. Defaults: command/http/mcp_tool 10 min (30 s under
-  `UserPromptSubmit`), prompt 30 s, agent 60 s.
+  `UserPromptSubmit` and the model-switch events), prompt 30 s, agent 60 s.
 
 ## The I/O contract (read this before writing output)
 
@@ -100,12 +100,13 @@ A hook reads **event JSON on stdin** and replies through **stdout + exit code**.
 
 | Code | Meaning |
 |------|---------|
-| `0` | No objection. stdout is parsed as JSON for structured control. For `UserPromptSubmit`, `UserPromptExpansion`, `SessionStart`, plain stdout is added to context. |
-| `2` | Blocking error. stdout/JSON ignored; **stderr is fed to Claude** as feedback. Effect depends on event (blocks `PreToolUse`, rejects a prompt, continues `Stop`, …). Not all events can block. |
-| other | Non-blocking error. Transcript shows `<hook> hook error` + first stderr line; action proceeds. |
+| `0` | No objection. stdout is parsed as JSON for structured control. For `UserPromptSubmit`, `UserPromptExpansion`, `SessionStart`, and `PostModelSwitch`, plain stdout is added to context. |
+| `2` | Blocks on events that can block, even if JSON says `allow`. The message is the JSON `reason` if present, else stderr; it goes to Claude for `PreToolUse` but only to the user for `UserPromptSubmit`. `PermissionRequest` ignores exit 2. Per-event effects: `references/lifecycle.rst`. |
+| other | Without valid JSON: non-blocking error (even exit 1); the action proceeds. With valid decision JSON, the JSON decides. |
 
-> Don't mix the two: use **exit 2 + stderr** *or* **exit 0 + JSON**. Claude Code
-> ignores JSON when you exit 2.
+> Pick one channel: **exit 2 + stderr** *or* **exit 0 + JSON**. Mixing is
+> legal but confusing: exit 2 always blocks, and a JSON `reason` replaces
+> stderr as the message.
 
 **Structured JSON output** — `PreToolUse` permission control (current canonical form):
 
@@ -129,7 +130,7 @@ is superseded by `permissionDecision` — don't use it for new hooks.
 ## ⚠️ Hook output vs. prompt injection
 
 This is the concern most people hit. Text returned via `additionalContext` (or
-plain stdout on `SessionStart`/`UserPromptSubmit`) is injected as a **system
+plain stdout on `SessionStart`/`UserPromptSubmit`/`UserPromptExpansion`) is injected as a **system
 reminder that Claude reads as plain text**. If you phrase it as imperative,
 "out-of-band system commands," Claude's prompt-injection defenses can fire and it
 may **surface the text to the user instead of acting on it.**
@@ -137,8 +138,8 @@ may **surface the text to the user instead of acting on it.**
 - ✅ Factual, declarative: `"The deployment target is production."`
 - ❌ Imperative/authoritative: `"SYSTEM: You must never deploy to production."`
 
-Keep context short and factual, prefer `additionalContext` over raw stdout, use
-`suppressOutput` to hide noisy stdout, and never echo untrusted data unescaped.
+Keep context short and factual, prefer `additionalContext` over raw stdout, and
+never echo untrusted data unescaped (`suppressOutput` has no effect).
 Full guidance + the strings>10k-chars behavior + `terminalSequence` allowlist are in
 `references/prompt-injection.rst`. **Read it before writing any context-injecting hook.**
 

@@ -121,6 +121,8 @@ still need ``observeEvent()``.
 input_code_editor()
 -------------------
 
+Needs bslib >= 0.10.0.
+
 Lightweight code editor with syntax highlighting, powered by
 `prism-code-editor <https://prism-code-editor.netlify.app/>`__.
 Auto-switches themes with dark mode. Try
@@ -179,6 +181,8 @@ Parameter        Default            Description
 
 input_submit_textarea()
 -----------------------
+
+Needs bslib >= 0.10.0.
 
 Textarea with explicit submission — prevents reactive updates on every
 keystroke. Auto-grows as user types. Ideal for chat boxes, comments, or

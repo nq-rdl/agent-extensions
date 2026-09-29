@@ -19,7 +19,6 @@ Quick Integration
 
    import (
        "context"
-       "fmt"
        "os"
 
        "charm.land/fang/v2"
@@ -63,10 +62,14 @@ fang.Execute
    func Execute(ctx context.Context, root *cobra.Command, options ...Option) error
 
 Replaces ``root.Execute()`` (or ``root.ExecuteContext(ctx)``).
-Automatically adds: - Styled help output (colors, formatting) - Styled
-error messages - ``--version`` flag (if version info provided) - Hidden
-``man`` command (man page generation) - ``completion`` command (bash,
-zsh, fish, powershell)
+Automatically adds:
+
+- Styled help output (colors, formatting)
+- Styled error messages
+- ``-v``/``--version`` flag — always set unless ``WithoutVersion()``; falls
+  back to the module build info, then ``unknown (built from source)``
+- Hidden ``man`` command (man page generation)
+- ``completion`` command (bash, zsh, fish, powershell)
 
 --------------
 
@@ -82,12 +85,14 @@ Options
    fang.WithCommit(commit string) Option
 
    // Custom color scheme function
+   // type ColorSchemeFunc = func(lipgloss.LightDarkFunc) ColorScheme
    fang.WithColorSchemeFunc(cs ColorSchemeFunc) Option
 
    // Custom error handler — signature: func(w io.Writer, styles fang.Styles, err error)
    fang.WithErrorHandler(handler ErrorHandler) Option
 
-   // Custom interrupt signals (default: os.Interrupt, syscall.SIGTERM)
+   // Cancel the command context on these signals. No default: fang installs
+   // no signal handling unless this option is passed.
    fang.WithNotifySignal(signals ...os.Signal) Option
 
    // Disable built-in features
@@ -132,19 +137,25 @@ Custom Color Scheme
    import "charm.land/lipgloss/v2"
 
    fang.Execute(ctx, root,
-       fang.WithColorSchemeFunc(func() fang.ColorScheme {
-           return fang.ColorScheme{
-               // Primary accent color (command names, flags)
-               Primary: lipgloss.Color("#7C3AED"),
-               // Secondary color (descriptions)
-               Secondary: lipgloss.Color("#A78BFA"),
-           }
+       fang.WithColorSchemeFunc(func(c lipgloss.LightDarkFunc) fang.ColorScheme {
+           cs := fang.DefaultColorScheme(c) // start from the default, override fields
+           cs.Command = c(lipgloss.Color("#5B21B6"), lipgloss.Color("#7C3AED"))
+           cs.Flag = lipgloss.Color("#A78BFA")
+           return cs
        }),
    )
 
+``fang.ColorScheme`` fields (``color.Color`` unless noted):``Base``, ``Title``,
+``Description``, ``Codeblock``, ``Program``, ``DimmedArgument``,
+``Comment``, ``Flag``, ``FlagDefault``, ``Command``, ``QuotedString``,
+``Argument``, ``Help``, ``Dash``, ``ErrorHeader`` (``[2]color.Color``,
+fg/bg), ``ErrorDetails``. Presets: ``fang.DefaultColorScheme(c)``,
+``fang.AnsiColorScheme(c)``.
+
 ..
 
-   **Note:** ``fang.ColorScheme`` uses ``lipgloss.Color`` from
+   **Note:** ``fang.ColorScheme`` holds ``color.Color`` values (e.g. from
+   ``lipgloss.Color``) and ``LightDarkFunc`` comes from
    ``charm.land/lipgloss/v2``. If your project also uses
    ``github.com/charmbracelet/lipgloss`` (v0/v1), both versions coexist
    safely but their color types are not interchangeable.
@@ -178,6 +189,7 @@ Integration Pattern: Cobra + Bubbletea
 
    import (
        "context"
+       "fmt"
        "os"
 
        "charm.land/fang/v2"
@@ -270,9 +282,7 @@ Fang does not re-export Cobra — add both as direct dependencies.
    ``charm.land/lipgloss/v2``. Projects that already use
    ``github.com/charmbracelet/lipgloss`` (v0/v1) will end up with two
    lipgloss versions in their module graph — this is safe, but the types
-   are not interchangeable between versions. If you see ``x/ansi``
-   version conflicts, run
-   ``go get github.com/charmbracelet/x/cellbuf@latest`` to resolve them.
+   are not interchangeable between versions.
 
 --------------
 
@@ -291,5 +301,5 @@ tea event loop. In projects still using Bubbletea v1
   ``github.com/charmbracelet/lipgloss`` from your app) coexist safely
   but their types are not interchangeable
 
-Only Fang’s own ``ColorScheme`` uses ``lipgloss.Color`` from
-``charm.land/lipgloss/v2``.
+Only Fang’s own color-scheme API (``ColorSchemeFunc`` takes a
+``lipgloss.LightDarkFunc``) uses types from ``charm.land/lipgloss/v2``.

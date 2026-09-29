@@ -17,10 +17,12 @@ The **public key** is printed to stderr — copy it into ``--age`` flags or ``.s
 
 SOPS looks for ``keys.txt`` at decryption time using the following default paths:
 
-- **Linux**: ``$XDG_CONFIG_HOME/sops/age/keys.txt`` → falls back to ``$HOME/.config/sops/age/keys.txt``
-- **macOS**: ``$XDG_CONFIG_HOME/sops/age/keys.txt`` → falls back to ``$HOME/Library/Application Support/sops/age/keys.txt``
+- **Linux**: ``$XDG_CONFIG_HOME/sops/age/keys.txt`` if ``$XDG_CONFIG_HOME`` is set; otherwise ``$HOME/.config/sops/age/keys.txt``
+- **macOS**: ``$XDG_CONFIG_HOME/sops/age/keys.txt`` if ``$XDG_CONFIG_HOME`` is set; otherwise ``$HOME/Library/Application Support/sops/age/keys.txt``
 
-Override the default path with the ``SOPS_AGE_KEY_FILE`` environment variable. If ``SOPS_AGE_KEY_FILE`` is set but points at a missing file, decryption fails with a confusing error — verify the path before setting the variable.
+Only one of the two paths is searched: when ``$XDG_CONFIG_HOME`` is set, a key in ``$HOME/.config/sops/age/`` is **not** found.
+
+Override the default path with the ``SOPS_AGE_KEY_FILE`` environment variable. SOPS loads every key source, so a missing ``SOPS_AGE_KEY_FILE`` is ignored when another source (e.g. the default ``keys.txt``) holds the key. When no source does, the error names the missing file: ``failed to open SOPS_AGE_KEY_FILE file: open <path>: no such file or directory``.
 
 Encrypting
 ----------
@@ -36,8 +38,8 @@ Decrypting
 
 When decrypting a file with the corresponding identity, SOPS will look for a text file named ``keys.txt`` located in a ``sops`` subdirectory of your user configuration directory.
 
-- **Linux**: Looks for ``keys.txt`` in ``$XDG_CONFIG_HOME/sops/age/keys.txt``; falls back to ``$HOME/.config/sops/age/keys.txt``.
-- **macOS**: Looks for ``keys.txt`` in ``$XDG_CONFIG_HOME/sops/age/keys.txt``; falls back to ``$HOME/Library/Application Support/sops/age/keys.txt``.
+- **Linux**: Looks for ``keys.txt`` in ``$XDG_CONFIG_HOME/sops/age/keys.txt``; uses ``$HOME/.config/sops/age/keys.txt`` only if ``$XDG_CONFIG_HOME`` is unset.
+- **macOS**: Looks for ``keys.txt`` in ``$XDG_CONFIG_HOME/sops/age/keys.txt``; uses ``$HOME/Library/Application Support/sops/age/keys.txt`` only if ``$XDG_CONFIG_HOME`` is unset.
 
 You can override the default lookup by:
 
@@ -50,13 +52,13 @@ The contents of this key file should be a list of age X25519 identities, one per
 Editing in Place
 ----------------
 
-Open an encrypted file in your ``$EDITOR`` without writing a plaintext copy to disk:
+Open an encrypted file in an editor:
 
 .. code-block:: bash
 
    sops edit secrets.yaml
 
-SOPS decrypts to a temporary file, opens it in ``$EDITOR`` (falling back to ``vi``), re-encrypts on save, and removes the temporary file. The encrypted file on disk is updated atomically — no intermediate plaintext is left behind.
+SOPS decrypts to a temporary plaintext file in the system temp directory (``$TMPDIR``, usually ``/tmp``; mode ``0600``), opens it in ``$SOPS_EDITOR``, else ``$EDITOR``, else the first of ``vim``, ``nano``, ``vi`` found on ``PATH``. On exit it re-encrypts and deletes the temporary file and its directory. Plaintext therefore touches disk briefly — avoid ``sops edit`` on shared hosts whose temp directory is not private. If the file was not changed, SOPS prints ``File has not changed, exiting.`` and exits with status ``200``.
 
 Using .sops.yaml
 ----------------
@@ -77,15 +79,17 @@ After updating ``.sops.yaml`` with new (or removed) age recipients, re-encrypt t
 
 .. code-block:: bash
 
-   sops updatekeys secrets.yaml
+   sops updatekeys -y secrets.yaml
 
-SOPS re-wraps the symmetric data key against the current set of recipients listed in ``.sops.yaml``. The encrypted values themselves are not re-encrypted — only the encrypted copy of the data key changes. Run ``sops updatekeys`` on every file whose recipients you want to update.
+SOPS re-wraps the symmetric data key against the current set of recipients listed in ``.sops.yaml``. The encrypted values themselves are not re-encrypted — only the encrypted copy of the data key changes. Run ``sops updatekeys -y`` on every file whose recipients you want to update. The caller needs a key that can decrypt the file's current data key.
+
+Without ``-y`` (``--yes``), ``updatekeys`` shows the recipient diff and asks ``Is this okay? (y/n)``. With no terminal attached it reads EOF, leaves the file unchanged, and ``find -exec`` still exits ``0`` — so a non-interactive loop without ``-y`` silently does nothing.
 
 To rotate all files in a directory in one pass:
 
 .. code-block:: bash
 
-   find . -name "*.enc.yaml" -exec sops updatekeys {} \;
+   find . -name "*.enc.yaml" -exec sops updatekeys -y {} \;
 
 Encrypting with SSH Keys
 ------------------------

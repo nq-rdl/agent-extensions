@@ -3,6 +3,27 @@
 Pixi Pack
 =========
 
+Local verification note (2026-09-29): pixi-pack 0.7.11 needs an existing
+``pixi.lock``; packing a manifest alone fails with "could not read lockfile".
+On the connected build machine, run ``pixi lock`` first. Packing reads the
+lockfile; it does not solve it. The rest of this page is the older converted
+upstream snapshot described in SKILL.md, with the default-environment example
+corrected locally. For a manifest with only the default environment, run on
+the connected build machine::
+
+    pixi lock
+    pixi exec pixi-pack --platform linux-64 --create-executable pixi.toml
+
+Transfer ``environment.sh`` to the matching offline Linux target, then run::
+
+    bash environment.sh
+    source ./activate.sh
+
+The self-extractor requires Bash, not POSIX ``sh``. The target needs neither
+Pixi nor a network connection. Do not copy an example ``--environment prod``
+unless that environment exists in the manifest. ``pixi exec`` keeps the tool
+in a temporary environment; it does not put a bare ``pixi-pack`` on PATH.
+
 `pixi-pack <https://github.com/quantco/pixi-pack>`__ is a simple
 tool that takes an environment and packs it into a compressed archive
 that can be shipped to the target machine. The corresponding
@@ -44,7 +65,7 @@ You can pack an environment with
 
    ::
 
-      pixi-pack --environment prod --platform linux-64 pixi.toml
+      pixi-pack --platform linux-64 pixi.toml
 
 This will create an ``environment.tar`` file that contains all conda
 packages required to create the environment.

@@ -26,9 +26,13 @@ Without an explicit choice, run
 Forward a supplied ``--cwd`` to this candidate lookup as well as the task call.
 If a candidate exists, ask whether to continue it or start fresh, then add
 ``--resume`` or ``--fresh`` for the selected answer. Never silently attach an
-unrelated job. Then run
+unrelated job. If no candidate exists and the request only says to continue,
+there is no thread to resume: ask what Codex should do instead of starting a
+task. Then run
 ``node "${PLUGIN_ROOT}/scripts/codex-companion.mjs" task ARGUMENTS`` and return its
 stdout verbatim. Do not monitor, edit, or add follow-up work to the forwarding step.
+On failure, report the actionable stderr lines and $codex:setup for install or
+authentication errors; do not write a substitute answer.
 
 Optional delegation: read [references/subagent.rst](references/subagent.rst) only
 when the user requests a worker or delegation helps. Use the host's mechanism,

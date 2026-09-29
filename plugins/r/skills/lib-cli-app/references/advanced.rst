@@ -97,6 +97,70 @@ Windows
 Additional Examples
 -------------------
 
+Todo Manager (Subcommands)
+~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+Global ``--store`` option plus ``list``, ``add``, and ``done`` subcommands.
+Executed with Rapp 0.3.0 (``todo --help``, ``todo add``).
+
+.. code:: r
+
+   #!/usr/bin/env Rapp
+   #| name: todo
+   #| description: Manage a simple todo list.
+
+   #| description: Path to the todo list file.
+   #| short: s
+   store <- ".todo.yml"
+
+   switch(
+     command <- "",
+
+     list = {
+       #| description: Max entries to display (-1 for all).
+       limit <- 30L
+
+       tasks <- if (file.exists(store)) yaml::read_yaml(store) else list()
+       if (!length(tasks)) {
+         cat("No tasks yet.\n")
+       } else {
+         if (limit >= 0L) tasks <- head(tasks, limit)
+         writeLines(sprintf("%2d. %s\n", seq_along(tasks), tasks))
+       }
+     },
+
+     add = {
+       #| description: Task description to add.
+       task <- NULL
+
+       tasks <- if (file.exists(store)) yaml::read_yaml(store) else list()
+       tasks[[length(tasks) + 1L]] <- task
+       yaml::write_yaml(tasks, store)
+       cat("Added:", task, "\n")
+     },
+
+     done = {
+       #| description: Index of the task to complete.
+       #| short: i
+       index <- 1L
+
+       tasks <- if (file.exists(store)) yaml::read_yaml(store) else list()
+       task <- tasks[[as.integer(index)]]
+       tasks[[as.integer(index)]] <- NULL
+       yaml::write_yaml(tasks, store)
+       cat("Completed:", task, "\n")
+     }
+   )
+
+
+.. code:: sh
+
+   todo add "Write quarterly report"
+   todo list
+   todo list --limit 5
+   todo done 1
+   todo --store /tmp/work.yml list
+
 Deduplication Filter (stdin/stdout + Optional Positional)
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 

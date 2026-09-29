@@ -22,6 +22,7 @@ done
 bundles_arg="${args[*]:-}"
 
 python3 - "$check" "$bundles_arg" <<'PY'
+import json
 import re
 import shutil
 import sys
@@ -198,31 +199,185 @@ def sync_skill(plugin: str, source: str, leaf: str, bundle_file: Path) -> None:
     print(f"  ✓ skill {source} -> {leaf}" if source != leaf else f"  ✓ skill {source}")
 
 
-def sync_hooks(plugin, hook_names):
-    # Opt-in: canonical bundle config owns the entire packaged hooks directory.
-    # Existing bundles without this source keep their current hook packaging.
+# ── Hooks ────────────────────────────────────────────────────────────────────
+# Canonical mapping (#311): hooks/<plugin>/hooks.json is the Claude config and
+# the bundle's `hooks:` list names the shell hooks it ships. The config's
+# quoted "${CLAUDE_PLUGIN_ROOT}/<dir>/<name>.sh" paths fix where each hook is
+# installed, so install paths never move. plugins/<plugin>/hooks/ is owned
+# outright (config + any hooks installed there); a hook installed elsewhere
+# (the Codex runtime's scripts/) is owned file by file, so vendored neighbours
+# are never pruned. Mapping errors are fatal in both modes.
+CANONICAL_HOOKS = (
+    {p.stem for p in (repo / "hooks").glob("*.sh")} if (repo / "hooks").is_dir() else set()
+)
+QUOTED_ROOT = re.compile(
+    r'"\$\{CLAUDE_PLUGIN_ROOT\}(?:/([A-Za-z0-9._/-]+)"|"/([A-Za-z0-9._/-]+))'
+)
+PLUGIN_ROOT_REF = re.compile(
+    r"\$\{CLAUDE_PLUGIN_ROOT(?::-[^}]*)?\}/([A-Za-z0-9._-]+(?:/[A-Za-z0-9._-]+)*)"
+)
+hook_errors = []
+hook_ref_jobs = []  # (plugin, {name: rel}, {leaf: source}) resolved after skill sync
+
+
+def hook_error(bundle_file, message):
+    hook_errors.append(f"{bundle_file.relative_to(repo)}: {message}")
+
+
+def file_state(path):
+    return path.read_bytes(), bool(path.stat().st_mode & 0o111)
+
+
+def compare_hook_tree(expected, actual):
+    # Like compare_trees, plus the executable bit: an installed hook invoked by
+    # path needs it, and the Codex packager already treats it as content.
+    if not actual.is_dir():
+        return ["missing hooks directory — run sync-plugins.sh"]
+    exp = {p.relative_to(expected) for p in expected.rglob("*") if p.is_file()}
+    act = {p.relative_to(actual) for p in actual.rglob("*") if p.is_file()}
+    msgs = [f"missing file {rel}" for rel in sorted(exp - act)]
+    msgs += [f"stale file {rel}" for rel in sorted(act - exp)]
+    msgs += [
+        f"content or executable mode differs: {rel}"
+        for rel in sorted(exp & act)
+        if file_state(expected / rel) != file_state(actual / rel)
+    ]
+    return msgs
+
+
+def hook_destinations(bundle_file, config, hook_names):
+    # Return {hook name: plugin-relative destination} read from the config.
+    try:
+        data = json.loads(config.read_text())
+    except (OSError, json.JSONDecodeError) as exc:
+        hook_error(bundle_file, f"{config.relative_to(repo)} is not valid JSON: {exc}")
+        return None
+    commands = []
+    for groups in (data.get("hooks") or {}).values():
+        for group in groups if isinstance(groups, list) else []:
+            for h in (group or {}).get("hooks") or []:
+                if isinstance(h, dict) and isinstance(h.get("command"), str):
+                    commands.append(h["command"])
+    dest = {}
+    for command in commands:
+        quoted = QUOTED_ROOT.findall(command)
+        if command.count("${CLAUDE_PLUGIN_ROOT}") != len(quoted):
+            hook_error(
+                bundle_file,
+                f"hook command {command!r} must quote the plugin root "
+                '(bash "${CLAUDE_PLUGIN_ROOT}/<dir>/<name>.sh") so installs '
+                "under a path with spaces still run",
+            )
+            continue
+        for rel in (a or b for a, b in quoted):
+            parts = rel.split("/")
+            if len(parts) != 2 or not rel.endswith(".sh"):
+                hook_error(bundle_file, f"hook command path {rel} must be <dir>/<hook>.sh")
+                continue
+            name = parts[1][: -len(".sh")]
+            if name not in hook_names:
+                hook_error(bundle_file, f"hook command runs {rel}, but '{name}' is not in the bundle's hooks: list")
+            elif dest.setdefault(name, rel) != rel:
+                hook_error(bundle_file, f"hook '{name}' is wired at both {dest[name]} and {rel}")
+    for name in hook_names:
+        if name not in dest:
+            hook_error(bundle_file, f"hook '{name}' is listed in hooks: but no command in {config.relative_to(repo)} runs it")
+    return dest
+
+
+def remove(path):
+    if path.is_symlink() or path.is_file():
+        path.unlink()
+    elif path.exists():
+        shutil.rmtree(path)
+
+
+def sync_hooks(plugin, hook_names, bundle_file, leaves):
     config = repo / "hooks" / plugin / "hooks.json"
+    plugin_dir = repo / "plugins" / plugin
+    owned = plugin_dir / "hooks"
     if not config.is_file():
+        if hook_names:
+            hook_error(bundle_file, f"bundle lists hooks {hook_names} but hooks/{plugin}/hooks.json does not exist")
+        elif owned.exists() or owned.is_symlink():
+            if check:
+                drift.append(f"plugins/{plugin}/hooks: stale (no canonical hooks/{plugin}/hooks.json)")
+            else:
+                remove(owned)
         return
+    for name in hook_names:
+        if not (repo / "hooks" / f"{name}.sh").is_file():
+            hook_error(bundle_file, f"missing canonical hook hooks/{name}.sh")
+            return
+    dest = hook_destinations(bundle_file, config, hook_names)
+    if dest is None or set(dest) != set(hook_names):
+        return
+    hook_ref_jobs.append((bundle_file, plugin, dest, leaves))
+    installed = {plugin_dir / rel for rel in dest.values()}
+    # A canonical hook copy outside its mapped destination is stale (e.g. left
+    # behind after a destination change). Only canonical hook names are
+    # considered, so vendored runtime files are never touched.
+    for candidate in sorted(plugin_dir.glob("*/*.sh")):
+        parent = candidate.parent.name
+        if parent in ("hooks", "skills") or candidate.stem not in CANONICAL_HOOKS:
+            continue
+        if candidate not in installed:
+            if check:
+                drift.append(f"{candidate.relative_to(repo)}: stale hook copy (not wired by hooks/{plugin}/hooks.json)")
+            else:
+                candidate.unlink()
     with tempfile.TemporaryDirectory() as tmp:
         expected = Path(tmp) / "hooks"
         expected.mkdir()
         shutil.copy2(config, expected / "hooks.json")
-        for name in hook_names:
+        for name, rel in sorted(dest.items()):
             source = repo / "hooks" / f"{name}.sh"
-            if not source.is_file():
-                sys.exit(f"::error::Missing canonical hook: {source}")
-            shutil.copy2(source, expected / source.name)
-        dst = repo / "plugins" / plugin / "hooks"
+            directory, filename = rel.split("/")
+            if directory == "hooks":
+                shutil.copy2(source, expected / filename)
+                continue
+            target = plugin_dir / rel
+            if check:
+                if not target.is_file():
+                    drift.append(f"plugins/{plugin}/{rel}: missing hook copy — run sync-plugins.sh")
+                elif file_state(source) != file_state(target):
+                    drift.append(f"plugins/{plugin}/{rel}: content or executable mode differs from hooks/{name}.sh")
+            else:
+                target.parent.mkdir(parents=True, exist_ok=True)
+                remove(target)
+                shutil.copy2(source, target)
         if check:
-            for difference in compare_trees(expected, dst):
+            for difference in compare_hook_tree(expected, owned):
                 drift.append(f"plugins/{plugin}/hooks: {difference}")
         else:
-            if dst.is_symlink():
-                dst.unlink()
-            elif dst.exists():
-                shutil.rmtree(dst)
-            shutil.copytree(expected, dst)
+            remove(owned)
+            shutil.copytree(expected, owned)
+
+
+def check_hook_references():
+    # Every ${CLAUDE_PLUGIN_ROOT}/… path a packaged hook names must exist in the
+    # installed tree: a registry hook destination, a bundled skill file (mapped
+    # leaf -> canonical source, so this holds before and after sync), or a
+    # vendored runtime file already in the plugin tree.
+    for bundle_file, plugin, dest, leaves in hook_ref_jobs:
+        installed = set(dest.values())
+        for name in sorted(dest):
+            text = (repo / "hooks" / f"{name}.sh").read_text()
+            for ref in sorted(set(PLUGIN_ROOT_REF.findall(text))):
+                parts = ref.split("/")
+                if ref in installed:
+                    continue
+                if parts[0] == "skills" and len(parts) > 1:
+                    source = leaves.get(parts[1])
+                    if source and (repo / "skills" / source / "/".join(parts[2:])).exists():
+                        continue
+                elif (repo / "plugins" / plugin / ref).exists():
+                    continue
+                hook_error(
+                    bundle_file,
+                    f"hooks/{name}.sh needs ${{CLAUDE_PLUGIN_ROOT}}/{ref}, which the "
+                    f"installed plugins/{plugin} tree would not contain",
+                )
 
 
 for bundle_file in bundle_files:
@@ -236,9 +391,14 @@ for bundle_file in bundle_files:
     plugin = claude.get("pluginName") or data.get("id") or bundle
     print(f"{'Checking' if check else 'Syncing'} {bundle} -> plugins/{plugin}")
 
-    sync_hooks(plugin, list(data.get("hooks") or []))
-
     skills = list(data.get("skills") or [])
+    leaves = {}
+    for member in skills:
+        sl = normalize(member)
+        if sl is not None:
+            leaves[sl[1]] = sl[0]
+    sync_hooks(plugin, list(data.get("hooks") or []), bundle_file, leaves)
+
     if data.get("agents"):
         sys.exit(f"::error::{bundle_file}: agents are retired; use skills with references/subagent.rst")
 
@@ -280,6 +440,13 @@ for bundle_file in bundle_files:
 
     for source, leaf in norm_skills:
         sync_skill(plugin, source, leaf, bundle_file)
+
+check_hook_references()
+if hook_errors:
+    print("::error::hook packaging mapping is invalid (hooks/<plugin>/hooks.json + registry hooks:):", file=sys.stderr)
+    for e in hook_errors:
+        print(f"  - {e}", file=sys.stderr)
+    sys.exit(1)
 
 if check:
     if drift:

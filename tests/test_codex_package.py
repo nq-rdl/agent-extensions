@@ -298,7 +298,12 @@ class StrictPackaging(unittest.TestCase):
             self.assertIn("reporting skill's own metadata", entrypoint)
             self.assertIn("references/reporting.rst", entrypoint)
             procedure = (cache / "references/reporting.rst").read_text()
-            self.assertIn("Do not proceed to step 6 until the user explicitly confirms", procedure)
+            # #307: a filing request authorizes filing; otherwise the full
+            # draft needs explicit confirmation. Redaction always applies.
+            self.assertIn("Redact first, every time.", procedure)
+            self.assertIn("An observed defect alone does not authorize filing.", procedure)
+            self.assertIn("Showing a draft is not approval.", procedure)
+            self.assertIn("wait\n  for explicit confirmation", procedure)
             self.assertIn("--body-file", procedure)
             self.assertNotIn("mcp__plugin_github_github__", procedure)
             self.assertIn("Do NOT tell the user the issue was filed", procedure)

@@ -2,12 +2,10 @@
 license: CC-BY-4.0
 description: >-
   Fetch Red Hat product documentation and Customer Portal knowledge base (KCS)
-  content — including subscriber-only solutions — using the user's own Red Hat
-  offline token and curl/wget, on macOS or Linux. Use when the user gives a
-  docs.redhat.com or access.redhat.com URL, a KCS solution/article id, or asks
-  to look something up in Red Hat documentation, OpenShift docs, Ansible
-  Automation Platform docs, or the Red Hat knowledge base. Do NOT use WebFetch
-  or defuddle on these hosts — they get an Akamai 403 or a login-gated page.
+  content, including subscriber-only solutions, with the user's own offline
+  token. Use for a docs.redhat.com or access.redhat.com URL, a KCS id, or a Red
+  Hat, OpenShift, or Ansible Automation Platform docs lookup. Never WebFetch
+  these hosts (Akamai 403 or login page). Token setup: redhat:setup.
 argument-hint: '<docs.redhat.com URL | access.redhat.com/solutions/<id> | kcs:<id> | search:<terms>>'
 user-invocable: true
 compatibility: >-

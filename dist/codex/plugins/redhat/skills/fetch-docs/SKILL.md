@@ -1,13 +1,11 @@
 ---
 name: fetch-docs
 license: CC-BY-4.0
-description: Fetch Red Hat product documentation and Customer Portal knowledge base
-  (KCS) content — including subscriber-only solutions — using the user's own Red Hat
-  offline token and curl/wget, on macOS or Linux. Use when the user gives a docs.redhat.com
-  or access.redhat.com URL, a KCS solution/article id, or asks to look something up
-  in Red Hat documentation, OpenShift docs, Ansible Automation Platform docs, or the
-  Red Hat knowledge base. Do NOT use WebFetch or defuddle on these hosts — they get
-  an Akamai 403 or a login-gated page.
+description: 'Fetch Red Hat product documentation and Customer Portal knowledge base
+  (KCS) content, including subscriber-only solutions, with the user''s own offline
+  token. Use for a docs.redhat.com or access.redhat.com URL, a KCS id, or a Red Hat,
+  OpenShift, or Ansible Automation Platform docs lookup. Never WebFetch these hosts
+  (Akamai 403 or login page). Token setup: redhat:setup.'
 compatibility: Customer Portal search API (api.access.redhat.com/support/search/kcs)
   and Red Hat SSO offline-token exchange as of 2026-08; source-repo layouts of ansible/aap-docs
   (2.x branches) and openshift/openshift-docs (enterprise-4.x). Needs curl (or wget)
@@ -17,8 +15,6 @@ metadata:
 ---
 
 ## Codex execution
-
-Use the host’s available file, search, shell, and user-question tools for this workflow. Legacy tool names and slash-qualified skill references in supporting references describe capabilities; they do not install those tools. Keep code/configuration examples for another host unchanged when authoring that host’s artifacts.
 
 When supporting references invoke a catalog skill as /subject:facet, use $subject:facet in Codex. Preserve slash syntax inside examples that configure or document another host.
 

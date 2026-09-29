@@ -1,8 +1,6 @@
 Bubbletea v2 — Testing Reference
 ================================
 
---------------
-
 Unit Testing Update() Directly
 ------------------------------
 
@@ -32,8 +30,9 @@ The simplest approach — no tea.Program needed.
        _, cmd := m.Update(tea.KeyPressMsg{})
 
        // Simulate 'q' press using String() matching
-       _, cmd = m.Update(tea.KeyPressMsg{Code: tea.KeyRunes, Text: "q"})
+       _, cmd = m.Update(tea.KeyPressMsg{Code: 'q', Text: "q"})
        // Note: tea.Quit is a func() Msg, compare by calling it
+       // (v2 has no tea.KeyRunes; set Code to the rune and Text to the string)
        if cmd == nil {
            t.Fatal("expected quit command")
        }
@@ -49,16 +48,20 @@ teatest — Integration Testing
 
 teatest runs your full tea.Program in a test environment.
 
-**Import:** ``charm.land/bubbletea/v2/teatest``
+**Import:** ``github.com/charmbracelet/x/exp/teatest/v2`` (there is no
+``charm.land`` teatest; the v2 module is untagged, so ``go get`` resolves a
+pseudo-version)
 
 .. code:: go
 
    import (
+       "io"
+       "strings"
        "testing"
        "time"
 
        tea "charm.land/bubbletea/v2"
-       "charm.land/bubbletea/v2/teatest"
+       "github.com/charmbracelet/x/exp/teatest/v2"
    )
 
 NewTestModel
@@ -79,7 +82,7 @@ Sending Messages
 .. code:: go
 
    // Send a key press
-   tm.Send(tea.KeyPressMsg{Code: tea.KeyRunes, Text: "q"})
+   tm.Send(tea.KeyPressMsg{Code: 'q', Text: "q"})
 
    // Send any Msg type
    tm.Send(tea.WindowSizeMsg{Width: 100, Height: 40})
@@ -107,7 +110,7 @@ FinalModel — Get Final State
 .. code:: go
 
    // Quit the program and get the final model
-   tm.Send(tea.KeyPressMsg{Code: tea.KeyRunes, Text: "q"})
+   tm.Send(tea.KeyPressMsg{Code: 'q', Text: "q"})
    tm.WaitFinished(t, teatest.WithFinalTimeout(3*time.Second))
 
    final := tm.FinalModel(t).(model)
@@ -146,32 +149,27 @@ RequireEqualOutput
            return strings.Contains(string(bts), "My App")
        }, teatest.WithDuration(2*time.Second))
 
-       tm.Send(tea.KeyPressMsg{Code: tea.KeyRunes, Text: "q"})
+       tm.Send(tea.KeyPressMsg{Code: 'q', Text: "q"})
        tm.WaitFinished(t)
 
-       // Compare against golden file
-       teatest.RequireEqualOutput(t, tm.FinalOutput(t))
+       // Compare against golden file (RequireEqualOutput takes []byte;
+       // FinalOutput returns an io.Reader)
+       out, err := io.ReadAll(tm.FinalOutput(t))
+       if err != nil {
+           t.Fatal(err)
+       }
+       teatest.RequireEqualOutput(t, out)
    }
 
 Golden files are stored in ``testdata/`` with ``.golden`` extension.
+The ``-update`` flag is registered by teatest's golden package — do not
+define your own ``update`` flag (it panics with ``flag redefined: update``).
 
 **Update golden files:**
 
 .. code:: bash
 
    go test ./... -update
-
-TestMain Setup (Optional)
-~~~~~~~~~~~~~~~~~~~~~~~~~
-
-.. code:: go
-
-   var update = flag.Bool("update", false, "update golden files")
-
-   func TestMain(m *testing.M) {
-       flag.Parse()
-       os.Exit(m.Run())
-   }
 
 --------------
 
@@ -186,7 +184,7 @@ and documentation.
 Tape File Format
 ~~~~~~~~~~~~~~~~
 
-.. code:: vhs
+.. code:: text
 
    # demo.tape
 
@@ -231,7 +229,7 @@ Testing with VHS Output
 For visual regression, diff GIFs are not practical — instead, record
 text output:
 
-.. code:: vhs
+.. code:: text
 
    Output output.txt
 
@@ -263,7 +261,7 @@ Test Multiple Key Sequences
            return strings.Contains(string(bts), "> Item 4")  // cursor on 4th item
        }, teatest.WithDuration(2*time.Second))
 
-       tm.Send(tea.KeyPressMsg{Code: tea.KeyRunes, Text: "q"})
+       tm.Send(tea.KeyPressMsg{Code: 'q', Text: "q"})
        tm.WaitFinished(t)
    }
 
@@ -277,14 +275,14 @@ Test Async Commands
            teatest.WithInitialTermSize(80, 24))
 
        // Trigger load
-       tm.Send(tea.KeyPressMsg{Code: tea.KeyRunes, Text: "l"})
+       tm.Send(tea.KeyPressMsg{Code: 'l', Text: "l"})
 
        // Wait for loading to complete
        teatest.WaitFor(t, tm.Output(), func(bts []byte) bool {
            return strings.Contains(string(bts), "Loaded 10 items")
        }, teatest.WithDuration(5*time.Second))
 
-       tm.Send(tea.KeyPressMsg{Code: tea.KeyRunes, Text: "q"})
+       tm.Send(tea.KeyPressMsg{Code: 'q', Text: "q"})
        tm.WaitFinished(t)
    }
 
@@ -299,8 +297,8 @@ Test View Rendering Directly
            cursor: 1,
        }
        view := m.View()
-       // view is tea.View — get the string content
-       content := view.String()  // if available, or test via teatest output
+       // view is tea.View — its rendered string is the Content field
+       content := view.Content
 
        if !strings.Contains(content, "> Banana") {
            t.Error("expected cursor on Banana")

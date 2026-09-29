@@ -148,6 +148,13 @@ unavailable:
   - add_repo
 """)
 
+ROUTES_GOOD = ("v1.0.0 reached the researcher, so the rename is an amendment; fix would be wrong for it. "
+               "The comma-grouped Encounter_id contradicts the agreed output, so it is a defect.\n\n") + yaml_block(
+    """rename_stage: amend
+identifier_stage: /data-request:fix
+release_body_stage: "release"   # after both changes land
+""")
+
 CASES = {
     "triage-only-read-only": {
         "good": TRIAGE_GOOD,
@@ -271,6 +278,25 @@ CASES = {
             ("hard-coded codex model", [("model_tier: low reasoning effort", "model_tier: gpt-5.6-luna")],
              {"no-model-names"}),
             ("missing tiers", [("    model_tier: low reasoning effort\n", "")], {"tier-per-task"}),
+        ],
+    },
+    "triage-codev-routes-stages": {
+        "good": ROUTES_GOOD,
+        "graders": {"rename-to-amend", "identifier-to-fix", "release-body-to-release"},
+        "cases": [
+            ("released rename sent to fix", [("rename_stage: amend", "rename_stage: fix")], {"rename-to-amend"}),
+            ("released rename sent to draft", [("rename_stage: amend", "rename_stage: draft")],
+             {"rename-to-amend"}),
+            ("defect sent to amend", [("identifier_stage: /data-request:fix", "identifier_stage: amend")],
+             {"identifier-to-fix"}),
+            ("release body from analyse", [("release_body_stage: \"release\"", "release_body_stage: analyse")],
+             {"release-body-to-release"}),
+            ("release body from explain", [("release_body_stage: \"release\"",
+                                            "release_body_stage: /data-request:explain")],
+             {"release-body-to-release"}),
+            ("two stages in one key", [("rename_stage: amend", "rename_stage: amend or fix")],
+             {"rename-to-amend"}),
+            ("key missing", [("rename_stage: amend\n", "")], {"rename-to-amend"}),
         ],
     },
 }

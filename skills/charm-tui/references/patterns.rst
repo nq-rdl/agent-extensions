@@ -1,8 +1,6 @@
 Bubbletea v2 — Composition Patterns
 ===================================
 
---------------
-
 Pattern 1: Flat Model (State Enum)
 ----------------------------------
 
@@ -368,8 +366,16 @@ Bug 4: Init Not Returning Component Cmds
    func (m model) Init() tea.Cmd {
        return tea.Batch(
            m.spinner.Tick,
-           m.textinput.Focus(),
+           textinput.Blink,
        )
+   }
+
+   // Focus the input when you build the model, not in Init: Init has a value
+   // receiver, so m.textinput.Focus() there changes a copy and the focus is lost.
+   func initialModel() model {
+       ti := textinput.New()
+       ti.Focus()
+       return model{spinner: spinner.New(), textinput: ti}
    }
 
 Bug 5: Using tea.Quit() with Parentheses

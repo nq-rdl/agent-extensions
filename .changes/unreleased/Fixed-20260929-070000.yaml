@@ -1,0 +1,3 @@
+kind: Fixed
+body: 'cc-agent-teams check-config.sh: jq rewrite for Bash 3.2; drops the nonexistent user-local scope, follows settings precedence, and --disable sets "0" without breaking JSON (#305)'
+time: 2026-09-29T07:00:00.000000000Z

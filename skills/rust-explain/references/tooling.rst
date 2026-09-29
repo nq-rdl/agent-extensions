@@ -23,8 +23,9 @@ are part of the trust boundary, in two layers:
   ``include!`` read environment variables and files straight off your machine.
   A snippet can fold them into a diagnostic, and the message — which this skill
   tells you to read back — becomes an exfiltration channel. Verified with rustc
-  1.94.1: ``compile_error!(env!("HOME"))`` makes the compiler print your home
-  path, and ``compile_error!(include_str!("…/secret"))`` prints a file's
+  1.97.1 on 2026-09-29 (current stable at that date: 1.98.1):
+  ``compile_error!(env!("VAR"))`` prints the variable's value (e.g. your home
+  path for ``HOME``), and ``compile_error!(include_str!("…/secret"))`` prints a file's
   contents — no binary, build script, or proc-macro required.
 
 So for **untrusted** code, do not compile it on your own machine at all: read
@@ -105,8 +106,8 @@ exactly the iterator-invalidation bug that C++ allows silently."
 Use ``rustc --explain E0502`` for the long-form explanation of any error code.
 
 Invoking ``rustc`` on a snippet: two defaults will mislead you. Bare
-``rustc file.rs`` assumes **edition 2015** and a **binary** crate, so modern
-syntax (``async``, ``let … else``) trips an edition error and any snippet
+``rustc file.rs`` assumes **edition 2015** and a **binary** crate, so edition-gated
+syntax (``async fn``) trips an edition error and any snippet
 without ``fn main`` trips ``error[E0601]`` — spurious errors that hide the
 borrow/lifetime one you actually want. Type-check a snippet like this instead:
 

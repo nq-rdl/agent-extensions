@@ -264,6 +264,8 @@ opencode run --attach http://localhost:4096 "Explain async/await in JavaScript"
 | `--thinking`                      |       | Show thinking blocks                                                       |
 | `--dangerously-skip-permissions`  |       | Auto-approve permissions that are not explicitly denied (dangerous!)       |
 
+> ERRATUM (checked 2026-09-29, `opencode run --help` on v1.18.33): the documented flag is now `--auto`; `--dangerously-skip-permissions` remains only as a hidden alias.
+
 ---
 
 ### serve

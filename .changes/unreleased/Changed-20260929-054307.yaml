@@ -1,0 +1,3 @@
+kind: Changed
+body: 'defuddle: compatibility records the tested CLI (defuddle 0.19.4, Node 22) and notes stdin input'
+time: 2026-09-29T05:43:07.147184382Z

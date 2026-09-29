@@ -1,0 +1,3 @@
+kind: Fixed
+body: 'writerside: output archive is webHelp<ID>2-all.zip; CI gates use the exit code or report.json instead of grep ERROR; custom Dockerfile copies sources and serves the unzipped site'
+time: 2026-09-29T05:40:53.545025968Z

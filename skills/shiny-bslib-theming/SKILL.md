@@ -48,7 +48,8 @@ bs_theme(
 ```
 
 If `_brand.yml` exists in the app or project directory, `bs_theme()` applies
-it automatically (requires the `brand.yml` R package).
+it automatically (brand.yml support needs bslib >= 0.9.0; since bslib 0.10.0
+discovery also requires the `brand.yml` R package).
 `bs_theme(brand = FALSE)` disables discovery, `brand = TRUE` requires the
 file, and `brand = "path/to/brand.yml"` names it.
 

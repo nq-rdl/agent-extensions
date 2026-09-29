@@ -59,19 +59,19 @@ Collection
    -- Sample-based for large tables (faster, slightly less accurate)
    ANALYZE SAMPLE TABLE my_table;
 
-   -- Automatic collection (recommended)
-   SET GLOBAL enable_statistic_collect = true;
+Automatic collection is on by default (FE configuration
+``enable_statistic_collect``, changed with ``ADMIN SET FRONTEND CONFIG``).
 
 Verification
 ~~~~~~~~~~~~
 
 .. code:: sql
 
-   -- Check column statistics
-   SHOW COLUMN STATS my_table;
+   -- Check collected statistics and when they were updated
+   SHOW STATS META WHERE `table` = 'my_table';
 
-   -- Check table-level stats
-   SHOW TABLE STATS my_table;
+   -- Check histograms
+   SHOW HISTOGRAM META WHERE `table` = 'my_table';
 
 When to Collect
 ~~~~~~~~~~~~~~~
@@ -102,9 +102,9 @@ automatically uses the MV when it matches the query pattern.
    FROM events
    GROUP BY date_trunc('hour', event_time), event_type;
 
-**Limitations:** - Single base table only - No joins - Limited to simple
-aggregations (SUM, COUNT, MIN, MAX, HLL_UNION, BITMAP_UNION) - Cannot
-include WHERE clause
+**Limitations:** - Single base table only - No joins - Complex
+expressions such as ``date_trunc(...)`` need v3.1+ and an alias for each
+expression - ``WHERE`` is supported from v3.1.8
 
 Asynchronous (Multi-Table)
 ~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -214,12 +214,17 @@ Expand arrays or JSON arrays into rows:
 Skew Join
 ---------
 
-Handles data skew by broadcasting frequently occurring values (v3.1+):
+Skew Join V1 (query rewrite, v3.1+) is enabled by default
+(``enable_optimize_skew_join_v1``). Skew Join V2 (v3.5+) broadcasts the skew
+values you name in a hint; it replaces V1 when enabled:
 
 .. code:: sql
 
-   SET skew_join_data_skew_threshold = 100000;
-   -- The optimizer auto-detects and optimizes skewed joins
+   SET enable_optimize_skew_join_v1 = false;
+   SET enable_optimize_skew_join_v2 = true;
+
+   SELECT * FROM orders o
+   JOIN [skew|o.user_id(1001, 1002)] users u ON o.user_id = u.id;
 
 Caching
 -------
@@ -227,33 +232,43 @@ Caching
 Query Cache
 ~~~~~~~~~~~
 
-Caches results of identical queries. Effective for dashboard use cases.
+Caches per-tablet intermediate aggregation results in BE memory, so
+identical or similar aggregate queries reuse them (v2.5+ shared-nothing,
+v3.4+ shared-data). Effective for dashboard use cases.
 
 .. code:: sql
 
    -- Enable for a session
    SET enable_query_cache = true;
 
-   -- Set cache TTL
-   SET query_cache_entry_max_bytes = 4194304;  -- 4 MB per entry
-   SET query_cache_entry_max_rows = 100000;
+   -- Passthrough thresholds: tablet results larger than these are not cached
+   SET query_cache_entry_max_bytes = 4194304;  -- default
+   SET query_cache_entry_max_rows = 409600;    -- default
 
 Data Cache (Shared-Data Mode)
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-Caches remote storage data on local disks. Configured at the BE level —
-not a DBA concern (platform engineering).
+Caches remote storage data (native shared-data and external tables) on
+local disks. Introduced as Block Cache in v2.5; enabled by default from
+v3.3.0. Configured at the BE level — not a DBA concern (platform
+engineering).
 
 Flat JSON
 ---------
 
-Automatically extracts frequently accessed JSON fields into columnar
-storage for faster access (v3.3+):
+Automatically extracts common JSON fields into columnar storage for
+faster access (v3.3.0 shared-nothing, v3.3.3 shared-data). Before v4.0 it
+is off by default: set BE config ``enable_json_flat = true`` and
+``SET GLOBAL cbo_prune_json_subfield = true``. The docs state that v4.0
+enables it globally and adds table properties:
 
 .. code:: sql
 
-   -- Enable flat JSON for a table
-   ALTER TABLE my_table SET ("flat_json_meta" = '["payload.user_id", "payload.event_type"]');
+   -- v4.0+ table level
+   ALTER TABLE my_table SET ("flat_json.enable" = "true");
+
+   -- Inspect extracted fields
+   SELECT flat_json_meta(payload) FROM my_table[_META_];
 
 Useful when JSON columns contain semi-structured data with stable
 top-level fields.
@@ -263,13 +278,12 @@ JIT Compilation
 
 Compiles complex expressions to native code at runtime:
 
+Controlled by the ``jit_level`` variable (v3.3+): ``1`` (default)
+adaptive, ``-1`` all compilable expressions, ``0`` disabled.
+
 .. code:: sql
 
-   -- Enable globally
-   SET GLOBAL enable_jit = true;
-
-   -- Check if JIT was used in a query
-   EXPLAIN <query>;  -- Look for "JIT" in the plan
+   SET jit_level = 0;  -- disable if a query errors under JIT
 
 Best for queries with complex CASE/WHEN, arithmetic, or string
 expressions.
@@ -292,7 +306,7 @@ prefix.
 Query Tuning Checklist
 ----------------------
 
-1. **Check statistics**: ``SHOW COLUMN STATS`` — are they fresh?
+1. **Check statistics**: ``SHOW STATS META`` — are they fresh?
 2. **Check the plan**: ``EXPLAIN`` — any unexpected full scans?
 3. **Partition pruning**: does the WHERE include the partition column?
 4. **Bucket pruning**: does the WHERE filter on the bucket column?

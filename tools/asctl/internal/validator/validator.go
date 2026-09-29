@@ -1,4 +1,4 @@
-// Package validator implements SKILL.md frontmatter validation rules.
+// Package validator implements SKILL.md frontmatter rules and repository body policy.
 package validator
 
 import (
@@ -20,6 +20,7 @@ const (
 	MaxNameLength          = 64
 	MaxDescriptionLength   = 1024
 	MaxCompatibilityLength = 500
+	MaxBodyLines           = 500 // Repository policy, not an Agent Skills schema limit.
 )
 
 var allowedFields = map[string]bool{
@@ -87,12 +88,18 @@ func Validate(skillDir string) []string {
 		return []string{fmt.Sprintf("read %s: %v", skillMD, err)}
 	}
 
-	metadata, _, err := frontmatter.Parse(string(data))
+	metadata, body, err := frontmatter.ParseRaw(string(data))
 	if err != nil {
 		return []string{err.Error()}
 	}
 
-	return ValidateMetadata(metadata, skillDir)
+	errors := ValidateMetadata(metadata, skillDir)
+	if size := MeasureBody(body); size.Lines > MaxBodyLines {
+		errors = append(errors, fmt.Sprintf(
+			"body has %d lines; repository limit is %d body lines; move task-specific detail to focused references linked from SKILL.md",
+			size.Lines, MaxBodyLines))
+	}
+	return errors
 }
 
 func validateName(name, skillDir string) []string {

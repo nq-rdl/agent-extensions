@@ -1,0 +1,3 @@
+kind: Fixed
+body: 'r-lib-lifecycle: deprecate_warn() warns once per session (lifecycle 1.0.5), not once per 8 hours; signal_stage() is now a no-op (#304)'
+time: 2026-09-29T05:35:33.536734425Z

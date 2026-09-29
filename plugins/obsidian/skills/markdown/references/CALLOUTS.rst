@@ -52,7 +52,11 @@
 
 ```css
 .callout[data-callout="custom-type"] {
-  --callout-color: 255, 0, 0;
+  --callout-color: #ff0000;
   --callout-icon: lucide-alert-circle;
 }
 ```
+
+From Obsidian 1.13, `--callout-color` accepts any CSS color (hex or `rgb()`).
+Before 1.13 it took a bare RGB triple such as `255, 0, 0`. `--callout-icon`
+takes a Lucide icon ID or an SVG element.

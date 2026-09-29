@@ -4,7 +4,7 @@ license: CC-BY-4.0
 metadata:
   repo: https://github.com/nq-rdl/agent-extensions
 description: Switch active repository context within a Claude Code multi-repo session, load the target project skills, and verify spec-kit runs in the correct repo.
-compatibility: Claude Code 2.1.274; additional-directory skill loading requires 2.1.257+ for nested directories
+compatibility: Requires Claude Code 2.1.32+ (skills load from --add-dir directories); /add-dir of a subdirectory of the working directory needs 2.1.257+. Written for Claude Code 2.1.274.
 ---
 
 Treat the requested repo as the active work target, while retaining the session’s

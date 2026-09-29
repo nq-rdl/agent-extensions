@@ -1,7 +1,9 @@
 ---
 name: speckit-publish
 license: CC-BY-4.0
-compatibility: "spec-kit >=0.12; catalog schema_version 1.0; re-verify at github.github.io/spec-kit"
+compatibility: >-
+  spec-kit extension catalogs, catalog schema_version "1.0"; publishing guide,
+  community catalog, and issue templates read at v1.0.12 on 2026-09-29.
 description: >-
   Publish and distribute a GitHub spec-kit extension — cut a GitHub release, write
   the catalog entry, and register it in a catalog. Defaults to the team catalog
@@ -16,8 +18,8 @@ metadata:
 
 # Publish a spec-kit extension
 
-> **Verify-canonical guard.** Publishing/catalog pinned to spec-kit v0.12.x /
-> catalog schema_version 1.0 (2026-07-04). Confirm against `references/publishing.rst` and the
+> **Verify-canonical guard.** Publishing/catalog facts re-read at spec-kit v1.0.12
+> (catalog schema_version 1.0, 2026-09-29). Confirm against `references/publishing.rst` and the
 > live [publishing guide](https://raw.githubusercontent.com/github/spec-kit/main/extensions/EXTENSION-PUBLISHING-GUIDE.md).
 
 ## Where to publish?

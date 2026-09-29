@@ -2,128 +2,70 @@
 name: quarto-authoring
 license: CC-BY-4.0
 description: >-
-  Writing and authoring Quarto documents (.qmd), including code cell options,
-  figure and table captions, cross-references, callout blocks (notes, warnings,
-  tips), citations and bibliography, page layout and columns, Mermaid diagrams,
-  YAML metadata configuration, and Quarto extensions. Also covers converting and
-  migrating R Markdown (.Rmd), bookdown, blogdown, xaringan, and distill projects
-  to Quarto, and creating Quarto websites, books, presentations, and reports.
+  Write and edit Quarto documents (.qmd) and projects (_quarto.yml): cell
+  options, figures, tables, cross-references, callouts, citations, layout,
+  diagrams, YAML, extensions, and converting R Markdown, bookdown, blogdown,
+  xaringan, or distill to Quarto. Use when a task involves .qmd files or a
+  Quarto website, book, report, or slides. For figure alt text, use the
+  Quarto alt-text skill.
+compatibility: >-
+  Quarto CLI. The essentials below rendered without errors with Quarto 1.9.38
+  and 1.10.18 (latest stable) on 2026-09-29; the references were written
+  against 1.8.26. Check https://quarto.org/docs/guide/ for newer options.
 metadata:
   repo: https://github.com/nq-rdl/agent-extensions
 ---
 
 # Quarto Authoring
 
-> This skill is based on Quarto CLI v1.8.26.
-
 ## When to Use What
 
-Task: Write a new Quarto document
-Use: Follow "QMD Essentials" below, then see specific reference files
+For a new document, follow "QMD Essentials" below; read a reference only when
+the task needs it.
 
-Task: Convert R Markdown to Quarto
-Use: [references/conversion-rmarkdown.rst](references/conversion-rmarkdown.rst)
-
-Task: Migrate bookdown project
-Use: [references/conversion-bookdown.rst](references/conversion-bookdown.rst)
-
-Task: Migrate xaringan slides
-Use: [references/conversion-xaringan.rst](references/conversion-xaringan.rst)
-
-Task: Migrate distill article
-Use: [references/conversion-distill.rst](references/conversion-distill.rst)
-
-Task: Migrate blogdown site
-Use: [references/conversion-blogdown.rst](references/conversion-blogdown.rst)
-
-Task: Add cross-references
-Use: [references/cross-references.rst](references/cross-references.rst)
-
-Task: Configure code cells
-Use: [references/code-cells.rst](references/code-cells.rst)
-
-Task: Add figures with captions
-Use: [references/figures.rst](references/figures.rst)
-
-Task: Create tables
-Use: [references/tables.rst](references/tables.rst)
-
-Task: Add citations and bibliography
-Use: [references/citations.rst](references/citations.rst)
-
-Task: Add callout blocks
-Use: [references/callouts.rst](references/callouts.rst)
-
-Task: Add diagrams (Mermaid, Graphviz)
-Use: [references/diagrams.rst](references/diagrams.rst)
-
-Task: Control page layout
-Use: [references/layout.rst](references/layout.rst)
-
-Task: Use shortcodes
-Use: [references/shortcodes.rst](references/shortcodes.rst)
-
-Task: Add conditional content
-Use: [references/conditional-content.rst](references/conditional-content.rst)
-
-Task: Use divs and spans
-Use: [references/divs-and-spans.rst](references/divs-and-spans.rst)
-
-Task: Configure YAML front matter
-Use: [references/yaml-front-matter.rst](references/yaml-front-matter.rst)
-
-Task: Find and use extensions
-Use: [references/extensions.rst](references/extensions.rst)
-
-Task: Apply markdown linting rules
-Use: [references/markdown-linting.rst](references/markdown-linting.rst)
+| Task | Read |
+|------|------|
+| Convert R Markdown | [references/conversion-rmarkdown.rst](references/conversion-rmarkdown.rst) |
+| Migrate a bookdown project | [references/conversion-bookdown.rst](references/conversion-bookdown.rst) |
+| Migrate xaringan slides | [references/conversion-xaringan.rst](references/conversion-xaringan.rst) |
+| Migrate a distill article | [references/conversion-distill.rst](references/conversion-distill.rst) |
+| Migrate a blogdown site | [references/conversion-blogdown.rst](references/conversion-blogdown.rst) |
+| Configure code cells | [references/code-cells.rst](references/code-cells.rst) |
+| Cross-references | [references/cross-references.rst](references/cross-references.rst) |
+| Figures and subfigures | [references/figures.rst](references/figures.rst) |
+| Tables | [references/tables.rst](references/tables.rst) |
+| Citations and bibliography | [references/citations.rst](references/citations.rst) |
+| Callout blocks | [references/callouts.rst](references/callouts.rst) |
+| Diagrams (Mermaid, Graphviz) | [references/diagrams.rst](references/diagrams.rst) |
+| Page layout and columns | [references/layout.rst](references/layout.rst) |
+| Shortcodes | [references/shortcodes.rst](references/shortcodes.rst) |
+| Conditional content | [references/conditional-content.rst](references/conditional-content.rst) |
+| Divs and spans | [references/divs-and-spans.rst](references/divs-and-spans.rst) |
+| YAML front matter, formats (HTML, PDF, revealjs), `_quarto.yml` projects | [references/yaml-front-matter.rst](references/yaml-front-matter.rst) |
+| Find and use extensions | [references/extensions.rst](references/extensions.rst) |
+| Markdown linting rules | [references/markdown-linting.rst](references/markdown-linting.rst) |
 
 ## QMD Essentials
 
-### Basic Document Structure
+A document is YAML front matter between `---` lines, then Markdown:
 
 ```markdown
 ---
 title: "Document Title"
-author: "Author Name"
-date: today
 format: html
 ---
-
-Content goes here.
 ```
 
-A Quarto document consists of two main parts:
-
-1. **YAML Front Matter**: Metadata and configuration at the top, enclosed by `---`.
-2. **Markdown Content**: Main body using standard markdown syntax.
-
-### Divs and Spans
-
-Divs use fenced syntax with three colons:
-
-```markdown
-::: {.class-name}
-Content inside the div.
-:::
-```
-
-Spans use bracketed syntax:
-
-```markdown
-This is [important text]{.highlight}.
-```
-
-Details: [references/divs-and-spans.rst](references/divs-and-spans.rst)
+Divs use three colons, `::: {.class-name}` … `:::`; spans use
+`[text]{.class-name}`.
 
 ### Code Cell Options Syntax
 
-A code cell starts with triple backticks and a language identifier between curly braces.
-Code cells are code blocks that can be executed to produce output.
+Quarto puts cell options inside the cell, as the language's comment symbol
+plus `|`. Options use **dashes, not dots** (`fig-cap`, not the knitr
+`fig.cap`):
 
-Quarto uses the language's comment symbol + `|` for cell options. Options use **dashes, not dots** (e.g., `fig-cap` not `fig.cap`).
-
-- R, Python: `#|`
+- R, Python, Julia: `#|`
 - Mermaid: `%%|`
 - Graphviz/DOT: `//|`
 
@@ -148,171 +90,35 @@ Common execution options:
 | `error`   | Show errors       | `true`, `false`           |
 | `include` | Include in output | `true`, `false`           |
 
-Set document-level defaults in YAML front matter:
-
-```yaml
-execute:
-  echo: false
-  warning: false
-```
-
-Details: [references/code-cells.rst](references/code-cells.rst)
+Set document-level defaults under `execute:` in the front matter
+(`execute: {echo: false, warning: false}`).
 
 ### Cross-References
 
-Labels must start with a type prefix. Reference with `@`:
+A label must start with its type prefix, and you reference it with `@`:
 
-- Figure: `fig-` prefix, e.g., `#| label: fig-plot` → `@fig-plot`
-- Table: `tbl-` prefix, e.g., `#| label: tbl-data` → `@tbl-data`
-- Section: `sec-` prefix, e.g., `{#sec-intro}` → `@sec-intro`
-- Equation: `eq-` prefix, e.g., `{#eq-model}` → `@eq-model`
+| Type | Label | Reference |
+|------|-------|-----------|
+| Figure | `#| label: fig-plot` or `![…](p.png){#fig-plot}` | `@fig-plot` |
+| Table | `#| label: tbl-data` or a `::: {#tbl-data}` div | `@tbl-data` |
+| Section | `## Intro {#sec-intro}` | `@sec-intro` |
+| Equation | `$$ … $$ {#eq-model}` | `@eq-model` |
 
-````markdown
-```{r}
-#| label: fig-plot
-#| fig-cap: "A caption for the plot."
-plot(1)
-```
+An unresolved reference renders as `?@fig-…` with an "Unable to resolve
+crossref" warning, so check the render output.
 
-See @fig-plot for the results.
-````
+### Callouts, figures, tables, citations
 
-Details: [references/cross-references.rst](references/cross-references.rst)
+- Callouts: `::: {.callout-note}` … `:::`; the five types are `note`,
+  `warning`, `important`, `tip`, `caution`.
+- Figures: `![Caption](image.png){#fig-name fig-alt="Alt text"}`; subfigures
+  go in a `::: {#fig-group layout-ncol=2}` div.
+- Tables: a Markdown table inside `::: {#tbl-example}` with the caption as the
+  div's last paragraph.
+- Citations: `@smith2020` or `[@smith2020; @jones2021]`, with
+  `bibliography:` (and optionally `csl:`) in the front matter.
 
-### Callout Blocks
-
-Five types: `note`, `warning`, `important`, `tip`, `caution`.
-
-```markdown
-::: {.callout-note}
-This is a note callout.
-:::
-
-::: {.callout-warning}
-
-## Custom Title
-
-This is a warning with a custom title.
-
-:::
-```
-
-Details: [references/callouts.rst](references/callouts.rst)
-
-### Figures
-
-```markdown
-![Caption text](image.png){#fig-name fig-alt="Alt text"}
-```
-
-Subfigures:
-
-```markdown
-::: {#fig-group layout-ncol=2}
-![Sub caption 1](image1.png){#fig-sub1}
-
-![Sub caption 2](image2.png){#fig-sub2}
-
-Main caption for the group.
-:::
-```
-
-Details: [references/figures.rst](references/figures.rst)
-
-### Tables
-
-```markdown
-::: {#tbl-example}
-
-| Column 1 | Column 2 |
-| -------- | -------- |
-| Data 1   | Data 2   |
-
-Table caption.
-:::
-```
-
-Details: [references/tables.rst](references/tables.rst)
-
-### Citations
-
-```markdown
-According to @smith2020, the results show...
-Multiple citations [@smith2020; @jones2021].
-```
-
-Configure in YAML:
-
-```yaml
-bibliography: references.bib
-csl: apa.csl
-```
-
-Details: [references/citations.rst](references/citations.rst)
-
-## Common Workflows
-
-### Creating an HTML Document
-
-```yaml
-title: "My Report"
-author: "Your Name"
-date: today
-format:
-  html:
-    toc: true
-    code-fold: true
-    theme: cosmo
-```
-
-### Creating a PDF Document
-
-```yaml
-title: "My Report"
-format:
-  pdf:
-    documentclass: article
-    papersize: a4
-```
-
-### Creating a RevealJS Presentation
-
-```markdown
----
-title: "My Presentation"
-format: revealjs
----
-
-## First Slide
-
-Content here.
-
-## Second Slide
-
-More content.
-```
-
-### Setting Up a Quarto Project
-
-Create `_quarto.yml` in the project root:
-
-```yaml
-project:
-  type: website
-
-website:
-  title: "My Site"
-  navbar:
-    left:
-      - href: index.qmd
-        text: Home
-      - href: about.qmd
-        text: About
-
-format:
-  html:
-    theme: cosmo
-```
+Examples and options for each are in the references above.
 
 ## Resources
 

@@ -1,16 +1,17 @@
 ---
 name: opencode-plugin
 license: CC-BY-4.0
-compatibility: opencode
+compatibility: >-
+  OpenCode plugins (JS/TS, run by Bun inside OpenCode) typed by
+  @opencode-ai/plugin; Hooks interface checked against v1.18.33 source
+  (packages/plugin/src/index.ts) on 2026-09-29. SDK versions: opencode-sdk.
 description: >-
-  Author OpenCode plugins and hooks — JS/TS modules that hook into OpenCode's
-  lifecycle to block tools, mutate args, inject env, react to events, or register
-  custom tools. Use when building or debugging anything under `.opencode/plugins/`,
-  importing `@opencode-ai/plugin`, writing a `tool.execute.before` /
-  `tool.execute.after` / `permission.ask` / `shell.env` / `command.execute.before`
-  handler, subscribing to OpenCode events via the `event` handler (`session.idle`,
-  `command.executed`), registering a custom tool from a plugin, or looking for an
-  OpenCode "stop hook" or a settings.json hook table. Distinct from OpenAI Codex.
+  Write or debug OpenCode plugins — JS/TS modules in `.opencode/plugins/` that
+  return hook handlers (`tool.execute.before/after`, `permission.ask`, `shell.env`,
+  `command.execute.before`), read bus events (`session.idle`) in the `event`
+  handler, or register tools from code. Use for "OpenCode hook/stop hook"
+  asks. Not Claude Code hooks, not OpenAI Codex; standalone tool files →
+  opencode-dev:tools.
 argument-hint: "What OpenCode plugin/hook do you want? (e.g. 'block reads of .env', 'notify when a session finishes', 'add a custom tool from a plugin')"
 user-invocable: true
 metadata:
@@ -19,8 +20,8 @@ metadata:
 
 # OpenCode Plugins & Hooks
 
-OpenCode (SST's open-source coding agent, `opencode.ai`, `sst/opencode` — **not**
-OpenAI Codex) extends via **plugins**: a JS/TS module exporting
+OpenCode (the open-source coding agent at `opencode.ai`, source
+`github.com/anomalyco/opencode` — **not** OpenAI Codex) extends via **plugins**: a JS/TS module exporting
 `async (input, options?) => Promise<Hooks>`. There is **no settings-file hook
 table like Claude Code** — "hooks" exist *only* as keys of the object your plugin
 returns. Get the vocabulary layering right and most plugins are a few lines.
@@ -30,11 +31,11 @@ returns. Get the vocabulary layering right and most plugins are a few lines.
 > re-check <https://opencode.ai/docs/plugins/> for drift. The handler-key set is
 > defined in `interface Hooks` (`packages/plugin/src/index.ts`).
 
-**Version pins.** Packages `@opencode-ai/plugin` (types + `tool` helper) and
-`@opencode-ai/sdk` (the `client`). The `interface Hooks` key set and field names
-encoded below were validated against `references/plugins.rst` as fetched
-**2026-06-29**; re-check that baseline for drift before pinning a version. SDK/Go
-specifics (Go SDK `v0.19.2`, Go 1.22+) belong to the **sdk** facet, not here.
+**Checked against.** The `interface Hooks` key set and `(input, output)` shapes below
+match `packages/plugin/src/index.ts` at OpenCode `v1.18.33` (2026-09-29).
+`references/plugins.rst` is the docs page as fetched 2026-06-29. Package and SDK
+versions are owned by `/opencode-dev:sdk`. If the installed OpenCode differs, re-read
+`interface Hooks` at that tag before relying on a field name.
 
 ---
 
@@ -87,7 +88,7 @@ place; `throw` to block** the action.
 | `tool.execute.after` | `{ tool, … }` | `{ title, output, metadata }` | — |
 | `permission.ask` | the `Permission` | `{ status: "ask" \| "deny" \| "allow" }` | set `status` |
 | `shell.env` | `{ cwd, … }` | `{ env }` | — |
-| `command.execute.before` | command info | command args | `throw` |
+| `command.execute.before` | `{ command, sessionID, arguments }` | `{ parts }` | `throw` |
 | `tool.definition` | tool id | `{ description, parameters }` | — |
 
 Gotcha: the field is `output.args`, keyed by tool. For `read` it's
@@ -96,9 +97,10 @@ Gotcha: the field is `output.args`, keyed by tool. For `read` it's
 
 ## Where plugins live, and how they load
 
-- **Plural** `.opencode/plugins/` (project) or `~/.config/opencode/plugins/`
-  (global) — auto-loaded at startup. (A widely-copied community gist writes the
-  singular `.opencode/plugin/`; that is **wrong** and silently loads nothing.)
+- `.opencode/plugins/` (project) or `~/.config/opencode/plugins/` (global) —
+  top-level `*.ts`/`*.js` files auto-load at startup. Plural is the documented
+  name; v1.18.33 also scans singular `plugin/` (`{plugin,plugins}` glob), so a
+  singular directory is not why a plugin fails to load.
 - **npm packages** via the config `"plugin": [...]` array — Bun-installed to
   `~/.cache/opencode/node_modules/`. Both bare and `@scoped` names work.
 - **Local runtime deps**: add `.opencode/package.json`; OpenCode runs `bun install`
@@ -107,10 +109,10 @@ Gotcha: the field is `output.args`, keyed by tool. For `read` it's
 ## PluginInput — the context you destructure
 
 `PluginInput` is `{ client, project, directory, worktree, serverUrl, $ }` (plus
-`experimental_workspace`). Two non-obvious points: `$` is **Bun's shell**, and to
-log you must use the SDK client — `client.app.log({ body: { service, level,
-message, extra } })`, level `debug|info|warn|error` — **not** `console.log`, which
-is swallowed.
+`experimental_workspace`). Two non-obvious points: `$` is **Bun's shell**, and for
+structured logs the docs direct you to the SDK client — `client.app.log({ body: {
+service, level, message, extra } })`, level `debug|info|warn|error` — instead of
+`console.log`.
 
 ## Registering a custom tool from a plugin
 

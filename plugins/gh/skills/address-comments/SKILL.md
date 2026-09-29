@@ -1,5 +1,5 @@
 ---
-description: Use when asked to address pull request review comments; it evaluates each comment, makes targeted fixes, ensures test coverage, and commits changes with descriptive messages.
+description: Use when asked to address pull request review comments; it evaluates each comment, makes targeted fixes with test coverage, reports a disposition per comment, and commits only when authorized.
 license: MIT
 metadata:
   upstream: https://github.com/github/awesome-copilot/blob/main/agents/address-comments.agent.md

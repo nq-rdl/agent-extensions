@@ -104,7 +104,7 @@ class Hooks(unittest.TestCase):
     def test_hooks_json_wires_both_scripts(self):
         hooks = json.loads((PLUGIN / "hooks" / "hooks.json").read_text())["hooks"]
         cmds = {h["command"] for groups in hooks.values() for g in groups for h in g["hooks"]}
-        self.assertEqual(cmds, {"${CLAUDE_PLUGIN_ROOT}/hooks/data-request-preflight.sh", "${CLAUDE_PLUGIN_ROOT}/hooks/data-request-guard.sh"})
+        self.assertEqual(cmds, {'"${CLAUDE_PLUGIN_ROOT}/hooks/data-request-preflight.sh"', '"${CLAUDE_PLUGIN_ROOT}/hooks/data-request-guard.sh"'})
         self.assertEqual(hooks["PreToolUse"][0]["matcher"], "Write|Edit")
         for name in ("data-request-preflight.sh", "data-request-guard.sh"):
             self.assertTrue((PLUGIN / "hooks" / name).is_file())

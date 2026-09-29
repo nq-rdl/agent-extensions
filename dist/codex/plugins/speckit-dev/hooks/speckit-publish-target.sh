@@ -8,15 +8,20 @@ set -euo pipefail
 
 input=$(cat)
 
+# Extract the prompt text: jq, then python3, then a POSIX `sed -E` scrape. Any
+# parse failure yields an empty prompt, so malformed input is a silent no-op.
+# The scrape runs on bash 3.2 with BSD/BusyBox sed (no grep -P). It keeps JSON
+# escapes except \n \r \t, which become spaces; the gate below only needs markers.
 if command -v jq >/dev/null 2>&1; then
-  prompt=$(printf '%s' "$input" | jq -r '.prompt // empty' 2>/dev/null || true)
+  prompt=$(printf '%s' "$input" | jq -r 'if type == "object" then (.prompt | strings) else empty end' 2>/dev/null || true)
 elif command -v python3 >/dev/null 2>&1; then
-  prompt=$(printf '%s' "$input" | python3 -c 'import sys, json; print(json.load(sys.stdin).get("prompt") or "")' 2>/dev/null || true)
+  prompt=$(printf '%s' "$input" | python3 -c 'import sys, json
+try: d = json.load(sys.stdin)
+except Exception: sys.exit(0)
+p = d.get("prompt") if isinstance(d, dict) else None
+print(p if isinstance(p, str) else "")' 2>/dev/null || true)
 else
-  # Last-resort best-effort fallback (no jq/python3): scrape the "prompt"
-  # string value with POSIX sed. Avoids grep -oP (PCRE), which BSD grep
-  # (macOS) lacks; does not decode JSON string escapes.
-  prompt=$(printf '%s' "$input" | sed -n 's/.*"prompt"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/p' || true)
+  prompt=$(printf '%s' "$input" | tr '\n' ' ' | sed -nE 's/.*"prompt"[[:space:]]*:[[:space:]]*"(([^"\\]|\\.)*)".*/\1/p' | sed -E 's/\\[nrt]/ /g' || true)
 fi
 
 # Gate: fire only when BOTH a spec-kit marker AND a publish/distribute marker

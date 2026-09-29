@@ -8,254 +8,115 @@ description: >-
   the PERSONAL password manager only — NOT Bitwarden Secrets Manager. Trigger
   on: "bitwarden .env", "bw CLI secrets", "load API keys from bitwarden",
   "store credentials in bitwarden", "inject env vars from bitwarden".
+compatibility: >-
+  Requires the Bitwarden Password Manager CLI (bw), jq, awk, and bash or zsh.
+  bw-env.sh was tested on 2026-09-29 against a stub of @bitwarden/cli 2026.9.0
+  behaviour, in bash 5 and zsh 5.9 with GNU and BusyBox awk.
 metadata:
   repo: https://github.com/nq-rdl/agent-extensions
 ---
 
 # Bitwarden Personal PM — .env & Dev Secrets
 
-Use the Bitwarden **personal** Password Manager CLI (`bw`) to store and load
-development secrets without ever touching a plaintext `.env` file on disk.
+Use the Bitwarden **personal** Password Manager CLI (`bw`) to keep development
+secrets in the vault and load them into a shell on demand, instead of leaving a
+plaintext `.env` on disk.
 
-> **CRITICAL DISTINCTION**
-> This skill uses the **personal Password Manager** — the `bw` CLI.
-> It does **NOT** use Bitwarden Secrets Manager (`bws`).
-> See [Password Manager overview](https://bitwarden.com/help/password-manager-overview/) vs
-> [Secrets Manager overview](https://bitwarden.com/help/secrets-manager-overview/).
+> **This is not Secrets Manager.** `bw` is the personal Password Manager;
+> Bitwarden Secrets Manager is a different product with the `bws` CLI. See the
+> [Password Manager overview](https://bitwarden.com/help/password-manager-overview/)
+> and the [Secrets Manager overview](https://bitwarden.com/help/secrets-manager-overview/).
 
----
-
-## Why Bitwarden for .env?
-
-| Problem | Solution |
-|---------|----------|
-| Plaintext `.env` files leak into git or logs | Secrets live only in encrypted vault |
-| Sharing secrets across machines is risky | Vault syncs automatically — no copying |
-| Secrets stay in memory all session | On-demand loading — gone when terminal closes |
-| Hard to rotate or audit | One vault item to update, all scripts get fresh value |
-
----
-
-## Quick-Start: Store & Load in 5 Minutes
-
-### 1. Install & Authenticate
+## Install and authenticate
 
 ```bash
-# Install (choose one)
-npm install -g @bitwarden/cli    # npm
-brew install bitwarden-cli       # macOS Homebrew
-snap install bw                  # Linux Snap
-
-# Log in once (interactive — stores credentials in system keychain)
-bw login
-
-# Unlock vault for the session and capture the session key
+npm install -g @bitwarden/cli    # or: brew install bitwarden-cli / snap install bw
+bw login                          # interactive, once per machine
 export BW_SESSION="$(bw unlock --raw)"
 ```
 
-### 2. Store a Block of .env Variables
+For CI and cron, use `bw login --apikey` (`BW_CLIENTID`, `BW_CLIENTSECRET`)
+and `bw unlock --passwordenv BW_PASSWORD --raw`, never interactive unlock.
 
-Best pattern: store an entire `.env` block as a **Secure Note** in the vault.
+## Use the shell functions in `scripts/bw-env.sh`
 
-```bash
-# Store from an existing .env file
-bw get template item | jq \
-  --rawfile notes .env \
-  --arg name "myproject-dev" \
-  '.type = 2 | .secureNote.type = 0 | .notes = $notes | .name = $name' \
-  | bw encode | bw create item
-```
+[scripts/bw-env.sh](scripts/bw-env.sh) is the one implementation of the
+`.env` functions. Tell the user to `source` it from `~/.bashrc` or `~/.zshrc`
+(or copy it there). Do not retype the functions from memory: the details below
+are what hand-written versions get wrong.
 
-Or store a single credential on a **Login item**'s custom fields:
+| Function | What it does |
+|---|---|
+| `bwc <item> [file]` | Create a Secure Note from a `.env` file (default `./.env`) |
+| `bwu <item> [file]` | Replace an existing item's notes from a `.env` file |
+| `bwe <item>` | Load the note's variables into the current shell |
+| `bwunload <item>` | Unset the variables that item exports |
+| `bwl [search]` / `bwll [search]` | List item names / names with IDs |
+| `bwf <item> <field>` | Print one custom field of a Login item (capture it with `$(...)`) |
+| `bwdotenv <item> [file]` | Write a plaintext `.env` for tools that need a file |
+| `bwdd <item>` | Move an item to the trash |
+| `bwss` | Unlock once per shell; the others call it |
 
-```bash
-bw get template item | jq \
-  --arg name "GITHUB_TOKEN" \
-  --arg secret "ghp_xxxx" \
-  '.type = 1 | .name = $name | .fields = [{"name":"value","value":$secret,"type":1}]' \
-  | bw encode | bw create item
-```
+What the script guarantees (covered by `tests/test_bitwarden_bw_env.py` in the
+source repository, using a fake `bw`):
 
-### 3. Load Secrets into Current Shell
+- **Storage format.** `bwc`/`bwu` store each line as `export NAME='value'`,
+  keeping comments and blank lines. They accept `NAME=value`, `export
+  NAME=value`, and single- or double-quoted values, and drop ` # comment` after
+  an unquoted value. Values are literal: there is no `$VAR` interpolation.
+- **No echo of secrets.** `bw create item` and `bw edit item` print the whole
+  item, notes included. The script discards that output and prints only the
+  item ID, so the values never reach the terminal or an agent transcript.
+- **No arbitrary eval.** `bwe` refuses a note with any line other than a plain
+  `export NAME=...`, so a hand-edited note cannot run commands.
+- Works in bash and zsh, including under `set -u`.
 
-```bash
-# Load entire .env block from a Secure Note
-eval "$(bw get notes "myproject-dev")"
+When you drive `bw` directly instead of through the script, keep the same
+rules: pipe `bw create`/`bw edit` output to `jq -r .id`, and never put a secret
+on the command line (`--arg secret ghp_...` lands in shell history). Read it
+with `read -rs`, then pass it through a pipe as in the Login example in
+[references/cli.rst](references/cli.rst): `--arg secret "$secret"` still exposes
+the expanded value in process arguments.
 
-# Load a single custom field value
-export GITHUB_TOKEN="$(bw get item "GITHUB_TOKEN" | jq -r '.fields[] | select(.name=="value") | .value')"
+## Vault naming
 
-# Load using item ID (faster — no search ambiguity)
-export GITHUB_TOKEN="$(bw get notes abc1234-xxxx-xxxx-xxxx-xxxxxxxxxxxx)"
-```
-
----
-
-## Recommended Vault Naming Convention
-
-Use a consistent pattern so `bw list items --search` is predictable:
-
-```
-<project>-<env>          # e.g.  myapp-dev, myapp-staging, myapp-prod
-<service>-credentials    # e.g.  aws-credentials, github-credentials
-```
-
-Example vault layout:
+Use predictable names so `bwl <project>` groups them:
 
 ```
-myapp-dev          (Secure Note)  — full .env block for local dev
-myapp-staging      (Secure Note)  — staging .env block
-aws-credentials    (Login)        — AWS_ACCESS_KEY_ID + AWS_SECRET_ACCESS_KEY as custom fields
-github-credentials (Login)        — GITHUB_TOKEN as custom field
+<project>-<env>          myapp-dev, myapp-staging   (Secure Note, full .env)
+<service>-credentials    aws-credentials            (Login, custom fields)
 ```
 
----
+## Security rules
 
-## Shell Functions Reference
+1. **`BW_SESSION` decrypts the whole vault.** Keep it in shell memory only:
+   never write it to a file, log it, or pass it to `set -x` output.
+2. **Use item IDs in lasting scripts** (`bw get notes <uuid>`); names can be
+   duplicated, and `bw` errors on ambiguous names.
+3. **Run `bw sync`** before reading data that may have changed elsewhere.
+4. **Delete `bwdotenv` output after use** and keep `.env` in `.gitignore`.
+5. **Mask values in CI logs.** A secret written to `$GITHUB_ENV` is not
+   masked automatically; see [references/env-patterns.rst](references/env-patterns.rst).
+6. **Secrets Manager is not this.** If a request needs `bws`, machine accounts,
+   or projects, say this skill does not cover it.
 
-Add these to `~/.zshrc` or `~/.bashrc`. See [references/shell-functions.rst](references/shell-functions.rst) for the full annotated set.
+## Common patterns
 
-```bash
-# Unlock vault if no active session
-bwss() {
-  if [[ -z "$BW_SESSION" ]]; then
-    export BW_SESSION="$(bw unlock --raw)"
-  fi
-}
+- **Several environments:** `bwe myapp-dev`, later `bwunload myapp-dev &&
+  bwe myapp-staging`.
+- **One token, many variable names:**
+  [scripts/load-github.sh](scripts/load-github.sh) loads a token stored as a
+  Secure Note by UUID and exports it as `GITHUB_TOKEN`, `GITHUB_OAUTH_TOKEN`,
+  and `GIT_TOKEN`. It is written as a zsh autoload function file.
+- **Structured credentials:** store AWS or database keys as hidden custom
+  fields (type 1) on a Login item and read them with `bwf`:
+  `export AWS_ACCESS_KEY_ID="$(bwf aws-credentials AWS_ACCESS_KEY_ID)"`.
 
-# Load a Secure Note's contents as env vars into current shell
-# Usage: bwe "myapp-dev"
-bwe() {
-  bwss
-  eval "$(bw get notes "$1" --session "$BW_SESSION")"
-}
+## Reference files
 
-# Create a Secure Note from current .env file
-# Usage: bwc "myapp-dev"    (reads .env in current dir)
-bwc() {
-  bwss
-  bw get template item \
-    | jq --rawfile notes "${2:-.env}" \
-         --arg name "$1" \
-         '.type = 2 | .secureNote.type = 0 | .notes = $notes | .name = $name' \
-    | bw encode | bw create item --session "$BW_SESSION"
-}
-
-# Update an existing vault item's notes from current .env file
-# Usage: bwu "myapp-dev"
-bwu() {
-  bwss
-  local id
-  id="$(bw get item "$1" --session "$BW_SESSION" | jq -r '.id')"
-  bw get item "$id" --session "$BW_SESSION" \
-    | jq --rawfile notes "${2:-.env}" '.notes = $notes' \
-    | bw encode | bw edit item "$id" --session "$BW_SESSION"
-}
-
-# List all vault item names (filterable)
-# Usage: bwl [filter]
-bwl() {
-  bwss
-  bw list items --search "${1:-}" --session "$BW_SESSION" \
-    | jq -r '.[].name' | sort
-}
-
-# Delete a vault item by name
-# Usage: bwdd "myapp-dev"
-bwdd() {
-  bwss
-  local id
-  id="$(bw get item "$1" --session "$BW_SESSION" | jq -r '.id')"
-  bw delete item "$id" --session "$BW_SESSION"
-}
-```
-
----
-
-## Security Rules
-
-1. **Never export `BW_SESSION` to disk.** It decrypts the entire vault. It lives only in the current shell's memory.
-2. **Use item IDs in production scripts** — `bw get notes <UUID>` — not names. Names can have duplicates; the CLI errors on ambiguity.
-3. **Store `.env` blocks with `export` prefix** so `eval "$(bw get notes ...)"` populates the current shell.
-4. **Avoid `bw unlock` in cron/CI.** Use `--apikey` with `BW_CLIENTID` / `BW_CLIENTSECRET` and `bw unlock --passwordenv`.
-5. **Sync before reading stale data**: `bw sync` to pull latest from server.
-6. **Do not commit `.env` files** — the whole point. Use `.gitignore`.
-7. **Secrets Manager is NOT this.** If someone suggests `bws` commands, that is a different product.
-
----
-
-## Common Patterns
-
-### Pattern 1: On-Demand Loading (Recommended)
-
-Load secrets into the current terminal only when needed. They disappear when the terminal closes.
-
-```bash
-# In .zshrc — define but don't auto-run
-autoload -Uz load_myapp_dev
-```
-
-```bash
-# In ~/.zsh_autoload_functions/load_myapp_dev
-load_myapp_dev() {
-  bwss
-  eval "$(bw get notes "myapp-dev" --session "$BW_SESSION")"
-  echo "myapp-dev secrets loaded"
-}
-```
-
-### Pattern 2: Multiple Environments
-
-Switch contexts cleanly without conflicting env vars:
-
-```bash
-bwe "myapp-dev"      # loads dev secrets
-# ... work ...
-unset $(bw get notes "myapp-dev" | grep -oP '(?<=export )\w+')  # unload
-
-bwe "myapp-staging"  # load staging secrets
-```
-
-### Pattern 3: Individual Credential Loading (Gruntwork Pattern)
-
-Store a single token in a Secure Note. Use a named shell function per credential:
-
-```bash
-load_github() {
-  bwss
-  local id='e3e46z6b-a643-4j13-9820-ae4313fg75nd'  # item UUID
-  local token
-  token="$(bw get notes "$id" --session "$BW_SESSION")"
-  export GITHUB_OAUTH_TOKEN="$token"
-  export GITHUB_TOKEN="$token"
-  export GIT_TOKEN="$token"
-}
-```
-
-### Pattern 4: Custom Fields for Structured Credentials
-
-Store AWS keys as separate custom fields on a Login item:
-
-```bash
-# Retrieve individual fields
-export AWS_ACCESS_KEY_ID="$(bw get item "aws-credentials" | jq -r '.fields[] | select(.name=="AWS_ACCESS_KEY_ID") | .value')"
-export AWS_SECRET_ACCESS_KEY="$(bw get item "aws-credentials" | jq -r '.fields[] | select(.name=="AWS_SECRET_ACCESS_KEY") | .value')"
-```
-
----
-
-## Reference Files
-
-| File | Contents |
-|------|----------|
-| [references/cli.rst](references/cli.rst) | Full `bw` CLI command reference — all flags, options, output formats |
-| [references/shell-functions.rst](references/shell-functions.rst) | Complete annotated shell function library with security notes |
-| [references/env-patterns.rst](references/env-patterns.rst) | Advanced patterns: multi-env, CI/CD, team workflows |
-
-## Example Files
-
-| File | What it does |
-|------|-------------|
-| [scripts/bw-env.sh](scripts/bw-env.sh) | Drop-in shell functions for .zshrc / .bashrc |
-| [scripts/load-github.sh](scripts/load-github.sh) | On-demand GitHub token loader (Gruntwork pattern) |
-| [assets/bw-env-format.env](assets/bw-env-format.env) | Example .env format suitable for `eval` loading |
+| File | Read when |
+|------|-----------|
+| [references/cli.rst](references/cli.rst) | You need a `bw` command, flag, item type, or environment variable |
+| [references/shell-functions.rst](references/shell-functions.rst) | You change `bw-env.sh` or explain why it is built the way it is |
+| [references/env-patterns.rst](references/env-patterns.rst) | CI/CD, direnv, Docker Compose files, custom-field items, rotation |
+| [assets/bw-env-format.env](assets/bw-env-format.env) | You need an example of the stored note format |

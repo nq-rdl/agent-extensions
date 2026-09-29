@@ -328,7 +328,9 @@ class TestCanonicalHookPackaging(unittest.TestCase):
             repo = Path(tmp)
             write(repo / "registry/bundles/demo.yaml",
                   "id: demo\nhooks: [reminder]\ntargets:\n  claude:\n    enabled: true\n")
-            write(repo / "hooks/demo/hooks.json", '{"hooks": {}}\n')
+            write(repo / "hooks/demo/hooks.json",
+                  '{"hooks": {"SessionStart": [{"hooks": [{"type": "command", '
+                  '"command": "bash \\"${CLAUDE_PLUGIN_ROOT}/hooks/reminder.sh\\""}]}]}}\n')
             write(repo / "hooks/reminder.sh", "#!/bin/bash\nexit 0\n")
             self.assertEqual(run_sync(repo).returncode, 0)
             packaged = repo / "plugins/demo/hooks/reminder.sh"
@@ -343,5 +345,6 @@ class TestCanonicalHookPackaging(unittest.TestCase):
             self.assertEqual(packaged.read_bytes(), (repo / "hooks/reminder.sh").read_bytes())
             write(repo / "registry/bundles/demo.yaml",
                   "id: demo\nhooks: []\ntargets:\n  claude:\n    enabled: true\n")
+            (repo / "hooks/demo/hooks.json").unlink()
             self.assertEqual(run_sync(repo).returncode, 0)
             self.assertFalse(packaged.exists())

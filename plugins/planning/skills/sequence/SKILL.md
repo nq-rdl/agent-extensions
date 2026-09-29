@@ -1,5 +1,8 @@
 ---
-description: 'Sequence a multi-file change: map every affected file, trace dependencies, and emit an ordered edit plan before any code is touched. File-level ordering, not strategy — see the planning strategy skill for what-to-build decisions.'
+description: >-
+  Sequence a multi-file change: map every affected file, trace dependencies, and
+  emit an ordered edit plan before any code is touched. File-level ordering, not
+  strategy — use planning:strategy to choose what to build.
 license: MIT
 metadata:
   upstream: https://github.com/github/awesome-copilot/blob/main/agents/context-architect.agent.md

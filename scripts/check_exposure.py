@@ -20,7 +20,13 @@ always the on-disk basename:
 
   * skill  — ``skills/<name>/SKILL.md``   -> ``<name>`` (a dir without the
     SKILL.md marker is not a skill and is invisible here)
-  * hook   — ``hooks/<name>.sh``          -> ``<name>``
+  * hook   — ``hooks/<name>.sh``          -> ``<name>``. Only top-level
+    scripts are hooks: each must be wired by its bundle's canonical
+    ``hooks/<plugin>/hooks.json`` (``sync-plugins.sh`` enforces that).
+    Scripts in subdirectories, such as the Codex adapter
+    ``hooks/codex/adapter.sh``, are target helpers packaged by their target
+    (``codex_package.py``), not independently invokable hooks, so they are
+    deliberately not identities here.
   * mcp    — ``mcp/<name>-go/``           -> ``<name>``: the ``-go`` suffix is a
     directory-naming convention (AGENTS.md, mcp/README.md "Layout"), while a
     bundle's ``mcp:`` key holds the *server* name from ``.mcp.json``

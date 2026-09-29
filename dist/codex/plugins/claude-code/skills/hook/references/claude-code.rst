@@ -32,7 +32,10 @@ Where you add a hook determines its scope
 +-----------------------------------+------------------------------------+------------------------------+
 | Plugin ``hooks/hooks.json``       | When the plugin is enabled         | Yes — bundled with plugin    |
 +-----------------------------------+------------------------------------+------------------------------+
-| Skill / agent frontmatter         | While that component is active     | Yes — in the component file  |
+| Skill frontmatter                 | From invocation to session end     | Yes — in the component file  |
+|                                   | (``once: true``: first run only)   |                              |
++-----------------------------------+------------------------------------+------------------------------+
+| Subagent frontmatter              | While that subagent runs           | Yes — in the component file  |
 +-----------------------------------+------------------------------------+------------------------------+
 
 - Run ``/hooks`` to browse configured hooks grouped by event. The menu is
@@ -90,7 +93,8 @@ Hook definition fields
   ``PermissionRequest``, ``PermissionDenied``.
 - **timeout** (optional): seconds before the hook is killed. Defaults:
   ``command``/``http``/``mcp_tool`` = 10 min (lowered to 30 s under
-  ``UserPromptSubmit``), ``prompt`` = 30 s, ``agent`` = 60 s.
+  ``UserPromptSubmit``, ``PreModelSwitch`` and ``PostModelSwitch``, and to
+  10 s under ``MessageDisplay``), ``prompt`` = 30 s, ``agent`` = 60 s.
 - **url**, **headers**, **allowedEnvVars** (http hooks): see *Hook Types*.
 - **prompt**, **model** (prompt/agent hooks): see
   ``references/prompt-and-agent-hooks.rst``.
@@ -106,7 +110,7 @@ Hook Types
 | ``command`` | Runs a shell command; reads stdin      | Most hooks — checks, scripts, |
 |             | JSON, replies via stdout + exit code   | formatting, logging           |
 +-------------+----------------------------------------+-------------------------------+
-| ``http``    | POSTs event JSON to a URL; reply is     | Web servers, shared audit /   |
+| ``http``    | POSTs event JSON to a URL; reply is    | Web servers, shared audit /   |
 |             | the HTTP response body                 | logging services              |
 +-------------+----------------------------------------+-------------------------------+
 | ``mcp_tool``| Calls a tool on a connected MCP server | Reuse MCP tooling as a hook   |
@@ -149,7 +153,8 @@ Events
 When an event fires, all matching hooks run **in parallel** and identical
 commands are deduplicated. After they finish, Claude Code merges their outputs.
 For ``PreToolUse`` permission decisions the **most restrictive wins**
-(``deny`` > ``ask`` > ``allow``); ``additionalContext`` from every hook is kept.
+(``deny`` > ``defer`` > ``ask`` > ``allow``); ``additionalContext`` from every
+hook is kept.
 
 Full firing order and blocking semantics are in ``references/lifecycle.rst``.
 Quick event table
@@ -209,12 +214,13 @@ Without a ``matcher`` a hook fires on every occurrence of its event. The
 - **Tool events** (``PreToolUse``, ``PostToolUse``, ``PostToolUseFailure``,
   ``PermissionRequest``, ``PermissionDenied``) — tool name: ``Bash``,
   ``Edit|Write``, ``mcp__github__.*``.
-- **SessionStart** — ``startup``, ``resume``, ``clear``, ``compact``.
+- **SessionStart** — ``startup``, ``resume``, ``clear``, ``compact``, ``fork``.
 - **Setup** — ``init``, ``maintenance``.
 - **SessionEnd** — ``clear``, ``resume``, ``logout``, ``prompt_input_exit``,
-  ``bypass_permissions_disabled``, ``other``.
+  ``other`` (``bypass_permissions_disabled`` was removed in v2.1.234).
 - **Notification** — ``permission_prompt``, ``idle_prompt``, ``auth_success``,
-  ``elicitation_dialog``, ``elicitation_complete``, ``elicitation_response``.
+  ``elicitation_dialog``, ``elicitation_complete``, ``elicitation_response``,
+  and others; see the hooks reference matcher table.
 - **SubagentStart / SubagentStop** — agent type (``Explore``, ``Plan``,
   ``general-purpose``, custom names).
 - **PreCompact / PostCompact** — ``manual``, ``auto``.
@@ -233,9 +239,13 @@ Without a ``matcher`` a hook fires on every occurrence of its event. The
   ``Stop``, ``TeammateIdle``, ``TaskCreated``, ``TaskCompleted``,
   ``WorktreeCreate``, ``WorktreeRemove``, ``CwdChanged``, ``MessageDisplay``.
 
-Tool-name matchers accept plain names and regex alternation (``Edit|Write``).
-MCP tools are named ``mcp__<server>__<tool>`` — match a whole server with
-``mcp__github__.*`` or cross-server with ``mcp__.*__write.*``.
+A matcher of only letters, digits, ``_``, ``-``, spaces, ``,`` and ``|`` is an
+exact name or list of exact names (``Edit|Write``, ``Edit, Write``). Any other
+character makes it an **unanchored** JavaScript regex: ``Edit.*`` also matches
+``NotebookEdit``, so use ``^Edit$`` for a whole-name match. MCP tools are named
+``mcp__<server>__<tool>`` — match a whole server with ``mcp__github__.*``
+(plain ``mcp__github`` is an exact name and matches nothing) or cross-server
+with ``mcp__.*__write.*``.
 
 .. note::
 
@@ -311,7 +321,7 @@ Worked example (multiple types)
          {
            "matcher": "Edit|Write",
            "hooks": [
-             { "type": "command", "command": "path=$(jq -r '.tool_input.file_path // empty'); [ -n \"$path\" ] && npx prettier --write -- \"$path\"" }
+             { "type": "command", "command": "path=$(jq -r '.tool_input.file_path // empty'); if [ -n \"$path\" ]; then npx prettier --write -- \"$path\"; fi" }
            ]
          }
        ]

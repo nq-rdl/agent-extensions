@@ -1,0 +1,92 @@
+<!doctype html>
+<html><head><meta charset="utf-8"></head><body>
+<!-- Figures without fig-alt: cell with only fig-cap, Markdown figures with and without an id, one subfigure. Cut from a Quarto 1.10.18 HTML render (Jupyter engine, 2026-09-29). -->
+<main class="content" id="quarto-document-content">
+<p>Case A: labelled cell with fig-alt and fig-cap.</p>
+<div id="cell-fig-a" class="cell" data-execution_count="2">
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb2"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb2-1"><a href="#cb2-1" aria-hidden="true" tabindex="-1"></a>plt.plot([<span class="dv">1</span>, <span class="dv">2</span>, <span class="dv">3</span>])<span class="op">;</span> plt.show()</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<div class="cell-output cell-output-display">
+<div id="fig-a" class="quarto-float quarto-figure quarto-figure-center anchored" alt="ALT-A line chart rising.">
+<figure class="quarto-float quarto-float-fig figure">
+<div aria-describedby="fig-a-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
+<img src="alttext_files/figure-html/fig-a-output-1.png" alt="ALT-A line chart rising." width="579" height="411" class="figure-img">
+</div>
+<figcaption class="quarto-float-caption-bottom quarto-float-caption quarto-float-fig" id="fig-a-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
+Figure&nbsp;1: Caption A.
+</figcaption>
+</figure>
+</div>
+</div>
+</div>
+<p>Case C: labelled cell with fig-cap, no fig-alt.</p>
+<div id="cell-fig-c" class="cell" data-execution_count="4">
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb4"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb4-1"><a href="#cb4-1" aria-hidden="true" tabindex="-1"></a>plt.plot([<span class="dv">1</span>, <span class="dv">3</span>, <span class="dv">2</span>])<span class="op">;</span> plt.show()</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<div class="cell-output cell-output-display">
+<div id="fig-c" class="quarto-float quarto-figure quarto-figure-center anchored">
+<figure class="quarto-float quarto-float-fig figure">
+<div aria-describedby="fig-c-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
+<img src="alttext_files/figure-html/fig-c-output-1.png" width="579" height="411" class="figure-img">
+</div>
+<figcaption class="quarto-float-caption-bottom quarto-float-caption quarto-float-fig" id="fig-c-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
+Figure&nbsp;2: Caption C.
+</figcaption>
+</figure>
+</div>
+</div>
+</div>
+<p>Case E: Markdown image with id, no fig-alt.</p>
+<div id="fig-e" class="quarto-float quarto-figure quarto-figure-center anchored">
+<figure class="quarto-float quarto-float-fig figure">
+<div aria-describedby="fig-e-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
+<img src="img2.png" class="img-fluid figure-img">
+</div>
+<figcaption class="quarto-float-caption-bottom quarto-float-caption quarto-float-fig" id="fig-e-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
+Figure&nbsp;4: Caption E
+</figcaption>
+</figure>
+</div>
+<p>Case F: subfigures.</p>
+<div id="fig-f" class="quarto-layout-panel">
+<figure class="quarto-float quarto-float-fig figure">
+<div aria-describedby="fig-f-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
+<div class="quarto-layout-row">
+<div class="quarto-layout-cell-subref quarto-layout-cell" data-ref-parent="fig-f" style="flex-basis: 50.0%;justify-content: flex-start;">
+<div id="fig-f1" class="quarto-float quarto-figure quarto-figure-center anchored" alt="ALT-F1">
+<figure class="quarto-float quarto-subfloat-fig figure">
+<div aria-describedby="fig-f1-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
+<img src="sub1.png" class="img-fluid figure-img" data-ref-parent="fig-f" alt="ALT-F1">
+</div>
+<figcaption class="quarto-float-caption-bottom quarto-subfloat-caption quarto-subfloat-fig" id="fig-f1-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
+(a) Sub F1
+</figcaption>
+</figure>
+</div>
+</div>
+<div class="quarto-layout-cell-subref quarto-layout-cell" data-ref-parent="fig-f" style="flex-basis: 50.0%;justify-content: flex-start;">
+<div id="fig-f2" class="quarto-float quarto-figure quarto-figure-center anchored">
+<figure class="quarto-float quarto-subfloat-fig figure">
+<div aria-describedby="fig-f2-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
+<img src="sub2.png" class="img-fluid figure-img" data-ref-parent="fig-f">
+</div>
+<figcaption class="quarto-float-caption-bottom quarto-subfloat-caption quarto-subfloat-fig" id="fig-f2-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
+(b) Sub F2
+</figcaption>
+</figure>
+</div>
+</div>
+</div>
+</div>
+<figcaption class="quarto-float-caption-bottom quarto-float-caption quarto-float-fig" id="fig-f-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
+Figure&nbsp;5: Main caption F.
+</figcaption>
+</figure>
+</div>
+<p>Case J: unlabelled markdown image with no attrs.</p>
+<div class="quarto-figure quarto-figure-center">
+<figure class="figure">
+<p><img src="img.png" class="img-fluid figure-img"></p>
+<figcaption>Caption J plain</figcaption>
+</figure>
+</div>
+</main>
+</body></html>

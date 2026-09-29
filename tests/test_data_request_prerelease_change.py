@@ -196,6 +196,41 @@ class AmendIsReleasedOnly(unittest.TestCase):
                 self.assertNotIn("recommend `/data-request:analyse` when a refreshed", report)
 
 
+class DefectVersusReleasedChange(unittest.TestCase):
+    """A defect in a released extract stays with fix; only different output goes to amend (#306).
+
+    The bodies already said so; the descriptions did not. With "A change to a released extract
+    goes to amend" in fix's description, a triage co-development run routed a released
+    identifier-formatting defect to amend (docs/skill-review/new-plugins.md).
+    """
+
+    TRIAGE = copies("data-request-triage", "triage")
+
+    def test_fix_description_keeps_released_defects(self):
+        for target, path in FIX.items():
+            with self.subTest(target=target):
+                desc = flat(frontmatter(path)[0]["description"])
+                self.assertIn("a defect with a concrete expected result, released or not", desc)
+                self.assertIn("A request for different output from a released extract goes to amend", desc)
+                self.assertNotIn("A change to a released extract goes to amend", desc)
+
+    def test_amend_description_sends_defects_to_fix(self):
+        for target, path in AMEND.items():
+            with self.subTest(target=target):
+                desc = flat(frontmatter(path)[0]["description"])
+                self.assertIn("different output than was agreed", desc)
+                self.assertIn("a defect in delivered output goes to fix", desc)
+
+    def test_triage_routes_defects_and_released_changes_apart(self):
+        for target, path in self.TRIAGE.items():
+            with self.subTest(target=target):
+                rows = {l.rsplit("|", 2)[1].strip(): l for l in frontmatter(path)[1].splitlines()
+                        if l.startswith("| ") and "/data-request:" in l}
+                self.assertIn("released or not", rows["`/data-request:fix`"])
+                self.assertIn("different output than was agreed", rows["`/data-request:amend`"])
+                self.assertIn("release body", rows["`/data-request:release`"])
+
+
 @unittest.skipUnless(shutil.which("jq"), "plugin discovery requires jq")
 class Discovery(unittest.TestCase):
     def catalog(self) -> dict[str, str]:

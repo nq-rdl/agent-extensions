@@ -139,8 +139,9 @@ Then use in tests:
 Setup Files
 -----------
 
-Files starting with ``setup-`` run only during ``R CMD check`` and
-``devtools::test()``, not during ``devtools::load_all()``.
+Files starting with ``setup-`` are sourced by the test runners
+(``devtools::test()``, ``test_file()``, ``test_dir()``, ``R CMD check``), not
+by ``devtools::load_all()``.
 
 .. code:: r
 

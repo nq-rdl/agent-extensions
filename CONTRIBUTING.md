@@ -80,6 +80,18 @@ available subagent mechanism; the filename does not register an agent type.
 Tool restrictions expressed in prose do not create runtime permission controls.
 Preserve upstream attribution and licenses in the skill and adapted reference.
 
+Put the delegation contract in the outline's Handoff section:
+
+> Complete the delegated scope using available tools. If blocked by missing
+> information or authorization, return the blocker and questions to the
+> caller. Do not perform unauthorized actions. The caller may provide answers
+> and resume the work.
+
+Keep verification loops and existing authorization; tool permission is not
+task authorization. Name companion skills only when a plugin that ships the
+outline also ships them. [`docs/delegation.md`](docs/delegation.md) has the
+full rules, and `tests/test_delegation_handoff.py` checks them.
+
 Each skill has one home subject. Existing guest listings carried over from the
 agent migration remain supported: GitHub Actions in `go` (home `gh`), delivery
 debugging in `gh` (home `argo-cd`), and plugin discovery in `rdl-team` (home
@@ -162,6 +174,47 @@ When a skill ships more than its `SKILL.md`, sort each extra file into exactly o
 If a file is neither runnable nor `.rst` prose, it belongs in `assets/`.
 
 ## Skill content conventions
+
+### Body size and disclosure
+
+This repository limits each `SKILL.md` to **500 body lines**, enforced by both
+`asctl validate` and `asctl repo-check`. The body starts after the closing YAML
+frontmatter fence. Leading and trailing blank lines count. LF and CRLF each end
+one line; a final newline does not add an extra line, and an unterminated final
+line still counts. An empty body has zero lines. Malformed frontmatter remains
+a parse error, not a body-size result.
+
+This is **house policy**, distinct from the [Agent Skills recommendation](https://agentskills.io/specification#progressive-disclosure)
+to keep the main file under 500 lines and its instruction body below roughly
+5,000 tokens. Neither line count nor an approximate token count measures task
+quality or actual model context usage.
+
+Aim for **300 body lines** during review. This is an editorial target, not an
+additional gate: crossing it does not require an otherwise unnecessary reference
+file. Keep task-specific references focused and directly reachable from
+`SKILL.md`; a table of contents can help navigate a long reference. Preserve
+useful examples, failure handling, and critical constraints when task evidence
+supports them.
+
+Run `asctl repo-check --size-report` before a content pilot. It adds body lines,
+approximate tokens (**raw UTF-8 body bytes / 4**, including whitespace and line
+endings), and visible regular file counts recursively under `references/`.
+Hidden entries and symlinks are excluded from reference counts. Rows sort by
+descending body lines, then skill path; unavailable metrics show `n/a` with a
+reason. The report does not suppress validation errors or add validation rules.
+Measure actual loading, correctness, and task completion separately during pilots.
+
+### Discovery descriptions
+
+Make invocation conditions clear in `description`. Aim for **400 characters for
+skill descriptions** and **300 for agent descriptions where applicable**, with
+justified exceptions under the existing schema limits (skill descriptions allow
+1,024 characters). These are editorial defaults, not automated shape/length
+gates. A three-part description template is optional. Keep identifiers and
+negative triggers when they improve routing; verify ambiguous sibling routing
+with representative requests. No new metadata field or agent body cap is required.
+
+### Content value
 
 A skill must encode a **gap the fresh model cannot see** — not restate public
 knowledge. Before writing or accepting skill content, apply these:
@@ -344,13 +397,32 @@ failed Prepare or Finalize run are in [`AGENTS.md`](AGENTS.md) under **"Release"
 
 ## Bundled hooks
 
-A bundle can opt into generated hook packaging with a canonical
-`hooks/<pluginName>/hooks.json`. List its shell hooks by stem in the bundle’s
-`hooks:` array; `sync-plugins.sh` copies the config and `hooks/<name>.sh` files
-into `plugins/<pluginName>/hooks/`, removes stale copies, and checks drift with
-`--check`. This directory is generated once the canonical config exists.
-Commands use `bash "${CLAUDE_PLUGIN_ROOT}/hooks/<name>.sh"` for portable installs.
-Existing bundles without a canonical config retain their current packaging.
+Every bundle with hooks has a canonical Claude config at
+`hooks/<pluginName>/hooks.json`. (The `codex` plugin’s config is
+`hooks/codex/hooks.json`; the subdirectories of `hooks/codex/` hold native
+Codex adapter configs.) List the bundle’s shell hooks by stem in its `hooks:`
+array. Each hook command names its installed path, and the path must be
+quoted so that an install under a path with spaces still runs:
+
+- `bash "${CLAUDE_PLUGIN_ROOT}/hooks/<name>.sh"` for a new hook;
+- `"${CLAUDE_PLUGIN_ROOT}/scripts/<name>.sh"` where an existing plugin
+  already installs hooks beside its runtime, as the `codex` plugin does.
+
+Edit only the canonical files, then run
+`pixi run bash scripts/sync-plugins.sh <bundle>`. The script generates
+`plugins/<pluginName>/hooks/` (config and any hooks installed there) and copies
+each other hook to the directory its command names. It never prunes vendored
+files that share that directory. `sync-plugins.sh --check` (CI and the
+pre-commit hook) fails on stale, missing, content-drifted, or mode-drifted
+copies, and on a copy left at an old location. It also fails on a listed hook
+that no command runs, a command that runs an unlisted script, an unquoted plugin
+root, and a `${CLAUDE_PLUGIN_ROOT}/…` path in a hook that the installed tree
+would not contain. Top-level `hooks/*.sh` files are always hooks. Put a helper
+that is not a hook with its target, as with the Codex adapter
+`hooks/codex/adapter.sh`, or in the owning skill’s `scripts/` directory.
+`tests/test_installed_hooks.py` and `tests/codex/hook-wrappers.test.mjs` run
+installed copies from a path with spaces. See
+[the #311 hook review](docs/skill-review/hooks.md) for the mapping.
 
 The `tech-writing` reminder uses `jq` (silently skips if unavailable) and
 adds advisory context for `PreToolUse` on the `Skill` tool and
