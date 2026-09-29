@@ -26,6 +26,15 @@ detailed review, and `/data-request:explain` walks the analyst through it. This 
 short release body from the release's own artifacts. It never changes a scope, review or SQL
 file, and it never publishes a release, pushes a tag or posts the body.
 
+Order: the Data Engineer completes `analyse`, the authorised operator run, UAT and the triage
+hand-off; the Data Analyst runs `explain`, accepts for release preparation, sends back or
+amends presentation, then drafts here and publishes. Never direct the engineer to release.
+If the analyst chooses **Send back** here, use the paste-ready *Analyst outcome* note in
+`${CLAUDE_PLUGIN_ROOT}/skills/explain/SKILL.md`: logic changes or defects to `fix`, presentation
+changes to `amend` before or after release. Keep unresolved claims `pending` and the current
+candidate record `draft`; do not overwrite a previously approved release record, post the
+note or clear a gate. Refreshed review and operator-run/UAT evidence precede another hand-off.
+
 For RDL cohort SQL, read `${CLAUDE_PLUGIN_ROOT}/skills/guardrails/SKILL.md` when a claim rests on
 a storage fact or conversion. Worked example:
 [references/worked-example.rst](references/worked-example.rst).

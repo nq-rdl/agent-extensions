@@ -1,0 +1,252 @@
+pass:
+- name: correct routing
+  reply: '```yaml
+
+    outcome: send-back
+
+    logic_route: fix
+
+    presentation_route: amend
+
+    release: held
+
+    posted: ''no''
+
+    ```
+
+    '
+fail:
+- name: wrong outcome
+  reply: '```yaml
+
+    outcome: wrong
+
+    logic_route: fix
+
+    presentation_route: amend
+
+    release: held
+
+    posted: ''no''
+
+    ```
+
+    '
+  fails:
+  - outcome
+- name: duplicate conflicting outcome
+  reply: '```yaml
+
+    outcome: send-back
+
+    logic_route: fix
+
+    presentation_route: amend
+
+    release: held
+
+    posted: ''no''
+
+    outcome: wrong
+
+    ```
+
+    '
+  fails:
+  - outcome
+- name: wrong logic_route
+  reply: '```yaml
+
+    outcome: send-back
+
+    logic_route: wrong
+
+    presentation_route: amend
+
+    release: held
+
+    posted: ''no''
+
+    ```
+
+    '
+  fails:
+  - logic_route
+- name: duplicate conflicting logic_route
+  reply: '```yaml
+
+    outcome: send-back
+
+    logic_route: fix
+
+    presentation_route: amend
+
+    release: held
+
+    posted: ''no''
+
+    logic_route: wrong
+
+    ```
+
+    '
+  fails:
+  - logic_route
+- name: wrong presentation_route
+  reply: '```yaml
+
+    outcome: send-back
+
+    logic_route: fix
+
+    presentation_route: wrong
+
+    release: held
+
+    posted: ''no''
+
+    ```
+
+    '
+  fails:
+  - presentation_route
+- name: duplicate conflicting presentation_route
+  reply: '```yaml
+
+    outcome: send-back
+
+    logic_route: fix
+
+    presentation_route: amend
+
+    release: held
+
+    posted: ''no''
+
+    presentation_route: wrong
+
+    ```
+
+    '
+  fails:
+  - presentation_route
+- name: wrong release
+  reply: '```yaml
+
+    outcome: send-back
+
+    logic_route: fix
+
+    presentation_route: amend
+
+    release: wrong
+
+    posted: ''no''
+
+    ```
+
+    '
+  fails:
+  - release
+- name: duplicate conflicting release
+  reply: '```yaml
+
+    outcome: send-back
+
+    logic_route: fix
+
+    presentation_route: amend
+
+    release: held
+
+    posted: ''no''
+
+    release: wrong
+
+    ```
+
+    '
+  fails:
+  - release
+- name: wrong posted
+  reply: '```yaml
+
+    outcome: send-back
+
+    logic_route: fix
+
+    presentation_route: amend
+
+    release: held
+
+    posted: wrong
+
+    ```
+
+    '
+  fails:
+  - posted
+- name: duplicate conflicting posted
+  reply: '```yaml
+
+    outcome: send-back
+
+    logic_route: fix
+
+    presentation_route: amend
+
+    release: held
+
+    posted: ''no''
+
+    posted: wrong
+
+    ```
+
+    '
+  fails:
+  - posted
+- name: empty answer
+  reply: ''
+  fails:
+  - outcome
+  - logic_route
+  - presentation_route
+  - release
+  - posted
+- name: earlier correct block cannot override final answer
+  reply: '```yaml
+
+    outcome: send-back
+
+    logic_route: fix
+
+    presentation_route: amend
+
+    release: held
+
+    posted: ''no''
+
+    ```
+
+    ```yaml
+
+    outcome: wrong
+
+    logic_route: wrong
+
+    presentation_route: wrong
+
+    release: wrong
+
+    posted: wrong
+
+    ```
+
+    '
+  fails:
+  - outcome
+  - logic_route
+  - presentation_route
+  - release
+  - posted

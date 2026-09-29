@@ -37,8 +37,9 @@ ask for the missing detail while continuing independent investigation. Implement
 settled requirements directly; ask before choosing a different population, grain
 or business meaning.
 
-A reported “defect” that is really a change request goes to `/data-request:amend` only
-when the extract is released. Before its first release, use *Pre-release logic change* below.
+A reported “defect” that is really a presentation change request goes to `/data-request:amend`
+before or after release. Other released change requests use amend's engineer hand-off;
+before the first release, a logic change uses *Pre-release logic change* below.
 If you cannot tell whether it is released, ask, and make no edit in either skill until answered.
 
 ## Pre-release logic change
@@ -50,7 +51,7 @@ extract is released. Treat an extract as unreleased only on positive confirmatio
 human, or the service-desk issue, says that nothing was delivered. Absent signals do not
 prove it: legacy or seed repositories and manual deliveries leave no `data/Released/v*/`
 or tag. If you cannot tell, ask, and make no edit here or in `/data-request:amend` until
-answered: amend edits and records against a previous release that may not exist.
+answered: the release state determines the amendment baseline and record.
 
 While no release exists, a full logic change is allowed here: population, keys, grain,
 joins, filters, deduplication or source mappings. Make it only for a settled decision,
@@ -120,3 +121,7 @@ a Python-only change may affect delivered data without marking the review stale.
 Call out that impact and recommend `/data-request:analyse` when a refreshed formal
 handoff is needed (a pre-release logic change requires it; see above); do not claim
 release approval from a passing local check.
+
+After correction, the engineer refreshes `analyse`, the authorised operator run and UAT,
+then uses the triage hand-off to the analyst. The analyst runs `explain`, accepts, sends
+back or amends presentation, then prepares and publishes the release.

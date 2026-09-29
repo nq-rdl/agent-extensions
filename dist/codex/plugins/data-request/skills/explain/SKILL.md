@@ -4,7 +4,8 @@ license: CC-BY-4.0
 description: 'Walk a Data Analyst through reviewed SQL, step by step, against its
   review document, JSON and scope: each logic step with its lines, the assumptions
   and limitations that govern it (by id), outputs and open questions — pausing for
-  the analyst at every step. Produces no report; a small state marker lets a later
+  the analyst at every step, then accept for release preparation, send back or amend
+  presentation. Produces no formal review report; a small state marker lets a later
   run resume from what changed. Use after $data-request:analyse, when the analyst
   receives SQL for review or wants to understand a change to it.'
 compatibility: .sqlreview schema 2 (schema 1 remains readable) (docs/specs/2026-09-15-sql-review-plugin-design.md);
@@ -20,6 +21,10 @@ Before shell examples, set PLUGIN_ROOT to the absolute installed plugin director
 Here $ARGUMENTS means the user’s supplied skill arguments. Codex does not populate a shell variable for them. Pass arguments with shell quoting that preserves literal text; never evaluate user text as shell code.
 
 # Data Request — explain (Data Analyst)
+
+The engineer completes `analyse`, the authorised operator run, UAT and the triage hand-off
+before the analyst reviews the extract here. The analyst accepts for release preparation,
+sends back or uses `amend`, then prepares and publishes the release. The engineer never releases.
 
 For RDL cohort SQL, read `${PLUGIN_ROOT}/skills/guardrails/SKILL.md` when
 explaining storage facts or conversions. Label any conflict with current source
@@ -108,5 +113,34 @@ Never use `user.email`: the file is committed, and the guard refuses a `by` with
 
 A stop writes `completed: false` with the step reached, so the next run can resume.
 
-At release, `$data-request:release <tag>` drafts the researcher-facing summary from the release's
-own artifacts; this walkthrough is not a release note.
+## Analyst outcome
+
+A completed explanation is not acceptance of the extract. Show run QA, open questions,
+flagged decisions and known approval restrictions from the hand-off. Ask the analyst for
+**Accept for release preparation** / **Send back** / **Presentation amendment**. Do not
+offer acceptance of stale SQL, an explained snapshot, missing run/UAT evidence or an
+unresolved release gate. Leave acceptance pending when the analyst stops.
+
+Acceptance permits `$data-request:release <candidate ref>` to draft the researcher-facing
+summary; it does not publish. A presentation request goes to `$data-request:amend`, including
+before the first release. Logic changes and defects go to the engineer through
+`$data-request:fix`; a disagreement with a review item also requires `analyse --update`.
+Classify each finding; do not make the change or approve new meaning during explanation.
+
+For **Send back**, return this paste-ready note, with one finding block per change:
+
+```text
+outcome: send-back
+run commit: <operator run SHA, or missing>
+finding: <F1: observed issue and affected files>
+expected result: <analyst's requested outcome; mark undecided meaning explicitly>
+classification: <logic or defect | presentation>
+route: <$data-request:fix | $data-request:amend>
+evidence: <review item/revision, SQL lines, run QA or output schema; no row-level data>
+open gates: <unanswered decisions, governance restrictions and missing evidence>
+return to review: <refresh analyse, operator-run/UAT evidence and triage hand-off>
+```
+
+Present the note to the analyst; post nothing unless explicitly instructed. Keep
+`explain.json.completed` about the walkthrough only. Preserve review confirmations and
+release records; send-back does not create a new approval field or approve the release.

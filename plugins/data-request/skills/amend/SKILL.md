@@ -1,10 +1,10 @@
 ---
 license: CC-BY-4.0
 description: >-
-  Classify and make an analyst amendment to a released, engineer-produced RDL extract.
+  Classify analyst amendments to an operator-run or released RDL extract.
   Renames, reorders, dropped already-surfaced columns and presentation changes go through
   query-builder's projection extension points; anything that changes rows or meaning
-  becomes a paste-ready engineer hand-off. Use when a released extract needs different
+  becomes a paste-ready engineer hand-off. Use when an extract needs different
   output than was agreed; a defect in delivered output goes to fix, and before the first
   release, a logic change goes to fix.
 argument-hint: '<requested change> [builder, cohort.yaml, SQL or extract path]'
@@ -32,17 +32,27 @@ An amendment asks for different output than was agreed. When the delivered outpu
 contradicts what was agreed (a wrong value, type or format), it is a defect: use
 `/data-request:fix` instead.
 
-This skill applies only to a released extract: a version exists under `data/Released/v*/`,
-a release tag exists or any version reached the requester (a `data/Review/` drop that reached
-them counts). Before the first release there is no extract to amend. A logic change then goes
+This skill covers presentation changes before or after release. An extract is released when
+a version exists under `data/Released/v*/`, a release tag exists or any version reached the requester (a `data/Review/` drop that reached
+them counts). Before the first release, use the operator-run extract as the baseline,
+with its run commit, SQL fingerprint and DVC pointer. Confirm that nothing reached the
+requester; absent release files or tags do not prove that. If no operator-run baseline
+exists, classify only and report validation pending; do not edit or claim a checked amendment.
+A logic change before the first release goes
 to `/data-request:fix` (*Pre-release logic change*), which allows it with the same runbook, UAT
 and review rules. If you cannot tell whether the extract is released, ask, and make no edit
 until answered.
 
+The engineer completes `analyse`, the authorised operator run, UAT and the triage hand-off.
+The analyst runs `explain`, then accepts, sends back or amends presentation here. After any
+change, refresh the review and run/UAT evidence before another hand-off. Release remains
+the analyst's decision.
+
 ## 1. Classify before any edit
 
 Locate the maintained source (the `CohortQuery` builder, `cohort.yaml`, the pipeline or the
-export code), the generated request SQL and the previous released extract. Read the
+export code), the generated request SQL and the baseline extract (operator-run before
+release, previous released version afterwards). Read the
 repository instructions. Then classify each requested change:
 
 - **analyst-safe** only when the extract keeps the same rows (count and keys) and every value
@@ -113,8 +123,12 @@ repository has no runbook or UAT checklist, say so.
 
 ## 5. Record the amendment
 
-Add one entry per amendment, with its classification, to the child's amendment record. In a
-data-analysis-scaffold child this is `specs/amendments.md`
+Before the first release, record the requested change, reason, classification, run commit,
+baseline pointer and validation in the PR or existing review ledger. Do not add an `AMD-` entry
+to `specs/amendments.md`: that record governs released extracts. Keep the baseline immutable.
+
+For a released extract, add one entry per amendment, with its classification, to the child's
+amendment record. In a data-analysis-scaffold child this is `specs/amendments.md`
 ([data-analysis-scaffold#234](https://github.com/nq-rdl/data-analysis-scaffold/issues/234)).
 Follow the record's template and field names, which its guard reads, and use the next `AMD-`
 number. Never edit an entry that is already in a release. Write names or handles, never an
@@ -128,17 +142,20 @@ it. An analyst-safe change passes only when all of these hold:
 
 - the fast SQL gate (`rdl_etl_helpers.harness.sql_gate`) and `CohortQuery.validate()` pass;
 - `spec-validate` shows the output columns match the declared projection;
-- the regenerated SQL differs from the previous SQL only in the final projection
-  (scaffold: `pixi run amend check`);
+- the regenerated SQL differs from the previous SQL at the run commit (before release),
+  or previous release (afterwards), only in the final projection;
+  use `pixi run amend check` only if the pinned scaffold supports that baseline;
 - the row count and key set match the previous extract (scaffold: `pixi run amend
-  validate-output --sql <sql> --extract <new> --previous <released> --key NEW=OLD`);
+  validate-output --sql <sql> --extract <new> --previous <baseline> --key NEW=OLD`);
 - the runbook and UAT checklist name the new columns, and no live reference (a query, a
   checklist item or an expected-output table) uses an old name.
 
 Any other difference (a CTE body, predicate, join, dedupe step, row count or key) is a
 blocker. Report it as a blocker, never as a success, and hand the change off (step 2). A check
 that could not run, such as a missing previous extract, framework environment or release tag,
-is reported as not run with its command. Do not run a live extract or publish data yourself:
+is reported as not run with its command. A release tag is not required for an operator-run
+baseline; inspect the pinned scaffold's supported flags and never fabricate a release or
+alter its guard to make a pre-release check pass. Do not run a live extract or publish data yourself:
 if the new extract does not exist yet, the row and key check is pending. Use
 `/data-request:validate` for a static review of the regenerated SQL.
 
@@ -148,7 +165,7 @@ Return the classification, the governance status (request ID, reason, open quest
 changed paths, the regenerated SQL, the record entry, the checks run with their results and
 any blocker. Regenerated SQL or a renamed validation or UAT output column leaves an existing
 `.sqlreview/` review stale in meaning, even where its fingerprint still matches: its outputs
-and steps describe the released logic. Before the next release, re-run `/data-request:analyse`
+and steps describe the previous output. Before the next release, re-run `/data-request:analyse`
 on each changed SQL file with a full re-walk (walk every item and publish with
 `--reconfirm-all`), because carry-forward keeps items whose SQL lines did not change. A passing
 check is not release approval.

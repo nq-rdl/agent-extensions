@@ -1,0 +1,252 @@
+pass:
+- name: correct routing
+  reply: '```yaml
+
+    gate: blocked
+
+    destination: child-issue
+
+    board: pending
+
+    reviewer: ask
+
+    release_owner: analyst
+
+    ```
+
+    '
+fail:
+- name: wrong gate
+  reply: '```yaml
+
+    gate: wrong
+
+    destination: child-issue
+
+    board: pending
+
+    reviewer: ask
+
+    release_owner: analyst
+
+    ```
+
+    '
+  fails:
+  - gate
+- name: duplicate conflicting gate
+  reply: '```yaml
+
+    gate: blocked
+
+    destination: child-issue
+
+    board: pending
+
+    reviewer: ask
+
+    release_owner: analyst
+
+    gate: wrong
+
+    ```
+
+    '
+  fails:
+  - gate
+- name: wrong destination
+  reply: '```yaml
+
+    gate: blocked
+
+    destination: wrong
+
+    board: pending
+
+    reviewer: ask
+
+    release_owner: analyst
+
+    ```
+
+    '
+  fails:
+  - destination
+- name: duplicate conflicting destination
+  reply: '```yaml
+
+    gate: blocked
+
+    destination: child-issue
+
+    board: pending
+
+    reviewer: ask
+
+    release_owner: analyst
+
+    destination: wrong
+
+    ```
+
+    '
+  fails:
+  - destination
+- name: wrong board
+  reply: '```yaml
+
+    gate: blocked
+
+    destination: child-issue
+
+    board: wrong
+
+    reviewer: ask
+
+    release_owner: analyst
+
+    ```
+
+    '
+  fails:
+  - board
+- name: duplicate conflicting board
+  reply: '```yaml
+
+    gate: blocked
+
+    destination: child-issue
+
+    board: pending
+
+    reviewer: ask
+
+    release_owner: analyst
+
+    board: wrong
+
+    ```
+
+    '
+  fails:
+  - board
+- name: wrong reviewer
+  reply: '```yaml
+
+    gate: blocked
+
+    destination: child-issue
+
+    board: pending
+
+    reviewer: wrong
+
+    release_owner: analyst
+
+    ```
+
+    '
+  fails:
+  - reviewer
+- name: duplicate conflicting reviewer
+  reply: '```yaml
+
+    gate: blocked
+
+    destination: child-issue
+
+    board: pending
+
+    reviewer: ask
+
+    release_owner: analyst
+
+    reviewer: wrong
+
+    ```
+
+    '
+  fails:
+  - reviewer
+- name: wrong release_owner
+  reply: '```yaml
+
+    gate: blocked
+
+    destination: child-issue
+
+    board: pending
+
+    reviewer: ask
+
+    release_owner: wrong
+
+    ```
+
+    '
+  fails:
+  - release_owner
+- name: duplicate conflicting release_owner
+  reply: '```yaml
+
+    gate: blocked
+
+    destination: child-issue
+
+    board: pending
+
+    reviewer: ask
+
+    release_owner: analyst
+
+    release_owner: wrong
+
+    ```
+
+    '
+  fails:
+  - release_owner
+- name: empty answer
+  reply: ''
+  fails:
+  - gate
+  - destination
+  - board
+  - reviewer
+  - release_owner
+- name: earlier correct block cannot override final answer
+  reply: '```yaml
+
+    gate: blocked
+
+    destination: child-issue
+
+    board: pending
+
+    reviewer: ask
+
+    release_owner: analyst
+
+    ```
+
+    ```yaml
+
+    gate: wrong
+
+    destination: wrong
+
+    board: wrong
+
+    reviewer: wrong
+
+    release_owner: wrong
+
+    ```
+
+    '
+  fails:
+  - gate
+  - destination
+  - board
+  - reviewer
+  - release_owner

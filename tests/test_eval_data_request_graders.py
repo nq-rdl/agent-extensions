@@ -309,7 +309,7 @@ class SuiteShape(unittest.TestCase):
         # test_data_request_prerelease_change and release-* cases (#407) by
         # test_data_request_release; any other directory is ours.
         cases = {p.name for p in SUITE.iterdir()
-                 if p.is_dir() and not p.name.startswith(("amend-", "field-", "prerelease-", "release-"))}
+                 if p.is_dir() and not p.name.startswith(("amend-", "field-", "prerelease-", "release-", "handoff-"))}
         self.assertEqual(cases, set(CASES))
         for case, spec in CASES.items():
             with self.subTest(case=case):

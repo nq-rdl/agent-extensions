@@ -381,6 +381,32 @@ class Evidence(unittest.TestCase):
         self.assertEqual(rev["applies"], "changed")
         self.assertNotEqual(rev["sql_sha256_at_ref"], rev["sql_sha256_reviewed"])
 
+    def test_run_commit_needs_no_release_tag(self):
+        # Handoff uses an operator-run SHA before the first release (#424).
+        run_commit = git(self.p.root, "rev-parse", "HEAD")
+        result = self.p.evidence(run_commit)
+        self.assertEqual(result.returncode, 0, result.stderr)
+        doc, review = self.only(result)
+        self.assertEqual(doc["commit"], run_commit)
+        self.assertEqual(review["applies"], "current")
+
+    def test_current_head_does_not_make_old_operator_run_current(self):
+        # The operator ran old SQL; a newer reviewed head cannot substitute for it.
+        run_commit = git(self.p.root, "rev-parse", "HEAD")
+        self.p.write(SQL_PATH, SQL_V2)
+        self.p.commit("update source after operator run")
+        self.p.review_commit = git(self.p.root, "rev-parse", "HEAD")
+        self.p.review(SQL_V2)
+        self.p.commit("review newer head")
+        head = self.p.evidence("HEAD")
+        self.assertEqual(head.returncode, 0, head.stderr)
+        self.assertEqual(self.only(head)[1]["applies"], "current")
+        ran = self.p.evidence(run_commit)
+        self.assertEqual(ran.returncode, 10, ran.stderr)
+        review = self.only(ran)[1]
+        self.assertEqual(review["applies"], "changed")
+        self.assertFalse(review["reviewed_commit_in_ref"])
+
     def test_working_tree_is_not_the_release(self):
         # The tag holds the reviewed SQL; an uncommitted edit afterwards does not change that.
         self.p.tag("v1.0.0")

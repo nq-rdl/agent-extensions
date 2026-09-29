@@ -1,0 +1,3 @@
+kind: Fixed
+body: Allows analyst presentation changes through `data-request:amend` before release using the operator-run baseline (#424)
+time: 2026-09-29T21:41:04.060083753Z
