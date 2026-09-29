@@ -5,13 +5,24 @@ description: Use this skill to help agents manage Python projects, dependencies,
   and builds using the `pixi` package manager. Covers installation, project creation
   (pyproject.toml, workspaces, cross-compilation), managing dependencies, security,
   and migrating from other tools like uv.
+compatibility: Pixi 0.78.0 CLI baseline, checked 2026-09-29; pixi-build still requires
+  workspace.preview = ["pixi-build"]. Vendored references are an older documentation
+  snapshot, not a claim that every example was tested on 0.78.0.
 metadata:
   repo: https://github.com/nq-rdl/agent-extensions
+  upstream: https://pixi.prefix.dev/
 ---
 
 # pixi — Package management for reproducible environments
 
 Pixi is a fast, cross-platform, next-generation package manager that provides reproducible environments.
+
+Before relying on version-sensitive commands or build-backend settings, check
+the project's Pixi version and the [canonical documentation](https://pixi.prefix.dev/latest/).
+The 24 RST references were converted from pixi.prefix.dev documentation and
+vendored by 2026-04-26 through agent-skills v0.6.0; their exact upstream
+revision was not recorded. Read the reference for the task at hand. Offline,
+use it as a snapshot, check local CLI help and report anything unverified.
 
 ---
 
@@ -29,6 +40,23 @@ Pixi is a fast, cross-platform, next-generation package manager that provides re
 - **Global Tools:** Install isolated CLI tools globally using `pixi global install`.
 - **Reproducibility:** Pixi uses lockfiles (`pixi.lock`) to ensure exact versions of packages across platforms.
 - **Backends:** Pixi integrates with various build backends (e.g., `pixi-build-cmake`, `pixi-build-python`).
+
+## Consumer checks
+
+- `pixi task add` only registers a command; it does not add its executable as
+  a dependency. A pytest task also needs `pytest` in the environment that runs it.
+- For an offline deployment, check that `pixi.lock` exists and is current;
+  run `pixi lock` on the connected build machine before `pixi-pack`. Packing
+  does not create the lockfile. Select only an environment present in the
+  manifest; omit `--environment` for default. `pixi exec` does not install a
+  global command: keep that prefix on subsequent invocations. Use
+  `pixi-unpack` or a self-extracting archive
+  on the target; `pixi-pack pack` and `pixi-pack unpack` are not subcommands.
+  See [Pixi Pack](references/pixi_pack.rst).
+- A named environment includes the default feature unless
+  `no-default-feature = true`. `pixi add --feature dev` and
+  `pixi add --environment dev` are alternative scopes, not combinable flags.
+  Inspect the manifest before choosing one; keep tools out of other environments.
 
 ## References
 

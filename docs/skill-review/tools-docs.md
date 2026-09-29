@@ -250,9 +250,9 @@ twice (a staging race, then the wind-down) whose cost was not captured
 | #308 | argo-cd | Separate factual fix | `install-cli.sh` always failed (no `.sha256` assets); obsolete Helm repo, missing chart version |
 | #308 | Writerside provenance | Changed | builder 2026.09.0357 documented, examples run with 2026.02.8644 |
 | #308 | defuddle, rust-explain | Changed | tested versions recorded; `let … else` example corrected |
-| #308 | pixi | **Not started** (content) | pixi 0.78.0 still needs `preview = ["pixi-build"]` (checked); references: 0 broken links, 76 redirects (lychee, 2026-09-29) |
+| #308 | pixi | **Changed** | 0.78.0 baseline, provenance, canonical/offline guard and executed consumer checks; see decision below |
 | #308 | obsidian-bases follow-up | Changed | guard now covers older version / unreachable help |
-| #309 | pixi and 24 references | **Deferred** | decision record not written; P1–P3 not run; retain until evidence |
+| #309 | pixi and 24 references | **Retained** | P1–P3 with/without comparisons and targeted repeat fixes; offline pack/unpack executed |
 | — | obsidian-bases date subtraction | Deferred | obsidian-help `bc5b4f2`: `Bases syntax.md` (last changed `ed4f6f4`, 2026-03-26) still says milliseconds; `Functions.md` documents `duration()` but no `.days`; needs an Obsidian instance |
 
 ### Not done / next steps
@@ -314,3 +314,68 @@ two tasks do not cover its full ownership/closure/iterator content. Retention
 preserves the existing offline resource and public route; no incoming link,
 registry member or grouping changes. A broader deletion needs better task
 coverage, not a line-count argument.
+
+## Pixi decision and verification (#308/#309, 2026-09-29)
+
+**Retain** `pixi:env` and all 24 references. The consumer scope remains general
+Pixi work, not this catalog's tooling. Both Claude and Codex publish `pixi:env`;
+there are no hooks, preloads, grouping changes or public removals. No replacement
+or migration is needed. Reference reading works offline; solving, package
+fetches and tool installation need a connected build machine unless cached.
+
+Provenance is now explicit: the pages were converted from pixi.prefix.dev and
+vendored through agent-skills v0.6.0 at `659c438` (2026-04-26); the upstream
+snapshot revision was not recorded. Compatibility names the checked Pixi 0.78.0
+CLI, keeps the pixi-build preview requirement, and does not claim every old
+example was tested. The canonical-source guard includes version mismatches and
+unavailable sources. The pack page records its local delta and pixi-pack 0.7.11
+verification. The previous scan found 0 broken links / 76 redirects; redirects
+are not evidence that old API examples remain valid.
+
+Predeclared consumer prompts, each run twice with the skill and twice without:
+
+1. P1: create a Python 3.12 workspace with NumPy and the GDAL C library, plus a
+   pytest task; provide commands and manifest, execute nothing.
+2. P2: in the fixture (Python 3.12, NumPy `>=1.26,<2`, pandas, linux-64 and
+   osx-arm64, no lockfile), upgrade NumPy, isolate ruff in dev and refresh the
+   lock without installing; provide commands and manifest changes only.
+3. P3: ship that environment to an offline linux-64 server without Pixi;
+   provide packaging/unpacking commands only.
+
+Claude Code 2.1.284 / claude-sonnet-5, Skill/Read/Glob/Grep, hooks disabled,
+independent workspaces. “Initial skill” is the unchanged reference tree plus
+provenance/guard lines. The consumer corrections followed those baselines.
+
+| Task | Without skill | Initial skill | After targeted correction |
+|---|---|---|---|
+| P1 | 2/2 include a usable pytest task and dependency | 1/2; other run omitted pytest | 2/2 include pytest after clarifying that task registration adds no executable dependency |
+| P2 | One usable plan; one combines mutually exclusive feature/environment flags | Both isolate ruff and avoid installation; one falsely says a named env excludes default | 2/2 preserve default-feature inheritance and use valid separate flags |
+| P3 | 0/2: invented `pixi-pack pack/unpack` commands | 0/2 complete: right tool/flags but missing lockfile | Final 2/2 include lock, default environment, consistent `pixi exec`, Bash self-extraction |
+
+An intermediate P3 rewrite added the lock prerequisite but both repeats copied
+an absent `prod` environment from the reference; one also assumed `pixi exec`
+installed a global tool. Both failed. The final reference uses the fixture's
+default environment and one runnable recipe. An intermediate P1 repeat still
+omitted pytest (1/2); its final explicit task-dependency check then passed 2/2.
+These failures are part of the decision, not discarded successes.
+
+Execution evidence, separate from model answers:
+
+- Pixi 0.78.0 rejects `add --feature dev --environment dev --no-install` (exit 2).
+  A two-feature lock probe confirms dev includes default dependencies unless
+  `no-default-feature=true`; default remains free of the dev-only dependency.
+- pixi-pack 0.7.11 fails without `pixi.lock` (exit 1). `pixi lock`, followed by
+  `pixi exec pixi-pack --platform linux-64 --create-executable pixi.toml`, succeeds.
+- The resulting archive unpacked in a node:22-bookworm container with
+  `--network=none` and no Pixi. Its Python imported NumPy 1.26.4 and pandas 3.0.6.
+  The self-extractor needs Bash: the evaluator's first attempt with `sh` failed
+  on pipefail; `bash environment.sh` succeeded. No user project changed.
+
+Both final P3 runs read only `pixi_pack.rst`, not all 24 pages. Initial P3 loaded
+about 3.2k skill-body characters; final about 4.0k (including injected arguments),
+plus the selected reference. This is a correctness improvement with more loaded
+content, not a compression claim. Other pages were not all behaviourally tested;
+the observed offline-packaging benefit supports selective retention, not a
+claim that every converted page is current. Version strings in generated model
+manifests are illustrative until solved; the GDAL environment was not installed
+in this review.
