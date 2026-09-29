@@ -159,7 +159,7 @@ USD 3.1; `claude plugin eval` about USD 2.3).
 | pandera-validate | Retained: 80 lines | Retained: no duplication | Retained: 234 chars, single skill | Retained: fixture-based done-check present | Retained: all claims verified on 0.33.0/0.33.1. PA-2 (add verification date to `compatibility`) **not started** | n/a | Retained |
 | testcontainers | Retained: 118 lines | Retained: languages/guides in references | Retained with reason: 666 chars over target, but single-skill plugin with no sibling; product identifiers are routing cues | Retained | Retained: dated check (2026-09-26) is accurate; node moved to v12.2.0 after it (follow-up) | n/a | Retained |
 | tech-writing-copyedit | Retained: 176 lines | Retained | Retained: 422 chars | Retained | **Defect found, not fixed (not started):** says the completion hook "independently reviews the deliverable and blocks completion" in every copy; Codex runs only the reminder hook (`docs/codex.md`) (TW-2) | n/a | Retained |
-| se-technical-writer | Retained: 11 lines; 505-line outline is upstream-derived and loaded only for delegation | Retained: outline already reconciled with house style | **Defect found, not fixed (not started):** description is ungrammatical ("Use when asked to technical writing tasks") (TW-1) | Retained | Retained: upstream link present | Changed: Handoff contract added; canonical and both installed copies pass | Retained |
+| se-technical-writer | Retained: 11 lines; 505-line outline is upstream-derived and loaded only for delegation | Retained: outline already reconciled with house style | Changed (TW-1): grammatical new-writing trigger and explicit copyedit route; original/final positive and negative routing pass | Retained | Retained: upstream link present | Changed: Handoff contract added; canonical and both installed copies pass | Retained |
 | lucid (MCP only) | n/a | n/a | n/a (no skills) | n/a | Retained: hosted URL, no pinned binary | n/a | n/a |
 
 Hook findings (report only): the tech-writing Stop/SubagentStop agent review
@@ -207,3 +207,20 @@ Scratch harness and raw results (not committed):
   `with-without`).
 - The `claude plugin eval` harness does not expand a leading slash command in
   `prompt.md`; explicit-invocation cases need `claude -p` or harness support.
+
+## Follow-up results (2026-09-29)
+
+TW-1 baseline was recorded in [finish.md](finish.md) before editing. The final
+description now names new technical writing and directs existing-prose edits
+to `tech-writing:copyedit`. Claude Code 2.1.284 / claude-sonnet-5, temporary
+original and final plugins, hooks disabled, tools Skill/Read/Glob/Grep:
+
+| Prompt | Original | Final |
+|---|---|---|
+| Tutorial for Python developers: a context manager that closes files, with a runnable example | author then copyedit | author, then reads copyedit plus house-style and STE references |
+| Copyedit “You can utilize the command in order to obtain the data. It is recommended that users should ensure that the config is valid.” | copyedit | copyedit |
+| Why does Python raise TypeError for `1 + "2"`? | neither | neither |
+
+These are one run per variant; they show preserved routing for these prompts,
+not a measured routing gain. Original = the pre-edit snapshot at a2364aa;
+final = the canonical description change in this follow-up.

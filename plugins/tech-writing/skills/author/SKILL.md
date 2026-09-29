@@ -1,5 +1,9 @@
 ---
-description: Use when asked to technical writing tasks — developer docs, blog posts, tutorials, ADRs, and user guides — it adapts voice, structure, and depth to audience and content type.
+description: >-
+  Draft developer documentation, tutorials, ADRs, user guides, and technical
+  blog posts from source material, adapting structure and depth to the audience.
+  Use for new technical writing; for copyediting existing prose, use
+  tech-writing:copyedit.
 license: MIT
 metadata:
   upstream: https://github.com/github/awesome-copilot/blob/main/agents/se-technical-writer.agent.md
