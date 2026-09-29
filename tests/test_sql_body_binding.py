@@ -140,3 +140,35 @@ class BindingIntegrity(BodyBinding):
         doc["header_revisions"] = [{"sql_sha256": "garbage", "at": ""}]
         result = run(["check", "--stdin"], self.p.root, stdin=json.dumps(doc))
         self.assertEqual(result.returncode, 4)
+
+
+class ScopeBodyState(unittest.TestCase):
+    def test_scope_alone_retains_header_binding_and_refuses_body_or_snapshot_corruption(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            p = Project(tmp)
+            sql = p.sql("q.sql", OLD)
+            d = p.review_dir("q")
+            doc = scope_doc("q", "q.sql", sql_sha256=sha(OLD), sql_body_sha256=sha(BODY))
+            p.write_json("q", "scope.json", doc)
+            baseline = d / "scope.source.sql"
+            baseline.write_text(OLD)
+            sql.write_text(NEW)
+            self.assertIn("scoped-header-only", run(["status"], p.root).stdout)
+            sql.write_text(NEW.replace("SELECT 1", "SELECT 2"))
+            self.assertIn("stale", run(["status"], p.root).stdout)
+            sql.write_text(NEW)
+            baseline.write_text(NEW)
+            self.assertIn("stale", run(["status"], p.root).stdout)
+
+    def test_header_body_match_cannot_create_a_historical_snapshot_without_original_bytes(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            p = Project(tmp)
+            p.sql("q.sql", NEW)
+            d = p.review_dir("q")
+            doc = review_doc("q", "q.sql", sql_sha256=sha(OLD), sql_body_sha256=sha(BODY))
+            draft = d / "review.draft.json"
+            draft.write_text(json.dumps(doc))
+            self.assertEqual(run(["publish", "q", "review", str(draft)], p.root).returncode, 0)
+            result = run(["snapshot", "q", "q.sql"], p.root)
+            self.assertNotEqual(result.returncode, 0)
+            self.assertFalse((d / "source.sql").exists())
