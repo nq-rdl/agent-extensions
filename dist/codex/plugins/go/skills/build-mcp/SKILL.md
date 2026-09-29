@@ -1,8 +1,7 @@
 ---
 name: build-mcp
-description: Use when asked to authoring or reviewing Go MCP servers; it applies official
-  github.com/modelcontextprotocol/go-sdk patterns, type-safe structs, context handling,
-  and idiomatic Go conventions throughout.
+description: Use when authoring or reviewing Go MCP servers; it applies official github.com/modelcontextprotocol/go-sdk
+  patterns, type-safe structs, context handling, and idiomatic Go conventions throughout.
 license: MIT
 metadata:
   upstream: https://github.com/github/awesome-copilot/blob/main/agents/go-mcp-expert.agent.md

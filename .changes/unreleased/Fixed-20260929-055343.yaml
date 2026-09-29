@@ -1,0 +1,3 @@
+kind: Fixed
+body: redhat:fetch-docs worker outline defers routes and exit codes to the skill instead of keeping a drifting copy (#310)
+time: 2026-09-29T05:53:43.446352601Z
