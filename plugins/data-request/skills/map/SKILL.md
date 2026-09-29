@@ -34,9 +34,9 @@ none is committed or run, except exempt probes, until a writable run publishes t
 
 **Exempt probes:** an operator probe is outside the hand-SQL gate only when it is
 aggregate-only, small-cell-suppressed and single-scan, returns no identifying
-values (no patient or clinician identifiers, no staff or person keys), and feeds
-no delivered extract. Record any `NOLOCK` use. Guardrails is the source of truth
-for these rules.
+values (no patient identifiers, no staff or person keys; clinician and resource
+names are not personal information), and feeds no delivered extract. Record any
+`NOLOCK` use. Guardrails is the source of truth for these rules.
 Classification and confirmation happen in `/data-request:lift` at close-out.
 
 ## Inputs

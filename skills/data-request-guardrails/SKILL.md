@@ -89,9 +89,9 @@ repository cannot be written, or a mapping run finds no `.sqlreview/`, use
 of publishing it. A proposal-only entry authorises no hand SQL: none is committed or
 run, except exempt probes, until a writable run publishes the entry.
 An operator probe is exempt only when it is aggregate-only, small-cell suppressed and
-bounded to a single scan, returns no patient or clinician identifier, feeds no
-delivered extract, and records any `NOLOCK` or `READ UNCOMMITTED` use. `lifts.rst`
-gives both rules in full.
+bounded to a single scan, returns no patient identifier and no staff or person key,
+feeds no delivered extract, and records any `NOLOCK` or `READ UNCOMMITTED` use.
+`lifts.rst` gives both rules in full.
 
 For N related datasets from one cohort, check the pinned `create_temp_table()`,
 `register_result()` and `execute_pipeline_results()` implementations first:
@@ -287,6 +287,8 @@ Keep validation listings and the study-ID link table out of the delivery run. Us
 `scripts/run_extract.py` supports it: released scaffold runners (v0.5.0 and earlier)
 deliver a batch so marked. This skill sets no suppression threshold: use the request's
 de-identification assessment or approval; if none is stated, ask and record it.
+Clinician and resource names are not personal information (governance ruling,
+2026-09-28); patient identifiers are. See "Personal information" in `release.rst`.
 
 ## Carry evidence into the task
 

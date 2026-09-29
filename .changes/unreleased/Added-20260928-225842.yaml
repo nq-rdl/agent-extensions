@@ -1,0 +1,3 @@
+kind: Added
+body: 'data-request guardrails: allowlist exact clinician labels flagged by the child pre-push PII scan, citing the ruling; never a patient name (#413)'
+time: 2026-09-28T22:58:42.06833771Z

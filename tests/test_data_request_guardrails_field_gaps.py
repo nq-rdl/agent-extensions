@@ -332,10 +332,52 @@ class LiftGate(unittest.TestCase):
     def test_guardrails_probe_exemption_matches_lifts(self):
         self.assertIn("**proposal-only mode**", self.compose)
         for token in ("aggregate-only", "small-cell suppressed", "single scan",
-                      "no patient or clinician identifier", "feeds no delivered extract"):
+                      "no patient identifier", "feeds no delivered extract"):
             with self.subTest(token=token):
                 self.assertIn(token, self.compose)
                 self.assertIn(token.replace("feeds no", "feed no"), self.lifts)
+        # #413: clinician names are not personal information, so neither file exempts them.
+        for text in (self.compose, self.lifts):
+            self.assertNotIn("clinician identifier", text)
+
+
+class PersonalInformation(unittest.TestCase):
+    """#413: the 2026-09-28 ruling that clinician names are not personal information."""
+
+    def setUp(self):
+        self.release = ref("release.rst")
+        self.ref = ref("performance.rst")
+
+    def test_patient_identifiers_listed_and_clinician_names_excluded(self):
+        for token in ("name, URN/MRN, date of birth, address, Medicare number and free text",
+                      "clinician names are not personal information", "2026-09-28",
+                      "OPD_Appointments.Resource", "Staff and person keys stay out",
+                      "small-cell suppression still applies", "overrides this ruling"):
+            with self.subTest(token=token):
+                self.assertIn(token, self.release)
+
+    def test_pii_scan_allowlists_exact_labels_never_patient_names(self):
+        for token in ("Presidio ``PERSON``", "data-analysis-scaffold v0.5.0", "``.pii-allowlist``",
+                      "exact label", "Never allowlist a patient's name"):
+            with self.subTest(token=token):
+                self.assertIn(token, self.release)
+
+    def test_skill_points_to_the_ruling(self):
+        release = section(body(SKILL), "Release conventions")
+        self.assertIn("Clinician and resource names are not personal information", release)
+        self.assertIn('"Personal information" in `release.rst`', release)
+
+    def test_probe_redacts_only_patient_names(self):
+        self.assertIn("Free of patient identifiers", self.ref)
+        self.assertIn("pastes those labels as they are", self.ref)
+        self.assertIn("Only a label that looks like a patient's name is written as \"name removed\"",
+                      self.ref)
+        self.assertNotIn("such as a clinician or resource name", self.ref)
+        self.assertNotIn("Free of identifying values", self.ref)
+
+    def test_lifts_defers_to_the_ruling(self):
+        self.assertIn("Clinician and resource names are not patient identifiers",
+                      flat(LIFTS.read_text()))
 
 
 class Checklist(unittest.TestCase):
