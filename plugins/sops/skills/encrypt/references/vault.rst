@@ -44,7 +44,7 @@ If ``VAULT_TOKEN`` is not set, the Vault client falls back to the token stored i
    # Export the client_token from the response
    export VAULT_TOKEN=<client_token>
 
-The ``VAULT_ADDR``, ``VAULT_TOKEN``, and any TLS-related environment variables (``VAULT_CACERT``, ``VAULT_SKIP_VERIFY``) must be available at **both** encrypt and decrypt time — not just when the file is first created.
+A valid token (``VAULT_TOKEN`` or ``~/.vault-token``) must be available at **both** encrypt and decrypt time; without one Vault answers ``403 permission denied``. ``VAULT_ADDR`` is only needed when encrypting: SOPS records ``vault_address`` in the file's metadata and uses it to decrypt, so the stored address must stay reachable. TLS-related variables (``VAULT_CACERT``, ``VAULT_SKIP_VERIFY``) are read by the Vault client library and are needed whenever the server uses TLS (not tested here).
 
 Encrypting via CLI
 ------------------
@@ -75,11 +75,11 @@ A HashiCorp Vault transit URI can be added to ``.sops.yaml`` to specify rules:
        - path_regex: \.prod\.yaml$
          hc_vault_transit_uri: "http://127.0.0.1:8200/v1/sops/keys/thirdkey"
 
-Then you can encrypt your target file simply, since SOPS will apply the correct ``hc_vault_transit_uri``:
+Then you can encrypt your target file simply, since SOPS will apply the correct ``hc_vault_transit_uri``. The file name must match a ``path_regex`` (here ``\.prod\.yaml$``), otherwise SOPS fails with ``no matching creation rules found``. ``--verbose`` is a global flag and goes **before** the subcommand:
 
 .. code-block:: bash
 
-   sops encrypt --verbose prod/raw.yaml > prod/encrypted.yaml
+   sops --verbose encrypt prod/raw.prod.yaml > prod/encrypted.prod.yaml
 
 Rotating Keys
 -------------
@@ -88,9 +88,9 @@ After changing recipients in ``.sops.yaml``, re-encrypt the data key with the cu
 
 .. code-block:: bash
 
-   sops updatekeys prod/encrypted.yaml
+   sops updatekeys -y prod/encrypted.prod.yaml
 
-This re-wraps the symmetric data key against the new Vault transit URI without re-encrypting the underlying values.
+This re-wraps the symmetric data key against the new Vault transit URI without re-encrypting the underlying values. The file path must match a ``creation_rules`` entry. Without ``-y``, ``updatekeys`` prompts ``Is this okay? (y/n)`` and, with no terminal, leaves the file unchanged.
 
 **Rotating the Vault transit key itself** (cryptographic rotation) is a separate operation performed in Vault:
 
@@ -98,4 +98,10 @@ This re-wraps the symmetric data key against the new Vault transit URI without r
 
    vault write -f sops/keys/firstkey/rotate
 
-After a Vault key rotation, Vault uses the new key version for new encrypt operations but can still decrypt data encrypted with older versions (controlled by ``min_decryption_version``). To clean up old key versions and enforce a minimum version, see the `Vault Transit Secrets Engine documentation <https://developer.hashicorp.com/vault/docs/secrets/transit>`_ — do not set ``min_decryption_version`` higher than the version used to encrypt your oldest file without first running ``sops updatekeys`` on all affected files.
+After a Vault key rotation, Vault uses the new key version for new encrypt operations but can still decrypt data encrypted with older versions (controlled by ``min_decryption_version``). Existing files keep their old wrapped data key (``enc: vault:v1:...``) until you re-wrap them. ``sops updatekeys`` does **not** do this — with unchanged recipients it reports ``already up to date``. Use ``sops rotate``, which generates a new data key, re-encrypts the values and wraps the key with the latest Vault key version:
+
+.. code-block:: bash
+
+   sops rotate -i prod/encrypted.prod.yaml
+
+Only after every affected file shows the new version (``enc: vault:v2:...``) may you raise ``min_decryption_version``; older files then fail with ``ciphertext or signature version is disallowed by policy (too old)``. See the `Vault Transit Secrets Engine documentation <https://developer.hashicorp.com/vault/docs/secrets/transit>`_.

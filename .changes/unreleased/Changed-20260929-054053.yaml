@@ -1,0 +1,3 @@
+kind: Changed
+body: 'writerside: docker-deployment.rst owns the builder image and tag (2026.09.0357); other examples use WRS_BUILDER or DOCKER_VERSION instead of repeating a literal tag'
+time: 2026-09-29T05:40:53.447185706Z

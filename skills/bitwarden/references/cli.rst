@@ -125,26 +125,28 @@ Creating Items (``bw create``)
 ------------------------------
 
 The workflow is always: get template → edit with jq → encode → create.
+``bw create item`` and ``bw edit item`` print the resulting item as JSON,
+notes and field values included. In scripts, keep only the ID
+(``| jq -r .id``) so the values do not reach a terminal or log.
 
 .. code-block:: bash
 
    # See the item template structure
    bw get template item
 
-   # Create a Secure Note (type=2) from a .env file
-   bw get template item \
-     | jq --rawfile notes .env \
-          --arg name "myapp-dev" \
-          '.type = 2 | .secureNote.type = 0 | .notes = $notes | .name = $name' \
-     | bw encode | bw create item
+   # Secure Note (type=2) from a .env file: use bwc from scripts/bw-env.sh,
+   # which also normalises the values so bwe can load them.
 
-   # Create a Login item (type=1) with custom fields
+   # Login item (type=1) with a hidden custom field.
+   # read -rs keeps the secret out of shell history and argv listings.
+   read -rs -p "Token: " secret; echo
    bw get template item \
-     | jq --arg name "GITHUB_TOKEN" \
-          --arg secret "ghp_xxxx" \
+     | jq --arg name "github-credentials" \
+          --arg secret "$secret" \
           '.type = 1 | .name = $name |
-           .fields = [{"name":"value","value":$secret,"type":1}]' \
-     | bw encode | bw create item
+           .fields = [{"name":"GITHUB_TOKEN","value":$secret,"type":1}]' \
+     | bw encode | bw create item | jq -r .id
+   unset secret
 
    # Create a folder
    bw get template folder | jq '.name = "Development"' | bw encode | bw create folder
@@ -178,10 +180,11 @@ Editing Items (``bw edit``)
 
 .. code-block:: bash
 
-   # Update an item — always get first, modify, then edit
-   bw get item "myapp-dev" \
-     | jq --rawfile notes .env '.notes = $notes' \
-     | bw encode | bw edit item "abc1234-xxxx-xxxx-xxxx-xxxxxxxxxxxx"
+   # Update an item — always get first, modify, then edit.
+   # For .env notes use bwu from scripts/bw-env.sh.
+   bw get item "aws-credentials" \
+     | jq '.fields |= map(if .name == "AWS_DEFAULT_REGION" then .value = "eu-west-1" else . end)' \
+     | bw encode | bw edit item "abc1234-xxxx-xxxx-xxxx-xxxxxxxxxxxx" | jq -r .id
 
 Deleting Items (``bw delete``)
 -------------------------------

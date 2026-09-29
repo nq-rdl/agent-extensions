@@ -1,0 +1,3 @@
+kind: Fixed
+body: 'obsidian: markdown notes that title: is an ordinary property and fixes tag, block ID and callout colour rules; cli drops the removed silent flag and needs Obsidian 1.12.7+'
+time: 2026-09-29T05:43:26.642003778Z

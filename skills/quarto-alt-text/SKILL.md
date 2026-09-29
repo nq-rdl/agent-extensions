@@ -6,25 +6,27 @@ description: >-
   when the user wants to add, improve, or review alt text for figures in .qmd
   files. Triggers for requests about accessibility, figure descriptions, fig-alt,
   screen reader support, or making Quarto documents more accessible.
+compatibility: >-
+  Works on .qmd source alone. Verification renders with the Quarto CLI; the
+  rendered-HTML check and the engine gotcha were tested with Quarto 1.9.38 and
+  1.10.18 (Jupyter and knitr engines) on 2026-09-29.
 metadata:
   repo: https://github.com/nq-rdl/agent-extensions
 ---
 
 # Write Chart Alt Text
 
-Generate accessible alt text for data visualizations in this project.
-
-ARGUMENTS
-- label: (optional) specific fig- label to generate alt text for
-- file: (optional) specific .qmd file to process
+Write alt text for the data visualizations in the user's Quarto documents.
+The user may name a file, a figure label, or neither (then cover every figure
+in the documents they point you to).
 
 ## Instructions
 
-When invoked, analyze the figure(s) and generate alt text following these guidelines:
+Analyze each figure and write alt text following these guidelines.
 
 ### Key Advantage: Source Code Access
 
-Unlike typical alt text scenarios where you only see an image, **we have access to the code that generates each chart**. Use this to extract precise details:
+Unlike typical alt text scenarios where you only see an image, **you usually have the code that generates each chart**. Use it to extract precise details:
 
 **From plotting code:**
 - Variable mappings → exact variable names for axes
@@ -43,8 +45,11 @@ Unlike typical alt text scenarios where you only see an image, **we have access 
 
 **From surrounding prose:**
 - Text before/after the chunk explains the **purpose** and **key insight**
-- Chapter context tells you what the figure is meant to teach
+- The section or chapter it sits in tells you what the figure is meant to show
 - This is often the best source for the "key insight" part of alt text
+
+If the figure is a static image with no generating code, read the image itself
+and the surrounding prose; say which details you could not confirm.
 
 ### Three-Part Structure (Amy Cesal's Formula)
 
@@ -156,25 +161,59 @@ Correlation [matrix/heatmap] of [what variables]. [Arrangement].
 
 ### Finding Figures
 
-To find all figure chunks in the project:
-```bash
-# List all figure labels with file and line number
-grep -n "#| label: fig-" *.qmd
+A figure is not always a labelled code cell. Search every `.qmd` in scope,
+recursively, for all of these (for example with Grep over `**/*.qmd`):
 
-# Find figures in a specific file
-grep -n "#| label: fig-" numeric-splines.qmd
+- code cells that plot, labelled or not (`#| label: fig-…`, `#|label:`, or a
+  knitr chunk header such as `{r fig-name, …}`);
+- existing `fig-alt` (and knitr `fig.alt`) options;
+- Markdown images `![caption](path){…}`, including subfigures inside a
+  `::: {#fig-… layout-ncol=…}` div;
+- computational subfigures (`fig-subcap` lists), which need a `fig-alt` list
+  with one entry per panel.
 
-# Find a specific figure
-grep -rn "#| label: fig-splines-predictor-outcome" *.qmd
-```
+A `#| label: fig-` grep alone misses unlabelled cells, Markdown figures,
+subfigure panels, and files in subdirectories.
+
+### Where fig-alt goes
+
+- Code cell: `#| fig-alt: "…"` beside `#| fig-cap:`.
+- Markdown image: `![Caption](plot.png){#fig-name fig-alt="…"}`.
+- Computational subfigures: `#| fig-alt:` followed by a YAML list.
+
+**Engine gotcha.** A multi-line block (`#| fig-alt: |`, `|-`, `>`) works with
+the knitr engine (R) but breaks under the Jupyter engine (Python, Julia): the
+caption lands in `alt`, the attribute text appears on the page, and the figure
+loses its id so `@fig-…` no longer resolves. Observed with Quarto 1.9.38 and
+1.10.18. For Jupyter documents write the alt text as one quoted line. A
+Python chunk-header attribute (`{python fig-alt="…"}`) is ignored.
 
 ### For Each Figure
 
-1. **Locate** - Use grep to find file and line number
-2. **Read context** - Read ~50 lines around the chunk (prose before + code + prose after)
-3. **Extract details** - Note fig-cap, ggplot code, data generation, surrounding explanation
-4. **Draft alt text** - Apply three-part structure (type → data → insight)
-5. **Verify** - Check against quality checklist
+1. **Locate** the cell or image and read the prose before and after it.
+2. **Extract details**: `fig-cap`, the plotting and data code, the claim the
+   prose makes.
+3. **Draft alt text** with the three-part structure (type → data → insight).
+4. **Check** it against the quality checklist.
+
+### Verify
+
+When the Quarto CLI is available, render the changed documents and check the
+HTML Quarto actually produced:
+
+```bash
+quarto render path/to/doc.qmd --to html
+bash scripts/check-alt.sh path/to/doc.html   # this skill's script
+```
+
+[scripts/check-alt.sh](scripts/check-alt.sh) lists every figure image without alt text (Quarto
+omits `alt` when `fig-alt` is missing; it does not fall back to the caption),
+raw `fig-alt=` text leaked into the page, and unresolved `?@fig-…`
+cross-references. Treat an "Unable to resolve crossref" warning from the
+render the same way. Rendering runs the document's code; if the user has not
+asked you to run it, or Quarto or the engine is not installed, say so and fall
+back to re-reading the source: every figure found above has a `fig-alt`, and
+Jupyter documents use one-line values.
 
 ## Example
 
@@ -191,7 +230,8 @@ plotting_data |>
 
 **fig-cap:** "Normalization doesn't make data more normal. The green curve indicates the density of the unit normal distribution."
 
-**Good alt text:**
+**Good alt text** (R/knitr cell, so a multi-line block is fine; in a Python
+cell put it on one line):
 ```
 #| fig-alt: |
 #|   Faceted histogram with two panels stacked vertically. Top panel shows

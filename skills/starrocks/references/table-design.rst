@@ -85,17 +85,20 @@ Hash vs Random
 |                        |                                        | ``col``, colocate      |
 |                        |                                        | joins                  |
 +------------------------+----------------------------------------+------------------------+
-| Random                 | ``DISTRIBUTED BY RANDOM BUCKETS N``    | Append-only tables     |
-|                        |                                        | without clear filter   |
-|                        |                                        | columns                |
+| Random (v3.1+,         | ``DISTRIBUTED BY RANDOM BUCKETS N``    | Append-only tables     |
+| Duplicate Key tables   |                                        | without clear filter   |
+| only)                  |                                        | columns                |
 +------------------------+----------------------------------------+------------------------+
 
 Bucket Count
 ~~~~~~~~~~~~
 
 - Each bucket = one tablet
-- Target: **100 MB–1 GB per tablet** after compression
-- Formula: ``BUCKETS = data_size_gb / 0.5`` (rough starting point)
+- Default: StarRocks sets the bucket count automatically (v2.5.7+) when
+  ``BUCKETS`` is omitted
+- Manual count: the docs recommend about **10 GB of raw data per tablet**
+  (tablets are scanned in parallel since v2.4; keep
+  ``enable_tablet_internal_parallel`` on)
 - Too few buckets → large tablets, poor parallelism
 - Too many buckets → small tablets, metadata overhead
 
@@ -110,7 +113,9 @@ Rules
 
 1. Place the **most selective filter column first**
 2. Maximum 3 columns in the sort key for practical benefit
-3. For Primary Key tables, the primary key IS the sort key
+3. For Primary Key tables (v3.0+), set the sort key separately with
+   ``ORDER BY (cols)``; without it the prefix index uses the primary key.
+   The primary key must include the partition and bucket columns
 4. For Duplicate Key tables, specify with ``DUPLICATE KEY(col1, col2)``
 
 Example

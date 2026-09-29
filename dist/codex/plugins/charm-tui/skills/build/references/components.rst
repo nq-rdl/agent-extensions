@@ -15,13 +15,18 @@ textinput — Single-line text field
 
 **Constructor:** ``textinput.New() Model``
 
-**Key Model fields:** \| Field \| Type \| Purpose \| \|——-\|——\|———\| \|
-``Prompt`` \| ``string`` \| Prefix shown before input (default ``"> "``)
-\| \| ``Placeholder`` \| ``string`` \| Ghost text when empty \| \|
-``EchoMode`` \| ``EchoMode`` \| ``EchoNormal``, ``EchoPassword``,
-``EchoNone`` \| \| ``CharLimit`` \| ``int`` \| Max characters (0 =
-unlimited) \| \| ``Validate`` \| ``func(string) error`` \| Real-time
-validation \| \| ``Err`` \| ``error`` \| Last validation error \|
+**Key Model fields:**
+
+=================== ======================== ==============================================
+Field               Type                     Purpose
+=================== ======================== ==============================================
+``Prompt``          ``string``               Prefix shown before input (default ``"> "``)
+``Placeholder``     ``string``               Ghost text when empty
+``EchoMode``        ``EchoMode``             ``EchoNormal``, ``EchoPassword``, ``EchoNone``
+``CharLimit``       ``int``                  Max characters (0 = unlimited)
+``Validate``        ``ValidateFunc``         ``func(string) error``; real-time validation
+``Err``             ``error``                Last validation error
+=================== ======================== ==============================================
 
 **Key methods:**
 
@@ -67,12 +72,18 @@ textarea — Multi-line text editor
 
 **Constructor:** ``textarea.New() Model``
 
-**Key Model fields:** \| Field \| Type \| Purpose \| \|——-\|——\|———\| \|
-``Placeholder`` \| ``string`` \| Ghost text \| \| ``ShowLineNumbers`` \|
-``bool`` \| Show line numbers \| \| ``CharLimit`` \| ``int`` \| Max
-characters \| \| ``MaxHeight`` \| ``int`` \| Max rendered height \| \|
-``MaxWidth`` \| ``int`` \| Max rendered width \| \| ``Err`` \| ``error``
-\| Last error \|
+**Key Model fields:**
+
+=================== ============ =====================
+Field               Type         Purpose
+=================== ============ =====================
+``Placeholder``     ``string``   Ghost text
+``ShowLineNumbers`` ``bool``     Show line numbers
+``CharLimit``       ``int``      Max characters
+``MaxHeight``       ``int``      Max rendered height
+``MaxWidth``        ``int``      Max rendered width
+``Err``             ``error``    Last error
+=================== ============ =====================
 
 **Key methods:**
 
@@ -83,7 +94,7 @@ characters \| \| ``MaxHeight`` \| ``int`` \| Max rendered height \| \|
    func (m Model) Focused() bool
    func (m *Model) SetValue(s string)
    func (m Model) Value() string
-   func (m Model) LineCount() int
+   func (m *Model) LineCount() int
    func (m Model) Line() int        // current line number
    func (m Model) Column() int      // current column
    func (m *Model) SetWidth(w int)
@@ -95,8 +106,8 @@ characters \| \| ``MaxHeight`` \| ``int`` \| Max rendered height \| \|
 
 --------------
 
-table — Sortable data table
----------------------------
+table — Data table
+------------------
 
 .. code:: go
 
@@ -233,11 +244,16 @@ viewport — Scrollable content pane
 
 Options: ``viewport.WithWidth(w int)``, ``viewport.WithHeight(h int)``
 
-**Key Model fields:** \| Field \| Type \| Purpose \| \|——-\|——\|———\| \|
-``SoftWrap`` \| ``bool`` \| Wrap long lines \| \| ``FillHeight`` \|
-``bool`` \| Expand to fill height \| \| ``MouseWheelEnabled`` \|
-``bool`` \| Mouse wheel scrolling \| \| ``Style`` \| ``lipgloss.Style``
-\| Container style \|
+**Key Model fields:**
+
+===================== =================== ======================
+Field                 Type                Purpose
+===================== =================== ======================
+``SoftWrap``          ``bool``            Wrap long lines
+``FillHeight``        ``bool``            Expand to fill height
+``MouseWheelEnabled`` ``bool``            Mouse wheel scrolling
+``Style``             ``lipgloss.Style``  Container style
+===================== =================== ======================
 
 **Key methods:**
 
@@ -256,7 +272,7 @@ Options: ``viewport.WithWidth(w int)``, ``viewport.WithHeight(h int)``
    func (m *Model) GotoTop() []string
    func (m *Model) GotoBottom() []string
    func (m *Model) SetYOffset(n int)
-   func (m Model) YOffset() int
+   func (m *Model) YOffset() int
    func (m Model) AtTop() bool
    func (m Model) AtBottom() bool
    func (m Model) ScrollPercent() float64
@@ -510,12 +526,15 @@ key — Key binding definitions
 
    // On a Binding
    func (b Binding) Keys() []string
-   func (b Binding) Help() HelpData            // .Key and .Desc
+   func (b Binding) Help() Help                // key.Help{Key, Desc}
    func (b *Binding) SetEnabled(v bool)
    func (b Binding) Enabled() bool
+   func (b *Binding) SetKeys(keys ...string)
+   func (b *Binding) SetHelp(key, desc string)
+   func (b *Binding) Unbind()
 
-   // Match a KeyPressMsg against a binding
-   func Matches(k tea.KeyPressMsg, b ...Binding) bool
+   // Match a key message (e.g. tea.KeyPressMsg) against bindings
+   func Matches[Key fmt.Stringer](k Key, b ...Binding) bool
 
 **Usage:**
 
@@ -541,7 +560,9 @@ paginator — Page counter
 
    import "charm.land/bubbles/v2/paginator"
 
-**Constructor:** ``paginator.New() Model``
+**Constructor:** ``paginator.New(opts ...Option) Model``
+
+Options: ``paginator.WithPerPage(n int)``, ``paginator.WithTotalPages(n int)``
 
 **Key Model fields:**
 
@@ -562,11 +583,10 @@ paginator — Page counter
 
    func (m *Model) SetTotalPages(items int) int  // returns total pages
    func (m Model) ItemsOnPage(totalItems int) int
-   func (m Model) GetSliceBounds(length int) (start, end int)
+   func (m *Model) GetSliceBounds(length int) (start, end int)
    func (m *Model) NextPage()
    func (m *Model) PrevPage()
-   func (m *Model) First()
-   func (m *Model) Last()
+   // No First()/Last() methods — set m.Page = 0 or m.Page = m.TotalPages-1
    func (m Model) OnFirstPage() bool
    func (m Model) OnLastPage() bool
    func (m Model) Update(msg tea.Msg) (Model, tea.Cmd)
@@ -581,7 +601,7 @@ timer — Countdown timer
 
    import "charm.land/bubbles/v2/timer"
 
-**Constructor:** ``timer.New(timeout time.Duration) Model``
+**Constructor:** ``timer.New(timeout time.Duration, opts ...Option) Model``
 
 .. code:: go
 
@@ -610,10 +630,10 @@ Options: ``stopwatch.WithInterval(d time.Duration)``
    func (m Model) Init() tea.Cmd
    func (m Model) Elapsed() time.Duration
    func (m Model) Running() bool
-   func (m *Model) Start() tea.Cmd
-   func (m *Model) Stop() tea.Cmd
-   func (m *Model) Toggle() tea.Cmd
-   func (m *Model) Reset() tea.Cmd
+   func (m Model) Start() tea.Cmd   // returns a Cmd; state changes arrive via Update
+   func (m Model) Stop() tea.Cmd
+   func (m Model) Toggle() tea.Cmd
+   func (m Model) Reset() tea.Cmd
    func (m Model) Update(msg tea.Msg) (Model, tea.Cmd)
    func (m Model) View() string
 
@@ -635,7 +655,8 @@ uncommon but available.
 
    func (m *Model) Focus() tea.Cmd
    func (m *Model) Blur()
-   func (m Model) Focused() bool
-   func (m Model) SetMode(mode Mode)   // CursorBlink, CursorStatic, CursorHide
+   func (m *Model) SetMode(mode Mode) tea.Cmd  // CursorBlink, CursorStatic, CursorHide
+   func (m Model) Mode() Mode
+   // No Focused() method on cursor.Model
    func (m Model) View() string        // renders as cursor character or space
    func (m Model) Update(msg tea.Msg) (Model, tea.Cmd)

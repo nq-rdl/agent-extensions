@@ -68,8 +68,8 @@ tea.Program
    // Kill terminates without cleanup
    func (p *Program) Kill()
 
-   // Wait blocks until the program exits (use after Send + Quit)
-   func (p *Program) Wait() error
+   // Wait blocks until the program exits (returns nothing; Run returns the error)
+   func (p *Program) Wait()
 
    // Println / Printf write to stdout without disturbing the TUI
    func (p *Program) Println(args ...any)
@@ -103,6 +103,8 @@ ProgramOption Functions
 +----------------------------------------------+-------------------------------------------+
 | ``WithoutRenderer()``                        | Disable TUI rendering (plain output)      |
 +----------------------------------------------+-------------------------------------------+
+| ``WithoutSignals()``                         | Ignore OS signals                         |
++----------------------------------------------+-------------------------------------------+
 
 **Note:** ``tea.WithAltScreen()`` does NOT exist in v2. Set
 ``v.AltScreen = true`` in your ``View()`` method instead.
@@ -121,18 +123,19 @@ View Type
 
    // Key fields you can set before returning:
    type View struct {
+       Content                   string               // rendered screen content (set by NewView)
+       OnMouse                   func(msg MouseMsg) Cmd // optional view-specific mouse handler
        // Terminal features — set declaratively in View(), not via NewProgram options
-       AltScreen                bool   // use alternate screen buffer
-       MouseMode                ...    // enable mouse tracking
-       ReportFocus              bool   // receive FocusMsg/BlurMsg
-       WindowTitle              string
-       KeyboardEnhancements     ...
-       Cursor                   Cursor // cursor position, shape, color, blink (replaces v1 hide/show commands)
-       ForegroundColor          color.Color // query/set terminal foreground
-       BackgroundColor          color.Color // query/set terminal background
-       DisableBracketedPasteMode bool  // disable bracketed paste
-       ProgressBar              float64     // native terminal progress indicator (0.0–1.0)
-       // internal content field
+       AltScreen                 bool                 // use alternate screen buffer
+       MouseMode                 MouseMode            // MouseModeNone / MouseModeCellMotion / MouseModeAllMotion
+       ReportFocus               bool                 // receive FocusMsg/BlurMsg
+       WindowTitle               string
+       KeyboardEnhancements      KeyboardEnhancements
+       Cursor                    *Cursor              // nil hides the cursor; tea.NewCursor(x, y)
+       ForegroundColor           color.Color          // nil = terminal default
+       BackgroundColor           color.Color          // nil = terminal default
+       DisableBracketedPasteMode bool
+       ProgressBar               *ProgressBar         // nil = none; tea.NewProgressBar(state, value int)
    }
 
    // Mutate content after creation if needed:
@@ -233,11 +236,12 @@ Command Functions (tea.Cmd)
    // Fire repeatedly at an interval
    tea.Every(d time.Duration, fn func(time.Time) Msg) Cmd
 
-   // Request current window size (triggers WindowSizeMsg)
-   tea.RequestWindowSize() Cmd
+   // Request current window size (triggers WindowSizeMsg).
+   // Signature: func RequestWindowSize() Msg — pass it as a Cmd, no parens:
+   tea.RequestWindowSize
 
-   // Clear the terminal screen
-   tea.ClearScreen() Cmd
+   // Clear the terminal screen. func ClearScreen() Msg — also no parens:
+   tea.ClearScreen
 
 Custom Commands
 ~~~~~~~~~~~~~~~
@@ -250,8 +254,12 @@ Any function matching ``func() tea.Msg`` is a valid Cmd:
 
    func fetchData(url string) tea.Cmd {
        return func() tea.Msg {
-           data, err := http.Get(url)
-           // ... read body ...
+           resp, err := http.Get(url)
+           if err != nil {
+               return fetchDoneMsg{err: err}
+           }
+           defer resp.Body.Close()
+           body, err := io.ReadAll(resp.Body)
            return fetchDoneMsg{data: body, err: err}
        }
    }

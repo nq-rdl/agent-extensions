@@ -6,6 +6,9 @@ description: Extract clean markdown content from web pages using Defuddle CLI, r
   a URL to read or analyze, for online documentation, articles, blog posts, or any
   standard web page. Do NOT use for URLs ending in .md — those are already markdown,
   use WebFetch directly.
+compatibility: Requires Node.js and the defuddle npm package (CLI tested with 0.19.4
+  on Node 22 on 2026-09-29). The package declares no engines field; its use of global
+  fetch implies Node 18+.
 metadata:
   repo: https://github.com/nq-rdl/agent-extensions
 ---
@@ -46,3 +49,5 @@ defuddle parse <url> -p domain
 | `--json` | JSON with both HTML and markdown |
 | (none) | HTML |
 | `-p <name>` | Specific metadata property |
+
+With no source argument, or with `-`, `defuddle parse` reads HTML from stdin.

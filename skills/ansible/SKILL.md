@@ -2,15 +2,12 @@
 name: ansible
 license: CC-BY-4.0
 description: >-
-  Use this skill whenever the user wants to create, modify, debug, or optimise
-  Ansible playbooks, roles, inventories, or configuration. Triggers include any
-  mention of 'ansible', 'playbook', 'role', 'inventory', 'host_vars',
-  'group_vars', Jinja2 templates for Ansible, or requests involving system
-  configuration, package management, service orchestration, or VM provisioning.
-  Also use when the user asks to scaffold a new role, review an existing
-  playbook, fix a failed play, or write handlers/templates. If the user mentions
-  'ansible-navigator', 'ansible-vault', or their infrastructure layer patterns
-  (layer1, layer2, etc.), use this skill.
+  Write, review, and debug Ansible content: playbooks, roles, inventories,
+  group_vars/host_vars, Jinja2 templates, collections (requirements.yml,
+  FQCN), ansible-vault secrets, and ansible-navigator runs. Use when the user
+  mentions Ansible or these files, asks to scaffold a role or fix a failed
+  play, or uses a layered playbook layout (layer1_*, layer2_*). Not for
+  Puppet, Chef, or Salt.
 compatibility: >-
   Requires Python 3.11+, ansible-core 2.16+, ansible-lint 24.0+
 metadata:
@@ -21,8 +18,10 @@ metadata:
 
 Write, modify, debug, and optimise Ansible content.
 
-Before writing any Ansible content, read the relevant reference files:
-- `references/role-reference.rst` — Role scaffolding patterns and directory conventions
+When you create, scaffold, or restructure a role, read
+[references/role-reference.rst](references/role-reference.rst) (role layout,
+defaults vs vars, meta, handlers, templates). Playbook, inventory, variable,
+and single-task work does not need it.
 
 ## Dependencies
 
@@ -94,7 +93,7 @@ roles/my_role/
     └── my_config.j2
 ```
 
-See `references/role-reference.rst` for the full pattern.
+See [references/role-reference.rst](references/role-reference.rst) for the full pattern.
 
 ### Task Splitting by Concern
 

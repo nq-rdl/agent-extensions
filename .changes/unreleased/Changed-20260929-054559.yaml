@@ -1,0 +1,3 @@
+kind: Changed
+body: 'quarto-alt-text: no longer assumes one book project; finds unlabelled cells and Markdown figures, and warns that multi-line fig-alt breaks under the Jupyter engine'
+time: 2026-09-29T05:45:59.489248553Z
