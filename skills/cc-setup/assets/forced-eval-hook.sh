@@ -15,8 +15,8 @@
 # Installation:
 #   1. Merge a hooks.UserPromptSubmit block into settings.json that runs this
 #      script (project: .claude/settings.json with "$CLAUDE_PROJECT_DIR";
-#      global: ~/.claude/settings.json with "$HOME"). /rdl-team:cc-setup and the
-#      `hooks` plugin both wire this for you.
+#      global: ~/.claude/settings.json with "$HOME"). /rdl-team:cc-setup wires
+#      this for you.
 #   2. Point the "command" path at this script's install location.
 #   3. Ensure this script is executable: chmod +x forced-eval-hook.sh
 #

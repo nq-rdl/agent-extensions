@@ -17,20 +17,27 @@ Exit codes (command hooks)
 Code  Behavior
 ===== ====================================================================
 0     No objection. stdout is parsed as JSON for structured control. For
-      ``UserPromptSubmit``, ``UserPromptExpansion``, and ``SessionStart``,
-      plain (non-JSON) stdout is added to Claude's context.
-2     Blocking error. stdout/JSON is **ignored**; stderr is fed back to
-      Claude as feedback. The blocking effect is per-event — see the table
-      in ``references/lifecycle.rst``.
-other Non-blocking error. Transcript shows ``<hook> hook error`` plus the
-      first stderr line; full stderr goes to the debug log. Action proceeds.
+      ``UserPromptSubmit``, ``UserPromptExpansion``, ``SessionStart``, and
+      ``PostModelSwitch``, plain (non-JSON) stdout is added to Claude's
+      context; for other events it goes to the debug log only.
+2     Blocking error on events that can block. It blocks even if the JSON
+      says ``allow``. Valid JSON on stdout is still read, and the blocking
+      message is the JSON ``reason`` if present, otherwise stderr. Where the
+      message goes is per event (``PreToolUse``: Claude; ``UserPromptSubmit``:
+      the user only). ``PermissionRequest`` ignores exit 2. See the table in
+      ``references/lifecycle.rst``.
+other Without valid JSON: non-blocking error. Transcript shows ``<hook> hook
+      error`` plus the first stderr line; the action proceeds, even on
+      exit 1. With valid decision JSON, the JSON alone decides.
+      ``WorktreeCreate`` and ``WorktreeRemove`` fail on any non-zero exit.
 ===== ====================================================================
 
 .. note::
 
    **Pick one channel.** Use exit ``2`` + stderr to block with a message, *or*
-   exit ``0`` + JSON for structured control. Claude Code ignores JSON when you
-   exit ``2``; don't mix them.
+   exit ``0`` + JSON for structured control. Mixing them is legal but harder
+   to reason about: exit 2 always blocks, and a JSON ``reason`` replaces
+   stderr as the message.
 
 A minimal blocking command hook:
 
@@ -54,14 +61,15 @@ Universal JSON fields (any event, exit 0)
 
    {
      "continue": true,
-     "stopReason": "string shown to the user when continue is false (not shown to Claude)",
+     "stopReason": "shown to the user when continue is false; stays in the conversation",
      "suppressOutput": false,
      "systemMessage": "warning shown to the user",
      "terminalSequence": "allow-listed terminal escape (titles / notifications only)"
    }
 
 - ``continue: false`` halts further processing entirely.
-- ``suppressOutput: true`` hides the hook's stdout from the transcript.
+- ``suppressOutput`` is accepted but has no effect: a successful hook's stdout
+  is never shown in the transcript.
 - ``systemMessage`` surfaces a warning to the user.
 - ``terminalSequence`` is restricted to an allowlist (see
   ``references/prompt-injection.rst``).
@@ -113,8 +121,8 @@ This is the **current canonical** form (the older top-level
 Optional: ``updatedInput`` (rewrite the tool's arguments — last writer wins
 across parallel hooks) and ``additionalContext``.
 
-PostToolUse / Stop / SubagentStop / PreCompact / ConfigChange / TaskCreated / TaskCompleted — top-level ``decision``
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+PostToolUse / PostToolUseFailure / PostToolBatch / Stop / SubagentStop / PreCompact / ConfigChange / TaskCreated — top-level ``decision``
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 .. code:: json
 
@@ -124,8 +132,17 @@ PostToolUse / Stop / SubagentStop / PreCompact / ConfigChange / TaskCreated / Ta
   of stopping; ``reason`` becomes Claude's next instruction.
 - ``PostToolUse``: ``"block"`` surfaces ``reason`` to Claude (the tool already
   ran — it cannot be undone).
-- ``PreCompact`` / ``ConfigChange`` / ``TaskCreated`` / ``TaskCompleted``:
-  ``"block"`` prevents the operation.
+- ``PreCompact`` / ``ConfigChange`` / ``TaskCreated``: ``"block"`` prevents
+  the operation.
+- ``PostToolBatch``: ``"block"`` stops the loop before the next model call.
+
+TeammateIdle / TaskCompleted — exit code or ``continue: false``
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+These events do not use top-level ``decision``. Exit ``2`` blocks with stderr
+feedback; ``{"continue": false, "stopReason": "..."}`` stops the teammate.
+``TaskCompleted`` ignores ``continue: false`` when the ``TaskUpdate`` tool
+triggered it.
 
 PermissionRequest — ``hookSpecificOutput.decision.behavior``
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -166,7 +183,8 @@ plain stdout is also added as context.
 SessionStart
 ~~~~~~~~~~~~
 
-Plain stdout is added to context. Structured extras:
+Plain stdout is added to context. Structured extras (``initialUserMessage`` is
+also accepted):
 
 .. code:: json
 
@@ -188,7 +206,8 @@ HTTP hook responses
 HTTP hooks reply through the response, not exit codes:
 
 - ``2xx`` empty body → success, no output.
-- ``2xx`` plain text → success, text added as context.
+- ``2xx`` plain text → non-blocking error; the text is **not** added to
+  context.
 - ``2xx`` JSON → parsed with the schema above.
 - non-2xx / connection failure / timeout → non-blocking error; execution
   continues.

@@ -81,7 +81,7 @@ Use this template for the issue body:
 ## Environment
 
 - **Client:** [AI coding client and version]
-- **Model:** [e.g., claude-sonnet-4-20250514]
+- **Model:** [model ID shown by the client]
 - **OS:** [e.g., macOS 15.2, Ubuntu 24.04]
 - **Skill version:** [commit hash or date if known]
 
@@ -90,23 +90,26 @@ Use this template for the issue body:
 [Logs, screenshots, related issues, or other helpful details]
 ```
 
-### 5b. Review Before Filing (MANDATORY)
+### 5b. Redact and Authorize
 
-Before publishing either a new issue or a comment on an existing one, present the
-complete draft and exact destination to the user. For a comment, show the existing
-issue URL and the full comment body; for a new issue, show the repository, title,
-and full issue body:
+**Redact first, every time.** Remove API keys, tokens, credentials, personal
+details, proprietary data, and internal hostnames or paths the author does not
+need. Use placeholders such as `<home>/project`.
 
-> "Here is the issue I'm about to create on https://github.com/<owner>/<repo>. Please review it for any sensitive information (API keys, internal paths, proprietary data, personal details) before I proceed."
->
-> **Title:** [skill:<name>] <summary>
->
-> **Body:** <formatted template from step 5>
->
-> "Should I file this issue as written, or would you like to redact anything first?"
+**Authorization.** Publishing is an external action:
 
-Do not proceed to step 6 until the user explicitly confirms. For the duplicate-comment
-route, do not post the comment until this same completed-draft approval is received.
+- **The user asked to file** (for example "file a bug for this skill" or "report
+  this upstream"): that request authorizes filing this report in the skill's
+  `metadata.repo`. File it in step 6 without asking again, and show the
+  destination, title, and body in your reply.
+- **Otherwise** (you noticed the defect, or the user only asked whether the
+  skill is wrong): present the complete draft and exact destination, then wait
+  for explicit confirmation. An observed defect alone does not authorize filing.
+  Showing a draft is not approval.
+- **Ask before publishing** even after a filing request when the destination
+  differs from what the user asked for, when the draft must include material you
+  cannot safely redact, or when you would comment on an existing issue instead.
+  For a comment, show the existing issue URL and the full comment body.
 
 ### 6. File the Issue
 
@@ -119,14 +122,14 @@ Extract `owner/repo` from the `repo` URL:
 **Labels:** Attempt to add `bug` and `skill` labels. `gh issue create --label` aborts the whole create when a label is missing (`could not add label: '<label>' not found`); on that error, retry without that label and tell the user:
 > "Note: The label '<label>' does not exist on this repository and was not applied. You may want to add it manually."
 
-**Using an available GitHub integration:** Discover its issue-creation capability and pass owner/repo, the title, and the complete approved body as structured data. Do not assume a particular MCP tool name is installed.
+**Using an available GitHub integration:** Discover its issue-creation capability and pass owner/repo, the title, and the complete authorized body as structured data. Do not assume a particular MCP tool name is installed.
 
-**Fallback — `gh` CLI:** Write the exact approved body to a temporary UTF-8 file, then run:
+**Fallback — `gh` CLI:** Write the exact authorized body to a temporary UTF-8 file, then run:
 ```bash
 gh issue create \
   --repo <owner>/<repo> \
   --title "[skill:<name>] <summary>" \
-  --body-file "<path to approved UTF-8 issue body>" \
+  --body-file "<path to the UTF-8 issue body>" \
   --label "bug"
 ```
 

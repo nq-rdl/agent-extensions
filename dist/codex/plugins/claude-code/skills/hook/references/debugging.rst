@@ -53,35 +53,35 @@ Testing a hook manually
 Common failure modes
 --------------------
 
-+---------------------------------+--------------------------------+--------------------------------------+
-| Symptom                         | Cause                          | Fix                                  |
-+=================================+================================+======================================+
++--------------------------------+--------------------------------+--------------------------------------+
+| Symptom                        | Cause                          | Fix                                  |
++================================+================================+======================================+
 | Hook never fires               | Wrong settings level, wrong    | Check global vs project vs local;    |
 |                                | event, or bad matcher          | confirm via ``/hooks``               |
-+---------------------------------+--------------------------------+--------------------------------------+
-| ``<hook> hook error`` in        | Script exited non-zero         | Test manually; use absolute paths or |
++--------------------------------+--------------------------------+--------------------------------------+
+| ``<hook> hook error`` in       | Script exited non-zero         | Test manually; use absolute paths or |
 | transcript                     | unexpectedly / not found       | ``$CLAUDE_PROJECT_DIR``; add         |
 |                                |                                | ``"args": []`` for exec form         |
-+---------------------------------+--------------------------------+--------------------------------------+
++--------------------------------+--------------------------------+--------------------------------------+
 | "command not found"            | Relative path / missing tool   | Absolute path; install ``jq`` or use |
 |                                |                                | Python/Node for JSON parsing         |
-+---------------------------------+--------------------------------+--------------------------------------+
++--------------------------------+--------------------------------+--------------------------------------+
 | Permission denied              | Script not executable          | ``chmod +x hook.sh``                 |
-+---------------------------------+--------------------------------+--------------------------------------+
++--------------------------------+--------------------------------+--------------------------------------+
 | Block has no reason shown      | Missing ``reason`` /           | Add ``permissionDecisionReason`` or  |
 |                                | ``permissionDecisionReason``   | ``reason`` to the decision JSON      |
-+---------------------------------+--------------------------------+--------------------------------------+
++--------------------------------+--------------------------------+--------------------------------------+
 | Hook killed silently           | Timeout too short              | Increase ``timeout``; keep it fast   |
-+---------------------------------+--------------------------------+--------------------------------------+
++--------------------------------+--------------------------------+--------------------------------------+
 | JSON parse error despite valid | Shell profile echoes a banner  | Guard profile output behind          |
 | output                         | before the JSON                | ``[[ $- == *i* ]]``; debug to stderr |
-+---------------------------------+--------------------------------+--------------------------------------+
++--------------------------------+--------------------------------+--------------------------------------+
 | ``"allow"`` doesn't bypass a   | Deny rules always win          | Hooks can tighten, not loosen,       |
 | prompt                         |                                | permissions                          |
-+---------------------------------+--------------------------------+--------------------------------------+
++--------------------------------+--------------------------------+--------------------------------------+
 | Injected context shown to user | Phrased as an imperative       | Use factual phrasing — see           |
 | instead of used                | "system command"               | ``references/prompt-injection.rst``  |
-+---------------------------------+--------------------------------+--------------------------------------+
++--------------------------------+--------------------------------+--------------------------------------+
 
 --------------
 
@@ -95,7 +95,9 @@ stdout::
    Shell ready on arm64
    {"decision": "block", "reason": "Not allowed"}
 
-Claude Code then fails to parse it. Fix by only printing in interactive shells:
+The output no longer starts with ``{``, so Claude Code treats it as plain text
+and the decision silently has no effect (on exit 0 nothing is reported). Fix
+by only printing in interactive shells:
 
 .. code:: bash
 
@@ -105,7 +107,9 @@ Claude Code then fails to parse it. Fix by only printing in interactive shells:
    fi
 
 Or switch the hook to **exec form** by adding ``"args": []``, which spawns the
-program directly without a shell.
+program directly without a shell. In exec form ``command`` is only the
+executable path: drop shell quoting such as ``"$CLAUDE_PROJECT_DIR"/…`` and
+use the ``${CLAUDE_PROJECT_DIR}`` placeholder, with extra words in ``args``.
 
 --------------
 

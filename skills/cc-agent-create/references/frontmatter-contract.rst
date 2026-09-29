@@ -19,6 +19,8 @@ The outline contains:
   environment. No automatic skill preload is available.
 * The task-specific execution procedure and expected result with evidence.
 * The parent's verification responsibilities and behavior if workers are unavailable.
+* The delegation contract in `normalization.rst <normalization.rst>`_ (return
+  blockers and questions to the caller; no unauthorized actions; resumable).
 
 Use the host's supported subagent mechanism; do not assume a custom agent type
 exists. Model and permission selection belong to the host and user's settings.

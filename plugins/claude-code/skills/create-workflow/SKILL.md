@@ -13,9 +13,11 @@ description: >-
   `.claude/workflows/` distribution rules.
 argument-hint: "Describe the task to turn into a workflow (e.g. 'audit every API route for missing auth checks')"
 compatibility: >-
-  Requires Claude Code v2.1.154+ for dynamic workflows. Monorepo path-walking
-  requires v2.1.178+. Before v2.1.160 the trigger keyword was `workflow` instead
-  of `ultracode` (natural-language requests work in both).
+  Requires Claude Code v2.1.154+ for dynamic workflows (on Pro, enable them in
+  /config). Monorepo path-walking requires v2.1.178+. Before v2.1.160 the
+  trigger keyword was `workflow` instead of `ultracode` (natural-language
+  requests work in both). Checked against the workflows docs with Claude Code
+  2.1.284 on 2026-09-29.
 user-invocable: true
 metadata:
   repo: https://github.com/nq-rdl/agent-extensions
@@ -80,10 +82,14 @@ Workflows have a fixed shape you must design *for*, not against:
   other's findings, or draft a plan from several angles and weigh them, before
   reporting.
 - **Stage gating needs separate workflows.** There is **no mid-run user input** —
-  only agent permission prompts can pause a run. For sign-off between stages, run
-  each stage as its own workflow.
-- **Respect the caps:** up to **16 concurrent agents** (fewer on low-CPU
-  machines) and **1,000 agents total per run**. Design the fan-out to fit.
+  a run pauses only for agent permission prompts and, from v2.1.271, a
+  usage-limit wait. For sign-off between stages, run each stage as its own
+  workflow.
+- **Respect the caps:** up to **16 concurrent agents** by default (fewer on
+  low-CPU machines; `CLAUDE_CODE_WORKFLOW_MAX_CONCURRENT_AGENTS` sets 1–256 on
+  v2.1.269+), **4,096 items** per `parallel()`/`pipeline()` call, and **1,000
+  agents total per run**. Scripts cannot use `import()`. Design the fan-out to
+  fit.
 
 ## Step 3 — Have Claude write it
 
@@ -94,7 +100,9 @@ description. Trigger it one of two ways:
   "use a workflow"). Example: `ultracode: audit every API endpoint under
   src/routes/ for missing auth checks`.
 - **Whole session:** `/effort ultracode` — Claude plans a workflow for every
-  substantive task until the session ends or you drop back with `/effort high`.
+  substantive task until the session ends or you turn it off with
+  `/effort ultracode off` (v2.1.284+, where Ultracode is a toggle; earlier
+  versions drop back by choosing another effort level such as `/effort high`).
 
 Claude shows the planned phases and asks to approve before running (the prompt's
 frequency depends on permission mode; `Ctrl+G` opens the script, `Tab` edits the
@@ -137,7 +145,8 @@ methods on `args` directly — no parsing. If omitted, `args` is `undefined`.
 
 ## Distribution reality (important)
 
-**Claude Code 2.1.274 supports plugin workflows.** Store the JavaScript at the
+**Plugin workflows were verified on Claude Code 2.1.274** (the changelog does
+not record the first supporting version). Store the JavaScript at the
 plugin root under `workflows/`, or declare script paths in the manifest’s
 `workflows` field. The plugin namespaces each script’s `meta.name`.
 For this catalog, keep scripts in the owning canonical skill’s `scripts/` folder.
@@ -156,9 +165,13 @@ conversation; runs count toward plan usage and rate limits. Before a large run:
 
 - **Gauge on a slice first** — one directory, not the whole repo — and watch
   per-agent token usage in `/workflows`; stop anytime without losing completed work.
-- Every agent uses the **session model** unless the script routes a stage
-  elsewhere. Check `/model` before a big run, and ask Claude to route low-stakes
-  stages to a smaller model.
+- Each agent's model follows the subagent model order (a model the script names
+  for a stage counts as the per-invocation choice); with nothing else set it is
+  the **session model**. Check `/model` before a big run, and ask Claude to
+  route low-stakes stages to a smaller model.
+- A run above 25 agents or 1.5M projected tokens shows an advisory
+  `Large workflow` warning; the `workflowSizeGuideline` setting (v2.1.219+)
+  sets the advisory size Claude aims for.
 
 ## Permissions
 

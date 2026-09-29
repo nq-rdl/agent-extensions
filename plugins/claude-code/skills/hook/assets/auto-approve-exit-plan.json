@@ -1,5 +1,5 @@
 {
-  "description": "Auto-approve the ExitPlanMode permission prompt. PermissionRequest hooks answer the dialog via hookSpecificOutput.decision.behavior. Keep the matcher narrow — an empty matcher would auto-approve everything. Does not fire in non-interactive -p mode (use PreToolUse there).",
+  "description": "Auto-approve the ExitPlanMode permission prompt. PermissionRequest hooks answer the dialog via hookSpecificOutput.decision.behavior. Keep the matcher narrow — an empty matcher would auto-approve everything. In -p mode it runs only when an SDK canUseTool callback supplies the prompt; use PreToolUse there.",
   "hooks": {
     "PermissionRequest": [
       {
