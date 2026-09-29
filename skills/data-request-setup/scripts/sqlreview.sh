@@ -20,9 +20,9 @@
 #   publish --reconfirm-all SLUG KIND DRAFT    same, but refuse any carried (carried_from_revision) confirmation
 #   roles ENGINEER ANALYST                     update only the two confirmed role names in config.json
 #   guard string-sql on|off                    set only guard.require_lift_for_string_sql in config.json
-#   fingerprint SQL                            {sql_path, sql_sha256, git_commit, git_dirty}
+#   fingerprint SQL                            {sql_path, sql_sha256, sql_body_sha256, git_commit, git_dirty}
 #   snapshot SLUG SQL                          verify final review SHA, retain history, advance source.sql
-#   delta SLUG                                 diff source.sql vs the current SQL; exit 10 when changed, 6 no baseline
+#   delta SLUG                                 body binding + full hashes; exit 0 full/header-only, 10 body change, 6 no baseline
 #   carryover SLUG DRAFT                       review draft items matching confirmed, still-valid scope items (JSON)
 #   carryforward SLUG scope|review DRAFT       draft items whose previous-revision confirmation may be carried (JSON)
 #   impact SLUG                                heuristic: identifiers in the diff traced into unchanged lines
@@ -383,17 +383,50 @@ cmd_publish() (
     cmd_check "$dest" >/dev/null || sr_die 4 "existing document is invalid"
     previous="$(jq -r .revision "$dest")"
   fi
-  if [ "$kind" = review ]; then
-    [ -f "$SR_ROOT/$rel" ] || sr_die 2 "no such SQL: $rel"
-    [ "$(sr_sha256 "$SR_ROOT/$rel")" = "$(jq -r .sql_sha256 "$tmp")" ] || sr_die 2 "SQL changed since fingerprint; reassess before publishing"
+  # Header history is helper-owned. A draft may retain it or omit it, never alter it.
+  if jq -e 'has("header_revisions")' "$tmp" >/dev/null; then
+    local history_doc=/dev/null
+    [ ! -f "$dest" ] || history_doc="$dest"
+    jq -e --slurpfile old "$history_doc" '.header_revisions == ($old[0].header_revisions // [])' "$tmp" >/dev/null || sr_die 4 "header_revisions is helper-owned; retain or omit the published history"
   fi
-  if [ "$kind" = scope ] && jq -e '.sql_sha256 | type == "string"' "$tmp" >/dev/null; then
-    # The scope was framed against existing SQL: refuse to publish over a later edit (#340).
-    [ -f "$SR_ROOT/$rel" ] || sr_die 2 "scope records sql_sha256 but the SQL is missing: $rel"
-    [ "$(sr_sha256 "$SR_ROOT/$rel")" = "$(jq -r .sql_sha256 "$tmp")" ] || sr_die 2 "SQL changed since the scope framing was confirmed; re-diff, re-put intent, inputs, outputs and affected items, then refresh sql_sha256"
+  if [ -f "$dest" ] && jq -e 'has("header_revisions")' "$dest" >/dev/null; then
+    local inherited
+    inherited="$(jq --slurpfile old "$dest" '.header_revisions = $old[0].header_revisions' "$tmp")" || sr_die 2 "cannot preserve header history"
+    printf '%s\n' "$inherited" > "$tmp"
+  fi
+  if [ "$kind" = review ] || { [ "$kind" = scope ] && jq -e '.sql_sha256 | type == "string"' "$tmp" >/dev/null; }; then
+    [ -f "$SR_ROOT/$rel" ] || sr_die 2 "scope records sql_sha256 but the SQL is missing: $rel (no such SQL)"
+    local baseline="$SR_REVIEWS/$slug/source.sql" binding
+    [ "$kind" != scope ] || baseline="$SR_REVIEWS/$slug/scope.source.sql"
+    sr_no_symlinks "$baseline" || exit 2
+    if [ -f "$baseline" ] && [ -f "$dest" ] && [ "$(sr_sha256 "$SR_ROOT/$rel")" != "$(jq -r .sql_sha256 "$tmp")" ]; then
+      [ "$(sr_sha256 "$baseline")" = "$(jq -r .sql_sha256 "$dest")" ] || sr_die 2 "published baseline is corrupt; reassess before publishing"
+    fi
+    # A fresh confirmed body revision has a new full fingerprint; the previous baseline
+    # remains evidence for carry checks, rather than evidence for the new fingerprint.
+    if [ -f "$baseline" ] && [ "$(sr_sha256 "$baseline")" != "$(jq -r .sql_sha256 "$tmp")" ]; then baseline=/dev/null; fi
+    sr_binding "$tmp" "$SR_ROOT/$rel" "$baseline"; binding=$?
+    case "$binding" in
+      0) ;;
+      10)
+        local amended
+        amended="$(jq --arg sha "$(sr_sha256 "$SR_ROOT/$rel")" --arg at "$(sr_now)" --arg body "$(sr_body_sha256 "$SR_ROOT/$rel")" '
+          .header_revisions = ((.header_revisions // []) +
+            (if any((.header_revisions // [])[]; .sql_sha256 == $sha) then []
+             else [{sql_sha256: $sha, sql_body_sha256: $body, revision: .revision, at: $at}] end))' "$tmp")" || sr_die 2 "cannot record header revision"
+        printf '%s\n' "$amended" > "$tmp"
+        ;;
+      *) sr_die 2 "SQL changed since fingerprint or baseline is corrupt; reassess before publishing; re-put intent, inputs, outputs and affected items, then refresh sql_sha256" ;;
+    esac
   fi
   if [ -f "$dest" ] && cmp -s "$tmp" "$dest"; then
     printf 'already published\t%s\n' "${dest#"$SR_ROOT"/}"
+    exit 0
+  fi
+  if [ "$kind" != lifts ] && [ "${binding:-}" = 10 ] && [ -f "$dest" ] && jq -e --slurpfile old "$dest" '
+    del(.header_revisions) == ($old[0] | del(.header_revisions))' "$tmp" >/dev/null; then
+    mv "$tmp" "$dest" || sr_die 2 "cannot publish header revision"
+    printf 'published header revision\t%s\n' "${dest#"$SR_ROOT"/}"
     exit 0
   fi
   jq -e --argjson previous "$previous" '.revision == ($previous + 1)' "$tmp" >/dev/null || sr_die 4 "revision must follow the existing document (first revision is 1)"
@@ -452,18 +485,19 @@ cmd_fingerprint() {
   [ $# -eq 1 ] || usage
   sr_need_jq
   sr_require_root
-  local rel abs sha commit="" dirty=false
+  local rel abs sha body="" commit="" dirty=false
   rel="$(sr_relpath "$1")" || exit $?
   sr_safe_sql "$rel"
   abs="$SR_ROOT/$rel"
   [ -f "$abs" ] || sr_die 2 "no such file: $rel"
   sha="$(sr_sha256 "$abs")"
+  body="$(sr_body_sha256 "$abs" || true)"
   if git -C "$SR_ROOT" rev-parse --is-inside-work-tree >/dev/null 2>&1; then
     commit="$(git -C "$SR_ROOT" rev-parse HEAD 2>/dev/null || true)"
     [ -n "$(git -C "$SR_ROOT" status --porcelain --untracked-files=all -- "$rel" 2>/dev/null)" ] && dirty=true
   fi
-  jq -n --arg p "$rel" --arg sha "$sha" --arg c "$commit" --argjson dirty "$dirty" \
-    '{sql_path: $p, sql_sha256: $sha, git_commit: (if $c == "" then null else $c end), git_dirty: $dirty}'
+  jq -n --arg p "$rel" --arg sha "$sha" --arg body "$body" --arg c "$commit" --argjson dirty "$dirty" \
+    '{sql_path: $p, sql_sha256: $sha, sql_body_sha256: (if $body == "" then null else $body end), git_commit: (if $c == "" then null else $c end), git_dirty: $dirty}'
 }
 
 # ---------------------------------------------------------------------------------------------
@@ -489,7 +523,17 @@ cmd_snapshot() {
   tmp="$(mktemp "$SR_REVIEWS/$slug/.snapshot.XXXXXX")" || sr_die 2 "mktemp failed"
   cp "$abs" "$tmp" || { rm -f "$tmp"; sr_die 2 "snapshot copy failed"; }
   sha="$(sr_sha256 "$tmp")"
-  [ "$sha" = "$(jq -r .sql_sha256 "$doc")" ] || { rm -f "$tmp"; sr_die 2 "SQL changed since fingerprint; reassess before snapshot"; }
+  local binding
+  local baseline="$SR_REVIEWS/$slug/source.sql"
+  [ "$sha" != "$(jq -r .sql_sha256 "$doc")" ] || baseline=/dev/null
+  sr_binding "$doc" "$tmp" "$baseline"; binding=$?
+  if [ "$binding" = 10 ] && [ -f "$SR_REVIEWS/$slug/source.sql" ]; then
+    # Retain the authenticated bytes that were reviewed, never replace them with a body match.
+    cp "$SR_REVIEWS/$slug/source.sql" "$tmp" || { rm -f "$tmp"; sr_die 2 "baseline copy failed"; }
+    sha="$(sr_sha256 "$tmp")"
+  elif [ "$binding" != 0 ]; then
+    rm -f "$tmp"; sr_die 2 "SQL changed since fingerprint; reassess before snapshot (header-only requires an authenticated original baseline)"
+  fi
   revision="$(jq -r .revision "$doc")"
   sr_no_symlinks "$SR_REVIEWS/$slug/history/$revision.sql" || { rm -f "$tmp"; exit 2; }
   mkdir -p "$SR_REVIEWS/$slug/history" || { rm -f "$tmp"; sr_die 2 "cannot create history"; }
@@ -521,8 +565,10 @@ _delta_prepare() {
   [ -f "$SR_BASE" ] || sr_die 6 "no baseline: reviews/$slug/source.sql is missing, so there is nothing to diff against — run a full /data-request:analyse (it records the snapshot)"
   [ -f "$SR_CUR" ] || sr_die 2 "the reviewed SQL no longer exists: $SR_SQL_PATH (moved? see: sqlreview.sh move)"
   [ ! -f "$SR_REVIEWS/$slug/rebind-required" ] || return 10
-  [ "$(sr_sha256 "$SR_BASE")" = "$(jq -r .sql_sha256 "$doc")" ] || return 10
-  cmp -s "$SR_BASE" "$SR_CUR" && return 0
+  local binding
+  sr_binding "$doc" "$SR_CUR" "$SR_BASE"; binding=$?
+  [ "$binding" = 10 ] && { printf 'header-only revision; SQL body unchanged\n'; return 0; }
+  [ "$binding" = 0 ] && return 0
   return 10
 }
 
@@ -906,6 +952,11 @@ cmd_render() {
   vars="$(jq -c --slurpfile cfgs "$cfg" -f "$SR_SCRIPT_DIR/sqlreview-render.jq" "$doc")" || sr_die 2 "render failed for reviews/$slug/$kind.json"
   rendered="$(jq -r -n --rawfile tpl "$tpl" --argjson vars "$vars" \
     'reduce ($vars | keys[]) as $k ($tpl; gsub("\\{\\{\($k)\\}\\}"; $vars[$k]))')" || sr_die 2 "render failed for reviews/$slug/$kind.json"
+  if jq -e '(.header_revisions // []) | length > 0' "$doc" >/dev/null; then
+    rendered="$rendered
+
+Header revision history: metadata changed without changing its corresponding SQL body; full-file header hashes and timestamps are recorded in $kind.json. Changed assumption text still requires confirmation."
+  fi
   printf '%s\n' "$rendered" > "$out" || sr_die 2 "cannot write rendered report"
   unknown="$(grep -o '{{[A-Za-z0-9_]*}}' "$out" | sort -u || true)"
   if [ -n "$unknown" ]; then

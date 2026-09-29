@@ -198,6 +198,27 @@ sr_body_same() { # <file> <file>
   a="$(sr_body_sha256 "$1")" && b="$(sr_body_sha256 "$2")" && [ -n "$a" ] && [ "$a" = "$b" ]
 }
 
+# A body digest never authenticates a snapshot. If one exists its full hash must match the
+# document before it can support a binding (including legacy records without a body hash).
+sr_binding() { # <document> <current SQL> <optional baseline>; 0 full, 10 header-only, 1 changed
+  local doc="$1" cur="$2" base="$3" full body current
+  full="$(jq -r '.sql_sha256 // ""' "$doc")"
+  body="$(jq -r '.sql_body_sha256 // ""' "$doc")"
+  if [ -f "$base" ]; then
+    [ "$(sr_sha256 "$base")" = "$full" ] || return 1
+    if [ -n "$body" ]; then [ "$(sr_body_sha256 "$base")" = "$body" ] || return 1; fi
+  fi
+  current="$(sr_sha256 "$cur")"
+  if [ "$current" = "$full" ]; then
+    if [ -n "$body" ]; then [ "$(sr_body_sha256 "$cur")" = "$body" ] || return 1; fi
+    return 0
+  fi
+  if [ -n "$body" ]; then
+    [ "$(sr_body_sha256 "$cur")" = "$body" ] && return 10
+  elif [ -f "$base" ] && sr_body_same "$base" "$cur"; then return 10; fi
+  return 1
+}
+
 sr_now() { date -u +%Y-%m-%dT%H:%M:%SZ; }
 
 # The authoritative document of a review directory: review.json, else scope.json, else nothing.
@@ -232,15 +253,26 @@ sr_state() { # <slug>
   sr_safe_sql "$sql"
   rev="$(jq -r '.revision // ""' "$doc" 2>/dev/null)"
   case "$doc" in
-    */scope.json) state="scoped" ;;
+    */scope.json)
+      state="scoped"
+      if jq -e '.sql_sha256 != null' "$doc" >/dev/null; then
+        if [ ! -f "$SR_ROOT/$sql" ]; then state="missing"
+        else
+          local bound
+          sr_binding "$doc" "$SR_ROOT/$sql" "$d/scope.source.sql"; bound=$?
+          case "$bound" in 0) ;; 10) state="scoped-header-only" ;; *) state="stale" ;; esac
+        fi
+      fi ;;
     */lifts.json) state="lifts" ;;
     *)
       if [ ! -f "$SR_ROOT/$sql" ]; then state="missing"
       elif [ ! -f "$d/source.sql" ]; then state="no-baseline"
       elif [ -f "$d/rebind-required" ]; then state="stale"
-      elif [ "$(sr_sha256 "$d/source.sql")" != "$(jq -r .sql_sha256 "$doc")" ]; then state="stale"
-      elif cmp -s "$d/source.sql" "$SR_ROOT/$sql"; then state="current"
-      else state="stale"; fi ;;
+      else
+        local bound
+        sr_binding "$doc" "$SR_ROOT/$sql" "$d/source.sql"; bound=$?
+        case "$bound" in 0) state="current" ;; 10) state="header-only" ;; *) state="stale" ;; esac
+      fi ;;
   esac
   printf '%s\t%s\t%s\n' "$state" "$sql" "$rev"
 }

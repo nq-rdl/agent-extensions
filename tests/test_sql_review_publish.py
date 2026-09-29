@@ -55,6 +55,21 @@ class Publish(unittest.TestCase):
         self.assertEqual(self.run_helper("snapshot", "q", "q.sql").returncode, 0)
         self.assertTrue((self.final / "history/2.sql").is_file())
 
+    def test_installed_header_only_publish_retains_binding_and_original_snapshot(self):
+        original = "-- notes: Male or Female\nSELECT 1;\n"
+        self.project.sql("q.sql", original)
+        fingerprint = json.loads(self.run_helper("fingerprint", "q.sql").stdout)
+        doc = review_doc("q", "q.sql", **{k: fingerprint[k] for k in ("sql_sha256", "sql_body_sha256")})
+        self.assertEqual(self.publish(doc).returncode, 0)
+        self.assertEqual(self.run_helper("snapshot", "q", "q.sql").returncode, 0)
+        self.project.sql("q.sql", original.replace("Male or Female", "MALE or FEMALE"))
+        self.assertEqual(self.publish(doc).returncode, 0)
+        self.assertEqual(self.run_helper("delta", "q").returncode, 0)
+        self.assertIn("header-only", self.run_helper("status").stdout)
+        self.assertEqual((self.final / "source.sql").read_text(), original)
+        self.assertEqual(self.run_helper("render", "q", "review").returncode, 0)
+        self.assertIn("Header revision", (self.final / "review.md").read_text())
+
     def test_invalid_publish_preserves_final_and_draft(self):
         original = scope_doc("q", "q.sql")
         self.assertEqual(self.publish(original).returncode, 0)

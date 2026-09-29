@@ -46,6 +46,18 @@ class CompletePublication(unittest.TestCase):
         return subprocess.run(["bash", "-c", self.recovery], cwd=self.workspace,
                               env=self.env, capture_output=True, text=True)
 
+    def test_header_only_completion_records_revision_without_reconfirming(self):
+        sql = self.workspace / "q.sql"
+        sql.write_text("-- corrected header\nselect 1;\n")
+        self.assertEqual(self.helper("delta", "q").returncode, 0)
+        result = self.recover()
+        self.assertEqual(result.returncode, 0, result.stderr)
+        published = json.loads((self.directory / "review.json").read_text())
+        self.assertEqual(published["revision"], 1)
+        self.assertEqual(published["header_revisions"][-1]["sql_sha256"], hashlib.sha256(sql.read_bytes()).hexdigest())
+        self.assertEqual((self.directory / "source.sql").read_text(), "select 1;\n")
+        self.assertIn("Header revision", (self.directory / "review.md").read_text())
+
     def test_render_failure_then_resume_completes_without_new_revision(self):
         template = self.workspace / ".sqlreview/templates/review.md"
         original = template.read_text()
