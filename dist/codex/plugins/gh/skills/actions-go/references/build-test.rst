@@ -24,9 +24,9 @@ Single Version
      build:
        runs-on: ubuntu-latest
        steps:
-         - uses: actions/checkout@v5
+         - uses: actions/checkout@v7
          - name: Setup Go
-           uses: actions/setup-go@v5
+           uses: actions/setup-go@v7
            with:
              go-version: '1.25.x'
          - name: Display Go version
@@ -48,9 +48,9 @@ Test across multiple Go versions:
          matrix:
            go-version: ['1.23', '1.24', '1.25.x']
        steps:
-         - uses: actions/checkout@v5
+         - uses: actions/checkout@v7
          - name: Setup Go ${{ matrix.go-version }}
-           uses: actions/setup-go@v5
+           uses: actions/setup-go@v7
            with:
              go-version: ${{ matrix.go-version }}
          - name: Display Go version
@@ -62,8 +62,8 @@ Installing Dependencies
 .. code:: yaml
 
    steps:
-     - uses: actions/checkout@v5
-     - uses: actions/setup-go@v5
+     - uses: actions/checkout@v7
+     - uses: actions/setup-go@v7
        with:
          go-version-file: go.mod
      - name: Install dependencies
@@ -81,12 +81,12 @@ For specific additional dependencies:
 Caching Dependencies
 ~~~~~~~~~~~~~~~~~~~~
 
-``actions/setup-go`` v5+ handles caching automatically. For monorepos or
-multi-module layouts:
+``actions/setup-go`` caches by default (key: root ``go.mod`` from v6). For
+monorepos, multi-module layouts or a ``go.sum``-based key:
 
 .. code:: yaml
 
-   - uses: actions/setup-go@v5
+   - uses: actions/setup-go@v7
      with:
        go-version-file: go.mod
        cache-dependency-path: subdir/go.sum
@@ -142,8 +142,8 @@ Save test results for later analysis or cross-job consumption:
          matrix:
            go-version: ['1.23', '1.24', '1.25.x']
        steps:
-         - uses: actions/checkout@v5
-         - uses: actions/setup-go@v5
+         - uses: actions/checkout@v7
+         - uses: actions/setup-go@v7
            with:
              go-version: ${{ matrix.go-version }}
          - name: Install dependencies
@@ -153,7 +153,7 @@ Save test results for later analysis or cross-job consumption:
          - name: Test
            run: go test -json ./... > TestResults-${{ matrix.go-version }}.json
          - name: Upload test results
-           uses: actions/upload-artifact@v4
+           uses: actions/upload-artifact@v7
            with:
              name: Go-results-${{ matrix.go-version }}
              path: TestResults-${{ matrix.go-version }}.json
@@ -179,10 +179,10 @@ A full CI workflow combining all patterns:
          matrix:
            go-version: ['1.24', '1.25']
        steps:
-         - uses: actions/checkout@v5
+         - uses: actions/checkout@v7
 
          - name: Setup Go ${{ matrix.go-version }}
-           uses: actions/setup-go@v5
+           uses: actions/setup-go@v7
            with:
              go-version: ${{ matrix.go-version }}
 
@@ -196,14 +196,14 @@ A full CI workflow combining all patterns:
            run: go test -v -race -coverprofile=coverage.out ./...
 
          - name: Upload coverage
-           uses: actions/upload-artifact@v4
+           uses: actions/upload-artifact@v7
            with:
              name: coverage-${{ matrix.go-version }}
              path: coverage.out
 
          - name: Upload test results
            if: always()
-           uses: actions/upload-artifact@v4
+           uses: actions/upload-artifact@v7
            with:
              name: test-results-${{ matrix.go-version }}
              path: TestResults-*.json

@@ -3,6 +3,8 @@ actions/setup-go — Advanced Usage
 
    Source:
    https://github.com/actions/setup-go/blob/main/docs/advanced-usage.md
+   (condensed; checked against the v7.0.0 tag on 2026-09-29. Upstream
+   examples still show ``@v6``; inputs are unchanged in v7.)
 
 Version Specification
 ---------------------
@@ -62,7 +64,7 @@ The ``go-version-file`` input supports:
 
 .. code:: yaml
 
-   - uses: actions/setup-go@v5
+   - uses: actions/setup-go@v7
      with:
        go-version-file: 'go.mod'
 
@@ -80,8 +82,8 @@ Matrix Testing
          go: '1.24'
 
    steps:
-     - uses: actions/checkout@v5
-     - uses: actions/setup-go@v5
+     - uses: actions/checkout@v7
+     - uses: actions/setup-go@v7
        with:
          go-version: ${{ matrix.go }}
 
@@ -92,7 +94,7 @@ Force a check that the cached version is current:
 
 .. code:: yaml
 
-   - uses: actions/setup-go@v5
+   - uses: actions/setup-go@v7
      with:
        go-version: '1.25'
        check-latest: true
@@ -106,15 +108,18 @@ Caching Strategies
 Default Behavior
 ~~~~~~~~~~~~~~~~
 
-``actions/setup-go`` v5+ automatically caches ``~/go/pkg/mod`` and
-``~/.cache/go-build`` using ``go.sum`` as the cache key.
+Caching is enabled by default (since v4) and covers the module cache
+(``GOMODCACHE``) and build cache (``GOCACHE``). From v6 the key hashes the
+root ``go.mod``; set ``cache-dependency-path`` to key on ``go.sum`` files or
+modules outside the root. If caching fails, the action logs a warning and
+continues.
 
 Monorepos
 ~~~~~~~~~
 
 .. code:: yaml
 
-   - uses: actions/setup-go@v5
+   - uses: actions/setup-go@v7
      with:
        go-version-file: go.mod
        cache-dependency-path: subdir/go.sum
@@ -166,21 +171,26 @@ Include source files to bust cache on code changes:
 Restore-only Caches
 ~~~~~~~~~~~~~~~~~~~
 
-Read from cache without writing back:
+Read from cache without writing back. The restore key must equal the key of
+the job that saved the cache; a made-up key restores nothing. To reuse the
+caches setup-go saves, rebuild its key
+(``setup-go-<os>-<arch>-<ImageOS>-go-<version>-<hash of go.mod>``) as in the
+upstream example; this sketch assumes another job saves with the same key:
 
 .. code:: yaml
 
-   - uses: actions/setup-go@v5
+   - uses: actions/setup-go@v7
+     id: setup-go
      with:
        go-version: '1.25.5'
        cache: false
 
-   - uses: actions/cache/restore@v5
+   - uses: actions/cache/restore@v6
      with:
        path: |
          ~/go/pkg/mod
          ~/.cache/go-build
-       key: go-${{ runner.os }}-${{ hashFiles('**/go.sum') }}
+       key: go-${{ runner.os }}-${{ steps.setup-go.outputs.go-version }}-${{ hashFiles('**/go.mod') }}
 
 Parallel Builds
 ~~~~~~~~~~~~~~~
@@ -198,7 +208,7 @@ The exact version installed (useful when specifying ranges):
 
 .. code:: yaml
 
-   - uses: actions/setup-go@v5
+   - uses: actions/setup-go@v7
      id: setup
      with:
        go-version: '^1.24'
@@ -211,7 +221,7 @@ Boolean — ``true`` when the primary cache key matched exactly:
 
 .. code:: yaml
 
-   - uses: actions/setup-go@v5
+   - uses: actions/setup-go@v7
      id: setup
      with:
        cache: true
@@ -225,7 +235,7 @@ Basic Usage
 
 .. code:: yaml
 
-   - uses: actions/setup-go@v5
+   - uses: actions/setup-go@v7
      with:
        go-version: '1.25.0'
        go-download-base-url: 'https://aka.ms/golang/release/latest'
@@ -255,7 +265,7 @@ Authenticated Downloads
 
 .. code:: yaml
 
-   - uses: actions/setup-go@v5
+   - uses: actions/setup-go@v7
      with:
        go-version: '1.25.0'
        go-download-base-url: 'https://private-mirror.example.com/golang'
@@ -266,7 +276,13 @@ Token is passed as an ``Authorization`` header.
 GHES (GitHub Enterprise Server)
 -------------------------------
 
-- Use custom download URLs or pre-cached versions to reduce external API
-  calls
-- For environments without github.com access, configure a private mirror
-  via ``go-download-base-url`` with the appropriate auth token
+- setup-go reads the version manifest from ``actions/go-versions`` on
+  github.com with unauthenticated requests (60 per hour per IP; GHES runners
+  often share one IP). It then falls back to the raw manifest and to go.dev.
+  If all fail, pass a github.com personal access token as ``token``.
+- **No access to github.com:** every requested Go version must already be in
+  the runner's tool cache. See `Setting up the tool cache on self-hosted
+  runners without internet access
+  <https://docs.github.com/en/enterprise-server@3.2/admin/github-actions/managing-access-to-actions-from-githubcom/setting-up-the-tool-cache-on-self-hosted-runners-without-internet-access>`__.
+  A reachable internal mirror with ``go-download-base-url`` is the other
+  option (exact versions only, see above).
