@@ -5,8 +5,9 @@ The Core Difference
 -------------------
 
 **Subagents** (the ``Agent`` tool) are workers within a single session.
-They do focused work and report results back to the parent. They cannot
-talk to each other. Think of them as running an errand — you send
+They do focused work and report results back to the parent; a named
+subagent can be messaged or resumed with ``SendMessage``, but subagents do
+not share a task list or debate each other. Think of them as running an errand — you send
 someone out, they come back with an answer.
 
 **Agent teams** are fully independent Claude Code sessions. Each
@@ -57,8 +58,8 @@ Side-by-Side Comparison
 | **Model           | Per-agent via ``model`` parameter  | Per-teammate via natural language or lead  |
 | selection**       |                                    | decision                                   |
 +-------------------+------------------------------------+--------------------------------------------+
-| **Lifecycle**     | Ephemeral — dies when task         | Persistent — runs until shut down or the   |
-|                   | completes                          | session ends                               |
+| **Lifecycle**     | Ends when the task completes;      | Persistent — runs until shut down or the   |
+|                   | resumable via ``SendMessage``      | session ends                               |
 +-------------------+------------------------------------+--------------------------------------------+
 | **Token cost**    | Lower — results summarized back    | Higher — each teammate is a separate       |
 |                   |                                    | Claude instance                            |
@@ -68,8 +69,8 @@ Side-by-Side Comparison
 +-------------------+------------------------------------+--------------------------------------------+
 | **Nesting**       | Subagents can spawn subagents      | Teammates cannot spawn their own teams     |
 +-------------------+------------------------------------+--------------------------------------------+
-| **User            | None — runs in background          | Direct: select in the agent panel, or      |
-| interaction**     |                                    | click pane                                 |
+| **User            | Via the agent panel; usually runs  | Direct: select in the agent panel, or      |
+| interaction**     | in the background                  | click pane                                 |
 +-------------------+------------------------------------+--------------------------------------------+
 | **Best for**      | Focused tasks where only the       | Complex work requiring discussion and      |
 |                   | result matters                     | collaboration                              |
@@ -188,6 +189,6 @@ Too many teammates
 ~~~~~~~~~~~~~~~~~~
 
 **Wrong**: “Spawn 10 teammates for this feature.” (Token costs scale
-linearly, coordination overhead grows quadratically.)
+linearly, and coordination overhead grows with every teammate.)
 
 **Right**: Start with 3-5. Scale up only if the work genuinely benefits.

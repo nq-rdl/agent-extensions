@@ -12,10 +12,12 @@ description: >-
   fits and shows the marker-file + hook gating pattern.
 argument-hint: "Describe the multi-step process to make reproducible (e.g. 'lint, then test, then release')"
 compatibility: >-
-  Reflects the Claude Code skills/commands unification (custom commands are
-  skills) and the hooks I/O contract as of v2.1.x. The hook `if` field requires
-  v2.1.85+. Agent-team task dependencies require the experimental
-  CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS flag. Dynamic workflows require v2.1.154+; plugin workflow distribution verified on v2.1.274.
+  Requires Claude Code v2.1.x with skills and commands unified. The hook `if`
+  field requires v2.1.85+. Agent-team task dependencies require the
+  experimental CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS flag. Dynamic workflows
+  require v2.1.154+; plugin workflow distribution verified on v2.1.274. Hook
+  output fields checked against the hooks docs with Claude Code 2.1.284 on
+  2026-09-29.
 user-invocable: true
 metadata:
   repo: https://github.com/nq-rdl/agent-extensions
@@ -86,7 +88,7 @@ There is **no built-in prerequisite graph** — hooks give you the *mechanism*
    mkdir -p .thing && touch .thing/step-1.done
    ```
 2. **A hook reads it** before step 2's work runs. `PreToolUse` is the earliest
-   block point; `UserPromptSubmit` gates at the prompt; `Stop` keeps the turn
+   tool-level block point; `UserPromptSubmit` gates the whole prompt earlier; `Stop` keeps the turn
    going until done. The hook inspects the filesystem and decides:
    ```bash
    #!/usr/bin/env bash

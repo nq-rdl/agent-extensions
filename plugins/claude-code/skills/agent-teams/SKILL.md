@@ -1,19 +1,18 @@
 ---
 license: CC-BY-4.0
 description: >-
-  Claude Code agent teams — coordinate multiple independent Claude Code sessions
-  working in parallel with shared task lists and inter-agent messaging. Use when
-  the user asks to create a team, spawn teammates, coordinate parallel work, or
-  describes work that benefits from parallel agents. Also triggers on
-  SendMessage, teammate mode, team lead, agent coordination, parallel sessions,
-  or 'can we parallelize this with agents?'. Helps with planning parallel
-  execution strategies and structuring team-based work.
+  Design and run Claude Code agent teams: parallel teammates with a shared task
+  list who message and challenge each other. Use when the user asks for a team
+  or teammates, wants parallel reviewers or investigators who debate findings,
+  asks whether to use a team or subagents, or mentions teammate mode, team lead,
+  or CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS.
 argument-hint: "Describe the work to parallelize (e.g., 'review PR #42 for security and performance')"
 compatibility: >-
-  Agent teams first shipped in Claude Code v2.1.32; this guidance assumes the
-  implicit per-session team of v2.1.178+ (TeamCreate/TeamDelete removed).
-  Checked against the agent-teams docs for v2.1.283 on 2026-09-28. Split-pane
-  mode requires tmux or iTerm2 with the it2 CLI.
+  Requires Claude Code v2.1.178+ (implicit per-session team; TeamCreate and
+  TeamDelete removed; teams first shipped in v2.1.32) with
+  CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS=1 and an interactive session. Split-pane
+  mode requires tmux or iTerm2 with the it2 CLI. Checked against the
+  agent-teams docs with Claude Code 2.1.284 on 2026-09-29.
 user-invocable: true
 metadata:
   repo: https://github.com/nq-rdl/agent-extensions
@@ -40,10 +39,10 @@ When designing a team, follow these steps:
 1. **Understand the work** — what is the user trying to accomplish?
 2. **Identify parallel lanes** — which parts can run independently?
 3. **Choose team vs subagents** — see [references/subagent-vs-team.rst](references/subagent-vs-team.rst) for the decision flowchart. Only recommend a team when teammates genuinely need to communicate with each other or coordinate via shared tasks.
-4. **Size the team** — aim for 2-5 teammates. More than 6 is rarely justified.
+4. **Size the team** — start with 3-5 teammates. More than 6 is rarely justified.
 5. **Define roles and ownership** — each teammate needs a clear name, responsibility, and file ownership boundaries to prevent overwrites.
 6. **Set dependency order** — which teammates must share interfaces before others can proceed?
-7. **Choose display mode** — `in-process` (default, one terminal) or `tmux` (split panes, requires tmux/iTerm2).
+7. **Choose display mode** — `in-process` (default, one terminal) or a split-pane mode (`auto`, `tmux`, `iterm2`); see *Display modes*.
 8. **Consider quality gates** — recommend `TeammateIdle`, `TaskCreated`, or `TaskCompleted` hooks where appropriate.
 
 ### Output Format
@@ -51,7 +50,7 @@ When designing a team, follow these steps:
 Present the team design as:
 
 ```
-## Team: <team-name>
+## Team plan: <short title>
 
 **Goal**: <one-sentence description>
 
@@ -134,9 +133,9 @@ bash scripts/check-config.sh --disable
 
 Teams add real value when:
 
-- **Teammates need to talk to each other** — subagents can only report back
-  to the parent; teammates can message each other, challenge findings, and
-  converge on answers together
+- **Teammates need to talk to each other** — subagents report back to the
+  parent; teammates share a task list, message each other, challenge findings,
+  and converge on answers together
 - **Work benefits from parallel exploration** — multiple independent agents
   investigating different angles of a problem simultaneously
 - **Tasks are large and independent** — each teammate owns a distinct piece
@@ -166,11 +165,17 @@ Have them each review and report findings.
 Every session has one implicit team (v2.1.178+); Claude spawns teammates
 directly with the Agent tool's `name` — there is no team-creation step.
 
+While teams are enabled, any subagent that Claude names launches as a
+teammate, so a team can form during ordinary delegation. Set
+`CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS` to `"0"` to get subagents back. Teammates
+are never spawned in `-p` mode or Agent SDK sessions; named subagents run as
+ordinary subagents there.
+
 ### Team sizing guidance
 
 | Team size | Best for |
 |-----------|----------|
-| 2-3 | Focused tasks: review, investigate, prototype |
+| 3 | Focused tasks: review, investigate, prototype (the usual start) |
 | 4-5 | Complex features: frontend + backend + tests + docs |
 | 6+ | Rarely justified — coordination overhead dominates |
 
@@ -186,8 +191,7 @@ Aim for **5-6 tasks per teammate** to keep everyone productive. If you have
 | `tmux` | Requires tmux or iTerm2 | Each teammate gets its own pane. |
 | `iterm2` | Requires the `it2` CLI | iTerm2 native split panes. |
 
-Set `teammateMode` in `~/.claude/settings.json` (older versions read
-`~/.claude.json`, which is still honoured):
+Set `teammateMode` in `~/.claude/settings.json`:
 
 ```json
 {
@@ -195,7 +199,7 @@ Set `teammateMode` in `~/.claude/settings.json` (older versions read
 }
 ```
 
-Or per-session: `claude --teammate-mode auto`
+Or per session: `claude --teammate-mode auto` (an experimental flag, hidden from `--help`).
 
 ### Specify teammates and models
 
@@ -222,8 +226,10 @@ commands still go through permission prompts in the lead session.
 ### Use subagent definitions for teammates
 
 Reference a subagent type from the project, user, or managed scope when
-spawning a teammate. The teammate inherits that subagent's system prompt, tools,
-and model:
+spawning a teammate. The teammate gets the definition's `tools` and `model`, and
+its body (appended to the default prompt in-process, replacing it in split
+panes). The definition's `skills` are not applied, and `mcpServers` apply only
+to split-pane teammates:
 
 ```text
 Spawn a teammate using the security-reviewer agent type to audit the auth module.
@@ -272,13 +278,14 @@ when the session ends, and the task list persists for resumed sessions.
 
 | Component | Role |
 |-----------|------|
-| **Team lead** | Main session that creates the team, spawns teammates, coordinates |
+| **Team lead** | Main session; its implicit team exists from startup; spawns and coordinates teammates |
 | **Teammates** | Separate Claude Code instances working on assigned tasks |
 | **Task list** | Shared work items at `~/.claude/tasks/{team-name}/` |
 | **Mailbox** | Inter-agent messaging system |
 
 Team config lives at `~/.claude/teams/{team-name}/config.json` (auto-generated,
-do not edit by hand — runtime state is overwritten on each update).
+do not edit by hand — runtime state is overwritten on each update). The team
+name is `session-` plus the first eight characters of the session ID.
 
 ### Context rules
 
@@ -289,8 +296,10 @@ do not edit by hand — runtime state is overwritten on each update).
 
 ### Permissions
 
-Teammates start with the lead's permission settings. Pre-approve common
-operations to reduce interruptions:
+Teammates start with the lead's permission mode, except `dontAsk`, which they
+do not inherit; if the lead skips permissions, so do all teammates. Their
+permission prompts surface in the lead session. Pre-approve common operations
+to reduce interruptions:
 
 ```json
 {
@@ -325,7 +334,7 @@ worthwhile. For routine tasks, a single session is more cost-effective.
 
 ## Limitations (Experimental)
 
-- No session resumption for in-process teammates (`/resume` won't restore them)
+- No session resumption for in-process teammates (`/resume` and `/rewind` do not restore them)
 - One implicit team per session; you can't create additional teams
 - No nested teams (teammates cannot spawn their own teams)
 - Lead is fixed for the lifetime of the team

@@ -69,11 +69,13 @@ a commit message, an MCP payload). Echoing them straight into
 Output-safety mechanics
 -----------------------
 
-- **Large strings.** ``additionalContext`` over ~10,000 characters is written to
-  a file and replaced with a preview + path (same as large tool results). Keep
-  injected context short and high-signal.
-- **suppressOutput.** Set ``"suppressOutput": true`` to keep a hook's stdout out
-  of the transcript (useful for noisy logging hooks).
+- **Large strings.** ``additionalContext``, ``systemMessage``,
+  ``initialUserMessage``, and plain stdout are each capped at 10,000
+  characters. Over the cap, Claude Code saves the text to a file and passes the
+  path plus a preview of up to 2,000 characters; Claude is not told to read
+  the file. Keep injected context short and high-signal.
+- **suppressOutput** has no effect. A successful hook's stdout is never shown in
+  the transcript; it goes to the debug log.
 - **systemMessage.** Use ``"systemMessage"`` for warnings meant for the *user*,
   not for Claude.
 - **Keep stdout clean.** On exit 0, stdout is parsed as JSON. Stray text — a

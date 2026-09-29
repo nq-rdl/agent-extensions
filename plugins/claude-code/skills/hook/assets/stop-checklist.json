@@ -1,5 +1,5 @@
 {
-  "description": "Continue the turn until checks pass. Stop hooks use top-level decision:block to keep working; reason becomes Claude's next instruction. Respects the stop_hook_active block cap.",
+  "description": "Force one completion-checklist pass per stop: the first Stop is blocked with a reminder, the retry (stop_hook_active) is allowed. Stop hooks use top-level decision:block to keep working; reason becomes Claude's next instruction.",
   "hooks": {
     "Stop": [
       {

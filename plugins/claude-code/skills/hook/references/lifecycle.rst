@@ -37,8 +37,10 @@ Agentic loop (per tool call)
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 - ``PreToolUse`` — before a tool call executes. **Can block.**
-- ``PermissionRequest`` — a permission dialog is about to appear. (Does **not**
-  fire in non-interactive ``-p`` mode — use ``PreToolUse`` there.)
+- ``PermissionRequest`` — a permission dialog is about to appear. In ``-p``
+  mode a prompt exists only when an Agent SDK ``canUseTool`` callback supplies
+  it (background subagents still run these hooks); use ``PreToolUse`` for
+  automated decisions in plain ``-p`` runs.
 - ``PermissionDenied`` — a tool call was denied by the auto-mode classifier.
 - ``PostToolUse`` — after a tool call succeeds.
 - ``PostToolUseFailure`` — after a tool call fails.
@@ -75,8 +77,10 @@ continues (https://code.claude.com/docs/en/hooks#exit-code-2-behavior-per-event)
 Event                            Blocks?  Effect of a block
 ================================ ======== =================================================
 ``PreToolUse``                   Yes      Blocks the tool call
-``PermissionRequest``            Yes      Denies permission
-``UserPromptSubmit``             Yes      Blocks the prompt, erases it
+``PermissionRequest``            **No**   Exit 2 is not honored; deny with
+                                          ``decision.behavior: "deny"`` JSON
+``UserPromptSubmit``             Yes      Blocks the prompt, erases it (the
+                                          message goes to the user, not Claude)
 ``UserPromptExpansion``          Yes      Blocks the expansion
 ``Stop``                         Yes      Prevents stopping; conversation continues
 ``SubagentStop``                 Yes      Prevents the subagent from stopping
@@ -85,15 +89,26 @@ Event                            Blocks?  Effect of a block
 ``TaskCompleted``                Yes      Prevents completion
 ``ConfigChange``                 Yes      Blocks the config change
 ``PreCompact``                   Yes      Blocks compaction
+``PreModelSwitch``               Yes      Blocks the model switch
 ``WorktreeCreate``               Yes      Fails worktree creation (any non-zero exit)
+``WorktreeRemove``               Yes      Fails removal if the directory remains
+                                          (any non-zero exit)
 ``Elicitation``                  Yes      Denies the elicitation
 ``ElicitationResult``            Yes      Blocks the response
 ``PostToolBatch``                Yes      Stops the agentic loop before the next model call
 ``PostToolUse``                  No       Shows stderr to Claude (tool already ran)
 ``PostToolUseFailure``           No       Shows stderr to Claude
 ``PermissionDenied``             No       Ignored — use JSON ``{"retry": true}`` instead
-``SessionStart`` / ``Setup`` /   No       Shows stderr to the user only
-``Notification`` / others
+``SessionStart``                 No       Shows stderr to the user only (also
+                                          ``SessionEnd``, ``SubagentStart``,
+                                          ``CwdChanged``, ``FileChanged``,
+                                          ``PostCompact``, ``PostModelSwitch``)
+``Setup``                        No       Exit code and stderr are ignored (also
+                                          ``Notification``; ``InstructionsLoaded``
+                                          ignores the exit code)
+``StopFailure``                  No       Output and exit code ignored, except
+                                          ``terminalSequence``
+``DirectoryAdded``               No       stderr goes to the debug log
 ================================ ======== =================================================
 
 .. important::

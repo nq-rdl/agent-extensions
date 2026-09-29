@@ -1,5 +1,5 @@
 {
-  "description": "Model-judged completion check. type:prompt sends the prompt + event data to a Claude model (Haiku by default) which returns {\"ok\":bool,\"reason\":...}. ok:false on Stop keeps Claude working with reason as the next instruction.",
+  "description": "Model-judged completion check. type:prompt sends the prompt + event data to a Claude model (the background model by default) which returns {\"ok\":bool,\"reason\":...}. ok:false on Stop keeps Claude working with reason as the next instruction.",
   "hooks": {
     "Stop": [
       {

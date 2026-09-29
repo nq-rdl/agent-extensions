@@ -22,29 +22,51 @@ can run the hook through a model instead of a shell command. Two types:
 
 --------------
 
+Where they run
+--------------
+
+Prompt and agent hooks run only on ``PreToolUse``, ``PostToolUse``,
+``PostToolUseFailure``, ``PostToolBatch``, ``PermissionDenied``, ``Stop``,
+``SubagentStop``, ``TaskCreated``, ``TaskCompleted``, ``TeammateIdle``,
+``UserPromptSubmit`` and ``UserPromptExpansion``. ``PermissionRequest`` takes
+prompt hooks but skips agent hooks. Other events, including ``SessionStart``,
+need a command (or http / mcp_tool) hook.
+
+--------------
+
 The ``ok`` / ``reason`` response format
 ----------------------------------------
 
 Both prompt and agent hooks make the model return:
 
 - ``{"ok": true}`` — the action proceeds.
-- ``{"ok": false, "reason": "..."}`` — what happens depends on the event:
+- ``{"ok": false, "reason": "..."}`` — what happens depends on the event and,
+  for prompt hooks, on ``continueOnBlock`` (default ``false``). Agent hooks
+  have no such field and always behave like ``continueOnBlock: true``:
 
   - ``Stop`` / ``SubagentStop``: ``reason`` is fed back to Claude so it keeps
-    working (use it as the next instruction).
-  - ``PreToolUse``: the tool call is denied and ``reason`` is returned to Claude
-    as the tool error, so it can adjust and continue.
-  - ``PostToolUse`` / ``PostToolBatch`` / ``UserPromptSubmit`` /
-    ``UserPromptExpansion``: the turn ends and ``reason`` appears in the chat as
-    a warning line.
+    working (use it as the next instruction), unless a prompt hook also returns
+    ``"impossible": true``, which lets the turn end.
+  - ``PreToolUse``: the tool call is denied. A prompt hook by default ends the
+    turn with ``reason`` as a warning line; with ``continueOnBlock: true`` (and
+    for agent hooks) ``reason`` is returned to Claude as the tool error so it
+    can adjust and continue.
+  - ``PostToolUse``: a prompt hook by default ends the turn with a warning
+    line; with ``continueOnBlock: true`` (and for agent hooks) the reason is
+    fed back and the turn continues.
+  - ``PostToolBatch`` / ``UserPromptSubmit`` / ``UserPromptExpansion``: the
+    turn ends and ``reason`` appears as a warning line.
+  - ``PostToolUseFailure`` / ``TaskCreated``: ``reason`` returns to Claude as a
+    tool error and the turn continues.
+  - ``PermissionRequest`` / ``PermissionDenied``: ``ok: false`` has no effect.
 
 --------------
 
 Prompt-based hooks (``type: "prompt"``)
 ---------------------------------------
 
-A single-turn LLM evaluation. By default it uses **Haiku**; set ``model`` for
-more capability. Use prompt hooks when the **hook input data alone** is enough
+A single-turn LLM evaluation. By default it uses the model Claude Code uses
+for background tasks; set ``model`` for more capability. Use prompt hooks when the **hook input data alone** is enough
 to decide. Default timeout: 30 s.
 
 .. code:: json
@@ -86,7 +108,8 @@ Agent-based hooks (``type: "agent"``) — experimental
 When verification requires inspecting files or running commands, an agent hook
 spawns a subagent that can read files, search code, and use tools before
 returning the same ``ok`` / ``reason`` decision. Default timeout: 60 s, up to 50
-tool-use turns. ``$ARGUMENTS`` interpolates provided arguments into the prompt.
+tool-use turns. ``$ARGUMENTS`` is replaced by the hook input JSON; without it,
+the input JSON is appended to the prompt.
 
 .. code:: json
 

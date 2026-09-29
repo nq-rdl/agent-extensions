@@ -7,7 +7,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "path=$(jq -r '.tool_input.file_path // empty'); [ -n \"$path\" ] && npx prettier --write -- \"$path\"",
+            "command": "path=$(jq -r '.tool_input.file_path // empty'); if [ -n \"$path\" ]; then npx prettier --write -- \"$path\"; fi",
             "timeout": 30
           }
         ]
