@@ -100,6 +100,9 @@ Write `reviews/$SLUG/explain.json` (state marker only — not a report):
  "at": "<UTC ISO>", "by": "<analyst>", "completed": true, "last_step": "outputs"}
 ```
 
+`by` is the analyst's handle: GitHub login where known, else `git config user.name`, else ask.
+Never use `user.email`: the file is committed, and the guard refuses a `by` with an `@`.
+
 A stop writes `completed: false` with the step reached, so the next run can resume.
 
 At release, `/data-request:release <tag>` drafts the researcher-facing summary from the release's

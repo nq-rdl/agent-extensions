@@ -11,7 +11,8 @@
 #   config.json                         ask   (config changes go through /data-request:setup)
 #   releases/*/release.json             Write → content run through `release.sh check`; Edit → deny
 #   releases/*/release.md               deny  (rendered from the record by `release.sh render`)
-#   reviews/*/*.draft.json, explain.json, source.sql, templates/*   pass
+#   reviews/*/explain.json              Write → its `by` must be a handle, not an email (#419); Edit → deny
+#   reviews/*/*.draft.json, source.sql, templates/*   pass
 # This is an invariant check, not proof that a human answered: it makes "forgot to ask" a denied
 # tool call with the offending ids named, and leaves a fabricated confirmation auditable in the
 # recorded document. Bash heredocs into .sqlreview/ are out of its reach by design (guardrail, not sandbox).
@@ -100,6 +101,15 @@ case "$rel" in
     decide deny "Lift ledgers require publication checks. Write lifts.draft.json, then run sqlreview.sh publish <slug> lifts <draft> to validate evidence revisions and lifecycle transitions." ;;
   reviews/*/review.json|reviews/*/scope.json)
     ;;  # validated below
+  reviews/*/explain.json)
+    # The walkthrough state marker is committed, so its analyst identity is checked (#419).
+    [ "$tool" = "Write" ] || decide deny "$rel records who ran the walkthrough and is checked as a whole. Write the complete file instead of an Edit fragment."
+    [ -n "$checker" ] || decide deny "SQL Review guard cannot find sqlreview.sh, so it cannot check $rel. Reinstall data-request@rdl-agent-extensions before writing it."
+    command -v jq >/dev/null 2>&1 || decide deny "$rel is checked with jq, which is not installed. Install jq (>= 1.6) before writing it."
+    out="$(field .tool_input.content | jq -r -L "$(dirname "$checker")" 'include "sqlreview-identity"; identity_violations' 2>&1)" ||
+      decide deny "$rel is not valid JSON: $(printf '%s' "$out" | tr '\n' ';' | sed 's/;$//')"
+    [ -z "$out" ] || decide deny "$rel rejected: $(printf '%s' "$out" | tr '\n' ';' | sed 's/;$//'). Record the analyst by GitHub login, else git config user.name; never user.email. If neither is available, ask."
+    exit 0 ;;
   releases/*/release.md)
     decide deny "$rel is the rendered release body — never hand-write it. Update releases/<tag>/release.json (whole-file Write) and re-render it with release.sh render: S=\${CLAUDE_PLUGIN_ROOT}/skills/setup/scripts; bash \"\$S/release.sh\" render <record> > <body>" ;;
   releases/*/release.json)

@@ -131,7 +131,8 @@ evidence and the proposed correction, and record the analyst's resolution. An un
 holds the release: the record stays `draft`.
 
 Never fill `decided_by` or `decided_at` from anything but an answered question. `decided_by` is
-the analyst (`git config user.name` / `user.email`, else ask). `decided_at` is now (UTC ISO). If
+the analyst's handle (GitHub login where known, else `git config user.name`, else ask; never
+`user.email` — `release.sh check` refuses an `@`). `recorded_by` and `resolved_by` follow the same rule. `decided_at` is now (UTC ISO). If
 the analyst stops, write a `draft` record with the undecided claims `pending`, and say so.
 
 ## 6. Record and render

@@ -181,7 +181,8 @@ Reworded items are asked again. Only confirmed items reach `review.json`; reject
 the draft. If the engineer stops, leave the draft and write nothing final — say so.
 
 **Never fill `confirmed_by`, `confirmed_at` or `confirmed_revision` from anything but an answered
-question** (a bulk answer, carry-over or `bulk`, counts for the items it listed, and only those): `confirmed_by` is the user (`git config user.name` / `user.email`, else ask),
+question** (a bulk answer, carry-over or `bulk`, counts for the items it listed, and only those): `confirmed_by` is the user's handle (GitHub
+login where known, else `git config user.name`, else ask; never `user.email` — `check` refuses an `@`),
 `confirmed_at` is now (UTC ISO), `confirmed_revision` equals the document `revision` — except an
 item carried forward on an update, which takes exactly the `set` fields `carryforward` printed.
 Never set `carried_from_revision` by hand.

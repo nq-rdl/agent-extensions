@@ -117,8 +117,9 @@ wording rewritten to state the confirmed decision.
 ## Write, render, hand over
 
 Only confirmed items go into `scope.json`. **Never fill `confirmed_by`, `confirmed_at` or
-`confirmed_revision` from anything but an answered question** — `confirmed_by` is the user (name
-or email from `git config user.name` / `user.email`, else ask), `confirmed_at` is now (UTC ISO),
+`confirmed_revision` from anything but an answered question** — `confirmed_by` is the user's handle
+(GitHub login where known, else `git config user.name`, else ask; never `user.email` — `check`
+refuses an `@`), `confirmed_at` is now (UTC ISO),
 `confirmed_revision` equals the document `revision` — except a carried item, which takes exactly
 the `set` fields `carryforward` printed. Write the complete confirmed document to
 `.sqlreview/reviews/$SLUG/scope.draft.json`, then publish it with the command below:

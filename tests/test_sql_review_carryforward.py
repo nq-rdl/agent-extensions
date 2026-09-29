@@ -25,7 +25,7 @@ LINE_SHIFT = "-- monthly admissions\n" + SQL_V1                       # every li
 CODE_SHIFT = "SET NOCOUNT ON;\n" + SQL_V1                             # every line moves down one (executable)
 GOVERNED_EDIT = SQL_V1.replace("IS NOT NULL", "IS NOT NULL AND ward <> 'X'")  # line 3
 
-WHO = {"confirmed_by": "analyst@example", "confirmed_at": "2026-09-15T00:00:00Z"}
+WHO = {"confirmed_by": "analyst-login", "confirmed_at": "2026-09-15T00:00:00Z"}
 
 
 def sha(text):
@@ -172,7 +172,7 @@ class ReviewPublish(Base):
         self.assertEqual(published["assumptions"][0]["confirmed_revision"], 1)
         # the rendered table shows the revision a human confirmed it at, marked as carried
         self.assertEqual(run(["render", "q", "review"], self.p.root).returncode, 0)
-        self.assertIn("| analyst@example | 1 (carried) |", (self.d / "review.md").read_text())
+        self.assertIn("| analyst-login | 1 (carried) |", (self.d / "review.md").read_text())
 
     def test_unrelated_edit_carries_located_items(self):
         self.edit(UNRELATED_EDIT)
@@ -368,7 +368,7 @@ class CarryForwardHelper(Base):
         doc = json.loads(json.dumps(draft))
         for k in ("assumptions", "limitations"):
             for it in doc[k]:
-                it.update(carry.get((k, it["id"]), {"status": "confirmed", "confirmed_by": "engineer@example",
+                it.update(carry.get((k, it["id"]), {"status": "confirmed", "confirmed_by": "engineer-login",
                                                     "confirmed_at": "2026-09-23T00:00:00Z", "confirmed_revision": 2}))
         bad = json.loads(json.dumps(doc))
         bad["assumptions"][0].update(out["carry"][0]["set"])  # A1 was offered in bulk, not carried

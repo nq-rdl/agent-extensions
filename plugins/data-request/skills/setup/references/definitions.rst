@@ -53,6 +53,16 @@ line count may not change), or, with no location, the whole SQL. ``sqlreview.sh 
 which draft items qualify; every other item is re-put to the human. ``publish --reconfirm-all``
 refuses carried items when a full re-walk is wanted.
 
+Recorded identity
+-----------------
+
+Every ``by`` and ``*_by`` field (``confirmed_by``, ``recorded_by``, ``decided_by``,
+``resolved_by``, the ``by`` of ``changes`` and ``explain.json``) records a person by handle: the
+GitHub login where known, else ``git config user.name``. If neither is available, ask. Never use
+``git config user.email``: these records are committed, so an email address in one is published
+with the request. ``sqlreview.sh check``, ``release.sh check`` and the guard refuse any such value
+that contains ``@``.
+
 Lift candidate
 --------------
 

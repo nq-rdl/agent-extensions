@@ -280,7 +280,7 @@ def git(cwd, *args):
 
 def item(id_, text, revision=1):
     return {"id": id_, "text": text, "rationale": "because", "location": None,
-            "status": "confirmed", "confirmed_by": "engineer@example",
+            "status": "confirmed", "confirmed_by": "engineer-login",
             "confirmed_at": "2026-09-28T00:00:00Z", "confirmed_revision": revision}
 
 
@@ -323,7 +323,7 @@ class Project:
         (d / "source.sql").write_text(sql)
         doc = {"schemaVersion": 2, "kind": "review", "slug": slug, "sql_path": sql_path,
                "title": "Falls", "revision": 2, "recorded_at": "2026-09-28T00:00:00Z",
-               "recorded_by": "engineer@example",
+               "recorded_by": "engineer-login",
                "sql_sha256": hashlib.sha256(sql.encode()).hexdigest(),
                "git_commit": self.review_commit, "git_dirty": False,
                "purpose": "Falls presentations.", "grain": "one row per encounter",
@@ -333,7 +333,7 @@ class Project:
                "assumptions": [item("A1", "Falls are identified by complaint text.", 2)],
                "limitations": [item("L1", "Text matching includes some non-falls.", 2)],
                "open_questions": ["Is the diagnosis also a source?"],
-               "changes": [{"revision": 2, "at": "2026-09-28T00:00:00Z", "by": "engineer@example",
+               "changes": [{"revision": 2, "at": "2026-09-28T00:00:00Z", "by": "engineer-login",
                             "summary": "update"}]}
         (d / "review.json").write_text(json.dumps(doc, indent=2))
 
@@ -433,7 +433,7 @@ class Evidence(unittest.TestCase):
         (d / "scope.json").write_text(json.dumps({
             "schemaVersion": 2, "kind": "scope", "slug": "sql__v1__later",
             "sql_path": "sql/v1/later.sql", "title": "Later", "revision": 1,
-            "recorded_at": "2026-09-28T00:00:00Z", "recorded_by": "engineer@example",
+            "recorded_at": "2026-09-28T00:00:00Z", "recorded_by": "engineer-login",
             "git_commit": None, "intent": "Later.", "inputs": [], "outputs": [],
             "assumptions": [], "limitations": [], "open_questions": []}))
         self.p.commit("scope")
@@ -482,14 +482,14 @@ def claim(id_, section_, text, decision="accepted", final=None, sources=None):
          "final": text if decision == "accepted" else final,
          "sources": sources or [{"kind": "file", "path": "src/pipelines/falls.py", "ref": "v1.0.0"}]}
     if decision != "pending":
-        d.update(decided_by="analyst@example", decided_at="2026-09-28T01:00:00Z")
+        d.update(decided_by="analyst-login", decided_at="2026-09-28T01:00:00Z")
     return d
 
 
 def record(**over):
     d = {"schemaVersion": 1, "kind": "release", "tag": "v1.0.0", "commit": "a" * 40,
          "status": "approved", "recorded_at": "2026-09-28T01:00:00Z",
-         "recorded_by": "analyst@example",
+         "recorded_by": "analyst-login",
          "evidence": [{"slug": SLUG, "revision": 2, "applies": "current"},
                       {"slug": "sql__v0__draft", "revision": 1, "applies": "missing-at-ref"}],
          "claims": [
@@ -503,7 +503,7 @@ def record(**over):
          "questions": [{"id": "Q1", "text": "Is the diagnosis a fall source?",
                         "sources": [{"kind": "review", "slug": SLUG, "item": "A1", "revision": 2}],
                         "resolution": "Yes: the pipeline also matches the diagnosis.",
-                        "resolved_by": "analyst@example", "resolved_at": "2026-09-28T01:00:00Z"}]}
+                        "resolved_by": "analyst-login", "resolved_at": "2026-09-28T01:00:00Z"}]}
     d.update(over)
     return d
 
