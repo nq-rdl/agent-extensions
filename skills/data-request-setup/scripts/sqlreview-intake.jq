@@ -1,11 +1,17 @@
 # Answers-sidecar contract: skills/setup/references/analyst-intake.rst.
 # Never echo malformed source values in diagnostics.
 def ine: type == "string" and test("\\S");
+# jq strptime/strftime can retain February 30; prove Gregorian days explicitly.
+def ical:
+  capture("^(?<y>[0-9]{4})-(?<m>[0-9]{2})-(?<d>[0-9]{2})")
+  | (.y | tonumber) as $y | (.m | tonumber) as $m | (.d | tonumber) as $d
+  | ($y % 4 == 0 and ($y % 100 != 0 or $y % 400 == 0)) as $leap
+  | $y >= 1 and $m >= 1 and $m <= 12 and $d >= 1 and
+    $d <= ([31, (if $leap then 29 else 28 end), 31, 30, 31, 30, 31, 31, 30, 31, 30, 31][$m - 1]);
 def iutc: type == "string" and test("^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}Z$") and
-  (. as $date | try (strptime("%Y-%m-%dT%H:%M:%SZ") | strftime("%Y-%m-%dT%H:%M:%SZ") == $date) catch false);
+  ical and (.[11:13] | tonumber) <= 23 and (.[14:16] | tonumber) <= 59 and (.[17:19] | tonumber) <= 59;
 def iactor: ine and (contains("@") | not);
-def iorigin: iutc or (type == "string" and test("^[0-9]{4}-[0-9]{2}-[0-9]{2}$") and
-  (. as $date | try (strptime("%Y-%m-%d") | strftime("%Y-%m-%d") == $date) catch false));
+def iorigin: iutc or (type == "string" and test("^[0-9]{4}-[0-9]{2}-[0-9]{2}$") and ical);
 def idecision:
   type == "object" and (.id | type == "string" and test("^[A-Za-z0-9][A-Za-z0-9_-]*$"))
   and (.topic as $t | ["cohort", "codes", "outcomes", "outputs", "grain", "governance"] | index($t) != null)

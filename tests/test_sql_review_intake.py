@@ -22,6 +22,25 @@ def intake():
 
 
 class Intake(unittest.TestCase):
+    def test_calendar_dates_and_utc_clock_match_python_validator(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            p = Project(tmp)
+            for field, date, valid in (
+                ("origin", "2026-02-30", False), ("origin", "2025-02-29", False),
+                ("origin", "2000-02-29", True), ("origin", "1900-02-29", False),
+                ("origin", "2024-02-29", True), ("confirmation", "2026-02-30T10:00:00Z", False),
+                ("confirmation", "2024-02-29T23:59:59Z", True),
+                ("confirmation", "2026-09-29T24:00:00Z", False),
+                ("confirmation", "2026-09-29T10:00:60Z", False)):
+                with self.subTest(field=field, date=date):
+                    value = intake()
+                    if field == "origin": value["decisions"][0]["decided"]["at"] = date
+                    else: value["decisions"][0]["confirmed_at"] = date
+                    source = p.root / "answers.intake.json"
+                    source.write_text(json.dumps(value))
+                    result = run(["intake", str(source), "1"], p.root)
+                    self.assertEqual(result.returncode, 0 if valid else 4, result.stderr)
+
     def test_installed_helpers_import_same_confirmations(self):
         with tempfile.TemporaryDirectory() as tmp:
             p = Project(tmp)
