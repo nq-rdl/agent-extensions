@@ -59,6 +59,7 @@ nav = [
         { "Delegation" = "skill-review/delegation.md" },
         { "GitHub workflows" = "skill-review/gh-workflows.md" },
         { "Hooks" = "skill-review/hooks.md" },
+        { "New plugins" = "skill-review/new-plugins.md" },
         { "OpenCode and Spec Kit" = "skill-review/opencode-speckit.md" },
         { "R and Shiny" = "skill-review/r-shiny.md" },
         { "Tools and docs" = "skill-review/tools-docs.md" },
