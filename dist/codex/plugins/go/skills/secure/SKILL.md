@@ -1,13 +1,11 @@
 ---
 name: secure
 license: CC-BY-4.0
-description: Secure Go error handling and information leakage prevention. Use whenever
-  writing Go code that handles errors in APIs, services, or any code that crosses
-  trust boundaries — HTTP handlers, gRPC services, CLI tools with user-facing output.
-  Also trigger when reviewing Go error handling, implementing structured logging,
-  or when the user mentions security, error sanitization, or preventing data leaks
-  through error messages — even if they don't explicitly say "security". Covers domain
-  error types, trust boundary translation, log redaction with slog, and safe API responses.
+description: 'Secure Go error handling across trust boundaries: never return err.Error()
+  to external callers, translate domain errors at HTTP, gRPC, and CLI boundaries,
+  redact secrets in slog logs, and return safe API error responses. Use when writing
+  or reviewing Go handlers, services, or error and logging code whose output reaches
+  users or logs, even if security is not mentioned.'
 metadata:
   repo: https://github.com/nq-rdl/agent-extensions
 ---

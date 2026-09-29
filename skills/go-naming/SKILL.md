@@ -2,13 +2,12 @@
 name: go-naming
 license: CC-BY-4.0
 description: >-
-  Go naming conventions and idiomatic identifier choices. Use when writing new
-  Go code, reviewing Go naming decisions, naming packages, types, functions,
-  variables, interfaces, constants, or error values — or when the user asks
-  about Go naming style, MixedCaps, getter/setter naming, receiver names,
-  initialism casing (URL, ID, HTTP), or when they are struggling with what to
-  name something in Go. Covers Effective Go, Google Go Style Guide, and
-  community conventions.
+  Go naming conventions for packages, types, functions, methods, receivers,
+  interfaces, constants, and error values: MixedCaps, initialism casing (URL,
+  ID, HTTP), getters without Get, and no package-name stutter. Use when
+  writing or reviewing Go code where names matter, or when the user asks what
+  to name something in Go. Based on Effective Go and the Google Go Style
+  Guide.
 metadata:
   repo: https://github.com/nq-rdl/agent-extensions
 ---
