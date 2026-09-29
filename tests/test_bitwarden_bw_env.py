@@ -157,6 +157,43 @@ class BwEnvRoundTrip(unittest.TestCase):
         self.assertEqual(CANONICAL.read_bytes(), PACKAGED.read_bytes(),
                          "plugin copy is stale: run pixi run bash scripts/sync-plugins.sh bitwarden")
 
+    def test_login_example_keeps_token_out_of_argv_and_output(self):
+        reference = self.script.parent.parent / "references" / "cli.rst"
+        example = reference.read_text().split(
+            "   # Login item (type=1) with a hidden custom field.\n", 1
+        )[1].split("   # Create a folder", 1)[0]
+        example = textwrap.dedent(example)
+        real_jq = shutil.which("jq")
+        self.assertIsNotNone(real_jq)
+        wrapper = self.tmp / "bin" / "jq"
+        wrapper.write_text(
+            "#!/usr/bin/env python3\n"
+            "import json, os, sys\n"
+            "with open(os.environ['ARGV_LOG'], 'a') as log:\n"
+            "    log.write(json.dumps(sys.argv[1:]) + '\\n')\n"
+            f"os.execv({real_jq!r}, [{real_jq!r}] + sys.argv[1:])\n"
+        )
+        wrapper.chmod(0o755)
+        self.env["ARGV_LOG"] = str(self.tmp / "argv.jsonl")
+        token = "FAKE-TOKEN-quote' space $dollar \\backslash"
+        proc = subprocess.run(
+            ["bash", "-c", "set -euo pipefail\n" + example],
+            input=token + "\n", capture_output=True, text=True,
+            env=self.env, cwd=self.tmp / "work", timeout=60,
+        )
+        self.assertEqual(proc.returncode, 0, proc.stderr)
+        items = json.loads((self.tmp / "state" / "items.json").read_text())
+        self.assertEqual(items[0]["fields"], [
+            {"name": "GITHUB_TOKEN", "value": token, "type": 1}
+        ])
+        self.assertEqual(proc.stdout.strip(), items[0]["id"])
+        self.assertNotIn(token, proc.stdout + proc.stderr)
+        calls = [json.loads(line) for line in
+                 (self.tmp / "argv.jsonl").read_text().splitlines()]
+        self.assertGreater(len(calls), 0)
+        self.assertFalse(any(token in arg for args in calls for arg in args),
+                         "token exposed in jq process arguments")
+
     def test_bwc_then_bwe_loads_dotenv_values(self):
         proc = self.sh('bwc fake-app-dev && bwe fake-app-dev && ' + self.dump_loaded())
         self.assertEqual(proc.returncode, 0, proc.stderr)

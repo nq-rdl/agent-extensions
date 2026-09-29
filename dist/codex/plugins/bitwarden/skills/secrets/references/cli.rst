@@ -138,11 +138,11 @@ notes and field values included. In scripts, keep only the ID
    # which also normalises the values so bwe can load them.
 
    # Login item (type=1) with a hidden custom field.
-   # read -rs keeps the secret out of shell history and argv listings.
+   # read -rs avoids shell history; the pipe keeps the value out of jq argv.
    read -rs -p "Token: " secret; echo
    bw get template item \
      | jq --arg name "github-credentials" \
-          --arg secret "$secret" \
+           --rawfile secret <(printf '%s' "$secret") \
           '.type = 1 | .name = $name |
            .fields = [{"name":"GITHUB_TOKEN","value":$secret,"type":1}]' \
      | bw encode | bw create item | jq -r .id

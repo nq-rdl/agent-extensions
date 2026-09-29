@@ -75,8 +75,10 @@ source repository, using a fake `bw`):
 
 When you drive `bw` directly instead of through the script, keep the same
 rules: pipe `bw create`/`bw edit` output to `jq -r .id`, and never put a secret
-on the command line (`--arg secret ghp_...` lands in shell history); read it
-with `read -rs` first.
+on the command line (`--arg secret ghp_...` lands in shell history). Read it
+with `read -rs`, then pass it through a pipe as in the Login example in
+[references/cli.rst](references/cli.rst): `--arg secret "$secret"` still exposes
+the expanded value in process arguments.
 
 ## Vault naming
 
