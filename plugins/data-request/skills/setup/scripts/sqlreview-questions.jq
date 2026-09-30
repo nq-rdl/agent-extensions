@@ -40,4 +40,12 @@ def legacy_covered($scope; $review):
   .questions as $qs
   | all(($scope.open_questions // [])[]; . as $text | any($qs[]; .text == $text and .applies == "scope"))
     and all(($review.open_questions // [])[]; . as $text | any($qs[]; .text == $text));
+# Both staged scope evidence and publication must preserve the authoritative history.
+def question_history_retained($old):
+  . as $new | .slug == $old.slug and .sql_path == $old.sql_path
+  and all($old.questions[]; . as $prior | [$new.questions[] | select(.id == $prior.id)] as $matches |
+    ($matches | length) == 1 and ($matches[0] |
+      .text == $prior.text and .applies == $prior.applies
+      and (if $prior.status == "closed" then . == $prior else true end)))
+  and all(.questions[]; . as $q | if any($old.questions[]; .id == $q.id) then true else .status == "open" end);
 def visible_questions($kind): .questions |= map(select($kind == "review" or .applies == "scope"));

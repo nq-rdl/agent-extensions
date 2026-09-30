@@ -38,7 +38,7 @@
 #                                              default: review.draft.json, else scope.draft.json; seed from published JSON
 #                                              changed/ambiguous ranges stay untouched in walk; never publish or confirm
 #   impact SLUG                                heuristic: identifiers in the diff traced into unchanged lines
-#   notes SQL [--against JSON] [--confirmed-by HANDLE]
+#   notes SQL [--against JSON] [--questions JSON] [--confirmed-by HANDLE]
 #                                              read-only: parse the query-builder >= 0.6.0 analysis-notes header
 #                                              (leading /* assumptions: / limitations: */ block in the first GO batch,
 #                                              before any -- @extract: marker) into JSON {present, lines,
@@ -46,6 +46,10 @@
 #                                              consequence becomes its rationale; absent detail -> null; no header
 #                                              -> present false, exit 0. --against adds match {id, rationale_same}
 #                                              (same list, same text) from a review/scope/draft JSON, else null.
+#                                              Scope --against adds scope_check: unmatched_header, rationale_differences,
+#                                              and question_checks (all open scope-question/header pairs; NOT conflicts).
+#                                              --questions selects a staged store; default: sibling questions.json, else
+#                                              legacy projection. A declared missing store fails; stage fresh questions.
 #                                              Review --against + explicit human HANDLE adds header_carry_over and
 #                                              header_walk with git-source evidence; never sets confirmed_*.
 #                                              Needs no .sqlreview/. Exit 4: malformed header, "line N: why" on stderr
@@ -1035,10 +1039,11 @@ _notes_scan() { # <sql file> → records separated by \037: H start end · I kin
 }
 
 cmd_notes() {
-  local sql="" against="" confirmer="" recs errs parsed
+  local sql="" against="" questions="" confirmer="" recs errs parsed
   while [ $# -gt 0 ]; do
     case "$1" in
       --against) [ $# -ge 2 ] || usage; against="$2"; shift ;;
+      --questions) [ $# -ge 2 ] || usage; questions="$2"; shift ;;
       --confirmed-by) [ $# -ge 2 ] || usage; confirmer="$2"; shift ;;
       -*) usage ;;
       *) [ -z "$sql" ] || usage; sql="$1" ;;
@@ -1052,6 +1057,7 @@ cmd_notes() {
     [ -f "$against" ] && [ -r "$against" ] || sr_die 2 "no such readable file: $against"
     jq -e 'type == "object"' "$against" >/dev/null 2>&1 || sr_die 4 "invalid JSON: $against"
   fi
+  [ -z "$questions" ] || { [ -n "$against" ] && [ "$(jq -r .kind "$against")" = scope ]; } || usage
   recs="$(_notes_scan "$sql")" || sr_die 2 "cannot read $sql"
   errs="$(printf '%s\n' "$recs" | awk 'BEGIN { FS = "\037" } $1 == "E" { printf "line %s: %s\n", $2, $3 }')"
   [ -z "$errs" ] || sr_die 4 "malformed analysis-notes header in $sql: $errs"
@@ -1067,10 +1073,54 @@ cmd_notes() {
           end];
     {present: ($h != null), lines: (if $h == null then null else [($h[1] | tonumber), ($h[2] | tonumber)] end),
      assumptions: items("assumptions"), limitations: items("limitations")}')" || sr_die 2 "cannot parse notes"
-  if [ -n "$against" ] && [ "$(jq -r .kind "$against")" = review ] &&
+  if [ -n "$against" ] && [ "$(jq -r .kind "$against")" = scope ]; then
+    _scope_notes "$against" "$questions" "$parsed"
+  elif [ -n "$against" ] && [ "$(jq -r .kind "$against")" = review ] &&
      { [ -n "$confirmer" ] || [ "$(printf '%s' "$parsed" | jq -r .present)" = true ]; }; then
     _header_decisions "$sql" "$against" "$confirmer" "$parsed"
   else printf '%s\n' "$parsed"; fi
+}
+
+# Pre-publish scope evidence (#433). Explicit staged questions support first bootstrap without
+# publishing early; resume defaults to the authoritative store, not historical embedded strings.
+_scope_notes() { # scope-draft optional-question-draft parsed-notes
+  local draft="$1" questions="$2" parsed="$3" qdoc diagnostics published
+  if [ -z "$questions" ]; then
+    questions="$(dirname "$draft")/questions.json"
+    sr_no_symlinks "$(sr_abspath "$questions")" || exit 2
+    if [ ! -e "$questions" ]; then
+      jq -e 'has("question_store")' "$draft" >/dev/null && sr_die 4 "declared questions.json is missing; supply --questions with the staged question draft"
+      questions=""
+    fi
+  fi
+  if [ -n "$questions" ]; then
+    sr_no_symlinks "$(sr_abspath "$questions")" || exit 2
+    [ -f "$questions" ] && [ -r "$questions" ] || sr_die 2 "no such readable question file: $questions"
+    diagnostics="$(cmd_check "$questions")" || sr_die 4 "invalid question store: $questions: $diagnostics"
+    jq -e -L "$SR_SCRIPT_DIR" --slurpfile draft "$draft" '
+      include "sqlreview-questions";
+      .kind == "questions" and .slug == $draft[0].slug and .sql_path == $draft[0].sql_path
+      and legacy_covered($draft[0]; null)' "$questions" >/dev/null || sr_die 4 "question store binding mismatch or untracked legacy questions"
+    # A staged draft cannot hide identities or closed rows that publish-questions would
+    # reject later, after scope publication. Keep notes usable without an initialised project.
+    published="$(dirname "$draft")/questions.json"
+    sr_no_symlinks "$(sr_abspath "$published")" || exit 2
+    if [ -e "$published" ]; then
+      [ -f "$published" ] && [ -r "$published" ] || sr_die 2 "no such readable published question store: $published"
+      diagnostics="$(cmd_check "$published")" || sr_die 4 "invalid published question store: $published: $diagnostics"
+      jq -e -L "$SR_SCRIPT_DIR" --slurpfile old "$published" '
+        include "sqlreview-questions"; question_history_retained($old[0])
+      ' "$questions" >/dev/null || sr_die 4 "question identity/history changed, removed, or new question already closed"
+    fi
+    qdoc="$(jq . "$questions")" || sr_die 4 "cannot read question store"
+  else
+    qdoc="$(jq -L "$SR_SCRIPT_DIR" '
+      include "sqlreview-questions"; legacy_questions(.; null; .slug; .sql_path)' "$draft")" || sr_die 4 "cannot project legacy questions"
+    printf '%s\n' "$qdoc" | jq -e -L "$SR_SCRIPT_DIR" '
+      include "sqlreview-questions"; [question_errors] | length == 0' >/dev/null || sr_die 4 "invalid legacy questions"
+  fi
+  printf '%s\n' "$parsed" | jq -L "$SR_SCRIPT_DIR" --argjson questions "$qdoc" '
+    include "sqlreview-scope-notes"; scope_notes($questions)' || sr_die 2 "cannot compare scope notes"
 }
 
 # Header decisions are never confirmations. Read reachable git objects as the dated source;
