@@ -97,6 +97,8 @@ leading zeroes were already lost upstream, fix ingestion from an authoritative
 source rather than attempting to reconstruct the original ID. Do not strip all
 punctuation from opaque IDs unless the contract establishes that it is formatting.
 
+Child tests must check item identifier lists and must not pin revision numbers in scope/review records.
+
 ## Verify the correction
 
 **Name the constant, never its value** in scope/review prose, drafts, logic descriptions,

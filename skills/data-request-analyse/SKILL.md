@@ -23,7 +23,7 @@ metadata:
 The **Data Engineer** runs analyse. Keep the Data Analyst's imported research
 decisions and provenance visible; confirm technical SQL findings with the
 engineer. Any research question missed by intake belongs to the analyst:
-prefix its `open_questions` entry `Analyst question:` and send it back through
+prefix its shared question's text `Analyst question:` and send it back through
 the handoff for the analyst to consult the requester. Do not relabel an
 engineer confirmation as an analyst confirmation.
 

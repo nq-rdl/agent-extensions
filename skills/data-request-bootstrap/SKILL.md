@@ -45,12 +45,17 @@ Copy its assumptions into the draft by ID, preserving analyst confirmation and
 `upstream` fields. Do not ask the engineer a research question that the intake
 answered. Confirm only its technical implementation with the engineer. Imported
 confirmation dates come from the analyst's recorded answer, not this interview.
-Prefer the helper's third-argument draft merge: it refreshes sidecar-owned questions
-without removing other gaps. If copying manually, copy `analyst_questions` into
-`open_questions` and record only the sidecar-owned strings in `intake_questions`;
-preserve that field when drafting updates. Any research question missed by
-intake also gets the `Analyst question:` prefix and goes back to the analyst, who
-consults the requester. Missing intake permits legacy technical scoping; it gives
+For legacy embedded arrays, prefer the helper's third-argument draft merge: it
+refreshes sidecar-owned questions without removing other gaps. If copying manually,
+copy `analyst_questions` into `open_questions` and record only the sidecar-owned
+strings in `intake_questions`; preserve that field when drafting legacy updates.
+For new or migrated shared-store work, import assumptions from the two-argument
+helper output and reconcile `analyst_questions` in `questions.draft.json` instead:
+retain existing IDs and closed rows, append missing scope questions, and close an
+answered question only with the analyst's answer and provenance. Absence from a
+sidecar is not closure evidence; never refresh shared history by deleting rows or
+reintroduce embedded arrays. Any research question missed by intake also gets the
+`Analyst question:` prefix and goes back to the analyst, who consults the requester. Missing intake permits legacy technical scoping; it gives
 no analyst confirmation. Do not resolve a research gap by treating an engineer's
 technical choice as the analyst's answer.
 

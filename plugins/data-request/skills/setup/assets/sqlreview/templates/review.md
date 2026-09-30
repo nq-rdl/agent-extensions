@@ -43,6 +43,10 @@ Grain: {{grain}}
 
 {{open_questions_list}}
 
+## Closed questions
+
+{{question_history_list}}
+
 ## Change log
 
 {{changes_list}}

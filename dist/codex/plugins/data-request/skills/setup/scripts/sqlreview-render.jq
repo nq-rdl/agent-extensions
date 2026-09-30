@@ -10,6 +10,12 @@ def decision:
     + (if (.decided.source | ascii_downcase | startswith("unlinked")) then " [UNLINKED]"
        elif (.decided.source | test("^git:[0-9a-f]+:.*#L[0-9]+$")) then " [recorded SQL header]" else "" end)
   end;
+def question_list(a): if (a | length) == 0 then "_none_" else (a | map(
+  "- **\(.id | cell)** [\(.status)] (\(.applies); owner: \((.owner // "unknown") | cell)): \(.text | cell)"
+  + (if .status == "closed" then " — \(.closed.answer | cell) · \(.closed.by | cell) · \(.closed.at | cell) · \(.closed.source | cell)"
+      + (if (.closed.source | ascii_downcase | startswith("unlinked")) then " [UNLINKED]" else "" end) else "" end)
+  + (if .decided != null then " · Decision: \(decision | cell)" else "" end)
+) | join("\n")) end;
 def table(a; heading):
   if (a | length) == 0 then "_none recorded_"
   else "| ID | \(heading) | Rationale | Lines | Decision and source | Confirmed by | Revision |\n|---|---|---|---|---|---|---|\n"
@@ -40,7 +46,8 @@ $cfgs[0] as $cfg |
   logic_steps: steps(.logic // []),
   assumptions_table: table(.assumptions // []; "Assumption"),
   limitations_table: table(.limitations // []; "Limitation"),
-  open_questions_list: str_list(.open_questions // []),
+  open_questions_list: question_list($question_rows | map(select(.status == "open"))),
+  question_history_list: question_list($question_rows | map(select(.status == "closed"))),
   changes_list: changes(.changes // []),
   definition_assumption: (($cfg.definitions.assumption // "") | tostring),
   definition_limitation: (($cfg.definitions.limitation // "") | tostring),
