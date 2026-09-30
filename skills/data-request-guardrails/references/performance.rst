@@ -118,13 +118,17 @@ Do not use a probe to discover high-cardinality personal values. Label spelling
 is not a population filter: an uppercase sex label calls for dictionary or
 presentation review, not a sex-based exclusion.
 
-Apply all Probe design rules above. Plan **one bounded source scan** into a
-minimal ``#temp`` containing only safe category columns, then reuse it for every
-label aggregate. Prefer an already authorised, bounded cohort materialisation;
-do not run the full delivery pipeline as a probe or re-scan a source per column.
-Verify that the materialisation matches the finished SQL joins, filters and label
-conversions. State the cohort/time/facility bounds, estimated rows and available
-runtime evidence. A narrowed preflight window must be marked partial coverage,
+Apply all Probe design rules above. Plan **one bounded source scan per independent
+source/cohort result** into a minimal ``#temp`` containing only safe category columns;
+reuse each materialisation for that result's label aggregates. Share it across outputs
+only when they have the same joins, filters, grain and label conversions. For example,
+admissions and procedures from independent pipelines need separate materialisations;
+do not pool their populations to fit one table. For every proposed probe, identify its
+materialisation and verify that it matches the corresponding finished SQL result.
+Prefer already authorised, bounded cohort materialisations; do not run the full delivery
+pipeline as a probe and do not re-scan a source per column. State the cohort/time/facility
+bounds, estimated rows and available runtime evidence for each materialisation, and assess
+the combined scan cost. A narrowed preflight window must be marked partial coverage,
 not a full-cohort check. No usable bound or scan plan means defer, not an unbounded
 query. Temporary probe material feeds no delivered extract and returns no patient
 rows. Record any NOLOCK or READ UNCOMMITTED use; never introduce either silently.
@@ -144,8 +148,8 @@ pending evidence, without dropping label proposals. Use the scoped age anchor
 broad bands that test a stated boundary, with missing/invalid age counted and
 suppressed alike. No stated age limit does not imply adult; an exploratory
 under-18 band is not a new inclusion rule. Compute safe age-band categories in
-the same bounded materialisation; do not add another source scan or store raw
-birth dates in the probe table. Do not expose MIN/MAX birth dates.
+the matching bounded materialisation for that result and age anchor; do not add another
+source scan for age or store raw birth dates in the probe table. Do not expose MIN/MAX birth dates.
 
 Mark every proposal ``proposed, not executed`` and identify the authorised
 operator action separately. When results return, tag evidence OBSERVED or INFERRED

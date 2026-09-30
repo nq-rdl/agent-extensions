@@ -144,17 +144,35 @@ applies it; reuse an already answered decision rather than asking again. Do not 
 from a service name or from an earlier run's surprise. Do not add a filter to settle ambiguity.
 
 Record an answer for each dimension in `scope.draft.json`, then confirm and publish through
-*Write* below. Reuse `A-population-age` and `A-population-sex`; for facility reuse the existing
-`tuh-facility` assumption or exception item, not a duplicate. In each item's text and rationale,
-state the limit (or **no stated limit** / **unclear**), cite the source path/revision and request
-wording, and report implementation: **applied**, **missing**, **contradicted**, **unverified**
-or **not yet written**, with SQL lines when available. A sex label is not a sex restriction.
-For age, record the age anchor: **age at index surgery** and age today differ. For facility,
-check the verified crosswalk/filter; retain the house default and exception routing above.
+*Write* below. Cite the source path/revision and request wording; state the limit or
+**no stated limit** / **unclear**. Choose the record kind using the shared definitions:
 
-If no assumption is needed, put the explicit no-limit answer and implementation evidence in
-`intent`; do not omit a dimension because it has no filter. An unclear research limit goes in
-`open_questions` as one `Analyst question:` with the proposed interpretation and missing anchor.
+- Stated requester limits belong in `intent`, not a new RDL assumption. Put an explicit
+  no-limit answer there too; do not omit a dimension because it has no filter.
+- Use `A-population-age` or `A-population-sex` only for an actual RDL interpretation choice,
+  reusing an existing choice's ID. Request facts are not RDL choices;
+  implementation defects are not confirmed decisions.
+- Record missing or contradicted implementation in `limitations`, using `L-population-age`
+  or `L-population-sex` (or the existing defect ID), with source evidence and SQL lines.
+  Any existing misclassification needs explicit reclassification and confirmation through *Write*;
+  do not carry a defect forward as an agreed choice or fabricate carried fields.
+
+Keep imported `A-intake-<id>` items verbatim: text, rationale, actor/date, confirmation revision,
+`upstream` and `decided`. These IDs retain the intake schema's assumption-list placement;
+reference them from intent rather than moving or rewriting them. Do not duplicate an answered
+intake decision as `A-population-*`. Keep the exact `tuh-facility` house-default wording and
+confirmation too; reuse the existing facility exception instead of another decision.
+
+Record the engineer-confirmed SQL implementation separately: **applied**, **missing**,
+**contradicted**, **unverified** or **not yet written**, with SQL revision/lines when available.
+Use `intent` for status/evidence that is not a limitation; use a separate limitation for a defect
+or unresolved constraint. Never append that assessment to imported text or rationale or attribute
+it to the analyst/house confirmer. A sex label is not a sex restriction. For age, record the
+age anchor: **age at index surgery** and age today differ. For facility, check the verified
+crosswalk/filter and retain the house default and exception routing above.
+
+An unclear research limit goes in `open_questions` as one `Analyst question:` with the
+proposed interpretation and missing anchor.
 Record that gap in intent or a confirmed limitation, not as an agreed population restriction.
 An engineer's confirmation of the static SQL finding is not an analyst research answer.
 Continue independent work under the shared authority rule; do not widen or narrow a cohort
