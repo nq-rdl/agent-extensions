@@ -5,8 +5,7 @@ description: >-
   Triage the RDL service-desk data-request queue: resolve enquiry and issue numbers to
   approval-ID repositories, check scope, scaffold, branch and library-gap state, classify
   blockers, and return paste-ready comments with an ordered queue (read-only). Co-development
-  mode works one selected request with the human and delegates agreed tasks to the other
-  data-request stages.
+  mode works one selected request with the human and delegates agreed tasks to the other data-request stages.
 argument-hint: '<enquiry IDs | issue numbers | priority filter> [--exclude <ids>] [--triage-only|--co-develop]'
 user-invocable: true
 compatibility: >-
@@ -22,9 +21,8 @@ metadata:
 
 # Data Request — triage (Data Analyst / Data Engineer)
 
-The queue entrypoint for service-desk data requests: it decides what to work on next and
-in what order. The stage skills do the work, so this skill routes to them and does not
-restate their procedures. Arguments: `$ARGUMENTS`. Read
+The queue entrypoint decides what to work on next and in what order. Stage skills do the
+work; this skill routes to them without restating procedures. Arguments: `$ARGUMENTS`. Read
 `${CLAUDE_PLUGIN_ROOT}/skills/guardrails/SKILL.md` for the source hierarchy before judging a
 requirement or a gap.
 
@@ -42,8 +40,8 @@ The session-file exception saves entries and private staging files in user state
 see [references/ledger.rst](references/ledger.rst). No child or service-desk writes are permitted.
 Stop at triage when that is the requested scope, even when a fix looks small.
 
-**Co-development**: work through one selected request with the human. Agree each task before
-you start or delegate it; write only to the branches the human agreed. See *Co-development*.
+**Co-development**: agree each task for one selected request before starting or delegating;
+write only to agreed branches. See *Co-development*.
 
 Infer the mode from the request when no flag is given. When unclear, ask and stay in triage only.
 

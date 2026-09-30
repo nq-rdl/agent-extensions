@@ -84,7 +84,7 @@ Example entry (the same shape is returned as text; convert to JSON for ``set``):
      - decision: Use supplied cohort
        decided: {by: analyst-handle, role: Requester, at: '2026-09-29', source: 'unlinked (verbal)'}
      # spec-kit direct mode, in the shape /rdl-team:workflow reuses:
-     - {decision: generativeMode, value: direct, by: engineer-handle, at: '2026-09-29', scope: nq-rdl/query-builder}
+     - {"decision": "generativeMode", "value": "direct", "by": "<who>", "at": "<date or ISO time>", "scope": "<owner/name>"}
    blockers:
      - {class: dependency, detail: Waiting on the resolver release}
    depends_on: [query-builder change merged and released, child re-pinned then scope re-bootstrapped]
