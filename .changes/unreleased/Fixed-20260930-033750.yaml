@@ -1,0 +1,3 @@
+kind: Fixed
+body: SQL review lint catches 8 to 10 digit code values in prose string fields without exposing them; drafting guidance uses constant names (#439)
+time: 2026-09-30T03:37:50.462167791Z

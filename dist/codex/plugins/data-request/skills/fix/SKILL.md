@@ -102,6 +102,17 @@ punctuation from opaque IDs unless the contract establishes that it is formattin
 
 ## Verify the correction
 
+**Name the constant, never its value** in scope/review prose, drafts, logic descriptions,
+questions, change summaries, runbooks and UAT notes (for example, `EVENT_CD`). A code value
+in prose is a defect; never add it to `.pii-code-values` or suppress the PII gate to clear it.
+When updating a scope/review draft, run
+`bash "${PLUGIN_ROOT}/skills/setup/scripts/sqlreview.sh" lint --ste "<draft path>"`
+before presenting it. `code-value` reports each maximal run of 8 to 10 digits by item/field,
+without the value; validated machine metadata is exempt (SQL path/bound slug, fingerprints
+and ISO timestamps at known locations). Preserve that metadata; never reword it to clear lint.
+Reworded confirmed items need fresh human confirmation via bootstrap
+or analyse; do not edit final JSON or create `.sqlreview/` just for a small correction.
+
 Make the smallest source change that resolves the reported defect, preserving
 unrelated edits. When the fix changes a filter, join or meaning in pipeline or
 resolver code, add or update its `record_assumption()` / `record_limitation()` call

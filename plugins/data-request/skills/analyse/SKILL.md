@@ -45,6 +45,31 @@ explaining what is an assumption and what is a limitation; never paraphrase it. 
 `reviews/$SLUG/scope.json` exists, Read it — the review is written *against* the scope. If it does
 not, offer `/data-request:bootstrap` retroactively once, then continue without it if declined.
 
+## Before presenting prose (fresh or update)
+
+**Name the constant, never its value** in scope/review prose, drafts, logic descriptions,
+questions and change summaries (for example, `EVENT_CD`, not its numeric value).
+`code-value` scans string fields for maximal runs of 8 to 10 digits, except validated
+machine metadata (SQL path/bound slug, fingerprints and ISO timestamps at known locations).
+Keep that metadata as-is; lint exemptions do not waive `check` or publication validation.
+Never add prose codes to `.pii-code-values` or suppress the PII gate to clear them.
+
+Before every question batch or displayed summary, stage the proposed wording in
+`.sqlreview/reviews/$SLUG/review.draft.json`, including stored prose, recurring suggestions,
+delta/impact explanations and `bulk`/`walk` questions. Inspect raw helper output locally;
+do not paste it into questions. Run:
+
+```bash
+bash "$S/sqlreview.sh" lint --ste ".sqlreview/reviews/$SLUG/review.draft.json"
+# exit 10 → <id>\t<field>\t<rule>\t<detail>, without code values; other failures → stop
+```
+
+Replace each prose code with its constant name and fix STE wording before showing it.
+Re-run lint after edits; decision-source warnings require a source check, not a made-up source.
+Reworded confirmed items need fresh human confirmation; do not retain their carried
+confirmation or edit the final JSON. Lint cannot grant confirmation. A reworded scope
+item no longer matches its scope text, so it is walked.
+
 Some decisions recur in every enquiry (#362). Before you put candidate items to the engineer, run
 `bash "$S/recurring-decisions.sh" match ".sqlreview/reviews/$SLUG/review.draft.json"`. For each match,
 show the prior enquiries, offer the listed wording and mark the item `upstream`, as
@@ -113,10 +138,13 @@ On exit 10, continue with impact hints and the update below:
 bash "$S/sqlreview.sh" impact "$SLUG"    # HINTS ONLY: identifiers from the changed lines traced into unchanged lines
 ```
 
-1. Walk the human through each hunk of the delta: what it does, and what it changes about grain,
-   filters, joins or output. Pause after each hunk (AskUserQuestion: **Continue** / **Discuss**).
-2. Show the impact hints as *places to look*, then check the unchanged code yourself for indirect
-   consequences the hints cannot see (a changed literal, join type or `DISTINCT` shifts grain
+1. Before discussing the delta, stage explanations and questions in the review draft and run
+   the pre-presentation lint above. Inspect hunks locally; do not paste raw delta output or
+   numeric code values into the discussion. Walk the human through each hunk with the linted explanation:
+   what it changes about grain, filters, joins or output, naming constants rather than values.
+   Repeat the check for each hunk's questions, then pause (AskUserQuestion: **Continue** / **Discuss**).
+2. Stage and lint the impact discussion before showing hints as *places to look*, then check
+   the unchanged code yourself for indirect consequences the hints cannot see (a changed literal, join type or `DISTINCT` shifts grain
    without touching an identifier). Confirm or dismiss each candidate with the human.
 3. **Reassess the existing assumptions and limitations.** Draft the next revision keeping each
    unchanged item's `id`, `text` and `rationale` verbatim and its old ranges. Compute unchanged
@@ -139,7 +167,9 @@ bash "$S/sqlreview.sh" impact "$SLUG"    # HINTS ONLY: identifiers from the chan
    (scope when no review exists); set the next revision and fresh fingerprint yourself.
 
    Copy each `carry` item's `set` fields (with `carried_basis`) onto it verbatim; do not ask
-   again. Ask the `bulk` items once, with their `location` lines, as
+   again. Re-run the pre-presentation lint before each `bulk`/`walk` question batch, including
+   stored and newly drafted items; reworded carried items need fresh confirmation.
+   Ask the `bulk` items once, with their `location` lines, as
    [references/carry.rst](references/carry.rst) describes. Confirm / reword / drop the `walk` items
    (hint-flagged first), plus any `carry` item the hunks or hints implicate indirectly, and add
    new ones. When the human asks for a full re-walk, walk every item and publish with `--reconfirm-all`.
@@ -186,14 +216,7 @@ omits; `present: false` is not evidence of no assumptions.
 
 ## Confirm, write, render
 
-Before each batch of questions below, the carry-over question included, check the wording (#394):
-
-```bash
-bash "$S/sqlreview.sh" lint --ste ".sqlreview/reviews/$SLUG/review.draft.json"  # exit 10 → "<id>\t<field>\t<rule>\t<detail>" per hit
-```
-
-Reword each hit (a sentence over 25 words, a contraction, a semicolon, `e.g.` or `i.e.`) before
-the human sees it. A reworded scope item no longer matches its scope text, so it is walked.
+Apply the pre-presentation lint above before each batch below, the carry-over question included (#394).
 
 The human-in-the-loop trigger (#130 §1.1). On an update, items `carryforward` listed under
 `carry` are already settled: leave them out of everything below. First, when a scope exists,
