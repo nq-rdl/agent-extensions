@@ -62,6 +62,11 @@ reintroduce embedded arrays. Any research question missed by intake also gets th
 no analyst confirmation. Do not resolve a research gap by treating an engineer's
 technical choice as the analyst's answer.
 
+Settle the main grain from intake or cited prior-delivery/data-element evidence,
+not the bare answers default, following guardrails `references/grain.rst`.
+Record one confirmed source-citing grain item, describe each requested finer output
+and check answers drift once; offer the answers correction in the same change.
+
 Read `definitions` from `.sqlreview/config.json` and use that wording, verbatim, whenever you
 tell the engineer what counts as an assumption or a limitation. Do not paraphrase it.
 

@@ -46,6 +46,11 @@ explaining what is an assumption and what is a limitation; never paraphrase it. 
 `reviews/$SLUG/scope.json` exists, Read it — the review is written *against* the scope. If it does
 not, offer `/data-request:bootstrap` retroactively once, then continue without it if declined.
 
+Before the delta/unchanged-SQL path, apply guardrails `references/grain.rst`: compare
+intake/scope and each output's actual grain with answers. Reuse one `L-grain-answers`
+drift record and offer an answers correction in the same change; preserve expected
+finer outputs. Bare Patient is not an agreed grain or a reason to change released SQL.
+
 ## Before presenting prose (fresh or update)
 
 **Name the constant, never its value** in scope/review prose, drafts, logic descriptions,
