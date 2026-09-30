@@ -84,6 +84,17 @@ as optional surrogates; the requester or engineer decides. Record the limitation
 that ethnicity is not held. Check the pinned library for surrogate units; a missing
 unit is a lift candidate. Guardrails holds the convention.
 
+## Lookup evidence for codes
+
+When a mapping needs a discovered code, use `$data-request:lookup` and cite the
+private lookup record's path, revision and labelled grid for that code. Carry its
+label, source, search/expansion provenance, operator/date and limitations into the
+mapping evidence. Distinguish observed candidates from analyst-selected codes;
+a hit does not confirm clinical inclusion. A pending run, missing grid or unresolved
+conflict remains unverified. Do not guess a code from its label or silently broaden
+the analyst's selection. Lookup's command dependency may be unavailable; follow
+its stop/engineer-reviewed-probe path, not replacement hand SQL.
+
 ## Mapping output
 
 Read guardrails `references/delivery.rst` before proposing delivery: estimate rows

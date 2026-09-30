@@ -1,7 +1,7 @@
 """Structural tests for the data-request plugin: registry, skills, hooks wiring, policy note.
 
 These pin the packaging contract (docs/specs/2026-09-15-data-request-plugin-design.md) that
-the generic validators do not know about: nine action facets, both hooks wired, every skill
+the generic validators do not know about: registered action facets, both hooks wired, every skill
 user-invocable with AskUserQuestion available, the consumer skills pointing at /data-request:setup,
 setup exempt from the initialisation gate, and the language-policy row that sanctions the shell helper.
 """
@@ -17,7 +17,7 @@ BUNDLE = REPO / "registry" / "bundles" / "data-request.yaml"
 PLUGIN = REPO / "plugins" / "data-request"
 RECORD_STAGES = ("setup", "bootstrap", "analyse", "explain", "release")
 SKILLS = {leaf: REPO / "skills" / f"data-request-{leaf}"
-          for leaf in (*RECORD_STAGES, "guardrails", "map", "draft", "validate", "fix", "amend", "lift",
+          for leaf in (*RECORD_STAGES, "guardrails", "lookup", "map", "draft", "validate", "fix", "amend", "lift",
                        "triage")}
 
 
@@ -27,7 +27,7 @@ def frontmatter(skill_md: Path) -> dict:
 
 
 class Registry(unittest.TestCase):
-    def test_bundle_maps_nine_facets_and_two_hooks(self):
+    def test_bundle_maps_registered_facets_and_two_hooks(self):
         data = yaml.safe_load(BUNDLE.read_text())
         self.assertEqual(data["targets"]["claude"]["pluginName"], "data-request")
         members = {m["source"]: m["leaf"] for m in data["skills"]}
