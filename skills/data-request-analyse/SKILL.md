@@ -103,10 +103,14 @@ reconfirmation. A lint hint is advisory; it does not establish who decided.
 If `reviews/$SLUG/review.json` exists (or `--update`):
 
 ```bash
-bash "$S/sqlreview.sh" delta "$SLUG"     # exit 0 → complete publication below · 10 changed · 6 no baseline → full review below (retain revision history) · 2 missing SQL → stop/rebind
+bash "$S/sqlreview.sh" delta "$SLUG"     # exit 0 → check review-content changes before completion below · 10 changed · 6 no baseline → full review below (retain revision history) · 2 missing SQL → stop/rebind
 ```
 
 ### Unchanged SQL: complete publication before stopping
+
+Only when the grain precheck requires no review-content change, use this exit-0
+completion path. Otherwise bypass this early return and take *Metadata-only changes*
+below. `delta` compares SQL bytes, not intake, answers or review content.
 
 On exit 0, the SQL body remains bound, including `header-only` status. Inspect a header-only
 diff and run `notes "<sql path>" --against ".sqlreview/reviews/$SLUG/review.json"` before
@@ -148,6 +152,21 @@ Stop before *After review* when unpublished work remains; continue below only wh
 no unpublished draft remains. If question publication or rendering fails, retain
 both drafts and report the handoff incomplete; retry this completion step once
 the cause is fixed.
+
+### Metadata-only changes: update despite unchanged SQL
+
+On exit 0, a newly confirmed grain, a need to add or revise `L-grain-answers`, or a
+correction to retire a resolved drift finding requires a review update. Compare the
+precheck with the published review; do not increment merely because the check ran.
+An unconfirmed proposal stays in the draft/handoff until answered; it is not published
+by this path or discarded by completion.
+
+For a required update, there are no SQL hunks or impact hints to walk. Continue at
+steps 3–4 of *Changed SQL* below: draft the next revision, run `carryforward`, reassess
+items implicated by the grain/evidence change even when their SQL lines are unchanged,
+increment the revision and append to `changes[]`. Then follow *Confirm, write, render*,
+including confirmation/carry gates and publish → snapshot → render. Do not change SQL
+or auto-confirm a new or reworded item to make this update possible.
 
 ### Changed SQL: reassess the review
 

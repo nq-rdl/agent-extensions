@@ -87,9 +87,10 @@ file's actual key/grouping with the answers value and confirmed per-file scope.
 Run this check before the unchanged-SQL early return in analyse: an intake or
 answers edit can matter even when SQL bytes do not change. A new drift finding
 can stay in the draft/handoff while the unchanged review is rendered. If a new
-confirmed finding or changed grain must enter the review, take the normal full
-review/update path despite unchanged SQL: increment the revision, preserve
-``changes[]`` and apply confirmation/carry gates. Do not silently publish it in
+confirmed finding, changed grain or retirement of resolved drift must enter the
+review, bypass analyse's unchanged-SQL completion path and take its metadata-only
+review update: increment the revision, preserve ``changes[]`` and apply
+confirmation/carry gates. Do not silently publish it in
 the old revision. Do not run an extract or a warehouse query for this check
 without explicit authorisation.
 

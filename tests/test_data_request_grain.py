@@ -9,7 +9,7 @@ import tempfile
 import unittest
 
 from test_data_request_facility_default import TREES, path, text
-from test_sql_review_scripts import Project, scope_doc
+from test_sql_review_scripts import Project, item, review_doc, scope_doc
 
 
 class GrainContracts(unittest.TestCase):
@@ -74,6 +74,24 @@ class GrainContracts(unittest.TestCase):
                               "resolved", "do not duplicate"):
                     self.assertIn(token, rule)
 
+    def test_unchanged_sql_exit_is_gated_on_review_content(self):
+        for tree in TREES:
+            with self.subTest(tree=tree):
+                analyse = text(tree, "analyse")
+                unchanged = analyse.split("### Unchanged SQL: complete publication before stopping", 1)[1]
+                unchanged = unchanged.split("### ", 1)[0]
+                unchanged = " ".join(unchanged.split())
+                self.assertIn("Only when the grain precheck requires no review-content change", unchanged)
+                self.assertIn("Otherwise bypass this early return", unchanged)
+                metadata = analyse.split("### Metadata-only changes: update despite unchanged SQL", 1)[1]
+                metadata = " ".join(metadata.split("### ", 1)[0].split())
+                for change in ("newly confirmed grain", "add or revise `L-grain-answers`",
+                               "retire a resolved drift finding"):
+                    self.assertIn(change, metadata)
+                for gate in ("steps 3–4", "carryforward", "increment", "changes[]",
+                             "Confirm, write, render", "no SQL hunks", "unconfirmed"):
+                    self.assertIn(gate, metadata)
+
     def test_release_does_not_elevate_bare_answers_to_scope(self):
         for tree in TREES:
             with self.subTest(tree=tree):
@@ -88,6 +106,82 @@ class GrainContracts(unittest.TestCase):
 
 
 class GrainRendering(unittest.TestCase):
+    def test_review_metadata_updates_add_retire_and_change_grain_without_sql_edits(self):
+        # Execute the publication/carry gates with authored confirmation fixtures.
+        # This is not a live-model routing test or evidence of real human answers.
+        for tree in TREES:
+            with self.subTest(tree=tree), tempfile.TemporaryDirectory() as tmp:
+                p = Project(tmp)
+                helper = path(tree, "setup", "scripts/sqlreview.sh")
+
+                def invoke(*args, code=0):
+                    result = subprocess.run(["bash", str(helper), *args], cwd=p.root,
+                                            capture_output=True, text=True, timeout=30)
+                    self.assertEqual(result.returncode, code, result.stdout + result.stderr)
+                    return result.stdout
+
+                sql = p.sql("q.sql", "select admission_id from admissions;\n")
+                original_sql = sql.read_bytes()
+                sha = json.loads(invoke("fingerprint", "q.sql"))["sql_sha256"]
+                grain = item("A-grain", "One row per admission.",
+                             rationale="Prior delivery admissions.csv at v1.0.0 uses admission keys.")
+                doc = review_doc("q", "q.sql", sql_sha256=sha, grain="one row per admission",
+                                 assumptions=[grain], limitations=[], open_questions=[])
+                draft = p.write_json("q", "review.draft.json", doc)
+                invoke("publish", "q", "review", str(draft))
+                invoke("snapshot", "q", "q.sql")
+                prior_bytes = (draft.parent / "review.json").read_bytes()
+                for revision, change in ((2, "add drift"), (3, "retire drift"), (4, "change grain")):
+                    self.assertIn("unchanged since the reviewed snapshot", invoke("delta", "q"))
+                    doc["revision"] = revision
+                    doc["changes"].append({"revision": revision, "at": "2026-09-30T10:00:00Z",
+                                           "by": "engineer-login", "summary": change})
+                    if change == "add drift":
+                        doc["limitations"] = [item("L-grain-answers", "Answers says Patient.", revision,
+                                                   rationale="The evidenced main grain is admission.", status="candidate")]
+                    elif change == "retire drift":
+                        doc["limitations"] = []
+                    else:
+                        doc["grain"] = "one row per patient"
+                        doc["assumptions"] = [item("A-grain", "One row per patient.", revision,
+                                                  rationale="Amended analyst intake records patient grain.",
+                                                  status="candidate")]
+                    draft.write_text(json.dumps(doc))
+                    carry = json.loads(invoke("carryforward", "q", "review", str(draft)))
+                    self.assertTrue(carry["sql_unchanged"])
+                    self.assertEqual([row["id"] for row in carry["carry"]],
+                                     [] if change == "change grain" else ["A-grain"])
+                    self.assertEqual([row["id"] for row in carry["walk"]],
+                                     {"add drift": ["L-grain-answers"], "retire drift": [],
+                                      "change grain": ["A-grain"]}[change])
+                    for row in carry["carry"]:
+                        next(i for i in doc[row["kind"]] if i["id"] == row["id"]).update(row["set"])
+                    draft.write_text(json.dumps(doc))
+                    if change != "retire drift":
+                        invoke("publish", "q", "review", str(draft), code=4)
+                        self.assertEqual((draft.parent / "review.json").read_bytes(), prior_bytes)
+                        # Authored answered-question fixture, not inferred confirmation.
+                        for candidate in doc["assumptions"] + doc["limitations"]:
+                            if candidate["status"] == "candidate":
+                                candidate.update(status="confirmed", confirmed_by="engineer-login",
+                                                 confirmed_at="2026-09-30T10:00:00Z",
+                                                 confirmed_revision=revision)
+                    draft.write_text(json.dumps(doc))
+                    invoke("publish", "q", "review", str(draft))
+                    invoke("snapshot", "q", "q.sql")
+                    invoke("render", "q", "review")
+                    prior_bytes = (draft.parent / "review.json").read_bytes()
+                    published = json.loads(prior_bytes)
+                    self.assertEqual(published["revision"], revision)
+                    self.assertEqual(len(published["changes"]), revision)
+                    rendered = (draft.parent / "review.md").read_text()
+                    self.assertEqual(rendered.count("L-grain-answers"), int(change == "add drift"))
+                    self.assertIn(doc["grain"], rendered)
+                    self.assertEqual(sql.read_bytes(), original_sql)
+                    self.assertEqual((draft.parent / "source.sql").read_bytes(), original_sql)
+                self.assertEqual(sorted(f.name for f in (draft.parent / "history").iterdir()),
+                                 ["1.sql", "2.sql", "3.sql", "4.sql"])
+
     def test_confirmed_patient_admission_presentation_and_finer_detail_are_visible_and_carry_once(self):
         for tree in TREES:
             for unit, finer in (("patient", []), ("admission", []), ("ED presentation", []),
