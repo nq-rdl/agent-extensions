@@ -92,7 +92,7 @@ class PlausibilityContracts(unittest.TestCase):
             with self.subTest(tree=tree):
                 rule = text(tree, "guardrails", "references/performance.rst")
                 for token in ("one bounded source scan", "#temp", "@min_cell", "threshold",
-                              "suppress the label", "complementary", "no patient rows",
+                              "Probe disclosure control", "no patient rows",
                               "feeds no delivered extract", "NOLOCK", "READ UNCOMMITTED",
                               "expensive requests only", "estimated rows", "runtime",
                               "cost is unknown", "age at index surgery", "not age today",

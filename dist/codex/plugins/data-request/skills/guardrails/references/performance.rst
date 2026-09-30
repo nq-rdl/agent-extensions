@@ -60,19 +60,17 @@ Probe design
 
 An operator probe is SQL the authorised operator runs by hand for source discovery
 or to check finished SQL before a delivery run. A proposal grants no execution
-authorisation; validate never connects to a database. Keep each probe:
+authorisation; validate never connects to a database. Before proposing or reporting
+one, read `Probe disclosure control <release.rst#probe-disclosure-control>`_ for
+its perimeter, formatter and combined-disclosure review. Keep each probe:
 
 * **Aggregate-only.** It returns counts, ranges and codes, never patient rows.
-* **Small-cell suppressed.** Write the threshold as a parameter (for example
-  ``@min_cell``). Its value comes from the request's de-identification assessment
-  ("Cell suppression threshold"); when that states none, ask for it and record the
-  answer (see ``release.rst``). Suppress the MIN and MAX of a small cell as well as
-  its count.
-* **One bounded scan.** Group on a few narrow keys and take MIN and MAX samples per
-  group, instead of a full-table aggregate over many columns. Take MIN and MAX only
-  of dates, category codes and numeric ranges, never of an identifier, name or
-  free-text column. Avoid ``GROUPING SETS`` combined with ``COUNT(DISTINCT ...)`` on
-  a full scan: it reads the table more than once.
+* **Disclosure-controlled.** Parameterise ``@min_cell`` using the effective floor
+  in ``release.rst``, "Probe disclosure control"; apply that section before output.
+* **One bounded scan.** Group on narrow keys within the disclosure-control limits,
+  instead of a full-table aggregate over many columns. Avoid ``GROUPING SETS``
+  combined with ``COUNT(DISTINCT ...)`` on a full scan: it reads the table more
+  than once.
 * **Free of patient identifiers.** Never ask the operator to paste a column that can
   hold a patient identifier ("Personal information" in ``release.rst``). Clinician and
   resource names are not personal information (governance ruling, 2026-09-28): a
@@ -133,12 +131,10 @@ not a full-cohort check. No usable bound or scan plan means defer, not an unboun
 query. Temporary probe material feeds no delivered extract and returns no patient
 rows. Record any NOLOCK or READ UNCOMMITTED use; never introduce either silently.
 
-Parameterise ``@min_cell`` from the assessment/approval threshold; when unknown,
-ask and mark the proposal not runnable. For a small cell **suppress the label**
-and count, not just its number. Apply required complementary suppression so
-visible totals, NULL/blank counts or a second probe cannot reveal hidden counts;
-do not request unsuppressed totals for subtraction. Return only safe category
-labels and counts, no identifiers, dates of birth, exact ages or patient examples.
+Apply ``release.rst``, "Probe disclosure control", to label distributions as well
+as fill counts; an unknown assessment threshold leaves the proposal not runnable.
+Return only safe category labels and controlled counts, no identifiers, dates of
+birth, exact ages or patient examples.
 
 For **expensive requests only**, add an age-band count probe before the operator
 run: cite estimated rows, a prior runtime or another recorded cost assessment.

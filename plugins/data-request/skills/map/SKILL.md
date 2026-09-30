@@ -42,6 +42,8 @@ yet, or you cannot write to it, publish nothing. Return the candidate ledger
 entry as text, marked proposal-only. A proposal-only entry authorises no hand SQL:
 none is committed or run, except exempt probes, until a writable run publishes the entry.
 
+For probe proposals and reported evidence, follow **Probe disclosure control** in
+`${CLAUDE_PLUGIN_ROOT}/skills/guardrails/references/release.rst`; gate exemption is not disclosure permission.
 **Exempt probes:** an operator probe is outside the hand-SQL gate only when it is
 aggregate-only, small-cell-suppressed and single-scan, returns no identifying
 values (no patient identifiers, no staff or person keys; clinician and resource

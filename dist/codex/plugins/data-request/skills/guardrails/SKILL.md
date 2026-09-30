@@ -290,8 +290,8 @@ raw/derived dates, validation listings, study IDs and suppression, read [referen
 Keep validation listings and the study-ID link table out of the delivery run. Use the
 `-- @extract: <name> internal` marker only after confirming that the child's pinned
 `scripts/run_extract.py` supports it: released scaffold runners (v0.5.0 and earlier)
-deliver a batch so marked. This skill sets no suppression threshold: use the request's
-de-identification assessment or approval; if none is stated, ask and record it.
+deliver a batch so marked. Delivered aggregates follow the assessment/approval;
+probe output and handover/open prose follow [Probe disclosure control](references/release.rst#probe-disclosure-control), including boundary/lint review.
 Clinician and resource names are not personal information (governance ruling,
 2026-09-28); patient identifiers are. See "Personal information" in `release.rst`.
 
