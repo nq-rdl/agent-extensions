@@ -145,6 +145,13 @@ instructions. Roles in config remain display labels, never ledger owner/decider 
 SQL paths are supplied explicitly to bootstrap/analyse. To customise report sections, edit the
 project templates; SQL glob filtering and section flags are not configuration options.
 
+Questions have an independent per-slug `questions.json` store: stable IDs, scope/review
+applicability, owner and answered closure provenance, with no SQL revision. Read
+[shared questions](references/questions.rst) before authoring/migrating or closing questions.
+`questions` is read-only; `migrate-questions` retains scope/review bytes; `publish-questions`
+updates only the store. Reports and release evidence use it rather than obsolete embedded
+strings. Closing alone requires no carry-forward or new scope/review revision.
+
 `fingerprint` records both `sql_sha256` (original full-file provenance) and `sql_body_sha256`
 (exact body bytes after conservative leading comments). `header-only` and `scoped-header-only`
 remain body-bound; `publish` records helper-owned full header hashes and timestamps in

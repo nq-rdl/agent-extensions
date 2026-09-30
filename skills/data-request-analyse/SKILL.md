@@ -195,7 +195,13 @@ Read the SQL. Draft into `reviews/$SLUG/review.draft.json` (guard-exempt) as you
   each the `location` lines it governs and a one-line rationale. Where an item restates a
   confirmed scope item that still holds, keep the scope's `text` and `rationale` verbatim so it
   can be carried over (below); reword only where the SQL changed what is true.
-- **open_questions** — anything unresolved.
+- **questions.json** — load `bash "$S/sqlreview.sh" questions "$SLUG" review` on every
+  resume: it includes the scope's questions and review-only questions. Never seed a second
+  list from scope. Follow `${CLAUDE_PLUGIN_ROOT}/skills/setup/references/questions.rst`;
+  migrate legacy strings once, retain stable IDs, owner and closure provenance. Add SQL-specific
+  open rows with `applies: review`; close only from an evidenced answer with `publish-questions`.
+  Closure alone changes no scope/review revision or confirmation. Publish the question draft
+  after the first review publication and before render; failures leave the handoff incomplete.
 
 ### Rendered header (#355)
 
@@ -289,7 +295,7 @@ item carried forward on an update, which takes exactly the `set` fields `carryfo
 Never set `carried_from_revision` by hand.
 
 Before publishing SQL with a header, run `notes "<sql path>" --against` the confirmed draft.
-Flag each mismatch to the human and in `open_questions`: a header item with `match: null`
+Flag each mismatch to the human and as an open row in `questions.json`: a header item with `match: null`
 (rejected or reworded) or a confirmed item the header contradicts. Suggest correcting the
 pipeline's record with `/data-request:fix`.
 
@@ -310,7 +316,7 @@ change before continuing. Write the complete confirmed document to
                    "status": "confirmed", "confirmed_by": "<user>", "confirmed_at": "<UTC ISO>", "confirmed_revision": 1}],
   "limitations": [{"id": "L1", "text": "…", "rationale": "…", "location": null,
                    "status": "confirmed", "confirmed_by": "<user>", "confirmed_at": "<UTC ISO>", "confirmed_revision": 1}],
-  "open_questions": ["…"],
+  "question_store": "questions.json",
   "changes": [{"revision": 1, "at": "<UTC ISO>", "by": "<user>", "summary": "initial review"}]
 }
 ```

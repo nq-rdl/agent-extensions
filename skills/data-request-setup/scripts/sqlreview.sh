@@ -52,6 +52,9 @@
 #   move OLDPATH NEWPATH                       rebind a review directory after the SQL moved (to the readable slug)
 #   move PATH PATH                             migrate a legacy-encoded slug to the readable one (no rebind needed)
 #   move --slug OLDSLUG NEWPATH                rebind a legacy review whose slug no current path derives
+#   questions SLUG [scope|review]                  read shared question store (legacy projection if unmigrated)
+#   migrate-questions SLUG                         create stable IDs from legacy strings; no document edits
+#   publish-questions SLUG DRAFT                   validate and atomically update only questions.json
 #   render SLUG scope|review|lifts                   JSON + templates/<kind>.md -> reviews/SLUG/<kind>.md
 #                                              (a missing templates/<kind>.md is first installed from the bundled default)
 #
@@ -62,6 +65,7 @@ SR_SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd -P)"
 # shellcheck source=sqlreview-lib.sh
 . "$SR_SCRIPT_DIR/sqlreview-lib.sh"
 . "$SR_SCRIPT_DIR/sqlreview-lifts.sh"
+. "$SR_SCRIPT_DIR/sqlreview-questions.sh"
 SR_ASSETS="$SR_SCRIPT_DIR/../assets/sqlreview"
 
 usage() {
@@ -256,7 +260,11 @@ cmd_check() {
   if ! jq -se 'length == 1 and (.[0] | type == "object")' "$tmp" >/dev/null 2>&1; then
     rm -f "$tmp"; printf 'invalid JSON: the document does not parse\n'; return 4
   fi
-  out="$(jq -r -L "$SR_SCRIPT_DIR" -f "$SR_SCRIPT_DIR/sqlreview-check.jq" "$tmp" 2>&1)"; rc=$?
+  if jq -e '.kind == "questions"' "$tmp" >/dev/null; then
+    out="$(jq -r -L "$SR_SCRIPT_DIR" 'include "sqlreview-questions"; question_errors' "$tmp" 2>&1)"; rc=$?
+  else
+    out="$(jq -r -L "$SR_SCRIPT_DIR" -f "$SR_SCRIPT_DIR/sqlreview-check.jq" "$tmp" 2>&1)"; rc=$?
+  fi
   rm -f "$tmp"
   if [ "$rc" -ne 0 ]; then printf 'check failed to run: %s\n' "$out"; return 4; fi
   if [ -n "$out" ]; then printf '%s\n' "$out"; return 4; fi
@@ -1151,7 +1159,7 @@ cmd_move() {
     return 0
   fi
   [ "$oldslug" = "$newslug" ] || [ ! -e "$SR_REVIEWS/$newslug" ] || sr_die 2 "reviews/$newslug/ already exists"
-  for f in review.json scope.json lifts.json rebind-required; do
+  for f in review.json scope.json lifts.json questions.json rebind-required; do
     sr_no_symlinks "$SR_REVIEWS/$oldslug/$f" || exit 2
     [ ! -d "$SR_REVIEWS/$oldslug/$f" ] || sr_die 2 "unexpected directory: $f"
   done
@@ -1167,7 +1175,7 @@ cmd_move() {
   [ "$oldslug" = "$newslug" ] || mv "$SR_REVIEWS/$oldslug" "$SR_REVIEWS/$newslug" || sr_die 2 "move failed"
   [ "$rebind" = 0 ] || touch "$SR_REVIEWS/$newslug/rebind-required" || sr_die 2 "cannot mark stale"
   rm -f "$SR_REVIEWS/$newslug/review.md" "$SR_REVIEWS/$newslug/scope.md" "$SR_REVIEWS/$newslug/lifts.md" || sr_die 2 "cannot remove stale renders"
-  for f in review.json scope.json lifts.json; do
+  for f in review.json scope.json lifts.json questions.json; do
     [ -f "$SR_REVIEWS/$newslug/$f" ] || continue
     tmp="$(mktemp "$SR_REVIEWS/$newslug/.move.XXXXXX")" || sr_die 2 "mktemp failed"
     jq --arg p "$newrel" --arg s "$newslug" '.sql_path = $p | .slug = $s' "$SR_REVIEWS/$newslug/$f" > "$tmp" && mv "$tmp" "$SR_REVIEWS/$newslug/$f" || { rm -f "$tmp"; sr_die 2 "rebind failed; review needs repair"; }
@@ -1214,7 +1222,12 @@ cmd_render() {
   out="$SR_REVIEWS/$slug/$kind.md"
   sr_no_symlinks "$out" || exit 2
   local vars
-  vars="$(jq -c --slurpfile cfgs "$cfg" -f "$SR_SCRIPT_DIR/sqlreview-render.jq" "$doc")" || sr_die 2 "render failed for reviews/$slug/$kind.json"
+  local question_rows='[]' question_doc
+  if [ "$kind" != lifts ]; then
+    question_doc="$(cmd_questions "$slug" "$kind")" || return $?
+    question_rows="$(printf '%s' "$question_doc" | jq -c .questions)"
+  fi
+  vars="$(jq -c --argjson question_rows "$question_rows" --slurpfile cfgs "$cfg" -f "$SR_SCRIPT_DIR/sqlreview-render.jq" "$doc")" || sr_die 2 "render failed for reviews/$slug/$kind.json"
   rendered="$(jq -r -n --rawfile tpl "$tpl" --argjson vars "$vars" \
     'reduce ($vars | keys[]) as $k ($tpl; gsub("\\{\\{\($k)\\}\\}"; $vars[$k]))')" || sr_die 2 "render failed for reviews/$slug/$kind.json"
   if jq -e '(.header_revisions // []) | length > 0' "$doc" >/dev/null; then
@@ -1254,6 +1267,9 @@ case "$cmd" in
   remap) cmd_remap "$@" ;;
   notes) cmd_notes "$@" ;;
   move) cmd_move "$@" ;;
+  questions) cmd_questions "$@" ;;
+  migrate-questions) cmd_migrate_questions "$@" ;;
+  publish-questions) cmd_publish_questions "$@" ;;
   render) cmd_render "$@" ;;
   -h|--help|help) usage ;;
   *) printf 'sqlreview: unknown command: %s\n' "$cmd" >&2; usage ;;

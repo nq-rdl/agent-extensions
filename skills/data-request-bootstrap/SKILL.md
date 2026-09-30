@@ -100,6 +100,17 @@ and carryforward; adding, changing or removing it requires fresh confirmation. R
 `lint` before publish: provenance warnings need a source check, separate from wording
 reconfirmation. A lint hint is advisory; it does not establish who decided.
 
+## Shared questions (#437)
+
+Load `bash "$S/sqlreview.sh" questions "$SLUG" scope` on resume. Keep questions in
+`questions.json`, not duplicate scope/review lists; follow
+`${CLAUDE_PLUGIN_ROOT}/skills/setup/references/questions.rst` for IDs, owner and answered
+closure provenance. Migrate legacy strings once with `migrate-questions`; retain historical
+embedded arrays untouched. Closing a question publishes only that store, without a scope
+revision or renewed confirmations. If its answer changes SQL meaning, use the update path.
+For a fresh scope, publish the scope first, then `publish-questions` its open question draft
+before rendering; failed question publication leaves the handoff incomplete.
+
 ## Existing scope → update path (#127 §2)
 
 If `.sqlreview/reviews/$SLUG/scope.json` exists (or `--update`):
@@ -224,7 +235,7 @@ the `set` fields `carryforward` printed. Write the complete confirmed document t
   "assumptions": [{"id": "A1", "text": "…", "rationale": "…", "location": null,
                    "status": "confirmed", "confirmed_by": "<user>", "confirmed_at": "<UTC ISO>", "confirmed_revision": 1}],
   "limitations": [],
-  "open_questions": ["…"]
+  "question_store": "questions.json"
 }
 ```
 

@@ -206,14 +206,17 @@ rl_review_row() { # <slug> <commit>
     *) if git -C "$SR_ROOT" merge-base --is-ancestor "$gc" "$commit" 2>/dev/null; then inref=true
        elif [ $? -eq 1 ]; then inref=false; fi ;;
   esac
-  jq -c --arg slug "$slug" --arg applies "$applies" --arg at "$at" --arg body_at "$body_at" --argjson inref "$inref" '
+  local question_doc
+  question_doc="$(bash "$SR_SCRIPT_DIR/sqlreview.sh" questions "$slug" "$kind")" || sr_die 4 "invalid shared question evidence"
+  jq -c --argjson question_doc "$question_doc" --arg slug "$slug" --arg applies "$applies" --arg at "$at" --arg body_at "$body_at" --argjson inref "$inref" '
     def items: [(. // [])[] | {id, text, rationale, confirmed_revision}];
     {slug: $slug, kind, sql_path, revision, applies: $applies,
      sql_sha256_reviewed: .sql_sha256, sql_sha256_at_ref: (if $at == "" then null else $at end),
      sql_body_sha256_reviewed: (.sql_body_sha256 // null), sql_body_sha256_at_ref: (if $body_at == "" then null else $body_at end),
      reviewed_commit: .git_commit, reviewed_commit_in_ref: $inref,
      assumptions: (.assumptions | items), limitations: (.limitations | items),
-     open_questions: (.open_questions // [])}' "$doc"
+     questions: $question_doc.questions,
+     open_questions: [$question_doc.questions[] | select(.status == "open") | .text]}' "$doc"
 }
 
 cmd_evidence() {

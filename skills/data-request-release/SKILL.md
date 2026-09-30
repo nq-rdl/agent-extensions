@@ -64,6 +64,13 @@ Then list the reviews and whether each describes the release:
 bash "$S/release.sh" evidence "<tag>"   # exit 0 every review applies · 10 at least one does not · 2 unknown ref
 ```
 
+For each slug, load `bash "$S/sqlreview.sh" questions "$SLUG" review`: `questions.json`
+is the authoritative current handoff question status; `release.sh evidence` includes its
+structured rows and open-only compatibility list. Closed legacy strings in scope/review
+are not unresolved questions. Label these as current handoff evidence against the tag, not
+question status at the historical tag. Reconcile obsolete intake copies with their owner;
+do not silently update `answers.yaml` or convert engineer choices into analyst answers.
+
 A claim that needs a missing manifest, schema or validation result is a question, not a fact.
 Say which source is missing.
 

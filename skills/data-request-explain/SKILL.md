@@ -41,6 +41,12 @@ No `reviews/$SLUG/review.json` → stop: there is nothing reviewed to explain; t
 and the SQL. Read `definitions` from `.sqlreview/config.json` and use that wording verbatim when
 the analyst asks what an assumption or limitation is.
 
+Load `bash "$S/sqlreview.sh" questions "$SLUG" review` on every resume, even when the
+review revision matches. This reads authoritative `questions.json` (or a read-only legacy
+projection); stale embedded strings and cached Markdown are not current question status.
+Show closures by ID, answer and provenance as well as remaining open questions. Do not
+change this store during a walkthrough; send reconciliation to the owning engineer/analyst.
+
 ## Staleness first — always
 
 ```bash
