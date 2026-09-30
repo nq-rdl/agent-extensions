@@ -82,7 +82,8 @@ empty arrays. Invalid fields fail with exit 4 without exposing values.
 Imported scope IDs are ``A-intake-<id>``; reserve that prefix. Items are
 assumptions with null SQL location, the analyst's original actor/date, and the
 current scope ``confirmed_revision``. ``upstream`` contains ``source:
-analyst-intake``, ``file``, ``intake_id``, ``approval_number``, ``role: analyst``
+analyst-intake``, ``file`` (stable source filename, never a workstation path),
+``intake_id``, ``approval_number``, ``role: analyst``
 and ``topic``; grain metadata and optional ``decided`` are preserved.
 Questions become strings prefixed ``Analyst question:`` so legacy renderers and
 schemas remain readable.
@@ -90,8 +91,17 @@ schemas remain readable.
 Optionally pass the draft as a third argument to return a merged scope JSON.
 Use a separate temporary output path; never redirect over the input draft.
 Merge by ID; an identical imported item is kept once. A collision, changed
-answer/provenance, wrong revision or conflicting approval fails rather than
-replacing engineer work. Compare removed intake IDs separately: route any
+answer/provenance (including SQL location), wrong revision or conflicting
+approval fails rather than replacing engineer work. Existing imported items'
+approval IDs must match even when the scope lacks a document-level approval.
+The merge records sidecar-owned strings in ``intake_questions`` and replaces
+only those strings on refresh, including when the new question list is empty.
+Other technical and analyst questions stay. Preserve ``intake_questions`` in
+update drafts; for manual imports, record only the sidecar-owned questions.
+For legacy drafts without ownership metadata, identify the old sidecar's
+questions with the analyst and seed that array before refresh. Do not assume
+every ``Analyst question:`` string came from the sidecar.
+Compare removed intake IDs separately: route any
 change/removal to the analyst for a recorded answer before dependent work.
 Updates keep unchanged confirmed items through ``carryforward``; its ``set``
 now includes existing upstream and decision provenance. Never rebadge analyst

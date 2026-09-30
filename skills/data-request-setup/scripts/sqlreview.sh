@@ -662,16 +662,24 @@ cmd_intake() {
       if ($drafts | length) != 1 or $d.kind != "scope" or $d.revision != $revision or
          ($d.assumptions | type) != "array" or ($d.open_questions | type) != "array" or
          ($d.approval_number != null and $d.approval_number != $intake.approval_number) or
+         ($d.assumptions | any(.[]; .upstream.source == "analyst-intake" and
+           .upstream.approval_number != $intake.approval_number)) or
+         ($d | has("intake_questions") and (.intake_questions | type != "array" or
+           (all(.[]; type == "string" and startswith("Analyst question: ")) | not))) or
          ($d.assumptions | map(.id) | length != (unique | length)) then
         error("invalid scope draft or mismatched approval/revision")
       else
         reduce $intake.assumptions[] as $item ($d;
           [.assumptions[] | select(.id == $item.id)] as $matches |
           if ($matches | length) == 0 then .assumptions += [$item]
-          elif ($matches[0] | {text, rationale, confirmed_by, confirmed_at, upstream, decided}) ==
-               ($item | {text, rationale, confirmed_by, confirmed_at, upstream, decided}) then .
+          elif ($matches[0] | {text, rationale, location, confirmed_by, confirmed_at, upstream, decided}) ==
+               ($item | {text, rationale, location, confirmed_by, confirmed_at, upstream, decided}) then .
           else error("intake ID collision or changed analyst answer; ask analyst") end)
-        | .open_questions = (.open_questions + $intake.analyst_questions | unique)
+        # Only replace questions owned by the previous sidecar import. Independently
+        # raised research gaps also use the prefix and must not disappear on refresh.
+        | ($d.open_questions - ($d.intake_questions // [])) as $manual
+        | .open_questions = ($manual + $intake.analyst_questions | unique)
+        | .intake_questions = ($intake.analyst_questions - $manual | unique)
       end
     ' 2>/dev/null || sr_die 4 "cannot merge intake: invalid draft, collision, changed answer or mismatched approval/revision"
   else

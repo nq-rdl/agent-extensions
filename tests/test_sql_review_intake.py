@@ -23,6 +23,176 @@ def intake():
                      "source": "enquiry reply"}}], "open_questions": ["Which TIA subcodes?"]}
 
 
+TREES = ("skills/data-request-setup", "plugins/data-request/skills/setup",
+         "dist/codex/plugins/data-request/skills/setup")
+
+
+class IntakeReviewRegressions(unittest.TestCase):
+    def invoke(self, tree, root, *args):
+        return subprocess.run(["bash", str(REPO / tree / "scripts/sqlreview.sh"), *args],
+                              cwd=root, capture_output=True, text=True, timeout=30)
+
+    def successful(self, tree, root, *args):
+        result = self.invoke(tree, root, *args)
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        return result.stdout
+
+    def test_existing_item_approvals_checked_without_document_approval(self):
+        for tree in TREES:
+            with self.subTest(tree=tree), tempfile.TemporaryDirectory() as tmp:
+                p = Project(tmp)
+                source = p.root / "answers.intake.json"
+                source.write_text(json.dumps(intake()))
+                imported = json.loads(self.successful(tree, p.root, "intake", str(source), "1"))
+                d = scope_doc(sql_sha256=None, assumptions=imported["assumptions"])
+                self.assertNotIn("approval_number", d)
+                draft = p.write_json(d["slug"], "scope.draft.json", d)
+                other = intake()
+                other["approval_number"] = "SECRET-OTHER-APPROVAL"
+                other["decisions"][0]["id"] = "noncolliding"
+                # Empty intake must not bypass the existing-item approval check either.
+                for decisions in (other["decisions"], []):
+                    with self.subTest(decisions=len(decisions)):
+                        other["decisions"] = decisions
+                        source.write_text(json.dumps(other))
+                        before = draft.read_bytes()
+                        result = self.invoke(tree, p.root, "intake", str(source), "1", str(draft))
+                        self.assertEqual(result.returncode, 4, result.stdout + result.stderr)
+                        self.assertEqual(result.stdout, "")
+                        self.assertNotIn("SECRET", result.stderr)
+                        self.assertEqual(draft.read_bytes(), before)
+                # Same-approval additions still work without a document-level identifier.
+                other["approval_number"] = intake()["approval_number"]
+                other["decisions"] = intake()["decisions"]
+                other["decisions"][0]["id"] = "noncolliding"
+                source.write_text(json.dumps(other))
+                merged = json.loads(self.successful(tree, p.root, "intake", str(source), "1", str(draft)))
+                self.assertEqual(len(merged["assumptions"]), 2)
+
+    def test_refresh_removes_only_sidecar_owned_questions(self):
+        for tree in TREES:
+            with self.subTest(tree=tree), tempfile.TemporaryDirectory() as tmp:
+                p = Project(tmp)
+                source = p.root / "answers.intake.json"
+                source.write_text(json.dumps(intake()))
+                manual = ["Which wards?", "Analyst question: Confirm the follow-up window."]
+                d = scope_doc(sql_sha256=None, open_questions=manual)
+                draft = p.write_json(d["slug"], "scope.draft.json", d)
+                first = self.successful(tree, p.root, "intake", str(source), "1", str(draft))
+                draft.write_text(first)
+                self.successful(tree, p.root, "publish", d["slug"], "scope", str(draft))
+                d = json.loads(first)
+                d["revision"] = 2
+                draft.write_text(json.dumps(d))
+                carried = json.loads(self.successful(tree, p.root, "carryforward", d["slug"], "scope", str(draft)))
+                by_id = {row["id"]: row["set"] for row in carried["carry"]}
+                for item in d["assumptions"]:
+                    item.update(by_id[item["id"]])
+                draft.write_text(json.dumps(d))
+                answered = intake()
+                decision = copy.deepcopy(answered["decisions"][0])
+                decision.update(id="tia", topic="codes", text="Include the recorded TIA subcodes.")
+                answered["decisions"].append(decision)
+                for questions in (["Which outcome window?"], []):
+                    with self.subTest(questions=questions):
+                        answered["open_questions"] = questions
+                        source.write_text(json.dumps(answered))
+                        merged_text = self.successful(tree, p.root, "intake", str(source), "2", str(draft))
+                        merged = json.loads(merged_text)
+                        expected = manual + ["Analyst question: " + q for q in questions]
+                        self.assertEqual(sorted(merged["open_questions"]), sorted(expected))
+                        draft.write_text(merged_text)
+                        repeated = self.successful(tree, p.root, "intake", str(source), "2", str(draft))
+                        self.assertEqual(json.loads(repeated), merged)
+                self.successful(tree, p.root, "publish", d["slug"], "scope", str(draft))
+                self.successful(tree, p.root, "render", d["slug"], "scope")
+                rendered = (draft.parent / "scope.md").read_text()
+                self.assertNotIn("Which TIA subcodes?", rendered)
+                self.assertNotIn("Which outcome window?", rendered)
+                self.assertIn(manual[1], rendered)
+
+    def test_legacy_question_ownership_is_explicit_and_does_not_erase_other_gaps(self):
+        for tree in TREES:
+            with self.subTest(tree=tree), tempfile.TemporaryDirectory() as tmp:
+                p = Project(tmp)
+                source = p.root / "answers.intake.json"
+                answered = intake()
+                answered["open_questions"] = []
+                source.write_text(json.dumps(answered))
+                old = "Analyst question: Which TIA subcodes?"
+                manual = "Analyst question: Confirm the follow-up window."
+                d = scope_doc(sql_sha256=None, open_questions=[old, manual])
+                draft = p.write_json(d["slug"], "scope.draft.json", d)
+                unowned = json.loads(self.successful(tree, p.root, "intake", str(source), "1", str(draft)))
+                self.assertEqual(sorted(unowned["open_questions"]), sorted([old, manual]))
+                # Seed known legacy sidecar ownership, never infer it from the prefix.
+                d["intake_questions"] = [old]
+                draft.write_text(json.dumps(d))
+                migrated = json.loads(self.successful(tree, p.root, "intake", str(source), "1", str(draft)))
+                self.assertEqual(migrated["open_questions"], [manual])
+                # The same wording may also have been raised independently; don't claim it.
+                answered["open_questions"] = [manual.removeprefix("Analyst question: ")]
+                source.write_text(json.dumps(answered))
+                draft.write_text(json.dumps(migrated))
+                overlap = json.loads(self.successful(tree, p.root, "intake", str(source), "1", str(draft)))
+                self.assertEqual(overlap["intake_questions"], [])
+                draft.write_text(json.dumps(overlap))
+                answered["open_questions"] = []
+                source.write_text(json.dumps(answered))
+                cleared = json.loads(self.successful(tree, p.root, "intake", str(source), "1", str(draft)))
+                self.assertEqual(cleared["open_questions"], [manual])
+                for invalid in (None, "SECRET", ["Which wards?"], [42]):
+                    with self.subTest(invalid=invalid):
+                        d["intake_questions"] = invalid
+                        draft.write_text(json.dumps(d))
+                        result = self.invoke(tree, p.root, "intake", str(source), "1", str(draft))
+                        self.assertEqual(result.returncode, 4, result.stdout + result.stderr)
+                        self.assertEqual(result.stdout, "")
+                        self.assertNotIn("SECRET", result.stderr)
+
+    def test_merge_rejects_sql_location_on_imported_confirmation(self):
+        for tree in TREES:
+            with self.subTest(tree=tree), tempfile.TemporaryDirectory() as tmp:
+                p = Project(tmp)
+                source = p.root / "answers.intake.json"
+                source.write_text(json.dumps(intake()))
+                imported = json.loads(self.successful(tree, p.root, "intake", str(source), "1"))
+                imported["assumptions"][0]["location"] = {"lines": [1, 2]}
+                d = scope_doc(sql_sha256=None, assumptions=imported["assumptions"])
+                draft = p.write_json(d["slug"], "scope.draft.json", d)
+                before = draft.read_bytes()
+                result = self.invoke(tree, p.root, "intake", str(source), "1", str(draft))
+                self.assertEqual(result.returncode, 4, result.stdout + result.stderr)
+                self.assertEqual(result.stdout, "")
+                self.assertEqual(draft.read_bytes(), before)
+
+    def test_source_filename_is_portable_in_import_merge_and_render(self):
+        for tree in TREES:
+            with self.subTest(tree=tree), tempfile.TemporaryDirectory() as tmp:
+                p = Project(tmp)
+                source = p.root / "private workstation" / "answers.intake.json"
+                source.parent.mkdir()
+                original = json.dumps(intake())
+                source.write_text(original)
+                absolute = json.loads(self.successful(tree, p.root, "intake", str(source), "1"))
+                self.assertEqual(absolute["assumptions"][0]["upstream"]["file"], source.name)
+                relative = json.loads(self.successful(tree, p.root, "intake", str(source.relative_to(p.root)), "1"))
+                self.assertEqual(absolute, relative)
+                d = scope_doc(sql_sha256=None)
+                draft = p.write_json(d["slug"], "scope.draft.json", d)
+                draft.write_text(self.successful(tree, p.root, "intake", str(source), "1", str(draft)))
+                merged = json.loads(draft.read_text())
+                again = self.successful(tree, p.root, "intake", str(source.relative_to(p.root)), "1", str(draft))
+                self.assertEqual(json.loads(again), merged)
+                self.successful(tree, p.root, "publish", d["slug"], "scope", str(draft))
+                self.successful(tree, p.root, "render", d["slug"], "scope")
+                rendered = (draft.parent / "scope.md").read_text()
+                self.assertIn("answers.intake.json#age", rendered)
+                self.assertNotIn(str(p.root), rendered)
+                self.assertNotIn("private workstation", rendered)
+                self.assertEqual(source.read_text(), original)
+
+
 class Intake(unittest.TestCase):
     def test_calendar_dates_and_utc_clock_match_python_validator(self):
         with tempfile.TemporaryDirectory() as tmp:

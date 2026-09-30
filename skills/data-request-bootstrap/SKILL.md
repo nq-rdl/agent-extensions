@@ -45,7 +45,10 @@ Copy its assumptions into the draft by ID, preserving analyst confirmation and
 `upstream` fields. Do not ask the engineer a research question that the intake
 answered. Confirm only its technical implementation with the engineer. Imported
 confirmation dates come from the analyst's recorded answer, not this interview.
-Copy `analyst_questions` into `open_questions`. Any research question missed by
+Prefer the helper's third-argument draft merge: it refreshes sidecar-owned questions
+without removing other gaps. If copying manually, copy `analyst_questions` into
+`open_questions` and record only the sidecar-owned strings in `intake_questions`;
+preserve that field when drafting updates. Any research question missed by
 intake also gets the `Analyst question:` prefix and goes back to the analyst, who
 consults the requester. Missing intake permits legacy technical scoping; it gives
 no analyst confirmation. Do not resolve a research gap by treating an engineer's

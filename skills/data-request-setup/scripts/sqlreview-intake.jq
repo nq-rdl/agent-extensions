@@ -32,7 +32,7 @@ if intake_valid then
     assumptions: [.decisions[] | . as $item |
       {id: ("A-intake-" + .id), text, rationale, location: null, status: "confirmed",
        confirmed_by, confirmed_at, confirmed_revision: $revision,
-       upstream: ({source: "analyst-intake", file: $source, intake_id: .id,
+       upstream: ({source: "analyst-intake", file: ($source | split("/") | last), intake_id: .id,
                   approval_number: $intake.approval_number, role: "analyst", topic: .topic}
                   + (if .topic == "grain" then {unit, finer_outputs: (.finer_outputs // [])} else {} end))}
        + (if has("decided") then {decided} else {} end)],
