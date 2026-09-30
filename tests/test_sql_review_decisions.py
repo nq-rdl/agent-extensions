@@ -7,7 +7,6 @@ import copy
 import json
 import tempfile
 import unittest
-from pathlib import Path
 
 from test_sql_review_scripts import Project, REPO, SQL_V1, item, review_doc, run, scope_doc
 
