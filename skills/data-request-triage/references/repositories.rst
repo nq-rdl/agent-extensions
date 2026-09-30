@@ -137,6 +137,12 @@ and read what it runs instead of guessing.
 Branches, owners and pins
 -------------------------
 
+* For a new request branch, use ``enq/<enquiry number>`` with the enquiry's
+  digits: ``ENQ9003`` becomes ``enq/9003``, not the service-desk issue number
+  ``#903``. For a later version, add a suffix such as ``enq/9003-v2``.
+  Reuse a sound existing branch only with its owner's agreement; this naming
+  rule is not a reason to replace it. Keep existing ``triage/<n>`` branch names,
+  and never rename a branch someone else owns.
 * List open PRs and branches with their last committer and date. A branch with
   no PR (such as ``enq/9003``) can be someone's work in progress. Name its owner
   and ask; never reuse, rebase or delete it unasked.
