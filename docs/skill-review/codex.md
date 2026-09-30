@@ -415,9 +415,13 @@ tests/codex/*.test.mjs` (223 pass, 0 fail); `generate_manifests.py --check`,
   Codex task, review or login was run (no paid Codex jobs, no OpenAI calls).
 - The Codex-host entrypoints (`references/codex.rst`) were checked by tests and
   reading only; no Codex-host behavioural run was made.
-- `review_model` precedence remains unverified against a live backend, as the
-  skills already say.
-- `-p` mode cannot answer `AskUserQuestion`, so the "continue or new thread"
-  question and the review wait/background question were not exercised.
+- The original stubbed review did not verify `review_model` precedence.
+  The [#430 live pilot](codex-live-430.md) now confirms it in persisted
+  app-server and `codex exec review` runs and records the companion's
+  ephemeral-review observability limit.
+- Human answers and question cancellation remain untested. The #430 pilot
+  exercises unavailable interaction in `claude -p`, explicit runtime resume
+  and job cancellation; none substitutes for a human answering the review
+  wait/background or rescue continue/new-thread question.
 - The model catalog came from the local cache written by the installed CLI on
   the same day; `codex debug models` itself was not run.
