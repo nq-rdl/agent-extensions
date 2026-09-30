@@ -44,6 +44,19 @@ show the prior enquiries, offer the listed wording and mark the item `upstream`,
 `${CLAUDE_PLUGIN_ROOT}/skills/setup/references/recurring-decisions.rst` says. The engineer still confirms each item.
 Rows from `carryforward` or `carryover` omit `upstream`: copy it from the prior or scope item when you re-draft.
 
+## Decision origin (#434)
+
+Keep decision origin separate from engineer confirmation. When evidence identifies the
+decider, attach optional `decided: {by, role, at, source}` to the item: a human handle,
+role, decision date or ISO time, and comment/PR URL or dated document reference.
+Use `unlinked (verbal)` for a reported verbal decision; never invent a source, decider
+or date from rationale wording. If origin is unknown, omit `decided` and surface the
+attribution question. Show the provenance with the item before confirmation.
+Preserve `decided` verbatim when re-drafting, including header candidates, carryover
+and carryforward; adding, changing or removing it requires fresh confirmation. Run plain
+`lint` before publish: provenance warnings need a source check, separate from wording
+reconfirmation. A lint hint is advisory; it does not establish who decided.
+
 ## Existing review → update path (#130 §2)
 
 If `reviews/$SLUG/review.json` exists (or `--update`):

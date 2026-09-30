@@ -4,10 +4,15 @@ def lines(l): if l == null then "—" elif (l | type) == "array" then (l | map(t
 def named_list(a): if (a | length) == 0 then "_none_" else (a | map("- **\(.name // "?")** — \(.description // "")") | join("\n")) end;
 def str_list(a): if (a | length) == 0 then "_none_" else (a | map("- " + (if type == "object" then (.question // .text // tostring) else tostring end)) | join("\n")) end;
 def cell: tostring | gsub("\\|"; "&#124;") | gsub("[\r\n]+"; "<br>");
+def decision:
+  if .decided == null then "—"
+  else "\(.decided.by) (\(.decided.role)) · \(.decided.at) · \(.decided.source)"
+    + (if (.decided.source | ascii_downcase | startswith("unlinked")) then " [UNLINKED]" else "" end)
+  end;
 def table(a; heading):
   if (a | length) == 0 then "_none recorded_"
-  else "| ID | \(heading) | Rationale | Lines | Confirmed by | Revision |\n|---|---|---|---|---|---|\n"
-       + (a | map("| \(.id | cell) | \(.text | cell) | \(.rationale // "" | cell) | \(lines(.location.lines) | cell) | \(.confirmed_by // "" | cell) | \((.confirmed_revision // "" | tostring) + (if .carried_from_revision != null then " (carried)" else "" end) | cell) |") | join("\n"))
+  else "| ID | \(heading) | Rationale | Lines | Decision and source | Confirmed by | Revision |\n|---|---|---|---|---|---|---|\n"
+       + (a | map("| \(.id | cell) | \(.text | cell) | \(.rationale // "" | cell) | \(lines(.location.lines) | cell) | \(decision | cell) | \(.confirmed_by // "" | cell) | \((.confirmed_revision // "" | tostring) + (if .carried_from_revision != null then " (carried)" else "" end) | cell) |") | join("\n"))
   end;
 def steps(a): if (a | length) == 0 then "_none_" else (a | map("\(.step). **\(.title // "")** (lines \(lines(.lines))) — \(.description // "")") | join("\n")) end;
 def changes(a): if (a | length) == 0 then "_none_" else (a | map("- r\(.revision) — \(.at // "") — \(.by // ""): \(.summary // "")") | join("\n")) end;

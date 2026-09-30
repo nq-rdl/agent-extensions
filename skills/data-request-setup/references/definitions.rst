@@ -47,7 +47,7 @@ item has ``confirmed_revision`` equal to the document ``revision``. On an update
 instead be *carried* from the previous published revision: it keeps that revision's
 ``confirmed_by``, ``confirmed_at`` and ``confirmed_revision`` and records
 ``carried_from_revision`` (always ``revision - 1``). ``sqlreview.sh publish`` allows a carried item
-only when the previous revision has the same id in the same list with identical text, rationale and
+only when the previous revision has the same id in the same list with identical text, rationale, decision origin and
 confirmation, and its governed SQL is unchanged: the item's location lines (remapping allowed, the
 line count may not change), or, with no location, the whole SQL. ``sqlreview.sh carryforward`` lists
 which draft items qualify; every other item is re-put to the human. ``publish --reconfirm-all``
@@ -72,3 +72,24 @@ reusable library work from request-specific composition. Its id is ``LIFT-n``;
 classification is new-capability, existing-unit-gap or request-specific. Capture is
 silent and unconfirmed. Only answered human questions supply confirmation fields.
 See ``lifts.rst`` for independent entry revisions and the publication contract.
+
+Decision origin
+---------------
+
+Scope and review assumptions and limitations may carry optional ``decided``
+with four nonempty string fields: ``by`` (the human's handle), ``role`` (requester,
+engineer, custodian or the role in the evidence), ``at`` (decision date or ISO time),
+and ``source`` (comment/PR URL, dated document reference or ``unlinked (verbal)``).
+Omit it when unknown; do not insert null or infer a reliable history from rationale
+dates. Schema 1 and 2 records without it remain valid. This is separate from
+``confirmed_by``: a requester may decide while an engineer confirms the item.
+It records the available evidence, not authority or governance clearance.
+
+``check`` validates its shape and refuses emails in ``decided.by``. ``render``
+shows origin beside confirmation, with an UNLINKED marker for verbal sources.
+Plain ``lint`` and ``lint --ste`` warn on unlinked explicit provenance at any
+status, and on a rationale attributing a decision to a role or a named person
+without a written source. This heuristic cannot identify all names or certify
+that a reference is real; verify the source against the original document.
+Keep origin unchanged across scope-to-review carryover and revision carryforward;
+changing, adding or removing it requires fresh confirmation.
