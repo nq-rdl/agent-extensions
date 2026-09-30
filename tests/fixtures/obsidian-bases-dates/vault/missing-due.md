@@ -1,0 +1,1 @@
+Disposable missing-property fixture.

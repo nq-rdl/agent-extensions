@@ -55,12 +55,20 @@ Contents: [Global](#global-functions) · [Any](#any-type-functions) ·
 
 ## Duration Type
 
-When subtracting two dates, the result is a **Duration** type (not a number). Duration has its own properties and methods.
+Application-tested in Obsidian 1.13.7 on 2026-09-29: subtracting two dates
+returns a **Duration** type (not a number). The canonical syntax page still
+describes a millisecond difference. For other versions, verify application
+behaviour before replacing `.days` with numeric division.
+
+`.days` measures **elapsed 24-hour days**, not a count of calendar dates.
+Across DST, successive local midnights can span **23 or 25 hours** and return
+fractional days. Rounding is a modelling choice: `-1.5` rounds to `-1`, floors
+to `-2`, and ceils to `-1`. Confirm the intended meaning before rounding.
 
 **Duration Fields:**
 | Field | Type | Description |
 |-------|------|-------------|
-| `duration.days` | Number | Total days in duration |
+| `duration.days` | Number | Elapsed 24-hour days |
 | `duration.hours` | Number | Total hours in duration |
 | `duration.minutes` | Number | Total minutes in duration |
 | `duration.seconds` | Number | Total seconds in duration |
@@ -69,9 +77,9 @@ When subtracting two dates, the result is a **Duration** type (not a number). Du
 **IMPORTANT:** Duration does NOT support `.round()`, `.floor()`, `.ceil()` directly. You must access a numeric field first (like `.days`), then apply number functions.
 
 ```yaml
-# CORRECT: Calculate days between dates
-"(date(due_date) - today()).days"                    # Returns number of days
-"(now() - file.ctime).days"                          # Days since created
+# CORRECT: Calculate elapsed 24-hour days
+"(date(due_date) - today()).days"                    # Elapsed days until due
+"(now() - file.ctime).days"                          # Elapsed days since created
 
 # CORRECT: Round the numeric result if needed
 "(date(due_date) - today()).days.round(0)"           # Rounded days
@@ -95,7 +103,7 @@ When subtracting two dates, the result is a **Duration** type (not a number). Du
 
 # Subtract dates returns Duration type
 "now() - file.ctime"                    # Returns Duration
-"(now() - file.ctime).days"             # Get days as number
+"(now() - file.ctime).days"             # Get elapsed 24-hour days as number
 "(now() - file.ctime).hours"            # Get hours as number
 
 # Complex duration arithmetic

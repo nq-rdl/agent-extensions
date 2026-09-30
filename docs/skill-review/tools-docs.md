@@ -253,7 +253,7 @@ twice (a staging race, then the wind-down) whose cost was not captured
 | #308 | pixi | **Changed** | 0.78.0 baseline, provenance, canonical/offline guard and executed consumer checks; see decision below |
 | #308 | obsidian-bases follow-up | Changed | guard now covers older version / unreachable help |
 | #309 | pixi and 24 references | **Retained** | P1–P3 with/without comparisons and targeted repeat fixes; offline pack/unpack executed |
-| — | obsidian-bases date subtraction | Deferred to [#428](https://github.com/nq-rdl/agent-extensions/issues/428) | obsidian-help `bc5b4f2`: `Bases syntax.md` (last changed `ed4f6f4`, 2026-03-26) still says milliseconds; `Functions.md` documents `duration()` but no `.days`; needs an Obsidian instance |
+| #428 | obsidian-bases date subtraction | Verified in Obsidian 1.13.7 | [Application evidence](obsidian-bases-dates.md): Duration and numeric `.days` confirmed, including rounding and New York DST boundaries. Official help at `9cf8c291` still describes milliseconds. |
 
 ### Not done / next steps
 
