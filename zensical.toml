@@ -50,6 +50,7 @@ nav = [
     { "Codex" = "codex.md" },
     { "Codex directory readiness" = "codex-directory.md" },
     { "Delegation" = "delegation.md" },
+    { "Data-request permissions" = "data-request-permissions.md" },
     { "External marketplaces" = "external-marketplaces.md" },
     { "Link monitoring" = "link-monitoring.md" },
     { "Skill review (epic #312)" = [

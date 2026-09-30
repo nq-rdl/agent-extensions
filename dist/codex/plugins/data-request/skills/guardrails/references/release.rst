@@ -4,9 +4,37 @@ Release conventions
 Read this before delivery, and when a request asks for dates, validation listings,
 study identifiers, aggregate counts or clinician names. Evidence: two related
 enquiries whose builder had to decide each point from first principles (issue #389),
-and the governance ruling below (issue #413). The approval and the
+and the governance ruling below (issue #413). Known approval restrictions and the
 requester's confirmed scope override these conventions. Record each choice you make
 under them as an assumption or a ledger decision.
+
+Approved enquiry: build, then analyst review
+-------------------------------------------
+
+The approval of an enquiry is the permission to build, commit and push its request code
+(issue #445, JoshKgh decision, 2026-09-29). The engineer does not need a separate
+permission step for that in-scope work. During review, the data analyst checks the
+delivered elements against the approval before release; do not claim that check is
+complete during the build.
+
+* Build every requested element as usual, including identifiers and free text:
+  for example ``clinic_notes``, outwards correspondence and URN/MRN keys.
+  Do not withhold a requested output or mark it ``internal`` just because the
+  approval is unchecked. This does not authorise extra, unrequested elements.
+* Unchecked coverage is not a blocker, open question or Ben note item.
+  At most one limitation names all approval-sensitive requested elements for the
+  analyst's review. Reuse it in the analyst hand-off; do not repeat the question
+  at each stage. For example: "Analyst review: check the requested clinic notes,
+  correspondence and MRN against the approval before release."
+* A known restriction or custodian decision still comes first: cite it, do not
+  build the prohibited output, and route the conflict to the approver or custodian.
+  Validation listings and study-ID link tables remain undelivered, as below.
+* Enquiry approval does not override runtime tool permissions, hooks or the
+  selected task's scope. Triage-only stays read-only. Warehouse queries,
+  service-desk writes and release actions retain their separate authorisation.
+  If a runtime action is denied, report it and stop; never retry in another form
+  or route through another agent to evade the denial. Only the engineer may
+  change host permission settings, not the agent.
 
 Personal information
 --------------------
@@ -35,13 +63,15 @@ Raw dates or a derived outcome
   outcome is the researcher's modelling choice ("Leave modelling choices to the
   researcher" in ``SKILL.md``).
 * Deliver a derived outcome instead of the raw date only when the approval or the
-  confirmed scope names the derived outcome, or when the approval does not cover
-  the raw date. For example, an approval can permit "died within 30 days" but not
+  confirmed scope names the derived outcome, or when a known approval restriction
+  excludes the raw date. For example, an approval can permit "died within 30 days" but not
   the date of death.
 * For a derived outcome, record its rule (anchor, window and boundaries) with
   ``record_assumption()``. Keep the raw date for validation outside the delivery
   run.
-* Do not deliver both unless the approval covers both.
+* Deliver both only when both are requested and no known restriction excludes
+  them. Unchecked approval alone does not withhold either requested output; the
+  analyst checks coverage during review.
 
 Validation listings stay out of the delivery
 --------------------------------------------

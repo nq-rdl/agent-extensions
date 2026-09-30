@@ -280,8 +280,9 @@ symptom and a fix. Report each finding with its SQL location.
 
 ## Release conventions
 
-Before delivery, settle raw dates against a derived outcome, validation listings, study
-IDs and small-cell suppression. Read [references/release.rst](references/release.rst).
+Build all requested elements, including identifiers and free text, even when approval is unchecked;
+the analyst checks coverage during review. Known restrictions still apply. For build/commit/push permission,
+raw/derived dates, validation listings, study IDs and suppression, read [references/release.rst](references/release.rst).
 Keep validation listings and the study-ID link table out of the delivery run. Use the
 `-- @extract: <name> internal` marker only after confirming that the child's pinned
 `scripts/run_extract.py` supports it: released scaffold runners (v0.5.0 and earlier)

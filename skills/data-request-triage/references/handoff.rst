@@ -95,10 +95,11 @@ prepares and publishes the release. Never direct the engineer to release.
    ``current`` only means the SQL bytes match the reviewed snapshot: also confirm that
    ``/data-request:analyse`` re-ran
    (with ``--reconfirm-all``) after any pre-release logic change. Name every
-   open delivery gate, such as governance reconciliation. Flag approval-sensitive
-   requested outputs, known restricted fields and flagged decisions for analyst review.
-   An unchecked approval does not by itself prevent review; a known restriction remains
-   a release gate. When the run-evidence or PR gate fails,
+   open delivery gate, including known governance restrictions. Flag approval-sensitive
+   requested outputs in at most one limitation, plus known restricted fields and flagged
+   decisions for analyst review. The data analyst checks the delivered elements against
+   the approval before release. An unchecked approval does not by itself prevent review;
+   a known restriction remains a release gate. When the run-evidence or PR gate fails,
    report which part failed and stop. Re-read the PR head before steps 2 to 4; if it
    changed, recheck the gate on the new SHA. Without ``gh``, reading CI runs can need
    the GitHub MCP Actions toolset; if it is not enabled, say so.
