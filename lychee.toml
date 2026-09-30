@@ -107,3 +107,10 @@ headers = { "Accept" = "text/html", "Accept-Language" = "en-US,en;q=0.9" }
 [hosts."docs.conda.io"]
 concurrency = 1
 request_interval = "5s"
+
+# testcontainers.com guide links time out under bursts on GitHub runners
+# (run 36678363149). Throttle this host instead of excluding it, so the
+# skill guides still receive HTTP and fragment checks.
+[hosts."testcontainers.com"]
+concurrency = 2
+request_interval = "1s"
