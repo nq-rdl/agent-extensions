@@ -18,6 +18,8 @@ metadata:
 
 ## Codex execution
 
+Use the host’s available file, search, shell, and user-question tools for this workflow. Legacy tool names and slash-qualified skill references in supporting references describe capabilities; they do not install those tools. Keep code/configuration examples for another host unchanged when authoring that host’s artifacts.
+
 When supporting references invoke a catalog skill as /subject:facet, use $subject:facet in Codex. Preserve slash syntax inside examples that configure or document another host.
 
 Before shell examples, set PLUGIN_ROOT to the absolute installed plugin directory: two parent directories above this SKILL.md’s containing skill directory. Derive it from the loaded file path, never the working directory. This variable is not automatically supplied to ordinary shell tools. Quote it in commands.
@@ -93,7 +95,7 @@ Recheck affected evidence/artifacts, not every stage. See [references/ledger.rst
    for the interpretation checks to raise.
 7. **Recheck every gap claim**, whether yours, a worker's or a register row, against current
    code, tests, releases and dependency topology before you plan or file it. A delivered
-   capability is closed, whatever an older gap register says.
+   capability is closed; run and report the [read-only stale lift check](references/checks.rst).
 8. **Classify blockers** with the taxonomy in [references/checks.rst](references/checks.rst).
 9. **Update the ledger** after each state-changing stage and before handoff; read
    [references/ledger.rst](references/ledger.rst) for persistence, schema and resume rules.

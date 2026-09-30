@@ -98,8 +98,9 @@ The sources of truth are in ``nq-rdl/query-builder``:
   ``SNAPSHOT``, ``READ COMMITTED`` or ``READ UNCOMMITTED``, and rejects the string
   ``NOLOCK``. Store ``executor.audit_metadata()`` with the extract: it records the
   configured and the effective level.
-* ADR 0004 adds opt-in per-table ``WITH (NOLOCK)`` hints. It is on ``main`` and is
-  not in v0.6.0. Check the request's pin before you use a table hint.
+* ADR 0004 describes opt-in per-table ``WITH (NOLOCK)`` hints. Inspect the
+  request's tagged implementation/tests before claiming availability or absence;
+  a merge on ``main`` alone is not release evidence.
 
 Where the request repo has its own ``docs/READ_ISOLATION.md``, follow it as well.
 

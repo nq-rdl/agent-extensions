@@ -9,6 +9,7 @@ def nonempty: type == "string" and length > 0;
 def integer: type == "number" and . >= 1 and . == floor;
 def line_range: type == "array" and length == 2 and all(.[]; integer) and .[0] <= .[1];
 def path_ok: nonempty and (startswith("/") | not) and (split("/") | all(.[]; . != "" and . != "." and . != ".."));
+def release_tag: type == "string" and test("^v?(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)$");
 def req($k): if has($k) then empty else "missing key: \($k)" end;
 
 def items($kind; $rev):
@@ -68,6 +69,15 @@ def lift_document($rev):
       (if (.looked_in | type) != "array" or (.looked_in | length) == 0 or
         (.looked_in | all(.[]; type == "object" and (.path | nonempty) and (.revision | nonempty)) | not)
         then "\($id): looked_in requires paths and revisions" else empty end),
+      (if has("units") then
+        if (.units | type) != "array" then "\($id): units must be a nonempty array"
+        elif (.units | length) == 0 then "\($id): units must be a nonempty array"
+        else (.units[] | if type != "object" then "\($id): unit must be an object"
+          elif (.path | path_ok | not) or (.symbol | type) != "string" then "\($id): unit requires a normalized path and identifier symbol"
+          elif (.symbol | test("^[A-Za-z_][A-Za-z0-9_]*$") | not) then "\($id): unit requires an identifier symbol"
+          elif (.absent_tag | release_tag | not) then "\($id): unit absent_tag must be a stable X.Y.Z tag"
+          else empty end) end
+       else empty end),
       (if (.workaround | type) != "object" or (.workaround.file | path_ok | not) or
           (.workaround.lines | line_range | not) then "\($id): workaround requires file and lines" else empty end),
       (.classification as $c | if $c != null and (["new-capability", "existing-unit-gap", "request-specific"] | index($c)) == null then "\($id): invalid classification" else empty end),
