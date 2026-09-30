@@ -75,8 +75,8 @@ excluded or suppressed. The code pins these thresholds (`CONFIRMATION_PASSES`,
 
 A 404 from an access-controlled resource is not rot. GitHub answers 404 for
 private repositories and projects. Exclude such a URL in `lychee.toml`. Anchor
-the pattern narrowly and add a comment, as described in `CONTRIBUTING.md` under
-"Example URLs and placeholders". Or suppress the URL on the tracker.
+the pattern narrowly and add a comment, as described in
+[Example URLs and placeholders](authoring-skills.md#example-urls-and-placeholders). Or suppress the URL on the tracker.
 
 ### URL identity
 

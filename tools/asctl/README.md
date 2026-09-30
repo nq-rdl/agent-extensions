@@ -42,7 +42,7 @@ The 500-body-line limit is house policy, distinct from the
 for a main file under 500 lines and an instruction body below roughly 5,000
 tokens. The **300-body-line review target** is editorial, without a requirement
 to create reference files solely to hit it. See
-[CONTRIBUTING.md](../../CONTRIBUTING.md#skill-content-conventions) for disclosure
+[Authoring skills](../../docs/authoring-skills.md#skill-content-conventions) for disclosure
 and description targets. Behavioral pilots must establish correctness and actual
 loading costs separately; static size does not prove improvement.
 

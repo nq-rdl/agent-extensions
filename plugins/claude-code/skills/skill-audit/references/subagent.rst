@@ -67,8 +67,8 @@ Worker procedure
 
 Given one or more ``SKILL.md`` paths, apply the rubric in the owning
 ``skill-audit`` SKILL.md (passed by resolved path in the handoff) and, when the
-target is in the agent-extensions repository, CONTRIBUTING.md "Skill content
-conventions".
+target is in the agent-extensions repository, ``docs/authoring-skills.md`` "Skill
+content conventions".
 
 For each skill, score the six rubric items, then output findings grouped
 CRITICAL → MODERATE → MINOR. Each finding: ``file:line``, the rubric

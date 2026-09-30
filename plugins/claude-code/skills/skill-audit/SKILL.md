@@ -14,7 +14,7 @@ metadata:
 
 Run the non-inferable-value rubric over a target `SKILL.md` (or the session's
 skill diff). The rubric below is self-contained. In the agent-extensions
-repository, CONTRIBUTING.md → "Skill content conventions" holds the authoring
+repository, `docs/authoring-skills.md` → "Skill content conventions" holds the authoring
 rules it enforces; elsewhere, do not search for that file.
 
 ## Rubric

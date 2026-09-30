@@ -1,456 +1,115 @@
 # Contributing
 
-Thanks for contributing to the RDL agent extension catalog. This file covers the **rules for
-grouping skills into plugins**, the **skill directory structure and content
-conventions**, and the **packaging loop** that turns a new skill into installable
-Claude Code and Codex artifacts. For repo mechanics (sync scripts, validation, CI), see [`AGENTS.md`](AGENTS.md) and
-[`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md).
+Thank you for contributing to the RDL agent extension catalog. This guide
+describes the tools you need, how to set up a working copy, and the usual
+change loop. The detailed rules are in the documentation:
 
-**Tooling:** all repo Python runs via **pixi** (`pixi install` once, then
-`pixi run …` for every script below — the environment is defined in `pyproject.toml`).
+- [Authoring skills](docs/authoring-skills.md) – grouping rules, skill layout,
+  content conventions, and packaging
+- [Development](docs/development.md) – commands, git hooks, CI checks,
+  changelog, and releases
+- [Architecture](docs/ARCHITECTURE.md) – design and packaging decisions
 
-## Plugin grouping: one plugin per subject
+## Tools
 
-Every skill is identified as **`<subject>:<facet>`** — the `subject` is the plugin and
-the facet is what it does. Claude Code invokes skills as `/<subject>:<facet>`; Codex references
-enabled skills as `$<subject>:<facet>`.
+The build scripts need macOS or Linux. On Windows, use WSL2 or a dev container.
 
-### 1. One plugin per subject
+| Tool | Use | Required |
+|---|---|---|
+| [Dev Containers](https://containers.dev/) | Isolated development environments (`.devcontainer/`) | Recommended |
+| [pixi](https://pixi.sh/) | Python environment for the registry scripts and the docs site | Yes |
+| [lefthook](https://lefthook.dev/) 1.10 or later | pre-commit and pre-push hooks that mirror CI | Yes |
+| [Go](https://go.dev/) | Builds and tests the `asctl` skill validator | Yes |
+| [changie](https://changie.dev/) | Changelog fragments | Yes |
+| [Bun](https://bun.sh/) | TypeScript dependencies and type checks for the Codex runtime | For Codex work |
+| Node.js 18.18 or later | Codex runtime tests | For Codex work |
+| [lychee](https://lychee.cli.rs/) | External link checks | Optional |
+| Docker | SkillSpector scan, dev containers | Optional |
 
-A **subject** is a tool, library, language, app, or named workflow (`obsidian`, `go`, `r`,
-`sops`, `planning`). Each subject is exactly one plugin. A subject with a single facet still gets
-its own plugin — small plugins are fine. Its content can be skills, hooks, or MCP servers
-in any combination — a bundle may be skill-only or MCP-only (e.g. `lucid` wires only
-an MCP server).
+Run all repository Python through pixi (`pixi run …`). Do not use a system
+`python3`.
 
-### 2. File by *primary* subject, not by tools touched
+## Dev containers
 
-Put each skill under the one thing it is **primarily about**. Secondary tools it merely
-*uses* do not count.
+The repository has three dev containers:
 
-- `shiny-bslib` themes a **Shiny** app with bslib → subject is **Shiny** → `shiny:bslib`. (Not
-  a bslib plugin.)
+| Container | Path | Use |
+|---|---|---|
+| RDL Plugin Sandbox | `.devcontainer/` | General catalog development, with an outbound firewall |
+| Zensical Docs | `.devcontainer/docs/` | Docs preview on macOS, because the `docs` pixi environment is linux-64 only |
+| Codex smoke test | `.devcontainer/codex/` | Offline Codex marketplace install test |
 
-If you're tempted to file something under two subjects, you've applied the wrong test. Ask
-"what is this *about*?" — that question returns exactly one answer.
+Each container directory has a `README.md` with its own instructions.
 
-> **The `gh` bundle and its one exception.** `gh` is the team's GitHub *workflow* subject (rule
-> 4 below): `changie`, `conventional-commits`, `husky`, `lefthook`, `pre-commit`, `send-pr`, and
-> `document-release` all invoke as `/gh:*`. `go-gh` ("GitHub Actions CI/CD **for Go**") is grouped
-> there too, as `/gh:actions-go`, even though its primary subject is **Go** — the one sanctioned
-> exception to "file by primary subject," not a precedent. The bare `actions` leaf is reserved for
-> a future generic GitHub Actions skill. The `/git:pr-comments` entrypoint
-> is a separate packaging exception under `git`; existing GitHub workflow skills
-> remain in `gh` without duplication.
-> File everything else by what it is *about*.
+## Set up a working copy
 
-### 3. The facet is always an action or stage
+1. Clone the repository and open it in a dev container or a local shell.
+2. Create the Python environment:
 
-Name the facet for *what it does*, even when the subject has only one facet. Never repeat the
-subject.
+    ```bash
+    pixi install
+    ```
 
-- ✅ `sops:encrypt`, `pixi:env`, `obsidian:bases`
-- ❌ `sops:sops`, `pixi:pixi`
-- Multi-step workflows use stage facets, e.g. a hypothetical `release` subject with
-  `release:start`, `release:middle`, `release:close`. Ordering lives in the skill **content**
-  — each stage points to the next; the namespace does not enforce order.
+3. Activate the git hooks:
 
-The facet is the **leaf** you set in the registry mapping (see rule 6); the canonical skill stays
-flat and is renamed to the leaf when the plugin tree is generated.
+    ```bash
+    lefthook install
+    ```
 
-### 4. No-tool subjects → name the workflow
+4. For Codex runtime work, install the TypeScript dependencies:
 
-If a skill isn't about a tool, its subject is the **workflow/activity** it performs — real
-workflow subjects include `planning`, `debug`, and `tech-writing`. An action filed under a
-workflow subject invokes like any other facet: `gh:send-pr`, `gh:conventional-commits` (subject
-`gh`, facet the action).
+    ```bash
+    bun install
+    ```
 
-### 5. Optional delegation belongs to the skill
+## Make a change
 
-The catalog publishes skills, hooks, and MCP integrations. It does not publish
-standalone named agents. Put reusable task instructions in `skills/<name>/SKILL.md`
-and a worker outline in `skills/<name>/references/subagent.rst` when delegation
-adds value. The skill must link to the outline and explain when to read it:
-when the main agent chooses delegation or the user requests a subagent.
-Do not require loading the outline for ordinary direct execution.
+1. Create a branch from `main`.
+2. Edit canonical content only. Skills are in `skills/`, hooks are in `hooks/`,
+   and bundle definitions are in `registry/`.
+3. Regenerate the plugin trees:
 
-Keep the worker's objective, handoff inputs, capability requirements, scope,
-companion references, and return contract in that reference. Use the host's
-available subagent mechanism; the filename does not register an agent type.
-Tool restrictions expressed in prose do not create runtime permission controls.
-Preserve upstream attribution and licenses in the skill and adapted reference.
+    ```bash
+    pixi run bash scripts/sync-plugins.sh
+    ```
 
-Put the delegation contract in the outline's Handoff section:
+4. If you changed a bundle, `registry/marketplace.yaml`, or `VERSION`,
+   regenerate the manifests and the bundle list:
 
-> Complete the delegated scope using available tools. If blocked by missing
-> information or authorization, return the blocker and questions to the
-> caller. Do not perform unauthorized actions. The caller may provide answers
-> and resume the work.
+    ```bash
+    pixi run python3 scripts/generate_manifests.py .
+    pixi run python3 scripts/generate_bundles_doc.py .
+    ```
 
-Keep verification loops and existing authorization; tool permission is not
-task authorization. Name companion skills only when a plugin that ships the
-outline also ships them. [`docs/delegation.md`](docs/delegation.md) has the
-full rules, and `tests/test_delegation_handoff.py` checks them.
+5. Add a changelog fragment. Write one idea in each fragment, in 200
+   characters or fewer:
 
-Each skill has one home subject. Existing guest listings carried over from the
-agent migration remain supported: GitHub Actions in `go` (home `gh`), delivery
-debugging in `gh` (home `argo-cd`), and plugin discovery in `rdl-team` (home
-`claude-code`). Keep their registry comments and use home-qualified names in
-cross-plugin documentation. This preserves existing bundle coverage; new skills
-follow the primary-subject rule above.
+    ```bash
+    changie new
+    ```
 
-### 6. How grouping is expressed (owned here in `agent-extensions`)
+6. Commit, push, and open a pull request. The git hooks run the same checks
+   as CI.
 
-Skills are authored in this repo as a **flat** library — `skills/<skill>/SKILL.md`, one level, no
-group folders. **Grouping is a packaging decision** expressed in the bundle registry:
+Do not edit generated files by hand. These are the `plugins/` and
+`dist/codex/` trees, all `plugin.json` and `marketplace.json` files, and
+`docs/bundles.md`.
 
-- A bundle sets `pluginName: <subject>` and lists each skill member as either:
-  - a **flat string** `<name>` — packaged as-is (`leaf == <name>`); or
-  - an explicit **`{source, leaf}` mapping** — packages the flat `skills/<source>/` under a
-    different `leaf` (e.g. `{source: go-gh, leaf: actions-go}` → `gh:actions-go`).
-- A bundle may also wire `hooks:` and `mcp:` entries; see the registry schema in `AGENTS.md`.
-- `scripts/sync-plugins.sh` copies `skills/<source>/` → `plugins/<subject>/skills/<leaf>/`, renaming
-  to the leaf — so the plugin tree is one level deep and Claude Code invokes `<subject>:<leaf>`.
-  **The leaf folder name drives invocation.** Claude Code labels a skill in `/`-autocomplete as
-  `frontmatter.name || <subject>:<leaf>` — a present `name:` would override the namespaced id with
-  a bare label (e.g. `/gh` listing `go-gh` instead of `gh:actions-go`), so `sync-plugins.sh`
-  **strips the copy's `name:` entirely**. The canonical `skills/` source is never touched; only the
-  derivative plugin copy is stripped.
-- Validators enforce: every member has a valid shape · no duplicate leaf within a bundle ·
-  `pluginName` unique across bundles (`scripts/check_grouping.py`) · each plugin skill copy carries
-  **no** frontmatter `name:` (`scripts/validate-plugins.sh`).
+## Preview the docs
 
-Codex gets a separate generated copy under `dist/codex/plugins/<subject>/skills/<leaf>/`
-with explicit `name: <leaf>`. The packager selects canonical `references/codex.rst`
-entrypoints only when `targets.codex.skillOverrides` declares them. Supporting
-resources and optional delegation outlines remain inside the installed skill.
-Do not introduce `agents/` directories for either runtime.
-
-So to add `obsidian:bases`, the canonical skill stays flat `skills/obsidian-bases/`; the registry
-maps `{source: obsidian-bases, leaf: bases}` under `pluginName: obsidian`. Delegation outlines are authored inside the owning skill’s `references/`. See [`AGENTS.md`](AGENTS.md)
-for the mechanical add-and-sync steps.
-
-### 7. Manifests are generated
-
-Claude and Codex `plugin.json` and `marketplace.json` artifacts are **generated from
-`registry/bundles/<subject>.yaml`** — do **not** hand-edit them. When you add a **new subject**,
-append it to the `order:` list in `registry/marketplace.yaml` (see step 4 below). CI consistency
-checks fail if the registry and the generated manifests disagree.
-
-## Skill directory structure
-
-A skill lives at `skills/<name>/` and follows a fixed v1 layout so the catalog stays predictable
-and installs stay clean. `asctl repo-check` enforces this contract — a violation fails CI (see the
-`validate-skills` job in [`.github/workflows/validate.yml`](.github/workflows/validate.yml), which
-builds `asctl` and runs `asctl repo-check` on every PR and push).
-
-The rules:
-
-1. **`SKILL.md` is required** at the skill root — it is the skill. The filename must be exactly
-   `SKILL.md` (uppercase); a lowercase `skill.md` is rejected.
-2. **Only three non-hidden subdirectories are allowed:** `scripts/`, `references/`, and `assets/`.
-   Any other non-hidden subdirectory is an error.
-3. **`references/` is `.rst`-only.** Every file under `references/` (at any depth) must be `.rst`;
-   anything else is an error.
-4. **Delegation outlines use `references/subagent.rst`.** Keep them separate from
-   `SKILL.md` and load them only when needed. An `agents/` directory inside a skill
-   remains invalid under this repository's layout contract; OpenAI UI metadata
-   is not required by this migration.
-5. **Hidden entries are ignored.** Dot-prefixed files and directories (e.g. `.evals`) are not
-   linted; the structure check does not descend into or flag them.
-6. **Top-level files: `SKILL.md` plus a small config allowlist.** The only non-hidden top-level
-   file permitted besides `SKILL.md` is `lychee.toml` (used by `skills/lychee`). Any other
-   non-hidden top-level file is an error.
-
-### The 3-bucket rule
-
-When a skill ships more than its `SKILL.md`, sort each extra file into exactly one bucket:
-
-- **`scripts/`** — runnable files the skill invokes (`.sh`, compiled helpers, and the like).
-- **`references/`** — prose docs Claude reads on demand. `.rst` only.
-- **`assets/`** — everything else the skill ships: sample configs, templates, fixtures, and files
-  like `.json`, `.env`, `.yml.tmpl`, or icons. Not prose, not executed as a script.
-
-If a file is neither runnable nor `.rst` prose, it belongs in `assets/`.
-
-## Skill content conventions
-
-### Body size and disclosure
-
-This repository limits each `SKILL.md` to **500 body lines**, enforced by both
-`asctl validate` and `asctl repo-check`. The body starts after the closing YAML
-frontmatter fence. Leading and trailing blank lines count. LF and CRLF each end
-one line; a final newline does not add an extra line, and an unterminated final
-line still counts. An empty body has zero lines. Malformed frontmatter remains
-a parse error, not a body-size result.
-
-This is **house policy**, distinct from the [Agent Skills recommendation](https://agentskills.io/specification#progressive-disclosure)
-to keep the main file under 500 lines and its instruction body below roughly
-5,000 tokens. Neither line count nor an approximate token count measures task
-quality or actual model context usage.
-
-Aim for **300 body lines** during review. This is an editorial target, not an
-additional gate: crossing it does not require an otherwise unnecessary reference
-file. Keep task-specific references focused and directly reachable from
-`SKILL.md`; a table of contents can help navigate a long reference. Preserve
-useful examples, failure handling, and critical constraints when task evidence
-supports them.
-
-Run `asctl repo-check --size-report` before a content pilot. It adds body lines,
-approximate tokens (**raw UTF-8 body bytes / 4**, including whitespace and line
-endings), and visible regular file counts recursively under `references/`.
-Hidden entries and symlinks are excluded from reference counts. Rows sort by
-descending body lines, then skill path; unavailable metrics show `n/a` with a
-reason. The report does not suppress validation errors or add validation rules.
-Measure actual loading, correctness, and task completion separately during pilots.
-
-### Discovery descriptions
-
-Make invocation conditions clear in `description`. Aim for **400 characters for
-skill descriptions** and **300 for agent descriptions where applicable**, with
-justified exceptions under the existing schema limits (skill descriptions allow
-1,024 characters). These are editorial defaults, not automated shape/length
-gates. A three-part description template is optional. Keep identifiers and
-negative triggers when they improve routing; verify ambiguous sibling routing
-with representative requests. No new metadata field or agent body cap is required.
-
-### Content value
-
-A skill must encode a **gap the fresh model cannot see** — not restate public
-knowledge. Before writing or accepting skill content, apply these:
-
-### Prefer the non-inferable delta
-Ask Biggs's test: *"could a fresh model write this verbatim, with no prior
-struggle?"* If yes, cut it. Don't restate public specs or style guides; encode
-the gaps, gotchas, and project-specific decisions instead. Empirically
-(SkillsBench), wins concentrate in **concise** skills carrying verifier-facing,
-non-inferable detail — "comprehensive" prose scores worst and can displace the
-model's own stronger default.
-
-### Pin versions
-When a skill encodes a library or tool API surface, pin the version in
-`compatibility:` so drift is visible and reviewable. An unpinned API recital is
-how stale guidance (e.g. a deprecated method form) silently overrides the
-model's newer, correct default.
-
-### Add a verify-canonical guard
-For fast-moving or correctness-critical subjects, include a one-line "verify
-against the canonical source when being wrong would mislead," and point to the
-authoritative docs. See `skills/rust-explain/SKILL.md` for the model pattern.
-
-References: Biggs, *You're Probably Using Agent Skills Wrong*; SkillsBench (arXiv 2602.12670).
-
-### Local references
-
-Links between files of a skill are checked offline by `asctl repo-check` (the
-`validate-skills` CI job and the `asctl-repo-check` pre-commit hook). Run it
-from the repository root:
+On Linux, run:
 
 ```bash
-go -C tools/asctl build -o /tmp/asctl ./cmd/asctl/ && /tmp/asctl repo-check
+pixi run zensical serve
 ```
 
-- **Supported syntax.** Markdown inline links and images `[text](path)`,
-  `![alt](path)` and definitions `[label]: path` (in `.md`, and in `.rst` files
-  that carry Markdown prose). RST embedded links `` `text <path>`_ `` /
-  `` `text <path>`__ ``, targets `.. _name: path` / `.. __: path`, and the
-  `image`, `figure`, `include` and `literalinclude` directives (including
-  `.. |name| image:: path`). Named RST references (`` `name`_ ``,
-  `` `text <name_>`_ ``) point at targets, not files.
-- **Resolution.** A target resolves from the directory of the file that
-  contains it, not the working directory. `references/codex.rst` is a Codex
-  entrypoint body, so its links resolve from the skill root. Name matching is
-  exact. A target must stay inside the skill: an installed plugin copies only
-  the skill directory, so `../other-skill/…`, `/docs/…` and `~/…` fail. Use a
-  full URL for anything outside the skill.
-- **Ignored.** External URIs (`https:`, `mailto:`, any scheme, `//host`),
-  `#fragment`-only links, fenced code blocks, inline code, HTML and RST
-  comments, RST literal blocks (`::` and `code`/`code-block` directives), and
-  placeholders containing `<`, `>`, `{`, `}`, `$`, `*`, `...` or `…`. A
-  `#fragment` or `?query` is removed before the file check; fragments are not
-  validated.
-- **Not supported.** Markdown indented code blocks (use fences), links whose
-  destination spans lines, the short `__ path` anonymous target, and Sphinx
-  roles such as `:doc:`.
+The preview is at <http://localhost:8000>. On macOS, use the Zensical Docs dev
+container.
 
-### Example URLs and placeholders
+## Claude Code plugins for catalog work
 
-External links are checked by lychee against the root
-[`lychee.toml`](lychee.toml): on PRs that touch skill Markdown/RST
-(`link-check.yml`, advisory), and weekly across skills, `docs/`, `README.md`,
-`CONTRIBUTING.md` and `AGENTS.md` (`link-rot-check.yml`, which keeps one
-`link-rot` tracker issue; see [`docs/link-monitoring.md`](docs/link-monitoring.md)).
-Keep examples out of their failure lists:
-
-- **Illustrative hosts** use RFC 2606/6761 reserved names: `example.com`,
-  `example.org`, `example.net`, their subdomains (`docs.example.com`,
-  `git.example.com`), or the `.example`, `.test` and `.invalid` TLDs. Do not
-  invent plausible hosts such as `my-company.com`, `janedoe.com` or `a.edu`.
-- **Variable parts of a real host's URL** use angle-bracket placeholders:
-  `https://github.com/<owner>/<repo>.git`. In XML or HTML examples, where
-  `<…>` is markup, use a reserved host instead.
-- **Real URLs** must resolve. Fix rot at the source; verify that a
-  replacement answers and says the same thing.
-- **Exclusions** go in the root `lychee.toml` only when a plain HTTP page check
-  cannot verify the URL, such as API endpoints, OIDC issuers, channel roots or
-  bot-blocked hosts. Anchor each pattern narrowly, add a comment with the file
-  and reason, and add a fixture to `tests/fixtures/lychee/urls.toml`. Do not
-  accept 4xx statuses globally. A 404 from a private resource (GitHub answers
-  404 for private repositories and projects) is an access boundary, so it gets
-  the same narrow exclusion.
-- **Weekly findings** on the `link-rot` tracker are fixed at the source like any
-  other rot. When a URL must stay as it is, suppress it on the tracker with
-  `/link-rot suppress <url> <reason>` rather than widening an exclusion.
-
-Run the external scan locally as CI does:
-
-```bash
-bash skills/lychee/scripts/check-links.sh --config lychee.toml --cache=false \
-  'skills/**/*.md' 'skills/**/*.rst'
-```
-
-## Packaging a new skill into a plugin
-
-A new skill authored under `skills/<name>/` is **not installable until you map it into a bundle**
-— authoring the `SKILL.md` only adds it to the flat library; the registry decides which plugin
-(subject) it belongs to. CI enforces this: `scripts/check_exposure.py` fails if a canonical
-skill/hook isn't referenced by any `registry/bundles/*.yaml` (or explicitly allowlisted in
-`registry/unbundled.yaml`). Here is the full loop, using a hypothetical `data-request-analyse` skill
-that should become `data-request:analyse`:
-
-1. **Pick the subject and facet** (the rules above). Subject → the plugin (`data-request`); facet →
-   the action/stage leaf (`analyse`). Never repeat the subject in the facet.
-2. **Choose or create the bundle.** If `registry/bundles/data-request.yaml` exists, add to it;
-   otherwise copy an existing single-subject bundle (e.g. `registry/bundles/sops.yaml`) and set
-   `id`, `displayName`, `description` (no trailing period), `keywords`, and
-   `targets.claude.pluginName: data-request`.
-3. **Add the skill member.** Under `skills:`, write either a flat string (when the skill's
-   directory name already equals the leaf you want) or a `{source, leaf}` mapping to rename:
-   ```yaml
-   skills:
-     - {source: data-request-analyse, leaf: analyse}   # → /data-request:analyse
-   ```
-   To include a portable skill bundle in the Codex catalog, add an explicit target. Select
-   components explicitly and supply native configuration for MCP and hooks:
-   ```yaml
-   targets:
-     codex:
-       enabled: true
-       pluginName: data-request
-       marketplaceName: rdl-agent-extensions
-       category: Developer Tools
-       components:
-         skills: true
-         mcp: false
-         hooks: false
-         apps: false
-   ```
-   Native execution uses the host's available tools. Codex packaging adapts entrypoint
-   names and host calls; target-host configuration examples retain their original meaning.
-   Use `skillOverrides: {source-name: references/codex.rst}` for a different host workflow.
-   Use `skillDescriptions: {source-name: "Native capability description"}` when that
-   workflow supports different capabilities; omitted descriptions stay canonical.
-   `excludeSkills` names canonical sources. MCP and hooks require `mcpConfig` and
-   `hookConfig` repository-relative sources; `resources` copies declared runtime assets.
-   Run `pixi run python3 scripts/codex_package.py . --validate` and native smoke tests.
-   Directory archives and external submission gates are documented in `docs/codex.md`.
-4. **If it is a brand-new subject, add it to the marketplace order.** Append `data-request` to the
-   `order:` list in `registry/marketplace.yaml` (otherwise it is appended alphabetically with a
-   CI `::warning::`).
-5. **Build the plugin tree and manifests:**
-   ```bash
-   pixi run bash scripts/sync-plugins.sh data-request     # copies skills/<source>/ → plugins/data-request/skills/<leaf>/
-   pixi run python3 scripts/generate_manifests.py .     # writes Claude + Codex manifests
-   pixi run python3 scripts/generate_bundles_doc.py .   # refreshes docs/bundles.md
-   ```
-6. **Validate** exactly what CI will:
-   ```bash
-   pixi run python3 scripts/check_bundle_refs.py .   && \
-   pixi run python3 scripts/check_exposure.py .      && \
-   pixi run python3 scripts/check_grouping.py .      && \
-   pixi run python3 scripts/generate_manifests.py . --check && \
-   pixi run python3 scripts/generate_bundles_doc.py . --check && \
-   pixi run python3 scripts/check_consistency.py .   && \
-   pixi run bash scripts/validate-plugins.sh
-   ```
-
-Adding a **delegatable workflow** follows the same skill packaging loop. Keep the
-ordinary workflow in `SKILL.md` and its optional worker instructions under
-`references/subagent.rst`. There is no registry `agents:` list or agent preload.
-
-## Claude Code on the web
-
-Cloud sessions run on a fresh VM with only a clone of this repo. Dev-helper plugins are not
-auto-configured for these sessions — enable the external dev-helpers (Go/LSP, PR review, Python
-tooling, git worktrees, general workflows) yourself in your **user** settings; see
-[`docs/external-marketplaces.md`](docs/external-marketplaces.md) for the policy on installing
-external plugins from their own upstream marketplaces. Never enable the `rdl-agent-extensions` marketplace or any of its published plugins
-for catalog development — a session for developing the catalog should not install the catalog
-itself.
-
-## Cutting a release
-
-Releases are dispatched from the Actions tab (**"Release — Prepare PR"**) and land as a
-reviewable `release/v<version>` PR — reviewing and squash-merging that PR is the release gate.
-Version rules (`X.Y.Z`, no leading `v`, no zero-padded components) and the recovery steps for a
-failed Prepare or Finalize run are in [`AGENTS.md`](AGENTS.md) under **"Release"**.
-
-## Bundled hooks
-
-Every bundle with hooks has a canonical Claude config at
-`hooks/<pluginName>/hooks.json`. (The `codex` plugin’s config is
-`hooks/codex/hooks.json`; the subdirectories of `hooks/codex/` hold native
-Codex adapter configs.) List the bundle’s shell hooks by stem in its `hooks:`
-array. Each hook command names its installed path, and the path must be
-quoted so that an install under a path with spaces still runs:
-
-- `bash "${CLAUDE_PLUGIN_ROOT}/hooks/<name>.sh"` for a new hook;
-- `"${CLAUDE_PLUGIN_ROOT}/scripts/<name>.sh"` where an existing plugin
-  already installs hooks beside its runtime, as the `codex` plugin does.
-
-Edit only the canonical files, then run
-`pixi run bash scripts/sync-plugins.sh <bundle>`. The script generates
-`plugins/<pluginName>/hooks/` (config and any hooks installed there) and copies
-each other hook to the directory its command names. It never prunes vendored
-files that share that directory. `sync-plugins.sh --check` (CI and the
-pre-commit hook) fails on stale, missing, content-drifted, or mode-drifted
-copies, and on a copy left at an old location. It also fails on a listed hook
-that no command runs, a command that runs an unlisted script, an unquoted plugin
-root, and a `${CLAUDE_PLUGIN_ROOT}/…` path in a hook that the installed tree
-would not contain. Top-level `hooks/*.sh` files are always hooks. Put a helper
-that is not a hook with its target, as with the Codex adapter
-`hooks/codex/adapter.sh`, or in the owning skill’s `scripts/` directory.
-`tests/test_installed_hooks.py` and `tests/codex/hook-wrappers.test.mjs` run
-installed copies from a path with spaces. See
-[the #311 hook review](docs/skill-review/hooks.md) for the mapping.
-
-The `tech-writing` reminder uses `jq` (silently skips if unavailable) and
-adds advisory context for `PreToolUse` on the `Skill` tool and
-`UserPromptExpansion` on a typed `/tech-writing:copyedit` command. It makes no
-network requests and does not change tool permissions. Claude versions without
-`UserPromptExpansion` still have the lookup instruction in the skill itself;
-delegated workers likewise receive that instruction. Hook event details:
-https://code.claude.com/docs/en/hooks#userpromptexpansion
-
-The plugin also registers a native agent review on `Stop` and a task-scoped
-`SubagentStop`. These hooks block on findings in the simplified STE profile;
-see [Technical-writing completion review](docs/tech-writing-ste-review.md)
-for scope, source review, and harness limitations.
-
-## Claude Workflow scripts
-
-Keep native Workflow JavaScript in the owning skill’s `scripts/` directory.
-These files use Claude Code’s orchestration runtime, not a Node CLI.
-The JavaScript format is required by that runtime. New CLI helpers still use Go.
-
-Register installed paths in `targets.claude.workflows`, for example:
-
-```yaml
-workflows: [./skills/workflow/scripts/house-style.js]
-```
-
-Paths must name `.js` files under a bundled skill’s `scripts/` directory.
-The generator validates canonical sources before adding the native manifest field.
-Normal skill sync copies the scripts and checks drift.
-Exclude Claude-only entrypoints from the Codex target with `excludeSkills`.
-See the [RDL house-style workflow](docs/rdl-workflow.md) for usage and runtime limits.
+Install development plugins, such as Go language servers or PR review tools, in
+your user settings. See [External marketplaces](docs/external-marketplaces.md).
+Do not enable the `rdl-agent-extensions` marketplace or its plugins in a session
+that develops the catalog. To test a plugin from your working copy, see
+[Testing installs locally](docs/development.md#testing-installs-locally).

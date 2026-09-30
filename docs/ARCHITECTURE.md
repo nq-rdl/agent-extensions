@@ -78,7 +78,7 @@ and checks both content and executable modes for drift. No agents tree is restor
 
 ### `asctl` — the skills spec validator
 
-`tools/asctl/` is a Go CLI imported from the former agent-skills repo. `asctl repo-check` checks every canonical skill's frontmatter against the [agentskills.io](https://agentskills.io) spec, plus repository structure rules, the 500-body-line house limit, and prompt generation, and checks offline that every local Markdown/RST link target exists inside its skill (`internal/localrefs`; conventions in `CONTRIBUTING.md` → "Local references"). It runs in CI as the `validate-skills` job, and locally:
+`tools/asctl/` is a Go CLI imported from the former agent-skills repo. `asctl repo-check` checks every canonical skill's frontmatter against the [agentskills.io](https://agentskills.io) spec, plus repository structure rules, the 500-body-line house limit, and prompt generation, and checks offline that every local Markdown/RST link target exists inside its skill (`internal/localrefs`; conventions in [Local references](authoring-skills.md#local-references)). It runs in CI as the `validate-skills` job, and locally:
 
 ```bash
 go -C tools/asctl build -o /tmp/asctl ./cmd/asctl/ && /tmp/asctl repo-check
@@ -87,7 +87,7 @@ go -C tools/asctl build -o /tmp/asctl ./cmd/asctl/ && /tmp/asctl repo-check
 
 The size report lists body lines, estimated tokens (raw UTF-8 body bytes / 4),
 and reference file counts. It leaves validation results unchanged and does not
-measure task quality or actual model usage. CONTRIBUTING.md defines the house
+measure task quality or actual model usage. [Authoring skills](authoring-skills.md#body-size-and-disclosure) defines the house
 limit and the separate 300-line editorial target.
 
 **Registry resilience:** the registry names skills by directory name, so a rename or removal can leave a stale reference. `scripts/sync-plugins.sh` reports it as a `::warning::` and skips it (it never aborts); the authoritative gate is `validate.yml`'s `validate-bundles` job, which fails the PR until a human reconciles the registry in the same change.
@@ -272,7 +272,7 @@ the `main` protection API returned `required_status_checks: null`, and the branc
 API returned `[]`: no required status checks were configured. Protection required
 one PR approval and resolved conversations, with administrator enforcement
 disabled. This is a dated observation, not a claim about earlier settings.
-[AGENTS.md](https://github.com/nq-rdl/agent-extensions/blob/main/AGENTS.md#build-test-lint) records the API endpoints, intended
+[Merge enforcement](development.md#merge-enforcement) records the API endpoints, intended
 always-run check inventory, and responsibility for keeping check names aligned
 if maintainers enable enforcement. See [GitHub's protected-branch documentation](https://docs.github.com/en/repositories/configuring-branches-and-merges-in-your-repository/managing-protected-branches/about-protected-branches).
 
@@ -361,4 +361,4 @@ This repository should not:
 - publish to a target without a native marketplace/install model and target-specific generated validation;
 - hand-edit generated output (`plugins/*/` trees, target `plugin.json` and `marketplace.json` files, `docs/bundles.md`) — run the generator scripts instead.
 
-For contribution expectations and authoring guidance, see the repository-root `AGENTS.md`.
+For contribution expectations and authoring guidance, see [Authoring skills](authoring-skills.md) and [Development](development.md).

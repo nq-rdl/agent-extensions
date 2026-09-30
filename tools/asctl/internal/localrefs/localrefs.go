@@ -8,7 +8,7 @@
 // resolution that does not depend on the process working directory.
 //
 // It is not a full Markdown or RST parser. It recognises the link syntax the
-// catalog actually ships (see CONTRIBUTING.md "Local references"):
+// catalog actually ships (see docs/authoring-skills.md "Local references"):
 //
 //   - Markdown (.md, and Markdown-flavoured prose in .rst): inline links and
 //     images [text](target) / ![alt](target), and reference definitions

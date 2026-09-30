@@ -118,7 +118,7 @@ jobs:
           body="$(printf '%s\n\n%s\n\n%s\n\n%s\n' \
             "The Changie binary pinned in \`$WORKFLOW\` (\`version:\` on the \`changie-action\` step) is **$pinned**, but the latest upstream release is **$latest** — https://github.com/$UPSTREAM/releases/tag/$latest" \
             "Dependabot bumps the action SHA but never \`with:\` inputs, so the weekly **Changie pin check** workflow reports this drift instead (#283). It only notifies — the bump is a human decision." \
-            "**To bump:** read the upstream release notes (a major bump may change how the changelog is rendered), open a normal PR changing \`version: $pinned\` → \`version: $latest\`, then eyeball the next batched \`.changes/<version>.md\` — that review is the reason the pin exists (see AGENTS.md § Release)." \
+            "**To bump:** read the upstream release notes (a major bump may change how the changelog is rendered), open a normal PR changing \`version: $pinned\` → \`version: $latest\`, then eyeball the next batched \`.changes/<version>.md\` — that review is the reason the pin exists (see docs/development.md § Release)." \
             "Closing this issue without bumping is fine: the check stays quiet for this exact version pair and only opens a new issue when a newer upstream release appears.")"
 
           exact_open="$(printf '%s' "$issues" | jq -r --arg t "$title" \

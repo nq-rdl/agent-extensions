@@ -12,7 +12,7 @@ case "$path" in
     jq -nc --arg p "$path" '{
       hookSpecificOutput: {
         hookEventName: "PostToolUse",
-        additionalContext: ("Skill edited (" + $p + "). Consider running /claude-code:skill-audit to check it encodes non-inferable value (CONTRIBUTING.md → Skill content conventions).")
+        additionalContext: ("Skill edited (" + $p + "). Consider running /claude-code:skill-audit to check it encodes non-inferable value (docs/authoring-skills.md → Skill content conventions).")
       }
     }'
     ;;

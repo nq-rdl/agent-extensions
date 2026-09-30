@@ -174,7 +174,7 @@ class DestructiveRuleScope(unittest.TestCase):
                 self.assert_scope(path.read_text())
 
 
-CONTRIBUTING = REPO / "CONTRIBUTING.md"
+CONTRIBUTING = REPO / "docs" / "authoring-skills.md"
 
 # The delegation contract (#310). One fixed text, pasted unchanged.
 CONTRACT = (
@@ -209,7 +209,7 @@ def contributing_delegation_section() -> str:
     match = re.search(r"^### 5\. Optional delegation belongs to the skill\n(.*?)(?=^### |\Z)",
                       text, re.M | re.S)
     if not match:
-        raise AssertionError("CONTRIBUTING.md lost section 5 (Optional delegation)")
+        raise AssertionError("docs/authoring-skills.md lost section 5 (Optional delegation)")
     return match.group(1)
 
 

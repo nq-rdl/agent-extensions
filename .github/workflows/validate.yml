@@ -82,7 +82,7 @@ jobs:
 
   validate-plugins:
     # Keep this legacy name stable for the intended required-check inventory.
-    # Current enforcement and settings responsibilities are documented in AGENTS.md.
+    # Current enforcement and settings responsibilities are documented in docs/development.md.
     name: Validate Claude plugin structure, hooks, and agents
     runs-on: ubuntu-latest
     steps:

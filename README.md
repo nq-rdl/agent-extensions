@@ -1,42 +1,48 @@
-# Agent Extensions
+# Agent extensions
 
-Curated reusable agent skills packaged as self-contained plugins. Claude Code and Codex publish the complete catalog as separate target packages. Canonical skills and optional delegation outlines live under `skills/`, while generated manifests expose target-supported bundles from `plugins/` (Claude) and `dist/codex/plugins/` (Codex).
+A plugin marketplace for Claude Code and Codex. Each plugin covers one subject,
+such as Go or Git, and installs as a self-contained package. A plugin brings
+skills and, where the subject needs them, hooks and MCP servers.
 
-## Installation
+Install only the subjects you work with. Each skill in a plugin is one facet of
+its subject. For example, `/go:naming` is the naming facet of the `go` plugin.
+[`docs/bundles.md`](docs/bundles.md) lists the plugins.
 
-### Claude Code
+## Install in Claude Code
+
+1. Add the marketplace once:
+
+    ```bash
+    /plugin marketplace add nq-rdl/agent-extensions
+    ```
+
+2. Install a plugin:
+
+    ```bash
+    /plugin install go@rdl-agent-extensions
+    ```
+
+To set up the RDL team configuration, install the `rdl-team` plugin:
 
 ```bash
-# Add the marketplace (once)
-/plugin marketplace add nq-rdl/agent-extensions
-
-# Install a single subject
-/plugin install go@rdl-agent-extensions
-
-# Onboarding: install the rdl-team plugin
 /plugin install rdl-team@rdl-agent-extensions
 ```
 
-See [`docs/bundles.md`](docs/bundles.md) for the full subject list.
+### Use a skill in Claude Code
 
-#### Using skills in Claude Code
-
-Each plugin is a **subject**, and each skill in it is a facet, so skills invoke as
-`/<subject>:<skill>`. For example, the `go` plugin provides `/go:naming` and
-`/go:secure`:
+Type `/<plugin>:<skill>`, then your request:
 
 ```text
 /go:naming review the identifiers in internal/store/
 ```
 
-Type `/<subject>` to list a plugin's skills in autocomplete. Claude can also load an
-installed skill on its own when your request matches the skill's description.
-[`docs/bundles.md`](docs/bundles.md) lists every skill per plugin for both Claude Code
-and Codex.
+Type `/<plugin>` to list the skills of a plugin in autocomplete. Claude can also
+load an installed skill when your request matches the description of the skill.
 
-#### Updating and removing plugins
+### Update or remove a plugin
 
-Run these from a shell. `/plugin` opens the same manager inside a session.
+Run these commands from a shell. Inside a session, `/plugin` opens the same
+manager.
 
 ```bash
 # Refresh the marketplace catalog, then update an installed plugin
@@ -47,61 +53,79 @@ claude plugin update go@rdl-agent-extensions   # restart Claude Code to apply
 claude plugin uninstall go@rdl-agent-extensions
 ```
 
-### Codex
+## Install in Codex
 
-```bash
-# Add the native marketplace (once)
-codex plugin marketplace add nq-rdl/agent-extensions
+1. Add the marketplace once:
 
-# List and install a Codex-enabled subject
-codex plugin list --marketplace rdl-agent-extensions --available --json
-codex plugin add go@rdl-agent-extensions --json
+    ```bash
+    codex plugin marketplace add nq-rdl/agent-extensions
+    ```
+
+2. List the available plugins, then install one:
+
+    ```bash
+    codex plugin list --marketplace rdl-agent-extensions --available --json
+    codex plugin add go@rdl-agent-extensions --json
+    ```
+
+Codex installs the same plugins as Claude Code, with native skills, MCP
+integrations, and command hooks. See [Codex](docs/codex.md) for verification
+commands and current limitations.
+
+### Use a skill in Codex
+
+Type `$` in the composer to select an installed skill, then add your request:
+
+```text
+$git:pr-comments <PR URL>
 ```
 
-The Codex catalog includes all 36 bundles, with strict skill names, MCP integrations, and native command hooks. See [`docs/codex.md`](docs/codex.md) for verification commands and current limitations.
+The CLI also provides `/skills`. See [Invoking skills](docs/codex.md#invoking-skills)
+for the desktop menu and the differences from Claude Code slash commands.
 
-To invoke an installed skill in Codex, type `$` to select it. Add your request after the skill mention.
-For example, the installed `git` plugin provides `$git:pr-comments <PR URL>` in the Codex composer.
-The CLI also provides `/skills`. Refer to [Invoking skills](docs/codex.md#invoking-skills)
-for desktop menu behaviour and differences from Claude Code slash commands.
+## Delegation
 
-See [Delegation](docs/delegation.md) for optional subagent execution and migrated agent names.
+Some skills can run their workflow in a subagent. See
+[Delegation](docs/delegation.md) for when this applies and for the names of the
+former agents.
 
 ## Contributing
 
-See [`CONTRIBUTING.md`](CONTRIBUTING.md) for how skills are grouped into plugins, the
-skill directory layout, content conventions, and the packaging loop. See
-[`AGENTS.md`](AGENTS.md) for repo commands, CI checks, local hooks, and the changelog and
-release flow. Design decisions live in [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md).
-Contributor validation and the skill-size report are documented in
-[asctl](tools/asctl/README.md).
+Plugins are generated from canonical skills in `skills/` and bundle definitions
+in `registry/`. Do not edit `plugins/` or `dist/codex/` by hand.
+
+- [`CONTRIBUTING.md`](CONTRIBUTING.md) – required tools and setup
+- [Authoring skills](docs/authoring-skills.md) – grouping rules, skill layout,
+  and packaging
+- [Development](docs/development.md) – commands, CI checks, the changelog, and
+  releases
+- [Architecture](docs/ARCHITECTURE.md) – design decisions
+
+`AGENTS.md` is the entry point for coding agents. The repository has no
+`CLAUDE.md`.
 
 ## Roadmap
 
-Planned work is tracked as epics and on the
-[RDL Planning project board](https://github.com/orgs/nq-rdl/projects/1) (visible to
-`nq-rdl` organization members):
+Epics and the [RDL Planning project board](https://github.com/orgs/nq-rdl/projects/1)
+track planned work. Only members of the `nq-rdl` organisation can see the board.
 
-- [#180](https://github.com/nq-rdl/agent-extensions/issues/180) — reviewable,
-  merge-triggered release process hardened to Actions best practice
-- [#261](https://github.com/nq-rdl/agent-extensions/issues/261) — follow-up for the
-  shipped `redhat` plugin: settle the credential path and docs-to-source map
-  ([#262](https://github.com/nq-rdl/agent-extensions/issues/262)) and verify it end to
-  end on Linux and macOS with real credentials
+- [#180](https://github.com/nq-rdl/agent-extensions/issues/180) – a reviewable,
+  merge-triggered release process that follows Actions best practice
+- [#261](https://github.com/nq-rdl/agent-extensions/issues/261) – follow-up for
+  the `redhat` plugin: settle the credential path and docs-to-source map
+  ([#262](https://github.com/nq-rdl/agent-extensions/issues/262)), and verify it
+  end to end on Linux and macOS with real credentials
   ([#267](https://github.com/nq-rdl/agent-extensions/issues/267))
-- [#312](https://github.com/nq-rdl/agent-extensions/issues/312) — reliable,
+- [#312](https://github.com/nq-rdl/agent-extensions/issues/312) – reliable,
   discoverable skills: verified fixes, behavioural pilots, and link integrity
 
-See [open issues](https://github.com/nq-rdl/agent-extensions/issues) for smaller items.
+See [open issues](https://github.com/nq-rdl/agent-extensions/issues) for smaller
+items.
 
-## Agent File Management
+## Licence
 
-`AGENTS.md` is the single source of truth for agent contributor guidance. The repo
-does not carry a `CLAUDE.md`; there is no symlink or copy to keep in sync.
+The licence of a file depends on its type. You do not choose between them.
 
-## License
-
-This repo is **scope-licensed** (not an `OR` dual-license — the license depends on the file, not the user's choice):
-
-- **Software** — `SPDX-License-Identifier: MIT`. Full text: [LICENSE](LICENSE).
-- **Media** — `SPDX-License-Identifier: CC-BY-4.0`. Full text: [LICENSE-CC-BY-4.0](LICENSE-CC-BY-4.0).
+- **Software** – `SPDX-License-Identifier: MIT`. Full text: [LICENSE](LICENSE).
+- **Media** – `SPDX-License-Identifier: CC-BY-4.0`. Full text:
+  [LICENSE-CC-BY-4.0](LICENSE-CC-BY-4.0).

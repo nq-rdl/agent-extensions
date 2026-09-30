@@ -160,7 +160,7 @@ What the `go` suite currently measures (sonnet-5, 5 runs per arm):
 | `interfaces-and-types` | 1.00 | 1.00 | 0.00 | nothing — tagged `saturated` |
 
 A Δ of 0 means the model already does this without the skill, so that guidance is a
-candidate for cutting under CONTRIBUTING's "non-inferable delta" rule; the case is kept
+candidate for cutting under the "non-inferable delta" rule in docs/authoring-skills.md; the case is kept
 as a regression guard. One model and five runs is evidence, not proof.
 
 Read Δ only with enough runs: this case measured −0.22 at 3 runs per arm and +0.10
