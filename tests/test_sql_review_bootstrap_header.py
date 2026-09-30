@@ -1,4 +1,5 @@
 """#433: factual pre-publish evidence, not a semantic matcher or live agent pilot."""
+import copy
 import json
 import shutil
 import subprocess
@@ -145,6 +146,95 @@ class BootstrapHeader(unittest.TestCase):
         r = self.notes()
         self.assertEqual(r.returncode, 0, r.stderr)
         self.assertEqual(len(json.loads(r.stdout)["scope_check"]["question_checks"]), 4)
+
+    def test_staged_questions_reject_lost_or_changed_published_history_before_output(self):
+        published = copy.deepcopy(self.qdoc)
+        published["questions"][1].update(status="closed", closed={
+            "answer": "Brand is unknown", "by": "analyst-login", "at": "2026-09-29", "source": "request.md"})
+        published["questions"][1]["decided"] = {
+            "by": "requester-login", "role": "requester", "at": "2026-09-28", "source": "request.md"}
+        published["questions"].append({"id": "Q11", "text": "Count transfers?", "applies": "review",
+                                       "owner": None, "status": "open"})
+        self.p.write_json("q", "questions.json", published)
+        self.p.write_json("q", "scope.json", self.scope)
+        bads = []
+        for index in (0, 1, 2):
+            bad = copy.deepcopy(published)
+            del bad["questions"][index]
+            bads.append(bad)
+        for index, updates in ((0, {"id": "Q8"}), (0, {"text": "Different codes?"}),
+                               (0, {"applies": "review"}), (1, {"owner": "other-login"}),
+                               (1, {"closed": {**published["questions"][1]["closed"], "answer": "Changed"}}),
+                               (1, {"decided": {**published["questions"][1]["decided"], "at": "2026-09-27"}})):
+            bad = copy.deepcopy(published)
+            bad["questions"][index].update(updates)
+            bads.append(bad)
+        bad = copy.deepcopy(published)
+        bad["questions"][1].update(status="open")
+        del bad["questions"][1]["closed"]
+        bads.append(bad)
+        bad = copy.deepcopy(published)
+        bad["questions"].append({**published["questions"][1], "id": "Q10"})
+        bads.append(bad)
+        for bad in bads:
+            with self.subTest(questions=bad["questions"]):
+                self.questions.write_text(json.dumps(bad))
+                before = {p: p.read_bytes() for p in self.p.root.rglob("*") if p.is_file()}
+                r = self.notes("--questions", str(self.questions))
+                self.assertEqual(r.returncode, 4, r.stdout + r.stderr)
+                self.assertEqual(r.stdout, "")
+                self.assertIn("history", r.stderr)
+                self.assertEqual(before, {p: p.read_bytes() for p in self.p.root.rglob("*") if p.is_file()})
+
+    def test_valid_staged_question_transition_matches_publisher(self):
+        self.p.write_json("q", "questions.json", self.qdoc)
+        self.p.write_json("q", "scope.json", self.scope)
+        self.qdoc["questions"][0].update(status="closed", closed={
+            "answer": "Code 123", "by": "analyst-login", "at": "2026-09-29", "source": "request.md"})
+        self.qdoc["questions"][1]["owner"] = "analyst-login"
+        self.qdoc["questions"].append({"id": "Q10", "text": "Which wards?", "applies": "scope",
+                                       "owner": None, "status": "open"})
+        self.questions.write_text(json.dumps(self.qdoc))
+        out = self.compared()
+        self.assertEqual({row["question"]["id"] for row in out["question_checks"]}, {"Q9", "Q10"})
+        r = run(["publish-questions", "q", str(self.questions)], self.p.root)
+        self.assertEqual(r.returncode, 0, r.stdout + r.stderr)
+
+    def test_explicit_draft_cannot_bypass_invalid_published_store(self):
+        for raw in ("{bad", json.dumps(dict(self.qdoc, slug="other", sql_path="other.sql"))):
+            with self.subTest(raw=raw):
+                self.p.write_json("q", "questions.json", {}).write_text(raw)
+                r = self.notes("--questions", str(self.questions))
+                self.assertEqual(r.returncode, 4, r.stdout + r.stderr)
+                self.assertEqual(r.stdout, "")
+
+    def test_explicit_draft_cannot_bypass_symlinked_published_store(self):
+        store = self.draft.parent / "questions.json"
+        store.symlink_to(self.questions)
+        r = self.notes("--questions", str(self.questions))
+        self.assertEqual(r.returncode, 2, r.stdout + r.stderr)
+        self.assertEqual(r.stdout, "")
+
+    def test_staged_history_is_checked_even_without_an_sql_header(self):
+        self.sql.write_text(SQL_V1)
+        self.p.write_json("q", "questions.json", self.qdoc)
+        self.qdoc["questions"] = []
+        self.questions.write_text(json.dumps(self.qdoc))
+        r = self.notes("--questions", str(self.questions))
+        self.assertEqual(r.returncode, 4, r.stdout + r.stderr)
+        self.assertEqual(r.stdout, "")
+
+    def test_installed_helpers_reject_truncated_question_drafts(self):
+        self.p.write_json("q", "questions.json", self.qdoc)
+        self.qdoc["questions"] = []
+        self.questions.write_text(json.dumps(self.qdoc))
+        for tree in (REPO / "plugins/data-request", REPO / "dist/codex/plugins/data-request"):
+            with self.subTest(tree=tree), tempfile.TemporaryDirectory(prefix="installed question history ") as tmp:
+                installed = Path(tmp) / "plugin with spaces"
+                shutil.copytree(tree, installed)
+                r = self.notes("--questions", str(self.questions), script=installed / "skills/setup/scripts/sqlreview.sh")
+                self.assertEqual(r.returncode, 4, r.stdout + r.stderr)
+                self.assertEqual(r.stdout, "")
 
     def test_declared_missing_store_is_not_silently_clean(self):
         r = self.notes()

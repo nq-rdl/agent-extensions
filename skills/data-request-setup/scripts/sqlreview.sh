@@ -1084,7 +1084,7 @@ cmd_notes() {
 # Pre-publish scope evidence (#433). Explicit staged questions support first bootstrap without
 # publishing early; resume defaults to the authoritative store, not historical embedded strings.
 _scope_notes() { # scope-draft optional-question-draft parsed-notes
-  local draft="$1" questions="$2" parsed="$3" qdoc diagnostics
+  local draft="$1" questions="$2" parsed="$3" qdoc diagnostics published
   if [ -z "$questions" ]; then
     questions="$(dirname "$draft")/questions.json"
     sr_no_symlinks "$(sr_abspath "$questions")" || exit 2
@@ -1101,6 +1101,17 @@ _scope_notes() { # scope-draft optional-question-draft parsed-notes
       include "sqlreview-questions";
       .kind == "questions" and .slug == $draft[0].slug and .sql_path == $draft[0].sql_path
       and legacy_covered($draft[0]; null)' "$questions" >/dev/null || sr_die 4 "question store binding mismatch or untracked legacy questions"
+    # A staged draft cannot hide identities or closed rows that publish-questions would
+    # reject later, after scope publication. Keep notes usable without an initialised project.
+    published="$(dirname "$draft")/questions.json"
+    sr_no_symlinks "$(sr_abspath "$published")" || exit 2
+    if [ -e "$published" ]; then
+      [ -f "$published" ] && [ -r "$published" ] || sr_die 2 "no such readable published question store: $published"
+      diagnostics="$(cmd_check "$published")" || sr_die 4 "invalid published question store: $published: $diagnostics"
+      jq -e -L "$SR_SCRIPT_DIR" --slurpfile old "$published" '
+        include "sqlreview-questions"; question_history_retained($old[0])
+      ' "$questions" >/dev/null || sr_die 4 "question identity/history changed, removed, or new question already closed"
+    fi
     qdoc="$(jq . "$questions")" || sr_die 4 "cannot read question store"
   else
     qdoc="$(jq -L "$SR_SCRIPT_DIR" '

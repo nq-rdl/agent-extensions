@@ -166,7 +166,9 @@ exact unmatched header items, rationale differences, and all open scope-question
 Bootstrap checks these before publish, warning with both identities on semantic settlement.
 Pairs are review inputs, not inferred conflicts. Fresh scopes supply a staged question store;
 resume defaults to sibling `questions.json` (legacy strings only when no store exists).
-Missing declared/invalid stores fail visibly. Reconcile wording or explicitly confirm provisional
+Missing declared/invalid stores fail visibly. Staged questions must preserve sibling published
+IDs, text/applicability and closed rows; newly added questions must be open, as at publication.
+Reconcile wording or explicitly confirm provisional
 implementation use while retaining the unanswered Q ID; an engineer choice is not an analyst answer.
 
 `sqlreview.sh notes SQL --against REVIEW_DRAFT --confirmed-by HANDLE` additionally reports

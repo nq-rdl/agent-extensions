@@ -400,7 +400,11 @@ the result.
   agreement. Fresh question drafts are checked before scope publication and published after it.
   Without `--questions`, notes loads sibling `questions.json`; absent undeclared stores use a
   read-only legacy Q projection. Missing declared, invalid, wrongly bound or symlinked stores
-  fail visibly. No SQL yet skips comparison; absent header is empty, malformed header stops.
+  fail visibly. When a sibling store exists, staged questions must satisfy the same history
+  invariants as `publish-questions` before comparison emits any output: retain every identity
+  and its text/applicability, keep closed rows immutable, and add only open questions. Invalid
+  or symlinked published evidence cannot be bypassed with `--questions`.
+  No SQL yet skips comparison; absent header is empty, malformed header stops.
 - **Absence proves nothing.** SQL built before 0.6.0, or by code that recorded nothing, has no
   header; the review still looks for assumptions and limitations in the SQL.
 

@@ -271,6 +271,10 @@ if [ -f "<sql path>" ]; then
 fi
 ```
 
+With a published sibling `questions.json`, comparison validates the staged questions against
+its identity/history invariants before emitting pairs: retain every ID and its text/applicability,
+keep closed rows unchanged, and add only open questions. Fix a rejected draft before publication.
+
 No SQL yet: skip the comparison, not the scope. An absent analysis-notes header means no
 header mismatch; a malformed header or missing/invalid questions is not a clean result —
 stop and surface the diagnostic, retain drafts, and use `/data-request:fix` for SQL edits.
