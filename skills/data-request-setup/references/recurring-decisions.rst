@@ -64,8 +64,10 @@ Only when the request explicitly changes the cohort's facility set to another fa
 the whole HHS or a network-wide cohort, do not insert or carry this TUH assumption.
 If it excludes transfers from another hospital or asks for admission-from or discharge-to
 facility fields, keep the TUH default; context-only mentions are not exceptions.
-Put one facility-set clarification in ``open_questions`` for
-the analyst, unless intake/prior scope already answered it. Remove any inherited TUH
+Put one facility-set clarification for the analyst in the shared ``questions.draft.json``
+store (``Analyst question:``; scope applicability, analyst owner), following ``questions.rst``;
+use ``open_questions`` only for legacy embedded arrays. Reuse an already recorded intake/prior-scope
+answer rather than asking again. Remove any inherited TUH
 candidate and mark dependent facility work unresolved, not runnable with the default.
 An explicit answered exception replaces, never intersects with, TUH. Do not retain
 the marker or house confirmation for changed wording, code or rationale: that is a

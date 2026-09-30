@@ -10,11 +10,11 @@
 #                         the decision's kind (assumptions or limitations) match; --any-kind drops
 #                         that filter. JSON {updated, tracking_issue, matches: [{kind, id, decision,
 #                         title, status, expected_kind, marked, evidence, library_issue,
-#                         related_issues, tracking_issue, proposal, retired_by}]}
+#                         related_issues, tracking_issue, proposal, retired_by, house_default?}]}
 #                         `evidence` links to the library issue rows that name the prior enquiries.
 #   marked RECORD...      marked items grouped by decision, for /data-request:lift. JSON
 #                         {decisions: [{decision, known, title, status, evidence, library_issue,
-#                         related_issues, tracking_issue, retired_by, items: [{file, kind, id, text}]}]}
+#                         related_issues, tracking_issue, retired_by, house_default?, items: [{file, kind, id, text}]}]}
 #
 # SQLREVIEW_RECURRING_DECISIONS overrides the list path (tests and local trials).
 # Exit codes: 0 ok · 1 usage · 2 error (missing file, no jq) · 4 invalid list, document or marker.
@@ -43,6 +43,15 @@ def list_errors:
         (if .kind == "assumption" or .kind == "limitation" then empty else "list: \($id): kind must be assumption or limitation" end),
         (if .status == "open" or .status == "retired" then empty else "list: \($id): status must be open or retired" end),
         (if (.proposal.text | str) and (.proposal.rationale | str) then empty else "list: \($id): proposal needs text and rationale" end),
+        (if has("house_default") and ((.house_default | type) != "object" or
+             (.house_default.facility_code | str | not) or
+             (.house_default.confirmed_by | (str and (contains("@") | not)) | not) or
+             (.house_default.confirmed_at | str | not) or
+             (.house_default.decided | type) != "object" or
+             ([.house_default.decided.by, .house_default.decided.role,
+               .house_default.decided.at, .house_default.decided.source] | all(.[]; str) | not) or
+             (.house_default.decided.by | contains("@")))
+         then "list: \($id): house_default needs a string facility code, recorded confirmation and decided origin" else empty end),
         (if (.match | type) == "array" and (.match | length) > 0
             and (.match | all(.[]; type == "array" and length > 0 and all(.[]; str)))
          then (if (.match | all(.[][]; . == ascii_downcase)) then empty else "list: \($id): match terms must be lowercase" end)
@@ -73,7 +82,8 @@ def hit($d): (((.text // "") + "\n" + (.rationale // "")) | ascii_downcase) as $
   | all($d.match[]; any(.[]; . as $term | $t | test("(?<![a-z0-9_])" + ($term | esc) + "(?![a-z0-9_])")));
 def summary($list):
   {title, status, evidence, library_issue, related_issues: (.related_issues // []),
-   tracking_issue: (.tracking_issue // $list.tracking_issue), retired_by};
+   tracking_issue: (.tracking_issue // $list.tracking_issue), retired_by}
+  + (if has("house_default") then {house_default} else {} end);
 '
 
 load_list() {

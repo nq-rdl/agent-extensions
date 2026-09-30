@@ -87,8 +87,9 @@ def carry_violations($ctx; $reconfirm_all):
     elif $r.basis == null then "\($i.id): cannot carry the confirmation forward: \($r.why) — re-confirm for this revision"
     elif ($i | {status, confirmed_by, confirmed_at, confirmed_revision, carried_from_revision}) != ($r.set | del(.carried_basis, .upstream, .decided))
     then "\($i.id): a carried item must copy confirmed_by, confirmed_at and confirmed_revision from revision \($r.set.carried_from_revision) exactly (sqlreview.sh carryforward prints them)"
-    elif $r.set.upstream.source == "analyst-intake" and ($i.upstream != $r.set.upstream or $i.decided != $r.set.decided)
-    then "\($i.id): carried analyst intake must preserve upstream and decision provenance"
+    elif ($r.set.upstream.source == "analyst-intake" or $r.set.upstream.source == "house-default")
+         and ($i.upstream != $r.set.upstream or $i.decided != $r.set.decided)
+    then "\($i.id): carried \($r.set.upstream.source) must preserve upstream and decision provenance"
     elif ($i | has("carried_basis")) and $i.carried_basis != $r.basis
     then "\($i.id): carried_basis \($i.carried_basis | tojson) does not match the evidence (\($r.basis)); copy the set fields sqlreview.sh carryforward prints"
     else empty end;

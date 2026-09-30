@@ -38,7 +38,9 @@ label; config roles are display labels, not logins. Date-only origins retain
 that precision; never invent midnight. Carry the original source and actor
 through later confirmation. A decision origin does not fill confirmation fields:
 publication still requires an answered human question or valid carried/imported
-confirmation under the existing schema. Building on a technical default does
+confirmation under the existing schema. The exact recorded TUH house confirmation
+is an upstream import, not a new autonomous decision (see House defaults in
+``SKILL.md`` and setup's recurring-decisions reference). Building on any other technical default does
 not manufacture ``confirmed_by``, ``confirmed_at`` or ``confirmed_revision``.
 
 Only these unanswered authority questions block

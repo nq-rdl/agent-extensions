@@ -7,6 +7,52 @@ the ieMR clinical-event pattern. It extends "Confirm sources before using a fact
 and "Join and index patterns" in ``SKILL.md``. Evidence: six enquiries across ieMR,
 HBCIS and BI-Reporting (issue #371).
 
+House default: TUH facility
+--------------------------
+
+Apply the ``SKILL.md`` House defaults rule when facility scope is unstated or
+explicitly TUH. The maintained wording, ``tuh-facility`` marker and original
+confirmation live in setup's ``references/recurring-decisions.rst`` and shared
+list. Preserve the code as the string ``'00200'`` with its leading zeros in SQL,
+YAML, JSON and spec arguments. Never turn it into numeric ``200``.
+
+* **HBCIS:** filter the cohort's ``FacilityCode`` to ``'00200'``. Check the
+  pinned ``resolvers/hbcis/tables.py`` and schema extracts for each participating
+  mart. ``SiteCode`` is a different key: a site can contain several facilities.
+  Admission-from and discharge-to facility fields are not the cohort facility.
+* **ePADT:** filter the cohort's ``FacilityCode`` to ``'00200'``. Verify the
+  actual ePADT source table/view and type at the request's pin; a BI-Reporting
+  field with the same name is not proof that it uses ePADT's representation.
+* **ieMR institution:** resolve TUH through the current **facility crosswalk**
+  to the institution key used by the chosen ieMR source/resolver. HBCIS/ePADT
+  facility codes, ``SiteCode`` and ieMR institution/location keys are not interchangeable.
+  Verify and cite the crosswalk table/columns, mapped institution value, revision
+  and uniqueness at the required grain before composing its join/predicate.
+  Do not invent an institution id, crosswalk name or join from ``00200``; the
+  episode-to-encounter mapping below is not itself a facility crosswalk. If the
+  mapping is unavailable, flag only that implementation as unverified, request
+  the missing evidence and continue independent work; do not re-ask the TUH choice.
+
+Compose the pinned facility unit where supported, otherwise follow the lift rules.
+``FacilitySpec('00200')`` and the HBCIS scope handler exist on query-builder main
+at ``2767aec2bf6a837cf054811e981eecf067d5cb4d`` (``clinical/specifications.py``,
+``resolvers/hbcis/resolver.py``, ``tests/clinical/test_facility_spec.py``).
+This unpinned upstream discovery is not evidence of availability in a request's
+installed release or of an ieMR/ePADT handler. Inspect that pin before use;
+``SiteCode`` alone is not the TUH facility filter.
+
+Only a request that explicitly changes the cohort's facility set to another facility,
+the whole HHS or a network-wide cohort gets one ``Analyst question:`` about the
+facility set and code mapping instead of the TUH
+assumption. Batch it with remaining research questions. Reuse an already recorded
+analyst answer; do not ask again or silently intersect it with TUH. Until answered,
+leave only the dependent facility scope unresolved and continue independent work.
+A request that excludes transfers from another hospital or asks for admission-from
+or discharge-to facility fields does not change the cohort's facility set: keep the TUH default.
+A facility merely mentioned as context is not an exception. These exclusions/outputs
+still need their own source evidence and normal authority checks.
+This rule does not authorise a broader cohort, database execution or new outputs.
+
 Where dataops lives
 -------------------
 

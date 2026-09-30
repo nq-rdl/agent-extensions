@@ -39,7 +39,10 @@ Confirmation record
 -------------------
 
 Every assumption and limitation carries ``status``, ``confirmed_by``, ``confirmed_at`` and
-``confirmed_revision``. These fields are filled only from an answered ``AskUserQuestion``; the
+``confirmed_revision``. Fill these from an answered ``AskUserQuestion`` or preserve
+an evidenced imported confirmation: analyst intake (``analyst-intake.rst``) or the
+exact recorded TUH house default (``recurring-decisions.rst``). A generic decision
+origin or upstream marker supplies no confirmation. Never fabricate one. The
 PreToolUse guard rejects a review or scope document in which any item lacks them.
 
 ``confirmed_revision`` is the revision at which a human confirmed the item. A freshly confirmed

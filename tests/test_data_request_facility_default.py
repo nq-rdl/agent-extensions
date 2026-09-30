@@ -225,7 +225,11 @@ class FacilityHelperRoundTrips(unittest.TestCase):
                                 before = (store / f"{kind}.json").read_bytes()
                                 result = self.helper(tree, tmp, "sqlreview", "publish", slug, kind,
                                                      str(draft), expected=4)
-                                self.assertIn("provenance", result.stdout + result.stderr)
+                                # Main rejects explicit null origins at schema validation,
+                                # before the carried-provenance comparison runs.
+                                diagnostic = ("decided must be an object" if name == "null decided"
+                                              else "provenance")
+                                self.assertIn(diagnostic, result.stdout + result.stderr)
                                 self.assertEqual((store / f"{kind}.json").read_bytes(), before)
                         draft.write_text(json.dumps(doc))
                         self.helper(tree, tmp, "sqlreview", "publish", slug, kind, str(draft))
