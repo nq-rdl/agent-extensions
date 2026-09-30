@@ -31,7 +31,7 @@ Keep one entry per request:
    approval_as_written: THHSAQUIRE9903
    approval: THHSAQUIRE-9903
    repo: rdl-service-desk/THHSAQUIRE-9903
-   branch: triage/903
+   branch: enq/9003
    owner: person or worker currently writing to the branch
    stage: validate          # intake, map, draft, validate, analyse, lift, report, review or parked
    stages_done: [intake, map, draft]
