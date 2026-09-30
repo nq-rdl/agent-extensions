@@ -7,8 +7,6 @@ import unittest
 
 import yaml
 
-import yaml
-
 try:
     from test_sql_review_scripts import Project, REPO, run, scope_doc
 except ModuleNotFoundError:
