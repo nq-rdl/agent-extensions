@@ -8,6 +8,7 @@
 #                                        carried confirmations → deny (only publish can prove them)
 #                                       Edit  → deny (a fragment cannot be validated; Write the whole file)
 #   reviews/*/review.md, scope.md       deny  (rendered from the JSON by `sqlreview.sh render`)
+#   ledger.json                         deny  (triage entries use validated atomic ledger set)
 #   config.json                         ask   (config changes go through /data-request:setup)
 #   releases/*/release.json             Write → content run through `release.sh check`; Edit → deny
 #   releases/*/release.md               deny  (rendered from the record by `release.sh render`)
@@ -93,6 +94,8 @@ case "$abs" in
 esac
 
 case "$rel" in
+  ledger.json)
+    decide deny "Triage ledger entries require validated atomic publication. Use sqlreview.sh ledger set <ticket> <entry.json>; direct Write/Edit of .sqlreview/ledger.json can corrupt other tickets." ;;
   config.json)
     decide ask "Editing .sqlreview/config.json directly bypasses the setup flow. Use /data-request:setup — on an initialised project it shows the per-file delta and applies only what the human confirms." ;;
   reviews/*/review.md|reviews/*/scope.md|reviews/*/lifts.md)
