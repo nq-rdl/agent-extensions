@@ -26,7 +26,7 @@ Here $ARGUMENTS means the user’s supplied skill arguments. Codex does not popu
 
 Delegation is optional. Read references/subagent.rst only when delegation is useful or requested. It does not install a named agent or grant permissions.
 
-# Data Request — triage
+# Data Request — triage (Data Analyst / Data Engineer)
 
 The queue entrypoint for service-desk data requests: it decides what to work on next and
 in what order. The stage skills do the work, so this skill routes to them and does not

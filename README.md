@@ -19,6 +19,13 @@ Curated reusable agent skills packaged as self-contained plugins. Claude Code an
 
 See [`docs/bundles.md`](docs/bundles.md) for the full subject list.
 
+For the `data-request` workflow, the Data Engineer runs `setup` once per project.
+The Data Analyst fills `answers.yaml` and its optional `answers.intake.json`
+sidecar in the same pass, then hands the branch to the engineer for `bootstrap`
+and `draft`. Bootstrap carries answered research decisions with analyst
+confirmation; missing research answers return to the analyst. See the
+[shared intake contract](skills/data-request-setup/references/analyst-intake.rst).
+
 #### Using skills in Claude Code
 
 Each plugin is a **subject**, and each skill in it is a facet, so skills invoke as

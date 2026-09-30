@@ -14,6 +14,10 @@ metadata:
 
 # Data Request — map
 
+The **Data Engineer** runs mapping from the analyst's research decisions.
+Return unanswered research choices to the Data Analyst; establish technical
+source, key and join evidence with the engineer.
+
 Invoke `/data-request:guardrails` first and follow its source hierarchy.
 Arguments: `$ARGUMENTS`.
 

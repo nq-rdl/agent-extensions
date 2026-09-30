@@ -24,6 +24,8 @@
 #   snapshot SLUG SQL                          verify final review SHA, retain history, advance source.sql
 #   delta SLUG                                 body binding + full hashes; exit 0 full/header-only, 10 body change, 6 no baseline
 #   carryover SLUG DRAFT                       review draft items matching confirmed, still-valid scope items (JSON)
+#   intake FILE REVISION [DRAFT]              read analyst answers sidecar; optional collision-safe scope draft merge
+#                                              missing FILE is a legacy no-op; invalid intake exits 4; never writes
 #   carryforward SLUG scope|review DRAFT       draft items whose previous-revision confirmation may be carried (JSON)
 #   impact SLUG                                heuristic: identifiers in the diff traced into unchanged lines
 #   notes SQL [--against JSON]                 read-only: parse the query-builder >= 0.6.0 analysis-notes header
@@ -639,6 +641,52 @@ cmd_impact() {
 #   scope-before-sql    the scope was confirmed before the SQL existed (sql_sha256 null, no baseline)
 #   intent-unchanged    the SQL changed, but the scope item has no location: it states intent
 # Every other matching item is walked, as is every new or reworded item.
+cmd_intake() {
+  [ $# -eq 2 ] || [ $# -eq 3 ] || usage
+  sr_need_jq
+  case "$2" in ''|*[!0-9]*|0) sr_die 1 "revision must be an integer >= 1" ;; esac
+  if [ ! -e "$1" ]; then
+    if [ $# -eq 3 ]; then cat "$3"; return $?; fi
+    printf '%s\n' '{"present":false,"assumptions":[],"analyst_questions":[]}'
+    return 0
+  fi
+  [ -f "$1" ] || sr_die 4 "intake must be a regular JSON file"
+  local out
+  out="$(jq -se --arg source "$1" --argjson revision "$2" '
+    if length == 1 then .[0] else error("expected one intake object") end
+  ' "$1" 2>/dev/null | jq --arg source "$1" --argjson revision "$2" -f "$SR_SCRIPT_DIR/sqlreview-intake.jq" 2>/dev/null)" || sr_die 4 "invalid analyst intake; run validate-answers and correct the sidecar"
+  [ -n "$out" ] || sr_die 4 "invalid analyst intake; expected one JSON object"
+  if [ $# -eq 3 ]; then
+    printf '%s\n' "$out" | jq --slurpfile drafts "$3" --argjson revision "$2" '
+      . as $intake | $drafts[0] as $d |
+      if ($drafts | length) != 1 or $d.kind != "scope" or $d.revision != $revision or
+         ($d.assumptions | type) != "array" or ($d.open_questions | type) != "array" or
+         ($d.approval_number != null and $d.approval_number != $intake.approval_number) or
+         ($d.assumptions | any(.[]; .upstream.source == "analyst-intake" and
+           .upstream.approval_number != $intake.approval_number)) or
+         ($d | has("intake_questions") and (.intake_questions | type != "array" or
+           (all(.[]; type == "string" and startswith("Analyst question: ")) | not))) or
+         ($d.assumptions | map(.id) | length != (unique | length)) then
+        error("invalid scope draft or mismatched approval/revision")
+      else
+        reduce $intake.assumptions[] as $item ($d;
+          [.assumptions[] | select(.id == $item.id)] as $matches |
+          if ($matches | length) == 0 then .assumptions += [$item]
+          elif ($matches[0] | {text, rationale, location, confirmed_by, confirmed_at, upstream, decided}) ==
+               ($item | {text, rationale, location, confirmed_by, confirmed_at, upstream, decided}) then .
+          else error("intake ID collision or changed analyst answer; ask analyst") end)
+        # Only replace questions owned by the previous sidecar import. Independently
+        # raised research gaps also use the prefix and must not disappear on refresh.
+        | ($d.open_questions - ($d.intake_questions // [])) as $manual
+        | .open_questions = ($manual + $intake.analyst_questions | unique)
+        | .intake_questions = ($intake.analyst_questions - $manual | unique)
+      end
+    ' 2>/dev/null || sr_die 4 "cannot merge intake: invalid draft, collision, changed answer or mismatched approval/revision"
+  else
+    printf '%s\n' "$out"
+  fi
+}
+
 cmd_carryover() {
   [ $# -eq 2 ] || usage
   sr_need_jq
@@ -998,6 +1046,7 @@ case "$cmd" in
   delta) cmd_delta "$@" ;;
   impact) cmd_impact "$@" ;;
   carryover) cmd_carryover "$@" ;;
+  intake) cmd_intake "$@" ;;
   carryforward) cmd_carryforward "$@" ;;
   notes) cmd_notes "$@" ;;
   move) cmd_move "$@" ;;

@@ -251,7 +251,7 @@ class Pointers(unittest.TestCase):
     def test_carry_rows_keep_the_marker(self):
         for tree in TREES:
             with self.subTest(tree=tree):
-                self.assertIn("omit `upstream`: copy it", self.read(tree, "bootstrap"))
+                self.assertIn("include recorded `upstream`", self.read(tree, "bootstrap"))
                 self.assertIn("`carryover` omit `upstream`: copy it", self.read(tree, "analyse"))
 
     def test_reference_keeps_confirmation_and_deduplication(self):

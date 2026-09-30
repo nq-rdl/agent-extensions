@@ -1,0 +1,3 @@
+kind: Added
+body: Analyst decisions from the `answers.yaml` pass carry into engineer scope with their original confirmation (#425)
+time: 2026-09-29T22:02:55.869202866Z

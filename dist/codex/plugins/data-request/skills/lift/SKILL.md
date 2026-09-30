@@ -19,6 +19,9 @@ Before shell examples, set PLUGIN_ROOT to the absolute installed plugin director
 
 # Data Request — lift
 
+The **Data Engineer** runs library close-out and confirms technical lift
+classifications. The Data Analyst owns unresolved research choices.
+
 Close-out asks what belongs in the library; `$data-request:analyse` separately
 reviews what the delivered pipeline does. Do not implement library fixes here.
 

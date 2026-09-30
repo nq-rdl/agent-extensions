@@ -21,7 +21,7 @@ metadata:
   repo: https://github.com/nq-rdl/agent-extensions
 ---
 
-# Data Request — guardrails
+# Data Request — guardrails (Data Engineer / Data Analyst)
 
 The shared advisory spine for RDL request repos and query-builder. Apply it to the
 request composition and SQL being worked on, including work outside a formal review.

@@ -19,7 +19,7 @@ metadata:
   repo: https://github.com/nq-rdl/agent-extensions
 ---
 
-# Data Request — triage
+# Data Request — triage (Data Analyst / Data Engineer)
 
 The queue entrypoint for service-desk data requests: it decides what to work on next and
 in what order. The stage skills do the work, so this skill routes to them and does not

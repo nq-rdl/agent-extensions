@@ -23,6 +23,9 @@ Here $ARGUMENTS means the user’s supplied skill arguments. Codex does not popu
 
 # Data Request — amend
 
+The **Data Analyst** runs presentation amendments before or after release.
+Logic or row changes go to the Data Engineer through the existing handoff below.
+
 Arguments: `$ARGUMENTS`. Read `${PLUGIN_ROOT}/skills/guardrails/SKILL.md` and apply
 the rules relevant to the request. The boundary is query-builder's
 [`docs/ANALYST_AMENDMENTS.md`](https://github.com/nq-rdl/query-builder/blob/main/docs/ANALYST_AMENDMENTS.md).

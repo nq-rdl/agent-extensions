@@ -22,7 +22,7 @@ When supporting references invoke a catalog skill as /subject:facet, use $subjec
 
 Before shell examples, set PLUGIN_ROOT to the absolute installed plugin directory: two parent directories above this SKILL.md’s containing skill directory. Derive it from the loaded file path, never the working directory. This variable is not automatically supplied to ordinary shell tools. Quote it in commands.
 
-# Data Request — guardrails
+# Data Request — guardrails (Data Engineer / Data Analyst)
 
 The shared advisory spine for RDL request repos and query-builder. Apply it to the
 request composition and SQL being worked on, including work outside a formal review.

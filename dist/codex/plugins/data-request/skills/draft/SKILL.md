@@ -19,6 +19,12 @@ Here $ARGUMENTS means the user’s supplied skill arguments. Codex does not popu
 
 # Data Request — draft
 
+The **Data Engineer** runs draft from the Data Analyst's request and confirmed
+intake carried into scope by bootstrap. Preserve analyst upstream decisions and
+their actors. Label missing research decisions `Analyst question:` and return
+them to the analyst to consult the requester; engineer technical choices do not
+replace those answers.
+
 Read `${PLUGIN_ROOT}/skills/guardrails/SKILL.md` first. Arguments: `$ARGUMENTS`.
 Use the requested SQL path, existing SQL, request and any supplied scope. Drafting
 requires no formal scope/review record. Before writing SQL outside the composition

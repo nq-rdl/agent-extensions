@@ -67,8 +67,10 @@ def carry_rows($ctx):
                else {why: "governed lines changed since revision \($pr)"} end
            end)
       | if has("basis") then
-          . + {set: {status: "confirmed", confirmed_by: $m.confirmed_by, confirmed_at: $m.confirmed_at,
-                     confirmed_revision: $m.confirmed_revision, carried_from_revision: $pr, carried_basis: .basis}}
+          . + {set: ({status: "confirmed", confirmed_by: $m.confirmed_by, confirmed_at: $m.confirmed_at,
+                     confirmed_revision: $m.confirmed_revision, carried_from_revision: $pr, carried_basis: .basis}
+                     + (if $m | has("upstream") then {upstream: $m.upstream} else {} end)
+                     + (if $m | has("decided") then {decided: $m.decided} else {} end))}
         else . + {basis: null, bulk: (.bulk // false), text: $i.text, rationale: $i.rationale, location: $i.location} end
     ];
 
@@ -83,8 +85,10 @@ def carry_violations($ctx; $reconfirm_all):
   | ([$rows[] | select(.kind == $k and .id == $i.id)][0]) as $r
   | if $reconfirm_all then "\($i.id): --reconfirm-all refuses carried confirmations — re-confirm for this revision"
     elif $r.basis == null then "\($i.id): cannot carry the confirmation forward: \($r.why) — re-confirm for this revision"
-    elif ($i | {status, confirmed_by, confirmed_at, confirmed_revision, carried_from_revision}) != ($r.set | del(.carried_basis))
+    elif ($i | {status, confirmed_by, confirmed_at, confirmed_revision, carried_from_revision}) != ($r.set | del(.carried_basis, .upstream, .decided))
     then "\($i.id): a carried item must copy confirmed_by, confirmed_at and confirmed_revision from revision \($r.set.carried_from_revision) exactly (sqlreview.sh carryforward prints them)"
+    elif $r.set.upstream.source == "analyst-intake" and ($i.upstream != $r.set.upstream or $i.decided != $r.set.decided)
+    then "\($i.id): carried analyst intake must preserve upstream and decision provenance"
     elif ($i | has("carried_basis")) and $i.carried_basis != $r.basis
     then "\($i.id): carried_basis \($i.carried_basis | tojson) does not match the evidence (\($r.basis)); copy the set fields sqlreview.sh carryforward prints"
     else empty end;
