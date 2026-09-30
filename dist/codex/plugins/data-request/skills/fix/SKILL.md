@@ -106,7 +106,11 @@ Make the smallest source change that resolves the reported defect, preserving
 unrelated edits. When the fix changes a filter, join or meaning in pipeline or
 resolver code, add or update its `record_assumption()` / `record_limitation()` call
 at that point (guardrails); remove a record whose logic the fix removes. Use the
-repository's managed environment and existing checks.
+repository's managed environment and existing checks. For a genuinely stated engineer
+decision, use `Engineer decision (<login>, <date>), flagged for the data analyst` in the
+rationale/consequence, retaining the actual human handle and original date or UTC ISO
+precision. Never substitute a role label, recorder or invented approval. Preserve separate
+origin/source evidence; changes need fresh review, not backdated confirmation.
 Inspect test/export commands before running them; exercise the affected path with
 local synthetic fixtures, without querying a live database or publishing exports
 as part of a code fix. Verify correctness-critical API behavior against the

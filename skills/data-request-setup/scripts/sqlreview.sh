@@ -28,13 +28,16 @@
 #                                              missing FILE is a legacy no-op; invalid intake exits 4; never writes
 #   carryforward SLUG scope|review DRAFT       draft items whose previous-revision confirmation may be carried (JSON)
 #   impact SLUG                                heuristic: identifiers in the diff traced into unchanged lines
-#   notes SQL [--against JSON]                 read-only: parse the query-builder >= 0.6.0 analysis-notes header
+#   notes SQL [--against JSON] [--confirmed-by HANDLE]
+#                                              read-only: parse the query-builder >= 0.6.0 analysis-notes header
 #                                              (leading /* assumptions: / limitations: */ block in the first GO batch,
 #                                              before any -- @extract: marker) into JSON {present, lines,
 #                                              assumptions, limitations: [{text, rationale, lines}]}; a limitation's
 #                                              consequence becomes its rationale; absent detail -> null; no header
 #                                              -> present false, exit 0. --against adds match {id, rationale_same}
 #                                              (same list, same text) from a review/scope/draft JSON, else null.
+#                                              Review --against + explicit human HANDLE adds header_carry_over and
+#                                              header_walk with git-source evidence; never sets confirmed_*.
 #                                              Needs no .sqlreview/. Exit 4: malformed header, "line N: why" on stderr
 #   move OLDPATH NEWPATH                       rebind a review directory after the SQL moved (to the readable slug)
 #   move PATH PATH                             migrate a legacy-encoded slug to the readable one (no rebind needed)
@@ -438,6 +441,18 @@ cmd_publish() (
   fi
   jq -e --argjson previous "$previous" '.revision == ($previous + 1)' "$tmp" >/dev/null || sr_die 4 "revision must follow the existing document (first revision is 1)"
   if [ "$kind" != lifts ]; then
+    # #431: carry-all is a fresh confirmation, but its claimed header basis must be real.
+    local header_actor header_notes
+    if jq -e 'any((.assumptions[], .limitations[]); .carried_basis == "header-decision")' "$tmp" >/dev/null; then
+      [ "$kind" = review ] && [ "$reconfirm_all" = false ] || sr_die 4 "header-decision basis requires a review carry-all answer"
+      while IFS= read -r header_actor; do
+        header_notes="$(cmd_notes "$SR_ROOT/$rel" --against "$tmp" --confirmed-by "$header_actor")" || sr_die 4 "cannot verify header-decision evidence"
+        printf '%s' "$header_notes" | jq -e --slurpfile doc "$tmp" --arg actor "$header_actor" '
+          .header_carry_over as $rows | all(("assumptions", "limitations") as $k | $doc[0][$k][] |
+            select(.carried_basis == "header-decision" and .confirmed_by == $actor) | {kind:$k, item:.};
+            .kind as $k | .item as $item | any($rows[]; .kind == $k and .id == $item.id and .decided == $item.decided and .location == $item.location))' >/dev/null || sr_die 4 "header-decision evidence refused; walk the affected items"
+      done < <(jq -r '[.assumptions[], .limitations[] | select(.carried_basis == "header-decision") | .confirmed_by] | unique[]' "$tmp")
+    fi
     # A carried confirmation must be provable from the previous revision and its SQL baseline (#348).
     local violations
     _carry_context "$slug" "$kind" "$rel"
@@ -890,10 +905,11 @@ _notes_scan() { # <sql file> → records separated by \037: H start end · I kin
 }
 
 cmd_notes() {
-  local sql="" against="" recs errs
+  local sql="" against="" confirmer="" recs errs parsed
   while [ $# -gt 0 ]; do
     case "$1" in
       --against) [ $# -ge 2 ] || usage; against="$2"; shift ;;
+      --confirmed-by) [ $# -ge 2 ] || usage; confirmer="$2"; shift ;;
       -*) usage ;;
       *) [ -z "$sql" ] || usage; sql="$1" ;;
     esac
@@ -909,7 +925,7 @@ cmd_notes() {
   recs="$(_notes_scan "$sql")" || sr_die 2 "cannot read $sql"
   errs="$(printf '%s\n' "$recs" | awk 'BEGIN { FS = "\037" } $1 == "E" { printf "line %s: %s\n", $2, $3 }')"
   [ -z "$errs" ] || sr_die 4 "malformed analysis-notes header in $sql: $errs"
-  printf '%s\n' "$recs" | jq -R -s --slurpfile against "${against:-/dev/null}" '
+  parsed="$(printf '%s\n' "$recs" | jq -R -s --slurpfile against "${against:-/dev/null}" '
     (split("\n") | map(select(. != "") | split("\u001f"))) as $recs
     | ($against[0] // null) as $doc
     | ([$recs[] | select(.[0] == "H")][0]) as $h
@@ -920,8 +936,65 @@ cmd_notes() {
             | . + {match: (if $m == null then null else {id: $m.id, rationale_same: ($m.rationale == $i.rationale)} end)}
           end];
     {present: ($h != null), lines: (if $h == null then null else [($h[1] | tonumber), ($h[2] | tonumber)] end),
-     assumptions: items("assumptions"), limitations: items("limitations")}'
+     assumptions: items("assumptions"), limitations: items("limitations")}')" || sr_die 2 "cannot parse notes"
+  if [ -n "$against" ] && [ "$(jq -r .kind "$against")" = review ]; then
+    _header_decisions "$sql" "$against" "$confirmer" "$parsed"
+  else printf '%s\n' "$parsed"; fi
 }
+
+# Header decisions are never confirmations. Read reachable git objects as the dated source;
+# inspect every subsequent path revision, including a reverted change. No snapshot or draft
+# supplied by the caller establishes history. Relevant merges/renames and shallow history
+# fail closed; unrelated PR merges with identical path blobs do not invalidate evidence.
+_header_decisions() ( # SQL DRAFT intended-human-confirmer parsed-notes
+  local sql="$1" draft="$2" actor="$3" parsed="$4" root rel history tmp commit epoch parents rec body start safe=true rows="[]" path_sha=""
+  # Replacement refs/grafts are not evidence of the original object ancestry.
+  export GIT_NO_REPLACE_OBJECTS=1
+  tmp="$(mktemp -d)" || return 2
+  trap 'rm -rf "$tmp"' EXIT
+  trap 'exit 2' HUP INT TERM
+  if root="$(git -C "$(dirname "$sql")" rev-parse --show-toplevel 2>/dev/null)"; then
+    rel="$(cd "$(dirname "$sql")" && pwd -P)/$(basename "$sql")"
+    rel="${rel#"$root"/}"
+    path_sha="$(sr_sha256 "$sql")"
+    history="$(git -C "$root" log --full-history --topo-order --reverse --format='%H %ct %P' HEAD -- ":(literal)$rel" 2>/dev/null)" || safe=false
+    [ "$(git -C "$root" rev-parse --is-shallow-repository 2>/dev/null)" = false ] || safe=false
+    local grafts blob parent parent_blob changes
+    grafts="$(git -C "$root" rev-parse --git-path info/grafts)"
+    case "$grafts" in /*) ;; *) grafts="$root/$grafts" ;; esac
+    [ ! -s "$grafts" ] || safe=false
+    [ -n "$history" ] || safe=false
+    local prior_epoch=0
+    while read -r commit epoch parents; do
+      [ -n "$commit" ] || continue
+      [ "$epoch" -ge "$prior_epoch" ] || safe=false
+      prior_epoch="$epoch"
+      # Git simplification must not hide an alternate-parent edit or a path move.
+      changes="$(git -C "$root" diff-tree --root --no-commit-id -r -M -m "$commit" 2>/dev/null)" || safe=false
+      if printf '%s\n' "$changes" | awk -F '\t' -v path="$rel" '$1 ~ /^R/ && ($2 == path || $3 == path) { found=1 } END { exit !found }'; then safe=false; fi
+      case "$parents" in
+        *" "*)
+          blob="$(git -C "$root" rev-parse "$commit:$rel" 2>/dev/null)" || blob=absent
+          for parent in $parents; do
+            parent_blob="$(git -C "$root" rev-parse "$parent:$rel" 2>/dev/null)" || parent_blob=absent
+            [ "$parent_blob" = "$blob" ] || safe=false
+          done ;;
+      esac
+      if git -C "$root" show "$commit:$rel" > "$tmp/sql" 2>/dev/null; then
+        rec="$(bash "$SR_SCRIPT_DIR/sqlreview.sh" notes "$tmp/sql" 2>/dev/null)" || { rec=null; safe=false; }
+        start="$(sr_body_start "$tmp/sql")" || { start=0; safe=false; }
+        body="$(jq -Rn --rawfile sql "$tmp/sql" '$sql | rtrimstr("\n") | split("\n")')" || { body=null; safe=false; }
+      else rec=null; start=0; body=null; safe=false; fi
+      rows="$(printf '%s' "$rows" | jq --arg commit "$commit" --argjson at "$epoch" --argjson notes "$rec" --argjson start "$start" --argjson sql "$body" '. + [{commit:$commit, at:$at, notes:$notes, body_start:$start, sql:$sql}]')" || safe=false
+    done <<EOF
+$history
+EOF
+  else root=""; rel=""; safe=false; fi
+  start="$(sr_body_start "$sql")" || start=0
+  printf '%s\n' "$parsed" | jq -L "$SR_SCRIPT_DIR" --slurpfile draft "$draft" --rawfile sql "$sql" \
+    --arg actor "$actor" --arg path "$rel" --arg sha "$path_sha" --argjson safe "$safe" --argjson start "$start" --argjson history "$rows" \
+    'include "sqlreview-header"; header_candidates($draft[0]; $sql; $actor; $path; $sha; $safe; $start; $history)'
+)
 
 # ---------------------------------------------------------------------------------------------
 cmd_move() {

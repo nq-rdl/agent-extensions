@@ -160,6 +160,13 @@ absent: report the items in the task output and recommend the pin bump; never
 hand-write the header. Verify behaviour against the installed version and the
 [analysis-notes contract](https://github.com/nq-rdl/query-builder/blob/main/docs/ANALYSIS_NOTES.md).
 
+For an explicitly stated engineer decision, use
+`Engineer decision (<login>, <date>), flagged for the data analyst` in the rationale or
+consequence. Record the actual human handle and original date (or precise UTC ISO instant);
+never infer attribution from role labels or the recorder, and never invent a timestamp.
+Keep independent decision origin/source precision intact. This header is evidence for
+analyse's carry-all question, not identity authentication or review confirmation.
+
 Advisory: flag a new filter, join or exclusion that settles an ambiguous request, or
 accepts a known source weakness, with no nearby record.
 

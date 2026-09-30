@@ -8,9 +8,9 @@ description: 'Review a finished SQL file for handoff: read it against its scope,
   human through the change, and reassesses every item the change touches. Use when
   SQL is ready to hand to the Data Analyst.'
 compatibility: .sqlreview schema 2 (schema 1 remains readable) (docs/specs/2026-09-15-sql-review-plugin-design.md);
-  bash 3.2+, jq >= 1.6, git optional (provenance only — the diff baseline is the stored
-  snapshot). The analysis-notes header read by `notes` needs query-builder 0.6.0 or
-  later.
+  bash 3.2+, jq >= 1.6, git optional (required only for header-decision eligibility;
+  diffs use the stored snapshot). The analysis-notes header read by `notes` needs
+  query-builder 0.6.0 or later.
 metadata:
   repo: https://github.com/nq-rdl/agent-extensions
 ---
@@ -208,7 +208,46 @@ each, then ask each non-empty list as **one** question, as
 not change) with **Carry over all (Recommended)**, `carry_over_intent` (the SQL changed or came
 after the scope) with a delta summary and no recommended option. Every item shows its `location`.
 
-Then put **each** remaining candidate (the `walk` list, or every item when there is no scope) to
+### Named dated header decisions (#431)
+
+For remaining candidates, establish the **explicit intended human confirmer's handle** before
+running the command below. Ask if it is not explicitly known; do not infer it from config
+`roles` (display labels), `recorded_by`, git author/committer or the header decider. Header/git
+bytes prove recorded attribution, not human identity or an answer.
+
+```bash
+bash "$S/sqlreview.sh" notes "<sql path>" \
+  --against ".sqlreview/reviews/$SLUG/review.draft.json" --confirmed-by "<human handle>"
+# → header_carry_over: [{kind, id, text, rationale, location, basis:"header-decision",
+#                      decided:{by,role,at,source}, evidence:{commit,committed_at,precision,...}}]
+#   header_walk: [{kind,id,text,rationale,location,why}]
+```
+
+Exclude items already settled by carryforward or an answered scope question. Check indirect
+SQL effects yourself; move affected items to the walk even if their line bytes match. Ask the
+remaining `header_carry_over` as **ONE** question: **Carry over all (Recommended)** / **Walk each
+individually**. List every kind/id, text, rationale, governed `location`, `decided` and observed
+source commit/time, as [references/carry.rst](references/carry.rst) specifies. For date-only
+attribution, explain that proof begins at the displayed source time that day, not midnight.
+A later-day source or a source after a precise ISO cutoff is not eligible.
+
+Only an **answered** Carry over all question permits copying the listed `decided` verbatim and
+setting `carried_basis: "header-decision"` plus fresh `confirmed_*` for this revision from that
+answer. Never invent confirmation fields from the candidate rows. Preserve an existing
+independent `decided` unchanged: a provenance mismatch is walked, not overwritten to gain
+eligibility. Mixed deciders matching another handle are walked with the current confirmer.
+Walk each individually (or no answer/interruption) sets nothing; leave the draft unpublished
+until all remaining items are answered. Publish re-proves header evidence, but cannot authenticate
+who answered. A subsequent update uses normal carryforward, retaining `decided` and copying its
+`set`; do not reuse header-decision as a previous-revision confirmation.
+
+Changed, missing, shallow, ambiguous repeated/relocated ranges, relevant merge/rename evidence
+and malformed/unnamed attribution go to `header_walk`. Unrelated PR merges alone do not block
+eligibility. Only leading comment growth is remapped automatically; body-prefix structural
+changes are conservative walks. No git history means ordinary per-item confirmation, not a
+blocked review. Correctness and source authenticity still require human/source inspection.
+
+Then put **each** remaining candidate (scope/header `walk`, or every unsettled item) to
 the engineer via the host user-question tool — batches of at most four per call, one question per item
 showing its text and rationale, options **Confirm (Recommended)** / **Reword** / **Reject**.
 Reworded items are asked again. Only confirmed items reach `review.json`; rejected ones stay in
@@ -216,7 +255,7 @@ the draft. If the engineer stops, leave the draft and write nothing final — sa
 
 **Never fill `confirmed_by`, `confirmed_at` or `confirmed_revision` from anything but an answered
 question** (a bulk answer, carry-over or `bulk`, counts for the items it listed, and only those): `confirmed_by` is the user's handle (GitHub
-login where known, else `git config user.name`, else ask; never `user.email` — `check` refuses an `@`),
+login explicitly known, else ask; never a role label, recorder, git author or `user.email` — `check` refuses an `@`),
 `confirmed_at` is now (UTC ISO), `confirmed_revision` equals the document `revision` — except an
 item carried forward on an update, which takes exactly the `set` fields `carryforward` printed.
 Never set `carried_from_revision` by hand.
