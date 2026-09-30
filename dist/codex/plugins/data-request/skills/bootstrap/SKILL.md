@@ -127,6 +127,13 @@ corrupt baseline and requires reassessment.
 
 ## Fresh scope → interview
 
+**Name the constant, never its value** in scope/review prose, drafts, logic descriptions,
+questions and change summaries (for example, `EVENT_CD`, not its numeric value).
+`code-value` lint scans every string field for maximal runs of 8 to 10 digits and reports
+item/field without the value. Replace prose codes before showing or publishing the draft;
+never add them to `.pii-code-values` or suppress the PII gate to clear a prose defect.
+Reworded confirmed items need fresh human confirmation; lint cannot grant it.
+
 Work through these in order, pausing (the host user-question tool) on each scoping decision:
 
 1. **Intent** — one paragraph: what question the SQL answers and for whom.
@@ -170,7 +177,8 @@ Also self-check the confirmed wording before publish:
 bash "$S/sqlreview.sh" lint ".sqlreview/reviews/$SLUG/scope.draft.json"  # exit 10 → one "<id>\t<field>\t<phrases>" per hit
 ```
 
-A text or rationale hit is a confirmed item whose wording still reads as provisional ("should be
+A `code-value` hit needs the constant name, not a numeric exemption. A provisional-wording
+text or rationale hit is a confirmed item whose wording still reads as provisional ("should be
 confirmed", "proposed", "needs confirming"). Re-put it, showing text and rationale, with the
 wording rewritten to state the confirmed decision.
 

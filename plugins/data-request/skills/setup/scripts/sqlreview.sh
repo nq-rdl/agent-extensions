@@ -13,8 +13,9 @@
 #                                              sql/cohort_pipeline/x.sql -> sql__cohort_pipeline__x; an existing
 #                                              legacy-encoded reviews/sql__cohort%5Fpipeline__x/ is kept
 #   check FILE | check --stdin                 validate a review/scope JSON; exit 4 with one violation per line
-#   lint FILE                                  provisional confirmed wording or unlinked decision sources; exit 10 when any
-#   lint --ste FILE                            STE wording in intent and item text/rationale, any status: one
+#   lint FILE                                  code values in all string fields, provisional confirmed wording or
+#                                              unlinked decision sources; three columns, exit 10 when any
+#   lint --ste FILE                            also STE wording in intent and item text/rationale, any status: one
 #                                              "<id>\t<field>\t<rule>\t<detail>" line per hit; exit 10 when any
 #   publish SLUG scope|review|lifts DRAFT             validate a staged copy, then atomically replace the final JSON
 #   publish --reconfirm-all SLUG KIND DRAFT    same, but refuse any carried (carried_from_revision) confirmation
@@ -261,7 +262,12 @@ cmd_check() {
 #   contraction      n't, 're, 've, 'll, 'd, 'm, and 's after a pronoun (not a possessive); detail = the words
 #   semicolon        detail = how many
 #   abbreviation     e.g. / i.e.; detail = which
-# --ste uses four columns, including decision-source warnings; plain lint keeps three columns.
+# code-value (#439) checks every string leaf in scopes/reviews/drafts at any status,
+# including nested provenance and future fields: one warning per maximal run of 8 to 10 digits.
+# Item = nearest id, else indexed object path (logic[0]), else "-"; field = relative leaf path.
+# No matched value is printed; all lint diagnostics redact such runs, including ids/keys.
+# --ste uses four columns, including decision-source/code-value warnings; plain lint keeps three
+# columns (the third starts "code-value:" for this rule). This does not change check/publish.
 cmd_lint() {
   local ste=0
   if [ "${1:-}" = "--ste" ]; then ste=1; shift; fi
@@ -269,6 +275,8 @@ cmd_lint() {
   case "$1" in -*) usage ;; esac
   sr_need_jq
   [ -f "$1" ] || sr_die 2 "no such file: $1"
+  # jq runtime errors can quote malformed draft values. Suppress raw diagnostics;
+  # the generic exit-4 error below is safe and keeps the existing failure contract.
   local out
   if [ "$ste" = 1 ]; then
     out="$(jq -r '
@@ -289,7 +297,7 @@ cmd_lint() {
       ((.assumptions // [], .limitations // []) | if type == "array" then .[] else empty end
        | select(type == "object") | . as $item
        | ("text", "rationale") as $field | $item[$field] | hits($item.id // "?"; $field))
-    ' "$1")" || sr_die 4 "invalid JSON: $1"
+    ' "$1" 2>/dev/null)" || sr_die 4 "invalid JSON: $1"
   else
   out="$(jq -r '
     ("should be confirmed|to be confirmed|needs? (to be )?confirm(ing|ed|ation)?|pending confirmation|awaiting confirmation|unconfirmed|\\bproposed\\b|\\btbc\\b") as $re
@@ -299,7 +307,7 @@ cmd_lint() {
     | ([($item[$field] // "" | strings) | match($re; "gi").string | ascii_downcase] | unique) as $hits
     | select($hits | length > 0)
     | "\($item.id // "?")\t\($field)\t\($hits | join(", "))"
-  ' "$1")" || sr_die 4 "invalid JSON: $1"
+  ' "$1" 2>/dev/null)" || sr_die 4 "invalid JSON: $1"
   fi
   local decisions
   decisions="$(jq -L "$SR_SCRIPT_DIR" -r --argjson ste "$ste" '
@@ -307,10 +315,20 @@ cmd_lint() {
     decision_source_warnings
     | if $ste == 1 then "\(.id)\t\(.field)\tdecision-source\t\(.detail)"
       else "\(.id)\t\(.field)\t\(.detail)" end
-  ' "$1")" || sr_die 4 "invalid JSON: $1"
-  [ -n "$out" ] || [ -n "$decisions" ] || return 0
-  [ -z "$out" ] || printf '%s\n' "$out"
-  [ -z "$decisions" ] || printf '%s\n' "$decisions"
+  ' "$1" 2>/dev/null)" || sr_die 4 "invalid JSON: $1"
+  local codes
+  codes="$(jq -L "$SR_SCRIPT_DIR" -r --argjson ste "$ste" '
+    include "sqlreview-code-values";
+    code_value_warnings
+    | if $ste == 1 then "\(.id)\t\(.field)\tcode-value\t\(.detail)"
+      else "\(.id)\t\(.field)\tcode-value: \(.detail)" end
+  ' "$1" 2>/dev/null)" || sr_die 4 "invalid JSON: $1"
+  [ -n "$out" ] || [ -n "$decisions" ] || [ -n "$codes" ] || return 0
+  {
+    [ -z "$out" ] || printf '%s\n' "$out"
+    [ -z "$decisions" ] || printf '%s\n' "$decisions"
+    [ -z "$codes" ] || printf '%s\n' "$codes"
+  } | jq -L "$SR_SCRIPT_DIR" -Rr 'include "sqlreview-code-values"; code_value_redact' || sr_die 4 "lint redaction failed"
   return 10
 }
 
