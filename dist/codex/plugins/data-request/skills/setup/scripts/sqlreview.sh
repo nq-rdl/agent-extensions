@@ -27,6 +27,9 @@
 #   intake FILE REVISION [DRAFT]              read analyst answers sidecar; optional collision-safe scope draft merge
 #                                              missing FILE is a legacy no-op; invalid intake exits 4; never writes
 #   carryforward SLUG scope|review DRAFT       draft items whose previous-revision confirmation may be carried (JSON)
+#   remap SLUG [DRAFT]                         atomically remap unchanged location/logic ranges in a draft (JSON report)
+#                                              default: review.draft.json, else scope.draft.json; seed from published JSON
+#                                              changed/ambiguous ranges stay untouched in walk; never publish or confirm
 #   impact SLUG                                heuristic: identifiers in the diff traced into unchanged lines
 #   notes SQL [--against JSON] [--confirmed-by HANDLE]
 #                                              read-only: parse the query-builder >= 0.6.0 analysis-notes header
@@ -844,6 +847,76 @@ cmd_carryforward() {
        walk: [$rows[] | select(.basis == null and (.bulk | not)) | {kind, id, why}]}' --arg document "$kind"
 }
 
+# Draft range plumbing only: diff authentic baseline bytes against frozen current SQL.
+# Match ranges by published item id/logic step, so retries cannot apply an offset twice.
+cmd_remap() (
+  [ $# -ge 1 ] && [ $# -le 2 ] || usage
+  sr_need_jq
+  sr_require_root
+  local slug="$1" draft="${2:-}" kind prior base sql work input code had_draft=false
+  sr_safe_slug "$slug"
+  if [ -z "$draft" ]; then
+    prior="$(sr_doc_for "$slug")" || sr_die 6 "no published scope/review baseline"
+    kind="$(jq -r .kind "$prior")"
+    case "$kind" in scope|review) ;; *) sr_die 4 "remap requires scope or review" ;; esac
+    draft="$SR_REVIEWS/$slug/$kind.draft.json"
+  fi
+  draft="$(sr_abspath "$draft")"
+  sr_no_symlinks "$draft" || exit 2
+  [ "$(dirname "$draft")" = "$SR_REVIEWS/$slug" ] || sr_die 2 "draft must be directly inside this slug's review directory"
+  case "$(basename "$draft")" in
+    scope.json|review.json|lifts.json) sr_die 2 "remap cannot write published JSON" ;;
+    *.json) ;; *) sr_die 2 "draft must be a JSON file, never an SQL snapshot" ;;
+  esac
+  [ ! -d "$draft" ] || sr_die 2 "draft is a directory"
+  if [ -f "$draft" ]; then
+    had_draft=true
+    input="$draft"
+    kind="$(jq -r '.kind // ""' "$input" 2>/dev/null)" || sr_die 4 "invalid draft JSON"
+  else
+    [ $# -eq 1 ] || sr_die 2 "no such draft: $draft"
+    input="$prior"
+  fi
+  case "$kind" in scope|review) ;; *) sr_die 4 "remap requires scope or review" ;; esac
+  prior="$SR_REVIEWS/$slug/$kind.json"
+  base="$SR_REVIEWS/$slug/source.sql"
+  [ "$kind" != scope ] || base="$SR_REVIEWS/$slug/scope.source.sql"
+  sr_no_symlinks "$prior" && sr_no_symlinks "$base" || exit 2
+  [ -f "$prior" ] && [ -f "$base" ] || sr_die 6 "no published $kind baseline"
+  cmd_check "$prior" >/dev/null || sr_die 4 "published $kind is invalid"
+  sql="$(jq -r .sql_path "$prior")"
+  sr_safe_sql "$sql"
+  [ -f "$SR_ROOT/$sql" ] || sr_die 2 "no such SQL: $sql"
+  jq -e --arg s "$slug" --arg k "$kind" --arg p "$sql" '
+    .slug == $s and .kind == $k and .sql_path == $p' "$input" >/dev/null || sr_die 4 "draft slug/kind/sql_path must match published baseline"
+  work="$(mktemp -d "$SR_REVIEWS/$slug/.remap.XXXXXX")" || sr_die 2 "mktemp failed"
+  trap 'rm -rf "$work"' EXIT
+  trap 'exit 2' HUP INT TERM
+  cp "$input" "$work/draft.json" && cp "$prior" "$work/prior.json" &&
+    cp "$base" "$work/base.sql" && cp "$SR_ROOT/$sql" "$work/current.sql" || sr_die 2 "cannot stage remap inputs"
+  [ "$(sr_sha256 "$work/base.sql")" = "$(jq -r .sql_sha256 "$work/prior.json")" ] || sr_die 2 "published baseline is corrupt or unauthenticated"
+  jq -e -L "$SR_SCRIPT_DIR" 'include "sqlreview-remap"; remap_valid' "$work/draft.json" >/dev/null || sr_die 4 "invalid draft ranges"
+  LC_ALL=C diff -U 0 "$work/base.sql" "$work/current.sql" > "$work/diff"
+  code=$?
+  [ "$code" -le 1 ] || sr_die 2 "diff failed"
+  if [ "$code" -eq 1 ]; then
+    grep -q '^@@ ' "$work/diff" || sr_die 2 "diff has no text line map (binary SQL is unsupported)"
+  fi
+  jq -e -L "$SR_SCRIPT_DIR" --slurpfile prior "$work/prior.json" --rawfile base "$work/base.sql" \
+    --rawfile cur "$work/current.sql" --rawfile delta "$work/diff" '
+      include "sqlreview-remap"; remap_result' "$work/draft.json" > "$work/result.json" || sr_die 2 "cannot compute line map"
+  jq '.draft' "$work/result.json" > "$work/remapped.json" || sr_die 2 "cannot stage remapped draft"
+  # Refuse concurrent edits rather than overwriting work or publishing a map for stale SQL.
+  cmp -s "$prior" "$work/prior.json" && cmp -s "$base" "$work/base.sql" &&
+    cmp -s "$SR_ROOT/$sql" "$work/current.sql" && cmp -s "$input" "$work/draft.json" || sr_die 2 "remap inputs changed; retry"
+  sr_no_symlinks "$draft" || exit 2
+  if [ "$had_draft" = false ] && [ -e "$draft" ]; then sr_die 2 "draft appeared during remap; retry"; fi
+  if ! cmp -s "$draft" "$work/remapped.json"; then
+    mv "$work/remapped.json" "$draft" || sr_die 2 "cannot replace draft"
+  fi
+  jq '.report' "$work/result.json"
+)
+
 # ---------------------------------------------------------------------------------------------
 # query-builder >= 0.6.0 renders record_assumption()/record_limitation() as a leading comment header
 # (nq-rdl/query-builder docs/ANALYSIS_NOTES.md, #355). Read-only: the header is review *evidence*;
@@ -1142,6 +1215,7 @@ case "$cmd" in
   carryover) cmd_carryover "$@" ;;
   intake) cmd_intake "$@" ;;
   carryforward) cmd_carryforward "$@" ;;
+  remap) cmd_remap "$@" ;;
   notes) cmd_notes "$@" ;;
   move) cmd_move "$@" ;;
   render) cmd_render "$@" ;;

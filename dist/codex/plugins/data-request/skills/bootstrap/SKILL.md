@@ -101,12 +101,22 @@ corrupt baseline and requires reassessment.
    imported upstream items first; changed or removed decisions go to the analyst
    for a recorded answer before dependent work proceeds. Then find which existing items keep
    their confirmation (#348): draft the next revision with each unchanged item's `id`, `text` and
-   `rationale` verbatim and its `location` lines remapped to the current SQL, and run
+   `rationale` verbatim and its old `location` lines. When an authenticated `scope.source.sql`
+   exists, compute unchanged ranges first; missing/corrupt baseline means a manual reassessment,
+   not a guessed offset:
 
    ```bash
+   bash "$S/sqlreview.sh" remap "$SLUG" ".sqlreview/reviews/$SLUG/scope.draft.json"
+   # → {document, prior_revision, remapped: [{kind, id, from, to}], walk: [{kind, id, lines, why}]}
    bash "$S/sqlreview.sh" carryforward "$SLUG" scope ".sqlreview/reviews/$SLUG/scope.draft.json"
    # → {prior_revision, revision, sql_unchanged, carry: [{kind, id, basis, set}], walk: [{kind, id, why}]}
    ```
+
+   Remap changes only draft ranges, never confirmations, revisions or fingerprints. Its `walk`
+   ranges (changed, split by an insertion, or ambiguous repeated text) stay untouched; reassess
+   their current lines with the human before carryforward. It preserves new/manual ranges and
+   is safe to retry. The explicit draft must be directly inside this slug's review directory,
+   not a published JSON or SQL snapshot.
 
    Copy each `carry` item's `set` fields onto it verbatim; it keeps the confirmation a human gave
    at `confirmed_revision` and is not asked again. Walk **only** the `walk` items (confirm / reword /
