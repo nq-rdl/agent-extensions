@@ -1,0 +1,183 @@
+filters: file.ext == "md"
+formulas:
+  one_day_raw: (date("2026-01-02 00:00:00") - date("2026-01-01 00:00:00"))
+  one_day_is_duration: (date("2026-01-02 00:00:00") - date("2026-01-01 00:00:00")).isType("duration")
+  one_day_is_number: (date("2026-01-02 00:00:00") - date("2026-01-01 00:00:00")).isType("number")
+  one_day_days: (date("2026-01-02 00:00:00") - date("2026-01-01 00:00:00")).days
+  one_day_hours: (date("2026-01-02 00:00:00") - date("2026-01-01 00:00:00")).hours
+  one_day_milliseconds: (date("2026-01-02 00:00:00") - date("2026-01-01 00:00:00")).milliseconds
+  one_day_days_round: (date("2026-01-02 00:00:00") - date("2026-01-01 00:00:00")).days.round(0)
+  one_day_days_floor: (date("2026-01-02 00:00:00") - date("2026-01-01 00:00:00")).days.floor()
+  one_day_days_ceil: (date("2026-01-02 00:00:00") - date("2026-01-01 00:00:00")).days.ceil()
+  one_day_days_round_3: (date("2026-01-02 00:00:00") - date("2026-01-01 00:00:00")).days.round(3)
+  one_day_direct_round: (date("2026-01-02 00:00:00") - date("2026-01-01 00:00:00")).round(0)
+  one_day_divide_round: ((date("2026-01-02 00:00:00") - date("2026-01-01 00:00:00")) / 86400000).round(0)
+  one_day_numeric_dates: (number(date("2026-01-02 00:00:00")) - number(date("2026-01-01 00:00:00"))) / 86400000
+  fraction_raw: (date("2026-01-02 12:30:00") - date("2026-01-01 00:00:00"))
+  fraction_is_duration: (date("2026-01-02 12:30:00") - date("2026-01-01 00:00:00")).isType("duration")
+  fraction_is_number: (date("2026-01-02 12:30:00") - date("2026-01-01 00:00:00")).isType("number")
+  fraction_days: (date("2026-01-02 12:30:00") - date("2026-01-01 00:00:00")).days
+  fraction_hours: (date("2026-01-02 12:30:00") - date("2026-01-01 00:00:00")).hours
+  fraction_milliseconds: (date("2026-01-02 12:30:00") - date("2026-01-01 00:00:00")).milliseconds
+  fraction_days_round: (date("2026-01-02 12:30:00") - date("2026-01-01 00:00:00")).days.round(0)
+  fraction_days_floor: (date("2026-01-02 12:30:00") - date("2026-01-01 00:00:00")).days.floor()
+  fraction_days_ceil: (date("2026-01-02 12:30:00") - date("2026-01-01 00:00:00")).days.ceil()
+  fraction_days_round_3: (date("2026-01-02 12:30:00") - date("2026-01-01 00:00:00")).days.round(3)
+  fraction_direct_round: (date("2026-01-02 12:30:00") - date("2026-01-01 00:00:00")).round(0)
+  fraction_divide_round: ((date("2026-01-02 12:30:00") - date("2026-01-01 00:00:00")) / 86400000).round(0)
+  fraction_numeric_dates: (number(date("2026-01-02 12:30:00")) - number(date("2026-01-01 00:00:00"))) / 86400000
+  zero_raw: (date("2026-01-01") - date("2026-01-01"))
+  zero_is_duration: (date("2026-01-01") - date("2026-01-01")).isType("duration")
+  zero_is_number: (date("2026-01-01") - date("2026-01-01")).isType("number")
+  zero_days: (date("2026-01-01") - date("2026-01-01")).days
+  zero_hours: (date("2026-01-01") - date("2026-01-01")).hours
+  zero_milliseconds: (date("2026-01-01") - date("2026-01-01")).milliseconds
+  zero_days_round: (date("2026-01-01") - date("2026-01-01")).days.round(0)
+  zero_days_floor: (date("2026-01-01") - date("2026-01-01")).days.floor()
+  zero_days_ceil: (date("2026-01-01") - date("2026-01-01")).days.ceil()
+  zero_days_round_3: (date("2026-01-01") - date("2026-01-01")).days.round(3)
+  zero_direct_round: (date("2026-01-01") - date("2026-01-01")).round(0)
+  zero_divide_round: ((date("2026-01-01") - date("2026-01-01")) / 86400000).round(0)
+  zero_numeric_dates: (number(date("2026-01-01")) - number(date("2026-01-01"))) / 86400000
+  negative_raw: (date("2026-01-01 00:00:00") - date("2026-01-02 12:00:00"))
+  negative_is_duration: (date("2026-01-01 00:00:00") - date("2026-01-02 12:00:00")).isType("duration")
+  negative_is_number: (date("2026-01-01 00:00:00") - date("2026-01-02 12:00:00")).isType("number")
+  negative_days: (date("2026-01-01 00:00:00") - date("2026-01-02 12:00:00")).days
+  negative_hours: (date("2026-01-01 00:00:00") - date("2026-01-02 12:00:00")).hours
+  negative_milliseconds: (date("2026-01-01 00:00:00") - date("2026-01-02 12:00:00")).milliseconds
+  negative_days_round: (date("2026-01-01 00:00:00") - date("2026-01-02 12:00:00")).days.round(0)
+  negative_days_floor: (date("2026-01-01 00:00:00") - date("2026-01-02 12:00:00")).days.floor()
+  negative_days_ceil: (date("2026-01-01 00:00:00") - date("2026-01-02 12:00:00")).days.ceil()
+  negative_days_round_3: (date("2026-01-01 00:00:00") - date("2026-01-02 12:00:00")).days.round(3)
+  negative_direct_round: (date("2026-01-01 00:00:00") - date("2026-01-02 12:00:00")).round(0)
+  negative_divide_round: ((date("2026-01-01 00:00:00") - date("2026-01-02 12:00:00")) / 86400000).round(0)
+  negative_numeric_dates: (number(date("2026-01-01 00:00:00")) - number(date("2026-01-02 12:00:00"))) / 86400000
+  spring_dst_raw: (date("2026-03-09 00:00:00") - date("2026-03-08 00:00:00"))
+  spring_dst_is_duration: (date("2026-03-09 00:00:00") - date("2026-03-08 00:00:00")).isType("duration")
+  spring_dst_is_number: (date("2026-03-09 00:00:00") - date("2026-03-08 00:00:00")).isType("number")
+  spring_dst_days: (date("2026-03-09 00:00:00") - date("2026-03-08 00:00:00")).days
+  spring_dst_hours: (date("2026-03-09 00:00:00") - date("2026-03-08 00:00:00")).hours
+  spring_dst_milliseconds: (date("2026-03-09 00:00:00") - date("2026-03-08 00:00:00")).milliseconds
+  spring_dst_days_round: (date("2026-03-09 00:00:00") - date("2026-03-08 00:00:00")).days.round(0)
+  spring_dst_days_floor: (date("2026-03-09 00:00:00") - date("2026-03-08 00:00:00")).days.floor()
+  spring_dst_days_ceil: (date("2026-03-09 00:00:00") - date("2026-03-08 00:00:00")).days.ceil()
+  spring_dst_days_round_3: (date("2026-03-09 00:00:00") - date("2026-03-08 00:00:00")).days.round(3)
+  spring_dst_direct_round: (date("2026-03-09 00:00:00") - date("2026-03-08 00:00:00")).round(0)
+  spring_dst_divide_round: ((date("2026-03-09 00:00:00") - date("2026-03-08 00:00:00")) / 86400000).round(0)
+  spring_dst_numeric_dates: (number(date("2026-03-09 00:00:00")) - number(date("2026-03-08 00:00:00"))) / 86400000
+  fall_dst_raw: (date("2026-11-02 00:00:00") - date("2026-11-01 00:00:00"))
+  fall_dst_is_duration: (date("2026-11-02 00:00:00") - date("2026-11-01 00:00:00")).isType("duration")
+  fall_dst_is_number: (date("2026-11-02 00:00:00") - date("2026-11-01 00:00:00")).isType("number")
+  fall_dst_days: (date("2026-11-02 00:00:00") - date("2026-11-01 00:00:00")).days
+  fall_dst_hours: (date("2026-11-02 00:00:00") - date("2026-11-01 00:00:00")).hours
+  fall_dst_milliseconds: (date("2026-11-02 00:00:00") - date("2026-11-01 00:00:00")).milliseconds
+  fall_dst_days_round: (date("2026-11-02 00:00:00") - date("2026-11-01 00:00:00")).days.round(0)
+  fall_dst_days_floor: (date("2026-11-02 00:00:00") - date("2026-11-01 00:00:00")).days.floor()
+  fall_dst_days_ceil: (date("2026-11-02 00:00:00") - date("2026-11-01 00:00:00")).days.ceil()
+  fall_dst_days_round_3: (date("2026-11-02 00:00:00") - date("2026-11-01 00:00:00")).days.round(3)
+  fall_dst_direct_round: (date("2026-11-02 00:00:00") - date("2026-11-01 00:00:00")).round(0)
+  fall_dst_divide_round: ((date("2026-11-02 00:00:00") - date("2026-11-01 00:00:00")) / 86400000).round(0)
+  fall_dst_numeric_dates: (number(date("2026-11-02 00:00:00")) - number(date("2026-11-01 00:00:00"))) / 86400000
+  duration_day: duration("1d")
+  duration_days: duration("36h").days
+  duration_hours: duration("36h").hours
+  duration_milliseconds: duration("36h").milliseconds
+  duration_round: duration("36h").round(0)
+  duration_days_round: duration("36h").days.round(0)
+  duration_double: date("2026-01-01") + (duration("1d") * 2)
+  optional_due: if(due, (date(due) - today()).days, "")
+  spring_shift_day: (date("2026-03-08") + "1d").format("YYYY-MM-DD HH:mm:ss Z")
+  spring_shift_24h: (date("2026-03-08") + "24h").format("YYYY-MM-DD HH:mm:ss Z")
+views:
+  - type: table
+    name: Date arithmetic
+    order:
+      - file.name
+      - formula.one_day_raw
+      - formula.one_day_is_duration
+      - formula.one_day_is_number
+      - formula.one_day_days
+      - formula.one_day_hours
+      - formula.one_day_milliseconds
+      - formula.one_day_days_round
+      - formula.one_day_days_floor
+      - formula.one_day_days_ceil
+      - formula.one_day_days_round_3
+      - formula.one_day_direct_round
+      - formula.one_day_divide_round
+      - formula.one_day_numeric_dates
+      - formula.fraction_raw
+      - formula.fraction_is_duration
+      - formula.fraction_is_number
+      - formula.fraction_days
+      - formula.fraction_hours
+      - formula.fraction_milliseconds
+      - formula.fraction_days_round
+      - formula.fraction_days_floor
+      - formula.fraction_days_ceil
+      - formula.fraction_days_round_3
+      - formula.fraction_direct_round
+      - formula.fraction_divide_round
+      - formula.fraction_numeric_dates
+      - formula.zero_raw
+      - formula.zero_is_duration
+      - formula.zero_is_number
+      - formula.zero_days
+      - formula.zero_hours
+      - formula.zero_milliseconds
+      - formula.zero_days_round
+      - formula.zero_days_floor
+      - formula.zero_days_ceil
+      - formula.zero_days_round_3
+      - formula.zero_direct_round
+      - formula.zero_divide_round
+      - formula.zero_numeric_dates
+      - formula.negative_raw
+      - formula.negative_is_duration
+      - formula.negative_is_number
+      - formula.negative_days
+      - formula.negative_hours
+      - formula.negative_milliseconds
+      - formula.negative_days_round
+      - formula.negative_days_floor
+      - formula.negative_days_ceil
+      - formula.negative_days_round_3
+      - formula.negative_direct_round
+      - formula.negative_divide_round
+      - formula.negative_numeric_dates
+      - formula.spring_dst_raw
+      - formula.spring_dst_is_duration
+      - formula.spring_dst_is_number
+      - formula.spring_dst_days
+      - formula.spring_dst_hours
+      - formula.spring_dst_milliseconds
+      - formula.spring_dst_days_round
+      - formula.spring_dst_days_floor
+      - formula.spring_dst_days_ceil
+      - formula.spring_dst_days_round_3
+      - formula.spring_dst_direct_round
+      - formula.spring_dst_divide_round
+      - formula.spring_dst_numeric_dates
+      - formula.fall_dst_raw
+      - formula.fall_dst_is_duration
+      - formula.fall_dst_is_number
+      - formula.fall_dst_days
+      - formula.fall_dst_hours
+      - formula.fall_dst_milliseconds
+      - formula.fall_dst_days_round
+      - formula.fall_dst_days_floor
+      - formula.fall_dst_days_ceil
+      - formula.fall_dst_days_round_3
+      - formula.fall_dst_direct_round
+      - formula.fall_dst_divide_round
+      - formula.fall_dst_numeric_dates
+      - formula.duration_day
+      - formula.duration_days
+      - formula.duration_hours
+      - formula.duration_milliseconds
+      - formula.duration_round
+      - formula.duration_days_round
+      - formula.duration_double
+      - formula.optional_due
+      - formula.spring_shift_day
+      - formula.spring_shift_24h

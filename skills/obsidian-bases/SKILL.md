@@ -9,7 +9,8 @@ description: >-
 compatibility: >-
   Obsidian 1.9+ with the Bases core plugin (table and cards views). List and
   map views need 1.10+; map views also need the official Maps plugin. Syntax
-  checked against the obsidian-help source on 2026-09-29.
+  checked against the obsidian-help source on 2026-09-29. Date arithmetic
+  application-tested in Obsidian 1.13.7 on that date.
 metadata:
   repo: https://github.com/nq-rdl/agent-extensions
 ---
@@ -150,14 +151,24 @@ formulas:
 
 ### Duration: take a numeric field before rounding
 
-Subtracting two dates gives a **Duration**, not a number. Duration does NOT
-support `.round()`, `.floor()`, or `.ceil()`. Take a numeric field first
+In Obsidian 1.13.7, subtracting two dates gives a **Duration**, not a number.
+The canonical syntax page still describes a millisecond difference.
+For other versions, verify the result in the application before adapting a formula.
+Duration does NOT support `.round()`, `.floor()`, or `.ceil()`. Take a numeric field first
 (`.days`, `.hours`, `.minutes`, `.seconds`, `.milliseconds`), then apply number
 functions.
 
+`.days` measures **elapsed 24-hour days**, not calendar-date boundaries.
+Local midnight to the next midnight can span **23 or 25 hours** across
+daylight saving time (DST). Thus, `.days` can be fractional even for date-only inputs.
+Choose rounding for the user's intended result.
+`.round(0)` rounds to nearest, `.floor()` rounds down, and `.ceil()` rounds up.
+For example, `-1.5` becomes `-1`, `-2`, or `-1`, respectively.
+Do not describe elapsed days as a calendar-day count.
+
 ```yaml
 # CORRECT
-"(date(due_date) - today()).days"              # Days between dates
+"(date(due_date) - today()).days"              # Elapsed 24-hour days
 "(date(due_date) - today()).days.round(0)"     # Rounded days
 "(now() - file.ctime).hours.round(1)"          # Hours, one decimal
 

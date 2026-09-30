@@ -1,0 +1,28 @@
+{
+  "issue": 428,
+  "observed_on": "2026-09-29",
+  "application": "Obsidian",
+  "version": "1.13.7",
+  "electron": "43.3.0",
+  "chromium": "150.0.7871.212",
+  "installer_url": "https://github.com/obsidianmd/obsidian-releases/releases/download/v1.13.7/obsidian_1.13.7_amd64.deb",
+  "installer_sha256": "17dc33b49cb3e785ecc27edd2ea0c79e40207798b554fd2886e36ebee7af9ae0",
+  "container_image": "mcr.microsoft.com/playwright/python:v1.61.0-noble",
+  "container_digest": "sha256:a9731514f24121d1dcd25d58d0a38146646d290a5998fd80d3e533e7b5e21c69",
+  "display": "Xvfb :99, 1600x1000x24",
+  "capture": "Electron DevTools Runtime.evaluate on the loaded .base view; Page.captureScreenshot for PNG",
+  "help_commit": "9cf8c2913e56830e75c13f33ba198d7e70b6d9ef",
+  "help_sources": [
+    {
+      "path": "en/Bases/Bases syntax.md",
+      "blob": "9a072e3a8138bc961c67b1dade0c3385ae32736c",
+      "sha256": "7fabd5f8fc3dadc45cdac2cac687016e9fdd9bc5e97f6879ef6beb4d26aac8e7",
+      "date_subtraction_excerpt": "Subtract two dates to get the millisecond difference between the two, for example, `now() - file.ctime`."
+    },
+    {
+      "path": "en/Bases/Functions.md",
+      "blob": "2bef1c83d5c3d1ed02b9641fa0ef8ba43c935575",
+      "sha256": "70eb34c754cbf0f38c06b82d307605465101f98f9c7c2c331a328c001f2ef32f"
+    }
+  ]
+}
