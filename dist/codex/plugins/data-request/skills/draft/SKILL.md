@@ -34,6 +34,8 @@ API, silently publish a lift candidate under the pipeline path, following
 inspected unit/resolver/tests and shortfall first. No entry means no hand SQL;
 leave classification and confirmation for `$data-request:lift` at close-out.
 
+Use the evidenced grain and requested finer outputs, not the bare answers default;
+follow guardrails `references/grain.rst` for source-citing records and drift handling.
 Establish the population, exclusions, output grain, anchor, window boundaries and
 required columns from explicit instructions or confirmed scope. Consult column-spec
 metadata and dataops DDL comments for every field whose interpretation affects the

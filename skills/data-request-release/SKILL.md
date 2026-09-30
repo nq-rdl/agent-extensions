@@ -52,8 +52,8 @@ bash "$S/sqlreview.sh" status --json   # exit 3 → stop: not initialised, run /
 Read every source at the tag with `git show <tag>:<path>`, never the working tree or another
 branch:
 
-- the request and the confirmed scope (`scope.json`, `.copier-answers.yml`), open questions and
-  `specs/amendments.md`;
+- the request, confirmed scope (`scope.json`), analyst intake, answers configuration
+  (`answers.yaml` or `.copier-answers.yml`), open questions and `specs/amendments.md`;
 - the pipeline or builder that produced the extract, and the SQL it generates;
 - the output manifest or schema: each delivered file, its columns and its row grain;
 - validation and UAT evidence: runbook, UAT checklist and validation outputs.
@@ -99,13 +99,17 @@ Before you draft any wording, compare each source with the others and with any e
 wording:
 
 - **inclusion rule**: the codes, text matches and Boolean structure (and, or) that admit a record;
-- **unit of observation**: the grain of each delivered file, against the scope (for example
-  `measurement_granularity`) and the review `grain`;
+- **unit of observation**: the grain of each delivered file, against source-citing scope/intake
+  and review `grain`, keeping the main grain separate from requested finer outputs. Apply
+  guardrails `references/grain.rst`: a bare answers-file default is not a confirmed scope;
 - **delivered outputs**: each file and field, against the requested elements. A requested element
   that is absent is a finding;
 - **derivations**: period, site, age basis and other derived fields.
 
-Each difference is a blocking discrepancy. Record it as a question (`Q1`, `Q2`, ...) with the
+Bare-default drift alone is not a blocking discrepancy: reuse the existing `L-grain-answers`
+finding once and offer correction to the engineer, without changing answers or SQL here.
+An unknown grain or real conflict with an evidenced agreed grain still holds its claim.
+Each meaning-changing difference is a blocking discrepancy. Record it as a question (`Q1`, `Q2`, ...) with the
 conflicting evidence from each source and a proposed correction, and hold the draft until the
 analyst resolves it. Never soften a discrepancy into boilerplate, and never leave it out. A prose
 or typo pass comes after.

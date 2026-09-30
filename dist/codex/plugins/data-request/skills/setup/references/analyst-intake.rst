@@ -39,6 +39,16 @@ choice. Optional ``finer_outputs`` is an array of objects, each with unique
 outputs; they do not silently replace the cohort grain. Bootstrap confirms
 how source keys implement this choice with the engineer.
 
+Ask explicitly in the same answers filling pass: "What does one row represent —
+one row per <unit>, in clinical terms? Are any requested outputs finer, such as
+per surgery or per ward stay?" Record the actual answer as the grain decision
+and named ``finer_outputs``, not by copying ``measurement_granularity: Patient``.
+A recorded patient answer is valid; an untouched default is not an answer.
+If unsettled, put the clinical-unit question in ``open_questions`` rather than
+inventing confirmation. Prior SQL/delivery and requested elements can support
+an engineer technical proposal, not an analyst research answer. Guardrails'
+``references/grain.rst`` owns evidence selection and once-only drift handling.
+
 Optional ``decided`` is ``{by, role, at, source}``, separate from confirmation:
 nonempty actor handle, role and evidence source; ``at`` uses the same UTC form
 or a real ``YYYY-MM-DD`` date when the source gives only the day.

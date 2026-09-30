@@ -61,7 +61,11 @@ Read every supplied input and say which ones the mapping uses:
   join and filter back to its requested concept and source. The SQL is evidence
   of intent, not of correctness; each hand-built block is a lift candidate.
 
-Identify population, output grain, anchor, window and requested concepts. Reuse
+Identify population, output grain, anchor, window and requested concepts. Bare
+`measurement_granularity: Patient` is unconfirmed, not a requirement. Read guardrails
+`references/grain.rst`: propose the grain from intake, prior SQL/delivery or requested
+elements with source citations; preserve requested finer outputs and distinguish a
+technical proposal from human confirmation. Reuse
 a confirmed decision only when a supplied input records the human answer and it
 applies to this mapping; otherwise label it unresolved. Autonomous mode never
 supplies business decisions or confirmations. Inspect actual column specs, their
