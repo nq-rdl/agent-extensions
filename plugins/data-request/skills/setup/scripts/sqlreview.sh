@@ -822,7 +822,8 @@ cmd_carryover() {
        scope_before_sql: $before_sql,
        carry_over: [$rows[] | select(.basis == "sql-unchanged" or .basis == "sql-body-unchanged" or .basis == "lines-unchanged")],
        carry_over_intent: [$rows[] | select(.basis == "scope-before-sql" or .basis == "intent-unchanged")],
-       walk: [$rows[] | select(.basis == null) | {kind, id, why}]}'
+       walk: [$rows[] | select(.basis == null) | {kind, id, why}
+              + (if has("decided") then {decided} else {} end)]}'
 }
 
 # ---------------------------------------------------------------------------------------------

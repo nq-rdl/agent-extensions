@@ -325,12 +325,13 @@ class HandOffToReview(unittest.TestCase):
 
 
 class Ethnicity(unittest.TestCase):
-    """#386 (triage part): ask the ethnicity question once during scoping."""
+    """#386 convention; #443 offers optional surrogates without building extras."""
 
     def test_ethnicity_prompt(self):
         bullet = rst_bullet(rst_section("checks.rst", "Interpretation checks"), "Ethnicity")
-        for token in ("no ethnicity field", "``PERSON_INFO``", "Indigenous status", "ask once",
-                      "country of birth", "preferred language", "not held", "/data-request:guardrails"):
+        for token in ("no ethnicity field", "``PERSON_INFO``", "Indigenous status",
+                      "offer", "unbuilt", "do not add them unasked", "country of birth",
+                      "preferred language", "not held", "/data-request:guardrails"):
             with self.subTest(token=token):
                 self.assertIn(token, bullet)
 

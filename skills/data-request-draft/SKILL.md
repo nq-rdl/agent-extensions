@@ -22,7 +22,8 @@ their actors. Label missing research decisions `Analyst question:` and return
 them to the analyst to consult the requester; engineer technical choices do not
 replace those answers.
 
-Read `${CLAUDE_PLUGIN_ROOT}/skills/guardrails/SKILL.md` first. Arguments: `$ARGUMENTS`.
+Read `${CLAUDE_PLUGIN_ROOT}/skills/guardrails/SKILL.md` first, including **Engineer decisions: proceed and flag**
+in its `references/decision-authority.rst`. Arguments: `$ARGUMENTS`.
 Use the requested SQL path, existing SQL, request and any supplied scope. Drafting
 requires no formal scope/review record. Before writing SQL outside the composition
 API, silently publish a lift candidate under the pipeline path, following
@@ -36,12 +37,16 @@ metadata and dataops DDL comments for every field whose interpretation affects t
 result; use `/data-request:map` for unresolved source/resolver choices. Verify dialect and
 correctness-critical syntax using the canonical docs linked by guardrails.
 
-**Autonomous:** implement the well-defined portion without repeated confirmation.
-If a missing clinical/business decision changes who is included or what an output
-means, stop the dependent portion and report the precise question; do not invent a
-cohort definition. **Co-develop:** present alternatives and their population/grain
-effects, obtain the decision, then continue. Infer mode from the request if no flag
-is supplied. Neither mode permits manufacturing human-confirmation fields.
+**Autonomous:** implement evidenced engineer-owned technical defaults and flag them, without
+waiting for analyst approval. Do not attribute an agent default to the engineer. Stop only the
+dependent portion for known governance restrictions, cohort expansion, released-output row-count
+changes or an unsupported requester-defined measure (clinical, research or business definition)
+that changes inclusion or output meaning; name the class and continue independent work.
+Do not make the dependent SQL executable by inventing a measure, even at unchanged cohort/grain.
+Batch remaining questions with defaults/evidence into one analyst message; keep building on safe defaults.
+Deliver only the narrowest supported request; offer extras in hand-off, do not build them.
+**Co-develop:** present alternatives and effects to the owning engineer or analyst, obtain the
+decision, then proceed and flag. Infer mode if absent. Neither mode manufactures confirmation fields.
 
 Write the requested SQL, preserving unrelated edits. Keep indexed filter columns
 bare, transform verified anchors, and use verified encounter/event join keys. Trace
@@ -56,6 +61,8 @@ record `Engineer decision (<login>, <date>), flagged for the data analyst` as th
 (or limitation consequence). Use the actual human handle and original date or UTC ISO
 instant, never a role label, recorder or inferred approval. Preserve any independently
 known decision origin/source. Unknown attribution stays unknown and is walked in analyse.
+Include real engineer login/date and decision evidence in the generated SQL header and
+analyst hand-off per the shared authority rule.
 
 Return the path, implemented cohort definition, evidence locations for mappings and
 conversions, and any unresolved limitations. Perform a static check using

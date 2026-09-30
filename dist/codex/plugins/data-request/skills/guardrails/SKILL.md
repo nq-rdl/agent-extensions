@@ -23,10 +23,13 @@ Before shell examples, set PLUGIN_ROOT to the absolute installed plugin director
 
 # Data Request — guardrails (Data Engineer / Data Analyst)
 
-The shared advisory spine for RDL request repos and query-builder. Apply it to the
-request composition and SQL being worked on, including work outside a formal review.
-Ordinary composition needs no `.sqlreview/` setup. Hand SQL requires the lift
-ledger below; its experimental hook is off by default.
+Shared advisory spine for RDL request repos and query-builder: apply to composition and SQL even outside formal review.
+Ordinary composition needs no `.sqlreview/` setup; hand SQL needs the lift ledger (experimental hook off).
+
+## Engineer decisions: proceed and flag
+
+Proceed on evidenced technical choices; only unresolved authority questions block dependent work.
+Read [references/decision-authority.rst](references/decision-authority.rst) for ownership/provenance, batched questions and narrow scope; no tool permission or confirmation is granted.
 
 ## Confirm sources before using a fact
 
@@ -177,10 +180,9 @@ WHERE ce.PERFORMED_DT_TM >= DATEADD(hour, -10, @window_start_aest)
   AND ce.PERFORMED_DT_TM <  DATEADD(hour, -10, @window_end_aest)
 ```
 
-The half-open interval above is illustrative: preserve the request's agreed boundary
-semantics. Do not silently replace an inclusive endpoint, choose nine months, or
-substitute a fixed offset where daylight-saving rules apply. Check bound types and
-implicit conversions too; a bare column alone does not prove an index seek.
+The half-open interval is illustrative: preserve agreed boundaries; do not silently replace inclusive endpoints,
+choose nine months or use fixed offsets where daylight-saving applies. Check bound types/implicit conversions;
+a bare column alone does not prove an index seek.
 Render datetime bounds as `'YYYY-MM-DDTHH:MM:SS'`; `'YYYYMMDD'` is safe only for midnight bounds. A `DATETIME` column
 reads `'YYYY-MM-DD'` by the login's language ([SET DATEFORMAT](https://learn.microsoft.com/en-us/sql/t-sql/statements/set-dateformat-transact-sql)), and day-first logins misread it.
 
@@ -293,8 +295,6 @@ Clinician and resource names are not personal information (governance ruling,
 
 ## Carry evidence into the task
 
-For each applicable rule, report the relevant SQL location, evidence location and
-result: supported, concern, or unverified. A static review is not a measured runtime
-result. Keep business decisions separate from storage facts and never claim human
-confirmation on the basis of an autonomous run. Future domain rules belong here only
-when there is a concrete incident and an authoritative source to confirm the details.
+Report each rule's SQL/evidence location and result: supported, concern or unverified; static review is not runtime evidence.
+Keep business decisions apart from storage facts; never claim human confirmation from an autonomous run.
+Future domain rules need a concrete incident and an authoritative source.
