@@ -59,6 +59,30 @@ technical choice as the analyst's answer.
 Read `definitions` from `.sqlreview/config.json` and use that wording, verbatim, whenever you
 tell the engineer what counts as an assumption or a limitation. Do not paraphrase it.
 
+## Before presenting prose (fresh or update)
+
+**Name the constant, never its value** in scope/review prose, drafts, logic descriptions,
+questions and change summaries (for example, `EVENT_CD`, not its numeric value).
+`code-value` scans string fields for maximal runs of 8 to 10 digits, except validated
+machine metadata (SQL path/bound slug, fingerprints and ISO timestamps at known locations).
+Keep that metadata as-is; lint exemptions do not waive `check` or publication validation.
+Never add prose codes to `.pii-code-values` or suppress the PII gate to clear them.
+
+Before every question batch or displayed summary, stage the proposed wording in
+`.sqlreview/reviews/$SLUG/scope.draft.json`, including stored prose, recurring suggestions
+and any history/SQL-delta explanations. Inspect raw helper/git output locally; do not paste
+it into questions. Run:
+
+```bash
+bash "$S/sqlreview.sh" lint --ste ".sqlreview/reviews/$SLUG/scope.draft.json"
+# exit 10 → <id>\t<field>\t<rule>\t<detail>, without code values; other failures → stop
+```
+
+Replace each prose code with its constant name and fix STE wording before showing it.
+Re-run lint after edits; decision-source warnings require a source check, not a made-up source.
+Reworded confirmed items need fresh human confirmation; do not retain their carried
+confirmation or edit the final JSON. Lint cannot grant confirmation.
+
 Some decisions recur in every enquiry (#362). Before you put candidate items to the engineer, run
 `bash "$S/recurring-decisions.sh" match ".sqlreview/reviews/$SLUG/scope.draft.json"`. For each match,
 show the prior enquiries, offer the listed wording and mark the item `upstream`, as
@@ -89,14 +113,16 @@ repeating unchanged confirmations or incrementing the semantic revision. Changed
 rationale or framing still follows the update path below. `stale` includes a body change or
 corrupt baseline and requires reassessment.
 
-1. Show how the scope itself moved: `git log -p --follow -- .sqlreview/reviews/$SLUG/scope.json`
+1. First inspect locally how the scope itself moved: `git log -p --follow -- .sqlreview/reviews/$SLUG/scope.json`
    when it is tracked (skip silently otherwise). Also inspect `git diff -- <scope path>` and
    `git diff --cached -- <scope path>` for unstaged and staged scope edits.
 2. If the SQL now exists, use `git diff --no-index -- ".sqlreview/reviews/$SLUG/scope.source.sql" "<sql path>"`
-   to show changes since the previous bootstrap (exit 1 means changes). If the baseline is absent,
+   to inspect changes since the previous bootstrap (exit 1 means changes). Show only the linted
+   explanations, not raw scope/SQL diffs. If the baseline is absent,
    explicitly say a historical delta is unavailable and do a full reassessment. Read the SQL and compare it with the scope's intent, inputs and outputs —
    name each place the SQL does something the scope did not foresee.
-3. **Re-put technical implementation of intent, inputs and outputs** to the engineer;
+3. Before re-putting intent, inputs and outputs, stage and lint their proposed wording using
+   the pre-presentation check above. **Re-put technical implementation of intent, inputs and outputs** to the engineer;
    retain answered research decisions from intake. Compare the current sidecar with
    imported upstream items first; changed or removed decisions go to the analyst
    for a recorded answer before dependent work proceeds. Then find which existing items keep
@@ -119,14 +145,16 @@ corrupt baseline and requires reassessment.
    not a published JSON or SQL snapshot.
 
    Copy each `carry` item's `set` fields onto it verbatim; it keeps the confirmation a human gave
-   at `confirmed_revision` and is not asked again. Walk **only** the `walk` items (confirm / reword /
-   drop, showing text and rationale, with `why`), plus any `carry` item the SQL diff or framing
+   at `confirmed_revision` and is not asked again. Re-run the pre-presentation lint before each `walk` batch,
+   including new items; reworded carried items need fresh confirmation. Walk **only** the `walk` items
+   (confirm / reword / drop, showing text and rationale, with `why`), plus any `carry` item the SQL diff or framing
    change still implicates, and ask for new ones. When the engineer asks for a full re-walk, walk
    every item and publish with `--reconfirm-all`. Never set `carried_from_revision` by hand.
 4. Continue at *Write* with `revision` incremented.
 
 ## Fresh scope → interview
 
+Apply the pre-presentation check above to every interview batch, including framing and open questions.
 Work through these in order, pausing (the host user-question tool) on each scoping decision:
 
 1. **Intent** — one paragraph: what question the SQL answers and for whom.
@@ -170,7 +198,8 @@ Also self-check the confirmed wording before publish:
 bash "$S/sqlreview.sh" lint ".sqlreview/reviews/$SLUG/scope.draft.json"  # exit 10 → one "<id>\t<field>\t<phrases>" per hit
 ```
 
-A text or rationale hit is a confirmed item whose wording still reads as provisional ("should be
+A `code-value` hit needs the constant name, not a numeric exemption. A provisional-wording
+text or rationale hit is a confirmed item whose wording still reads as provisional ("should be
 confirmed", "proposed", "needs confirming"). Re-put it, showing text and rationale, with the
 wording rewritten to state the confirmed decision.
 

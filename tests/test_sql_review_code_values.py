@@ -43,6 +43,7 @@ class CodeValues(unittest.TestCase):
             doc = factory(sql_path="reports/extract_20260930.sql",
                           slug="reports__extract_20260930",
                           sql_sha256="a12345678a" + "a" * 54,
+                          sql_body_sha256="c12345678c" + "c" * 54,
                           git_commit="b123456789b" + "b" * 29)
             for flags in ((), ("--ste",)):
                 with self.subTest(kind=doc["kind"], flags=flags):
@@ -56,8 +57,25 @@ class CodeValues(unittest.TestCase):
                 self.assertEqual(run(["lint", "--ste", str(path)], tmp).returncode, 0)
                 self.assertEqual(path.read_bytes(), before)
 
+    def test_header_revision_machine_metadata_is_not_prose(self):
+        stamp = "2026-09-30T05:21:28.123456789Z"
+        doc = review_doc(header_revisions=[{
+            "sql_sha256": "a12345678a" + "a" * 54,
+            "sql_body_sha256": "b123456789b" + "b" * 53,
+            "revision": 1, "at": stamp}])
+        for flags in ((), ("--ste",)):
+            result = self.lint(doc, *flags)
+            self.assertEqual((result.returncode, result.stdout), (0, ""))
+        for field in ("sql_sha256", "sql_body_sha256", "at", "summary"):
+            bad = copy.deepcopy(doc)
+            bad["header_revisions"][0][field] = "Use " + DIGITS
+            self.assertEqual(len(self.code_rows(bad, "--ste")), 1)
+        doc["extension"] = {"header_revisions": copy.deepcopy(doc["header_revisions"])}
+        self.assertEqual(len(self.code_rows(doc, "--ste")), 3)
+
     def test_metadata_exemptions_are_validated_and_location_specific(self):
         for over in ({"sql_sha256": "not a hash " + DIGITS},
+                     {"sql_body_sha256": "not a hash " + DIGITS},
                      {"git_commit": "not a commit " + DIGITS},
                      {"sql_path": "../extract_" + DIGITS + ".sql"},
                      {"slug": "unbound_" + DIGITS}):
@@ -66,8 +84,9 @@ class CodeValues(unittest.TestCase):
                     self.assertEqual(len(self.code_rows(review_doc(**over), *flags)), 1)
         doc = review_doc()
         doc["extension"] = {"sql_sha256": "a12345678a" + "a" * 54,
+                            "sql_body_sha256": "b12345678b" + "b" * 54,
                             "sql_path": "extract_20260930.sql"}
-        self.assertEqual(len(self.code_rows(doc, "--ste")), 2)
+        self.assertEqual(len(self.code_rows(doc, "--ste")), 3)
 
     def test_fractional_machine_timestamps_are_not_prose(self):
         stamp = "2026-09-30T05:21:28.123456789Z"
