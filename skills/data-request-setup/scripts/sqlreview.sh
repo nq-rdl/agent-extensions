@@ -937,7 +937,8 @@ cmd_notes() {
           end];
     {present: ($h != null), lines: (if $h == null then null else [($h[1] | tonumber), ($h[2] | tonumber)] end),
      assumptions: items("assumptions"), limitations: items("limitations")}')" || sr_die 2 "cannot parse notes"
-  if [ -n "$against" ] && [ "$(jq -r .kind "$against")" = review ]; then
+  if [ -n "$against" ] && [ "$(jq -r .kind "$against")" = review ] &&
+     { [ -n "$confirmer" ] || [ "$(printf '%s' "$parsed" | jq -r .present)" = true ]; }; then
     _header_decisions "$sql" "$against" "$confirmer" "$parsed"
   else printf '%s\n' "$parsed"; fi
 }

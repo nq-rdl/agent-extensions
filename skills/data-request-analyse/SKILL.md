@@ -250,7 +250,7 @@ the draft. If the engineer stops, leave the draft and write nothing final — sa
 
 **Never fill `confirmed_by`, `confirmed_at` or `confirmed_revision` from anything but an answered
 question** (a bulk answer, carry-over or `bulk`, counts for the items it listed, and only those): `confirmed_by` is the user's handle (GitHub
-login explicitly known, else ask; never a role label, recorder, git author or `user.email` — `check` refuses an `@`),
+login explicitly known, else ask; never a role label, recorder or git author; never `user.email` — `check` refuses an `@`),
 `confirmed_at` is now (UTC ISO), `confirmed_revision` equals the document `revision` — except an
 item carried forward on an update, which takes exactly the `set` fields `carryforward` printed.
 Never set `carried_from_revision` by hand.

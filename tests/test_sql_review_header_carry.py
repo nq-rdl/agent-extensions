@@ -308,6 +308,10 @@ class HeaderCarry(unittest.TestCase):
         self.sql.write_text(SQL_V1)
         self.walked()
 
+    def test_missing_header_without_actor_retains_legacy_notes_shape(self):
+        self.sql.write_text(SQL_V1)
+        self.assertEqual(self.notes(None), {"present": False, "lines": None, "assumptions": [], "limitations": []})
+
     def test_later_carryforward_preserves_header_origin(self):
         origin = self.answered()["decided"]
         r = run(["publish", "q", "review", str(self.draft)], self.p.root)
