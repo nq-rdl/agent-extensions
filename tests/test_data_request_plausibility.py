@@ -23,7 +23,9 @@ class PlausibilityContracts(unittest.TestCase):
                               "age anchor", "age at index surgery", "SQL lines", "request wording",
                               "Analyst question:", "not an analyst research answer",
                               "Do not infer adult", "Do not add a filter", "already answered",
-                              "existing scope item", "open_questions", "intent"):
+                              "existing scope item", "open_questions", "intent",
+                              "shared `questions.draft.json` / `questions.json` store",
+                              "do not add a new embedded list"):
                     self.assertIn(token, rule)
                 self.assertLess(rule.index("## Population limits"), rule.index("## Existing scope"))
 

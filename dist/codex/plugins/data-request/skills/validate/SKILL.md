@@ -36,6 +36,20 @@ a new lint stack, execute SQL against a database or modify data as a side effect
 When no suitable tool is available, perform a static review and say so. Parser success
 does not establish cohort correctness, and a static index assessment is not a plan.
 
+## Pre-run plausibility: operator proposals only
+
+Read guardrails `references/performance.rst`, **Pre-run plausibility**. Return a proposed
+count-only probe for **each label column** across all final outputs, using its inventory table;
+show exclusions or unresolved metadata explicitly. Include expected raw labels/format from the
+scope and data dictionary, SQL location, bounds/cost and suppression parameter. Propose an
+age-band probe only for expensive requests with cited cost evidence; otherwise state why omitted.
+
+This stage runs **no SQL** and must not connect to a database, inspect live catalogs or invoke
+an extract runner, even to test a proposed probe. Database-capable clients, credentials and an
+operator proposal are not execution authorisation. Mark every probe **proposed, not executed**;
+static validation does not establish plausibility. The authorised operator runs approved probes
+before the delivery run; retain unresolved thresholds/bounds as reasons not to run.
+
 Return findings with severity, SQL location, rule/requirement, observed evidence,
 effect on the result and a proposed correction. Distinguish **observed problems**,
 **unverified facts** and **checks passed**, and list commands actually run with their

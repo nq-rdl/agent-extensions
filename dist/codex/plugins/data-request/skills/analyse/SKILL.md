@@ -103,6 +103,23 @@ and carryforward; adding, changing or removing it requires fresh confirmation. R
 `lint` before publish: provenance warnings need a source check, separate from wording
 reconfirmation. A lint hint is advisory; it does not establish who decided.
 
+## Pre-run plausibility: operator proposals only
+
+Before the delta/unchanged-SQL path, read guardrails `references/performance.rst`,
+**Pre-run plausibility**. Compare the population answers in scope with the current SQL;
+carry unresolved or contradicted limits into the review and analyst questions without
+inventing restrictions. Return the inventory and a proposed count-only probe for **each label column**
+across all final outputs, including expected labels/format, SQL location, bounds/cost and suppression.
+For expensive requests only, propose an age-band probe with the scoped age anchor and cost evidence.
+This check runs **no SQL**: mark proposals **proposed, not executed**, not OBSERVED findings.
+Reuse valid existing proposals on reruns but recheck scope, output columns and bounds even if SQL
+is unchanged. Show this proposal table alongside `review.md`, not as a confirmed probe result.
+Unknown labels/thresholds remain unverified; do not fabricate confirmations to publish a review.
+
+The operator needs explicit authorisation to run approved probes before the delivery run.
+Returned counts inform UAT and the data dictionary; surprises go to the analyst, not an automatic
+cohort filter. Apply *After review* below for the separate authorised run and handoff.
+
 ## Existing review → update path (#130 §2)
 
 If `reviews/$SLUG/review.json` exists (or `--update`):
