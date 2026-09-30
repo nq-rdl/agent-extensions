@@ -282,6 +282,7 @@ symptom and a fix. Report each finding with its SQL location.
 
 ## Release conventions
 
+At map and draft time, read [references/delivery.rst](references/delivery.rst) for workbook limits, per-output row estimates, text length bands and engineer delivery choices flagged for the analyst; near-limit estimates remain undecided.
 Build all requested elements, including identifiers and free text, even when approval is unchecked;
 the analyst checks coverage during review. Known restrictions still apply. For build/commit/push permission,
 raw/derived dates, validation listings, study IDs and suppression, read [references/release.rst](references/release.rst).

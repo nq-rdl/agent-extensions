@@ -59,6 +59,12 @@ Deliver only the narrowest supported request; offer extras in hand-off, do not b
 **Co-develop:** present alternatives and effects to the owning engineer or analyst, obtain the
 decision, then proceed and flag. Infer mode if absent. Neither mode manufactures confirmation fields.
 
+Before writing, apply guardrails `references/delivery.rst`: estimate each output's
+rows from available probe counts at the drafted grain and check text length bands.
+Record row/cell-limit risks and near-limit (within 10%) uncertainty as limitations
+at the affected logic; put the delivery choice to the engineer, flagged for the
+analyst. Do not silently change grain or cut requested text to fit Excel.
+
 Write the requested SQL, preserving unrelated edits. Keep indexed filter columns
 bare, transform verified anchors, and use verified encounter/event join keys. Trace
 the resulting grain through joins and exclusions. Keep unresolved placeholders out
