@@ -111,7 +111,9 @@ verified; commands record only actual runs and their results.
 Decisions use #434/#437's independent ``decided: {by,role,at,source}`` origin;
 ``role`` is a display label, ``by`` a human handle, not a confirmer inferred from
 config. Preserve date-only precision; never invent midnight. Legacy
-``{date,who,decision,source}`` and spec-kit direct-mode records remain accepted.
+``{date,who,decision,source}`` remains accepted. The only source-free exception
+is the exact five-field spec-kit ``generativeMode: direct`` record shown above;
+other decisions require their normal origin.
 Business decisions require a human origin; never promote an engineer technical
 choice into an analyst research answer. A verbal decision stays explicitly
 ``unlinked (verbal)`` until written evidence is supplied.

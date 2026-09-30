@@ -98,7 +98,14 @@ cmd_init() {
     return 0
   fi
 
-  if [ "$mode" = "create" ] && [ ! -d "$target" ]; then
+  # A ledger saved before setup is session state, not an initialized project.
+  # Complete only that exact ledger-only tree; any other existing state stays report-only.
+  local ledger_only=0
+  if [ -f "$target/ledger.json" ] &&
+     [ -z "$(find "$target" -mindepth 1 -maxdepth 1 ! -name ledger.json -print)" ]; then
+    ledger_only=1
+  fi
+  if [ "$mode" = "create" ] && { [ ! -d "$target" ] || [ "$ledger_only" = 1 ]; }; then
     for f in $files; do
       sr_no_symlinks "$target/$f" || exit 2
       mkdir -p "$target/$(dirname "$f")" || sr_die 2 "cannot create target directory"

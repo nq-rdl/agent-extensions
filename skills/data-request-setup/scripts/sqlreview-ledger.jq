@@ -18,7 +18,9 @@ def decision:
   (if has("decided") then (.decided | origin)
    elif has("date") or has("who") or has("source") then
      (.date | nonempty) and (.who | identity) and (.source | nonempty)
-   else (.by | identity) and (.at | nonempty) and (.value | nonempty) and (.scope | repo)
+   else keys == ["at", "by", "decision", "scope", "value"] and
+     .decision == "generativeMode" and .value == "direct" and
+     (.by | identity) and (.at | nonempty) and (.scope | repo)
    end);
 def entry:
   . as $entry |

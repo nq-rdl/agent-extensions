@@ -207,6 +207,76 @@ class Ledger(unittest.TestCase):
                 self.assertEqual(json.loads(result.stdout)['hookSpecificOutput']['permissionDecision'], 'deny')
                 self.assertIn('ledger', result.stdout)
 
+    def test_guard_denies_ledger_path_aliases(self):
+        self.save()
+        (self.root / 'state').symlink_to('.sqlreview', target_is_directory=True)
+        (self.root / 'alias.json').symlink_to('.sqlreview/ledger.json')
+        (self.root / '.sqlreview/subdir').mkdir()
+        for hook in ('hooks/data-request-guard.sh',
+                     'plugins/data-request/hooks/data-request-guard.sh',
+                     'dist/codex/plugins/data-request/hooks/data-request-guard.sh'):
+            for tool in ('Write', 'Edit'):
+                for path in ('state/ledger.json', 'state/subdir/../ledger.json',
+                             str(self.root / 'state/ledger.json'), 'alias.json'):
+                    with self.subTest(hook=hook, tool=tool, path=path):
+                        event = {'tool_name': tool, 'cwd': str(self.root),
+                                 'tool_input': {'file_path': path, 'content': '{}'}}
+                        result = subprocess.run(['bash', str(REPO / hook)],
+                                                input=json.dumps(event), text=True, capture_output=True,
+                                                cwd=self.root, env=self.env, check=True)
+                        self.assertTrue(result.stdout, 'ledger alias bypassed guarded publication')
+                        self.assertEqual(json.loads(result.stdout)['hookSpecificOutput']['permissionDecision'], 'deny')
+
+    def test_backslash_artifact_paths_preserve_unchanged_completion(self):
+        artifact = self.root / 'query\\cohort.sql'
+        artifact.write_text('SELECT 1;')
+        doc = entry(); doc['stage_evidence']['draft']['artifacts'] = [
+            {'path': artifact.name, 'sha256': hashlib.sha256(artifact.read_bytes()).hexdigest()}]
+        self.save(doc)
+        current = self.root / 'current.json'; current.write_text(json.dumps(doc['evidence_revision']))
+        result = json.loads(self.run_helper('get', TICKET, '--against', str(current)).stdout)
+        self.assertEqual(result['recheck'], [])
+        self.assertEqual(result['unchanged'], doc['stages_done'])
+        artifact.write_text('SELECT 2;')
+        self.assertEqual(json.loads(self.run_helper('get', TICKET, '--against', str(current)).stdout)['recheck'], ['draft'])
+
+    def test_init_completes_ledger_only_directory_without_changing_ledger(self):
+        self.save(); before = self.dest.read_bytes()
+        def init(*args):
+            return subprocess.run(['bash', str(SCRIPT), 'init', *args], cwd=self.root,
+                                  env=self.env, text=True, capture_output=True)
+        diff = init('--diff', '--json')
+        self.assertEqual(diff.returncode, 10, diff.stderr)
+        self.assertFalse((self.dest.parent / 'config.json').exists())
+        created = init('--json')
+        self.assertEqual(created.returncode, 0, created.stderr)
+        self.assertTrue(json.loads(created.stdout)['created'])
+        for path in ('config.json', 'templates/scope.md', 'templates/review.md',
+                     'templates/lifts.md', 'reviews/.gitkeep'):
+            self.assertTrue((self.dest.parent / path).is_file(), path)
+        self.assertEqual(self.dest.read_bytes(), before)
+        roles = subprocess.run(['bash', str(SCRIPT), 'roles', 'Engineer', 'Requester'], cwd=self.root,
+                               env=self.env, text=True, capture_output=True)
+        self.assertEqual(roles.returncode, 0, roles.stderr)
+        config = self.dest.parent / 'config.json'; config.write_text('{"custom": true}')
+        self.assertEqual(init().returncode, 10)
+        self.assertEqual(config.read_text(), '{"custom": true}')
+        config.unlink()
+        self.assertEqual(init().returncode, 10)
+        self.assertFalse(config.exists(), 'partial existing setup must remain report-only')
+
+    def test_source_free_decisions_are_only_exact_spec_kit_direct_mode(self):
+        self.save(); before = self.dest.read_bytes()
+        direct = {'decision': 'generativeMode', 'value': 'direct', 'by': 'engineer',
+                  'at': '2026-09-29', 'scope': 'nq-rdl/query-builder'}
+        for mutation in ({'decision': 'Choose cohort'}, {'value': 'cohort A'},
+                         {'decision': 'generativeMode', 'value': 'spec-kit'},
+                         {'role': 'Requester'}, {'cohort': 'A'}):
+            with self.subTest(mutation=mutation):
+                doc = entry(); doc['decisions'] = [dict(direct, **mutation)]
+                self.assertEqual(self.save(doc, ok=False).returncode, 4)
+                self.assertEqual(self.dest.read_bytes(), before)
+
     def test_invalid_current_evidence_fails_instead_of_rechecking_everything(self):
         self.save(); current = self.root / 'current.json'; current.write_text('{bad')
         self.run_helper('get', TICKET, '--against', str(current), ok=False)

@@ -55,8 +55,29 @@ case "$tool" in Write|Edit) ;; *) exit 0 ;; esac
 path="$(field .tool_input.file_path)"; [ -n "$path" ] || exit 0
 cwd="$(field .cwd)"; [ -n "$cwd" ] || cwd="$(pwd -P)"
 case "$path" in /*) abs="$path" ;; *) abs="$cwd/$path" ;; esac
-# Collapse . and .. without touching the filesystem (the target may not exist yet).
-abs="$(printf '%s\n' "$abs" | awk -F/ '{ n=0; for (i=1;i<=NF;i++) { if ($i==""||$i==".") continue; if ($i=="..") { if (n>0) n--; continue }; p[++n]=$i }; o=""; for (i=1;i<=n;i++) o=o "/" p[i]; print (o==""?"/":o) }')"
+# Resolve existing parents before lexical cleanup: aliases can lead into .sqlreview,
+# and symlink/.. must follow filesystem semantics. Keep absent suffixes for new files.
+lexical_abs="$abs"
+[ ! -L "$abs" ] || decide deny "SQL Review guard cannot validate a symlink file alias. Use the non-symlink destination path."
+parent="$(dirname "$abs")"; suffix="$(basename "$abs")"
+while [ ! -d "$parent" ] && [ "$parent" != / ]; do
+  suffix="$(basename "$parent")/$suffix"
+  parent="$(dirname "$parent")"
+done
+physical_parent="$(cd -P -- "$parent" 2>/dev/null && pwd -P)" ||
+  decide deny "SQL Review guard cannot resolve the destination's existing parent directory."
+abs="$physical_parent/$suffix"
+normalize_path() {
+  awk -F/ '{ n=0; for (i=1;i<=NF;i++) { if ($i==""||$i==".") continue; if ($i=="..") { if (n>0) n--; continue }; p[++n]=$i }; o=""; for (i=1;i<=n;i++) o=o "/" p[i]; print (o==""?"/":o) }'
+}
+# Collapse absent suffixes. Physical protection wins; retain lexical protection
+# too when .sqlreview itself points outside the child.
+abs="$(printf '%s\n' "$abs" | normalize_path)"
+lexical_abs="$(printf '%s\n' "$lexical_abs" | normalize_path)"
+case "$abs" in
+  */.sqlreview/*) ;;
+  *) case "$lexical_abs" in */.sqlreview/*) abs="$lexical_abs" ;; esac ;;
+esac
 # Resolve once for both ledger coverage and authoritative record validation.
 here="$(cd "$(dirname "$0")" 2>/dev/null && pwd -P)"
 checker=""

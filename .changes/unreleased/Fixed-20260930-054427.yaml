@@ -1,0 +1,3 @@
+kind: Fixed
+body: Setup initializes ledger-only `.sqlreview` directories without changing saved triage entries (#462)
+time: 2026-09-30T05:44:27.704254219Z
