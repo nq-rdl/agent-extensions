@@ -18,6 +18,11 @@ metadata:
 
 # Data Request — bootstrap (Data Engineer)
 
+The **Data Engineer** runs this stage after setup and the Data Analyst's
+`answers.yaml` filling pass. The analyst records research decisions in the optional
+`answers.intake.json` sidecar in that same pass. There is no separate intake skill.
+The engineer owns technical sources, keys, timezones, joins and validity rules.
+
 For RDL cohort SQL, read `${CLAUDE_PLUGIN_ROOT}/skills/guardrails/SKILL.md` before
 scoping or reviewing. Consult its dataops/column-spec sources and carry evidence or
 unverified facts into the discussion; advisory findings do not replace human confirmation.
@@ -31,6 +36,23 @@ bash "$S/sqlreview.sh" status --json           # exit 3 → stop: not initialise
 SLUG="$(bash "$S/sqlreview.sh" slug "<intended sql path>")"   # exit 5 → the slug is bound to another path; say so and stop
 ```
 
+Before either interview path, read the request's `answers.yaml` and run its
+`validate-answers` check, which also validates the sibling `answers.intake.json`.
+See `${CLAUDE_PLUGIN_ROOT}/skills/setup/references/analyst-intake.rst` for the schema
+and merge rules. Import with `bash "$S/sqlreview.sh" intake answers.intake.json <next-revision>`.
+Copy its assumptions into the draft by ID, preserving analyst confirmation and
+`upstream` fields. Do not ask the engineer a research question that the intake
+answered. Confirm only its technical implementation with the engineer. Imported
+confirmation dates come from the analyst's recorded answer, not this interview.
+Prefer the helper's third-argument draft merge: it refreshes sidecar-owned questions
+without removing other gaps. If copying manually, copy `analyst_questions` into
+`open_questions` and record only the sidecar-owned strings in `intake_questions`;
+preserve that field when drafting updates. Any research question missed by
+intake also gets the `Analyst question:` prefix and goes back to the analyst, who
+consults the requester. Missing intake permits legacy technical scoping; it gives
+no analyst confirmation. Do not resolve a research gap by treating an engineer's
+technical choice as the analyst's answer.
+
 Read `definitions` from `.sqlreview/config.json` and use that wording, verbatim, whenever you
 tell the engineer what counts as an assumption or a limitation. Do not paraphrase it.
 
@@ -38,7 +60,7 @@ Some decisions recur in every enquiry (#362). Before you put candidate items to 
 `bash "$S/recurring-decisions.sh" match ".sqlreview/reviews/$SLUG/scope.draft.json"`. For each match,
 show the prior enquiries, offer the listed wording and mark the item `upstream`, as
 `${CLAUDE_PLUGIN_ROOT}/skills/setup/references/recurring-decisions.rst` says. The engineer still confirms each item.
-Rows from `carryforward` omit `upstream`: copy it from the prior item when you re-draft that item.
+Rows from `carryforward` include recorded `upstream` and `decided` fields: preserve them.
 
 ## Decision origin (#434)
 
@@ -71,7 +93,10 @@ corrupt baseline and requires reassessment.
    to show changes since the previous bootstrap (exit 1 means changes). If the baseline is absent,
    explicitly say a historical delta is unavailable and do a full reassessment. Read the SQL and compare it with the scope's intent, inputs and outputs —
    name each place the SQL does something the scope did not foresee.
-3. **Re-put intent, inputs and outputs** to the engineer. Then find which existing items keep
+3. **Re-put technical implementation of intent, inputs and outputs** to the engineer;
+   retain answered research decisions from intake. Compare the current sidecar with
+   imported upstream items first; changed or removed decisions go to the analyst
+   for a recorded answer before dependent work proceeds. Then find which existing items keep
    their confirmation (#348): draft the next revision with each unchanged item's `id`, `text` and
    `rationale` verbatim and its `location` lines remapped to the current SQL, and run
 
@@ -101,7 +126,8 @@ Work through these in order, pausing (AskUserQuestion) on each scoping decision:
    confirmed record, so a rationale the engineer never saw must not be published. Reword may change
    either; a reworded item is asked again with its new text and rationale.
    Before each batch, run `bash "$S/sqlreview.sh" lint --ste ".sqlreview/reviews/$SLUG/scope.draft.json"` (intent too; exit 10 → one `<id>\t<field>\t<rule>\t<detail>` line per hit) and reword each hit first.
-5. **Open questions** — anything the engineer must take back to the requester. First look for a
+5. **Open questions** — technical gaps for the engineer, research gaps labelled
+   `Analyst question:` for the analyst to take back to the requester. First look for a
    prior version's SQL or delivery (a V2 request's V1 repository or release). When it answers the
    question, ask it as confirm-or-change, quoting the prior answer and its source. Propose a
    default answer for each open question: the engineer can accept it as a candidate assumption
@@ -141,7 +167,8 @@ Only confirmed items go into `scope.json`. **Never fill `confirmed_by`, `confirm
 `confirmed_revision` from anything but an answered question** — `confirmed_by` is the user's handle
 (GitHub login where known, else `git config user.name`, else ask; never `user.email` — `check`
 refuses an `@`), `confirmed_at` is now (UTC ISO),
-`confirmed_revision` equals the document `revision` — except a carried item, which takes exactly
+`confirmed_revision` equals the document `revision` — imported intake takes the original
+analyst actor/date and the import revision; a carried item takes exactly
 the `set` fields `carryforward` printed. Write the complete confirmed document to
 `.sqlreview/reviews/$SLUG/scope.draft.json`, then publish it with the command below:
 
