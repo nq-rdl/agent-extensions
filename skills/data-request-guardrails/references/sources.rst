@@ -41,11 +41,16 @@ This unpinned upstream discovery is not evidence of availability in a request's
 installed release or of an ieMR/ePADT handler. Inspect that pin before use;
 ``SiteCode`` alone is not the TUH facility filter.
 
-An explicit other facility, whole HHS or network-wide cohort gets one
-``Analyst question:`` about the facility set and code mapping instead of the TUH
+Only a request that explicitly changes the cohort's facility set to another facility,
+the whole HHS or a network-wide cohort gets one ``Analyst question:`` about the
+facility set and code mapping instead of the TUH
 assumption. Batch it with remaining research questions. Reuse an already recorded
 analyst answer; do not ask again or silently intersect it with TUH. Until answered,
 leave only the dependent facility scope unresolved and continue independent work.
+A request that excludes transfers from another hospital or asks for admission-from
+or discharge-to facility fields does not change the cohort's facility set: keep the TUH default.
+A facility merely mentioned as context is not an exception. These exclusions/outputs
+still need their own source evidence and normal authority checks.
 This rule does not authorise a broader cohort, database execution or new outputs.
 
 Where dataops lives

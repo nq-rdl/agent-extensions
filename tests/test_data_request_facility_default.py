@@ -4,12 +4,15 @@ These test authored instructions in all target trees, not live agent behaviour o
 warehouse facts. Runtime cases exercise shipped Bash/jq helpers in temp repos.
 """
 
+import copy
+import hashlib
 import json
 import tempfile
 import unittest
 from pathlib import Path
 
 from test_data_request_recurring_decisions import run
+from test_sql_review_scripts import item, review_doc, scope_doc
 
 REPO = Path(__file__).resolve().parent.parent
 TREES = {"canonical": REPO / "skills",
@@ -71,6 +74,20 @@ class HouseDefaultContracts(unittest.TestCase):
                     rule = text(tree, leaf)
                     for token in ("another facility", "whole HHS", "network-wide", "Analyst question:",
                                   "instead of the TUH default", "already answered"):
+                        self.assertIn(token, rule)
+
+    def test_exception_requires_a_change_to_the_cohort_facility_set(self):
+        # Authored routing contract, not an executable natural-language classifier.
+        for tree in TREES:
+            for leaf in ("guardrails", "triage", "map", "bootstrap", "draft"):
+                with self.subTest(tree=tree, leaf=leaf):
+                    self.assertIn("explicitly changes the cohort's facility set", text(tree, leaf))
+            for leaf, relative in (("guardrails", "references/sources.rst"),
+                                   ("setup", "references/recurring-decisions.rst")):
+                with self.subTest(tree=tree, relative=relative):
+                    rule = text(tree, leaf, relative)
+                    for token in ("cohort's facility set", "admission-from", "discharge-to",
+                                  "excludes transfers from another hospital", "keep the TUH default"):
                         self.assertIn(token, rule)
 
     def test_recurring_rule_is_narrow_and_keeps_formal_gates(self):
@@ -155,6 +172,64 @@ class FacilityHelperRoundTrips(unittest.TestCase):
                                  {"SQLREVIEW_RECURRING_DECISIONS": str(custom)})
                     self.assertEqual(result.returncode, 4, result.stdout + result.stderr)
                     self.assertIn("house_default", result.stderr)
+
+    def test_carried_house_provenance_mutations_cannot_publish(self):
+        mutations = {
+            "drop upstream": lambda a: a.pop("upstream"),
+            "null upstream": lambda a: a.update(upstream=None),
+            "replace source": lambda a: a["upstream"].update(source="other"),
+            "drop source": lambda a: a["upstream"].pop("source"),
+            "replace decision": lambda a: a["upstream"].update(decision="other"),
+            "drop decided": lambda a: a.pop("decided"),
+            "null decided": lambda a: a.update(decided=None),
+            **{f"replace decided {field}":
+               (lambda a, field=field: a["decided"].update({field: "other"}))
+               for field in ("by", "role", "at", "source")},
+        }
+        for tree in TREES:
+            for kind in ("scope", "review"):
+                with self.subTest(tree=tree, kind=kind), tempfile.TemporaryDirectory() as tmp:
+                    root = Path(tmp)
+                    sql = "SELECT 1;\n"
+                    (root / "cohort.sql").write_text(sql)
+                    self.helper(tree, tmp, "sqlreview", "init")
+                    slug = "cohort"
+                    store = root / ".sqlreview/reviews" / slug
+                    store.mkdir(parents=True, exist_ok=True)
+                    d = entry(tree)
+                    h = d["house_default"]
+                    a = item("A1", d["proposal"]["text"], rationale=d["proposal"]["rationale"],
+                             confirmed_by=h["confirmed_by"], confirmed_at=h["confirmed_at"],
+                             decided=h["decided"], upstream={"decision": DECISION, "source": "house-default"})
+                    factory = scope_doc if kind == "scope" else review_doc
+                    doc = factory(slug, "cohort.sql", schemaVersion=2, assumptions=[a], limitations=[],
+                                  sql_sha256=hashlib.sha256(sql.encode()).hexdigest(),
+                                  logic=[{"step": 1, "title": "Select", "lines": [1, 1], "description": "Fixture"}])
+                    draft = store / f"{kind}.draft.json"
+                    draft.write_text(json.dumps(doc))
+                    self.helper(tree, tmp, "sqlreview", "publish", slug, kind, str(draft))
+                    # Both the first carry and a later carry must protect the prior
+                    # marker/origin, even if the proposed item drops its source.
+                    for revision in (2, 3):
+                        doc["revision"] = revision
+                        draft.write_text(json.dumps(doc))
+                        carry = json.loads(self.helper(tree, tmp, "sqlreview", "carryforward",
+                                                      slug, kind, str(draft)).stdout)
+                        self.assertEqual(len(carry["carry"]), 1)
+                        a.update(carry["carry"][0]["set"])
+                        for name, mutate in mutations.items():
+                            with self.subTest(revision=revision, mutation=name):
+                                changed = copy.deepcopy(doc)
+                                mutate(changed["assumptions"][0])
+                                draft.write_text(json.dumps(changed))
+                                before = (store / f"{kind}.json").read_bytes()
+                                result = self.helper(tree, tmp, "sqlreview", "publish", slug, kind,
+                                                     str(draft), expected=4)
+                                self.assertIn("provenance", result.stdout + result.stderr)
+                                self.assertEqual((store / f"{kind}.json").read_bytes(), before)
+                        draft.write_text(json.dumps(doc))
+                        self.helper(tree, tmp, "sqlreview", "publish", slug, kind, str(draft))
+                        self.assertEqual(json.loads((store / f"{kind}.json").read_text())["assumptions"], [a])
 
     def test_default_publish_render_and_carry_keep_the_original_record(self):
         for tree in TREES:

@@ -42,7 +42,7 @@ library issue that would retire it. Each entry has these fields:
 Recorded house default
 ----------------------
 
-For ``tuh-facility``, when the request is silent on facilities or names TUH, apply
+For ``tuh-facility``, when cohort facility scope is unstated or explicitly TUH, apply
 without asking the engineer or analyst. Read ``list`` and use the exact listed wording
 and rationale as **one item**, with ``upstream: {decision: "tuh-facility", source:
 "house-default"}``; reuse that item by id through map, bootstrap, draft and review,
@@ -60,8 +60,11 @@ Later revisions use normal ``carryforward`` / ``carryover`` and preserve provena
 copy ``upstream`` from the prior or scope item when a tool omits it. Analyse still
 checks that the governed SQL actually implements the recorded facility scope.
 
-For another facility, the whole HHS or a network-wide cohort, do not insert or carry
-this TUH assumption. Put one facility-set clarification in ``open_questions`` for
+Only when the request explicitly changes the cohort's facility set to another facility,
+the whole HHS or a network-wide cohort, do not insert or carry this TUH assumption.
+If it excludes transfers from another hospital or asks for admission-from or discharge-to
+facility fields, keep the TUH default; context-only mentions are not exceptions.
+Put one facility-set clarification in ``open_questions`` for
 the analyst, unless intake/prior scope already answered it. Remove any inherited TUH
 candidate and mark dependent facility work unresolved, not runnable with the default.
 An explicit answered exception replaces, never intersects with, TUH. Do not retain

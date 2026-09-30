@@ -24,7 +24,7 @@ Apply TUH `00200` without asking when no alternative facility scope is named: re
 one standard assumption from setup's `tuh-facility` entry with its `upstream` marker.
 Read `${CLAUDE_PLUGIN_ROOT}/skills/setup/references/recurring-decisions.rst` for wording
 and original confirmation; mapping returns the assumption as a proposal/handoff, never initialises a store.
-For an explicit alternative/HHS/network scope, leave the TUH default out, carry the
+If the request explicitly changes the cohort's facility set (alternative/HHS/network scope), leave the TUH default out, carry the
 analyst's recorded answer or return one facility-set question; do not intersect with TUH.
 Arguments: `$ARGUMENTS`.
 

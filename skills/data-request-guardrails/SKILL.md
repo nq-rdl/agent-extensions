@@ -32,7 +32,7 @@ Read [references/decision-authority.rst](references/decision-authority.rst) for 
 
 ## House defaults
 
-The cohort is **Townsville University Hospital**, facility string `00200`, unless the request names other facilities, the whole HHS or a network-wide cohort.
+The cohort is **Townsville University Hospital**, facility string `00200`, unless the request explicitly changes the cohort's facility set to another facility, the whole HHS or a network-wide cohort.
 This house default was confirmed by Data Engineer **JoshKgh** on **2026-09-29** ([#436](https://github.com/nq-rdl/agent-extensions/issues/436)). Apply it without asking; record one upstream-marked assumption, not a new request-specific decision.
 Read [references/sources.rst](references/sources.rst) for HBCIS/ePADT fields, ieMR facility-crosswalk verification and exception routing; setup's recurring-decisions reference owns the wording and recorded confirmation.
 

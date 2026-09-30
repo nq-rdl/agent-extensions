@@ -92,7 +92,7 @@ confirmation or edit the final JSON. Lint cannot grant confirmation.
 Apply guardrails **House defaults** without asking: reuse one standard assumption from
 setup's `tuh-facility` entry, with its `upstream` marker and recorded house confirmation
 (see `${CLAUDE_PLUGIN_ROOT}/skills/setup/references/recurring-decisions.rst`). Do not ask a fresh facility question.
-If the request names another facility, the whole HHS or a network-wide cohort, put one
+If the request explicitly changes the cohort's facility set to another facility, the whole HHS or a network-wide cohort, put one
 `Analyst question:` about the facility set instead of the TUH default; do not apply or carry it.
 Reuse an already answered intake/scope exception; do not ask it again or intersect it with TUH.
 Continue independent work while the dependent facility scope remains unresolved.
