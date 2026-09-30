@@ -25,6 +25,8 @@
 #   publish --reconfirm-all SLUG KIND DRAFT    same, but refuse any carried (carried_from_revision) confirmation
 #   roles ENGINEER ANALYST                     update only the two confirmed role names in config.json
 #   guard string-sql on|off                    set only guard.require_lift_for_string_sql in config.json
+#   lifts-stale SLUG --tag TAG                  read-only JSON nudges for units newly present at a stable library tag
+#                                              uses authenticated gh GETs; unavailable evidence is unknown, never absent
 #   fingerprint SQL                            {sql_path, sql_sha256, sql_body_sha256, git_commit, git_dirty}
 #   snapshot SLUG SQL                          verify final review SHA, retain history, advance source.sql
 #   delta SLUG                                 body binding + full hashes; exit 0 full/header-only, 10 body change, 6 no baseline
@@ -59,6 +61,7 @@ set -u
 SR_SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd -P)"
 # shellcheck source=sqlreview-lib.sh
 . "$SR_SCRIPT_DIR/sqlreview-lib.sh"
+. "$SR_SCRIPT_DIR/sqlreview-lifts.sh"
 SR_ASSETS="$SR_SCRIPT_DIR/../assets/sqlreview"
 
 usage() {
@@ -1240,6 +1243,7 @@ case "$cmd" in
   publish) cmd_publish "$@" ;;
   roles) cmd_roles "$@" ;;
   guard) cmd_guard "$@" ;;
+  lifts-stale) cmd_lifts_stale "$@" ;;
   fingerprint) cmd_fingerprint "$@" ;;
   snapshot) cmd_snapshot "$@" ;;
   delta) cmd_delta "$@" ;;

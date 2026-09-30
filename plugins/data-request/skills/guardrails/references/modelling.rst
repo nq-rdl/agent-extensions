@@ -35,7 +35,7 @@ RDL sources hold no ethnicity field. By RDL convention:
   requester or engineer decides whether to include them.
 * Record a limitation that ethnicity is not held.
 
-query-builder v0.6.0 has no enrichment for either surrogate. Candidate sources to
-verify are ieMR ``PERSON.LANGUAGE_CD`` and the HBCIS ``mart_patient_view``
+Inspect the request's pinned query-builder enrichment for either surrogate before
+claiming a gap. Candidate sources to verify are ieMR ``PERSON.LANGUAGE_CD`` and the HBCIS ``mart_patient_view``
 birth-country and language columns (see ``schema_extracts/``). Compose a surrogate
 over a local ``TypedTable``; any hand SQL for it falls under the lift-ledger rules.

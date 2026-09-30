@@ -86,7 +86,7 @@ Recheck affected evidence/artifacts, not every stage. See [references/ledger.rst
    for the interpretation checks to raise.
 7. **Recheck every gap claim**, whether yours, a worker's or a register row, against current
    code, tests, releases and dependency topology before you plan or file it. A delivered
-   capability is closed, whatever an older gap register says.
+   capability is closed; run and report the [read-only stale lift check](references/checks.rst).
 8. **Classify blockers** with the taxonomy in [references/checks.rst](references/checks.rst).
 9. **Update the ledger** after each state-changing stage and before handoff; read
    [references/ledger.rst](references/ledger.rst) for persistence, schema and resume rules.

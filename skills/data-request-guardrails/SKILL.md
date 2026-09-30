@@ -10,7 +10,6 @@ argument-hint: '[request, SQL path or resolver]'
 user-invocable: true
 compatibility: >-
   RDL cohort SQL; DATEADD and sys catalog examples target SQL Server 2022 (16.x).
-  Composition API baseline: nq-rdl/query-builder 0.6.0 (resolvers/iemr, resolvers/hbcis);
   record_assumption, record_limitation and isolation_level need query-builder 0.6.0 or later.
   rdl-service-desk/query-builder is the retired legacy org.
   Source patterns from issues 313, 325 and 370 to 389 (2026-09-15 to 2026-09-28).
@@ -100,13 +99,12 @@ Do not default to separate lookups that extract IDs and re-scan with `IN()`.
 Verify availability/signatures in the pinned core and tests; sufficient existing
 units make this request-specific composition, not a library enhancement.
 
-The API baseline is `nq-rdl/query-builder` tag `v0.6.0`
-(`clinical/specifications.py`, `clinical/resolver.py`, `clinical/query.py`,
-`pypika_queries/queries.py`). Since v0.5.0 the source resolvers live in the same
-package, under `resolvers/iemr/resolver.py` and `resolvers/hbcis/resolver.py`; the
-former separate plugins package is archived. For a different installed revision, re-check those
-implementations and their tests before adapting the examples; the baseline does not
-establish enhancement availability.
+Use [the shared library release discovery policy](references/library.rst) for
+current tags and source paths (`clinical/specifications.py`, `clinical/resolver.py`,
+`clinical/query.py`, `pypika_queries/queries.py`, `resolvers/iemr/resolver.py`,
+`resolvers/hbcis/resolver.py`). The former separate plugins package is archived.
+Re-check the pinned implementations and tests before adapting examples; the latest
+release does not establish availability in an older pin.
 
 Read the request's pin (`framework_ref`, `pyproject.toml`, lock file) before drafting.
 `rdl-service-desk/query-builder` is the retired legacy org. Older scaffold renders
@@ -114,9 +112,9 @@ still pin it (scaffold v0.1.3 defaulted to its `v0.1.1`, which also lacks
 `register_result`), and GitHub redirects the old path, so an install can still succeed.
 Below `v0.6.0`, `record_assumption` and `record_limitation` are absent. Flag a pin on
 that org, or on `nq-rdl/query-builder` below `v0.6.0`, as a **blocker**: report the pin
-and the missing APIs, and re-pin to the baseline before drafting new SQL. The latest
-released scaffold (v0.5.0) still defaults to query-builder v0.5.0, so fresh renders
-need the re-pin until that default is bumped. Amending or fixing an already-delivered
+and the missing APIs, and propose a compatible released re-pin before drafting new SQL.
+Scaffold v0.5.0 defaulted to query-builder v0.5.0; inspect a fresh render's actual pin
+rather than assuming that the current scaffold default has changed. Amending or fixing an already-delivered
 enquiry is exempt: it stays on its delivered pin, with no backport. Agents never
 re-pin or run `copier update` unasked.
 
@@ -196,8 +194,8 @@ metadata probes and the probe design rules.
 Record any `NOLOCK` or `READ UNCOMMITTED` use, in probes and extracts alike. Uncommitted
 reads are not reproducible, so never make them the default for a final research
 extract. Whenever an extract reads uncommitted data, record an assumption that says so.
-query-builder v0.6.0 sets the level with `isolation_level` (ADR 0001); per-table
-`WITH (NOLOCK)` hints (ADR 0004) postdate v0.6.0. Read
+query-builder exposes `isolation_level` from v0.6.0 (ADR 0001); inspect the request's
+pin for per-table `WITH (NOLOCK)` hints (ADR 0004), rather than assuming absence. Read
 [references/performance.rst](references/performance.rst) and the request repo's own
 `docs/READ_ISOLATION.md` where it has one.
 

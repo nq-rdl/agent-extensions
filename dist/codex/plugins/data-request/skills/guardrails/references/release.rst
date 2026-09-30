@@ -62,8 +62,9 @@ pinned ``scripts/run_extract.py`` and confirm that it supports the flag:
   ``-- @extract: <name>`` only. Its marker pattern does not match a line with a
   trailing ``internal``, so the batch falls back to an ``extract_NN`` name and
   **lands in the delivered workbook**.
-* query-builder v0.6.0 emits ``-- @extract: <name>`` markers but has no internal
-  flag. Never hand-edit a generated marker (``/data-request:amend``).
+* At query-builder tag v0.6.0, ``-- @extract: <name>`` markers had no internal
+  flag. Check the request's pin for current behaviour. Never hand-edit a generated
+  marker (``/data-request:amend``).
 
 Study IDs
 ---------

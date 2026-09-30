@@ -185,7 +185,7 @@ class LiftClassifyOnly(unittest.TestCase):
 
 
 class LiftQueryBuilderBaseline(unittest.TestCase):
-    """#380 (lift part): v0.6.0 baseline; resolvers consolidated into query-builder."""
+    """#380/#441: API floor and consolidated resolvers, not a frozen current baseline."""
 
     def test_no_archived_plugins_package_anywhere_in_lift(self):
         for target, root in copies("lift").items():
@@ -200,9 +200,11 @@ class LiftQueryBuilderBaseline(unittest.TestCase):
         self.assertIn("resolvers/iemr and resolvers/hbcis from 0.5.0", compat)
         self.assertNotRegex(compat, r"0\.[34]\.0")
 
-    def test_resolvers_moved_at_v050_and_baseline_is_v060(self):
+    def test_resolvers_moved_at_v050_and_release_discovery_is_shared(self):
         intro = flat(LIFT_RAW.split("\n## ", 1)[0])
-        self.assertIn("live under `resolvers/iemr` and `resolvers/hbcis` from v0.5.0; the baseline is v0.6.0", intro)
+        self.assertIn("live under `resolvers/iemr` and `resolvers/hbcis` from v0.5.0", intro)
+        self.assertIn("skills/guardrails/references/library.rst", intro)
+        self.assertNotIn("the baseline is v0.6.0", intro)
 
     def test_source_resolver_candidates_file_on_query_builder(self):
         delivery = section(LIFT_RAW, "File and record delivery")

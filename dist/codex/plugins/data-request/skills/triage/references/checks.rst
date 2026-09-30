@@ -5,6 +5,26 @@ Read this when you settle a request's requirements and when you classify its
 blockers. Each check comes from the September 2026 triage. Raise a finding as a
 proposed assumption or a question for the requester, never as a decision.
 
+Read-only stale lift check
+-------------------------
+
+For each existing ``lifts.json``, read the stale-check contract at
+``${CLAUDE_PLUGIN_ROOT}/skills/setup/references/lifts.rst``. Discover the latest
+stable tag of the entry's owning library through the shared tag-list policy at
+``${CLAUDE_PLUGIN_ROOT}/skills/guardrails/references/library.rst``. Run the shared
+helper's ``lifts-stale SLUG --tag TAG`` in the child's read-only checkout/scratch
+view; it never edits a ledger. Mixed-library ledgers need a run per library's
+latest tag, using only matching-library rows from each result.
+
+Include messages in queue output and paste-ready comments, e.g. "LIFT-1 may be
+resolved in v0.7.0" (example, not a baseline). Name partly resolved units and
+remaining shortfalls; report unknown access/tags and untracked legacy entries.
+Do not initialise a store, publish or render, update pins/statuses or adopt a unit.
+Symbol presence is not behavioural or approval evidence; route an undelivered
+candidate to lift for a human-decided re-pin. If execution is unavailable, perform
+equivalent read-only tagged-tree inspection with the GitHub read tools and
+disclose the missing capability. Never treat inaccessible evidence as absence.
+
 Interpretation checks
 ---------------------
 
