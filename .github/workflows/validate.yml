@@ -147,6 +147,21 @@ jobs:
       - name: Run pipeline-script unit tests
         run: pixi run --locked python3 -m unittest discover -s tests -p 'test_*.py' -v
 
+      # Ubuntu's Docker daemon is the supported CI runtime. Downloads happen on
+      # the host; each fixture uses --network=none and --pull=never.
+      - name: Prepare pinned Bash 3.2 and verified static jq
+        timeout-minutes: 5
+        run: >-
+          pixi run --locked python3 scripts/run_bash32_portability.py
+          --prepare "$RUNNER_TEMP/bash32" --runtime docker
+
+      - name: Require Bash 3.2 portability cases without skips
+        timeout-minutes: 5
+        env:
+          BASH32_CONTAINER_RUNTIME: docker
+          BASH32_STATIC_JQ: ${{ runner.temp }}/bash32/jq
+        run: pixi run --locked python3 scripts/run_bash32_portability.py
+
       - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
         with:
           node-version: '20'

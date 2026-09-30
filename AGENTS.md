@@ -204,6 +204,11 @@ CI runs `validate.yml` on every PR/push to main. It checks:
 - Codex `0.152.0` and `0.154.0` install every native marketplace entry and discover the enabled native skill copies with explicit leaf names (`scripts/smoke-codex-marketplace.sh`)
 - Any symlink under `plugins/` resolves (`validate-symlinks` — plugin trees are real-file copies, so this guards against accidental links)
 - The pipeline scripts' unit tests pass (`tests/`)
+- The same `unit-tests` check also prepares pinned Bash 3.2/static jq fixtures
+  with Docker and runs the strict portability gate (no skips permitted). Local
+  reproduction with Docker or Podman and provenance are in
+  [docs/bash32-portability.md](docs/bash32-portability.md); BusyBox is a non-GNU
+  stand-in, not native macOS/BSD evidence
 - Skills validate against the agentskills.io spec, **the directory-structure standard, the repository's 500-body-line limit, and offline local Markdown/RST references** (`asctl repo-check`, built from `tools/asctl/`; every relative link target must exist inside its skill — see `CONTRIBUTING.md` → "Local references")
 
 Three more workflows run on PRs alongside `validate.yml`:

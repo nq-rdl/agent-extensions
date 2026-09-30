@@ -32,6 +32,8 @@ from pathlib import Path
 
 import yaml
 
+from bash32_fixture import container_runtime, run_container
+
 REPO = Path(__file__).resolve().parent.parent
 HOOK_PLUGINS = ("claude-code", "opencode-dev", "redhat", "speckit-dev", "data-request", "tech-writing")
 
@@ -319,32 +321,24 @@ class SkillAuditNudge(unittest.TestCase):
         self.assertEqual((r.returncode, r.stdout), (0, ""), r.stderr)
 
 
-def podman_bash32():
-    podman = shutil.which("podman")
-    if not podman:
-        return None
-    probe = subprocess.run([podman, "image", "exists", "docker.io/library/bash:3.2"], capture_output=True)
-    return podman if probe.returncode == 0 else None
-
-
-@unittest.skipUnless(podman_bash32(), "needs podman and a local docker.io/library/bash:3.2 image")
+@unittest.skipUnless(container_runtime(), "needs Docker/Podman and the pinned Bash 3.2 image")
 class Bash32BusyBoxFallback(unittest.TestCase):
-    """bash 3.2.57 (the macOS /bin/bash version) with BusyBox grep/sed, no jq/python3."""
+    """Bash 3.2.57 with BusyBox grep/sed, no jq/python3; not native BSD evidence."""
 
     def run_in_container(self, plugin, hook, prompt):
         # Mount a throwaway copy of the installed script (never relabel the checkout).
-        payload = '{"hook_event_name":"UserPromptSubmit","prompt":"%s"}' % prompt
+        payload = json.dumps({"hook_event_name": "UserPromptSubmit", "prompt": prompt})
         with tempfile.TemporaryDirectory() as tmp:
             shutil.copy2(REPO / "plugins" / plugin / "scripts" / f"{hook}.sh", tmp)
-            return subprocess.run(
-                [podman_bash32(), "run", "--rm", "-i", "--network=none",
-                 "-v", f"{tmp}:/p:ro,Z", "docker.io/library/bash:3.2",
-                 "bash", f"/p/{hook}.sh"],
-                input=payload, capture_output=True, text=True, timeout=120)
+            command = ('test -z "$(command -v jq || true)"; '
+                       'test -z "$(command -v python3 || true)"; '
+                       f"bash /p/{hook}.sh")
+            return run_container(tmp, "/p", command,
+                                 readonly=True, payload=payload)
 
     def test_prompt_fallbacks_gate_without_jq_or_python(self):
         for plugin, hook, prompt, marker in (
-            ("opencode-dev", "opencode-doc-review", 'Build an \\"OpenCode\\" plugin', "<opencode-dev-guidance>"),
+            ("opencode-dev", "opencode-doc-review", "Build an OpenCode plugin", "<opencode-dev-guidance>"),
             ("speckit-dev", "speckit-publish-target", "Publish my spec-kit extension", "<speckit-publish-guidance>"),
         ):
             with self.subTest(hook=hook):
@@ -353,6 +347,16 @@ class Bash32BusyBoxFallback(unittest.TestCase):
                 self.assertIn(marker, fired.stdout)
                 quiet = self.run_in_container(plugin, hook, "hello there")
                 self.assertEqual((quiet.returncode, quiet.stdout), (0, ""), quiet.stderr)
+
+    def test_escaped_input(self):
+        for plugin, hook, word, marker in (
+            ("opencode-dev", "opencode-doc-review", "OpenCode", "<opencode-dev-guidance>"),
+            ("speckit-dev", "speckit-publish-target", "spec-kit", "<speckit-publish-guidance>"),
+        ):
+            with self.subTest(hook=hook):
+                r = self.run_in_container(plugin, hook, f'Publish a "{word}" plugin\nfrom C:\\workspace')
+                self.assertEqual(r.returncode, 0, r.stderr)
+                self.assertIn(marker, r.stdout)
 
 
 if __name__ == "__main__":
