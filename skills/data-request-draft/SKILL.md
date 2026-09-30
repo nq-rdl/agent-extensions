@@ -36,6 +36,15 @@ required columns from explicit instructions or confirmed scope. Consult column-s
 metadata and dataops DDL comments for every field whose interpretation affects the
 result; use `/data-request:map` for unresolved source/resolver choices. Verify dialect and
 correctness-critical syntax using the canonical docs linked by guardrails.
+Apply guardrails **House defaults** without asking: use TUH `00200` unless another
+facility/HHS/network scope is named. Reuse one standard assumption from setup's
+`tuh-facility` entry, its `upstream` marker and original confirmation per
+`${CLAUDE_PLUGIN_ROOT}/skills/setup/references/recurring-decisions.rst`; do not duplicate an existing scope item.
+Record the same wording/rationale once at the facility-filter logic with `record_assumption`,
+including original decision evidence in the SQL header and analyst hand-off. Verify each
+system's representation/crosswalk per guardrails `references/sources.rst`; never filter an
+ieMR institution directly on `00200`. An unanswered explicit exception gets one analyst
+question instead of a runnable TUH-filtered substitute; an answered exception replaces TUH.
 
 **Autonomous:** implement evidenced engineer-owned technical defaults and flag them, without
 waiting for analyst approval. Do not attribute an agent default to the engineer. Stop only the

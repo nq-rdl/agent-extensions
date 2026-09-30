@@ -1,0 +1,3 @@
+kind: Fixed
+body: Data-request applies TUH facility `00200` as one upstream house default without re-asking; explicit other-facility, HHS or network cohorts go to analyst clarification (#436)
+time: 2026-09-30T04:01:01.753533012Z

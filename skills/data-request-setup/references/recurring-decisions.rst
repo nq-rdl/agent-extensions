@@ -12,7 +12,8 @@ One home
 
 The list lives in one file: ``assets/recurring-decisions.json`` in this skill (canonical source
 ``skills/data-request-setup/assets/recurring-decisions.json`` in ``nq-rdl/agent-extensions``).
-Do not copy its entries into a skill, a project, ``.sqlreview/`` or a record. Read it through
+Do not copy the list into a skill, a project or ``.sqlreview/``; records contain only
+applicable items. Read it through
 the helper beside ``sqlreview.sh`` (``$S`` is this skill's ``scripts`` directory):
 
 ::
@@ -30,35 +31,70 @@ library issue that would retire it. Each entry has these fields:
 * ``match``: lowercase term groups. An item matches when its text or rationale contains one
   term of every group as a whole word or phrase (case-insensitive). ``match`` checks only the
   list of the same kind (assumptions or limitations); ``--any-kind`` checks both.
-* ``evidence``: links to the library issue rows that name the prior enquiries, their tickets
-  and the item ids. This repository is public, so the list never names an enquiry. The
-  per-enquiry evidence stays in the private library issue.
+* ``evidence``: links to the library issue rows or a recorded house-default ruling.
+  This repository is public, so the list never names an enquiry. Per-enquiry evidence
+  stays in the private library issue. A ``house_default`` also records the string
+  ``facility_code``, original ``confirmed_by`` / ``confirmed_at`` and independent
+  ``decided: {by, role, at, source}``. It is not generic permission to skip confirmation.
 * ``library_issue`` (URL or null), ``related_issues``, and ``retired_by`` (``{unit, version}``
   when retired).
+
+Recorded house default
+----------------------
+
+For ``tuh-facility``, when the request is silent on facilities or names TUH, apply
+without asking the engineer or analyst. Read ``list`` and use the exact listed wording
+and rationale as **one item**, with ``upstream: {decision: "tuh-facility", source:
+"house-default"}``; reuse that item by id through map, bootstrap, draft and review,
+not a separate assumption for each source system or stage. Do not copy the list into
+projects; only the applicable assumption goes into scope/SQL.
+
+The ``house_default`` preserves JoshKgh's recorded human confirmation from #436.
+Copy its ``confirmed_by``, ``confirmed_at`` and ``decided`` verbatim. Keep the
+date-only ``2026-09-29`` precision: this is not a new engineer confirmation.
+Set ``status: confirmed`` and ``confirmed_revision`` to the first scope revision
+that imports the house confirmation, with no carried_from_revision. Use null scope
+location until SQL exists. This import is not a fabricated answer to a new interview;
+Never invent a confirmer, timestamp or confirmation for another listed proposal.
+Later revisions use normal ``carryforward`` / ``carryover`` and preserve provenance;
+copy ``upstream`` from the prior or scope item when a tool omits it. Analyse still
+checks that the governed SQL actually implements the recorded facility scope.
+
+For another facility, the whole HHS or a network-wide cohort, do not insert or carry
+this TUH assumption. Put one facility-set clarification in ``open_questions`` for
+the analyst, unless intake/prior scope already answered it. Remove any inherited TUH
+candidate and mark dependent facility work unresolved, not runnable with the default.
+An explicit answered exception replaces, never intersects with, TUH. Do not retain
+the marker or house confirmation for changed wording, code or rationale: that is a
+request-specific decision with normal confirmation. A source mapping gap is evidence
+work, not a question about the already decided default. Formal SQL review keeps its
+normal implementation/confirmation gates: a generated header alone confirms nothing.
 
 Detect (bootstrap and analyse)
 ------------------------------
 
-1. Before you draft candidate items, run ``list``. For each open decision that applies to the
-   request's sources and outputs, offer the listed text and rationale as the candidate item.
+1. Before you draft candidate items, run ``list``. Apply the recorded house-default
+   rule above first. For each other open decision that applies to the request's
+   sources and outputs, offer the listed text and rationale as the candidate item.
 2. Before each batch of questions, run ``match`` on the draft. The result is a set of hints.
    Decide each hit yourself. A miss does not prove that no listed decision applies.
-3. For each match, read the prior enquiries from the ``evidence`` links at run time
+3. For each other match, read the prior enquiries from the ``evidence`` links at run time
    (``gh issue view <number> --repo <owner/repo> --comments``). Show them in the question
    (enquiry, ticket and item ids) with the library issue. If you cannot read the links, show
    them and say that the prior enquiries are not available. Offer the listed wording as the
    proposal, unless this request needs a different reading. Say that the item is an upstream
    candidate. Do not copy enquiry ids into this list or into a skill.
-4. Mark the item with ``"upstream": {"decision": "<id>"}``. Human confirmation is still
-   required: the options stay **Confirm** / **Reword** / **Reject**. A rejected item is not
+4. Mark the item with ``"upstream": {"decision": "<id>"}``. The exact recorded house
+   default above is imported. Human confirmation is still required for other items:
+   the options stay **Confirm** / **Reword** / **Reject**. A rejected item is not
    published. After a reword, keep the marker only if the item still states the listed decision.
 5. For a ``retired`` decision, do not ask the question again as a new decision. Check that the
    pin contains ``retired_by.unit`` at ``retired_by.version``, compose that unit, and cite it.
    If the pin is older, ask as before and name the unit as the upgrade path.
 
-The marker is metadata. ``publish``, ``carryforward`` and ``carryover`` ignore it, so it never
-changes a confirmation. Their output rows do not include it: when you re-draft an item that
-they carry, copy ``upstream`` from the prior or scope item. Do not
+The marker is metadata: it never grants a confirmation or relaxes ``publish``.
+``carryforward`` includes recorded provenance. When a tool omits it, copy ``upstream`` from the prior
+or scope item. Do not
 mark an item that matches no listed decision. If you see a new recurrence, report it for the
 lift close-out.
 
