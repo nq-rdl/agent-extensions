@@ -89,13 +89,8 @@ cmd_publish_questions() (
   cmd_check "$tmp" || exit 4
   jq -e -L "$SR_SCRIPT_DIR" --slurpfile scope "$Q_SCOPE" --slurpfile review "$Q_REVIEW" '
     include "sqlreview-questions"; legacy_covered($scope[0]; $review[0])' "$tmp" >/dev/null || sr_die 4 "question draft omits untracked legacy questions"
-  jq -e --argjson old "$Q_DOC" '
-    . as $new | .slug == $old.slug and .sql_path == $old.sql_path
-    and all($old.questions[]; . as $prior | [$new.questions[] | select(.id == $prior.id)] as $matches |
-      ($matches | length) == 1 and ($matches[0] | . as $q |
-        .text == $prior.text and .applies == $prior.applies
-        and (if $prior.status == "closed" then . == $prior else true end)))
-    and all(.questions[]; . as $q | if any($old.questions[]; .id == $q.id) then true else .status == "open" end)
+  jq -e -L "$SR_SCRIPT_DIR" --argjson old "$Q_DOC" '
+    include "sqlreview-questions"; question_history_retained($old)
   ' "$tmp" >/dev/null || sr_die 4 "question identity/history changed, removed, or new question already closed"
   if [ -f "$dest" ] && jq -e --slurpfile old "$dest" '. == $old[0]' "$tmp" >/dev/null; then
     printf 'already published questions\t%s\n' "$slug"; exit 0

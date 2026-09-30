@@ -384,6 +384,27 @@ the result.
   `match`, so `carryover`/`carryforward` behave as before. The human confirms every item; nothing is
   confirmed because the header states it. Before publishing, `notes --against` the confirmed draft
   surfaces header items with no confirmed counterpart as mismatches.
+- **Bootstrap before publish (#433).** With existing SQL, bootstrap runs `notes SQL --against
+  scope.draft.json --questions questions.draft.json` before every scope publication, including
+  header-only updates. For a scope, `scope_check` reports `unmatched_header`,
+  `rationale_differences`, and `question_checks`: every open scope-question/header pair with
+  both identities and verbatim wording. `HA<n>`/`HL<n>` identify current header positions plus
+  line ranges; Q IDs come from the shared store (#437), not semantic/lexical matching. Pairs
+  are **not** a conflict verdict. The agent reviews them and warns when the header settles a
+  question still open in scope, quoting both IDs and wording (and scope A/L ID when matched).
+  Unrelated pairs and clean matches produce no warning. The engineer reconciles/ confirms
+  scope wording, requests `/data-request:fix` header changes, or explicitly confirms provisional
+  implementation use pending the named Q answer in scope rationale and header. This does not
+  close the question or turn an engineer choice into an analyst answer. Recheck after edits;
+  no unattended publication of unresolved mismatches. `publish` itself does not prove semantic
+  agreement. Fresh question drafts are checked before scope publication and published after it.
+  Without `--questions`, notes loads sibling `questions.json`; absent undeclared stores use a
+  read-only legacy Q projection. Missing declared, invalid, wrongly bound or symlinked stores
+  fail visibly. When a sibling store exists, staged questions must satisfy the same history
+  invariants as `publish-questions` before comparison emits any output: retain every identity
+  and its text/applicability, keep closed rows immutable, and add only open questions. Invalid
+  or symlinked published evidence cannot be bypassed with `--questions`.
+  No SQL yet skips comparison; absent header is empty, malformed header stops.
 - **Absence proves nothing.** SQL built before 0.6.0, or by code that recorded nothing, has no
   header; the review still looks for assumptions and limitations in the SQL.
 

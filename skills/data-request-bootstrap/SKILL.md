@@ -116,8 +116,11 @@ Load `bash "$S/sqlreview.sh" questions "$SLUG" scope` on resume. Keep questions 
 closure provenance. Migrate legacy strings once with `migrate-questions`; retain historical
 embedded arrays untouched. Closing a question publishes only that store, without a scope
 revision or renewed confirmations. If its answer changes SQL meaning, use the update path.
-For a fresh scope, publish the scope first, then `publish-questions` its open question draft
-before rendering; failed question publication leaves the handoff incomplete.
+Prepare `questions.draft.json` alongside the scope draft before the pre-publish header check,
+including an empty question list when none remain. On resume, retain all existing IDs and
+closed rows; stage any new questions. For a fresh scope, publish the scope first, then
+`publish-questions` its open question draft before rendering; failed question publication
+leaves the handoff incomplete.
 
 ## Existing scope → update path (#127 §2)
 
@@ -125,7 +128,8 @@ If `.sqlreview/reviews/$SLUG/scope.json` exists (or `--update`):
 
 For `scoped-header-only` status, inspect the header diff against the authenticated
 `scope.source.sql` and reconcile its notes with the confirmed scope. If only header wording
-changed, republish the existing `scope.json` and render it to record a header revision without
+changed, run the pre-publish header check below with the current shared questions, then
+republish the existing `scope.json` and render it to record a header revision without
 repeating unchanged confirmations or incrementing the semantic revision. Changed item text,
 rationale or framing still follows the update path below. `stale` includes a body change or
 corrupt baseline and requires reassessment.
@@ -254,8 +258,61 @@ the `set` fields `carryforward` printed. Write the complete confirmed document t
 }
 ```
 
+### Check the SQL header before publish (#433)
+
+After the scope and question drafts are complete, **before every scope publication**
+(including header-only updates), run this when SQL exists:
+
+```bash
+if [ -f "<sql path>" ]; then
+  bash "$S/sqlreview.sh" notes "<sql path>" \
+    --against ".sqlreview/reviews/$SLUG/scope.draft.json" \
+    --questions ".sqlreview/reviews/$SLUG/questions.draft.json" || exit $?
+fi
+```
+
+With a published sibling `questions.json`, comparison validates the staged questions against
+its identity/history invariants before emitting pairs: retain every ID and its text/applicability,
+keep closed rows unchanged, and add only open questions. Fix a rejected draft before publication.
+
+No SQL yet: skip the comparison, not the scope. An absent analysis-notes header means no
+header mismatch; a malformed header or missing/invalid questions is not a clean result —
+stop and surface the diagnostic, retain drafts, and use `/data-request:fix` for SQL edits.
+Verify the header contract against query-builder's canonical
+https://github.com/nq-rdl/query-builder/blob/main/docs/ANALYSIS_NOTES.md when syntax is uncertain.
+
+Read `scope_check` before publishing:
+
+- `unmatched_header`: warn for each header item with no exact same-list scope text match;
+  show its `header_id` (`HA1`/`HL1`), SQL lines, text and rationale. These labels identify the
+  current header only, not persistent scope IDs. Near-matches need source review, not automatic
+  duplicate items. Also inspect `rationale_differences` with the matching scope ID.
+- `question_checks`: compare **every** open scope question with the header decisions and
+  limitations, even when that header item already matches a scope item. The helper supplies
+  both identities and wording, not a semantic conflict verdict. Warn when a header states
+  as settled what the question leaves unresolved; quote the Q ID/text, header ID/lines/text
+  and matching scope A/L ID if present. For example: `Q7 asks which ieMR codes hold Actim
+  Partus; HA1 (lines 3–4, scope A14 if matched) selects code 123`. Apply the same check to
+  limitations such as a PAMG note's ability to name PartoSure. Unrelated pairs are not warnings.
+
+Put each mismatch to the engineer: add/reconcile the scope item and confirm its text and
+rationale; request header rewording through `/data-request:fix`; or keep the question open
+and explicitly record the header choice as **provisional implementation only**. For that last
+option, confirm a scope item's rationale naming the Q ID, the header choice and the unanswered
+analyst decision; have `/data-request:fix` make the header equally explicit. Confirmation is of
+that boundary, not of the research answer. Do not close a question from an engineer's technical
+choice or from adding an A/L item; only an actual answered closure follows the shared store
+rules. Known restrictions still apply.
+
+Re-run comparison after reconciliation. After SQL edits, also re-run fingerprint and the
+SQL-change checks above; changed framing or item wording needs the appropriate reconfirmation.
+Do not publish while a mismatch is unaddressed. If the matches are clean and no header settles
+an open question (including explicitly acknowledged provisional choices), give no warning.
+Semantic checking is the agent/source-review obligation, not something `publish` proves.
+
 ```bash
 bash "$S/sqlreview.sh" publish "$SLUG" scope ".sqlreview/reviews/$SLUG/scope.draft.json" || exit $?
+bash "$S/sqlreview.sh" publish-questions "$SLUG" ".sqlreview/reviews/$SLUG/questions.draft.json" || exit $?
 ```
 
 Publish validates a staged copy, including confirmations and the next revision, before atomically
