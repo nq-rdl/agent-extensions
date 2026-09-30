@@ -120,14 +120,24 @@ bash "$S/sqlreview.sh" impact "$SLUG"    # HINTS ONLY: identifiers from the chan
    consequences the hints cannot see (a changed literal, join type or `DISTINCT` shifts grain
    without touching an identifier). Confirm or dismiss each candidate with the human.
 3. **Reassess the existing assumptions and limitations.** Draft the next revision keeping each
-   unchanged item's `id`, `text` and `rationale` verbatim, its `location` lines remapped to the
-   current SQL, then find which keep their confirmation (#348):
+   unchanged item's `id`, `text` and `rationale` verbatim and its old ranges. Compute unchanged
+   `location.lines` and `logic[].lines` from the authenticated baseline, then find which keep
+   their confirmation (#348):
 
    ```bash
+   bash "$S/sqlreview.sh" remap "$SLUG" ".sqlreview/reviews/$SLUG/review.draft.json"
+   # → {document, prior_revision, remapped: [{kind, id, from, to}], walk: [{kind, id, lines, why}]}
    bash "$S/sqlreview.sh" carryforward "$SLUG" review ".sqlreview/reviews/$SLUG/review.draft.json"
    # → {prior_revision, revision, sql_unchanged, sql_body_unchanged, carry: [{kind, id, basis, set}],
    #    bulk: [{kind, id, text, rationale, location, why}], walk: [{kind, id, why}]}
    ```
+
+   `remap` edits only draft ranges, never confirmations or fingerprints. Its `walk` ranges
+   stay untouched: reassess their current lines with the human, including affected logic steps,
+   before using `carryforward`. Repeated governed text present in an edit is conservatively
+   ambiguous, not proof of a safe remap. New/manual ranges stay yours; retries do not shift twice.
+   With no draft argument, it seeds or updates `review.draft.json` from the published record
+   (scope when no review exists); set the next revision and fresh fingerprint yourself.
 
    Copy each `carry` item's `set` fields (with `carried_basis`) onto it verbatim; do not ask
    again. Ask the `bulk` items once, with their `location` lines, as
