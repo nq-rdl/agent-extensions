@@ -58,7 +58,10 @@ only exact identical strings are deduplicated, never semantic near-matches.
 No owner, decision or closure is invented. Embedded arrays stay byte-identical
 historical input; after migration the store is authoritative, so a closed legacy
 string is not still open. Retry preserves IDs and closures. New unmatched legacy
-strings fail visibly rather than disappear. Subsequent semantic revisions can
+strings fail visibly rather than disappear. To reconcile a mistaken legacy edit,
+append the missing question with a new ID through ``publish-questions``; its staged
+draft must cover every legacy string before readers accept it. Existing closed
+rows and IDs remain unchanged. Subsequent semantic revisions can
 replace historical arrays with ``question_store``; do not republish just for that.
 
 To add/close: load ``questions`` first, retain all existing rows, write the complete

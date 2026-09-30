@@ -25,15 +25,17 @@ _q_context() { # slug: load validated store or a read-only legacy projection int
     cmd_check "$d/questions.json" >/dev/null || sr_die 4 "invalid questions.json"
     jq -e --arg slug "$slug" --arg path "$path" '.slug == $slug and .sql_path == $path' "$d/questions.json" >/dev/null || sr_die 4 "question store binding mismatch"
     # Old embedded arrays are historical. Refuse new untracked strings rather than hide them.
-    jq -e --slurpfile scope "$scope" --slurpfile review "$review" '
-      .questions as $qs | all(($scope[0].open_questions // [])[]; . as $text | any($qs[]; .text == $text and .applies == "scope"))
-      and all(($review[0].open_questions // [])[]; . as $text | any($qs[]; .text == $text))' "$d/questions.json" >/dev/null || sr_die 4 "untracked legacy questions; reconcile in questions.json, not scope/review"
+    if [ "${2:-}" != publish ]; then
+      jq -e -L "$SR_SCRIPT_DIR" --slurpfile scope "$scope" --slurpfile review "$review" '
+        include "sqlreview-questions"; legacy_covered($scope[0]; $review[0])' "$d/questions.json" >/dev/null || sr_die 4 "untracked legacy questions; reconcile in questions.json, not scope/review"
+    fi
     Q_DOC="$(jq . "$d/questions.json")" || sr_die 4 "cannot read questions"
   else
-    [ "$declared" = false ] || [ "${2:-}" = allow-missing ] || sr_die 4 "declared questions.json is missing"
+    [ "$declared" = false ] || [ "${2:-}" = publish ] || sr_die 4 "declared questions.json is missing"
     Q_DOC="$(jq -n -L "$SR_SCRIPT_DIR" --slurpfile scope "$scope" --slurpfile review "$review" --arg slug "$slug" --arg path "$path" '
       include "sqlreview-questions"; legacy_questions($scope[0]; $review[0]; $slug; $path)')" || sr_die 4 "cannot project legacy questions"
   fi
+  Q_SCOPE="$scope" Q_REVIEW="$review"
 }
 
 cmd_questions() (
@@ -65,7 +67,7 @@ cmd_publish_questions() (
   [ $# -eq 2 ] || usage
   sr_need_jq; sr_require_root
   local slug="$1" draft="$2" Q_DOC tmp="" dest="$SR_REVIEWS/$1/questions.json"
-  _q_context "$slug" allow-missing
+  _q_context "$slug" publish
   sr_no_symlinks "$(sr_abspath "$draft")" || exit 2
   [ -f "$draft" ] || sr_die 2 "no such question draft"
   tmp="$(mktemp "$SR_REVIEWS/$slug/.questions.XXXXXX")" || sr_die 2 "mktemp failed"
@@ -73,6 +75,8 @@ cmd_publish_questions() (
   trap 'exit 2' HUP INT TERM
   cp "$draft" "$tmp" || sr_die 2 "cannot stage question draft"
   cmd_check "$tmp" || exit 4
+  jq -e -L "$SR_SCRIPT_DIR" --slurpfile scope "$Q_SCOPE" --slurpfile review "$Q_REVIEW" '
+    include "sqlreview-questions"; legacy_covered($scope[0]; $review[0])' "$tmp" >/dev/null || sr_die 4 "question draft omits untracked legacy questions"
   jq -e --argjson old "$Q_DOC" '
     . as $new | .slug == $old.slug and .sql_path == $old.sql_path
     and all($old.questions[]; . as $prior | [$new.questions[] | select(.id == $prior.id)] as $matches |

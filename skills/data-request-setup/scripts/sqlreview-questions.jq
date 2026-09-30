@@ -36,4 +36,8 @@ def legacy_questions($scope; $review; $slug; $path):
           (($review.open_questions // [])[] | {text: ., applies: "review"})) as $q
     ([]; if any(.[]; .text == $q.text) then . else . + [$q + {id: "Q\(length + 1)", owner: null, status: "open"}] end)
   | {schemaVersion: 1, kind: "questions", slug: $slug, sql_path: $path, questions: .};
+def legacy_covered($scope; $review):
+  .questions as $qs
+  | all(($scope.open_questions // [])[]; . as $text | any($qs[]; .text == $text and .applies == "scope"))
+    and all(($review.open_questions // [])[]; . as $text | any($qs[]; .text == $text));
 def visible_questions($kind): .questions |= map(select($kind == "review" or .applies == "scope"));

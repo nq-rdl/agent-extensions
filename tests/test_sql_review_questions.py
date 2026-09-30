@@ -188,6 +188,11 @@ class Questions(unittest.TestCase):
         self.p.write_json("q", "scope.json", doc)
         self.assertEqual(run(["questions", "q"], self.p.root).returncode, 4)
         self.assertEqual(run(["render", "q", "review"], self.p.root).returncode, 4)
+        # Reconcile the mistaken legacy edit through the store's guarded publisher.
+        store = json.loads(self.store.read_text())
+        store["questions"].append({"id": "Q3", "text": "New untracked question?", "applies": "scope", "owner": None, "status": "open"})
+        self.assertEqual(self.publish(store).returncode, 0)
+        self.assertEqual(run(["questions", "q"], self.p.root).returncode, 0)
 
     def test_guard_denies_final_question_writes_and_edits_but_allows_drafts(self):
         for event in (write_event(self.store, "{}", self.p.root), edit_event(self.store, self.p.root)):
