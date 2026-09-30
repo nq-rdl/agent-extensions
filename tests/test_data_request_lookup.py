@@ -1,4 +1,8 @@
-"""Offline authored lookup contracts, not a command or warehouse integration test."""
+"""Offline authored lookup contracts, not a command or warehouse integration test.
+
+The catalog is workflow-only: privacy checks must not themselves publish private
+schema names. Guard identifier shapes and SQL syntax without a source denylist.
+"""
 import re
 import unittest
 from pathlib import Path
@@ -44,17 +48,19 @@ class LookupContract(unittest.TestCase):
                 self.assertIn("temp table of keys", text)
                 self.assertIn("State no local rule", text)
 
-    def test_public_skill_contains_no_schema_or_sql_rules(self):
-        forbidden = re.compile(
-            r"\b(?:ORDER_DETAIL|ORDERS|ORDER_CATALOG\w*|OE_\w+|ORDER_ENTRY_\w+|"
-            r"V500_\w+|MLTM_\w+|CODE_VALUE|DISCRETE_TASK_ASSAY|ACTION_SEQUENCE|"
-            r"UPDT_DT_TM|MNEMONIC_KEY_CAP|ACTIVE_IND|END_EFFECTIVE_DT_TM|"
-            r"GETUTCDATE|GETDATE|BIGINT|COLLATE|ORDER_ID|matched_terms)\b"
+    def assert_workflow_only(self, text):
+        identifiers = set(re.findall(r"\b[A-Z][A-Z0-9]*(?:_[A-Z0-9]+)+\b", text))
+        # Claude/Codex host substitutions, not source identifiers. Keep this narrow.
+        self.assertFalse(identifiers - {"CLAUDE_PLUGIN_ROOT", "PLUGIN_ROOT"})
+        self.assertNotRegex(
+            text, r"\b(?:SELECT|JOIN|COLLATE|GETUTCDATE|GETDATE|BIGINT|WHERE|INSERT|UPDATE|DELETE)\b"
         )
+        self.assertNotIn("```sql", text)
+
+    def test_public_skill_contains_no_schema_or_sql_rules(self):
         for tree, text in self.texts():
             with self.subTest(tree=tree):
-                self.assertIsNone(forbidden.search(text))
-                self.assertNotIn("```sql", text)
+                self.assert_workflow_only(text.split("---", 2)[2])
                 self.assertNotRegex(text, r"--(?:order|term|reverse|from|to|format)\b")
                 self.assertIn("never copy them into this catalog", text)
 
@@ -88,9 +94,13 @@ class LookupContract(unittest.TestCase):
             prefix = "data-request-" if root == roots[0] else ""
             with self.subTest(root=root):
                 mapping = (root / f"{prefix}map/SKILL.md").read_text()
+                lookup_mapping = mapping.split("## Lookup evidence for codes\n", 1)[1].split("\n## ", 1)[0]
+                self.assert_workflow_only(lookup_mapping)
                 self.assertIn("lookup record's path, revision and labelled grid", mapping)
                 self.assertIn("a hit does not confirm clinical inclusion", mapping)
                 guard = (root / f"{prefix}guardrails/SKILL.md").read_text()
+                lookup_guard = guard.split("**Code-discovery probes:**", 1)[1].split("\n\n", 1)[0]
+                self.assert_workflow_only(lookup_guard)
                 for phrase in ("only codes, labels and counts", "`<7`", "no totals", "complementary suppression",
                                "bounded to a single scan", "feeds no delivered extract",
                                "waives only lift capture", "authorised human"):
