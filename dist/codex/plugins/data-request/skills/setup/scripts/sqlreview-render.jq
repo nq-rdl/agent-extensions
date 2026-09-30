@@ -4,6 +4,15 @@ def lines(l): if l == null then "—" elif (l | type) == "array" then (l | map(t
 def named_list(a): if (a | length) == 0 then "_none_" else (a | map("- **\(.name // "?")** — \(.description // "")") | join("\n")) end;
 def str_list(a): if (a | length) == 0 then "_none_" else (a | map("- " + (if type == "object" then (.question // .text // tostring) else tostring end)) | join("\n")) end;
 def cell: tostring | gsub("\\|"; "&#124;") | gsub("[\r\n]+"; "<br>");
+def intake_note:
+  if .upstream.source == "analyst-intake" then
+    " [analyst-intake: " + .upstream.file + "#" + .upstream.intake_id + "]"
+    + (if .upstream.topic == "grain" then
+         " [grain: one row per " + .upstream.unit
+         + ((.upstream.finer_outputs // []) | map(
+             "; " + .name + ": one row per " + .unit + " — " + .description) | join("")) + "]"
+       else "" end)
+  else "" end;
 def decision:
   if .decided == null then "—"
   else "\(.decided.by) (\(.decided.role)) · \(.decided.at) · \(.decided.source)"
@@ -19,7 +28,7 @@ def question_list(a): if (a | length) == 0 then "_none_" else (a | map(
 def table(a; heading):
   if (a | length) == 0 then "_none recorded_"
   else "| ID | \(heading) | Rationale | Lines | Decision and source | Confirmed by | Revision |\n|---|---|---|---|---|---|---|\n"
-       + (a | map("| \(.id | cell) | \(.text | cell) | \((.rationale // "") + (if .upstream.source == "analyst-intake" then " [analyst-intake: " + .upstream.file + "#" + .upstream.intake_id + "]" else "" end) | cell) | \(lines(.location.lines) | cell) | \(decision | cell) | \(.confirmed_by // "" | cell) | \((.confirmed_revision // "" | tostring) + (if .carried_from_revision != null then " (carried)" else "" end) + (if .carried_basis == "header-decision" then " (header-decision carry-over)" else "" end) | cell) |") | join("\n"))
+       + (a | map("| \(.id | cell) | \(.text | cell) | \((.rationale // "") + intake_note | cell) | \(lines(.location.lines) | cell) | \(decision | cell) | \(.confirmed_by // "" | cell) | \((.confirmed_revision // "" | tostring) + (if .carried_from_revision != null then " (carried)" else "" end) + (if .carried_basis == "header-decision" then " (header-decision carry-over)" else "" end) | cell) |") | join("\n"))
   end;
 def steps(a): if (a | length) == 0 then "_none_" else (a | map("\(.step). **\(.title // "")** (lines \(lines(.lines))) — \(.description // "")") | join("\n")) end;
 def changes(a): if (a | length) == 0 then "_none_" else (a | map("- r\(.revision) — \(.at // "") — \(.by // ""): \(.summary // "")") | join("\n")) end;

@@ -12,7 +12,8 @@ The sources
   admits an emergency presentation when "FALL" appears in the diagnosis **or** chief
   complaint **or** visit reason. It declares two outputs, ``Encounter_Level`` and
   ``Clinical_events``, and describes the cohort as patients aged 18 or over at arrival.
-- The confirmed ``.copier-answers.yml``, with ``measurement_granularity: Patient``.
+- The legacy ``.copier-answers.yml``, with ``measurement_granularity: Patient``:
+  a bare default, not a confirmed grain. No recorded patient-grain answer accompanies it.
 - A ``.sqlreview`` review made on the branch ``enq/9936-v2``. It describes **draft SQL**
   written before the pipeline, and it asks whether that SQL still represents the pipeline.
 - An earlier draft release body. It says that "Fall" must appear in "Presenting complaint"
@@ -30,16 +31,20 @@ before it becomes a claim. Offer the engineer ``/data-request:analyse`` on the r
 Compare before wording
 ----------------------
 
-Three differences change meaning. Each is a blocking discrepancy, recorded as a question with
-the evidence from each source and a proposed correction:
+Compare three leads. A real meaning-changing conflict is a blocking discrepancy,
+recorded with both sources and a proposed correction; bare configuration drift is not:
 
 - **Q1, inclusion rule.** The draft body says complaint **and** problem. The pipeline says
   diagnosis **or** chief complaint **or** visit reason, and the review describes an OR rule
   over different fields. Proposed correction: state the pipeline's OR rule, after the analyst
   confirms that the pipeline is what was agreed.
-- **Q2, unit of observation.** The scope says ``measurement_granularity: Patient``. The review
-  and the pipeline describe encounter-level records. Check the output manifest, then resolve
-  which grain was agreed before any unit-of-observation claim.
+- **Q2, unit of observation.** Answers says ``measurement_granularity: Patient`` without
+  confirmation. The stale review and the pipeline describe encounter-level records. Check
+  the tagged SQL, output manifest and intake/prior-delivery or requested-element evidence
+  to settle the main grain and the finer ``Clinical_events`` output. Record the evidenced
+  grain, not the bare Patient value. Reuse one ``L-grain-answers`` finding and offer the
+  answers correction to the engineer; do not hold the claim for stale configuration alone.
+  A genuine conflict with confirmed grain or missing grain evidence still needs resolution.
 - **Q3, age basis.** The review reads age from ``Present Age in Years``, which is age today.
   The pipeline says "aged 18 or over at arrival". Check the resolver and the produced SQL.
   The answer changes both who is in the cohort and what the age field means.

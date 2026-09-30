@@ -88,7 +88,7 @@ Recheck affected evidence/artifacts, not every stage. See [references/ledger.rst
    manual port, and name the branch to reuse and the branches to leave alone.
 6. **Settle requirements in order**: known approval restrictions first; a screening-log
    approval overrides a broader intake list. Build requested identifiers and free text even when approval is unchecked; the analyst checks coverage during review. Confirm
-   source system and grain with the engineer before `$data-request:bootstrap`; proceed and flag technical decisions.
+   source system and grain with the engineer before `$data-request:bootstrap`; proceed and flag technical decisions. Bare `Patient` is unconfirmed: propose evidenced grain using guardrails `references/grain.rst`, not the answers default.
    Separate confirmed requirements, engineer decisions and proposals; silence is not approval. Supplied cohorts mean linkage.
    Use explicit codes as written, not a broader library concept. Apply guardrails **House defaults**: TUH `00200` needs no facility question; see [references/checks.rst](references/checks.rst).
    When the request explicitly changes the cohort's facility set to another facility, the whole HHS or a network-wide cohort, return one `Analyst question:` about the facility set instead of the TUH default. Reuse an already answered intake/prior-scope exception, without asking again or intersecting it with TUH.
