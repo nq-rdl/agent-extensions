@@ -41,12 +41,16 @@ class BodyBinding(unittest.TestCase):
     def test_header_publish_snapshot_status_delta_and_render(self):
         for kind in ("scope", "review"):
             self.assertEqual(self.publish(self.doc(kind)).returncode, 0)
+        (self.d / "scope.source.sql").write_text(OLD)
         self.assertEqual(run(["snapshot", "q", "q.sql"], self.p.root).returncode, 0)
         self.sql.write_text(NEW)
         self.assertIn("header-only", run(["status"], self.p.root).stdout)
         delta = run(["delta", "q"], self.p.root)
         self.assertEqual(delta.returncode, 0, delta.stderr)
-        self.assertIn("header", delta.stdout)
+        self.assertIn("header-only revision; SQL body unchanged", delta.stdout)
+        self.assertIn("-/* analysis notes: Male or Female */", delta.stdout)
+        self.assertIn("+/* analysis notes: MALE or FEMALE */", delta.stdout)
+        self.assertNotIn("unchanged since the reviewed snapshot", delta.stdout)
         for kind in ("scope", "review"):
             result = self.publish(self.doc(kind))
             self.assertEqual(result.returncode, 0, result.stderr)
@@ -143,6 +147,41 @@ class BindingIntegrity(BodyBinding):
 
 
 class ScopeBodyState(unittest.TestCase):
+    def test_existing_scope_header_republish_requires_original_baseline(self):
+        for legacy in (False, True):
+            with self.subTest(legacy=legacy), tempfile.TemporaryDirectory() as tmp:
+                p = Project(tmp)
+                sql = p.sql("q.sql", OLD)
+                d = p.review_dir("q")
+                doc = scope_doc("q", "q.sql", sql_sha256=sha(OLD))
+                if not legacy:
+                    doc["sql_body_sha256"] = sha(BODY)
+                published = p.write_json("q", "scope.json", doc)
+                original = published.read_bytes()
+                sql.write_text(NEW)
+                result = run(["publish", "q", "scope", str(published)], p.root)
+                self.assertEqual(result.returncode, 2, result.stdout + result.stderr)
+                self.assertEqual(published.read_bytes(), original)
+                # Restoring authenticated original bytes enables the same-revision path.
+                (d / "scope.source.sql").write_text(OLD)
+                result = run(["publish", "q", "scope", str(published)], p.root)
+                self.assertEqual(result.returncode, 0, result.stderr)
+                self.assertEqual(json.loads(published.read_text())["revision"], 1)
+                self.assertEqual((d / "scope.source.sql").read_text(), OLD)
+
+    def test_missing_scope_baseline_allows_full_reassessment_with_current_fingerprint(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            p = Project(tmp)
+            p.sql("q.sql", NEW)
+            p.write_json("q", "scope.json", scope_doc("q", "q.sql", sql_sha256=sha(OLD),
+                                                       sql_body_sha256=sha(BODY)))
+            fresh = scope_doc("q", "q.sql", revision=2, sql_sha256=sha(NEW), sql_body_sha256=sha(BODY))
+            for item in fresh["assumptions"] + fresh["limitations"]:
+                item["confirmed_revision"] = 2
+            draft = p.write_json("q", "scope.draft.json", fresh)
+            result = run(["publish", "q", "scope", str(draft)], p.root)
+            self.assertEqual(result.returncode, 0, result.stderr)
+
     def test_scope_alone_retains_header_binding_and_refuses_body_or_snapshot_corruption(self):
         with tempfile.TemporaryDirectory() as tmp:
             p = Project(tmp)

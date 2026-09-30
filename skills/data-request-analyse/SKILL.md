@@ -81,7 +81,8 @@ it or ask for its confirmations again. Run from the project root:
 ```bash
 bash "$S/sqlreview.sh" publish "$SLUG" review ".sqlreview/reviews/$SLUG/review.json" || exit $?
 bash "$S/sqlreview.sh" render "$SLUG" review || exit $?
-if cmp -s ".sqlreview/reviews/$SLUG/review.draft.json" ".sqlreview/reviews/$SLUG/review.json"; then
+if jq -e -s 'length == 2 and (.[0] | del(.header_revisions)) == (.[1] | del(.header_revisions))' \
+    ".sqlreview/reviews/$SLUG/review.draft.json" ".sqlreview/reviews/$SLUG/review.json" >/dev/null 2>&1; then
   rm -f ".sqlreview/reviews/$SLUG/review.draft.json"
 fi
 if [ -e ".sqlreview/reviews/$SLUG/review.draft.json" ]; then
@@ -90,7 +91,9 @@ if [ -e ".sqlreview/reviews/$SLUG/review.draft.json" ]; then
 fi
 ```
 
-Show `review.md`. If a differing draft remains, stop before *After review*: tell the user it
+Show `review.md`. Draft equality is semantic, ignoring only helper-owned
+`header_revisions`; formatting and header history are not unpublished work. If any
+other differing or unreadable draft remains, stop before *After review*: tell the user it
 contains unpublished work; do not discard or publish it automatically. Continue with *After review*
 below only when no unpublished draft remains. If rendering fails,
 retain the draft and report the failure; retry this completion step once the cause

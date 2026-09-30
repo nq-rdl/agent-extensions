@@ -159,10 +159,10 @@ sr_body_start() { # <file> -> line number (N+1 when the whole file is header)
         if (r == "") return
         if (substr(r, 1, 3) == "/*!" || substr(r, 1, 3) == "/*+") hstart(NR)
         if (substr(r, 1, 2) == "/*") {
-          bstart = NR; nested = 0; bad = (tolower(r) ~ /@extract:/); depth = 1
+          bstart = NR; nested = 0; bad = (r ~ /@extract:/); depth = 1
           i = length(line) - length(r) + 3; continue
         }
-        if (substr(r, 1, 2) == "--" && tolower(r) !~ /^--[ \t]*@extract:/) {
+        if (substr(r, 1, 2) == "--" && r !~ /^--[ \t]*@extract:/) {
           p = index(r, cr)
           if (p) { t = substr(r, p + 1); gsub(/[ \t]/, "", t); gsub(cr, "", t); if (t != "") hstart(NR) }
           return
@@ -172,7 +172,7 @@ sr_body_start() { # <file> -> line number (N+1 when the whole file is header)
     }
     BEGIN { depth = 0; done = 0; cr = sprintf("%c", 13) }
     {
-      if (depth > 0 && tolower($0) ~ /@extract:/) bad = 1
+      if (depth > 0 && $0 ~ /@extract:/) bad = 1
       scan($0, 1)
     }
     END {

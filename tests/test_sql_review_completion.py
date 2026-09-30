@@ -57,6 +57,34 @@ class CompletePublication(unittest.TestCase):
         self.assertEqual(published["header_revisions"][-1]["sql_sha256"], hashlib.sha256(sql.read_bytes()).hexdigest())
         self.assertEqual((self.directory / "source.sql").read_text(), "select 1;\n")
         self.assertIn("Header revision", (self.directory / "review.md").read_text())
+        self.assertFalse(self.draft.exists(), "helper-owned history is not unpublished work")
+
+    def test_header_recovery_preserves_semantically_changed_draft(self):
+        sql = self.workspace / "q.sql"
+        sql.write_text("-- corrected header\nselect 1;\n")
+        draft = json.loads(self.draft.read_text())
+        draft["assumptions"][0]["rationale"] = "Unpublished rationale"
+        self.draft.write_text(json.dumps(draft))
+        original = self.draft.read_bytes()
+        result = self.recover()
+        self.assertEqual(result.returncode, 4, "unpublished work must stop the hand-off")
+        self.assertIn("unpublished", result.stderr)
+        self.assertEqual(self.draft.read_bytes(), original)
+
+    def test_recovery_removes_semantically_equal_reserialized_draft(self):
+        draft = json.loads(self.draft.read_text())
+        self.draft.write_text(json.dumps(draft, indent=4, sort_keys=True))
+        self.assertNotEqual(self.draft.read_bytes(), self.final_bytes)
+        result = self.recover()
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertFalse(self.draft.exists())
+
+    def test_recovery_preserves_malformed_draft(self):
+        self.draft.write_text("not JSON")
+        result = self.recover()
+        self.assertEqual(result.returncode, 4, "unreadable work must stop the hand-off")
+        self.assertIn("unpublished", result.stderr)
+        self.assertEqual(self.draft.read_text(), "not JSON")
 
     def test_render_failure_then_resume_completes_without_new_revision(self):
         template = self.workspace / ".sqlreview/templates/review.md"

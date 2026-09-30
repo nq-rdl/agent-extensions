@@ -409,6 +409,11 @@ cmd_publish() (
     case "$binding" in
       0) ;;
       10)
+        if [ "$kind" = scope ] && [ -f "$dest" ]; then
+          # Republishing a saved scope needs its original authenticated bytes, not just
+          # a claimed body digest. A fresh full-fingerprint reassessment takes case 0.
+          [ -f "$baseline" ] || sr_die 2 "header-only scope publication requires an authenticated original scope baseline; recover scope.source.sql or reassess"
+        fi
         local amended
         amended="$(jq --arg sha "$(sr_sha256 "$SR_ROOT/$rel")" --arg at "$(sr_now)" --arg body "$(sr_body_sha256 "$SR_ROOT/$rel")" '
           .header_revisions = ((.header_revisions // []) +
@@ -577,16 +582,20 @@ cmd_delta() {
   local rc
   _delta_prepare "$1"; rc=$?
   printf 'baseline_sha256=%s current_sha256=%s sql_path=%s\n' "$(sr_sha256 "$SR_BASE")" "$(sr_sha256 "$SR_CUR")" "$SR_SQL_PATH"
-  if [ "$rc" -eq 0 ]; then printf 'unchanged since the reviewed snapshot\n'; return 0; fi
-  diff -u -L "reviewed (reviews/$1/source.sql)" -L "current ($SR_SQL_PATH)" "$SR_BASE" "$SR_CUR"
-  return 10
+  if [ "$rc" -eq 0 ] && cmp -s "$SR_BASE" "$SR_CUR"; then
+    printf 'unchanged since the reviewed snapshot\n'; return 0
+  fi
+  local diff_rc
+  diff -u -L "reviewed (reviews/$1/source.sql)" -L "current ($SR_SQL_PATH)" "$SR_BASE" "$SR_CUR"; diff_rc=$?
+  [ "$diff_rc" -le 1 ] || sr_die 2 "cannot diff the reviewed snapshot against current SQL"
+  return "$rc"
 }
 
 cmd_impact() {
   [ $# -eq 1 ] || usage
   local rc changed idents ident
   _delta_prepare "$1"; rc=$?
-  if [ "$rc" -eq 0 ]; then printf 'no change since the reviewed snapshot; nothing to trace\n'; return 0; fi
+  if [ "$rc" -eq 0 ]; then printf 'no SQL body change since the reviewed snapshot; nothing to trace\n'; return 0; fi
   printf '# impact hints — HEURISTIC. Identifiers that appear in the changed lines, traced to unchanged lines\n'
   printf '# that mention them. This suggests where to look; it does not prove anything unaffected. Every\n'
   printf '# assumption and limitation is reassessed on an update regardless of this list.\n'
