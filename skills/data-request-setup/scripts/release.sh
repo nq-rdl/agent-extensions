@@ -206,8 +206,14 @@ rl_review_row() { # <slug> <commit>
     *) if git -C "$SR_ROOT" merge-base --is-ancestor "$gc" "$commit" 2>/dev/null; then inref=true
        elif [ $? -eq 1 ]; then inref=false; fi ;;
   esac
-  local question_doc
-  question_doc="$(bash "$SR_SCRIPT_DIR/sqlreview.sh" questions "$slug" "$kind")" || sr_die 4 "invalid shared question evidence"
+  local question_doc question_rc
+  question_doc="$(bash "$SR_SCRIPT_DIR/sqlreview.sh" questions "$slug" "$kind")" || {
+    question_rc=$?
+    [ "$question_rc" -eq 4 ] || sr_die 2 "cannot read shared question evidence"
+    jq -nc --arg slug "$slug" --arg kind "$kind" \
+      '{slug: $slug, kind: $kind, sql_path: null, revision: null, applies: "invalid"}'
+    return 0
+  }
   jq -c --argjson question_doc "$question_doc" --arg slug "$slug" --arg applies "$applies" --arg at "$at" --arg body_at "$body_at" --argjson inref "$inref" '
     def items: [(. // [])[] | {id, text, rationale, confirmed_revision}];
     {slug: $slug, kind, sql_path, revision, applies: $applies,

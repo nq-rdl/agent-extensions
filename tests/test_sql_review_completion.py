@@ -111,6 +111,57 @@ class CompletePublication(unittest.TestCase):
         self.assertTrue((self.directory / "review.md").is_file())
         self.assertEqual((self.directory / "review.json").read_bytes(), self.final_bytes)
 
+    def referenced_review_with_pending_questions(self):
+        review = json.loads((self.directory / "review.json").read_text())
+        review.pop("open_questions")
+        review["question_store"] = "questions.json"
+        (self.directory / "review.json").write_text(json.dumps(review))
+        self.draft.write_text(json.dumps(review))
+        questions = {"schemaVersion": 1, "kind": "questions", "slug": "q", "sql_path": "q.sql",
+                     "questions": [{"id": "Q1", "text": "Which wards?", "applies": "review",
+                                    "owner": None, "status": "open"}]}
+        pending = self.directory / "questions.draft.json"
+        pending.write_text(json.dumps(questions))
+        return pending, questions
+
+    def test_recovery_publishes_pending_first_store_before_render_without_new_revision(self):
+        pending, questions = self.referenced_review_with_pending_questions()
+        before = {p.name: p.read_bytes() for p in (self.directory / "history").iterdir()}
+        final = (self.directory / "review.json").read_bytes()
+        self.assertEqual(self.helper("render", "q", "review").returncode, 4)
+        result = self.recover()
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        self.assertEqual(json.loads((self.directory / "questions.json").read_text()), questions)
+        self.assertIn("Q1", (self.directory / "review.md").read_text())
+        self.assertEqual((self.directory / "review.json").read_bytes(), final)
+        self.assertEqual({p.name: p.read_bytes() for p in (self.directory / "history").iterdir()}, before)
+        self.assertEqual(json.loads(pending.read_text()), questions)
+
+    def test_recovery_keeps_bad_pending_questions_and_reports_incomplete(self):
+        pending, questions = self.referenced_review_with_pending_questions()
+        pending.write_text("{")
+        result = self.recover()
+        self.assertEqual(result.returncode, 4, result.stdout + result.stderr)
+        self.assertEqual(pending.read_text(), "{")
+        self.assertTrue(self.draft.exists())
+        self.assertFalse((self.directory / "questions.json").exists())
+        self.assertFalse((self.directory / "review.md").exists())
+        pending.unlink()
+        self.assertEqual(self.recover().returncode, 4)
+        self.assertFalse((self.directory / "questions.json").exists())
+        pending.write_text(json.dumps(questions))
+        (self.directory / "questions.json").write_text("{")
+        self.assertEqual(self.recover().returncode, 4)
+        self.assertEqual((self.directory / "questions.json").read_text(), "{")
+
+    def test_recovery_does_not_publish_differing_question_draft_over_valid_store(self):
+        pending, questions = self.referenced_review_with_pending_questions()
+        self.assertEqual(self.helper("publish-questions", "q", str(pending)).returncode, 0)
+        pending.write_text('{"unpublished": true}')
+        self.assertEqual(self.recover().returncode, 0)
+        self.assertEqual(json.loads((self.directory / "questions.json").read_text()), questions)
+        self.assertEqual(pending.read_text(), '{"unpublished": true}')
+
     def test_recovery_replaces_old_report_and_preserves_unpublished_draft(self):
         (self.directory / "review.md").write_text("old report")
         self.draft.write_text('{"unpublished": true}')

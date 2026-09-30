@@ -1,12 +1,15 @@
 """Issue 437: shared question lifecycle, real helper and consumers (not a live agent pilot)."""
 import copy
 import json
+import os
+import shutil
 import subprocess
 import tempfile
+import time
 import unittest
 from pathlib import Path
 
-from test_sql_review_scripts import Project, REPO, SQL_V1, git, run, scope_doc, review_doc
+from test_sql_review_scripts import Project, REPO, SCRIPT, SQL_V1, git, run, scope_doc, review_doc
 from test_sql_review_hooks import GUARD, decision, edit_event, env_for, run_hook, write_event
 
 CLOSED = {"answer": "Use the approved wards.", "by": "engineer-login", "at": "2026-09-29",
@@ -66,6 +69,13 @@ class Questions(unittest.TestCase):
             for token in ("Q1", "closed", CLOSED["answer"], CLOSED["by"], CLOSED["source"], "2026-09-29"):
                 self.assertIn(token, text)
             self.assertEqual("Count transfers?" in text, kind == "review")
+            open_section = text.split("## Open questions\n", 1)[1].split("\n## ", 1)[0]
+            self.assertNotIn("Q1", open_section)
+            self.assertNotIn(CLOSED["answer"], open_section)
+            self.assertEqual("Q2" in open_section, kind == "review")
+            history = text.split("## Closed questions\n", 1)[1].split("\n## ", 1)[0]
+            self.assertIn("Q1", history)
+            self.assertNotIn("Q2", history)
 
     def test_decision_origin_is_independent_visible_and_date_precision_is_retained(self):
         doc = self.migrate()
@@ -98,6 +108,83 @@ class Questions(unittest.TestCase):
         self.draft.symlink_to(self.store)
         self.assertEqual(run(["publish-questions", "q", str(self.draft)], self.p.root).returncode, 2)
         self.assertEqual(self.bytes(), before)
+
+    def test_overlapping_publishers_refuse_busy_store_then_reconcile_stale_draft(self):
+        doc = self.migrate()
+        added = copy.deepcopy(doc)
+        added["questions"].append({"id": "Q3", "text": "New question?", "applies": "review",
+                                   "owner": None, "status": "open"})
+        self.draft.write_text(json.dumps(added))
+        closed = copy.deepcopy(doc)
+        closed["questions"][0].update(status="closed", closed=CLOSED)
+        other = self.p.root / "closure.draft.json"
+        other.write_text(json.dumps(closed))
+        # Pause the first real publisher after loading history, before staging its draft.
+        wrappers = self.p.root / "wrappers"
+        wrappers.mkdir()
+        ready, resume = self.p.root / "ready", self.p.root / "resume"
+        cp = wrappers / "cp"
+        cp.write_text('#!/usr/bin/env bash\n: > "$READY"\n'
+                      'while [ ! -f "$RESUME" ]; do sleep 0.02; done\nexec "$REAL_CP" "$@"\n')
+        cp.chmod(0o755)
+        env = {k: v for k, v in os.environ.items() if not k.startswith("SQLREVIEW_")}
+        env.update(PATH=str(wrappers) + os.pathsep + env["PATH"], READY=str(ready),
+                   RESUME=str(resume), REAL_CP=shutil.which("cp"))
+        first = subprocess.Popen(["bash", str(SCRIPT), "publish-questions", "q", str(self.draft)],
+                                 cwd=self.p.root, env=env, stdout=subprocess.PIPE,
+                                 stderr=subprocess.PIPE, text=True)
+        try:
+            deadline = time.monotonic() + 10
+            while not ready.exists() and first.poll() is None and time.monotonic() < deadline:
+                time.sleep(0.02)
+            self.assertTrue(ready.exists(), "first publisher never reached staging")
+            second = run(["publish-questions", "q", str(other)], self.p.root)
+            migration = run(["migrate-questions", "q"], self.p.root)
+        finally:
+            resume.touch()
+            stdout, stderr = first.communicate(timeout=15)
+        self.assertEqual(first.returncode, 0, stdout + stderr)
+        self.assertEqual(second.returncode, 2, second.stdout + second.stderr)
+        self.assertIn("busy", second.stderr)
+        self.assertEqual(migration.returncode, 2, migration.stdout + migration.stderr)
+        self.assertEqual(json.loads(self.store.read_text()), added)
+        self.assertFalse((self.d / ".questions.lock").exists())
+        self.assertEqual(run(["publish-questions", "q", str(other)], self.p.root).returncode, 4)
+        added["questions"][0].update(status="closed", closed=CLOSED)
+        self.assertEqual(self.publish(added).returncode, 0)
+        self.assertEqual(json.loads(self.store.read_text()), added)
+
+    def test_symlink_before_dotdot_in_draft_is_refused_before_copy(self):
+        doc = self.migrate()
+        doc["questions"][0].update(status="closed", closed=CLOSED)
+        before = self.bytes()
+        with tempfile.TemporaryDirectory() as outside:
+            external = Path(outside)
+            (external / "subdir").mkdir()
+            (external / "questions.draft.json").write_text(json.dumps(doc))
+            (self.p.root / "link").symlink_to(external / "subdir", target_is_directory=True)
+            # Lexical normalization would point at this innocent local file instead.
+            self.draft.write_text(json.dumps(doc))
+            for path in ("link/../questions.draft.json", str(self.p.root) + "/link/../questions.draft.json"):
+                with self.subTest(path=path):
+                    r = run(["publish-questions", "q", path], self.p.root)
+                    self.assertEqual(r.returncode, 2, r.stdout + r.stderr)
+                    self.assertIn("symlink", r.stderr)
+                    self.assertEqual(self.bytes(), before)
+        (self.p.root / "safe").mkdir()
+        self.assertEqual(run(["publish-questions", "q", "safe/../questions.draft.json"], self.p.root).returncode, 0)
+
+    def test_custom_open_placeholder_never_shows_closed_history(self):
+        doc = self.migrate()
+        doc["questions"][0].update(status="closed", closed=CLOSED)
+        self.assertEqual(self.publish(doc).returncode, 0)
+        template = self.p.root / ".sqlreview/templates/review.md"
+        template.write_text("## Open questions\n\n{{open_questions_list}}\n")
+        self.assertEqual(run(["render", "q", "review"], self.p.root).returncode, 0)
+        text = (self.d / "review.md").read_text()
+        self.assertIn("Q2", text)
+        self.assertNotIn("Q1", text)
+        self.assertEqual(template.read_text(), "## Open questions\n\n{{open_questions_list}}\n")
 
     def test_near_match_legacy_questions_keep_distinct_ids_and_publish_retry_keeps_bytes(self):
         self.p.write_json("q", "review.json", review_doc("q", "q.sql", open_questions=["which wards?"]))
@@ -233,6 +320,33 @@ class Questions(unittest.TestCase):
         self.assertEqual(moved["slug"], "new")
         self.assertEqual(moved["sql_path"], "new.sql")
         self.assertEqual(moved["questions"], doc["questions"])
+
+    def test_bad_question_evidence_returns_invalid_json_not_operational_error(self):
+        self.migrate()
+        review = json.loads((self.d / "review.json").read_text())
+        review.pop("open_questions")
+        review["question_store"] = "questions.json"
+        self.p.write_json("q", "review.json", review)
+        git(self.p.root, "add", ".")
+        git(self.p.root, "commit", "-qm", "fixture")
+        release = REPO / "skills/data-request-setup/scripts/release.sh"
+        for raw in (None, "{", "{}"):
+            with self.subTest(raw=raw):
+                if raw is None:
+                    self.store.unlink()
+                else:
+                    self.store.write_text(raw)
+                r = subprocess.run(["bash", str(release), "evidence", "HEAD", "q"],
+                                   cwd=self.p.root, capture_output=True, text=True)
+                self.assertEqual(r.returncode, 10, r.stdout + r.stderr)
+                row = json.loads(r.stdout)["reviews"][0]
+                self.assertEqual(row["applies"], "invalid")
+                self.assertEqual(row["slug"], "q")
+        for ref, slug in (("missing-ref", "q"), ("HEAD", "unknown-slug")):
+            r = subprocess.run(["bash", str(release), "evidence", ref, slug],
+                               cwd=self.p.root, capture_output=True, text=True)
+            self.assertEqual(r.returncode, 2)
+            self.assertEqual(r.stdout, "")
 
     def test_release_evidence_uses_authoritative_store_not_obsolete_embedded_copies(self):
         doc = self.migrate()

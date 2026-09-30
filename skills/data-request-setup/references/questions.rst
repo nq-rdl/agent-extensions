@@ -68,9 +68,20 @@ To add/close: load ``questions`` first, retain all existing rows, write the comp
 ``questions.draft.json``, then run ``publish-questions``. Direct Write/Edit of the
 final store is guard-denied. The helper validates identity, closure evidence,
 bindings and retained history before one atomic rename; failures leave it intact.
-No SQL is required, and missing SQL does not block a governance closure. Rerender
-reports explicitly after publication when needed; closure alone edits one file.
+Publication and migration share a per-slug ``.questions.lock`` directory, acquired
+before loading history. A busy lock fails with exit 2: reload the current store,
+reconcile your draft and retry. Normal exits and handled signals remove the lock.
+After an uncatchable termination, remove a leftover lock with ``rmdir`` only after
+verifying no writer remains; never steal an active lock. No SQL is required, and
+missing SQL does not block a governance closure. Rerender reports explicitly after
+publication when needed; closure alone edits one file.
 Readers must fetch questions on every resume, even when document revisions match.
+Reports keep ``open_questions_list`` open-only; default templates show closed rows
+under ``Closed questions`` via ``question_history_list``. Existing custom templates
+are not overwritten: add that history placeholder explicitly to display closures.
+Release evidence emits ``applies: invalid`` and exit 10 for malformed or missing
+declared question stores, just as for invalid review documents; unknown refs/slugs
+and unsafe paths remain operational errors (exit 2).
 
 Do not maintain a second question list in review or seed one from scope. If an
 ``answers.yaml`` copy predates this store, surface the obsolete copy and reconcile

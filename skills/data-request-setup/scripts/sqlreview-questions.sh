@@ -47,15 +47,26 @@ cmd_questions() (
   printf '%s\n' "$Q_DOC" | jq -L "$SR_SCRIPT_DIR" --arg kind "$kind" 'include "sqlreview-questions"; visible_questions($kind)'
 )
 
+# Serialize both writers before reading history. mkdir is portable to macOS Bash 3.2;
+# fail busy rather than steal a lock or guess whether another publisher is still alive.
+_q_lock() { # slug; caller owns local Q_LOCK and tmp, and runs in a subshell
+  sr_safe_slug "$1"
+  local lock="$SR_REVIEWS/$1/.questions.lock"
+  sr_no_symlinks "$lock" || exit 2
+  mkdir "$lock" 2>/dev/null || sr_die 2 "question store busy or lock unavailable; retry after reloading questions"
+  Q_LOCK="$lock"
+  trap 'rm -f "$tmp"; rmdir "$Q_LOCK"' EXIT
+  trap 'exit 2' HUP INT TERM
+}
+
 cmd_migrate_questions() (
   [ $# -eq 1 ] || usage
   sr_need_jq; sr_require_root
-  local Q_DOC tmp="" dest="$SR_REVIEWS/$1/questions.json"
+  local Q_DOC Q_LOCK="" tmp="" dest="$SR_REVIEWS/$1/questions.json"
+  _q_lock "$1"
   _q_context "$1"
   [ ! -f "$dest" ] || { printf 'already migrated\t%s\n' "$1"; exit 0; }
   tmp="$(mktemp "$SR_REVIEWS/$1/.questions.XXXXXX")" || sr_die 2 "mktemp failed"
-  trap 'rm -f "$tmp"' EXIT
-  trap 'exit 2' HUP INT TERM
   printf '%s\n' "$Q_DOC" > "$tmp" || sr_die 2 "cannot stage questions"
   cmd_check "$tmp" >/dev/null || sr_die 4 "invalid migration"
   # Never overwrite a store that appeared during migration.
@@ -66,13 +77,14 @@ cmd_migrate_questions() (
 cmd_publish_questions() (
   [ $# -eq 2 ] || usage
   sr_need_jq; sr_require_root
-  local slug="$1" draft="$2" Q_DOC tmp="" dest="$SR_REVIEWS/$1/questions.json"
+  local slug="$1" draft="$2" Q_DOC Q_LOCK="" tmp="" dest="$SR_REVIEWS/$1/questions.json"
+  _q_lock "$slug"
   _q_context "$slug" publish
-  sr_no_symlinks "$(sr_abspath "$draft")" || exit 2
+  # Keep original components: normalizing link/../ first hides the symlink.
+  case "$draft" in /*) ;; *) draft="$(pwd -P)/$draft" ;; esac
+  sr_no_symlinks "$draft" || exit 2
   [ -f "$draft" ] || sr_die 2 "no such question draft"
   tmp="$(mktemp "$SR_REVIEWS/$slug/.questions.XXXXXX")" || sr_die 2 "mktemp failed"
-  trap 'rm -f "$tmp"' EXIT
-  trap 'exit 2' HUP INT TERM
   cp "$draft" "$tmp" || sr_die 2 "cannot stage question draft"
   cmd_check "$tmp" || exit 4
   jq -e -L "$SR_SCRIPT_DIR" --slurpfile scope "$Q_SCOPE" --slurpfile review "$Q_REVIEW" '

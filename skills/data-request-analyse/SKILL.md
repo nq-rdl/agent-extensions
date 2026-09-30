@@ -107,11 +107,20 @@ those differences and obtain fresh confirmation through the update path. For wor
 header corrections that leave the confirmed record intact, publish that record again to
 record the header revision, then render it.
 A previous run may have published and snapshotted successfully but failed or stopped
-before rendering. This recovery uses the existing confirmed revision; do not increment
-it or ask for its confirmations again. Run from the project root:
+before question publication or rendering. This recovery uses the existing confirmed
+revision; do not increment it or ask for its confirmations again. If the declared
+store is missing, Read the retained `questions.draft.json` and check its binding and
+answers before retrying publication. Do not invent a replacement if the draft is
+missing, or overwrite an invalid existing store. Run from the project root:
 
 ```bash
 bash "$S/sqlreview.sh" publish "$SLUG" review ".sqlreview/reviews/$SLUG/review.json" || exit $?
+if ! bash "$S/sqlreview.sh" questions "$SLUG" review >/dev/null; then
+  # Recover only a missing first store, never repair an existing invalid one implicitly.
+  [ ! -e ".sqlreview/reviews/$SLUG/questions.json" ] && [ ! -L ".sqlreview/reviews/$SLUG/questions.json" ] || exit 4
+  [ -f ".sqlreview/reviews/$SLUG/questions.draft.json" ] || { echo "Missing question draft; handoff incomplete" >&2; exit 4; }
+  bash "$S/sqlreview.sh" publish-questions "$SLUG" ".sqlreview/reviews/$SLUG/questions.draft.json" || exit $?
+fi
 bash "$S/sqlreview.sh" render "$SLUG" review || exit $?
 if jq -e -s 'length == 2 and (.[0] | del(.header_revisions)) == (.[1] | del(.header_revisions))' \
     ".sqlreview/reviews/$SLUG/review.draft.json" ".sqlreview/reviews/$SLUG/review.json" >/dev/null 2>&1; then
@@ -123,13 +132,14 @@ if [ -e ".sqlreview/reviews/$SLUG/review.draft.json" ]; then
 fi
 ```
 
-Show `review.md`. Draft equality is semantic, ignoring only helper-owned
-`header_revisions`; formatting and header history are not unpublished work. If any
-other differing or unreadable draft remains, stop before *After review*: tell the user it
-contains unpublished work; do not discard or publish it automatically. Continue with *After review*
-below only when no unpublished draft remains. If rendering fails,
-retain the draft and report the failure; retry this completion step once the cause
-is fixed.
+Show `review.md`. Review draft equality is semantic, ignoring only helper-owned
+`header_revisions`; formatting and header history are not unpublished work. Keep any
+differing or unreadable review or question draft and tell the user it contains
+unpublished work; do not discard it or publish it automatically over a valid store.
+Stop before *After review* when unpublished work remains; continue below only when
+no unpublished draft remains. If question publication or rendering fails, retain
+both drafts and report the handoff incomplete; retry this completion step once
+the cause is fixed.
 
 ### Changed SQL: reassess the review
 
