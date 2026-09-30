@@ -95,8 +95,7 @@ run, except exempt probes, until a writable run publishes the entry.
 An operator probe is exempt only when it is aggregate-only, small-cell suppressed and bounded to a single scan, returns no patient identifier and no staff or person key,
 feeds no delivered extract, and records any `NOLOCK` or `READ UNCOMMITTED` use. `lifts.rst` gives both rules in full.
 
-**Code-discovery probes:** `$data-request:lookup` probes returning only codes, labels and counts are exempt from the hand-SQL gate only under those same conditions. Counts from 1 to 6 display as `<7`; use complementary suppression where subtraction could reveal a masked cell, and no totals. Include matched-term provenance, not patient values, dates, identifiers or free-text results.
-The exemption waives only lift capture, not engineer review of a fallback probe, authorisation or disclosure controls. The agent never runs the lookup query; an authorised human runs it and pastes the labelled grids back.
+**Code-discovery probes:** `$data-request:lookup` probes returning only codes, labels and counts are exempt from the hand-SQL gate only under those same conditions. Counts from 1 to 6 display as `<7`; use complementary suppression where subtraction could reveal a masked cell, and no totals. Include matched-term provenance, not patient values, dates, identifiers or free-text results. The exemption waives only lift capture, not engineer review of a fallback probe, authorisation or disclosure controls. The agent never runs the lookup query; an authorised human runs it and pastes the labelled grids back.
 
 For N related datasets from one cohort, check the pinned `create_temp_table()`,
 `register_result()` and `execute_pipeline_results()` implementations first:
