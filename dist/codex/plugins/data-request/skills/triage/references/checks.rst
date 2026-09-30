@@ -28,12 +28,15 @@ disclose the missing capability. Never treat inaccessible evidence as absence.
 Interpretation checks
 ---------------------
 
-* **Approval restrictions come first.** Read the approval (screening log,
-  governance comment or approval letter) before the intake's field list. A
+* **Known approval restrictions come first.** Apply explicit restrictions in an
+  available screening log, governance comment or approval letter. A
   screening-log approval limits the output to screening fields. Contact,
   identity and pathology fields from the intake stay out, and the report says
-  why. Reconcile fields added during review (death dates, lab organisation,
-  accession number) with the approval before delivery.
+  why. If the approval is unchecked, build the requested fields, including death
+  dates, lab organisation and accession number; the analyst checks them against
+  the approval during review. Follow the build/review rule in
+  ``/data-request:guardrails`` ("Approved enquiry: build, then analyst review").
+  Do not turn unchecked coverage into a blocker or recurring scope question.
 * **Source system and grain come before bootstrap.** In one request the source moved
   from ieMR to HBCIS ``Inpatient.mart_v`` after its scope was published, which
   made that scope stale. Revising a published scope re-opens its confirmations.
@@ -113,8 +116,12 @@ source availability
    Name the source and whoever can grant or confirm it.
 
 governance
-   The approval, a screening-log restriction or a data custodian limits a field
-   or an action. Unblock through the approver; never widen the output meanwhile.
+   A known approval restriction (including a screening-log restriction) or a
+   custodian decision limits a field or an action. Cite that evidence and unblock
+   through the approver or custodian; never widen the output meanwhile.
+   Unchecked approval alone is not a governance blocker. Build the requested
+   elements and, if useful, carry one approval-sensitive limitation to analyst
+   review, not an open question or Ben note item.
 
 scaffold
    The child repository is a legacy shell, unapplied or outdated, or carries a

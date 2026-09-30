@@ -86,13 +86,12 @@ Recheck affected evidence/artifacts, not every stage. See [references/ledger.rst
    branches, `framework_ref` pins, `GOVERNANCE.md` and scaffold metadata. Tell an unapplied
    scaffold from an outdated one, reconcile existing bootstrap branches before proposing a
    manual port, and name the branch to reuse and the branches to leave alone.
-6. **Settle requirements in order**: approval restrictions first, then requested output
-   fields; a screening-log approval overrides a broader intake list. Confirm the source
-   system and grain before any `$data-request:bootstrap` run. Keep confirmed requirements
-   apart from proposed assumptions; an unanswered question is never approval. A supplied
-   cohort means linkage work, not cohort discovery. Use an explicit code list as written,
-   never broadened to a library concept. Read [references/checks.rst](references/checks.rst)
-   for the interpretation checks to raise.
+6. **Settle requirements in order**: known approval restrictions first; a screening-log
+   approval overrides a broader intake list. Build requested identifiers and free text
+   even when approval is unchecked; the analyst checks coverage during review. Confirm
+   source system and grain before `$data-request:bootstrap`. Keep confirmed requirements
+   apart from proposals; silence is not approval. Supplied cohorts mean linkage, not discovery.
+   Use explicit codes as written, not a broader library concept. Read [references/checks.rst](references/checks.rst).
 7. **Recheck every gap claim**, whether yours, a worker's or a register row, against current
    code, tests, releases and dependency topology before you plan or file it. A delivered
    capability is closed; run and report the [read-only stale lift check](references/checks.rst).
@@ -144,4 +143,5 @@ Each of these needs an explicit instruction from the human for that action:
 - bypassing, disabling or working around hooks and checks;
 - running `copier update` on a child repository.
 
-An approval for one request or one action does not extend to the next.
+Enquiry approval does not override runtime tool permissions or triage-only scope.
+If an action is denied, report it and stop; never retry in another form. Approval covers no other enquiry.

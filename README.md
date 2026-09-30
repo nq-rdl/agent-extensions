@@ -25,6 +25,9 @@ sidecar in the same pass, then hands the branch to the engineer for `bootstrap`
 and `draft`. Bootstrap carries answered research decisions with analyst
 confirmation; missing research answers return to the analyst. See the
 [shared intake contract](skills/data-request-setup/references/analyst-intake.rst).
+Approved enquiries build all requested elements; the analyst checks approval
+coverage at review. See [approval and runtime permissions](docs/data-request-permissions.md)
+for the separate engineer-owned host configuration boundary.
 
 #### Using skills in Claude Code
 
