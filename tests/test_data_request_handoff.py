@@ -1,9 +1,12 @@
 """Instruction contracts for #424; these do not prove live operator or board outcomes."""
 
 import json
+import os
 import re
 import shutil
 import subprocess
+import tempfile
+import textwrap
 import unittest
 from pathlib import Path
 
@@ -40,6 +43,23 @@ class HandoffContracts(unittest.TestCase):
         self.assertIn("stop", handoff)
         self.assertIn("restricted", handoff)
 
+    def test_explain_loads_durable_handoff_before_outcomes_on_fresh_invocation(self):
+        for path in (REPO / "skills/data-request-explain/SKILL.md",
+                     REPO / "plugins/data-request/skills/explain/SKILL.md",
+                     REPO / "dist/codex/plugins/data-request/skills/explain/SKILL.md"):
+            with self.subTest(path=path):
+                body = " ".join(path.read_text().split())
+                self.assertIn("## Load the durable hand-off", body)
+                load = body.split("## Load the durable hand-off", 1)[1].split("## Resume", 1)[0]
+                for token in ("hand-off comment URL", "child tracking issue", "current PR head SHA",
+                              "run commit", "review revision", "SQL fingerprint", "DVC", "UAT",
+                              "flagged decisions", "restrictions", "linked evidence", "ask",
+                              "do not offer acceptance", "walkthrough", "Send back"):
+                    self.assertIn(token, load)
+                self.assertLess(body.index("## Load the durable hand-off"), body.index("## Analyst outcome"))
+                outcome = body.split("## Analyst outcome", 1)[1]
+                self.assertIn("loaded and rechecked", outcome)
+
     def test_pre_release_amend_preserves_baseline_and_avoids_release_record(self):
         amend = text("amend")
         for token in ("operator-run extract as the baseline", "run commit", "Do not add an `AMD-` entry",
@@ -63,6 +83,60 @@ class HandoffContracts(unittest.TestCase):
                 self.assertIn("operator run", body)
                 self.assertIn("hand-off", body)
                 self.assertIn("analyst", body.lower())
+
+
+class CommittedHandoffEvidence(unittest.TestCase):
+    """Execute the documented gate against a checked PR SHA, not merely local HEAD."""
+
+    def test_review_and_snapshot_must_match_checked_head(self):
+        handoff = (REPO / "skills/data-request-triage/references/handoff.rst").read_text()
+        block = re.search(r"\.\. code-block:: bash\n\n((?:     .*\n|\n)+)", handoff)
+        self.assertIsNotNone(block, "hand-off needs an executable committed-evidence gate")
+        gate = textwrap.dedent(block.group(1))
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            env = {k: v for k, v in os.environ.items() if not k.startswith("GIT_")}
+            env["SLUG"] = "q"
+
+            def git(*args):
+                return subprocess.run(["git", *args], cwd=root, env=env,
+                                      text=True, capture_output=True, check=True).stdout.strip()
+
+            git("init", "-q")
+            git("config", "user.name", "Fixture")
+            git("config", "user.email", "fixture@example.test")
+            directory = root / ".sqlreview/reviews/q"
+            directory.mkdir(parents=True)
+            review = directory / "review.json"
+            snapshot = directory / "source.sql"
+            review.write_text('{"revision": 1}\n')
+            snapshot.write_text("select 1;\n")
+            git("add", ".sqlreview")
+            git("commit", "-qm", "checked review")
+            env["PR_HEAD"] = git("rev-parse", "HEAD")
+
+            def run(expected):
+                result = subprocess.run(["bash", "-c", gate], cwd=root, env=env,
+                                        capture_output=True, text=True)
+                self.assertEqual(result.returncode, expected, result.stderr)
+
+            run(0)
+            review.write_text('{"revision": 2}\n')
+            run(4)  # uncommitted review
+            git("add", ".sqlreview")
+            git("commit", "-qm", "local unpublished review")
+            run(4)  # clean local HEAD is not the checked PR head
+            review.write_text('{"revision": 1}\n')
+            snapshot.write_text("select 2;\n")
+            run(4)  # matching review alone is insufficient
+            snapshot.write_text("select 1;\n")
+            run(0)
+            env["SLUG"] = "untracked"
+            new = root / ".sqlreview/reviews/untracked"
+            new.mkdir()
+            (new / "review.json").write_text(review.read_text())
+            (new / "source.sql").write_text(snapshot.read_text())
+            run(4)  # evidence absent from the checked commit
 
 
 class HandoffEvalFixtures(unittest.TestCase):

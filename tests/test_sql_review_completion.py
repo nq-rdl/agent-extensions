@@ -64,10 +64,19 @@ class CompletePublication(unittest.TestCase):
         self.assertEqual(sorted(p.name for p in (self.directory / "history").iterdir()), ["1.sql"])
         self.assertFalse(self.draft.exists())
 
+    def test_no_draft_allows_unchanged_review_to_continue(self):
+        self.draft.unlink()
+        result = self.recover()
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertTrue((self.directory / "review.md").is_file())
+        self.assertEqual((self.directory / "review.json").read_bytes(), self.final_bytes)
+
     def test_recovery_replaces_old_report_and_preserves_unpublished_draft(self):
         (self.directory / "review.md").write_text("old report")
         self.draft.write_text('{"unpublished": true}')
-        self.assertEqual(self.recover().returncode, 0)
+        result = self.recover()
+        self.assertNotEqual(result.returncode, 0, "unpublished work must stop the hand-off")
+        self.assertIn("unpublished", result.stderr)
         self.assertNotEqual((self.directory / "review.md").read_text(), "old report")
         self.assertEqual(self.draft.read_text(), '{"unpublished": true}')
         self.assertEqual((self.directory / "review.json").read_bytes(), self.final_bytes)

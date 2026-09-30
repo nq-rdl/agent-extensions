@@ -77,10 +77,15 @@ bash "$S/sqlreview.sh" render "$SLUG" review || exit $?
 if cmp -s ".sqlreview/reviews/$SLUG/review.draft.json" ".sqlreview/reviews/$SLUG/review.json"; then
   rm -f ".sqlreview/reviews/$SLUG/review.draft.json"
 fi
+if [ -e ".sqlreview/reviews/$SLUG/review.draft.json" ]; then
+  printf 'Stop: review draft contains unpublished work; retain it for completion.\n' >&2
+  exit 4
+fi
 ```
 
-Show `review.md`. Continue with *After review* below. Keep any differing draft and tell the
-user it contains unpublished work; do not discard or publish it automatically. If rendering fails,
+Show `review.md`. If a differing draft remains, stop before *After review*: tell the user it
+contains unpublished work; do not discard or publish it automatically. Continue with *After review*
+below only when no unpublished draft remains. If rendering fails,
 retain the draft and report the failure; retry this completion step once the cause
 is fixed.
 

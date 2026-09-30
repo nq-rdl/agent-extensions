@@ -30,7 +30,8 @@ For RDL cohort SQL, read `${PLUGIN_ROOT}/skills/guardrails/SKILL.md` when
 explaining storage facts or conversions. Label any conflict with current source
 metadata and return it to `$data-request:analyse`; do not silently rewrite the reviewed record.
 
-Arguments: `$ARGUMENTS` — a SQL path or a slug from `status`.
+Arguments: `$ARGUMENTS` — a SQL path or a slug from `status`, optionally followed by
+its child-issue hand-off comment URL.
 
 ```bash
 S="${PLUGIN_ROOT}/skills/setup/scripts"
@@ -55,6 +56,27 @@ Exit 10: the review no longer describes the file. Ask (the host user-question to
 to run $data-request:analyse --update first (Recommended)** / **Explain the reviewed snapshot** — the
 second explains `reviews/$SLUG/source.sql`, and every step is labelled as describing the
 snapshot, not the current file.
+
+## Load the durable hand-off
+
+On every invocation, including a fresh session with no `explain.json`, read the hand-off
+comment URL supplied by the analyst. If none is supplied, locate it through the request's
+agreed durable triage ledger and child tracking issue; if ambiguous or unavailable, ask for
+the exact comment URL. Read that comment and its linked evidence with `gh` or available
+GitHub read tools, not a recollection of an earlier session. Make no GitHub writes.
+
+Verify the child repository, tracking issue and deliverable PR match this request. Read the
+current PR head SHA from GitHub and compare the hand-off's head SHA, run commit, review revision
+and SQL fingerprint with the review being explained. Read the linked run manifest, counts-only
+QA, DVC provenance and UAT sections 1 to 3 for that run, plus open questions, flagged decisions,
+requester limitations and known approval restrictions. Read
+`${PLUGIN_ROOT}/skills/triage/references/handoff.rst`, *Hand-off to review*, and recheck
+its gate, including the committed-review/snapshot check and `release.sh evidence` at the run
+commit. Recheck any referenced release gates against their current evidence before outcomes.
+
+If the record, linked evidence or tools are missing, or any identity/revision differs, name
+what is missing or stale and do not offer acceptance. A SQL-only walkthrough and **Send back**
+remain available; neither clears the gate. Do not infer acceptance from `explain.json`.
 
 ## Resume from a previous explanation (#128 §2)
 
@@ -115,8 +137,9 @@ A stop writes `completed: false` with the step reached, so the next run can resu
 
 ## Analyst outcome
 
-A completed explanation is not acceptance of the extract. Show run QA, open questions,
-flagged decisions and known approval restrictions from the hand-off. Ask the analyst for
+A completed explanation is not acceptance of the extract. Only after the durable hand-off
+has been loaded and rechecked, show run QA, open questions, flagged decisions and known approval
+restrictions from it. Ask the analyst for
 **Accept for release preparation** / **Send back** / **Presentation amendment**. Do not
 offer acceptance of stale SQL, an explained snapshot, missing run/UAT evidence or an
 unresolved release gate. Leave acceptance pending when the analyst stops.
