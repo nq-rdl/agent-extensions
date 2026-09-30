@@ -4,12 +4,13 @@ license: CC-BY-4.0
 description: >-
   Close out request pipelines: inspect the pinned library, classify lift candidates
   with the human, file reusable work on the owning library, and record delivered
-  hand-SQL limitations. Revisit released lifts for explicitly recurring extracts.
+  hand-SQL limitations. Revisit released lifts for recurring extracts and candidates
+  in builds not yet delivered, without automatic adoption.
 argument-hint: '<pipeline path>'
 user-invocable: true
 compatibility: >-
   .sqlreview schema 2 (schema 1 remains readable); Bash 3.2+, jq >= 1.6.
-  API baseline and record_limitation floor: query-builder 0.6.0; source
+  record_limitation API floor: query-builder 0.6.0; source
   resolvers live under resolvers/iemr and resolvers/hbcis from 0.5.0;
   inspect the enquiry's actual framework_ref before claiming availability.
 allowed-tools: Bash, Read, Glob, Grep, Write, AskUserQuestion
@@ -30,9 +31,10 @@ Invoke `/data-request:guardrails` and read the shared ledger contract at
 `skills/data-request-setup/references/lifts.rst`). Verify correctness-critical API
 claims against the pinned implementation and tests in `nq-rdl/query-builder`.
 Its source resolvers live under `resolvers/iemr` and `resolvers/hbcis` from
-v0.5.0; the baseline is v0.6.0. An older pin may still depend on the archived
-separate resolver package, so inspect the pin as it is. The baseline is a
-discovery aid, not evidence that a pin contains a unit.
+v0.5.0. An older pin may still depend on the archived separate resolver package,
+so inspect the pin as it is. Discover releases through the shared tag-list policy
+at `${CLAUDE_PLUGIN_ROOT}/skills/guardrails/references/library.rst`; a latest tag
+is a discovery aid, not evidence that the request's pin contains a unit.
 
 ## Classify-only mode
 
@@ -143,7 +145,21 @@ the unit's worktree path; the main session translates
 human. Routing `/speckit.*` through another agent (Codex, a subagent) to avoid
 `disable-model-invocation` is not a workaround; direct mode is the supported path.
 
-## Recurring follow-up
+## Release revisit and recurring follow-up
+
+For a build **not yet delivered**, revisit `candidate` entries even with
+`recurring: false`. Resolve the latest stable tag for each entry's owning library
+using the shared tag-list policy, then run `sqlreview.sh lifts-stale SLUG --tag TAG`.
+For mixed-library ledgers run once per owning library's latest tag; use only that
+library's rows from each result. Entries without unit references still need manual
+inspection. A symbol-presence result is only a nudge: check the complete shortfall,
+implementation and tests. Partial results leave the other units unresolved.
+Propose the exact re-pin and re-composition, not an automatic pin or status edit.
+The human decides whether to adopt it: a released class may include clinician names
+that the request intentionally excludes. Preserve approval restrictions and the
+confirmed output; do not treat an engineer's API choice as a research answer.
+After acceptance, use draft and analyse, and reconfirm changed ledger evidence.
+Do not invent an issue or advance a candidate through the filed/released lifecycle.
 
 For `filed` entries inspect the linked issue, merged change and release/tag that
 contains it. A closed issue alone is not release evidence. On verified release,
@@ -154,7 +170,8 @@ accepts, hand off to `/data-request:draft`, then `/data-request:analyse`; advanc
 to `recomposed` only after the workaround is removed, validation succeeds and the
 updated review is confirmed. Record `recomposition_evidence` with the new `pin`,
 `sql_sha256` and `review_revision`. Retain the original delivery limitation as history.
-One-off extracts stay forward-only; do not open backport issues or modify pins.
+Already-delivered one-off extracts stay forward-only; do not open backport issues
+or modify their pins. An undelivered one-off candidate may receive the proposal above.
 
 ## Upstream decision candidates
 

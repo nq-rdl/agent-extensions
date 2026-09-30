@@ -36,7 +36,8 @@ resolvers live in ``nq-rdl/query-builder`` under ``resolvers/iemr`` and
 ``resolvers/hbcis``; the former separate plugins package is archived. The
 workaround range may identify the planned insertion before writing; reconcile it
 with actual lines at close-out. ``recurring: false`` means no recurring follow-up
-is authorised; set true only from explicit request/scope evidence.
+is authorised; set true only from explicit request/scope evidence. It does not
+exclude a read-only stale check or a re-pin proposal for a build not yet delivered.
 
 Run ``publish SLUG lifts DRAFT`` before hand SQL, then ``render SLUG lifts``.
 In an older project without ``templates/lifts.md``, ``render`` installs the
@@ -44,6 +45,50 @@ bundled template first (one stderr line) and never replaces an existing or
 customised template; ``status`` lists missing templates with the fix command.
 No published entry means no hand SQL. Classification may remain null during
 capture; close-out settles it. A draft alone does not satisfy the hook.
+
+Read-only release stale check
+-----------------------------
+
+An entry may carry optional ``units`` evidence, a nonempty array such as::
+
+  "units": [
+    {"path": "models/appointments.py", "symbol": "Appointments", "absent_tag": "v0.6.0"},
+    {"path": "models/appointments.py", "symbol": "MissingColumn", "absent_tag": "v0.6.0"}
+  ]
+
+Use the exact inspected repository-relative file and identifier (class, function
+or column name) and the stable tag where it was absent. These example names are
+illustrative, not library facts. Add one reference per independently missing unit;
+absence of an entire file also counts. Omit ``units`` for legacy entries or
+behaviour-only shortfalls that symbol presence cannot test. Adding/changing this
+evidence increments the entry revision and requires reconfirmation if confirmed.
+
+Run ``sqlreview.sh lifts-stale SLUG --tag TAG`` with authenticated ``gh``. It
+returns JSON ``{slug, tag, entries}``, including every entry's ``id``, ``library``,
+``result``, ``message`` and per-unit results. It reads only GET tag refs, complete
+recursive trees and blob bytes from that entry's library; it never checks out,
+imports or executes library code. It confirms absence at ``absent_tag`` and exact
+identifier-token presence in a numerically newer stable ``v?X.Y.Z`` tag. Annotated
+tags are peeled. Older/equal tags return ``not-newer``; unsupported tag forms are
+rejected. No ledger, history, render, config, status, confirmation or pin is written.
+
+``may-be-resolved`` names newly present units; ``partly-resolved`` names partial
+shortfalls, leaving remaining units visible. Other results are ``absent``,
+``not-newer``, ``absence-contradicted`` (present at the claimed absence tag),
+``untracked`` (no unit evidence), and ``unknown`` (missing tag/access, incomplete
+tree, non-regular blob or unreadable evidence). Operational errors use the helper's
+normal nonzero exits; unknown remote evidence is a successful report, not a pass
+on availability. A symbol token in a comment/string can produce a nudge: this is
+not a language parser and never proves working behaviour or complete resolution.
+
+Triage includes the messages without writes. Discover latest stable tags using
+guardrails' shared ``references/library.rst`` policy; mixed-library ledgers need
+one run per library's latest tag, using only that library's rows in each run.
+Do not use a core release as evidence for the archived package. Inspect actual
+behaviour, all shortfalls, approved outputs and tests before a human decides on
+adoption. Candidates in undelivered builds are eligible even when nonrecurring;
+already-delivered one-off extracts remain forward-only. The check never advances
+the filed/released/recomposed lifecycle or authorises automatic re-pinning.
 
 Proposal-only mode and operator probes
 --------------------------------------
@@ -66,7 +111,7 @@ or identifiers, or that feeds an extract, is hand SQL and needs an entry.
 Guardrails' ``references/performance.rst`` gives the probe design rules.
 
 Increment the document revision on each publish. Each entry also has a revision:
-new candidates start at 1; changes to need, pin, inspected evidence, shortfall,
+new candidates start at 1; changes to need, pin, inspected evidence (including units), shortfall,
 workaround or classification increment that entry revision. A human answer binds
 ``confirmed_revision`` to the entry revision. This is the same confirmation rule
 as assumptions, applied to the independently evolving entry: appending another

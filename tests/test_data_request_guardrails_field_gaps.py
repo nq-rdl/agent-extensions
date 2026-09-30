@@ -25,7 +25,7 @@ LIFTS_COPIES = (
     REPO / "plugins" / "data-request" / "skills" / "setup" / "references" / "lifts.rst",
     REPO / "dist" / "codex" / "plugins" / "data-request" / "skills" / "setup" / "references" / "lifts.rst",
 )
-REFERENCES = ("performance.rst", "sources.rst", "checklist.rst", "release.rst", "modelling.rst")
+REFERENCES = ("performance.rst", "sources.rst", "checklist.rst", "release.rst", "modelling.rst", "library.rst")
 # The sentence guardrails, lifts.rst and map share for proposal-only entries (#372).
 PROPOSAL_ONLY = ("A proposal-only entry authorises no hand SQL: none is committed or run, "
                  "except exempt probes, until a writable run publishes the entry.")
@@ -103,18 +103,19 @@ class PublicRepoHygiene(unittest.TestCase):
 
 
 class Baseline(unittest.TestCase):
-    """#380: query-builder v0.6.0 with consolidated resolvers; PyPika composition is compliant."""
+    """#380/#441: query-builder API floor; release discovery must not freeze latest."""
 
     def test_archived_plugins_package_is_gone_everywhere(self):
         for path in shipped_files():
             with self.subTest(path=str(path.relative_to(REPO))):
                 text = path.read_text()
-                self.assertNotIn("query-builder-plugins", text)
+                if path.name != "library.rst":  # archived tag discovery is intentional, not a runtime API
+                    self.assertNotIn("query-builder-plugins", text)
                 self.assertNotIn("qb_plugins", text)
 
-    def test_compatibility_names_the_v060_baseline(self):
+    def test_compatibility_names_the_v060_api_floor(self):
         compat = frontmatter(SKILL)["compatibility"]
-        for token in ("query-builder 0.6.0", "resolvers/iemr", "resolvers/hbcis"):
+        for token in ("query-builder 0.6.0", "record_assumption", "record_limitation"):
             with self.subTest(token=token):
                 self.assertIn(token, compat)
         self.assertNotIn("0.4.0", compat)
@@ -128,8 +129,9 @@ class Baseline(unittest.TestCase):
         self.assertNotIn("v0.4.0", text)
 
     def test_resolvers_moved_at_v050(self):
-        text = section(body(SKILL), "Compose library units in requests")
-        self.assertIn("Since v0.5.0 the source resolvers", text)
+        text = (SKILL.parent / "references/library.rst").read_text()
+        self.assertIn("Since v0.5.0, source resolvers", text)
+        self.assertIn("references/library.rst", section(body(SKILL), "Compose library units in requests"))
 
     def test_lifts_example_uses_the_consolidated_package(self):
         text = LIFTS.read_text()
@@ -156,7 +158,8 @@ class LegacyOrg(unittest.TestCase):
         self.assertRegex(self.text, r"`v0\.1\.1`[^.]*lacks `register_result`")
 
     def test_scaffold_default_and_delivered_enquiries(self):
-        self.assertIn("scaffold (v0.5.0) still defaults to query-builder v0.5.0", self.text)
+        self.assertIn("Scaffold v0.5.0 defaulted to query-builder v0.5.0", self.text)
+        self.assertNotIn("The latest", self.text)
         for token in ("already-delivered", "no backport"):
             with self.subTest(token=token):
                 self.assertIn(token, self.text)
