@@ -1,0 +1,322 @@
+pass:
+- name: correct routing
+  reply: '```yaml
+
+    workflow: amend
+
+    classification: analyst-safe
+
+    baseline: operator-run
+
+    record: pr
+
+    row_keys: pending
+
+    review: stale
+
+    ```
+
+    '
+fail:
+- name: wrong workflow
+  reply: '```yaml
+
+    workflow: wrong
+
+    classification: analyst-safe
+
+    baseline: operator-run
+
+    record: pr
+
+    row_keys: pending
+
+    review: stale
+
+    ```
+
+    '
+  fails:
+  - workflow
+- name: duplicate conflicting workflow
+  reply: '```yaml
+
+    workflow: amend
+
+    classification: analyst-safe
+
+    baseline: operator-run
+
+    record: pr
+
+    row_keys: pending
+
+    review: stale
+
+    workflow: wrong
+
+    ```
+
+    '
+  fails:
+  - workflow
+- name: wrong classification
+  reply: '```yaml
+
+    workflow: amend
+
+    classification: wrong
+
+    baseline: operator-run
+
+    record: pr
+
+    row_keys: pending
+
+    review: stale
+
+    ```
+
+    '
+  fails:
+  - classification
+- name: duplicate conflicting classification
+  reply: '```yaml
+
+    workflow: amend
+
+    classification: analyst-safe
+
+    baseline: operator-run
+
+    record: pr
+
+    row_keys: pending
+
+    review: stale
+
+    classification: wrong
+
+    ```
+
+    '
+  fails:
+  - classification
+- name: wrong baseline
+  reply: '```yaml
+
+    workflow: amend
+
+    classification: analyst-safe
+
+    baseline: wrong
+
+    record: pr
+
+    row_keys: pending
+
+    review: stale
+
+    ```
+
+    '
+  fails:
+  - baseline
+- name: duplicate conflicting baseline
+  reply: '```yaml
+
+    workflow: amend
+
+    classification: analyst-safe
+
+    baseline: operator-run
+
+    record: pr
+
+    row_keys: pending
+
+    review: stale
+
+    baseline: wrong
+
+    ```
+
+    '
+  fails:
+  - baseline
+- name: wrong record
+  reply: '```yaml
+
+    workflow: amend
+
+    classification: analyst-safe
+
+    baseline: operator-run
+
+    record: wrong
+
+    row_keys: pending
+
+    review: stale
+
+    ```
+
+    '
+  fails:
+  - record
+- name: duplicate conflicting record
+  reply: '```yaml
+
+    workflow: amend
+
+    classification: analyst-safe
+
+    baseline: operator-run
+
+    record: pr
+
+    row_keys: pending
+
+    review: stale
+
+    record: wrong
+
+    ```
+
+    '
+  fails:
+  - record
+- name: wrong row_keys
+  reply: '```yaml
+
+    workflow: amend
+
+    classification: analyst-safe
+
+    baseline: operator-run
+
+    record: pr
+
+    row_keys: wrong
+
+    review: stale
+
+    ```
+
+    '
+  fails:
+  - row_keys
+- name: duplicate conflicting row_keys
+  reply: '```yaml
+
+    workflow: amend
+
+    classification: analyst-safe
+
+    baseline: operator-run
+
+    record: pr
+
+    row_keys: pending
+
+    review: stale
+
+    row_keys: wrong
+
+    ```
+
+    '
+  fails:
+  - row_keys
+- name: wrong review
+  reply: '```yaml
+
+    workflow: amend
+
+    classification: analyst-safe
+
+    baseline: operator-run
+
+    record: pr
+
+    row_keys: pending
+
+    review: wrong
+
+    ```
+
+    '
+  fails:
+  - review
+- name: duplicate conflicting review
+  reply: '```yaml
+
+    workflow: amend
+
+    classification: analyst-safe
+
+    baseline: operator-run
+
+    record: pr
+
+    row_keys: pending
+
+    review: stale
+
+    review: wrong
+
+    ```
+
+    '
+  fails:
+  - review
+- name: empty answer
+  reply: ''
+  fails:
+  - workflow
+  - classification
+  - baseline
+  - record
+  - row_keys
+  - review
+- name: earlier correct block cannot override final answer
+  reply: '```yaml
+
+    workflow: amend
+
+    classification: analyst-safe
+
+    baseline: operator-run
+
+    record: pr
+
+    row_keys: pending
+
+    review: stale
+
+    ```
+
+    ```yaml
+
+    workflow: wrong
+
+    classification: wrong
+
+    baseline: wrong
+
+    record: wrong
+
+    row_keys: wrong
+
+    review: wrong
+
+    ```
+
+    '
+  fails:
+  - workflow
+  - classification
+  - baseline
+  - record
+  - row_keys
+  - review

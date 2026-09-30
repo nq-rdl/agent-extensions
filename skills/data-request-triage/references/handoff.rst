@@ -53,22 +53,66 @@ hands a ``/speckit.*`` command back to the human.
 Hand-off to review
 ------------------
 
-Run this when the deliverable PR of the selected request is ready for review.
+Run this after the Data Engineer's ``/data-request:analyse``, authorised operator run
+and UAT, when the deliverable PR is ready for the Data Analyst's review. The request
+runbook's Delivery section must point here. The engineer hands over; the analyst
+explains, accepts for release preparation, sends back or amends presentation, then
+prepares and publishes the release. Never direct the engineer to release.
 
 1. **Gate.** Continue only when the PR is out of draft, its CI is green on the
    current head commit (read the run for that SHA, not an older one), and its
-   SQL review status is ``current``. ``current`` only means the SQL bytes match
-   the reviewed snapshot: also confirm that ``/data-request:analyse`` re-ran
+   SQL review status is ``current``. Match the review to the SQL that actually ran,
+   using the recorded run commit and SQL fingerprint, not just the PR's current SQL.
+   ``release.sh evidence`` reads review records and snapshots from the working tree,
+   not the PR. Fetch the checked PR head SHA from GitHub and its commit locally; never
+   substitute local ``HEAD``. For every review used in the evidence, set ``SLUG`` to
+   its slug and ``PR_HEAD`` to that checked SHA, then run from the request project root:
+
+   .. code-block:: bash
+
+     for name in review.json source.sql; do
+       path=".sqlreview/reviews/$SLUG/$name"
+       tmp="$(mktemp)" || exit 2
+       if ! git show "$PR_HEAD:./$path" > "$tmp" 2>/dev/null || ! cmp -s "$tmp" "$path"; then
+         rm -f "$tmp"
+         printf 'Stop: %s is absent or differs at checked PR head %s\n' "$path" "$PR_HEAD" >&2
+         exit 4
+       fi
+       rm -f "$tmp"
+     done
+
+   Missing or differing records stop the hand-off, including uncommitted, untracked
+   or locally committed but unpushed reviews. Retain any differing review draft and
+   stop for the engineer to complete its unpublished work. Run
+   ``bash "$S/release.sh" evidence "<run commit>"`` with ``S`` set to the installed
+   setup scripts only after these checks pass. Any ``changed``, ``missing-at-ref``,
+   ``unreviewed`` or invalid review, a missing snapshot, or unproven run provenance
+   stops the hand-off. A header-only
+   result needs proof that only the leading comments differ. Compare the run manifest
+   and maintained pipeline too: a matching committed file alone does not prove it ran.
+   Confirm DVC pointers and their corresponding objects are pushed, and that UAT sections
+   1 to 3 are recorded for this run. Missing evidence is a failed gate, never a passed check.
+   ``current`` only means the SQL bytes match the reviewed snapshot: also confirm that
+   ``/data-request:analyse`` re-ran
    (with ``--reconfirm-all``) after any pre-release logic change. Name every
-   open delivery gate, such as governance reconciliation. When the gate fails,
-   report which part failed and stop. Without ``gh``, reading CI runs can need
+   open delivery gate, such as governance reconciliation. Flag approval-sensitive
+   requested outputs, known restricted fields and flagged decisions for analyst review.
+   An unchecked approval does not by itself prevent review; a known restriction remains
+   a release gate. When the run-evidence or PR gate fails,
+   report which part failed and stop. Re-read the PR head before steps 2 to 4; if it
+   changed, recheck the gate on the new SHA. Without ``gh``, reading CI runs can need
    the GitHub MCP Actions toolset; if it is not enabled, say so.
-2. **Assign** the PR to the reviewer the human names, usually the analyst who
-   receives the deliverable. Never guess a reviewer. Re-resolve the child
+2. **Assign** the PR to the reviewer the human names. Read ``roles.analyst`` from
+   ``.sqlreview/config.json`` for the receiving role, not a person's login; if missing,
+   ask for the role and reviewer. Never guess a reviewer. Re-resolve the child
    repository through the API before this write.
 3. **Comment** on the child repository's tracking issue: the PR link, what is
-   handed over, and the open gates. Draft it for the human, or post it when the
-   human authorises that post.
+   handed over, run commit and head SHA, review slugs/revisions and SQL fingerprints,
+   counts-only QA, links to the run manifest, DVC pointers and UAT evidence, open questions,
+   flagged decisions, known governance restrictions and the limitations the requester
+   must hear. Keep row-level data, identifiers and small cell counts out. The child
+   issue is the hand-off destination; a PR comment alone is incomplete. Draft it for the
+   human, or post it when the human authorises that post.
 4. **Move** both the child issue and the service-desk request issue to
    **In-Review** on the Service Desk Request Tracking project board.
 5. **Record** the hand-off in the ledger: PR, head SHA, reviewer, board state and

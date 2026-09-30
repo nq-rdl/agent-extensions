@@ -3,10 +3,11 @@ license: CC-BY-4.0
 description: >-
   Walk a Data Analyst through reviewed SQL, step by step, against its review document, JSON and
   scope: each logic step with its lines, the assumptions and limitations that govern it (by id),
-  outputs and open questions — pausing for the analyst at every step. Produces no report; a
+  outputs and open questions — pausing for the analyst at every step, then accept for release
+  preparation, send back or amend presentation. Produces no formal review report; a
   small state marker lets a later run resume from what changed. Use after /data-request:analyse,
   when the analyst receives SQL for review or wants to understand a change to it.
-argument-hint: '<sql path | slug>'
+argument-hint: '<sql path | slug> [hand-off comment URL]'
 user-invocable: true
 compatibility: >-
   .sqlreview schema 2 (schema 1 remains readable) (docs/specs/2026-09-15-sql-review-plugin-design.md); bash 3.2+, jq >= 1.6.
@@ -17,11 +18,16 @@ metadata:
 
 # Data Request — explain (Data Analyst)
 
+The engineer completes `analyse`, the authorised operator run, UAT and the triage hand-off
+before the analyst reviews the extract here. The analyst accepts for release preparation,
+sends back or uses `amend`, then prepares and publishes the release. The engineer never releases.
+
 For RDL cohort SQL, read `${CLAUDE_PLUGIN_ROOT}/skills/guardrails/SKILL.md` when
 explaining storage facts or conversions. Label any conflict with current source
 metadata and return it to `/data-request:analyse`; do not silently rewrite the reviewed record.
 
-Arguments: `$ARGUMENTS` — a SQL path or a slug from `status`.
+Arguments: `$ARGUMENTS` — a SQL path or a slug from `status`, optionally followed by
+its child-issue hand-off comment URL.
 
 ```bash
 S="${CLAUDE_PLUGIN_ROOT}/skills/setup/scripts"
@@ -46,6 +52,27 @@ Exit 10: the review no longer describes the file. Ask (AskUserQuestion): **Ask t
 to run /data-request:analyse --update first (Recommended)** / **Explain the reviewed snapshot** — the
 second explains `reviews/$SLUG/source.sql`, and every step is labelled as describing the
 snapshot, not the current file.
+
+## Load the durable hand-off
+
+On every invocation, including a fresh session with no `explain.json`, read the hand-off
+comment URL supplied by the analyst. If none is supplied, locate it through the request's
+agreed durable triage ledger and child tracking issue; if ambiguous or unavailable, ask for
+the exact comment URL. Read that comment and its linked evidence with `gh` or available
+GitHub read tools, not a recollection of an earlier session. Make no GitHub writes.
+
+Verify the child repository, tracking issue and deliverable PR match this request. Read the
+current PR head SHA from GitHub and compare the hand-off's head SHA, run commit, review revision
+and SQL fingerprint with the review being explained. Read the linked run manifest, counts-only
+QA, DVC provenance and UAT sections 1 to 3 for that run, plus open questions, flagged decisions,
+requester limitations and known approval restrictions. Read
+`${CLAUDE_PLUGIN_ROOT}/skills/triage/references/handoff.rst`, *Hand-off to review*, and recheck
+its gate, including the committed-review/snapshot check and `release.sh evidence` at the run
+commit. Recheck any referenced release gates against their current evidence before outcomes.
+
+If the record, linked evidence or tools are missing, or any identity/revision differs, name
+what is missing or stale and do not offer acceptance. A SQL-only walkthrough and **Send back**
+remain available; neither clears the gate. Do not infer acceptance from `explain.json`.
 
 ## Resume from a previous explanation (#128 §2)
 
@@ -104,5 +131,35 @@ Never use `user.email`: the file is committed, and the guard refuses a `by` with
 
 A stop writes `completed: false` with the step reached, so the next run can resume.
 
-At release, `/data-request:release <tag>` drafts the researcher-facing summary from the release's
-own artifacts; this walkthrough is not a release note.
+## Analyst outcome
+
+A completed explanation is not acceptance of the extract. Only after the durable hand-off
+has been loaded and rechecked, show run QA, open questions, flagged decisions and known approval
+restrictions from it. Ask the analyst for
+**Accept for release preparation** / **Send back** / **Presentation amendment**. Do not
+offer acceptance of stale SQL, an explained snapshot, missing run/UAT evidence or an
+unresolved release gate. Leave acceptance pending when the analyst stops.
+
+Acceptance permits `/data-request:release <candidate ref>` to draft the researcher-facing
+summary; it does not publish. A presentation request goes to `/data-request:amend`, including
+before the first release. Logic changes and defects go to the engineer through
+`/data-request:fix`; a disagreement with a review item also requires `analyse --update`.
+Classify each finding; do not make the change or approve new meaning during explanation.
+
+For **Send back**, return this paste-ready note, with one finding block per change:
+
+```text
+outcome: send-back
+run commit: <operator run SHA, or missing>
+finding: <F1: observed issue and affected files>
+expected result: <analyst's requested outcome; mark undecided meaning explicitly>
+classification: <logic or defect | presentation>
+route: </data-request:fix | /data-request:amend>
+evidence: <review item/revision, SQL lines, run QA or output schema; no row-level data>
+open gates: <unanswered decisions, governance restrictions and missing evidence>
+return to review: <refresh analyse, operator-run/UAT evidence and triage hand-off>
+```
+
+Present the note to the analyst; post nothing unless explicitly instructed. Keep
+`explain.json.completed` about the walkthrough only. Preserve review confirmations and
+release records; send-back does not create a new approval field or approve the release.

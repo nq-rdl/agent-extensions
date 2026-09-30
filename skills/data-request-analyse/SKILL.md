@@ -78,10 +78,15 @@ bash "$S/sqlreview.sh" render "$SLUG" review || exit $?
 if cmp -s ".sqlreview/reviews/$SLUG/review.draft.json" ".sqlreview/reviews/$SLUG/review.json"; then
   rm -f ".sqlreview/reviews/$SLUG/review.draft.json"
 fi
+if [ -e ".sqlreview/reviews/$SLUG/review.draft.json" ]; then
+  printf 'Stop: review draft contains unpublished work; retain it for completion.\n' >&2
+  exit 4
+fi
 ```
 
-Show `review.md` and stop. Keep any differing draft and tell the user it contains
-unpublished work; do not discard or publish it automatically. If rendering fails,
+Show `review.md`. If a differing draft remains, stop before *After review*: tell the user it
+contains unpublished work; do not discard or publish it automatically. Continue with *After review*
+below only when no unpublished draft remains. If rendering fails,
 retain the draft and report the failure; retry this completion step once the cause
 is fixed.
 
@@ -229,8 +234,7 @@ bash "$S/sqlreview.sh" render "$SLUG" review || exit $?  # → reviews/<slug>/re
 rm -f ".sqlreview/reviews/$SLUG/review.draft.json"
 ```
 
-Show `review.md`. Hand over: the analyst runs `/data-request:explain <sql path>`. The review stays an
-internal handoff, not a release note: at release, the analyst runs `/data-request:release <tag>`.
+Show `review.md`. Continue with *After review* below.
 
 Publish validates a staged copy, confirmations, next revision and current SQL fingerprint before
 atomically replacing `review.json`, and re-proves each carried item against the previous
@@ -239,3 +243,18 @@ atomically replacing `review.json`, and re-proves each carried item against the 
 Snapshot verifies the final review hash before advancing `source.sql` and preserves
 `history/<revision>.sql` for resumed explanations. Stop on any failure and keep the draft. A failed
 or interrupted publish must never advance the baseline; a failed snapshot leaves the review stale.
+
+## After review: operator run, UAT and analyst hand-off
+
+The Data Engineer completes `analyse`, the authorised operator run and UAT, then hands the
+extract to the Data Analyst. The engineer never releases the extract. The analyst runs
+`/data-request:explain`, then accepts it for release preparation, sends it back or uses
+`/data-request:amend` for presentation changes. Only the analyst prepares the body through
+`/data-request:release <candidate ref>` and publishes the release.
+
+Read `${CLAUDE_PLUGIN_ROOT}/skills/triage/references/handoff.rst`, *Hand-off to review*.
+Use that existing procedure after the operator run and UAT, including its run-evidence gate,
+child-issue comment, reviewer assignment and board moves. A rendered review alone does not
+complete the hand-off. Require the request runbook's **Delivery** section to point to this
+same triage hand-off and name the analyst's next step; flag a missing section for the engineer.
+Do not run the extract or write to GitHub without the procedure's explicit authorisation.

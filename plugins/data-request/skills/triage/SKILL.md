@@ -107,13 +107,13 @@ Choose one request from the queue with the human, then route each agreed task:
 | Static checks against the request | `/data-request:validate` |
 | Human-confirmed handoff | `/data-request:analyse` |
 | Defects, released or not, and logic changes before the first release | `/data-request:fix` |
-| A released extract that needs different output than was agreed | `/data-request:amend` |
+| Presentation changes to an operator-run or released extract; different output than was agreed | `/data-request:amend` |
 | Researcher-facing release body | `/data-request:release` |
 | Library shortfalls and upstream issues | `/data-request:lift` |
 | Comments, reports and PR bodies | `/tech-writing:copyedit` |
 
-Fulfilment (parity-covered SQL from library units, fixes upstream, re-pin order, PRs as drafts
-by default), spec-kit library work and the review hand-off: read [references/handoff.rst](references/handoff.rst).
+Fulfilment (parity, upstream fixes, re-pin order, PRs as drafts by default) and spec-kit work: read [references/handoff.rst](references/handoff.rst). Delivery order: engineer `analyse`, authorised operator run, UAT and triage hand-off;
+analyst `explain`, accept for release preparation, send back or `amend`, then `release`. The engineer hands over and never releases the extract.
 
 Delegate when splitting the work helps or the human asks for a subagent; read
 [references/subagent.rst](references/subagent.rst) first. Select models by capability,

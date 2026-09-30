@@ -1,0 +1,3 @@
+kind: Fixed
+body: Loads durable run and UAT hand-off evidence before offering analyst acceptance in `data-request:explain` (#447)
+time: 2026-09-30T03:58:13.014694037Z

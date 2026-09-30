@@ -1,6 +1,6 @@
 """Contract tests for the pre-release logic change path (issue #390).
 
-`/data-request:amend` governs released extracts only (#356), so a decided logic change
+`/data-request:amend` governs presentation changes before or after release (#424), so a decided logic change
 made before an extract's first release goes to `/data-request:fix`. These checks pin
 that routing in both skills, their frontmatter descriptions (what skill discovery
 shows) and their packaged Claude Code and Codex copies, plus the three rules the path
@@ -69,13 +69,14 @@ def section(body: str, heading: str) -> str:
 
 
 class FixOwnsPreReleaseChanges(unittest.TestCase):
-    def test_change_requests_go_to_amend_only_once_released(self):
+    def test_presentation_changes_go_to_amend_before_or_after_release(self):
         for target, path in FIX.items():
             with self.subTest(target=target):
                 body = frontmatter(path)[1]
                 routing = next(s for s in sentences(body) if "change request" in s)
                 self.assertIn("/data-request:amend", routing)
-                self.assertRegex(routing, r"only when the extract is released")
+                self.assertIn("presentation", routing)
+                self.assertIn("before or after release", flat(body))
                 self.assertIn("*Pre-release logic change*", flat(body))
 
     def test_release_needs_positive_confirmation(self):
@@ -145,19 +146,20 @@ class FixOwnsPreReleaseChanges(unittest.TestCase):
                 self.assertIn("does not replace it", text)
 
 
-class AmendIsReleasedOnly(unittest.TestCase):
-    def test_description_says_released_and_points_pre_release_to_fix(self):
+class AmendSupportsPreReleasePresentation(unittest.TestCase):
+    def test_description_supports_operator_run_and_points_logic_to_fix(self):
         for target, path in AMEND.items():
             with self.subTest(target=target):
                 desc = flat(frontmatter(path)[0]["description"])
-                self.assertIn("released", desc[:80])
+                self.assertIn("operator-run or released", desc)
                 self.assertIn("before the first release, a logic change goes to fix", desc)
 
-    def test_body_routes_pre_release_changes_to_fix(self):
+    def test_body_routes_pre_release_logic_to_fix_and_requires_baseline(self):
         for target, path in AMEND.items():
             with self.subTest(target=target):
                 body = flat(frontmatter(path)[1])
-                self.assertIn("This skill applies only to a released extract", body)
+                self.assertIn("Before the first release, use the operator-run extract as the baseline", body)
+                self.assertNotIn("Before the first release there is no extract to amend", body)
                 self.assertIn("a `data/Review/` drop that reached them counts", body)
                 self.assertIn("goes to `/data-request:fix` (*Pre-release logic change*)", body)
                 self.assertIn("If you cannot tell whether the extract is released, ask, and make "
