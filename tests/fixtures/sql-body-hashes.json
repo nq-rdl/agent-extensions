@@ -1,0 +1,97 @@
+[
+  {
+    "name": "ordinary header",
+    "sql": "/* old notes */\n-- more notes\n\nSELECT 1;\n",
+    "body": "SELECT 1;\n"
+  },
+  {
+    "name": "no header",
+    "sql": "SELECT 1;\n",
+    "body": "SELECT 1;\n"
+  },
+  {
+    "name": "body comments retained",
+    "sql": "-- header\nSELECT 1;\n-- execution comment\n",
+    "body": "SELECT 1;\n-- execution comment\n"
+  },
+  {
+    "name": "code after closing block",
+    "sql": "/* notes */ SELECT 1;\n",
+    "body": "/* notes */ SELECT 1;\n"
+  },
+  {
+    "name": "multiline close and code",
+    "sql": "/* notes\n*/ SELECT 1;\n",
+    "body": "*/ SELECT 1;\n"
+  },
+  {
+    "name": "nested block",
+    "sql": "/* outer /* inner */ end */\nSELECT 1;\n",
+    "body": "/* outer /* inner */ end */\nSELECT 1;\n"
+  },
+  {
+    "name": "executable mysql",
+    "sql": "/*! SET mode=1 */\nSELECT 1;\n",
+    "body": "/*! SET mode=1 */\nSELECT 1;\n"
+  },
+  {
+    "name": "optimizer hint",
+    "sql": "/*+ hint */\nSELECT 1;\n",
+    "body": "/*+ hint */\nSELECT 1;\n"
+  },
+  {
+    "name": "extract marker",
+    "sql": "-- notes\n-- @extract: patients\nSELECT 1;\n",
+    "body": "-- @extract: patients\nSELECT 1;\n"
+  },
+  {
+    "name": "extract in block",
+    "sql": "/* notes\n@extract: patients\n*/\nSELECT 1;\n",
+    "body": "/* notes\n@extract: patients\n*/\nSELECT 1;\n"
+  },
+  {
+    "name": "unterminated",
+    "sql": "/* notes\nSELECT 1;\n",
+    "body": null
+  },
+  {
+    "name": "only header",
+    "sql": "-- notes\n/* metadata */",
+    "body": ""
+  },
+  {
+    "name": "crlf",
+    "sql": "-- notes\r\nSELECT 1;\r\n",
+    "body": "SELECT 1;\r\n"
+  },
+  {
+    "name": "bare cr code",
+    "sql": "-- notes\rSELECT 1;\n",
+    "body": "-- notes\rSELECT 1;\n"
+  },
+  {
+    "name": "bare cr whitespace",
+    "sql": "-- notes\r \t\r\nSELECT 1;\n",
+    "body": "SELECT 1;\n"
+  },
+  {
+    "name": "no final newline",
+    "sql": "-- notes\nSELECT 1;",
+    "body": "SELECT 1;"
+  },
+  {
+    "name": "bom conservative",
+    "sql": "﻿-- notes\nSELECT 1;\n",
+    "body": "﻿-- notes\nSELECT 1;\n"
+  },
+  {
+    "name": "uppercase extract marker",
+    "sql": "-- notes\n-- @EXTRACT: patients\nSELECT 1;\n",
+    "body": "-- @EXTRACT: patients\nSELECT 1;\n"
+  },
+  {
+    "name": "mixed case block extract marker",
+    "sql": "/* notes\n@ExTrAcT: patients\n*/\nSELECT 1;\n",
+    "body": "/* notes\n@ExTrAcT: patients\n*/\nSELECT 1;\n"
+  }
+]

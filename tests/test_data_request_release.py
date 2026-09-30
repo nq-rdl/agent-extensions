@@ -422,6 +422,24 @@ class Evidence(unittest.TestCase):
         self.assertEqual(r.returncode, 0, r.stderr)
         self.assertEqual(self.only(r)[1]["applies"], "header-only")
 
+    def test_body_evidence_keeps_full_hash_and_refuses_corrupt_snapshot(self):
+        path = self.p.root / ".sqlreview/reviews" / SLUG / "review.json"
+        doc = json.loads(path.read_text())
+        body = hashlib.sha256(SQL_V1.split("*/\n", 1)[1].encode()).hexdigest()
+        doc["sql_body_sha256"] = body
+        path.write_text(json.dumps(doc))
+        self.p.write(SQL_PATH, SQL_HEADER)
+        self.p.commit("header-only candidate")
+        self.p.tag("v1.0.0")
+        result = self.p.evidence("v1.0.0")
+        self.assertEqual(result.returncode, 0, result.stderr)
+        row = self.only(result)[1]
+        self.assertEqual(row["sql_body_sha256_reviewed"], body)
+        self.assertEqual(row["sql_body_sha256_at_ref"], body)
+        self.assertNotEqual(row["sql_sha256_reviewed"], row["sql_sha256_at_ref"])
+        self.p.write(f".sqlreview/reviews/{SLUG}/source.sql", SQL_HEADER)
+        self.assertEqual(self.only(self.p.evidence("v1.0.0"))[1]["applies"], "changed")
+
     def test_review_of_draft_sql_absent_from_the_release(self):
         # SQL-only review on a branch; the release is cut from a pipeline without that file.
         git(self.p.root, "checkout", "-q", "-b", "release", self.p.review_commit + "~0")

@@ -174,7 +174,7 @@ cmd_render() {
 
 # One review directory -> one JSON row on stdout.
 rl_review_row() { # <slug> <commit>
-  local slug="$1" commit="$2" d="$SR_REVIEWS/$1" doc kind sql reviewed at="" applies tmp gc inref="null"
+  local slug="$1" commit="$2" d="$SR_REVIEWS/$1" doc kind sql reviewed at="" body_at="" applies tmp gc inref="null" binding
   doc="$(sr_doc_for "$slug")" || return 1
   kind="$(jq -r '.kind // ""' "$doc")"
   if ! bash "$SR_SCRIPT_DIR/sqlreview.sh" check "$doc" >/dev/null 2>&1; then
@@ -193,10 +193,12 @@ rl_review_row() { # <slug> <commit>
   fi
   if [ "$kind" = scope ]; then applies="unreviewed"
   elif [ -z "$at" ]; then applies="missing-at-ref"
-  elif [ "$at" = "$reviewed" ]; then applies="current"
-  elif [ -f "$d/source.sql" ] && [ "$(sr_sha256 "$d/source.sql")" = "$reviewed" ] && sr_body_same "$d/source.sql" "$tmp"; then
-    applies="header-only"
-  else applies="changed"; fi
+  else
+    sr_no_symlinks "$d/source.sql" || exit 2
+    sr_binding "$doc" "$tmp" "$d/source.sql"; binding=$?
+    case "$binding" in 0) applies="current" ;; 10) applies="header-only" ;; *) applies="changed" ;; esac
+  fi
+  [ -z "$at" ] || body_at="$(sr_body_sha256 "$tmp" || true)"
   rm -f "$tmp"
   gc="$(jq -r '.git_commit // "" | strings' "$doc")"
   case "$gc" in
@@ -204,10 +206,11 @@ rl_review_row() { # <slug> <commit>
     *) if git -C "$SR_ROOT" merge-base --is-ancestor "$gc" "$commit" 2>/dev/null; then inref=true
        elif [ $? -eq 1 ]; then inref=false; fi ;;
   esac
-  jq -c --arg slug "$slug" --arg applies "$applies" --arg at "$at" --argjson inref "$inref" '
+  jq -c --arg slug "$slug" --arg applies "$applies" --arg at "$at" --arg body_at "$body_at" --argjson inref "$inref" '
     def items: [(. // [])[] | {id, text, rationale, confirmed_revision}];
     {slug: $slug, kind, sql_path, revision, applies: $applies,
      sql_sha256_reviewed: .sql_sha256, sql_sha256_at_ref: (if $at == "" then null else $at end),
+     sql_body_sha256_reviewed: (.sql_body_sha256 // null), sql_body_sha256_at_ref: (if $body_at == "" then null else $body_at end),
      reviewed_commit: .git_commit, reviewed_commit_in_ref: $inref,
      assumptions: (.assumptions | items), limitations: (.limitations | items),
      open_questions: (.open_questions // [])}' "$doc"

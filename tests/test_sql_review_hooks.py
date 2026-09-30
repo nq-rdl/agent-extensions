@@ -194,6 +194,34 @@ class GuardHook(unittest.TestCase):
 
 
 class PreflightHook(unittest.TestCase):
+    def test_header_only_states_report_slugs_and_next_steps(self):
+        import hashlib
+        for kind, state, workflow in (("review", "header-only", "/data-request:analyse"),
+                                      ("scope", "scoped-header-only", "/data-request:bootstrap")):
+            with self.subTest(kind=kind), tempfile.TemporaryDirectory() as tmp:
+                p = Project(tmp)
+                old = "-- original header\nSELECT 1;\n"
+                sql = p.sql("q.sql", old)
+                doc = (review_doc if kind == "review" else scope_doc)(
+                    "q", "q.sql", sql_sha256=hashlib.sha256(old.encode()).hexdigest())
+                p.write_json("q", f"{kind}.json", doc)
+                baseline = p.review_dir("q") / ("source.sql" if kind == "review" else "scope.source.sql")
+                baseline.write_text(old)
+                sql.write_text(old.replace("original", "corrected"))
+                status = json.loads(run_helper(["status", "--json"], p.root).stdout)
+                self.assertEqual(status["reviews"][0]["state"], state)
+                # Both canonical and installed hook entrypoints must expose the new states.
+                for hook in (PREFLIGHT, PLUGIN / "hooks/data-request-preflight.sh"):
+                    r = run_hook(hook, {"cwd": str(p.root)}, env_for())
+                    self.assertEqual(r.returncode, 0, r.stderr)
+                    ctx = decision(r)["additionalContext"]
+                    self.assertIn("1 " + state, ctx)
+                    self.assertIn("(q)", ctx)
+                    self.assertIn(workflow, ctx)
+                    self.assertIn("inspect", ctx.lower())
+                    self.assertIn("record", ctx.lower())
+                    self.assertIn("header revision", ctx.lower())
+
     def test_initialised_project_reports_counts_and_stale_slugs(self):
         with tempfile.TemporaryDirectory() as tmp:
             p = Project(tmp)
