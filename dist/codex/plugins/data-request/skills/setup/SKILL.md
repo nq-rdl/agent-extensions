@@ -139,3 +139,12 @@ written, or `$data-request:analyse <sql path>` for SQL that already exists. Sugg
 
 SQL paths are supplied explicitly to bootstrap/analyse. To customise report sections, edit the
 project templates; SQL glob filtering and section flags are not configuration options.
+
+`fingerprint` records both `sql_sha256` (original full-file provenance) and `sql_body_sha256`
+(exact body bytes after conservative leading comments). `header-only` and `scoped-header-only`
+remain body-bound; `publish` records helper-owned full header hashes and timestamps in
+`header_revisions`, and `render` notes them even with customised templates. Keep original
+snapshots. Legacy records use their full hash or an authenticated snapshot for header comparison.
+Hints, executable/nested comments, `@extract:` markers and code after a block close remain in
+the body; malformed headers have no body hash. Any body edit, including whitespace or comments,
+unbinds the record. Body equality never confirms changed assumptions, rationale or decisions.

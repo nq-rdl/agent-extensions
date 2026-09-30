@@ -108,6 +108,8 @@ else
     (if .kind == "review" and ((.purpose | nonempty | not) or (.sql_sha256 | test("^[0-9a-f]{64}$") | not)) then "review requires purpose and SHA256" else empty end),
     (if .kind == "scope" and (.intent | nonempty | not) then "scope requires intent" else empty end),
     (if .kind == "scope" and .sql_sha256 != null and (.sql_sha256 | (type == "string" and test("^[0-9a-f]{64}$")) | not) then "scope sql_sha256 must be null or a SHA256" else empty end),
+    (("sql_body_sha256") as $key | if has($key) and .[$key] != null and (.[$key] | (type == "string" and test("^[0-9a-f]{64}$")) | not) then "\($key) must be null or a SHA256" else empty end),
+    (if has("header_revisions") and ((.header_revisions | type) != "array" or (.header_revisions | all(.[]; type == "object" and (.sql_sha256 | type == "string" and test("^[0-9a-f]{64}$")) and (.at | nonempty)) | not)) then "header_revisions must contain full SHA256 and timestamp" else empty end),
     (.revision as $rev
   | req("schemaVersion"), req("kind"), req("slug"), req("sql_path"), req("revision"),
     (if .kind != "lifts" then req("assumptions"), req("limitations") else empty end),

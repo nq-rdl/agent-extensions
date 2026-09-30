@@ -30,7 +30,7 @@ S="${CLAUDE_PLUGIN_ROOT}/skills/setup/scripts"
 bash "$S/sqlreview.sh" status --json                # exit 3 → stop: not initialised, run /data-request:setup first
 SLUG="$(bash "$S/sqlreview.sh" slug "<sql path>")"  # exit 5 → bound to another path: offer `sqlreview.sh move OLD NEW`;
                                                     # a stderr legacy-review note → offer its `move --slug OLD_SLUG NEW`
-bash "$S/sqlreview.sh" fingerprint "<sql path>"     # {sql_path, sql_sha256, git_commit, git_dirty} — embed as-is
+bash "$S/sqlreview.sh" fingerprint "<sql path>"     # {sql_path, sql_sha256, sql_body_sha256, git_commit, git_dirty} — embed as-is
 ```
 
 Read `definitions` from `.sqlreview/config.json` and use that wording verbatim when deciding and
@@ -67,14 +67,21 @@ bash "$S/sqlreview.sh" delta "$SLUG"     # exit 0 → complete publication below
 
 ### Unchanged SQL: complete publication before stopping
 
-On exit 0, finish rendering the authoritative review before reporting it unchanged.
+On exit 0, the SQL body remains bound, including `header-only` status. Inspect a header-only
+diff and run `notes "<sql path>" --against ".sqlreview/reviews/$SLUG/review.json"` before
+completion. A body match does not confirm changed assumption text or rationale: reconcile
+those differences and obtain fresh confirmation through the update path. For wording-only
+header corrections that leave the confirmed record intact, publish that record again to
+record the header revision, then render it.
 A previous run may have published and snapshotted successfully but failed or stopped
 before rendering. This recovery uses the existing confirmed revision; do not increment
 it or ask for its confirmations again. Run from the project root:
 
 ```bash
+bash "$S/sqlreview.sh" publish "$SLUG" review ".sqlreview/reviews/$SLUG/review.json" || exit $?
 bash "$S/sqlreview.sh" render "$SLUG" review || exit $?
-if cmp -s ".sqlreview/reviews/$SLUG/review.draft.json" ".sqlreview/reviews/$SLUG/review.json"; then
+if jq -e -s 'length == 2 and (.[0] | del(.header_revisions)) == (.[1] | del(.header_revisions))' \
+    ".sqlreview/reviews/$SLUG/review.draft.json" ".sqlreview/reviews/$SLUG/review.json" >/dev/null 2>&1; then
   rm -f ".sqlreview/reviews/$SLUG/review.draft.json"
 fi
 if [ -e ".sqlreview/reviews/$SLUG/review.draft.json" ]; then
@@ -83,7 +90,9 @@ if [ -e ".sqlreview/reviews/$SLUG/review.draft.json" ]; then
 fi
 ```
 
-Show `review.md`. If a differing draft remains, stop before *After review*: tell the user it
+Show `review.md`. Draft equality is semantic, ignoring only helper-owned
+`header_revisions`; formatting and header history are not unpublished work. If any
+other differing or unreadable draft remains, stop before *After review*: tell the user it
 contains unpublished work; do not discard or publish it automatically. Continue with *After review*
 below only when no unpublished draft remains. If rendering fails,
 retain the draft and report the failure; retry this completion step once the cause
@@ -212,7 +221,7 @@ change before continuing. Write the complete confirmed document to
 {
   "schemaVersion": 2, "kind": "review", "slug": "<SLUG>", "sql_path": "<sql path>", "title": "…",
   "revision": 1, "recorded_at": "<UTC ISO>", "recorded_by": "<user>",
-  "sql_sha256": "<from fingerprint>", "git_commit": "<from fingerprint>", "git_dirty": "<boolean from fingerprint; preserve its JSON type>",
+  "sql_sha256": "<from fingerprint>", "sql_body_sha256": "<from fingerprint, or null if malformed>", "git_commit": "<from fingerprint>", "git_dirty": "<boolean from fingerprint; preserve its JSON type>",
   "purpose": "…", "grain": "one row per …",
   "inputs":  [{"name": "schema.table", "description": "one row per …"}],
   "outputs": [{"name": "column", "description": "…"}],
@@ -241,7 +250,7 @@ atomically replacing `review.json`, and re-proves each carried item against the 
 `carryforward` and walk what it lists. Never copy or patch the draft directly into the final path.
 Snapshot verifies the final review hash before advancing `source.sql` and preserves
 `history/<revision>.sql` for resumed explanations. Stop on any failure and keep the draft. A failed
-or interrupted publish must never advance the baseline; a failed snapshot leaves the review stale.
+or interrupted publish must never advance the baseline; a failed snapshot leaves the review stale. A header-only snapshot retains the authenticated original bytes; never replace historical snapshots from a claimed body match.
 
 ## After review: operator run, UAT and analyst hand-off
 
