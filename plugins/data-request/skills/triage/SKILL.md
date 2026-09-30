@@ -22,8 +22,8 @@ metadata:
 
 The queue entrypoint decides what to work on next and in what order. Stage skills do the
 work; this skill routes to them without restating procedures. Arguments: `$ARGUMENTS`. Read
-`${CLAUDE_PLUGIN_ROOT}/skills/guardrails/SKILL.md` for the source hierarchy before judging a
-requirement or a gap.
+`${CLAUDE_PLUGIN_ROOT}/skills/guardrails/SKILL.md` for source hierarchy and **Engineer decisions: proceed and flag**;
+its `references/decision-authority.rst` distinguishes technical defaults from analyst questions and genuine blockers.
 
 ## Choose the mode
 
@@ -79,8 +79,8 @@ Recheck affected evidence/artifacts, not every stage. See [references/ledger.rst
 6. **Settle requirements in order**: known approval restrictions first; a screening-log
    approval overrides a broader intake list. Build requested identifiers and free text
    even when approval is unchecked; the analyst checks coverage during review. Confirm
-   source system and grain before `/data-request:bootstrap`. Keep confirmed requirements
-   apart from proposals; silence is not approval. Supplied cohorts mean linkage, not discovery.
+   source system and grain with the engineer before `/data-request:bootstrap`; proceed and flag technical decisions.
+   Separate confirmed requirements, engineer decisions and proposals; silence is not approval. Supplied cohorts mean linkage.
    Use explicit codes as written, not a broader library concept. Read [references/checks.rst](references/checks.rst).
 7. **Recheck every gap claim**, whether yours, a worker's or a register row, against current
    code, tests, releases and dependency topology before you plan or file it. A delivered
@@ -100,7 +100,7 @@ Choose one request from the queue with the human, then route each agreed task:
 | Need | Stage |
 |---|---|
 | Source hierarchy, timezones, composition rules | `/data-request:guardrails` |
-| Confirmed scope, after source system and grain are confirmed | `/data-request:bootstrap` |
+| Scope, after engineer source/grain decisions; preserve analyst research answers | `/data-request:bootstrap` |
 | Source and resolver mapping | `/data-request:map` |
 | Compose or revise the pipeline and its SQL | `/data-request:draft` |
 | Static checks against the request | `/data-request:validate` |

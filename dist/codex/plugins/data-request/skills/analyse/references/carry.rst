@@ -61,8 +61,11 @@ text, rationale, basis and ``location`` lines:
    Show a one-line summary of the SQL delta since ``scope.source.sql`` (or "SQL written after the
    scope"). Options: **Carry over all** / **Walk each individually**, neither recommended.
 
-Carry over confirms the listed items, their locations included, from that answer. Walk moves
-them to the per-item walk.
+Copy each row's optional ``decided`` object onto the draft item verbatim, separate from the new confirmer.
+Preserve the original actor, role, source and date precision; do not invent an origin when absent.
+Moving an item to the walk does not erase a decision origin that still applies.
+Carry over confirms the listed items, their locations included, from that answer. It does not
+replace decision origin with confirmation provenance. Walk moves them to the per-item walk.
 
 Header to review: ``notes --against --confirmed-by``
 ---------------------------------------------------
