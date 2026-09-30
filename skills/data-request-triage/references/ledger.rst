@@ -97,6 +97,9 @@ Example entry (the same shape is returned as text; convert to JSON for ``set``):
      date: '2026-09-29'
    verification: {status: partial, commands: ['mapping check: pass'], at: '2026-09-29'}
 
+Rules
+-----
+
 Required: ticket, enquiry, stage, stages_done, evidence_revision, stage_evidence,
 decisions, blockers, depends_on, next_action and verification. Repo, approval,
 branch, owner and handoff may be omitted until known; never invent them.

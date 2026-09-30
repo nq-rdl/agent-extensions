@@ -41,7 +41,7 @@ see [references/ledger.rst](references/ledger.rst). No child or service-desk wri
 Stop at triage when that is the requested scope, even when a fix looks small.
 
 **Co-development**: agree each task for one selected request before starting or delegating;
-write only to agreed branches. See *Co-development*.
+write only to the branches the human agreed. See *Co-development*.
 
 Infer the mode from the request when no flag is given. When unclear, ask and stay in triage only.
 

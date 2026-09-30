@@ -13,6 +13,10 @@
 #                                              sql/cohort_pipeline/x.sql -> sql__cohort_pipeline__x; an existing
 #                                              legacy-encoded reviews/sql__cohort%5Fpipeline__x/ is kept
 #   check FILE | check --stdin                 validate a review/scope JSON; exit 4 with one violation per line
+#   ledger [--session] get TICKET [--against REVISIONS]  load one triage entry; optional selective recheck
+#   ledger [--session] set TICKET ENTRY         validate, lock and atomically save .sqlreview/ledger.json
+#                                              --session uses durable user state, never writes a child repository
+#   ledger check FILE                          validate a schema-1 triage ledger store; no init required
 #   lint FILE                                  prose code values (validated machine metadata exempt), provisional wording or
 #                                              unlinked decision sources; three columns, exit 10 when any
 #   lint --ste FILE                            also STE wording in intent and item text/rationale, any status: one
@@ -94,7 +98,14 @@ cmd_init() {
     return 0
   fi
 
-  if [ "$mode" = "create" ] && [ ! -d "$target" ]; then
+  # A ledger saved before setup is session state, not an initialized project.
+  # Complete only that exact ledger-only tree; any other existing state stays report-only.
+  local ledger_only=0
+  if [ -f "$target/ledger.json" ] &&
+     [ -z "$(find "$target" -mindepth 1 -maxdepth 1 ! -name ledger.json -print)" ]; then
+    ledger_only=1
+  fi
+  if [ "$mode" = "create" ] && { [ ! -d "$target" ] || [ "$ledger_only" = 1 ]; }; then
     for f in $files; do
       sr_no_symlinks "$target/$f" || exit 2
       mkdir -p "$target/$(dirname "$f")" || sr_die 2 "cannot create target directory"
@@ -1224,6 +1235,7 @@ case "$cmd" in
   status) cmd_status "$@" ;;
   slug) cmd_slug "$@" ;;
   check) cmd_check "$@" ;;
+  ledger) . "$SR_SCRIPT_DIR/sqlreview-ledger.sh"; cmd_ledger "$@" ;;
   lint) cmd_lint "$@" ;;
   publish) cmd_publish "$@" ;;
   roles) cmd_roles "$@" ;;

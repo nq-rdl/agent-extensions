@@ -122,11 +122,13 @@ sr_slug() {
   fi
 }
 
-sr_sha256() { # <file> -> hex digest
-  if command -v sha256sum >/dev/null 2>&1; then sha256sum "$1" | cut -d' ' -f1
-  elif command -v shasum >/dev/null 2>&1; then shasum -a 256 "$1" | cut -d' ' -f1
+sr_sha256() ( # <file> -> hex digest
+  set -o pipefail
+  # Hash stdin so filename escaping (e.g. backslashes) cannot prefix the digest.
+  if command -v sha256sum >/dev/null 2>&1; then sha256sum < "$1" | cut -d' ' -f1
+  elif command -v shasum >/dev/null 2>&1; then shasum -a 256 < "$1" | cut -d' ' -f1
   else sr_die 2 "neither sha256sum nor shasum is available"; fi
-}
+)
 
 # Where the SQL body starts, after the leading comment header (#366): the first line number that
 # is not a blank line, a full-line `--` comment or part of a leading /* */ block. The body is then
