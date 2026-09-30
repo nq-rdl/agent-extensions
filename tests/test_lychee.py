@@ -163,6 +163,9 @@ class ConfigTests(unittest.TestCase):
         # #301 throttles docs.conda.io (429 on runners) instead of excluding it.
         self.assertEqual(current["hosts"].pop("docs.conda.io"),
                          {"concurrency": 1, "request_interval": "5s"})
+        # Run 36678363149: throttle testcontainers.com bursts, not URL checks.
+        self.assertEqual(current["hosts"].pop("testcontainers.com"),
+                         {"concurrency": 2, "request_interval": "1s"})
         self.assertEqual(current, old)
 
     def test_exclusion_fixtures(self):

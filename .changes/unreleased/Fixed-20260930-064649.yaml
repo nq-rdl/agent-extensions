@@ -1,0 +1,3 @@
+kind: Fixed
+body: Throttle testcontainers.com link checks to avoid burst-induced GitHub runner timeouts while keeping HTTP and fragment validation enabled.
+time: 2026-09-30T06:46:49.227453063Z
