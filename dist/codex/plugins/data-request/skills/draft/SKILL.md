@@ -66,3 +66,4 @@ conversions, and any unresolved limitations. Perform a static check using
 For a formal handoff, proceed to `$data-request:analyse`. Leave existing `.sqlreview/`
 snapshots and confirmations untouched: edits to SQL must remain visible as stale
 until a fresh review is completed.
+Child tests must check item identifier lists and must not pin revision numbers in scope/review records.

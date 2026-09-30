@@ -36,5 +36,9 @@
 
 {{open_questions_list}}
 
+## Closed questions
+
+{{question_history_list}}
+
 ---
 Produced by `/data-request:bootstrap` for the {{role_engineer}}; next stage `/data-request:analyse`.

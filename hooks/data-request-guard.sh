@@ -121,6 +121,8 @@ case "$rel" in
     decide ask "Editing .sqlreview/config.json directly bypasses the setup flow. Use /data-request:setup — on an initialised project it shows the per-file delta and applies only what the human confirms." ;;
   reviews/*/review.md|reviews/*/scope.md|reviews/*/lifts.md)
     decide deny "$rel is rendered markdown — never hand-write it. Update reviews/<slug>/$(basename "${rel%.md}").json (whole-file Write, so the guard can validate it) and re-render: S=\${CLAUDE_PLUGIN_ROOT}/skills/setup/scripts; bash \"\$S/sqlreview.sh\" render <slug> $(basename "${rel%.md}")" ;;
+  reviews/*/questions.json)
+    decide deny "Question stores require identity and closure-history checks. Write questions.draft.json, then run sqlreview.sh publish-questions <slug> <draft>." ;;
   reviews/*/lifts.json)
     decide deny "Lift ledgers require publication checks. Write lifts.draft.json, then run sqlreview.sh publish <slug> lifts <draft> to validate evidence revisions and lifecycle transitions." ;;
   reviews/*/review.json|reviews/*/scope.json)

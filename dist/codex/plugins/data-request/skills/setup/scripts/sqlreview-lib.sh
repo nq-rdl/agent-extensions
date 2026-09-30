@@ -252,6 +252,9 @@ sr_state() { # <slug>
   }
   sr_no_symlinks "$d/source.sql" || exit 2
   cmd_check "$doc" >/dev/null || { printf 'invalid\t\t\n'; return 0; }
+  if [ "$(jq -r .kind "$doc")" != lifts ]; then
+    bash "$SR_SCRIPT_DIR/sqlreview.sh" questions "$1" >/dev/null 2>&1 || { printf 'invalid\t\t\n'; return 0; }
+  fi
   sql="$(jq -r '.sql_path // ""' "$doc" 2>/dev/null)"
   sr_safe_sql "$sql"
   rev="$(jq -r '.revision // ""' "$doc" 2>/dev/null)"
@@ -288,6 +291,9 @@ sr_state_reason() { # <slug> <state>
     invalid)
       doc="$(sr_doc_for "$slug")" || { printf 'no review.json, scope.json or lifts.json\n'; return 0; }
       violations="$(cmd_check "$doc" 2>&1 | grep -v '^ok$' | tr '\n' ';' | sed 's/;$//; s/;/; /g')"
+      if [ -z "$violations" ] && [ "$(jq -r .kind "$doc")" != lifts ]; then
+        violations="$(bash "$SR_SCRIPT_DIR/sqlreview.sh" questions "$slug" 2>&1 >/dev/null | tr '\n' ';' | sed 's/;$//')"
+      fi
       why="$(basename "$doc"): $violations"
       schema="$(jq -r '.schemaVersion // "missing" | tostring' "$doc" 2>/dev/null || echo unreadable)"
       why="$why; schemaVersion $schema"

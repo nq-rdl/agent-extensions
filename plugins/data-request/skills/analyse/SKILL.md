@@ -22,7 +22,7 @@ metadata:
 The **Data Engineer** runs analyse. Keep the Data Analyst's imported research
 decisions and provenance visible; confirm technical SQL findings with the
 engineer. Any research question missed by intake belongs to the analyst:
-prefix its `open_questions` entry `Analyst question:` and send it back through
+prefix its shared question's text `Analyst question:` and send it back through
 the handoff for the analyst to consult the requester. Do not relabel an
 engineer confirmation as an analyst confirmation.
 
@@ -106,11 +106,20 @@ those differences and obtain fresh confirmation through the update path. For wor
 header corrections that leave the confirmed record intact, publish that record again to
 record the header revision, then render it.
 A previous run may have published and snapshotted successfully but failed or stopped
-before rendering. This recovery uses the existing confirmed revision; do not increment
-it or ask for its confirmations again. Run from the project root:
+before question publication or rendering. This recovery uses the existing confirmed
+revision; do not increment it or ask for its confirmations again. If the declared
+store is missing, Read the retained `questions.draft.json` and check its binding and
+answers before retrying publication. Do not invent a replacement if the draft is
+missing, or overwrite an invalid existing store. Run from the project root:
 
 ```bash
 bash "$S/sqlreview.sh" publish "$SLUG" review ".sqlreview/reviews/$SLUG/review.json" || exit $?
+if ! bash "$S/sqlreview.sh" questions "$SLUG" review >/dev/null; then
+  # Recover only a missing first store, never repair an existing invalid one implicitly.
+  [ ! -e ".sqlreview/reviews/$SLUG/questions.json" ] && [ ! -L ".sqlreview/reviews/$SLUG/questions.json" ] || exit 4
+  [ -f ".sqlreview/reviews/$SLUG/questions.draft.json" ] || { echo "Missing question draft; handoff incomplete" >&2; exit 4; }
+  bash "$S/sqlreview.sh" publish-questions "$SLUG" ".sqlreview/reviews/$SLUG/questions.draft.json" || exit $?
+fi
 bash "$S/sqlreview.sh" render "$SLUG" review || exit $?
 if jq -e -s 'length == 2 and (.[0] | del(.header_revisions)) == (.[1] | del(.header_revisions))' \
     ".sqlreview/reviews/$SLUG/review.draft.json" ".sqlreview/reviews/$SLUG/review.json" >/dev/null 2>&1; then
@@ -122,13 +131,14 @@ if [ -e ".sqlreview/reviews/$SLUG/review.draft.json" ]; then
 fi
 ```
 
-Show `review.md`. Draft equality is semantic, ignoring only helper-owned
-`header_revisions`; formatting and header history are not unpublished work. If any
-other differing or unreadable draft remains, stop before *After review*: tell the user it
-contains unpublished work; do not discard or publish it automatically. Continue with *After review*
-below only when no unpublished draft remains. If rendering fails,
-retain the draft and report the failure; retry this completion step once the cause
-is fixed.
+Show `review.md`. Review draft equality is semantic, ignoring only helper-owned
+`header_revisions`; formatting and header history are not unpublished work. Keep any
+differing or unreadable review or question draft and tell the user it contains
+unpublished work; do not discard it or publish it automatically over a valid store.
+Stop before *After review* when unpublished work remains; continue below only when
+no unpublished draft remains. If question publication or rendering fails, retain
+both drafts and report the handoff incomplete; retry this completion step once
+the cause is fixed.
 
 ### Changed SQL: reassess the review
 
@@ -194,7 +204,13 @@ Read the SQL. Draft into `reviews/$SLUG/review.draft.json` (guard-exempt) as you
   each the `location` lines it governs and a one-line rationale. Where an item restates a
   confirmed scope item that still holds, keep the scope's `text` and `rationale` verbatim so it
   can be carried over (below); reword only where the SQL changed what is true.
-- **open_questions** — anything unresolved.
+- **questions.json** — load `bash "$S/sqlreview.sh" questions "$SLUG" review` on every
+  resume: it includes the scope's questions and review-only questions. Never seed a second
+  list from scope. Follow `${CLAUDE_PLUGIN_ROOT}/skills/setup/references/questions.rst`;
+  migrate legacy strings once, retain stable IDs, owner and closure provenance. Add SQL-specific
+  open rows with `applies: review`; close only from an evidenced answer with `publish-questions`.
+  Closure alone changes no scope/review revision or confirmation. Publish the question draft
+  after the first review publication and before render; failures leave the handoff incomplete.
 
 ### Rendered header (#355)
 
@@ -288,7 +304,7 @@ item carried forward on an update, which takes exactly the `set` fields `carryfo
 Never set `carried_from_revision` by hand.
 
 Before publishing SQL with a header, run `notes "<sql path>" --against` the confirmed draft.
-Flag each mismatch to the human and in `open_questions`: a header item with `match: null`
+Flag each mismatch to the human and as an open row in `questions.json`: a header item with `match: null`
 (rejected or reworded) or a confirmed item the header contradicts. Suggest correcting the
 pipeline's record with `/data-request:fix`.
 
@@ -309,7 +325,7 @@ change before continuing. Write the complete confirmed document to
                    "status": "confirmed", "confirmed_by": "<user>", "confirmed_at": "<UTC ISO>", "confirmed_revision": 1}],
   "limitations": [{"id": "L1", "text": "…", "rationale": "…", "location": null,
                    "status": "confirmed", "confirmed_by": "<user>", "confirmed_at": "<UTC ISO>", "confirmed_revision": 1}],
-  "open_questions": ["…"],
+  "question_store": "questions.json",
   "changes": [{"revision": 1, "at": "<UTC ISO>", "by": "<user>", "summary": "initial review"}]
 }
 ```

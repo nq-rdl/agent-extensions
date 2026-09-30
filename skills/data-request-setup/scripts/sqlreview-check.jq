@@ -115,6 +115,7 @@ else
     (if (.sql_path | path_ok) and .slug != (.sql_path | path_slug) and .slug != (.sql_path | legacy_path_slug) then "slug/sql_path binding mismatch" else empty end),
     ((if .kind == "lifts" then [] else ["inputs", "outputs"] end)[] as $key | if (.[$key] | type) != "array" or (.[$key] | all(.[]; type == "object" and (.name | nonempty) and (.description | type == "string")) | not) then "\($key) must be an array of named descriptions" else empty end),
     (if has("logic") and ((.logic | type) != "array" or (.logic | all(.[]; type == "object" and (.step | integer) and (.title | type == "string") and (.description | type == "string") and (.lines | line_range)) | not)) then "logic must be an array of numbered steps with line ranges" else empty end),
+    (if has("question_store") and (.question_store != "questions.json" or has("open_questions")) then "question_store must be questions.json, without embedded open_questions" else empty end),
     (if has("open_questions") and ((.open_questions | type) != "array" or (.open_questions | all(.[]; type == "string") | not)) then "open_questions must be an array of strings" else empty end),
     (if has("changes") and ((.changes | type) != "array" or (.changes | all(.[]; type == "object" and (.revision | integer) and (.at | nonempty) and (.by | nonempty) and (.summary | nonempty)) | not)) then "changes must be an array of revision records" else empty end),
     (if .kind == "review" and ((.purpose | nonempty | not) or (.sql_sha256 | test("^[0-9a-f]{64}$") | not)) then "review requires purpose and SHA256" else empty end),
@@ -127,7 +128,7 @@ else
     (if .kind != "lifts" then req("assumptions"), req("limitations") else empty end),
     (if has("schemaVersion") and .schemaVersion != 1 and .schemaVersion != 2 then "schemaVersion must be 1 or 2" else empty end),
     (if .kind == "review" then (req("purpose"), req("inputs"), req("outputs"), req("logic"), req("sql_sha256"))
-     elif .kind == "scope" then (req("intent"), req("inputs"), req("outputs"), req("open_questions"))
+     elif .kind == "scope" then (req("intent"), req("inputs"), req("outputs"), (if has("question_store") then empty else req("open_questions") end))
      elif .kind == "lifts" then lift_document($rev)
      else "kind must be \"review\" or \"scope\" or \"lifts\" (got \(.kind // "nothing"))" end),
     (if (.revision | integer | not) then "revision must be an integer >= 1" else empty end),
