@@ -101,10 +101,21 @@ class LookupContract(unittest.TestCase):
                 guard = (root / f"{prefix}guardrails/SKILL.md").read_text()
                 lookup_guard = guard.split("**Code-discovery probes:**", 1)[1].split("\n\n", 1)[0]
                 self.assert_workflow_only(lookup_guard)
-                for phrase in ("only codes, labels and counts", "`<7`", "no totals", "complementary suppression",
-                               "bounded to a single scan", "feeds no delivered extract",
-                               "waives only lift capture", "authorised human"):
+                # Pre-lookup main's longest line is 372 columns; do not evade the
+                # lean body limit by joining prose into longer lines.
+                self.assertLessEqual(max(map(len, guard.splitlines())), 372)
+                for phrase in ("exempt under those operator-probe", "[lifts.rst](",
+                               "bounded to a single scan", "feeds no delivered extract"):
                     self.assertIn(phrase, guard)
+                lifts = (root / f"{prefix}setup/references/lifts.rst").read_text()
+                lookup_rules = lifts.split("**Code-discovery probes:**", 1)[1].split("\n\n", 1)[0]
+                self.assert_workflow_only(lookup_rules)
+                self.assertLessEqual(max(map(len, lookup_rules.splitlines())), 100)
+                rules = " ".join(lookup_rules.replace("``", "`").split())
+                for phrase in ("only codes, labels and counts", "`<7`", "no totals",
+                               "complementary suppression", "operator-probe conditions",
+                               "waives only lift capture", "authorised human"):
+                    self.assertIn(phrase, rules)
 
 
 if __name__ == "__main__":

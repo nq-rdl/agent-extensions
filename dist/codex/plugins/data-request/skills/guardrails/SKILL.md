@@ -82,9 +82,8 @@ Read `${PLUGIN_ROOT}/skills/setup/references/lifts.rst` for the record and
 publish commands. Capture silently, with no confirmation question mid-draft;
 classification and confirmation belong to `$data-request:lift` at close-out.
 **No published entry means no hand SQL.** A missing source is not proof of a gap.
-The ledger permits a pinned-deadline workaround under this guidance, but does not
-override an explicit repository prohibition. Check the request's dependency pin
-before using an enhancement.
+The ledger permits a pinned-deadline workaround, not overriding an explicit repository
+prohibition. Check the request's dependency pin before using an enhancement.
 
 A mapping run never initialises `.sqlreview/`; stages that own the store (setup,
 bootstrap, a writable draft) still `init` a missing one. When the task is read-only, the
@@ -92,10 +91,11 @@ repository cannot be written, or a mapping run finds no `.sqlreview/`, use
 **proposal-only mode**: return the candidate entry as text in the task output instead
 of publishing it. A proposal-only entry authorises no hand SQL: none is committed or
 run, except exempt probes, until a writable run publishes the entry.
-An operator probe is exempt only when it is aggregate-only, small-cell suppressed and bounded to a single scan, returns no patient identifier and no staff or person key,
-feeds no delivered extract, and records any `NOLOCK` or `READ UNCOMMITTED` use. `lifts.rst` gives both rules in full.
-
-**Code-discovery probes:** `$data-request:lookup` probes returning only codes, labels and counts are exempt from the hand-SQL gate only under those same conditions. Counts from 1 to 6 display as `<7`; use complementary suppression where subtraction could reveal a masked cell, and no totals. Include matched-term provenance, not patient values, dates, identifiers or free-text results. The exemption waives only lift capture, not engineer review of a fallback probe, authorisation or disclosure controls. The agent never runs the lookup query; an authorised human runs it and pastes the labelled grids back.
+An operator probe is exempt only when it is aggregate-only, small-cell suppressed and
+bounded to a single scan, returns no patient identifier and no staff or person key,
+feeds no delivered extract, and records any `NOLOCK` or `READ UNCOMMITTED` use.
+**Code-discovery probes:** `$data-request:lookup` is exempt under those operator-probe
+conditions; [lifts.rst](https://github.com/nq-rdl/agent-extensions/blob/main/skills/data-request-setup/references/lifts.rst) gives both rules in full.
 
 For N related datasets from one cohort, check the pinned `create_temp_table()`,
 `register_result()` and `execute_pipeline_results()` implementations first:
