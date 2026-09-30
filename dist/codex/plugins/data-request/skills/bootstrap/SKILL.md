@@ -3,8 +3,8 @@ name: bootstrap
 license: CC-BY-4.0
 description: 'Scope a piece of SQL work with the Data Engineer before the SQL is written:
   an interview that produces .sqlreview/reviews/<slug>/scope.json and the rendered
-  scope.md (intent, inputs, outputs, assumptions, open questions), with every assumption
-  confirmed by the human. Re-running on an existing scope walks through what changed.
+  scope.md (intent, inputs, outputs, assumptions, open questions), preserving recorded
+  upstream confirmations. Re-running on an existing scope walks through what changed.
   Use at the start of the Data Request scoping workflow, after $data-request:setup
   and before $data-request:analyse.'
 compatibility: .sqlreview schema 2 (schema 1 remains readable) (docs/specs/2026-09-15-sql-review-plugin-design.md);
@@ -91,10 +91,19 @@ Re-run lint after edits; decision-source warnings require a source check, not a 
 Reworded confirmed items need fresh human confirmation; do not retain their carried
 confirmation or edit the final JSON. Lint cannot grant confirmation.
 
+Apply guardrails **House defaults** without asking: reuse one standard assumption from
+setup's `tuh-facility` entry, with its `upstream` marker and recorded house confirmation
+(see `${PLUGIN_ROOT}/skills/setup/references/recurring-decisions.rst`). Do not ask a fresh facility question.
+If the request explicitly changes the cohort's facility set to another facility, the whole HHS or a network-wide cohort, put one
+`Analyst question:` about the facility set instead of the TUH default; do not apply or carry it.
+Reuse an already answered intake/scope exception; do not ask it again or intersect it with TUH.
+Continue independent work while the dependent facility scope remains unresolved.
+
 Some decisions recur in every enquiry (#362). Before you put candidate items to the engineer, run
-`bash "$S/recurring-decisions.sh" match ".sqlreview/reviews/$SLUG/scope.draft.json"`. For each match,
+`bash "$S/recurring-decisions.sh" match ".sqlreview/reviews/$SLUG/scope.draft.json"`. For each other match,
 show the prior enquiries, offer the listed wording and mark the item `upstream`, as
-`${PLUGIN_ROOT}/skills/setup/references/recurring-decisions.rst` says. The engineer still confirms each item.
+`${PLUGIN_ROOT}/skills/setup/references/recurring-decisions.rst` says. The engineer still confirms each other item;
+the exact recorded TUH house default is imported, not put in a new confirmation batch.
 Rows from `carryforward` include recorded `upstream` and `decided` fields: preserve them.
 
 ## Decision origin (#434)
@@ -186,7 +195,8 @@ Keep build progress distinct from an unpublished scope draft.
 2. **Inputs** — each source table/view: name and what one row means.
 3. **Outputs** — each output column (or the grain plus columns) and what one row means.
 4. **Candidate assumptions** — every point where the request leaves more than one reasonable
-   reading; propose the decision and its rationale. Offer them in batches of at most four per
+   reading; propose the decision and its rationale. Exclude imported house/intake confirmations.
+   Offer the remaining items in batches of at most four per
    the host user-question tool call, one question per item, options **Confirm (Recommended)** / **Reword** /
    **Reject**. Each question shows the item's `text` **and** its `rationale`: both are the
    confirmed record, so a rationale the engineer never saw must not be published. Reword may change
@@ -236,12 +246,14 @@ wording rewritten to state the confirmed decision.
 ## Write, render, hand over
 
 Only confirmed items go into `scope.json`. **Never fill `confirmed_by`, `confirmed_at` or
-`confirmed_revision` from anything but an answered question** — `confirmed_by` is the user's handle
+`confirmed_revision` from anything but an answered question or a recorded imported confirmation**
+(analyst intake or the exact TUH house default above) — `confirmed_by` is the user's handle
 (GitHub login where known, else `git config user.name`, else ask; never `user.email` — `check`
 refuses an `@`), `confirmed_at` is now (UTC ISO),
 `confirmed_revision` equals the document `revision` — imported intake takes the original
 analyst actor/date and the import revision; a carried item takes exactly
-the `set` fields `carryforward` printed. Write the complete confirmed document to
+the `set` fields `carryforward` printed; the imported house default keeps its original actor/date and import revision.
+Write the complete confirmed document to
 `.sqlreview/reviews/$SLUG/scope.draft.json`, then publish it with the command below:
 
 ```json

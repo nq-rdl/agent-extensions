@@ -30,23 +30,25 @@ Ordinary composition needs no `.sqlreview/` setup; hand SQL needs the lift ledge
 Proceed on evidenced technical choices; only unresolved authority questions block dependent work.
 Read [references/decision-authority.rst](references/decision-authority.rst) for ownership/provenance, batched questions and narrow scope; no tool permission or confirmation is granted.
 
+## House defaults
+
+The cohort is **Townsville University Hospital**, facility string `00200`, unless the request explicitly changes the cohort's facility set to another facility, the whole HHS or a network-wide cohort.
+This house default was confirmed by Data Engineer **JoshKgh** on **2026-09-29** ([#436](https://github.com/nq-rdl/agent-extensions/issues/436)). Apply it without asking; record one upstream-marked assumption, not a new request-specific decision.
+Read [references/sources.rst](references/sources.rst) for HBCIS/ePADT fields, ieMR facility-crosswalk verification and exception routing; setup's recurring-decisions reference owns the wording and recorded confirmation.
+
 ## Confirm sources before using a fact
 
 Locate the relevant sources in the supplied workspace or connected repositories:
-
-- **dataops `CREATE TABLE` definitions and their comments** are authoritative for
-  schema, field timezone and units; inspect DDL/index comments for join rationale.
-  Record the file/table/column and revision read.
-- **query-builder column-spec metadata** is the consumer-facing pointer to each
-  field's meaning, timezone and units. Follow its provenance to the dataops DDL;
-  read the existing resolver's docstring and tests for the implemented mapping,
-  required joins and their performance or correctness rationale.
-- **Current index definitions** establish key order and usable join/filter paths.
-  Use an existing plan or authorised read-only plan inspection to check performance.
-  Without SHOWPLAN or VIEW DATABASE STATE, use the catalog-metadata route in
-  [references/performance.rst](references/performance.rst).
-- **Request and confirmed scope** establish population, grain, anchor, time window
-  and output meaning. They do not override storage facts.
+- **dataops `CREATE TABLE` definitions and their comments** are authoritative for schema, field timezone and units;
+  inspect DDL/index comments for join rationale. Record the file/table/column and revision read.
+- **query-builder column-spec metadata** points to each field's meaning, timezone and units.
+  Follow its provenance to the dataops DDL; read the existing resolver's docstring and tests for
+  implemented mapping, required joins and their performance or correctness rationale.
+- **Current index definitions** establish key order and usable join/filter paths. Use an existing plan
+  or authorised read-only plan inspection to check performance. Without SHOWPLAN or VIEW DATABASE STATE,
+  use the catalog-metadata route in [references/performance.rst](references/performance.rst).
+- **Request and confirmed scope** establish population, grain, anchor, time window and output meaning;
+  they do not override storage facts.
 
 dataops covers ieMR only, and many of its comments are empty. When it has no entry
 or no comment for a field, use the fallback evidence order in
@@ -58,8 +60,7 @@ Search by the actual table/column/resolver names; do not invent a column-spec pa
 metadata key, missing sibling implementation or database access. When sources conflict,
 show both locations and use dataops as ground truth for storage facts; flag stale
 consumer metadata. Library behaviour comes from the pinned implementation and tests.
-When evidence is unavailable, label the affected decision unverified and ask only
-for the missing source/decision needed to proceed. Never fill gaps from a field name.
+When evidence is unavailable, label the affected decision unverified and ask only for the missing source/decision needed to proceed. Never fill gaps from a field name.
 
 Verify correctness-critical syntax against the deployed engine's canonical docs
 ([SQL Server documentation](https://learn.microsoft.com/en-us/sql/t-sql/language-reference))
@@ -295,5 +296,4 @@ Clinician and resource names are not personal information (governance ruling,
 ## Carry evidence into the task
 
 Report each rule's SQL/evidence location and result: supported, concern or unverified; static review is not runtime evidence.
-Keep business decisions apart from storage facts; never claim human confirmation from an autonomous run.
-Future domain rules need a concrete incident and an authoritative source.
+Keep business decisions apart from storage facts; never claim human confirmation from an autonomous run. Future domain rules need a concrete incident and an authoritative source.

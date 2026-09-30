@@ -111,8 +111,11 @@ class ListShape(unittest.TestCase):
                                                              for t in g) for g in d["match"]))
                 self.assertTrue(d["evidence"])
                 for url in d["evidence"]:
-                    # The per-enquiry rows live in the private library issue, not here.
-                    self.assertRegex(url, r"^https://github\.com/nq-rdl/query-builder(-plugins)?/issues/\d+(#issuecomment-\d+)?$")
+                    # Per-enquiry rows stay private; the recorded house ruling is public.
+                    if d["id"] == "tuh-facility":
+                        self.assertEqual(url, "https://github.com/nq-rdl/agent-extensions/issues/436")
+                    else:
+                        self.assertRegex(url, r"^https://github\.com/nq-rdl/query-builder(-plugins)?/issues/\d+(#issuecomment-\d+)?$")
                 if d["library_issue"] is not None:
                     self.assertRegex(d["library_issue"], ISSUE_URL)
                 for url in d["related_issues"]:

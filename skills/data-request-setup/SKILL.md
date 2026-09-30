@@ -23,7 +23,10 @@ metadata:
 The **Data Engineer** runs setup once per project. The **Data Analyst** fills
 `answers.yaml` and its optional `answers.intake.json` sidecar in one pass, then
 hands the research decisions to the engineer for bootstrap and draft.
-See [analyst intake contract](references/analyst-intake.rst).
+See [analyst intake contract](references/analyst-intake.rst). The shared list's recorded
+TUH facility house default is imported by bootstrap without a fresh question;
+read [recurring decisions](references/recurring-decisions.rst) for its upstream marker,
+original confirmation, exceptions and normal carry rules. Setup does not copy that list into projects.
 
 Creates the `.sqlreview/` contract used by bootstrap, analyse, explain and lift.
 Ordinary composition can run without setup; recording a hand-SQL candidate silently
