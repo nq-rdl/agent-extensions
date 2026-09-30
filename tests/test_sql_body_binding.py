@@ -51,6 +51,10 @@ class BodyBinding(unittest.TestCase):
         self.assertIn("-/* analysis notes: Male or Female */", delta.stdout)
         self.assertIn("+/* analysis notes: MALE or FEMALE */", delta.stdout)
         self.assertNotIn("unchanged since the reviewed snapshot", delta.stdout)
+        impact = run(["impact", "q"], self.p.root)
+        self.assertEqual(impact.returncode, 0, impact.stderr)
+        self.assertIn("no SQL body change", impact.stdout)
+        self.assertNotIn("no change since the reviewed snapshot", impact.stdout)
         for kind in ("scope", "review"):
             result = self.publish(self.doc(kind))
             self.assertEqual(result.returncode, 0, result.stderr)
