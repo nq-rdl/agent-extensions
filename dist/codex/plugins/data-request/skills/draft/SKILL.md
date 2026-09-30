@@ -54,7 +54,11 @@ and explain the missing decision before creating a runnable file.
 In pipeline or resolver code, record each reading you commit to with
 `pipeline.record_assumption(text, rationale=...)` and each accepted weakness with
 `pipeline.record_limitation(text, consequence=...)` at the line that introduces it
-(guardrails), not in a separate notes file.
+(guardrails), not in a separate notes file. For a genuinely stated engineer decision,
+record `Engineer decision (<login>, <date>), flagged for the data analyst` as the rationale
+(or limitation consequence). Use the actual human handle and original date or UTC ISO
+instant, never a role label, recorder or inferred approval. Preserve any independently
+known decision origin/source. Unknown attribution stays unknown and is walked in analyse.
 
 Return the path, implemented cohort definition, evidence locations for mappings and
 conversions, and any unresolved limitations. Perform a static check using

@@ -162,8 +162,9 @@ absent: report the items in the task output and recommend the pin bump; never
 hand-write the header. Verify behaviour against the installed version and the
 [analysis-notes contract](https://github.com/nq-rdl/query-builder/blob/main/docs/ANALYSIS_NOTES.md).
 
-Advisory: flag a new filter, join or exclusion that settles an ambiguous request, or
-accepts a known source weakness, with no nearby record.
+For a stated decision use `Engineer decision (<login>, <date>), flagged for the data analyst` in the rationale/consequence.
+Use the actual human handle and original date/UTC instant, never role labels or invented approval; preserve independent origin/source.
+Advisory: flag a filter, join or exclusion settling an ambiguous request or accepting a source weakness with no nearby record.
 
 ## Performance: shift the anchor
 

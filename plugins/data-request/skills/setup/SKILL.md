@@ -146,3 +146,16 @@ snapshots. Legacy records use their full hash or an authenticated snapshot for h
 Hints, executable/nested comments, `@extract:` markers and code after a block close remain in
 the body; malformed headers have no body hash. Any body edit, including whitespace or comments,
 unbinds the record. Body equality never confirms changed assumptions, rationale or decisions.
+
+`sqlreview.sh notes SQL --against REVIEW_DRAFT --confirmed-by HANDLE` additionally reports
+`header_carry_over` and `header_walk` for explicitly named, dated engineer header decisions.
+HANDLE is the explicitly intended human confirmer, not config role labels or `recorded_by`.
+Read-only rows preserve date-only `decided.at` and show the separate observed source-commit
+time; they never fill `confirmed_*`. Same-day sources are eligible from that displayed time;
+precise UTC ISO cutoffs reject later sources. Analyse asks ONE answered Carry over all
+question listing items and governed locations, then records `carried_basis: header-decision`.
+Publish re-proves source bytes and all subsequent relevant path revisions plus working SQL.
+Shallow/missing history, repeated/relocated ranges, body-prefix changes and relevant merge/
+rename ambiguity are walked; unrelated PR merges with identical SQL path blobs are allowed.
+Git attribution is not human authentication. Retain independent origins; no answer means
+no publication. Later carryforward keeps `decided` and uses its normal confirmation fields.

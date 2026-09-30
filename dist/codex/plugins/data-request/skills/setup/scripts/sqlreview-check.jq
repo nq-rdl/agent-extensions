@@ -42,6 +42,8 @@ def items($kind; $rev):
         # carried_basis (#366) records why publish accepted a carried item; only carried items have one.
         (.carried_basis as $cb
          | if $cb == null then empty
+           elif $cb == "header-decision" then
+             if .carried_from_revision != null or .confirmed_revision != $rev then "\($id): header-decision requires a fresh answered confirmation for this revision" else empty end
            elif .carried_from_revision == null then "\($id): carried_basis on an item that is not carried — remove it"
            elif (["sql-unchanged", "sql-absent", "sql-body-unchanged", "intent-unchanged", "lines-unchanged"] | index([$cb])) == null
            then "\($id): unknown carried_basis \($cb | tojson)"

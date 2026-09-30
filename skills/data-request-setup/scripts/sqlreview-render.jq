@@ -7,12 +7,13 @@ def cell: tostring | gsub("\\|"; "&#124;") | gsub("[\r\n]+"; "<br>");
 def decision:
   if .decided == null then "—"
   else "\(.decided.by) (\(.decided.role)) · \(.decided.at) · \(.decided.source)"
-    + (if (.decided.source | ascii_downcase | startswith("unlinked")) then " [UNLINKED]" else "" end)
+    + (if (.decided.source | ascii_downcase | startswith("unlinked")) then " [UNLINKED]"
+       elif (.decided.source | test("^git:[0-9a-f]+:.*#L[0-9]+$")) then " [recorded SQL header]" else "" end)
   end;
 def table(a; heading):
   if (a | length) == 0 then "_none recorded_"
   else "| ID | \(heading) | Rationale | Lines | Decision and source | Confirmed by | Revision |\n|---|---|---|---|---|---|---|\n"
-       + (a | map("| \(.id | cell) | \(.text | cell) | \((.rationale // "") + (if .upstream.source == "analyst-intake" then " [analyst-intake: " + .upstream.file + "#" + .upstream.intake_id + "]" else "" end) | cell) | \(lines(.location.lines) | cell) | \(decision | cell) | \(.confirmed_by // "" | cell) | \((.confirmed_revision // "" | tostring) + (if .carried_from_revision != null then " (carried)" else "" end) | cell) |") | join("\n"))
+       + (a | map("| \(.id | cell) | \(.text | cell) | \((.rationale // "") + (if .upstream.source == "analyst-intake" then " [analyst-intake: " + .upstream.file + "#" + .upstream.intake_id + "]" else "" end) | cell) | \(lines(.location.lines) | cell) | \(decision | cell) | \(.confirmed_by // "" | cell) | \((.confirmed_revision // "" | tostring) + (if .carried_from_revision != null then " (carried)" else "" end) + (if .carried_basis == "header-decision" then " (header-decision carry-over)" else "" end) | cell) |") | join("\n"))
   end;
 def steps(a): if (a | length) == 0 then "_none_" else (a | map("\(.step). **\(.title // "")** (lines \(lines(.lines))) — \(.description // "")") | join("\n")) end;
 def changes(a): if (a | length) == 0 then "_none_" else (a | map("- r\(.revision) — \(.at // "") — \(.by // ""): \(.summary // "")") | join("\n")) end;

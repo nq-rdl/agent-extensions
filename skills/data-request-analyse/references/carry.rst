@@ -63,3 +63,35 @@ text, rationale, basis and ``location`` lines:
 
 Carry over confirms the listed items, their locations included, from that answer. Walk moves
 them to the per-item walk.
+
+Header to review: ``notes --against --confirmed-by``
+---------------------------------------------------
+
+``header_carry_over`` is eligibility for a fresh answer, not an old confirmation.
+An explicit named engineer attribution must match the intended human handle exactly.
+Show every kind/id, text, rationale, governed location, independent ``decided`` and
+``evidence.commit`` / ``committed_at`` in ONE question: **Carry over all (Recommended)** /
+**Walk each individually**. No answer or an interrupted question supplies no confirmation.
+
+A date-only decision keeps that precision. Its first recorded source may be committed
+on the same day; display the observed time and explain that unchanged-content evidence
+starts then, not at midnight. A precise UTC ISO decision requires a source no later
+than that instant. Git timestamps and handles are recorded claims, not authenticated
+human identities. Read the source and ask the human; never treat ``roles`` or
+``recorded_by`` as the confirmer.
+
+Proof checks the selected source, every subsequent relevant path revision and the
+working tree, not just HEAD. Readable pre-source header/merge/time failures do not
+poison a new decision; missing ancestry or objects still fail closed. The exact unique
+governed snippet and its body prefix must survive; later lines may change, and leading comments may grow. Repeated snippets, relocation, body-prefix
+changes, missing objects, shallow ancestry, nonmonotonic source times and path renames
+are conservative walks. A merge is ambiguous when the SQL blob differs from any parent;
+identical-path unrelated PR merges are allowed. Renames are not followed to invent a
+source for a new path. These limitations affect batching, not the ability to review.
+
+After the answered bulk question, copy ``decided`` verbatim, set fresh ``confirmed_*``
+and ``carried_basis: header-decision`` only on its listed items. Never overwrite a
+separate existing origin to match the helper's source; walk the mismatch. Publish
+re-proves the basis and requires confirmation fields but cannot authenticate an answer.
+Later carryforward preserves ``decided`` and uses its normal ``set`` fields, not a
+fresh header claim. Changed or unproven items remain in the per-item walk.
