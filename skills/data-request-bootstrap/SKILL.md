@@ -25,8 +25,11 @@ The **Data Engineer** runs this stage after setup and the Data Analyst's
 The engineer owns technical sources, keys, timezones, joins and validity rules.
 
 For RDL cohort SQL, read `${CLAUDE_PLUGIN_ROOT}/skills/guardrails/SKILL.md` before
-scoping or reviewing. Consult its dataops/column-spec sources and carry evidence or
-unverified facts into the discussion; advisory findings do not replace human confirmation.
+scoping or reviewing. Apply **Engineer decisions: proceed and flag** in its
+`references/decision-authority.rst`: implement evidenced technical defaults within the agreed task,
+flag them for analyst review, and batch only remaining research questions. This does not park the build for analyst approval
+or replace formal engineer confirmation. Deliver requested outputs only; offer extras, do not build them.
+Consult dataops/column-spec evidence; never invent human confirmation.
 
 Arguments: `$ARGUMENTS` — the path the SQL *will* live at (it need not exist yet). The scope
 directory is keyed by that path, so `reports/monthly.sql` and `audits/monthly.sql` never collide.
@@ -169,7 +172,9 @@ corrupt baseline and requires reassessment.
 ## Fresh scope → interview
 
 Apply the pre-presentation check above to every interview batch, including framing and open questions.
-Work through these in order, pausing (AskUserQuestion) on each scoping decision:
+Work through these in order with the engineer. Formal scope publication still needs answered
+AskUserQuestion confirmations; it does not require analyst approval of engineer-owned choices.
+Keep build progress distinct from an unpublished scope draft.
 
 1. **Intent** — one paragraph: what question the SQL answers and for whom.
 2. **Inputs** — each source table/view: name and what one row means.
@@ -187,6 +192,10 @@ Work through these in order, pausing (AskUserQuestion) on each scoping decision:
    question, ask it as confirm-or-change, quoting the prior answer and its source. Propose a
    default answer for each open question: the engineer can accept it as a candidate assumption
    (confirmed as in step 4), or keep the question open with the default noted for the requester.
+   Apply the shared authority classes: batch research questions into one analyst message,
+   continue independent work and safe defaults, and stop only a dependent portion that crosses
+   a known restriction, expands the cohort, changes released row count or invents a clinical definition.
+   An engineer technical decision proceeds and is flagged; it is not an analyst answer.
 
 Keep the working set in `.sqlreview/reviews/$SLUG/scope.draft.json` (guard-exempt). If the
 engineer stops, leave the draft and write nothing final — say so.

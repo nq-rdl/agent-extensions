@@ -2,8 +2,9 @@ Requirement checks and blocker taxonomy
 =======================================
 
 Read this when you settle a request's requirements and when you classify its
-blockers. Each check comes from the September 2026 triage. Raise a finding as a
-proposed assumption or a question for the requester, never as a decision.
+blockers. Apply guardrails' "Engineer decisions: proceed and flag" first:
+evidenced technical choices proceed within the agreed task and are flagged,
+not parked as analyst questions. Keep human decisions distinct from agent defaults.
 
 Read-only stale lift check
 -------------------------
@@ -39,17 +40,20 @@ Interpretation checks
   Do not turn unchecked coverage into a blocker or recurring scope question.
 * **Source system and grain come before bootstrap.** In one request the source moved
   from ieMR to HBCIS ``Inpatient.mart_v`` after its scope was published, which
-  made that scope stale. Revising a published scope re-opens its confirmations.
+  made that scope stale. Settle technical readings with the engineer, not the
+  analyst; a released-output row-count change needs an analyst/requester answer.
+  Revising a published scope re-opens its confirmations.
 * **Date windows.** A window written as ``BETWEEN '2021-01-01' AND
   '2025-12-31'`` on a datetime column drops most of 31 December. Propose a
-  half-open window (on or after the start, before the day after the end) and
-  confirm it with the requester.
+  half-open window (on or after the start, before the day after the end) to the
+  engineer, proceed and flag when it implements the requested full-day range.
+  A different research window is not a technical default.
 * **Time zone.** ieMR stores UTC, while HBCIS and BI-Reporting store AEST.
   Decide the delivery time zone explicitly, and verify each field through
   ``/data-request:guardrails``.
-* **Raw versus derived.** Ask for raw dated events rather than derived outcomes
-  (early or late stroke, death within a number of days) unless the approval asks
-  for derived ones.
+* **Raw versus derived.** Deliver the requested raw dated events or supported
+  derived outcomes, respecting known approval restrictions. An unsupported
+  clinical outcome definition goes to the analyst; do not invent it.
 * **Supplied cohort.** When the requester supplies the cohort (a URN list or a
   prior extract), the work is linkage to that supplied cohort. Do not plan cohort
   discovery or map inclusion criteria.
@@ -68,8 +72,8 @@ Interpretation checks
   that were added, retired or retitled. Record the edition as an assumption.
 * **Ethnicity.** The records hold no ethnicity field. When a request asks for
   ethnicity, propose Indigenous status from ``PERSON_INFO`` (the RDL convention)
-  and ask once, during scoping, whether to add country of birth or preferred
-  language as optional surrogates; the requester or engineer decides. Record the
+  and offer country of birth or preferred language in the hand-off as unbuilt
+  optional surrogates; do not add them unasked. Record the
   limitation that ethnicity is not held. ``/data-request:guardrails`` owns the
   convention.
 * **Stale issue body.** A later dated amendment or comment supersedes the body.
@@ -89,7 +93,8 @@ Interpretation checks
   Legacy items without ``decided`` remain readable: check attributed rationales
   against written evidence rather than inventing an origin or blocking every item.
 * **Unanswered question.** Silence, a pending request for information or an
-  assumption nobody contradicted is not approval.
+  assumption nobody contradicted is not approval to cross an authority boundary.
+  It does not block evidenced technical defaults or independent work.
 
 Open questions
 --------------
@@ -99,17 +104,26 @@ a scope assumption or send it to the requester. Before you ask, look for a prior
 version of the request: a V2 request's V1 repository, its SQL and its delivery.
 When the prior version answers the question, turn it into a confirm-or-change
 question that quotes the prior answer and its source. In September 2026, reading
-a V1 request's SQL removed the last open question for its V2. A default is a proposal;
-it becomes a requirement only when a named human accepts it.
+a V1 request's SQL removed the last open question for its V2. A proposed default
+is not human confirmation until a named human accepts it; an engineer-owned
+technical choice is not a clarification blocker. Batch remaining research
+questions into one analyst message, each with a default and evidence. Keep
+building independent portions and safe defaults; do not execute a prohibited
+output, cohort expansion, released grain change or invented clinical definition.
 
 Blocker taxonomy
 ----------------
 
-Give each blocker one primary class and the action that unblocks it.
+Give each blocker one primary class, the dependent portion, evidence, owner
+and action that unblocks it. Distinguish authority questions from operational
+failures; technical defaults are not blockers.
 
 clarification
-   The request has more than one reasonable reading, or a decision belongs to
-   the requester. Unblock with a question in the paste-ready comment.
+   Name the authority subclass: cohort expansion beyond the request,
+   released-output grain change affecting row count, or unsupported requester
+   clinical definition. Stop only dependent work; batch a question and default
+   in the analyst message. Preserve the requested cohort and released grain
+   meanwhile. Mere technical ambiguity is not this class.
 
 source availability
    The data is not in any source the team can reach, or access is not granted.

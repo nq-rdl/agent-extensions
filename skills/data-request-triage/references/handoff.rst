@@ -111,7 +111,12 @@ prepares and publishes the release. Never direct the engineer to release.
    handed over, run commit and head SHA, review slugs/revisions and SQL fingerprints,
    counts-only QA, links to the run manifest, DVC pointers and UAT evidence, open questions,
    flagged decisions, known governance restrictions and the limitations the requester
-   must hear. Keep row-level data, identifiers and small cell counts out. The child
+   must hear. For each real technical choice include ``Engineer decision (<login>, <date>),
+   flagged for the data analyst``, its rationale, SQL location and evidence;
+   preserve original decision provenance, separate from later confirmation.
+   List agent-applied technical defaults separately, never as human decisions.
+   Include offered extras (not built), not additional unrequested extracts.
+   Keep row-level data, identifiers and small cell counts out. The child
    issue is the hand-off destination; a PR comment alone is incomplete. Draft it for the
    human, or post it when the human authorises that post.
 4. **Move** both the child issue and the service-desk request issue to
