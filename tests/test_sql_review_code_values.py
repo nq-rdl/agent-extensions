@@ -1,4 +1,4 @@
-"""Issue 439: lint all JSON string fields without echoing numeric code values.
+"""Issue 439: lint prose strings without echoing numeric code values.
 
 Runs the actual helper on scope/review/draft documents. Prose assertions are
 instruction contracts, not evidence of live model behaviour.
@@ -38,7 +38,52 @@ class CodeValues(unittest.TestCase):
             self.assertEqual(rows[0][:2], ["logic[0]", "description"])
             self.assertEqual(len(rows[0]), 4 if flags else 3)
 
-    def test_every_string_field_in_scope_review_and_drafts(self):
+    def test_valid_binding_and_fingerprints_are_not_prose(self):
+        for factory in (scope_doc, review_doc):
+            doc = factory(sql_path="reports/extract_20260930.sql",
+                          slug="reports__extract_20260930",
+                          sql_sha256="a12345678a" + "a" * 54,
+                          git_commit="b123456789b" + "b" * 29)
+            for flags in ((), ("--ste",)):
+                with self.subTest(kind=doc["kind"], flags=flags):
+                    result = self.lint(doc, *flags)
+                    self.assertEqual((result.returncode, result.stdout), (0, ""))
+            with tempfile.TemporaryDirectory() as tmp:
+                path = Path(tmp) / "doc.json"
+                path.write_text(json.dumps(doc))
+                before = path.read_bytes()
+                self.assertEqual(run(["check", str(path)], tmp).returncode, 0)
+                self.assertEqual(run(["lint", "--ste", str(path)], tmp).returncode, 0)
+                self.assertEqual(path.read_bytes(), before)
+
+    def test_metadata_exemptions_are_validated_and_location_specific(self):
+        for over in ({"sql_sha256": "not a hash " + DIGITS},
+                     {"git_commit": "not a commit " + DIGITS},
+                     {"sql_path": "../extract_" + DIGITS + ".sql"},
+                     {"slug": "unbound_" + DIGITS}):
+            for flags in ((), ("--ste",)):
+                with self.subTest(over=over, flags=flags):
+                    self.assertEqual(len(self.code_rows(review_doc(**over), *flags)), 1)
+        doc = review_doc()
+        doc["extension"] = {"sql_sha256": "a12345678a" + "a" * 54,
+                            "sql_path": "extract_20260930.sql"}
+        self.assertEqual(len(self.code_rows(doc, "--ste")), 2)
+
+    def test_fractional_machine_timestamps_are_not_prose(self):
+        stamp = "2026-09-30T05:21:28.123456789Z"
+        doc = review_doc(recorded_at=stamp)
+        doc["assumptions"][0]["confirmed_at"] = stamp
+        doc["assumptions"][0]["decided"] = {
+            "by": "requester", "role": "Requester", "at": stamp,
+            "source": "dated request document"}
+        doc["changes"][0]["at"] = stamp
+        for flags in ((), ("--ste",)):
+            result = self.lint(doc, *flags)
+            self.assertEqual((result.returncode, result.stdout), (0, ""))
+        doc["changes"][0]["summary"] = "Use " + DIGITS
+        self.assertEqual(len(self.code_rows(doc, "--ste")), 1)
+
+    def test_every_non_metadata_string_field_in_scope_review_and_drafts(self):
         for factory in (scope_doc, review_doc):
             original = factory()
             # Capture all string leaf paths, not just fields currently known to lint.
@@ -52,6 +97,9 @@ class CodeValues(unittest.TestCase):
                     for index, child in enumerate(value):
                         yield from paths(child, (*prefix, index))
             for path in paths(original):
+                # Known binding/fingerprint fields have their own validation tests.
+                if path in (("sql_path",), ("slug",), ("sql_sha256",), ("git_commit",)):
+                    continue
                 for name in ("scope.json", "review.json", "review.draft.json"):
                     with self.subTest(kind=original["kind"], path=path, name=name):
                         doc = copy.deepcopy(original)
@@ -130,6 +178,28 @@ class CodeValues(unittest.TestCase):
 
 
 class DraftingContract(unittest.TestCase):
+    def test_bootstrap_checks_before_update_and_every_question_batch(self):
+        text = (REPO / "skills/data-request-bootstrap/SKILL.md").read_text()
+        before, update = text.split("## Existing scope", 1)
+        update = update.split("## Fresh scope", 1)[0]
+        self.assertIn('lint --ste ".sqlreview/reviews/$SLUG/scope.draft.json"', before)
+        self.assertIn("Before every question batch", before)
+        self.assertIn("stored prose", before)
+        self.assertIn("Before re-putting intent", update)
+        self.assertIn("before each `walk` batch", update)
+        self.assertIn("inspect locally", update)
+
+    def test_analyse_checks_before_delta_and_bulk_walk_questions(self):
+        text = (REPO / "skills/data-request-analyse/SKILL.md").read_text()
+        before, update = text.split("## Existing review", 1)
+        changed = update.split("### Changed SQL", 1)[1].split("## Full review", 1)[0]
+        self.assertIn('lint --ste ".sqlreview/reviews/$SLUG/review.draft.json"', before)
+        self.assertIn("Before every question batch", before)
+        self.assertIn("stored prose", before)
+        self.assertIn("Before discussing the delta", changed)
+        self.assertIn("before each `bulk`/`walk` question batch", changed)
+        self.assertIn("do not paste raw", changed)
+
     def test_all_three_skills_name_constants_not_values(self):
         for stage in ("analyse", "bootstrap", "fix"):
             for root, source in (("skills", f"data-request-{stage}"),

@@ -13,7 +13,7 @@
 #                                              sql/cohort_pipeline/x.sql -> sql__cohort_pipeline__x; an existing
 #                                              legacy-encoded reviews/sql__cohort%5Fpipeline__x/ is kept
 #   check FILE | check --stdin                 validate a review/scope JSON; exit 4 with one violation per line
-#   lint FILE                                  code values in all string fields, provisional confirmed wording or
+#   lint FILE                                  prose code values (validated machine metadata exempt), provisional wording or
 #                                              unlinked decision sources; three columns, exit 10 when any
 #   lint --ste FILE                            also STE wording in intent and item text/rationale, any status: one
 #                                              "<id>\t<field>\t<rule>\t<detail>" line per hit; exit 10 when any
@@ -262,8 +262,10 @@ cmd_check() {
 #   contraction      n't, 're, 've, 'll, 'd, 'm, and 's after a pronoun (not a possessive); detail = the words
 #   semicolon        detail = how many
 #   abbreviation     e.g. / i.e.; detail = which
-# code-value (#439) checks every string leaf in scopes/reviews/drafts at any status,
-# including nested provenance and future fields: one warning per maximal run of 8 to 10 digits.
+# code-value (#439) checks string leaves in scopes/reviews/drafts at any status,
+# including nested provenance and future fields, except validated known machine metadata:
+# root SQL path/bound slug, SHA256/git fingerprints and known ISO timestamp locations.
+# One warning per maximal run of 8 to 10 digits; never reword fingerprints or path bindings.
 # Item = nearest id, else indexed object path (logic[0]), else "-"; field = relative leaf path.
 # No matched value is printed; all lint diagnostics redact such runs, including ids/keys.
 # --ste uses four columns, including decision-source/code-value warnings; plain lint keeps three

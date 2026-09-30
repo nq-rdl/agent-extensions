@@ -192,20 +192,13 @@ omits; `present: false` is not evidence of no assumptions.
 
 ## Confirm, write, render
 
-**Name the constant, never its value** in scope/review prose, drafts, logic descriptions,
-questions and change summaries (for example, `EVENT_CD`, not its numeric value).
-`code-value` lint scans every string field for maximal runs of 8 to 10 digits and reports
-item/field without the value. Replace prose codes before showing or publishing the draft;
-never add them to `.pii-code-values` or suppress the PII gate to clear a prose defect.
-Reworded confirmed items need fresh human confirmation; lint cannot grant it.
-
 Before each batch of questions below, the carry-over question included, check the wording (#394):
 
 ```bash
 bash "$S/sqlreview.sh" lint --ste ".sqlreview/reviews/$SLUG/review.draft.json"  # exit 10 → "<id>\t<field>\t<rule>\t<detail>" per hit
 ```
 
-Reword each hit (a code value, a sentence over 25 words, a contraction, a semicolon, `e.g.` or `i.e.`) before
+Reword each hit (a sentence over 25 words, a contraction, a semicolon, `e.g.` or `i.e.`) before
 the human sees it. A reworded scope item no longer matches its scope text, so it is walked.
 
 The human-in-the-loop trigger (#130 §1.1). On an update, items `carryforward` listed under

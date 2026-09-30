@@ -106,7 +106,9 @@ in prose is a defect; never add it to `.pii-code-values` or suppress the PII gat
 When updating a scope/review draft, run
 `bash "${CLAUDE_PLUGIN_ROOT}/skills/setup/scripts/sqlreview.sh" lint --ste "<draft path>"`
 before presenting it. `code-value` reports each maximal run of 8 to 10 digits by item/field,
-without the value. Reworded confirmed items need fresh human confirmation via bootstrap
+without the value; validated machine metadata is exempt (SQL path/bound slug, fingerprints
+and ISO timestamps at known locations). Preserve that metadata; never reword it to clear lint.
+Reworded confirmed items need fresh human confirmation via bootstrap
 or analyse; do not edit final JSON or create `.sqlreview/` just for a small correction.
 
 Make the smallest source change that resolves the reported defect, preserving
