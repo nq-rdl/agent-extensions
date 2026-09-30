@@ -291,6 +291,105 @@ class HeaderCarry(unittest.TestCase):
         self.assertEqual(r.returncode, 4, r.stdout + r.stderr)
         self.assertFalse((self.draft.parent / "review.json").exists())
 
+    def publish_answered(self):
+        self.answered()
+        self.doc["schemaVersion"] = 2
+        fp = json.loads(run(["fingerprint", "q.sql"], self.p.root).stdout)
+        self.doc["sql_body_sha256"] = fp["sql_body_sha256"]
+        self.draft.write_text(json.dumps(self.doc))
+        r = run(["publish", "q", "review", str(self.draft)], self.p.root)
+        self.assertEqual(r.returncode, 0, r.stdout + r.stderr)
+        r = run(["snapshot", "q", "q.sql"], self.p.root)
+        self.assertEqual(r.returncode, 0, r.stdout + r.stderr)
+        return self.draft.parent / "review.json"
+
+    def test_header_only_republish_rejects_missing_changed_or_malformed_decision(self):
+        dest = self.publish_answered()
+        original = dest.read_bytes()
+        snapshot = (dest.parent / "source.sql").read_bytes()
+        for text in (SQL_V1, SQL.replace(R, R + " changed"), SQL.replace("rationale:", "unexpected:")):
+            with self.subTest(text=text):
+                self.sql.write_text(text)
+                r = run(["publish", "q", "review", str(dest)], self.p.root)
+                self.assertEqual(r.returncode, 4, r.stdout + r.stderr)
+                self.assertEqual(dest.read_bytes(), original)
+                self.assertEqual((dest.parent / "source.sql").read_bytes(), snapshot)
+
+    def test_header_only_republish_allows_unchanged_decision_and_is_idempotent(self):
+        dest = self.publish_answered()
+        snapshot = (dest.parent / "source.sql").read_bytes()
+        self.sql.write_text(SQL.replace("assumptions:", "assumptions: "))
+        r = run(["publish", "q", "review", str(dest)], self.p.root)
+        self.assertEqual(r.returncode, 0, r.stdout + r.stderr)
+        self.assertIn("published header revision", r.stdout)
+        published = json.loads(dest.read_text())
+        self.assertEqual(published["revision"], 1)
+        self.assertEqual(published["assumptions"], self.doc["assumptions"])
+        self.assertEqual(len(published["header_revisions"]), 1)
+        self.assertEqual((dest.parent / "source.sql").read_bytes(), snapshot)
+        r = run(["publish", "q", "review", str(dest)], self.p.root)
+        self.assertEqual(r.returncode, 0, r.stdout + r.stderr)
+        self.assertIn("already published", r.stdout)
+        self.sql.write_text(SQL_V1)
+        r = run(["publish", "q", "review", str(dest)], self.p.root)
+        self.assertEqual(r.returncode, 4, r.stdout + r.stderr)
+        self.assertEqual(json.loads(dest.read_text()), published)
+
+    def test_large_sql_body_does_not_travel_in_argv(self):
+        self.sql.write_text(SQL + "SELECT '" + "x" * 160000 + "';\n")
+        self.commit("2026-09-24T13:00:00Z")
+        self.eligible()
+        self.sql.write_text(self.sql.read_text().replace("IS NOT NULL", "IS NULL"))
+        self.walked()
+
+    def test_accumulated_history_does_not_travel_in_argv(self):
+        for n in range(12):
+            self.sql.write_text(SQL + "-- " + "x" * 16000 + str(n) + "\n")
+            self.commit("2026-09-24T13:00:00Z")
+        self.eligible()
+
+    def new_decision(self, at="2026-09-26T10:00:00Z"):
+        rationale = R.replace("2026-09-24", "2026-09-26")
+        self.sql.write_text(SQL.replace(R, rationale))
+        self.doc["assumptions"][0]["rationale"] = rationale
+        return self.commit(at)
+
+    def test_malformed_header_before_source_does_not_poison_new_decision(self):
+        self.sql.write_text(SQL.replace("rationale:", "unexpected:"))
+        self.commit("2026-09-25T10:00:00Z")
+        source = self.new_decision()
+        self.assertEqual(self.eligible()["evidence"]["commit"], source)
+        self.sql.write_text(self.sql.read_text().replace("rationale:", "unexpected:"))
+        self.commit("2026-09-27T10:00:00Z")
+        self.new_decision("2026-09-28T10:00:00Z")
+        self.walked()
+
+    def test_relevant_merge_before_source_does_not_poison_new_decision(self):
+        self.merge_branch(relevant=True)
+        source = self.new_decision()
+        self.assertEqual(self.eligible()["evidence"]["commit"], source)
+
+    def test_nonmonotonic_time_before_source_does_not_poison_new_decision(self):
+        self.sql.write_text(SQL.replace("SELECT month,", "SELECT calendar_month,"))
+        self.commit("2026-09-23T10:00:00Z")
+        source = self.new_decision()
+        self.assertEqual(self.eligible()["evidence"]["commit"], source)
+        self.sql.write_text(self.sql.read_text().replace("SELECT month,", "SELECT calendar_month,"))
+        self.commit("2026-09-25T10:00:00Z")
+        self.walked()
+
+    def test_missing_pre_source_blob_cannot_hide_an_earlier_decision_source(self):
+        blob = subprocess.check_output(["git", "rev-parse", "HEAD:q.sql"], cwd=self.p.root, text=True).strip()
+        self.new_decision()
+        (self.p.root / ".git/objects" / blob[:2] / blob[2:]).unlink()
+        self.walked()
+
+    def test_source_time_need_not_follow_irrelevant_pre_source_timestamp(self):
+        self.sql.write_text(SQL.replace("SELECT month,", "SELECT calendar_month,"))
+        self.commit("2026-09-28T10:00:00Z")
+        source = self.new_decision()
+        self.assertEqual(self.eligible()["evidence"]["commit"], source)
+
     def test_publish_rechecks_tampered_source(self):
         self.answered()
         self.doc["assumptions"][0]["decided"]["source"] = "git:" + "0" * 40 + ":q.sql#L3"

@@ -80,9 +80,10 @@ than that instant. Git timestamps and handles are recorded claims, not authentic
 human identities. Read the source and ask the human; never treat ``roles`` or
 ``recorded_by`` as the confirmer.
 
-Proof checks every subsequent relevant path revision and the working tree, not just
-HEAD. The exact unique governed snippet and its body prefix must survive; later lines
-may change, and leading comments may grow. Repeated snippets, relocation, body-prefix
+Proof checks the selected source, every subsequent relevant path revision and the
+working tree, not just HEAD. Readable pre-source header/merge/time failures do not
+poison a new decision; missing ancestry or objects still fail closed. The exact unique
+governed snippet and its body prefix must survive; later lines may change, and leading comments may grow. Repeated snippets, relocation, body-prefix
 changes, missing objects, shallow ancestry, nonmonotonic source times and path renames
 are conservative walks. A merge is ambiguous when the SQL blob differs from any parent;
 identical-path unrelated PR merges are allowed. Renames are not followed to invent a

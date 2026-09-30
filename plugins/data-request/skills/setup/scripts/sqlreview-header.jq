@@ -48,6 +48,11 @@ def header_candidates($doc; $sql; $actor; $path; $sha; $safe; $start; $history):
             elif (if $time.precision == "date" then ($first.at | strftime("%Y-%m-%d")) > $time.date else $first.at > $time.epoch end)
               then {why:"first committed decision source is after the decision date"}
             elif $first.at > now then {why:"committed decision source is in the future"}
+            # Entry failures before this decision's first source are irrelevant. Ancestry
+            # availability stays global; source/subsequent merges, renames and times do not.
+            elif ($later | all(.[]; .safe == true) | not) or
+                 (all(range(1; ($later|length)); . as $n | $later[$n].at >= $later[$n-1].at) | not)
+              then {why:"invalid source or subsequent relevant merge/rename or inconsistent git history"}
             elif ($later | all(.[]; hd_header($kind; $item) and hd_range(.sql; .body_start; $offset; $prefix; $excerpt)) | not)
               or (hd_range($lines; $start; $offset; $prefix; $excerpt) | not) then {why:"header wording or governed SQL changed since the recorded decision source"}
             else {by:$origin.by, role:"engineer", at:$origin.at,
