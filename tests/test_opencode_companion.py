@@ -99,6 +99,8 @@ class Harness:
             try:
                 os.kill(job['pid'], 15)
             except (KeyError, ProcessLookupError):
+                # Best-effort teardown: a job may have no PID yet, or its
+                # detached worker may already have exited. Continue cleanup.
                 pass
         for process in self.processes:
             if process.poll() is None:
