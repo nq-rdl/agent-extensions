@@ -136,6 +136,30 @@ closed rows; stage any new questions. For a fresh scope, publish the scope first
 `publish-questions` its open question draft before rendering; failed question publication
 leaves the handoff incomplete.
 
+## Population limits
+
+Before either interview path, check **age, sex and facility** against the request wording,
+intake and existing scope item. Ask whether the wording implies a limit and whether the SQL
+applies it; reuse an already answered decision rather than asking again. Do not infer adult
+from a service name or from an earlier run's surprise. Do not add a filter to settle ambiguity.
+
+Record an answer for each dimension in `scope.draft.json`, then confirm and publish through
+*Write* below. Reuse `A-population-age` and `A-population-sex`; for facility reuse the existing
+`tuh-facility` assumption or exception item, not a duplicate. In each item's text and rationale,
+state the limit (or **no stated limit** / **unclear**), cite the source path/revision and request
+wording, and report implementation: **applied**, **missing**, **contradicted**, **unverified**
+or **not yet written**, with SQL lines when available. A sex label is not a sex restriction.
+For age, record the age anchor: **age at index surgery** and age today differ. For facility,
+check the verified crosswalk/filter; retain the house default and exception routing above.
+
+If no assumption is needed, put the explicit no-limit answer and implementation evidence in
+`intent`; do not omit a dimension because it has no filter. An unclear research limit goes in
+`open_questions` as one `Analyst question:` with the proposed interpretation and missing anchor.
+Record that gap in intent or a confirmed limitation, not as an agreed population restriction.
+An engineer's confirmation of the static SQL finding is not an analyst research answer.
+Continue independent work under the shared authority rule; do not widen or narrow a cohort
+silently. Recheck these answers on updates, including when SQL first becomes available.
+
 ## Existing scope → update path (#127 §2)
 
 If `.sqlreview/reviews/$SLUG/scope.json` exists (or `--update`):

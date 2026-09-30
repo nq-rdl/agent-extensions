@@ -1,0 +1,3 @@
+kind: Added
+body: Data-request records implied population limits and proposes bounded, suppressed label-count probes before the operator run (#440)
+time: 2026-09-30T05:06:56.451185047Z

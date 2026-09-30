@@ -58,8 +58,9 @@ table fails under SNAPSHOT isolation (error 3964).
 Probe design
 ------------
 
-An operator probe is SQL the operator runs by hand to learn about a source before
-pipeline SQL exists. Keep each probe:
+An operator probe is SQL the authorised operator runs by hand for source discovery
+or to check finished SQL before a delivery run. A proposal grants no execution
+authorisation; validate never connects to a database. Keep each probe:
 
 * **Aggregate-only.** It returns counts, ranges and codes, never patient rows.
 * **Small-cell suppressed.** Write the threshold as a parameter (for example
@@ -87,6 +88,73 @@ Tag each finding ``OBSERVED`` (measured) or ``INFERRED`` (reasoned from a result
 with its scope: server, database, table, bound and date run. A probe that meets
 every rule above is outside the lift-ledger gate (see the setup skill's
 ``references/lifts.rst``).
+
+Pre-run plausibility
+--------------------
+
+``validate`` and ``analyse`` own proposals, not execution. Inspect **every final
+result set**, its final SELECT/resolver columns, scope and data dictionary. Return
+**one row per label column**, starting with low-cardinality categories such as
+sex, status and facility. Include code/label pairs separately; do not check sex
+and assume the other labels share its format. Use this output table:
+
+Column | Expected labels/format and source | Proposed probe | Bound/cost | Status
+
+Qualify columns by result-set name and cite SQL lines. For each, propose a
+**count-only** distinct-value distribution (raw category value and row count),
+including NULL, blank and unmapped categories. Preserve **raw spelling**, case
+and trailing spaces: case-insensitive grouping can hide the uppercase surprise.
+Use an engine-verified binary comparison plus byte length where padding collapses
+values. Do not UPPER, trim or normalise values in the probe. Escape whitespace in
+safe returned labels so blank versus padded values remain visible. Suppressed
+categories remain unknown; absent returned labels are not proof of absence.
+Check the actual output representation, not only its source code column.
+
+If cardinality or meaning is unverified, still list the column with a deferred
+proposal and missing metadata, rather than omitting it. Exclude identifiers,
+free text and patient-name fields explicitly, with the reason; never emit staff
+or person keys. Report **no label columns** when that is the evidenced inventory.
+Do not use a probe to discover high-cardinality personal values. Label spelling
+is not a population filter: an uppercase sex label calls for dictionary or
+presentation review, not a sex-based exclusion.
+
+Apply all Probe design rules above. Plan **one bounded source scan** into a
+minimal ``#temp`` containing only safe category columns, then reuse it for every
+label aggregate. Prefer an already authorised, bounded cohort materialisation;
+do not run the full delivery pipeline as a probe or re-scan a source per column.
+Verify that the materialisation matches the finished SQL joins, filters and label
+conversions. State the cohort/time/facility bounds, estimated rows and available
+runtime evidence. A narrowed preflight window must be marked partial coverage,
+not a full-cohort check. No usable bound or scan plan means defer, not an unbounded
+query. Temporary probe material feeds no delivered extract and returns no patient
+rows. Record any NOLOCK or READ UNCOMMITTED use; never introduce either silently.
+
+Parameterise ``@min_cell`` from the assessment/approval threshold; when unknown,
+ask and mark the proposal not runnable. For a small cell **suppress the label**
+and count, not just its number. Apply required complementary suppression so
+visible totals, NULL/blank counts or a second probe cannot reveal hidden counts;
+do not request unsuppressed totals for subtraction. Return only safe category
+labels and counts, no identifiers, dates of birth, exact ages or patient examples.
+
+For **expensive requests only**, add an age-band count probe before the operator
+run: cite estimated rows, a prior runtime or another recorded cost assessment.
+When cost is unknown, ask whether the run is expensive; omit the age-band probe
+pending evidence, without dropping label proposals. Use the scoped age anchor
+(for example age at index surgery, not age today), verified age calculation and
+broad bands that test a stated boundary, with missing/invalid age counted and
+suppressed alike. No stated age limit does not imply adult; an exploratory
+under-18 band is not a new inclusion rule. Compute safe age-band categories in
+the same bounded materialisation; do not add another source scan or store raw
+birth dates in the probe table. Do not expose MIN/MAX birth dates.
+
+Mark every proposal ``proposed, not executed`` and identify the authorised
+operator action separately. When results return, tag evidence OBSERVED or INFERRED
+with server/database, bound, date and SQL revision as above. Compare safe values
+with the expected labels and data dictionary; route surprises to the analyst
+with no automatic exclusion. Unrun or suppressed probes do not establish
+plausibility. Keep later UAT and ``validation_counts`` checks; machine checking
+scope expectations against those counts in data-analysis-scaffold is a follow-up,
+not implemented here. This guidance changes no runtime permissions.
 
 Read isolation
 --------------
