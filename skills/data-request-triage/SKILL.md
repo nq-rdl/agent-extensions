@@ -5,13 +5,12 @@ description: >-
   Triage the RDL service-desk data-request queue: resolve enquiry and issue numbers to
   approval-ID repositories, check scope, scaffold, branch and library-gap state, classify
   blockers, and return paste-ready comments with an ordered queue (read-only). Co-development
-  mode works one selected request with the human and delegates agreed tasks to the other
-  data-request stages.
+  mode works one selected request with the human and delegates agreed tasks to the other data-request stages.
 argument-hint: '<enquiry IDs | issue numbers | priority filter> [--exclude <ids>] [--triage-only|--co-develop]'
 user-invocable: true
 compatibility: >-
   gh CLI authenticated for rdl-service-desk and nq-rdl, or the GitHub MCP read tools
-  (search_issues, issue_read, list_issues, get_file_contents, ...) when gh is absent; git.
+  (search_issues, issue_read, list_issues, get_file_contents, ...) when gh is absent; git, bash 3.2+, jq >=1.6.
   Layout observed 2026-09-21 to 2026-09-23: requests are rdl-service-desk/service-desk issues,
   children are rdl-service-desk/<APPROVAL-ID> repositories rendered from data-analysis-scaffold,
   and query-builder-plugins is consolidated into query-builder. Re-check the layout before relying on it.
@@ -22,9 +21,8 @@ metadata:
 
 # Data Request — triage (Data Analyst / Data Engineer)
 
-The queue entrypoint for service-desk data requests: it decides what to work on next and
-in what order. The stage skills do the work, so this skill routes to them and does not
-restate their procedures. Arguments: `$ARGUMENTS`. Read
+The queue entrypoint decides what to work on next and in what order. Stage skills do the
+work; this skill routes to them without restating procedures. Arguments: `$ARGUMENTS`. Read
 `${CLAUDE_PLUGIN_ROOT}/skills/guardrails/SKILL.md` for the source hierarchy before judging a
 requirement or a gap.
 
@@ -37,15 +35,15 @@ commit, push, pull request, label, project field edit, or issue or PR comment. U
 queries (`gh ... view`, `gh ... list`, `gh api` GET, a fetch into a scratch clone), or the
 GitHub MCP read tools when `gh` is absent. Read another child's branch with `git show` or
 `git ls-tree`, never `git checkout`: a checkout fires that repository's own hooks. Return
-paste-ready comments, an ordered queue and ledger entries for the human to post and store,
-and say that nothing was posted. Stop at triage when that is the requested scope, even when a
-fix looks small.
+paste-ready comments, an ordered queue and ledger entries, and say that nothing was posted.
+The session-file exception saves entries and private staging files in user state outside repositories;
+see [references/ledger.rst](references/ledger.rst). No child or service-desk writes are permitted.
+Stop at triage when that is the requested scope, even when a fix looks small.
 
-**Co-development**: work through one selected request with the human. Agree each task before
-you start or delegate it; write only to the branches the human agreed. See *Co-development*.
+**Co-development**: agree each task for one selected request before starting or delegating;
+write only to the branches the human agreed. See *Co-development*.
 
-Infer the mode from the request when no flag is given. When the scope is unclear, ask, and
-stay in triage only until the human answers.
+Infer the mode from the request when no flag is given. When unclear, ask and stay in triage only.
 
 ## Inputs
 
@@ -56,6 +54,9 @@ titles and bodies, never by opening issue `#9003`. Echo the resolved set and the
 before you assess anything.
 
 ## Assess each request
+
+Load the stored entry first; offer the session entry on resume and reconcile conflicts explicitly.
+Recheck affected evidence/artifacts, not every stage. See [references/ledger.rst](references/ledger.rst).
 
 1. **Probe the environment** every session: `gh auth status` (or its MCP fallback), repository
    access, proxy egress, the pixi solve (skip it and say why when the child has no
@@ -87,9 +88,8 @@ before you assess anything.
    code, tests, releases and dependency topology before you plan or file it. A delivered
    capability is closed, whatever an older gap register says.
 8. **Classify blockers** with the taxonomy in [references/checks.rst](references/checks.rst).
-9. **Update the ledger** so that interrupted work resumes from recorded state without
-   repeating completed stages. Read [references/ledger.rst](references/ledger.rst) before
-   creating, updating or resuming one.
+9. **Update the ledger** after each state-changing stage and before handoff; read
+   [references/ledger.rst](references/ledger.rst) for persistence, schema and resume rules.
 10. **Order the queue** by verified priority, then age. Within that, put requests that can
     move now ahead of those waiting on a dependency, and give each blocked request the
     comment that unblocks it. Read [references/comments.rst](references/comments.rst) for the

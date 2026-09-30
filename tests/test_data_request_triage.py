@@ -130,9 +130,10 @@ class Composition(unittest.TestCase):
         for path in skill_files(CANON):
             text = path.read_text()
             with self.subTest(path=path.name):
-                # sqlreview publication, confirmation fields and SQL mechanics belong to
-                # setup/bootstrap/analyse/guardrails.
-                for owned in ("sqlreview.sh", "carryforward", "confirmed_revision", "DATEADD",
+                # SQL-bound publication/confirmation/mechanics belong to other stages.
+                # #435 deliberately permits only the shared helper's independent ledger calls.
+                self.assertNotRegex(text, r'sqlreview\.sh" (?!ledger\b)')
+                for owned in ("carryforward", "confirmed_revision", "DATEADD",
                               "CREATE TABLE", "scope.draft.json"):
                     self.assertNotIn(owned, text)
 
@@ -182,6 +183,22 @@ class References(unittest.TestCase):
         self.assertRegex(ledger, r"(?i)who")
         self.assertRegex(ledger, r"(?i)durable")
         self.assertRegex(ledger, r"(?i)scratchpad")
+
+    def test_durable_default_and_resume_first_contract(self):
+        for root in (CANON, CLAUDE_COPY, CODEX_COPY):
+            with self.subTest(root=root):
+                text = body(root / 'SKILL.md')
+                ledger = (root / 'references/ledger.rst').read_text()
+                self.assertIn('Load the stored entry first', text)
+                self.assertIn('session-file exception', text)
+                self.assertIn('.sqlreview/ledger.json', ledger)
+                self.assertIn('XDG_STATE_HOME', ledger)
+                self.assertIn('ledger --session', ledger)
+                self.assertIn('ledger check', ledger)
+                self.assertIn('stage_evidence', ledger)
+                self.assertIn('questions.json', ledger)
+                self.assertIn('decided', ledger)
+                self.assertNotIn('Do not pick a location yourself', ledger)
 
     def test_blocker_taxonomy(self):
         checks = (CANON / "references" / "checks.rst").read_text().lower()

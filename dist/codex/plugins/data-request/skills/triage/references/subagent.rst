@@ -76,7 +76,9 @@ Scope rules
 * One writer per worktree and per branch. Run workers in parallel only on
   different repositories or on read-only tasks.
 * Preserve branches that others own.
-* In triage-only mode, workers are read-only and return text.
+* In triage-only mode, workers are read-only and return text. The caller alone
+  saves the validated local session file described in ``ledger.rst``; that
+  exception does not grant workers repository or service-desk write permission.
 * Workers never merge, release, run extracts, run ``copier update``, bypass
   hooks or write to service-desk.
 * Destructive steps run in the parent. When the user approves a destructive

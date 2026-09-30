@@ -136,6 +136,12 @@ Tell the user the next stage: `/data-request:bootstrap <intended sql path>` befo
 written, or `/data-request:analyse <sql path>` for SQL that already exists. Suggest committing
 `.sqlreview/` — the reviews inside it are the handoff record.
 
+Triage session state uses separate schema-1 `.sqlreview/ledger.json`, not a SQL review or
+lift record. `sqlreview.sh ledger get|set` validates per-ticket entries; `ledger check FILE`
+validates a stored ledger. `ledger --session get|set` uses durable local user state instead,
+without initialising or writing a child. `/data-request:triage` owns its schema and resume
+instructions. Roles in config remain display labels, never ledger owner/decider handles.
+
 SQL paths are supplied explicitly to bootstrap/analyse. To customise report sections, edit the
 project templates; SQL glob filtering and section flags are not configuration options.
 

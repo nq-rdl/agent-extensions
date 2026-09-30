@@ -107,16 +107,18 @@ class GitHubMcpFallback(unittest.TestCase):
 
 
 class LedgerDefaultLocation(unittest.TestCase):
-    """#377: co-development with no agreed location returns the ledger as text."""
+    """#435 supersedes #377's human-selected location; keep branch authorization."""
 
-    def test_default_is_text_until_a_location_is_agreed(self):
+    def test_default_is_durable_without_inventing_write_authorization(self):
         where = flat(rst_section("ledger.rst", "Where it lives"))
-        default = where.split("no location is agreed", 1)
-        self.assertEqual(len(default), 2, "no rule for a co-development session without an agreed location")
-        self.assertRegex(default[1], r"(?i)entries as text")
-        self.assertIn("triage-only", default[1])
-        self.assertIn("tracking issue body", default[1])
-        self.assertRegex(default[1], r"(?i)not pick a location")
+        self.assertIn(".sqlreview/ledger.json", where)
+        self.assertIn("agrees work on that child branch", where)
+        self.assertIn("use this default without asking", where)
+        self.assertIn("no writable agreed branch yet, use the session file", where)
+        self.assertIn("triage-only mode, return the entries as text", where)
+        self.assertIn("save with ``--session``", where)
+        self.assertIn("persistence failed", where)
+        self.assertIn("does not authorize child work", where)
 
 
 class VerifyBeforeStale(unittest.TestCase):

@@ -8,6 +8,9 @@ allowed_tools: [Read, Glob, Grep, Skill, Write, Edit]
 ---
 
 Triage the Urgent and High service-desk data requests below. Triage only: I will post anything myself. I need the order to work them in and a comment I can paste on each issue. This session has no shell or GitHub access, so everything I gathered is below.
+The validated ledger helper and a durable user-state location are unavailable in this
+fixture: return ledger text and disclose that persistence could not be performed.
+Do not use Write/Edit as a substitute for validated session persistence.
 
 **rdl-service-desk/service-desk#901**, "THHSRDLENQ-9001 ENT screening log", label `priority: Urgent`, opened 2026-07-31 (54 calendar days ago).
 Body: Approval THHSAQUIRE-9901. Screening log of URNs for ICD-10-AM J36 at Example Hospital, 2021 to 2025.
