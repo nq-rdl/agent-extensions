@@ -160,3 +160,13 @@ Shallow/missing history, repeated/relocated ranges, body-prefix changes and rele
 rename ambiguity are walked; unrelated PR merges with identical SQL path blobs are allowed.
 Git attribution is not human authentication. Retain independent origins; no answer means
 no publication. Later carryforward keeps `decided` and uses its normal confirmation fields.
+
+`remap SLUG [DRAFT]` uses `diff -U 0` against an authenticated same-kind snapshot to update only
+unchanged `location.lines` and `logic[].lines` in a draft. It reports `{document, prior_revision,
+remapped, walk}`; changed or ambiguous ranges remain untouched for reassessment. Default:
+`review.draft.json` when a review exists, otherwise `scope.draft.json`; absent default drafts are
+seeded from the published record, existing drafts are preserved. An explicit draft must be a
+JSON file directly inside that slug's directory, never `scope.json`, `review.json` or `lifts.json`.
+It is retry-safe and atomic on failure. Missing baseline exits 6; corrupt evidence exits 2;
+invalid draft ranges/binding exit 4. It never publishes, confirms, increments revisions, refreshes
+fingerprints or advances snapshots. See analyse/bootstrap's update paths before carryforward.
