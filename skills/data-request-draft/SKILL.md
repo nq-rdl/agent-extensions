@@ -40,7 +40,9 @@ correctness-critical syntax using the canonical docs linked by guardrails.
 **Autonomous:** implement evidenced engineer-owned technical defaults and flag them, without
 waiting for analyst approval. Do not attribute an agent default to the engineer. Stop only the
 dependent portion for known governance restrictions, cohort expansion, released-output row-count
-changes or an unsupported requester clinical definition; name the class and continue independent work.
+changes or an unsupported requester-defined measure (clinical, research or business definition)
+that changes inclusion or output meaning; name the class and continue independent work.
+Do not make the dependent SQL executable by inventing a measure, even at unchanged cohort/grain.
 Batch remaining questions with defaults/evidence into one analyst message; keep building on safe defaults.
 Deliver only the narrowest supported request; offer extras in hand-off, do not build them.
 **Co-develop:** present alternatives and effects to the owning engineer or analyst, obtain the

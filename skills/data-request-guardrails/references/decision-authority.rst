@@ -62,17 +62,21 @@ continue independent work. A question by itself is not a blocker.
   technical reading of an unreleased requested output is not a released-output
   grain change. Do not use this distinction to expand the requested cohort or
   add an output.
-* **Clinical definition:** the requester's clinical definition with no evidence
-  for a default. Default: continue independent work, but do not invent a 30-day
-  outcome, its anchor or qualifying states from a raw date. An existing recorded
-  requester definition is evidence; an engineer's implementation choice is not.
+* **Requester-defined measure:** an unsupported clinical, research or business definition
+  that changes inclusion or output meaning belongs to the analyst/requester, even
+  without cohort expansion or a released row-count change. Examples: length of stay
+  calculation, rate denominator, qualifying business states or a 30-day outcome.
+  Default: continue independent work, but do not invent a 30-day outcome, its anchor
+  or qualifying states from a raw date, or a business measure from storage facts.
+  An existing recorded requester definition is evidence; an engineer's implementation
+  choice is not. Stop the dependent SQL until that definition is supported.
 
 Batch the remaining research questions into one analyst message, each with its
 default and its evidence (or the missing evidence). Avoid repeating answered
 intake or prior-delivery choices. Keep building on safe defaults while answers
 are pending: unchanged requested cohort/grain, evidenced technical choices and
 independent portions. Silence is not approval to cross any boundary above.
-A necessary unanswered clinical definition has no executable invented default.
+A necessary unanswered requester-defined measure has no executable invented default.
 
 Deliver only the request
 ------------------------

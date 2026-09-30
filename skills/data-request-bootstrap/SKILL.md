@@ -194,7 +194,8 @@ Keep build progress distinct from an unpublished scope draft.
    (confirmed as in step 4), or keep the question open with the default noted for the requester.
    Apply the shared authority classes: batch research questions into one analyst message,
    continue independent work and safe defaults, and stop only a dependent portion that crosses
-   a known restriction, expands the cohort, changes released row count or invents a clinical definition.
+   a known restriction, expands the cohort, changes released row count or invents a
+   requester-defined measure (clinical, research or business definition) affecting inclusion or output meaning.
    An engineer technical decision proceeds and is flagged; it is not an analyst answer.
 
 Keep the working set in `.sqlreview/reviews/$SLUG/scope.draft.json` (guard-exempt). If the

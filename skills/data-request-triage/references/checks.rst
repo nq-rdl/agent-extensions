@@ -53,7 +53,8 @@ Interpretation checks
   ``/data-request:guardrails``.
 * **Raw versus derived.** Deliver the requested raw dated events or supported
   derived outcomes, respecting known approval restrictions. An unsupported
-  clinical outcome definition goes to the analyst; do not invent it.
+  requester-defined measure (clinical, research or business definition) goes to the
+  analyst; do not invent its inclusion rules or output meaning, even at unchanged cohort/grain.
 * **Supplied cohort.** When the requester supplies the cohort (a URN list or a
   prior extract), the work is linkage to that supplied cohort. Do not plan cohort
   discovery or map inclusion criteria.
@@ -109,7 +110,7 @@ is not human confirmation until a named human accepts it; an engineer-owned
 technical choice is not a clarification blocker. Batch remaining research
 questions into one analyst message, each with a default and evidence. Keep
 building independent portions and safe defaults; do not execute a prohibited
-output, cohort expansion, released grain change or invented clinical definition.
+output, cohort expansion, released grain change or invented requester-defined measure.
 
 Blocker taxonomy
 ----------------
@@ -120,8 +121,9 @@ failures; technical defaults are not blockers.
 
 clarification
    Name the authority subclass: cohort expansion beyond the request,
-   released-output grain change affecting row count, or unsupported requester
-   clinical definition. Stop only dependent work; batch a question and default
+   released-output grain change affecting row count, or an unsupported
+   requester-defined measure affecting inclusion or output meaning (clinical,
+   research or business definition). Stop only dependent work; batch a question and default
    in the analyst message. Preserve the requested cohort and released grain
    meanwhile. Mere technical ambiguity is not this class.
 

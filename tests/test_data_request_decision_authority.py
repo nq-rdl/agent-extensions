@@ -86,7 +86,7 @@ class DecisionAuthority(unittest.TestCase):
         for tree in TREES:
             with self.subTest(tree=tree):
                 rule = self.rule(tree)
-                self.assertIn("requester's clinical definition with no evidence for a default", rule)
+                self.assertIn("unsupported clinical, research or business definition", rule)
                 self.assertIn("do not invent a 30-day outcome", rule)
                 self.assertIn("Stop only the dependent portion", rule)
                 self.assertIn("continue independent work", rule)
@@ -123,6 +123,44 @@ class DecisionAuthority(unittest.TestCase):
                 for token in ("Engineer decision (<login>, <date>), flagged for the data analyst",
                               "rationale", "SQL location", "evidence", "offered extras (not built)"):
                     self.assertIn(token, handoff)
+
+    def test_review_drafting_preserves_optional_origin_not_confirmation(self):
+        for tree in TREES:
+            with self.subTest(tree=tree):
+                analyse = text(tree, "analyse")
+                for token in ("copy its optional `decided` object verbatim", "original actor",
+                              "source", "date-only precision", "does not supply confirmation"):
+                    self.assertIn(token, analyse)
+                carry = text(tree, "analyse", "references/carry.rst")
+                self.assertIn("optional ``decided``", carry)
+                self.assertIn("separate from the new confirmer", carry)
+
+    def test_triage_status_is_assessment_only_unless_execution_is_evidenced(self):
+        for tree in TREES:
+            with self.subTest(tree=tree):
+                comments = text(tree, "triage", "references/comments.rst")
+                for token in ("Status: Assessment only; no work executed in this run",
+                              "Only use ``Proceeding on an engineer decision, flagged``",
+                              "Omit ``Engineer decisions`` when no human decision is evidenced",
+                              "Only include ``Independent work continuing`` for work actually executed",
+                              "triage-only", "planned, not implemented",
+                              "For an execution run, report the actual actions"):
+                    self.assertIn(token, comments)
+                self.assertNotIn("Status: Proceeding on an engineer decision, flagged", comments)
+
+    def test_business_and_research_definitions_are_not_technical_defaults(self):
+        for tree in TREES:
+            with self.subTest(tree=tree):
+                rule = self.rule(tree)
+                for token in ("clinical, research or business definition", "length of stay",
+                              "rate denominator", "qualifying business states",
+                              "no executable invented default", "continue independent work"):
+                    self.assertIn(token, rule)
+                for leaf, relative in (("draft", "SKILL.md"), ("bootstrap", "SKILL.md"),
+                                       ("triage", "references/checks.rst"),
+                                       ("triage", "references/comments.rst")):
+                    with self.subTest(leaf=leaf, relative=relative):
+                        self.assertIn("requester-defined measure", text(tree, leaf, relative))
 
     def test_formal_scope_and_runtime_controls_are_not_bypassed(self):
         for tree in TREES:

@@ -110,6 +110,89 @@ class CarryOver(unittest.TestCase):
         self.assertEqual(out["carry_over"], [])
         self.assertEqual(len(out["walk"]), 4)
 
+    def test_decision_origin_survives_scope_to_review_confirmation(self):
+        origin = {"by": "original-engineer", "role": "Data Engineer",
+                  "at": "2026-09-14", "source": "https://example.com/decision/12"}
+        for before_sql in (False, True):
+            with self.subTest(before_sql=before_sql):
+                scoped = dict(assumptions=[item("S1", "Keep the source grain", decided=origin)],
+                              limitations=[item("S2", "Source omits transfers", decided=origin)])
+                self.p.write_json("q", "scope.json", scope_doc(
+                    "q", "q.sql", schemaVersion=2, **scoped))
+                baseline = self.d / "scope.source.sql"
+                if before_sql:
+                    baseline.unlink(missing_ok=True)
+                else:
+                    baseline.write_text(SQL_V1)
+                draft = review_doc("q", "q.sql", schemaVersion=2,
+                    sql_sha256=hashlib.sha256(SQL_V1.encode()).hexdigest(),
+                    assumptions=[draft_item("A1", "Keep the source grain", "because")],
+                    limitations=[draft_item("L1", "Source omits transfers", "because")])
+                # Full-review drafting preserves the scope origin before asking for carryover.
+                # Main's #446 contract walks missing or changed provenance, even with equal prose.
+                for kind in ("assumptions", "limitations"):
+                    draft[kind][0]["decided"] = dict(origin)
+                self.draft.write_text(json.dumps(draft))
+                out = self.carryover()
+                rows = out["carry_over_intent" if before_sql else "carry_over"]
+                self.assertEqual(len(rows), 2)
+                for row in rows:
+                    self.assertEqual(row.get("decided"), origin)
+                    # Carryover is a suggestion, not an answered confirmation.
+                    self.assertNotIn("confirmed_by", row)
+                    target = next(i for i in draft[row["kind"]] if i["id"] == row["id"])
+                    target.update(decided=row["decided"], status="confirmed",
+                                  confirmed_by="review-confirmer", confirmed_at="2026-09-30T04:00:00Z",
+                                  confirmed_revision=1)
+                self.draft.write_text(json.dumps(draft))
+                result = run(["publish", "q", "review", str(self.draft)], self.p.root)
+                self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+                published = json.loads((self.d / "review.json").read_text())
+                for kind in ("assumptions", "limitations"):
+                    self.assertEqual(published[kind][0]["decided"], origin)
+                    self.assertEqual(published[kind][0]["confirmed_by"], "review-confirmer")
+                (self.d / "review.json").unlink()
+
+    def test_walk_keeps_matched_scope_origin_when_governed_sql_changed(self):
+        origin = {"by": "original-engineer", "role": "Data Engineer",
+                  "at": "2026-09-14T12:30:00Z", "source": "https://example.com/decision/13"}
+        self.scope()
+        scope = json.loads((self.d / "scope.json").read_text())
+        scope["assumptions"][1]["decided"] = origin
+        (self.d / "scope.json").write_text(json.dumps(scope))
+        draft = json.loads(self.draft.read_text())
+        draft["assumptions"][1]["decided"] = dict(origin)
+        self.draft.write_text(json.dumps(draft))
+        self.sql.write_text(SQL_V1.replace("GROUP BY month", "GROUP BY month, ward"))
+        row = next(r for r in self.carryover()["walk"] if r["id"] == "A2")
+        self.assertEqual(row.get("decided"), origin)
+        self.assertNotIn("confirmed_by", row)
+
+    def test_missing_or_changed_origin_is_walked_without_overwriting_draft_provenance(self):
+        origin = {"by": "original-engineer", "role": "Data Engineer",
+                  "at": "2026-09-14", "source": "https://example.com/decision/14"}
+        self.scope()
+        scope = json.loads((self.d / "scope.json").read_text())
+        scope["assumptions"][0]["decided"] = origin
+        (self.d / "scope.json").write_text(json.dumps(scope))
+        for draft_origin in (None, dict(origin, by="other-engineer")):
+            with self.subTest(draft_origin=draft_origin):
+                draft = json.loads(self.draft.read_text())
+                if draft_origin is not None:
+                    draft["assumptions"][0]["decided"] = draft_origin
+                self.draft.write_text(json.dumps(draft))
+                out = self.carryover()
+                self.assertNotIn("A1", {r["id"] for r in out["carry_over"]})
+                row = next(r for r in out["walk"] if r["id"] == "A1")
+                self.assertIn("provenance differs", row["why"])
+                self.assertEqual(row.get("decided"), draft_origin)
+                self.assertNotIn("confirmed_by", row)
+
+    def test_carryover_does_not_invent_optional_decision_origin(self):
+        self.scope()
+        for row in self.carryover()["carry_over"]:
+            self.assertNotIn("decided", row)
+
     def test_errors(self):
         self.assertEqual(run(["carryover", "q"], self.p.root).returncode, 1)
         self.assertEqual(run(["carryover", "q", str(self.d / "nope.json")], self.p.root).returncode, 2)

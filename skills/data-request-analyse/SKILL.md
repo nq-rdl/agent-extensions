@@ -75,7 +75,8 @@ Some decisions recur in every enquiry (#362). Before you put candidate items to 
 `bash "$S/recurring-decisions.sh" match ".sqlreview/reviews/$SLUG/review.draft.json"`. For each match,
 show the prior enquiries, offer the listed wording and mark the item `upstream`, as
 `${CLAUDE_PLUGIN_ROOT}/skills/setup/references/recurring-decisions.rst` says. The engineer still confirms each item.
-Rows from `carryforward` or `carryover` omit `upstream`: copy it from the prior or scope item when you re-draft.
+Rows from `carryforward` include recorded `upstream` and `decided`: preserve them.
+Rows from `carryover` omit `upstream`: copy it from the scope item when you re-draft.
 
 ## Decision origin (#434)
 
@@ -204,7 +205,9 @@ Read the SQL. Draft into `reviews/$SLUG/review.draft.json` (guard-exempt) as you
   **limitations** — every constraint the analyst must know before relying on the output. Give
   each the `location` lines it governs and a one-line rationale. Where an item restates a
   confirmed scope item that still holds, keep the scope's `text` and `rationale` verbatim so it
-  can be carried over (below); reword only where the SQL changed what is true.
+  can be carried over (below); copy its optional `decided` object verbatim, preserving the original actor,
+  role, source and date-only precision, separate from the review confirmer. Decision origin does not supply confirmation.
+  Reword only where the SQL changed what is true; retain the origin of any decision that still applies.
 - **questions.json** — load `bash "$S/sqlreview.sh" questions "$SLUG" review` on every
   resume: it includes the scope's questions and review-only questions. Never seed a second
   list from scope. Follow `${CLAUDE_PLUGIN_ROOT}/skills/setup/references/questions.rst`;
@@ -242,7 +245,7 @@ find what bootstrap already settled:
 ```bash
 bash "$S/sqlreview.sh" carryover "$SLUG" ".sqlreview/reviews/$SLUG/review.draft.json"
 # → {scope_revision, sql_unchanged, sql_body_unchanged, scope_before_sql, carry_over: [{kind, id,
-#    scope_id, basis, text, rationale, location}], carry_over_intent: [same], walk: [{kind, id, why}]}
+#    scope_id, basis, text, rationale, location, decided?}], carry_over_intent: [same], walk: [{kind, id, why, decided?}]}
 ```
 
 `carry_over` and `carry_over_intent` list draft items whose list, text and rationale match a
@@ -251,6 +254,9 @@ each, then ask each non-empty list as **one** question, as
 [references/carry.rst](references/carry.rst) describes: `carry_over` (the SQL under the item did
 not change) with **Carry over all (Recommended)**, `carry_over_intent` (the SQL changed or came
 after the scope) with a delta summary and no recommended option. Every item shows its `location`.
+Copy each row's optional `decided` onto the draft item verbatim, including matched scope items
+returned under `walk`; never replace it with the new confirmer or confirmation timestamp.
+Do not invent an origin when absent.
 
 ### Named dated header decisions (#431)
 
