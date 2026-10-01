@@ -3,6 +3,7 @@ name: codex-model-guide
 license: Apache-2.0
 description: Internal guide for selecting a Codex model and reasoning effort (GPT-5.6 Sol/Terra/Luna, GPT-6 Astra/Sol/Luna) when delegating work to Codex
 user-invocable: false
+compatibility: Codex CLI 0.159.1 for the dated live observation; older alias-table provenance is recorded separately
 metadata:
   repo: https://github.com/nq-rdl/agent-extensions
 ---
@@ -18,9 +19,32 @@ The delegation decision guide used by Claude Code and the `codex:rescue` executo
 
 ## Verify against the live catalog first
 
-`codex debug models` is the authority for what is actually available in the installed Codex. When a value below differs from `codex debug models`, trust the live catalog and prefer it over this static table. The catalog is server-fetched, so defaults can change without a CLI upgrade.
+Verify against Codex's server-fetched catalog (`codex debug models` or app-server `model/list`) when stale facts would mislead. It is authoritative for what is listed, not what an account can run. Catalog drift does not redefine companion aliases or authorize model selection; defaults can change without a CLI upgrade.
 
 Provenance, not a supported-version range: GPT-5.6 rows recorded against Codex CLI 0.144.6. GPT-6 rows recorded against Codex CLI 0.156.1 (nq-rdl/agent-extensions#393) and re-checked on 0.157.0. All rows re-checked on 2026-09-29 against the model catalog cached by `codex-cli 0.158.0`.
+
+## Observed catalog and default (2026-10-01)
+
+Facts, not selection policy (#477; follow-up to #430 / PR #471): at 03:09 UTC on Linux, `codex-cli 0.159.1`, authenticated ChatGPT sign-in, app-server `model/list` with `includeHidden: true`, `limit: 100`, `cursor: null` returned these entries and `nextCursor: null`:
+
+| Catalog id | Hidden | Default effort | Server default (`isDefault`) |
+|---|---|---|---|
+| `gpt-6.1-sol` | no | low | yes |
+| `gpt-6-astra` | no | medium | no |
+| `gpt-6-sol` | no | medium | no |
+| `gpt-6-luna` | no | medium | no |
+| `gpt-reserve` | yes | medium | no |
+| `gpt-5.6-sol` | no | low | no |
+| `gpt-5.6-terra` | no | medium | no |
+| `gpt-5.6-luna` | no | medium | no |
+| `gpt-5.5` | no | medium | no |
+| `codex-auto-review` | yes | medium | no |
+
+With an empty `config.toml`, `thread/start.model: null` resolved to `result.model: gpt-6.1-sol` (`approvalPolicy: never`, `sandbox: read-only`, `ephemeral: true`). This confirms the 2026-09-30 #430 default observation without a model turn: no `turn/start`, tools, or inference request was needed. `codex debug --help` also confirmed the `models` discovery command. Model identity was observed in the protocol, not by asking a model its name.
+
+Isolation followed `docs/skill-review/codex-live-430.md`: a disposable git repository outside the catalog checkout and a private `CODEX_HOME` containing only copied `~/.codex/auth.json` (chmod 600) and empty config before launch. The whole temporary directory, including credentials and CLI-created files, was removed afterwards. No live Codex ran in the catalog checkout.
+
+The alias table below is **not an exhaustive live catalog**: `gpt-6.1-sol`, `gpt-reserve`, `gpt-5.5`, and `codex-auto-review` have no companion aliases; Spark was absent from this response. The catalog calls `gpt-6-sol` “Previous generation workhorse model.” Listing and thread creation do not prove successful inference, account/plan support, price, or relative capability. This snapshot changes no aliases, tiers, or bare-name meanings; #201 owns selection policy. Do not substitute the observed server default for an alias or select it automatically.
 
 ## Models and aliases
 
@@ -57,7 +81,7 @@ Alias decision:
 
 Per-model defaults (a real gotcha):
 - **`gpt-5.6-sol` defaults to `low`.** If you want deep reasoning from GPT-5.6 Sol, set effort explicitly. `gpt-6-sol` defaults to `medium`.
-- Every other model defaults to `medium`. nq-rdl/agent-extensions#393 recorded `gpt-6-astra` at `low` on 0.156.1; 0.157.0 reports `medium`. Check `codex debug models` when it matters.
+- Every other model in the alias table defaults to `medium`. nq-rdl/agent-extensions#393 recorded `gpt-6-astra` at `low` on 0.156.1; 0.157.0 reports `medium`. Check `codex debug models` when it matters.
 
 `pro` is **not** a Codex effort — it is the API's `reasoning.mode: "pro"`, independent of effort. Do not pass `pro` as `--effort`.
 
@@ -78,4 +102,4 @@ No account-plan gating is asserted beyond the caveats above; there is no authori
 
 Use a GPT-6 alias only when the user asks for GPT-6 or names a GPT-6 model.
 
-Defaults: leave `--model` and `--effort` unset unless the user asks or the task clearly warrants a change — the companion honors the user's `config.toml`. Escalate effort before switching to a bigger model; a tighter prompt (see `codex:prompting`) often beats more reasoning.
+Model selection is only on user request: leave `--model` unset unless the user asks for a model change — the companion honors the user's `config.toml` or Codex's server default. The task mapping is advice for that request, not permission to switch models automatically. Leave `--effort` unset unless the user asks or the task clearly warrants a change. Escalate effort before considering a user-requested model switch; a tighter prompt (see `codex:prompting`) often beats more reasoning.

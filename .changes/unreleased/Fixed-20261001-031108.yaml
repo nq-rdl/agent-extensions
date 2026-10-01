@@ -1,0 +1,3 @@
+kind: Fixed
+body: Record the isolated GPT-6.1 Codex catalog/default observation separately from alias policy; guard alias agreement and user-request-only model selection.
+time: 2026-10-01T03:11:08.599434017Z

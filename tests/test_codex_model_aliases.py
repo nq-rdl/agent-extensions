@@ -1,4 +1,4 @@
-"""Contract tests for Codex model aliases (issues #392, #393).
+"""Contract tests for Codex model aliases (issues #392, #393, #477).
 
 The alias map lives in three places that drifted apart before: `MODEL_ALIASES` in the
 companion runtime, the alias table in `codex:model-guide`, and the model table in the
@@ -251,6 +251,74 @@ class ModelGuideFacts(unittest.TestCase):
         self.assertIn("0.155.0", caveats)
         self.assertIn("ChatGPT", caveats)
         self.assertIn("GPT-6", frontmatter(GUIDE)["description"])
+
+
+class CatalogProvenance(unittest.TestCase):
+    """Offline guards for the recorded snapshot, not live availability tests."""
+
+    def guides(self):
+        return [GUIDE] + [root / "model-guide" / "SKILL.md" for root in PACKAGED_ROOTS]
+
+    def test_dated_catalog_snapshot_is_separate_from_alias_policy(self):
+        expected_rows = [
+            ("gpt-6.1-sol", "no", "low", "yes"),
+            ("gpt-6-astra", "no", "medium", "no"),
+            ("gpt-6-sol", "no", "medium", "no"),
+            ("gpt-6-luna", "no", "medium", "no"),
+            ("gpt-reserve", "yes", "medium", "no"),
+            ("gpt-5.6-sol", "no", "low", "no"),
+            ("gpt-5.6-terra", "no", "medium", "no"),
+            ("gpt-5.6-luna", "no", "medium", "no"),
+            ("gpt-5.5", "no", "medium", "no"),
+            ("codex-auto-review", "yes", "medium", "no"),
+        ]
+        for path in self.guides():
+            with self.subTest(path=path):
+                facts = section(path.read_text(), "Observed catalog and default (2026-10-01)")
+                rows = re.findall(r"^\| `([^`]+)` \| (yes|no) \| (low|medium) \| (yes|no) \|$", facts, re.M)
+                self.assertEqual(rows, expected_rows)
+                for needle in (
+                    "03:09 UTC", "codex-cli 0.159.1", "model/list",
+                    "includeHidden: true", "nextCursor: null",
+                    "thread/start.model: null", "result.model: gpt-6.1-sol",
+                    "empty `config.toml`", "no `turn/start`",
+                    "not an exhaustive live catalog", "Spark was absent",
+                    "do not prove successful inference, account/plan support, price, or relative capability",
+                    "#201 owns selection policy", "Do not substitute the observed server default for an alias",
+                ):
+                    self.assertIn(needle, facts)
+                self.assertEqual(guide_aliases(path), js_aliases(COMPANION))
+                self.assertNotIn("gpt-6.1-sol", guide_aliases(path).values())
+                self.assertNotIn("gpt-6.1-sol", section(path.read_text(), "Task → model / effort mapping"))
+
+    def test_observation_records_isolation_and_cleanup(self):
+        facts = section(GUIDE.read_text(), "Observed catalog and default (2026-10-01)")
+        for needle in (
+            "docs/skill-review/codex-live-430.md", "disposable git repository",
+            "private `CODEX_HOME`", "~/.codex/auth.json", "chmod 600",
+            "whole temporary directory", "was removed afterwards",
+            "No live Codex ran in the catalog checkout", "sandbox: read-only",
+        ):
+            self.assertIn(needle, facts)
+
+    def test_model_selection_requires_user_request_in_all_guides(self):
+        for path in self.guides():
+            with self.subTest(path=path):
+                policy = section(path.read_text(), "Task → model / effort mapping")
+                self.assertIn("Model selection is only on user request", policy)
+                self.assertIn("leave `--model` unset unless the user asks", policy)
+                self.assertIn("not permission to switch models automatically", policy)
+                self.assertIn("Use a GPT-6 alias only when the user asks", policy)
+                self.assertNotRegex(policy, r"--model`[^.]*unless[^.]*task clearly warrants")
+
+    def test_live_guard_and_body_limit(self):
+        text = GUIDE.read_text()
+        guard = section(text, "Verify against the live catalog first")
+        self.assertIn("Verify against Codex's server-fetched catalog", guard)
+        self.assertIn("not what an account can run", guard)
+        self.assertIn("does not redefine companion aliases or authorize model selection", guard)
+        self.assertIn("0.159.1", frontmatter(GUIDE)["compatibility"])
+        self.assertLessEqual(len(text.split("---\n", 2)[2].splitlines()), 500)
 
 
 class ReviewModelDocs(unittest.TestCase):
