@@ -112,9 +112,11 @@ Guardrails' ``references/performance.rst`` gives the probe design rules.
 
 **Code-discovery probes:** ``/data-request:lookup`` probes returning only codes,
 labels and counts are exempt from the hand-SQL gate only under those same
-operator-probe conditions. Counts from 1 to 6 display as ``<7``; use complementary
-suppression where subtraction could reveal a masked cell, and no totals. Include
-matched-term provenance, not patient values, dates, identifiers or free-text results.
+operator-probe conditions. Before proposing or reporting one, read **Probe disclosure
+control** in ``${CLAUDE_PLUGIN_ROOT}/skills/guardrails/references/release.rst`` for
+its floor, formatter, structural-count treatment, rare-label folding and perimeter
+rules. Gate exemption is not disclosure permission. Include matched-term provenance,
+not patient values, dates, identifiers or free-text results.
 The exemption waives only lift capture, not engineer review of a fallback probe,
 authorisation or disclosure controls. The agent never runs the lookup query;
 an authorised human runs it and pastes the labelled grids back. The private lookup

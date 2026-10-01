@@ -31,8 +31,9 @@ owns source and implementation questions. A lookup hit is not clinical approval.
 
 Invoke `$data-request:guardrails` first. Arguments: `$ARGUMENTS`.
 This public skill holds only the workflow, not local schema facts, code values
-or SQL. Keep generated scripts, pasted grids and lookup records in the private
-child repository of the request; never copy them into this catalog.
+or SQL. Keep generated scripts and disclosure-controlled lookup records in the
+private child repository of the request; keep original grids only in a results
+store allowed by the disclosure section below; never copy them into this catalog.
 
 ## Verify the private reference first
 
@@ -103,28 +104,39 @@ for the agent to invent a replacement query or run one.
 Before handoff, check that the probe returns only codes, labels and counts, with
 matched-term provenance so short-term collisions remain visible. No patient
 values, patient dates, identifiers, staff/person keys or free-text results.
-Counts from 1 to 6 must display as `<7`, with complementary suppression where
-subtraction could reveal a masked cell, and no totals. Follow guardrails for
-bounded single-scan probes, isolation disclosure and no delivered-extract use.
-If these conditions cannot be verified, stop for engineer review, not a live test.
+Read **Probe disclosure control** in
+`${PLUGIN_ROOT}/skills/guardrails/references/release.rst` before proposing,
+reporting or recording a probe. That section owns the effective floor, rounding,
+complementary controls, rare-label folding and perimeter rules; gate exemption is
+not disclosure permission. Distinct-code/label inventory counts use its structural
+count treatment, including the folded-label-total exception; counts of cases or
+events behind each code are population counts, not structural inventory counts.
+Follow guardrails for bounded single-scan probes, isolation disclosure and no
+delivered-extract use. If the disclosure policy or probe conditions cannot be
+verified, stop for engineer review, not a live test.
 
 The authorised human runs the saved script in SSMS and pastes the labelled grids
-back. The agent runs no query, including through a database tool or connection
-helper. Ask for missing grid labels or run provenance; no paste-back means no
-observed code evidence. Unexpected patient data must not be reproduced or stored
+back, formatted under that disclosure section. The agent runs no query, including
+through a database tool or connection helper. Ask for missing grid labels or run
+provenance; no paste-back means no observed code evidence. If exact population
+counts are pasted, do not repeat or commit them: ask for formatted output and
+apply the section before writing any text. Unexpected patient data must not be reproduced or stored
 as a lookup record: stop and return the unsafe probe to the engineer.
 
 Check term collisions and distinguish no hit, suppressed count and missing grid.
 Do not reconstruct suppressed counts or treat missing evidence as zero. Separate
 candidate codes from analyst-selected codes; send ambiguous clinical matches to
-the analyst and technical/schema conflicts to the engineer.
+the analyst and technical/schema conflicts to the engineer. A folded "other" row
+is not code evidence for its hidden members; do not recover or list them in the record.
 
 ## Private lookup record
 
 Ask the analyst/engineer where to keep the Markdown record in the private child
-repository and record the chosen path; there is no default path. Commit the record
-there so map can cite its path and revision. This is not a new `.sqlreview` document
-type. Use the following fields (no live values belong in this public template):
+repository and record the chosen path; there is no default path. Commit only the
+disclosure-controlled record there so map can cite its path and revision. A private
+commit is not automatically RDL-only: classify its perimeter under the disclosure
+section before writing it. This is not a new `.sqlreview` document type. Use the
+following fields (no live values belong in this public template):
 
 - **Question and context:** request/intake/scope citation and revision, intended
   meaning, family, direction/route and rationale.
@@ -132,20 +144,24 @@ type. Use the following fields (no live values belong in this public template):
   with source and timezone basis from the private reference.
 - **Provenance:** private docs/DDL/probe paths and revisions, installed library
   pin, exact generation invocation, saved script and labelled-grid manifest path
-  (or explicitly unavailable); for a fallback, engineer review evidence.
+  (or explicitly unavailable); for a fallback, engineer review evidence. Record the
+  disclosure perimeter, assessment/approval source and formatting provenance.
 - **Run:** actual execution date/time and timezone, environment, who ran it and
   pasted-grid location. Use an operator handle, never an email or workstation
   identity, following intake's actor rule. Never invent execution or approval.
 - **Candidates:** one row per code with its label, source table/resolver, matched
-  term or expansion origin, labelled-grid citation and suppressed count as shown.
+  term or expansion origin, labelled-grid citation and disclosure-controlled count
+  as shown, classified as structural or population under the disclosure section.
   Keep schema names and code values here privately, not in the skill.
 - **Disposition:** selected, rejected or unresolved, with rationale; analyst
   decisions retain actual actor/date/source. Record no hits, missing grids,
   limitations, collisions and engineer questions explicitly.
 
 Before a run, record only the proposal and blocked/pending state; never label it
-OBSERVED. After paste-back, label observations with their scope, preserving the
-original grids and suppression. A rerun records new provenance rather than
+OBSERVED. After paste-back, label observations with their scope and cite the
+original results in their access-controlled store, not by copying exact population
+counts into the record. Preserve the reviewed display and formatting provenance.
+A rerun records new provenance rather than
 silently replacing earlier evidence. No lookup code is promoted automatically
 into a resolver or concept registry.
 

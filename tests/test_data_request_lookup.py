@@ -105,14 +105,23 @@ class LookupContract(unittest.TestCase):
         for tree, text in self.texts():
             with self.subTest(tree=tree):
                 text = " ".join(text.split())
-                for phrase in ("only codes, labels and counts", "`<7`", "complementary suppression",
-                               "no totals", "bounded single-scan", "no delivered-extract use"):
+                for phrase in ("only codes, labels and counts", "Probe disclosure control",
+                               "skills/guardrails/references/release.rst", "bounded single-scan",
+                               "delivered-extract use", "folded-label-total exception",
+                               "population counts, not structural inventory counts",
+                               "not automatically RDL-only", "do not repeat or commit them",
+                               "disclosure perimeter", "formatting provenance",
+                               "not code evidence for its hidden members",
+                               "do not recover or list them in the record"):
                     self.assertIn(phrase, text)
+                self.assertNotIn("`<7`", text)
+                self.assertNotIn("no totals", text)
                 for field in ("Question and context", "Search", "Provenance", "Run",
                               "Candidates", "Disposition", "who ran it", "source table/resolver",
                               "labelled-grid citation", "selected, rejected or unresolved",
                               "never label it OBSERVED", "no paste-back means no",
-                              "record the chosen path", "Commit the record", "operator handle",
+                              "record the chosen path", "Commit only the disclosure-controlled record",
+                              "operator handle",
                               "never an email or workstation identity", "topic: codes",
                               "record's path and revision in the rationale"):
                     self.assertIn(field, text)
@@ -148,10 +157,16 @@ class LookupContract(unittest.TestCase):
                 self.assert_workflow_only(lookup_rules)
                 self.assertLessEqual(max(map(len, lookup_rules.splitlines())), 100)
                 rules = " ".join(lookup_rules.replace("``", "`").split())
-                for phrase in ("only codes, labels and counts", "`<7`", "no totals",
-                               "complementary suppression", "operator-probe conditions",
+                for phrase in ("only codes, labels and counts", "Probe disclosure control",
+                               "skills/guardrails/references/release.rst", "structural-count treatment",
+                               "rare-label folding", "perimeter rules", "operator-probe conditions",
                                "waives only lift capture", "authorised human"):
                     self.assertIn(phrase, rules)
+                self.assertNotIn("`<7`", rules)
+                self.assertNotIn("no totals", rules)
+                self.assertIn("without repeating exact population counts", " ".join(lookup_mapping.split()))
+                self.assertIn("Probe disclosure control", guard)
+                self.assertIn("references/delivery.rst", guard)
 
     def test_intake_routes_code_discovery_back_to_recorded_decisions(self):
         roots = (REPO / "skills/data-request-setup",

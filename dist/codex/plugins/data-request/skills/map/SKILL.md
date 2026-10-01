@@ -93,7 +93,9 @@ mapping evidence. Distinguish observed candidates from analyst-selected codes;
 a hit does not confirm clinical inclusion. A pending run, missing grid or unresolved
 conflict remains unverified. Do not guess a code from its label or silently broaden
 the analyst's selection. Lookup's command dependency may be unavailable; follow
-its stop/engineer-reviewed-probe path, not replacement hand SQL.
+its stop/engineer-reviewed-probe path, not replacement hand SQL. Apply the disclosure
+section cited above before carrying lookup values into mapping; cite the evidence
+without repeating exact population counts.
 
 ## Mapping output
 
