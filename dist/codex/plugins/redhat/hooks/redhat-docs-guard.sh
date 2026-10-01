@@ -71,6 +71,24 @@ reads_file=0; has "${CMDPOS}(cat|less|more|head|tail|bat|xxd|od|strings|grep|sed
 
 # Shared lexical segments for the print and fetcher checks (not a full shell parser).
 segments="$(printf '%s\n' "$cmd" | sed -e 's/&&/;/g' -e 's/||/;/g' | tr ';|' '\n\n')"
+# The print check also uses quote-aware segments, so a separator inside a quoted argument
+# (printf '%s;' "$RH_OFFLINE_TOKEN") cannot split printf from the expansion.
+qsegments="$(printf '%s\n' "$cmd" | awk -v sq="'" -v dq='"' '{
+  s = $0; out = ""
+  for (i = 1; i <= length(s); i++) {
+    c = substr(s, i, 1)
+    if (q != "") {
+      if (c == q) q = ""
+      else if (c == "\\" && q == dq) { out = out c; i++; c = substr(s, i, 1) }
+      out = out c; continue
+    }
+    if (c == "\\") { out = out c substr(s, i + 1, 1); i++; continue }
+    if (c == sq || c == dq) { q = c; out = out c; continue }
+    if (c == ";" || c == "|" || c == "&") { out = out "\n"; continue }
+    out = out c
+  }
+  if (q != "") printf "%s ", out; else print out
+} END { if (q != "") print "" }')"
 
 # 1. Secret hygiene — checked first, applies even to plugin scripts.
 #    Only JWT-like or long base64url values count as literals; format strings and short
@@ -83,7 +101,8 @@ while IFS= read -r seg; do
   if printf '%s' "$seg" | grep -Eq "${CMDPOS}(echo|printf)[[:space:]]+.*"'\$\{?RH_OFFLINE_TOKEN'; then
     decide deny "Never print RH_OFFLINE_TOKEN — it would land in the transcript. Verify it with: rh-token.sh --check (reports source and expiry only)."
   fi
-done <<<"$segments"
+done <<<"$segments
+$qsegments"
 if [ "$dumps" = 1 ]; then
   decide deny "Never dump the environment around RH_OFFLINE_TOKEN (env/set/printenv/declare) — the value would land in the transcript. Verify it with: rh-token.sh --check."
 fi

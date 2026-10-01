@@ -152,6 +152,11 @@ class GuardHook(unittest.TestCase):
             'true | echo "$RH_OFFLINE_TOKEN"',
             'true\nprintf \'%s\' "$RH_OFFLINE_TOKEN"',
             'RH_CRED_SOURCES=env printf \'%s\' "$RH_OFFLINE_TOKEN"',
+            # Separators inside quoted arguments do not split the print from the expansion.
+            'printf \'%s;\' "$RH_OFFLINE_TOKEN"',
+            'printf \'a|b %s\' "$RH_OFFLINE_TOKEN"',
+            'echo "x && $RH_OFFLINE_TOKEN"',
+            'echo "a;b" "$RH_OFFLINE_TOKEN"',
         ):
             with self.subTest(cmd=cmd):
                 d = decision(run_hook(GUARD, bash_event(cmd), self.env))
