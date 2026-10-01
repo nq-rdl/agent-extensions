@@ -6,6 +6,8 @@ import path from "node:path";
 import test from "node:test";
 import assert from "node:assert/strict";
 import { fileURLToPath } from "node:url";
+import { spawnSync } from "node:child_process";
+import vm from "node:vm";
 
 // Assert against the canonical authoring source of truth. sync-plugins.sh copies
 // these bodies verbatim into the plugin tree (only frontmatter `name:` is stripped
@@ -60,6 +62,24 @@ for (const [name, sub] of Object.entries(ACTION_SKILLS)) {
     }
   });
 }
+
+test("single-command preflight exits correctly without echo or a shell wrapper", () => {
+  const script = readSkill("review").match(/```bash\nnode -e '([^']+)'\n```/)[1];
+  for (const [version, expected] of [
+    ["16.20.2", 1], ["18.17.1", 1], ["18.18.0", 0],
+    ["18.20.8", 0], ["20.0.0", 0], ["22.23.1", 0]
+  ]) {
+    let status;
+    vm.runInNewContext(script, {
+      process: { versions: { node: version }, exit: code => { status = code; } }
+    });
+    assert.equal(status, expected, version);
+  }
+  const result = spawnSync(process.execPath, ["-e", script], { encoding: "utf8" });
+  assert.equal(result.status, 0);
+  assert.equal(result.stdout, "");
+  assert.equal(result.stderr, "");
+});
 
 test("review and adversarial-review enforce a verbatim output contract", () => {
   for (const name of ["review", "adversarial-review"]) {
