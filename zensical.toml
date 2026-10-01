@@ -59,6 +59,7 @@ nav = [
         { "Claude Code" = "skill-review/claude-code.md" },
         { "Codex" = "skill-review/codex.md" },
         { "Delegation" = "skill-review/delegation.md" },
+        { "Prompt-builder pilot" = "skill-review/prompt-builder.md" },
         { "GitHub workflows" = "skill-review/gh-workflows.md" },
         { "Hooks" = "skill-review/hooks.md" },
         { "New plugins" = "skill-review/new-plugins.md" },

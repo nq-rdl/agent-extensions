@@ -358,7 +358,7 @@ fix), and probes USD 0.12.
 | hlbpa | Changed | docs-only writes, caller RFI and resumption, Mermaid keywords (`85c261a`); D7 1/1 both versions. Input/artifact schema kept (behaviour-bearing); the #298 fence fix was already in place |
 | context-architect | Changed | map returned, edits only under implementation authorization, strategy boundary (`85c261a`). Not run behaviourally (R2/R10 routing only) |
 | research-technical-spike | Changed | one update rule, one section rule, experiments need authorization (`85c261a`); D8 as above. No new template companion added: the existing document's sections are used |
-| prompt-builder | Changed (contract only) | Contract maps its direct-user dialogue to the caller. At this review the optional outline was 606 lines and untested as a worker (SKILL.md body is 11). The subsequent [#426 worker pilot](prompt-builder.md) records 16 runs and the bounded 185-line consolidation |
+| prompt-builder | Changed (contract only) | Contract maps its direct-user dialogue to the caller. At this review the optional outline was 606 lines and untested as a worker (SKILL.md body is 11). The subsequent [#426 worker pilot](prompt-builder.md) records 16 runs, the bounded consolidation and the final 190-line outline after small wording restorations |
 | address-comments | Changed | `b89e3f4`; D4 unauthorized commits 2/2 → 0/2; D4b authorized commit kept |
 | wg-code-sentinel | Changed | `sops:encrypt` removed, `sops` not added to `go` (`458f46f`); `CompanionSkillsResolve` test; severity/fix/verify kept. Not run behaviourally |
 | plan | Changed | output contract and hand-off boundary; provenance notes the local changes (`85c261a`); R1 routing |

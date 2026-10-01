@@ -11,21 +11,30 @@ revision). Tasks and expected checks were fixed before canonical edits.
 
 Read `skills/skill-audit/SKILL.md`; no catalog installation or recursive audit.
 
-- **MODERATE — outline:94–111, 260–313, 491–532:** repeated mandatory
-  validation and overlapping success criteria. In particular, the later
-  "any one" success criterion conflicts with the earlier no-critical-issues
-  requirement. Consolidate the cycle without weakening source compliance.
-- **MODERATE — outline:144–255, 315–375, 535–589:** generic research,
-  quality and tool-use advice repeated across sections. Compress, retaining
-  source reading, conflict handling, working elements, concrete examples,
-  version-conditioned findings and failure reporting.
-- **MINOR — outline:418–490, 591–598:** interaction examples and imperative
-  term glossary add little worker-specific value. Preserve role activation
-  and response headings rather than the repeated example requests.
-- **KEEP — outline:8–61, 113–142, 400–416, 600–606:** caller contract,
-  authorization, tester-only behavior, visible complete tester outputs and MIT
-  provenance are load-bearing. Do not infer independent execution from two
-  personas in one assistant.
+The section names below refer to the 606-line baseline outline, verified
+against `git show origin/main:skills/prompt-builder/references/subagent.rst`.
+
+- **MODERATE — Prompt Builder Role, Mandatory Validation Phase, Final
+  Confirmation Phase, Iterative Improvement Cycle, Successful Prompts Achieve:**
+  repeated validation and overlapping success criteria. The later "any one"
+  rule conflicts with the earlier no-critical-issues requirement. Consolidate
+  without dropping source compliance or consistency in the tested scope.
+- **MODERATE — Information Research Requirements, Prompt Creation
+  Requirements, Research and Analysis Phase, Testing Phase, Improvement Phase,
+  Core Principles, Common Issues to Address, Research Quality Standards, Error
+  Handling:** generic research, quality and tool-use advice repeated across
+  sections. Compress, retaining source reading, conflict handling, working
+  elements, examples, version-conditioned findings and failure reporting.
+- **MINOR — Default User Interaction examples, Research-Driven Request Types,
+  Initial Conversation Structure research-plan template, Quick Reference:
+  Imperative Prompting Terms:** examples and glossary add little worker-specific
+  value. Preserve role activation and response headings, not repeated requests.
+- **KEEP — Handoff, Prompt Tester Role, Response Format (Prompt Builder
+  Responses, Research Documentation Format, Prompt Tester Responses), Initial
+  Conversation Structure no-dual-persona-introduction rule, Provenance:** caller
+  contract, authorization, role activation, headings/opening, research summary,
+  complete visible tester outputs and MIT attribution are load-bearing. Do not
+  infer independent execution from two personas in one assistant.
 - **SKILL.md:** KEEP. Name, trigger, license, optional delegation link and
   complexity contract are appropriate. No library/tool API is encoded, so
   a compatibility pin or external canonical guard is not applicable. Source
@@ -178,7 +187,10 @@ is retained in both variants and the unstable baseline case is repeated.
 
 ## Baseline observations and bounded candidate
 
-All seven baseline runs completed before running the candidate. C/R produced
+All seven baseline runs completed before running the candidate. The candidate
+text in `procedure.rst` was fixed at 22:18:07, before baselines A, L, T and B
+finished (22:18:41, 22:19:44, 22:20:08 and 22:20:42 respectively, verified from
+local file timestamps). It was not tuned to those outcomes. C/R produced
 source-compliant prompts and visible same-assistant tester outputs. M returned
 ENOENT and consolidated caller questions. A used the supplied authorization
 without deploying. L actually ran FAIL → edit → FAIL → edit → PASS and showed
@@ -188,17 +200,31 @@ was supplied; repeat and matched candidate results are recorded below.
 
 This supports testing consolidation, not a quality gain claim. The candidate
 keeps the entire Handoff section unchanged, role separation, source analysis,
-imperative/XML conventions, research/response formats, visible full outputs,
-three-cycle bound, error handling and MIT attribution. It removes repeated
-lists, interaction examples and the term glossary. It clarifies that persona
-walkthroughs are not independent tests and resolves the contradictory "any one"
-success rule conservatively: critical issues cannot be ignored to finish.
+imperative/XML conventions, Builder/Tester headings and opening, research-summary
+format, visible full outputs, three-cycle bound, error handling and MIT
+attribution. It removes repeated lists, interaction examples, the term glossary
+and the Initial Conversation Structure's separate four-step research-plan
+template; the research summary's Integration Plan remains. The separate template
+repeats that plan and the validation cycle, but its exact format was not exercised
+by the pilot. Persona walkthroughs are explicitly not independent tests.
+
+Review restored consistency as a completion criterion alongside no critical
+issues, source compliance and a clear path, scoped to scenarios actually tested
+rather than asserted general reliability. Review also restored the short
+no-dual-persona-introduction and authoritative-source citation rules, and brief
+complete-coverage, implementation-feasibility and tool-usage-clarity requirements.
+These are cheap behavioral safeguards, not evidence-backed removals. The final
+text differs from the piloted revised text by these wording restorations; the
+16 worker runs were **not rerun** after them. The retained "report consistency
+only for scenarios actually tested" caveat still applies.
 
 ## Results and disposition
 
 Results are recorded after reviewing tool events, final responses and fixture
-side effects. Raw JSON transcripts, prompts, fixtures and timing logs remain
-under `/tmp/pi-issue-426/`; they are not committed wholesale.
+side effects. Raw JSON transcripts and timing logs were reviewed locally and
+are not retained as durable evidence. `/tmp/pi-issue-426/` was temporary scratch
+storage, not a persistent archive. Tasks and fixtures are inlined above; the
+results and measurements below summarize the reviewed runs.
 
 **16 actual worker runs:** seven baseline and seven revised, plus identical
 baseline B and revised L repeats. Every process exited 0; task completion is
@@ -238,7 +264,7 @@ unchanged Handoff retains the test/fix/re-test contract.
 
 The JSON system events contain the full injected outline. Baseline SHA-256:
 `704a3afbef9be09f2ec6b6d3866bbad2845154c66b0e1f102fbedcf25ba57e94`;
-revised (identical to the shipped canonical rewrite):
+piloted revised text (before the review restorations):
 `1084f4de05bc451511d9cc00252a0cc9ef5864ae93ffed43a3d16c3054c26d76`.
 
 | Component | Baseline | Revised |
@@ -252,6 +278,13 @@ That is **12,931 fewer loaded skill/outline bytes**, not a measured token,
 latency, cost or task-quality gain. The line reduction alone is not the
 justification. The full injected content and observed reads establish the
 loading difference for these worker runs.
+
+The final restored outline is **9,724 UTF-8 bytes / 190 lines**, SHA-256
+`84f3f037c3c7857ecf0ee7d793fa3e9a4e67f7fe21a178d8addd8a8e98594edf`.
+Its Handoff prefix remains byte-identical to `origin/main`. Including the
+unchanged SKILL.md gives **10,810 bytes**, a static reduction of **12,594 bytes**
+from baseline, not observed loading of the final text. The observed table above
+remains specific to the 185-line candidate actually exercised.
 
 The next table counts all observable tool calls and successful reads of task
 inputs, handoff files and draft prompts **in addition to** the fixed SKILL.md
@@ -283,13 +316,18 @@ savings. Elapsed durations are single observations, not a speed comparison.
 
 ### Disposition and limits
 
-**Ship the bounded consolidation.** The six discriminating cases retained
+**Ship the bounded consolidation.** The six matched cases retained
 source-grounded creation/revision, caller blockers, existing authorization,
 visible persona testing, tester-only scope and continuing verification. B's
 input omission persists in both variants; it is reported, not hidden as a pass.
 Keep the main skill, metadata, registry and Handoff unchanged. Preserve MIT
 provenance and record the local adaptation. Regenerate Claude and Codex copies;
 no new reference split, standalone agent or permission configuration.
+
+M, A and T state the expected behavior in the task, so they test non-regression
+under explicit instruction rather than the outline's rules alone. Final wording
+restorations were not behaviorally rerun; pilot outcomes apply to the recorded
+185-line candidate, not a fresh execution of the 190-line shipped outline.
 
 Limits: one model/host, one run per case except the two repeats; artificial
 small sources and checker; roles share the same assistant context rather than

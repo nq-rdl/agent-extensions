@@ -129,7 +129,7 @@ rewrite or unverified runtime repair is folded into this completion:
 
 | Follow-up | Decision and boundary |
 |---|---|
-| [#426: prompt-builder pilot](https://github.com/nq-rdl/agent-extensions/issues/426) | Retain the untested optional outline pending worker tasks. The handover's 594-line figure referred to this reference, not the 11-line SKILL.md body; the outline is now 606 lines. |
+| [#426: prompt-builder pilot](https://github.com/nq-rdl/agent-extensions/issues/426) | The subsequent [#426 worker pilot](prompt-builder.md) records 16 baseline/revised runs and a bounded consolidation, with a final 190-line outline after small wording restorations that were not rerun. The handover's 594-line figure referred to the optional reference, not the 11-line SKILL.md body. |
 | [#427: OpenCode failure state](https://github.com/nq-rdl/agent-extensions/issues/427) | Fix rejected companion requests with an executable SDK stub and race coverage in a separate change. Current failed requests can leave persisted `running` / `prompting` state. |
 | [#428: Obsidian duration arithmetic](https://github.com/nq-rdl/agent-extensions/issues/428) | Keep the existing formula until tested in a real application. Source and skill disagree; no application was available. #304 stays open because this is an explicitly required critical invariant. |
 | [#429: Bash 3.2 CI coverage](https://github.com/nq-rdl/agent-extensions/issues/429) | Add pinned image/static-jq provisioning and assert no skips in CI. Both container test classes ran locally; that does not establish native macOS execution. |
