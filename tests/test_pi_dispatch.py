@@ -6,6 +6,8 @@ import tempfile
 import unittest
 from pathlib import Path
 
+import yaml
+
 ROOT = Path(__file__).resolve().parents[1]
 CASES = ("parse", "waves", "render", "launch", "cap", "status", "lock", "setup")
 
@@ -57,6 +59,12 @@ class Bash32(unittest.TestCase):
 
 
 class SafetyText(unittest.TestCase):
+    def test_codex_suite_is_scoped_to_branch_changes(self):
+        hooks = yaml.safe_load((ROOT / "lefthook.yml").read_text())
+        job = next(j for j in hooks["pre-push"]["jobs"] if j["name"] == "codex-js-tests")
+        self.assertEqual(job["files"], "git diff --name-only origin/main...HEAD")
+        self.assertEqual(job["glob"], "{plugins/codex/**,tests/codex/**,hooks/codex-*.sh}")
+
     def test_authorisation_and_scope_contracts(self):
         dispatch = (ROOT / "skills/pi-dispatch/SKILL.md").read_text()
         setup = (ROOT / "skills/pi-setup/SKILL.md").read_text()
