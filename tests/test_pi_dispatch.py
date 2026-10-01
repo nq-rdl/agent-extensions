@@ -1,4 +1,5 @@
 """Offline CLI contracts under host Bash and pinned Bash 3.2 + BusyBox + jq."""
+import json
 import os
 import shutil
 import subprocess
@@ -9,7 +10,7 @@ from pathlib import Path
 import yaml
 
 ROOT = Path(__file__).resolve().parents[1]
-CASES = ("parse", "waves", "render", "launch", "cap", "status", "lock", "setup")
+CASES = ("parse", "waves", "render", "launch", "fast", "cap", "status", "lock", "setup")
 
 
 def fixture(directory):
@@ -28,7 +29,8 @@ class HostBash(unittest.TestCase):
             # No real pi/wt/gh calls: all external CLIs are local shims.
             env = os.environ.copy()
             for key in ("PI_DISPATCH_CAP", "PI_DISPATCH_STATE_DIR", "PI_DELAY", "PI_EXIT",
-                        "AUTH_FAIL", "GH_FAIL", "FILTER_FULL", "NO_PR", "CI_BUCKET", "CHECK_EXIT"):
+                        "AUTH_FAIL", "GH_FAIL", "FILTER_FULL", "NO_PR", "CI_BUCKET", "CHECK_EXIT",
+                        "PI_DISPATCH_SERVICE_TIER", "CODEX_HOME"):
                 env.pop(key, None)
             r = subprocess.run(["bash", "scenario.sh", case], cwd=tmp, env=env,
                                capture_output=True, text=True, timeout=30)
@@ -58,6 +60,17 @@ class Bash32(unittest.TestCase):
                 self.assertEqual(r.returncode, 0, r.stdout + r.stderr)
 
 
+class ServiceTierExtension(unittest.TestCase):
+    def test_fake_provider_events_and_invalid_tiers(self):
+        r = subprocess.run(["node", str(ROOT / "tests/fixtures/pi-dispatch/extension-test.mjs"),
+                            str(ROOT / "skills/pi-dispatch/assets/service-tier.mjs")],
+                           capture_output=True, text=True, timeout=15)
+        self.assertEqual(r.returncode, 0, r.stdout + r.stderr)
+        self.assertEqual(json.loads(r.stdout)["cases"], 26)
+        self.assertEqual(r.stderr.count("only priority is allowed"), 6)
+        self.assertNotIn("PRIVATE-PAYLOAD-MARKER", r.stdout + r.stderr)
+
+
 class SafetyText(unittest.TestCase):
     def test_codex_suite_is_scoped_to_branch_changes(self):
         hooks = yaml.safe_load((ROOT / "lefthook.yml").read_text())
@@ -84,6 +97,20 @@ class SafetyText(unittest.TestCase):
             self.assertIn("pi 0.99.1", text)
             self.assertIn("wt 0.77.0", text)
             self.assertLess(len(text.split("---", 2)[2].splitlines()), 500)
+
+    def test_fast_consent_cost_and_provenance(self):
+        dispatch = (ROOT / "skills/pi-dispatch/SKILL.md").read_text()
+        setup = (ROOT / "skills/pi-setup/SKILL.md").read_text()
+        reference = (ROOT / "skills/pi-dispatch/references/fast.rst").read_text()
+        for text in (dispatch, setup, reference):
+            for value in ("0.159.1", "2026-10-01", "requested"):
+                self.assertIn(value, text)
+        for value in ("OFF by default", "--fast", "--no-fast", "fast-check", "increased plan usage"):
+            self.assertIn(value, dispatch)
+        for value in ("fast", "default", "service_tiers", "additional_speed_tiers",
+                      "default_service_tier", "--fast-unverified", "language-policy exception"):
+            self.assertIn(value, reference)
+        self.assertIn("fast` (boolean, default", setup)
 
     def test_all_scripts_have_bash32_syntax(self):
         for name in ("dispatch", "setup"):

@@ -42,7 +42,7 @@ Default config (no secrets)
 
 With user approval only, write a private config with this shape::
 
-    {"model":"provider/model:high","concurrency":2}
+    {"model":"provider/model:high","concurrency":2,"fast":false}
 
 An optional stateDirectory is an absolute private path for this repo. Prefer
 omitting it for defaults shared across multiple repos, so owner/repo isolation
@@ -50,3 +50,32 @@ is preserved. Read existing JSON before proposing an update; merge keys with
 jq, write a temporary file and atomically rename. Do not source JSON as shell.
 Do not store API keys, OAuth tokens, permission rules or Worktrunk approvals
 here. These are dispatch defaults, not pi's own settings.json.
+
+Fast usage and provenance
+-------------------------
+
+Offer fast=false by default; saving true needs explicit consent to increased
+plan usage. Only an exact openai-codex model with an advertised priority tier
+is verified by the offline Codex catalog check. If the catalog is absent or
+priority is not listed, warn and ask instead of assuming support. Dispatch's
+fast-check reads models_cache.json under CODEX_HOME (default ~/.codex); setup
+may ask the orchestrator to use the installed dispatch helper or inspect that
+entry with jq. No app-server is started and no inference call is needed.
+
+Maintainer-supplied orchestrator investigation on 2026-10-01 with pi 0.99.1 /
+Codex CLI 0.159.1 found gpt-6.1-sol service_tiers priority named Fast with
+"2x speed, increased usage" (other GPT-6/5.x entries: 1.5x–2x); the catalog also
+has additional_speed_tiers ["fast"] and default_service_tier null. Pi's internal
+serviceTier forwards as service_tier, but no pi CLI flag/setting exposes it.
+The bundled dispatch assets/service-tier.mjs uses before_provider_request and
+pi -e, a maintainer-approved plain ESM language-policy exception; it is required
+for this workflow's Fast mode and does not log payloads.
+
+The orchestrator's live probe accepted priority on openai-codex/gpt-6.1-sol and
+rejected fast as "Codex error: Unsupported service_tier: fast". The response
+can still echo default (known Codex backend quirk noted in pi's CHANGELOG);
+status must say priority (requested), never confirmed. These are supplied
+observations, not live checks run by setup. Reverify current catalogs and pi's
+`extension example <https://github.com/earendil-works/pi/blob/main/packages/coding-agent/examples/extensions/provider-payload.ts>`_
+when being wrong could affect cost. Do not enable this globally in pi settings;
+only the confirmed dispatch invocation loads the reviewed extension asset.

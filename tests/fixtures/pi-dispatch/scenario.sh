@@ -2,7 +2,8 @@
 set -euo pipefail
 export FIXTURE=$PWD PATH="$PWD/bin:$PATH" HOME="$PWD/home" XDG_STATE_HOME="$PWD/state" PI_DISPATCH_CAP=2
 mkdir -p "$HOME"
-unset PI_DISPATCH_STATE_DIR
+export CODEX_HOME="$HOME/.codex"
+unset PI_DISPATCH_STATE_DIR PI_DISPATCH_SERVICE_TIER
 S="$PWD/dispatch/scripts/pi-dispatch.sh"
 P="$PWD/setup/scripts/pi-preflight.sh"
 run() { bash "$S" "$@"; }
@@ -55,8 +56,12 @@ render)
 launch)
     prepare pi/tighten-lychee null
     run launch unit.json "$WT" prompt provider/model:high > rejected 2>&1 && exit 1
-    meta=$(run launch unit.json "$WT" prompt provider/model:high --confirmed)
+    meta=$(PI_DISPATCH_SERVICE_TIER=priority run launch unit.json "$WT" prompt provider/model:high --confirmed)
     wait_exit "${meta%.json}.exit"
+    test "$(< pi.tier)" = unset
+    jq -e '.service_tier=="off" and .fast==false' "$meta"
+    run status | jq -e '.workers[0].service_tier=="off"'
+    jq -e 'index("-e")==null' pi.args
     jq -e '.[0:9]==["-p","--mode","json","--session-id","pi-tighten-lychee","--model","provider/model:high","--no-approve","--"]' pi.args
     test "$(< pi.cwd)" = "$WT"
     test "$(< "${meta%.json}.exit")" = 0
@@ -65,6 +70,46 @@ launch)
     run launch unit.json "$WT" prompt provider/model:high --confirmed > second
     wait_exit "${meta%.json}.exit"
     test -n "$(find "${meta%/*}" -name '*.jsonl.*' -print)"
+    ;;
+fast)
+    model=openai-codex/gpt-6.1-sol:high
+    prepare issue-481 481
+    run fast-check "$model" | jq -e '.catalog=="unavailable"'
+    run launch unit.json "$WT" prompt "$model" --confirmed --fast > rejected 2>&1 && exit 1
+    grep -F 'ask the user' rejected
+    test ! -e pi.args
+    mkdir -p "$CODEX_HOME"
+    printf '%s\n' '{"models":[{"slug":"gpt-6.1-sol","service_tiers":[{"id":"priority","name":"Fast","description":"2x speed, increased usage"}],"additional_speed_tiers":["fast"],"default_service_tier":null}]}' > "$CODEX_HOME/models_cache.json"
+    run fast-check "$model" | jq -e '.catalog=="listed" and .tier.id=="priority"'
+    run fast-check openai-codex/unknown | jq -e '.catalog=="not-listed"'
+    meta=$(run launch unit.json "$WT" prompt "$model" --fast --confirmed)
+    wait_exit "${meta%.json}.exit"
+    test "$(< pi.tier)" = priority
+    jq -e '.[0:9]==["-p","--mode","json","--session-id","issue-481","--model","openai-codex/gpt-6.1-sol:high","--no-approve","-e"] and (.[9]|endswith("/assets/service-tier.mjs")) and .[10]=="--"' pi.args
+    jq -e '.fast==true and .fastCatalog.catalog=="listed" and .service_tier=="priority (requested)"' "$meta"
+    run status | jq -e '.workers[0].service_tier=="priority (requested)"'
+    # Neither the marketing alias nor another provider verifies support.
+    printf '%s\n' '{"models":[{"slug":"gpt-6.1-sol","service_tiers":[{"id":"fast"}]}]}' > "$CODEX_HOME/models_cache.json"
+    run launch unit.json "$WT" prompt "$model" --confirmed --fast > rejected 2>&1 && exit 1
+    grep -F 'Stop for user decision' rejected
+    run launch unit.json "$WT" prompt anthropic/claude --confirmed --fast > rejected 2>&1 && exit 1
+    grep -F 'exact openai-codex/model' rejected
+    run launch unit.json "$WT" prompt "$model" --confirmed --fast-unverified > rejected 2>&1 && exit 1
+    grep -F 'requires --fast' rejected
+    # Only an explicit additional confirmation permits unverified catalog support.
+    meta=$(run launch unit.json "$WT" prompt "$model" --confirmed --fast --fast-unverified 2> warning)
+    wait_exit "${meta%.json}.exit"
+    grep -F 'WARNING:' warning
+    jq -e '.fastCatalog.catalog=="not-listed" and .service_tier=="priority (requested)"' "$meta"
+    printf '%s\n' '{"models":' > "$CODEX_HOME/models_cache.json"
+    run fast-check "$model" | jq -e '.catalog=="unreadable"'
+    run launch unit.json "$WT" prompt "$model" --confirmed --fast > rejected 2>&1 && exit 1
+    # Resuming without --fast must not carry over its tier or extension.
+    meta=$(PI_DISPATCH_SERVICE_TIER=priority run launch unit.json "$WT" prompt "$model" --confirmed)
+    wait_exit "${meta%.json}.exit"
+    test "$(< pi.tier)" = unset
+    jq -e 'index("-e")==null' pi.args
+    jq -e '.service_tier=="off"' "$meta"
     ;;
 cap)
     export PI_DELAY=2 PI_DISPATCH_CAP=1

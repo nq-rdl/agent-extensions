@@ -14,6 +14,9 @@ Read optional user JSON config at
 approved model as MODEL, concurrency as PI_DISPATCH_CAP (default 2, range 1..32),
 and optional stateDirectory as PI_DISPATCH_STATE_DIR. These helpers do not read
 config themselves; the orchestrator must explicitly pass approved values.
+The optional fast boolean defaults to false. Pass --fast only for an approved
+Fast request; --no-fast on the workflow overrides a saved true default.
+Read `Fast mode <fast.rst>`_ before checking catalog support or changing usage.
 
 Absent an override, state is
 ``${XDG_STATE_HOME:-$HOME/.local/state}/pi-dispatch/<owner>--<repo>/`` derived from
@@ -63,7 +66,7 @@ markers literally, and appends the brief. Only dispatchable units render.
 Issue units get a Closes directive; free text forbids it. The template directs
 workers to read repo rules instead of duplicating a particular repo's pipeline.
 
-``launch UNIT.json WORKTREE PROMPT MODEL --confirmed`` validates the unit and
+``launch UNIT.json WORKTREE PROMPT MODEL --confirmed [--fast]`` validates the unit and
 worktree branch, then acquires a directory lock and checks active recorded PIDs
 against their process start time (Linux /proc boot ID + start ticks, otherwise
 POSIX-host ps lstart; avoids PID reuse). It refuses if the cap is full, this
@@ -79,7 +82,8 @@ loads. If required project extensions are missing, return the blocker rather
 than granting trust. Global extensions remain active; review them in setup.
 
 State files per session: .json metadata (PID/start time, branch, worktree, model,
-repo), .prompt, .jsonl stdout, .err stderr, .exit numeric runner result. Resuming
+repo, Fast flag/catalog and service_tier labelled priority (requested) or off),
+.prompt, .jsonl stdout, .err stderr, .exit numeric runner result. Resuming
 an exited unit archives these files with a timestamp suffix and reuses the pi
 session in its original worktree. Do not move/delete pi's session storage while
 follow-ups are pending. The lock is held only during launch, not the worker's

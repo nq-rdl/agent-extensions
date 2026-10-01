@@ -7,8 +7,9 @@ description: 'Preflight pi worker orchestration: check pi, Worktrunk, gh, jq, pr
   readiness, exact model/thinking and private state storage; record user-approved
   defaults. Use before $pi:dispatch or to diagnose launch prerequisites, not to grant
   permissions or write credentials automatically.'
-compatibility: Verified pi 0.99.1 and wt 0.77.0; Bash 3.2+, jq >=1.6 and Git; gh auth
-  and repo fields verified on gh 2.97.0. Provider credentials are user-managed.
+compatibility: Verified pi 0.99.1 and wt 0.77.0; Fast catalog contract from Codex
+  CLI 0.159.1 (2026-10-01). Bash 3.2+, jq >=1.6 and Git; gh auth and repo fields verified
+  on gh 2.97.0. Provider credentials are user-managed.
 ---
 
 # Set up pi workers
@@ -32,6 +33,16 @@ and [Worktrunk docs](https://worktrunk.dev/) after upgrades, before giving guida
    refreshing/writing OAuth tokens. If expired/missing, the user authenticates
    with `/login` inside pi in their own terminal and reruns preflight.
    Never print auth keys/tokens, use `--credentials`, or ask them to paste secrets.
+   Offer a Fast default, **off unless explicitly approved**. For GPT on
+   `openai-codex`, explain increased plan usage (gpt-6.1-sol catalog: **2x speed,
+   increased usage**) and check its advertised `priority` tier when the Codex
+   catalog is available. Unknown/unlisted support means warn and ask; offer normal
+   mode. Fast requires the bundled dispatch `assets/service-tier.mjs` extension,
+   loaded via `pi -e`, not a pi setting or `--fast` CLI flag. Verify the installed
+   asset is present before saving a Fast default. Status shows only
+   **priority (requested)**; the backend tier echo cannot confirm Fast. See setup
+   details for provenance (orchestrator investigation, 2026-10-01, pi 0.99.1 /
+   Codex CLI 0.159.1), not new live/paid checks by setup.
 3. Inspect `type wt` in the **user's interactive shell** for integration; a child
    Bash script cannot prove it. Offer `wt config shell install` only for user
    approval. `--no-cd` worker creation itself does not need shell integration.
@@ -58,7 +69,8 @@ and [Worktrunk docs](https://worktrunk.dev/) after upgrades, before giving guida
    without the user's approval.
 8. With explicit approval, save only non-secret defaults at
    `${XDG_CONFIG_HOME:-$HOME/.config}/pi-dispatch/config.json` using jq and umask 077:
-   `model` (including thinking suffix), `concurrency`, optional `stateDirectory`.
+   `model` (including thinking suffix), `concurrency`, `fast` (boolean, default
+   false), optional `stateDirectory`.
    Merge existing unrelated JSON keys rather than overwrite them. Do not change
    pi settings or repo files. Without approval, report defaults without saving.
    Summarise readiness, exact versions/model, storage, cap and remaining blockers;

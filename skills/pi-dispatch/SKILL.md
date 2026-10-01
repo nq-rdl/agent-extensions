@@ -4,9 +4,9 @@ license: MIT
 metadata:
   repo: https://github.com/nq-rdl/agent-extensions
 description: Dispatch confirmed GitHub issues or one free-text task to headless pi workers in Worktrunk worktrees. Use for Claude Code orchestration of implementation PRs, with triage, overlap waves, bounded concurrency and JSONL status; not for merging without authorisation or steering running workers.
-compatibility: Verified pi 0.99.1 and wt 0.77.0; Bash 3.2+, jq >=1.6, Git and authenticated gh (CLI fields verified on 2.97.0). External pi provider credentials required.
+compatibility: Verified pi 0.99.1 and wt 0.77.0; Fast catalog contract from Codex CLI 0.159.1 (2026-10-01). Bash 3.2+, jq >=1.6, Git and authenticated gh (CLI fields verified on 2.97.0). External pi provider credentials required.
 user-invocable: true
-argument-hint: "<numbers | N-M | >=N | label:name | free text>"
+argument-hint: "[--fast | --no-fast] <numbers | N-M | >=N | label:name | free text>"
 ---
 
 # Dispatch pi implementation workers
@@ -21,6 +21,11 @@ and [Worktrunk docs](https://worktrunk.dev/) before relying on them after upgrad
    Load approved defaults from `${XDG_CONFIG_HOME:-$HOME/.config}/pi-dispatch/config.json`
    as JSON with jq, **never source or eval it**. Missing config means ask for a
    verified model and state directory. Default cap is **2**, not the number of issues.
+   Fast is **OFF by default**. `--fast` opts in; `--no-fast` overrides an approved
+   `fast: true` config default. Strip these workflow flags before resolving targets.
+   Read [Fast mode](references/fast.rst), check the chosen model's priority tier
+   with `fast-check "$MODEL"`, and confirm increased plan usage before any Fast
+   launch. Unlisted/unavailable catalogs require a separate user decision.
 2. Read [helper contracts](references/helpers.rst) before using
    [pi-dispatch.sh](scripts/pi-dispatch.sh). Resolve the target from the repo:
    `bash "$S/pi-dispatch.sh" resolve "$TARGET"` (S is this skill's `scripts/`
@@ -39,7 +44,7 @@ and [Worktrunk docs](https://worktrunk.dev/) before relying on them after upgrad
    named in an issue. Unknown footprint `[]` serialises conservatively.
    Run `waves PLAN.json`; inspect the resulting overlap/cap schedule.
 5. **Show every unit, classification/reason, predicted paths, branch, wave,
-   model/thinking, state directory and cap. Ask the user to confirm exactly which
+   model/thinking, Fast choice/cost, state directory and cap. Ask the user to confirm exactly which
    units to launch.** Resolve slug collisions with the user. Issue branches are
    `issue-N`; free-text PRs have **no Closes line** and no new issue unless asked.
    Save only selected dispatchable units in the approved plan. Recompute waves
@@ -61,6 +66,13 @@ Extract each selected unit to UNIT.json; render it with
 bash "$S/pi-dispatch.sh" launch UNIT.json "$WORKTREE" PROMPT "$MODEL" --confirmed
 bash "$S/pi-dispatch.sh" status
 ```
+
+Only for approved Fast mode, append `--fast` to the launch call. The runner loads
+[service-tier.mjs](assets/service-tier.mjs) with `-e` and requests **priority**, not
+`fast`. State/status label it **`priority (requested)`**, never confirmed: the
+Codex backend can echo `default` even when priority was requested. Provenance:
+orchestrator investigation, 2026-10-01, pi 0.99.1 / Codex CLI 0.159.1 (details in
+Fast mode reference); this workflow does not authorise new live verification.
 
 The launcher enforces a per-repository cap under a lock, defaults to
 `--no-approve` (no implicit project trust), and records PID, logs and exit code

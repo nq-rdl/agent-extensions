@@ -7,6 +7,7 @@ case "${1:-}" in
     auth) exit "${AUTH_FAIL:-0}" ;;
 esac
 printf '%s\n' "$PWD" > "$FIXTURE/pi.cwd"
+printf '%s\n' "${PI_DISPATCH_SERVICE_TIER-unset}" > "$FIXTURE/pi.tier"
 printf '{"type":"session"}\n'
 printf '{"type":"tool_execution_start","toolName":"bash","args":{"command":"test quoted \\\"value\\\""}}\n'
 sleep "${PI_DELAY:-1}"
