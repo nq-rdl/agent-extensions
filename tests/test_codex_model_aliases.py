@@ -223,12 +223,17 @@ class ModelGuideFacts(unittest.TestCase):
         self.assertRegex(aliases, r"GPT-6: Codex harness context 272,000 tokens.*0\.157\.0")
         self.assertIn("by design", aliases)
 
-    def test_review_model_precedence_is_marked_unverified(self):
+    def test_review_model_precedence_has_bounded_live_evidence(self):
         for text in (
             (SKILLS / "codex-review" / "SKILL.md").read_text(),
             section(GUIDE.read_text(), "Review commands"),
         ):
-            self.assertIn("not verified against a live backend", text)
+            self.assertRegex(text, r"\d{4}-\d{2}-\d{2} with CLI \d+\.\d+\.\d+")
+            self.assertIn("a persisted app-server probe", text)
+            self.assertIn("nq-rdl/agent-extensions#430", text)
+            self.assertIn("ephemeral", text)
+            self.assertIn("does not expose the reviewer model", text)
+            self.assertNotIn("not verified against a live backend", text)
 
     def test_no_unmaintained_prices(self):
         # #308: no price source or maintenance process exists in this repo.

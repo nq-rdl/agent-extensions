@@ -65,7 +65,7 @@ No account-plan gating is asserted beyond the caveats above; there is no authori
 
 ## Review commands
 
-`$codex:review` and `$codex:adversarial-review` accept `--model <model|alias>` for one run. For a persistent native-review model, set `review_model` in `~/.codex/config.toml` ([config reference](https://learn.chatgpt.com/docs/config-file/config-reference)). Per that reference it overrides the session model for native review. `--model` sets the session model, so a set `review_model` takes precedence on `$codex:review` (per the Codex config reference; not verified against a live backend). It does not apply to `$codex:adversarial-review`, which runs an ordinary turn on `model`.
+`$codex:review` and `$codex:adversarial-review` accept `--model <model|alias>` for one run. For a persistent native-review model, set `review_model` in `~/.codex/config.toml` ([config reference](https://learn.chatgpt.com/docs/config-file/config-reference)). Per that reference it overrides the session model for native review. `--model` sets the session model, so a set `review_model` takes precedence on `$codex:review` (per the Codex config reference). Live pilot on 2026-09-30 with CLI 0.159.1 (nq-rdl/agent-extensions#430) confirmed precedence in a persisted app-server probe and `codex exec review`; a rejected-model sentinel corroborated Codex's selection of `review_model` on the companion path; the companion's ephemeral native review does not expose the reviewer model in stdout. It does not apply to `$codex:adversarial-review`, which runs an ordinary turn on `model`.
 
 ## Task → model / effort mapping
 
