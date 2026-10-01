@@ -353,8 +353,8 @@ class SetupSkillText(unittest.TestCase):
                        "AGE-PLUGIN-", "not live-tested", "Encrypted at rest",
                        "Protects against same-user processes", "age-plugin-yubikey",
                        "Restart the agent", "another pane", "env → keychain → sops → file → bitwarden",
-                       "sudo dnf install sops age", "sudo apt install sops age", "brew install sops age",
-                       "age-keygen -o", "age-plugin-tpm --generate", "--from-bitwarden"):
+                       "rh-install-sops-age.sh", "raw binary", "--disablerepo=<broken-repo>",
+                       "rh-age-identity.sh", "readable/writable", "--from-bitwarden"):
             with self.subTest(needle=needle):
                 self.assertIn(needle, self.text)
         step1 = self.text.split("## 1. Check", 1)[1].split("## 2.", 1)[0]

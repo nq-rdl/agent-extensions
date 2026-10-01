@@ -7,10 +7,16 @@ set -o pipefail
 . "$(cd "$(dirname "$0")" && pwd)/rh-lib.sh"
 
 recipient="${1:-}"; seed="${2:-}"
-if [ -z "$recipient" ] || { [ -n "$seed" ] && [ "$seed" != --from-bitwarden ]; } || [ "$#" -gt 2 ]; then
-  echo 'Usage: rh-store-sops.sh <public-age-recipient> [--from-bitwarden]' >&2; exit 2
+if [ "$recipient" = --from-bitwarden ] && [ "$#" -eq 1 ]; then
+  recipient=''; seed=--from-bitwarden
+fi
+if { [ -n "$seed" ] && [ "$seed" != --from-bitwarden ]; } || [ "$#" -gt 2 ] || { [ -z "$recipient" ] && [ "$#" -eq 2 ]; }; then
+  echo 'Usage: rh-store-sops.sh [public-age-recipient] [--from-bitwarden]' >&2; exit 2
 fi
 command -v sops >/dev/null 2>&1 || { echo 'Install sops >= 3.10 first. Run /redhat:setup.' >&2; exit 2; }
+if [ -z "$recipient" ]; then
+  recipient="$(bash "$(cd "$(dirname "$0")" && pwd)/rh-age-identity.sh")" || exit 2
+fi
 if [ "$seed" = --from-bitwarden ]; then
   RH_CRED_SOURCES=bitwarden
   t="$(rh_cred_token)" || { echo 'Bitwarden lookup failed; unlock/sync the vault in this terminal.' >&2; exit 3; }
