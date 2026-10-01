@@ -14,6 +14,12 @@ CASES = (
     "test_redhat_setup.Bash32Bitwarden.test_bitwarden_notes_win_over_field",
     "test_redhat_setup.Bash32Bitwarden.test_bitwarden_empty_field_exits_3",
     "test_redhat_setup.Bash32Bitwarden.test_bitwarden_missing_or_wrong_field_exits_3",
+    "test_redhat_sops.Bash32Sops.test_source_found_empty_failure_missing",
+    "test_redhat_sops.Bash32Sops.test_started_before_file_exists_store_without_bw_and_check",
+    "test_redhat_sops.Bash32Sops.test_store_empty_failure_and_symlink_replacement",
+    "test_redhat_sops.Bash32Sops.test_bitwarden_seed_notes_and_custom_field",
+    "test_redhat_sops.Bash32Sops.test_path_override_order_filter_and_preflight_tools",
+    "test_redhat_sops.Bash32Sops.test_guard_direct_decrypt_denied_only_for_token_file",
 )
 
 

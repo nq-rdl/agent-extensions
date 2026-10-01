@@ -26,7 +26,7 @@ The scripts detect the platform with ``uname -s`` (``Darwin`` / ``Linux``; WSL v
   (``raw.githubusercontent.com``) rather than decoded from the contents API.
 * **Keychain** – macOS ``security find-generic-password -a "$USER" -s RH_OFFLINE_TOKEN -w``;
   Linux ``secret-tool lookup service redhat key RH_OFFLINE_TOKEN`` (needs a running Secret
-  Service – typically absent on headless hosts, where the 0600 file or Bitwarden applies).
+  Service – typically absent on headless hosts, where sops + age (recommended), a 0600 file, or Bitwarden applies).
 * **Runtime cache** – ``$XDG_RUNTIME_DIR`` (Linux, tmpfs, per-user) falling back to
   ``$TMPDIR`` (macOS per-user) then ``/tmp``. Because ``/tmp/rh-token-<uid>`` is predictable
   on a shared host, ``rh_cache_dir`` refuses a symlink or a directory it does not own, forces
