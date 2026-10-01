@@ -62,7 +62,7 @@ class LookupContract(unittest.TestCase):
         frontmatter_keys = {"name", "license", "description", "argument-hint",
                             "user-invocable", "compatibility", "allowed-tools", "metadata", "repo"}
         self.assertFalse(lower_snake - frontmatter_keys)
-        camel = set(re.findall(r"\b[A-Z][a-z]+(?:[A-Z][a-z]+){2,}\b", text))
+        camel = set(re.findall(r"\b[A-Z][a-z]+(?:[A-Z][a-z]+){1,}\b", text))
         self.assertFalse(camel - {"AskUserQuestion"})  # Host tool name.
         capitals = set(re.findall(r"\b[A-Z][A-Z0-9]{3,}\b", text))
         # Generic formats, code-system families, operator tool and evidence state;
@@ -75,7 +75,7 @@ class LookupContract(unittest.TestCase):
         self.assertNotRegex(text, r"https://github\.com/nq-rdl/agent-extensions/blob/(?:main|master)/")
 
     def test_privacy_guard_rejects_generic_identifier_shapes(self):
-        for token in ("EXAMPLE_FIELD", "example_field", "ExampleSourceField", "UNAPPROVED"):
+        for token in ("EXAMPLE_FIELD", "example_field", "ExampleField", "ExampleSourceField", "UNAPPROVED"):
             with self.subTest(token=token), self.assertRaises(AssertionError):
                 self.assert_workflow_only(f"---\ndescription: {token}\n---\nWorkflow")
         self.assert_workflow_only("AskUserQuestion JSON OBSERVED ${CLAUDE_PLUGIN_ROOT} ${PLUGIN_ROOT}")
@@ -112,7 +112,11 @@ class LookupContract(unittest.TestCase):
                                "not automatically RDL-only", "do not repeat or commit them",
                                "disclosure perimeter", "formatting provenance",
                                "not code evidence for its hidden members",
-                               "do not recover or list them in the record"):
+                               "do not recover or list them in the record",
+                               "script's population-count floor equals the effective F from Probe disclosure control",
+                               "if the installed command cannot take F, stop and hand off",
+                               "Never accept a paste-back exposing below-F population cells",
+                               "A committed record that map cites is handover tier unless excluded from the handover set"):
                     self.assertIn(phrase, text)
                 self.assertNotIn("`<7`", text)
                 self.assertNotIn("no totals", text)
@@ -180,6 +184,8 @@ class LookupContract(unittest.TestCase):
                 flat = " ".join(addition.replace("``", "`").split())
                 self.assertIn("lookup", flat)
                 self.assertIn("cite its record in the `rationale` of a `topic: codes` decision", flat)
+                self.assertIn("Cite the record, not its counts", flat)
+                self.assertIn("`answers.intake.json` is handover tier", flat)
 
 
 if __name__ == "__main__":

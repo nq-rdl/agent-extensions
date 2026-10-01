@@ -111,6 +111,9 @@ complementary controls, rare-label folding and perimeter rules; gate exemption i
 not disclosure permission. Distinct-code/label inventory counts use its structural
 count treatment, including the folded-label-total exception; counts of cases or
 events behind each code are population counts, not structural inventory counts.
+Confirm the script's population-count floor equals the effective F from Probe
+disclosure control; if the installed command cannot take F, stop and hand off.
+Never accept a paste-back exposing below-F population cells.
 Follow guardrails for bounded single-scan probes, isolation disclosure and no
 delivered-extract use. If the disclosure policy or probe conditions cannot be
 verified, stop for engineer review, not a live test.
@@ -120,8 +123,8 @@ back, formatted under that disclosure section. The agent runs no query, includin
 through a database tool or connection helper. Ask for missing grid labels or run
 provenance; no paste-back means no observed code evidence. If exact population
 counts are pasted, do not repeat or commit them: ask for formatted output and
-apply the section before writing any text. Unexpected patient data must not be reproduced or stored
-as a lookup record: stop and return the unsafe probe to the engineer.
+apply the section before writing any text. Unexpected patient data must not be
+reproduced or stored as a lookup record: stop and return the unsafe probe to the engineer.
 
 Check term collisions and distinguish no hit, suppressed count and missing grid.
 Do not reconstruct suppressed counts or treat missing evidence as zero. Separate
@@ -135,8 +138,9 @@ Ask the analyst/engineer where to keep the Markdown record in the private child
 repository and record the chosen path; there is no default path. Commit only the
 disclosure-controlled record there so map can cite its path and revision. A private
 commit is not automatically RDL-only: classify its perimeter under the disclosure
-section before writing it. This is not a new `.sqlreview` document type. Use the
-following fields (no live values belong in this public template):
+section before writing it. A committed record that map cites is handover tier unless
+excluded from the handover set. This is not a new `.sqlreview` document type. Use
+the following fields (no live values belong in this public template):
 
 - **Question and context:** request/intake/scope citation and revision, intended
   meaning, family, direction/route and rationale.
