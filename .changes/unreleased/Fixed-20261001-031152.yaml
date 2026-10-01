@@ -1,0 +1,3 @@
+kind: Fixed
+body: Keep Codex preflights and review size checks within the shipped Node and git grants; read status from tool results without shell composition.
+time: 2026-10-01T03:11:52.957158762Z

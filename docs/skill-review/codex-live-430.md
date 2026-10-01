@@ -360,3 +360,112 @@ then passed after the evidence wording and generated target refresh.
 
 Validation results are tracked in PR #471 rather than this evidence record.
 Deterministic tests do not close the human-question gap in #475.
+
+## 2026-10-01: shipped-grant follow-up (#476)
+
+Two live Claude attempts, starting at 03:12:26 and 03:13:21 UTC (second
+completed at 03:13:44), using the regenerated `plugins/codex` from branch
+`issue-476`, based on `865be81e48977d5a0225c18e7d9c2f67f4532d10`.
+Linux, Node v22.23.1, Codex CLI 0.159.1,
+Claude Code 2.1.286; Claude init and usage both identify `claude-sonnet-5`.
+The change replaces the composed preflight with one `node -e` invocation and
+requires reading Bash results directly; size checks are separate plain git
+commands. No allowed-tools grants changed.
+
+Each attempt followed the reproduction setup above in a **new disposable git
+repository**, with copied Codex authentication, private `CODEX_HOME` and
+`CLAUDE_PLUGIN_DATA`, the same Luna/Sol config, and the `EXIT` cleanup trap.
+No live Codex ran in the catalog. The exact hardened invocation was:
+
+```bash
+claude -p --plugin-dir "$P" --setting-sources local --strict-mcp-config \
+  --model claude-sonnet-5 --permission-mode dontAsk \
+  --allowedTools 'Bash(node:*)' 'Bash(git:*)' Read Glob Grep AskUserQuestion \
+  --output-format stream-json --verbose --max-turns 8 '/codex:review'
+```
+
+Attempt 2 changed only the final argument to `'/codex:review --wait'`: an
+explicit foreground invocation, **not** a simulated answer to attempt 1's
+question. Neither attempt added `Bash(echo:*)` or other harness grants.
+Both init records showed `mcp_servers: []`; the tool lists had no `mcp__`
+tools or Gmail, Slack, or Drive connectors. Local host tools were still listed;
+listing is not a permission grant. No connector operation was requested.
+
+### Exact Bash inputs and permission outcomes
+
+Attempt 1 requested these four Bash calls, in order:
+
+```json
+{"command":"node -e 'const [a,b]=process.versions.node.split(\".\").map(Number); process.exit(a>18||(a===18&&b>=18)?0:1)'"}
+{"command":"git status --short --untracked-files=all","description":"Check working tree status"}
+{"command":"git diff --shortstat --cached","description":"Check staged diff size"}
+{"command":"git diff --shortstat","description":"Check unstaged diff size"}
+```
+
+All four executed with `is_error: false`, respectively returning:
+
+```text
+(Bash completed with no output)
+ M value.js
+(Bash completed with no output)
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+```
+
+Claude read the empty preflight result as success. Its final result had
+`permission_denials: []`, `is_error: false`, `subtype: success`, 7 turns.
+ToolSearch for `AskUserQuestion` returned `No matching deferred tools found`;
+a second search found unrelated host tools, none executed. The final reply
+asked in text whether to **wait for results (recommended)** or **run the review
+in the background**, saying the interactive question tool was unavailable.
+**Codex did not launch.** This demonstrates preflight and working-tree size
+checks under shipped grants, plus a conservative stop, not human interaction.
+No base-branch size check was exercised live.
+
+Attempt 2 requested exactly:
+
+```json
+{"command":"node -e 'const [a,b]=process.versions.node.split(\".\").map(Number); process.exit(a>18||(a===18&&b>=18)?0:1)'","description":"Check Node.js version meets minimum requirement"}
+{"command":"node \"<P>/scripts/codex-companion.mjs\" review \"--wait\"","description":"Run Codex review in foreground and wait for results","timeout":600000}
+```
+
+`<P>` replaces only the absolute installed plugin path. Both calls executed
+with `is_error: false`; the first returned `(Bash completed with no output)`.
+The second reported thread ready, reviewer started, review output captured,
+reviewer finished, and turn completed. **Codex launched and completed one
+native review.** Final result: `permission_denials: []`, `is_error: false`,
+`subtype: success`, 3 turns. No question or size check was needed with explicit
+`--wait`; the companion received that argument unchanged. Final output:
+
+```text
+# Codex Review
+
+Target: working tree diff
+
+The only change updates the exported constant from 1 to 2. No affected callers, tests, or repository-specific invariants indicate that this introduces a bug.
+```
+
+Codex's own read-only reviewer log included composed shell commands; these
+are backend sandbox operations, **not Claude Bash tool requests** and not a
+widening of the host grants. The fixture still had only ` M value.js` after
+attempt 2. Actual ephemeral reviewer model/usage was not exposed: config was
+`model = "gpt-5.6-luna"`, `review_model = "gpt-5.6-sol"`, but config alone is
+not new model-selection evidence. Codex USD cost is unknown, not zero.
+
+| Attempt | Claude input | Cache read | Cache creation | Output | Thinking (subset) | CLI list-cost USD |
+|---|---:|---:|---:|---:|---:|---:|
+| 1: no flags | 10 | 150,240 | 21,519 | 825 | 161 | 0.124394 |
+| 2: explicit `--wait` | 6 | 84,832 | 12,513 | 417 | 14 | 0.0712004 |
+
+Claude total reported list-cost: USD 0.1955944, not reconciled billing. No
+third attempt or widened-grant diagnostic was run. The attempt-1 log-extraction
+shell exited 4 after its `jq -e` connector check printed `true` (later records
+produced no output); the EXIT trap still removed its copied credentials and
+logs. Attempt 2 used a slurped init check, returned `true`/exit 0, and explicitly
+removed its scratch root. A subsequent search found no `codex-430.*` scratch
+directories. Only trimmed evidence is retained here.
+
+Decision: option 1 works on these two runs without widening permissions.
+Apply the same preflight contract to all nine action skills sharing the old
+composed command, and the same size-check contract to adversarial review.
+This is bounded integration evidence, not a stochastic reliability guarantee;
+interactive answer/cancellation coverage remains #475.

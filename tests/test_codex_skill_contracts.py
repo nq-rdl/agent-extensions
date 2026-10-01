@@ -6,6 +6,7 @@ They guard the skill text; the runtime itself is tested in tests/codex/.
 """
 
 import re
+import shlex
 import unittest
 from pathlib import Path
 
@@ -22,6 +23,88 @@ def read(rel: str) -> str:
 
 def frontmatter(rel: str) -> dict:
     return yaml.safe_load(read(rel).split("---\n", 2)[1]) or {}
+
+
+class ShellPermissionContracts(unittest.TestCase):
+    """#476: instruction guards, not an emulation of Claude's permission engine."""
+
+    ACTIONS = {
+        "review": "Read, Glob, Grep, Bash(node:*), Bash(git:*), AskUserQuestion",
+        "adversarial-review": "Read, Glob, Grep, Bash(node:*), Bash(git:*), AskUserQuestion",
+        "rescue": "Bash(node:*), AskUserQuestion, Agent",
+        "setup": "Bash(node:*), Bash(npm:*), AskUserQuestion",
+        "result": "Bash(node:*)",
+        "status": "Bash(node:*)",
+        "transfer": "Bash(node:*)",
+        "cancel": "Bash(node:*)",
+        "report-defect": "Bash(node:*), Bash(gh:*), AskUserQuestion",
+    }
+
+    def test_preflights_are_single_node_invocations_under_unchanged_grants(self):
+        for action, grants in self.ACTIONS.items():
+            rel = f"codex-{action}/SKILL.md"
+            with self.subTest(action=action):
+                self.assertEqual(frontmatter(rel)["allowed-tools"], grants)
+                section = read(rel).split("## Preflight — Node.js runtime\n", 1)[1]
+                command = re.search(r"```bash\n(.*?)\n```", section, re.S).group(1)
+                # Quoted JS contains semicolons/operators; shell-level ones would
+                # produce extra tokens, rather than belonging to the -e argument.
+                tokens = list(shlex.shlex(command, posix=True, punctuation_chars=True))
+                self.assertEqual(tokens[:2], ["node", "-e"])
+                self.assertEqual(len(tokens), 3)
+                self.assertEqual(tokens[2], 'const [a,b]=process.versions.node.split(".").map(Number); process.exit(a>18||(a===18&&b>=18)?0:1)')
+                self.assertIn("Bash(node:*)", grants)
+
+    def test_preflight_instructions_forbid_composition_and_read_tool_status(self):
+        for action in self.ACTIONS:
+            with self.subTest(action=action):
+                text = read(f"codex-{action}/SKILL.md")
+                self.assertIn("exactly as written, as a single `Bash` command", text)
+                self.assertIn("Read the exit status and output from the Bash tool result", text)
+                self.assertIn("empty stdout on success is expected", text)
+                self.assertIn("Do not append `echo`, `;`, `&&`, pipes, or other shell separators, wrappers, or redirects", text)
+                self.assertIn("non-zero exit or `node` not found", text)
+                self.assertIn("stop and tell the user exactly: `Codex plugin requires Node.js >=18.18.0", text)
+
+    def test_review_size_checks_are_separate_plain_git_commands(self):
+        expected = {
+            "git status --short --untracked-files=all",
+            "git diff --shortstat --cached",
+            "git diff --shortstat",
+            "git diff --shortstat <base>...HEAD",
+        }
+        for action in ("review", "adversarial-review"):
+            with self.subTest(action=action):
+                rel = f"codex-{action}/SKILL.md"
+                text = read(rel)
+                size = text.split("estimate the review size before asking:", 1)[1].split("  - Treat untracked", 1)[0]
+                self.assertIn("as a separate, plain `git` invocation", size)
+                self.assertIn("Read each tool result directly; do not combine commands or add `echo`, `;`, `&&`, pipes, or other shell separators, wrappers, or redirects", size)
+                commands = re.findall(r"`(git [^`]+)`", size)
+                self.assertEqual(set(commands), expected)
+                self.assertEqual(len(commands), len(expected))
+                for command in commands:
+                    tokens = list(shlex.shlex(command.replace("<base>", "main"), posix=True, punctuation_chars=True))
+                    self.assertEqual(tokens[0], "git")
+                    self.assertFalse(set(tokens) & {";", "&&", "||", "|", "&", ">", "<", "echo"})
+                self.assertIn("Bash(git:*)", frontmatter(rel)["allowed-tools"])
+
+    def test_review_scope_arguments_and_question_boundary_remain(self):
+        for action in ("review", "adversarial-review"):
+            with self.subTest(action=action):
+                text = read(f"codex-{action}/SKILL.md")
+                for instruction in (
+                    "This command is review-only.",
+                    "Do not fix issues, apply patches",
+                    "Preserve the user's arguments exactly.",
+                    "Do not strip `--wait` or `--background` yourself.",
+                    "use `AskUserQuestion` exactly once with two options",
+                    "`Wait for results`",
+                    "`Run in background`",
+                    'review "$ARGUMENTS"',
+                ):
+                    self.assertIn(instruction, text)
+                self.assertLess(text.index("use `AskUserQuestion`"), text.index("Foreground flow:"))
 
 
 class ReviewContracts(unittest.TestCase):
