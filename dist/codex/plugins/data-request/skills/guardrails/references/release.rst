@@ -118,7 +118,9 @@ approval, the data custodian or the de-identification assessment overrides it.
 Small-cell suppression
 ----------------------
 
-These skills set no organisation-wide threshold. The governing threshold is the
+For delivered aggregates, these skills set no organisation-wide threshold.
+Probe and handover/open output use the probe floor below. The governing delivery
+threshold is the
 "Cell suppression threshold" field of the request's de-identification assessment
 (``nq-rdl/documentation``,
 ``zensical/governance/docs/governance/deidentification-assessment.md``), or a
@@ -126,8 +128,11 @@ threshold stated in the approval. If neither states one, ask the approver or
 requester, and record the answer as a decision before release. Do not choose a
 number yourself.
 
-Apply the assessment's suppression to every delivered aggregate, including
-cross-tabulations and summary tables, with the complementary controls below.
+Suppression applies to every aggregate that leaves RDL: delivered counts,
+cross-tabulations and summary tables, and aggregates quoted in handover/open
+channels such as task output, PR bodies, release notes and comments. Apply the
+assessment's delivery threshold to delivered aggregates and the controls below
+to quoted evidence, with complementary controls in both cases.
 A row-level extract delivered under an approval is governed by that approval,
 not by cell suppression. Probe output uses the stricter controls below.
 
@@ -147,16 +152,23 @@ not claims that the guideline mandates these particular tiers.
 Perimeter and fact kinds
 ~~~~~~~~~~~~~~~~~~~~~~~~
 
-* **RDL-only:** the runbook and exact results file may retain exact evidence in
-  an access-controlled RDL store. A committed file is not automatically RDL-only:
-  if the repo is handed over, exclude these files and review its history first.
-  Do not paste their exact cohort counts into an AI-agent conversation.
+* **RDL-only:** the results file may retain unrounded evidence in an
+  access-controlled RDL store, subject to the floor below. Runbooks reference
+  that file rather than embedding exact counts. A committed file is not
+  automatically RDL-only; review the repository's history before handover.
 * **Handover:** SQL headers, scope and review files use these controls.
 * **Open channels:** issues, PR bodies and chat (including AI-agent output) use
   these controls too. Restrict the audience as well; rounding is not approval.
 
-Counts of people, episodes, admissions and events (including grid and temp-table
-fill counts) use the floor and rounding below in handover/open output. Structural
+A runbook or results file not excluded from the handover set is handover tier.
+If exact counts reach you, do not repeat them: apply these controls before
+writing any handover or open-channel text, and ask the operator for formatted
+output. Reading existing exact evidence does not authorise echoing it.
+
+Counts of people, episodes, admissions and events use the floor at **every tier**:
+every probe grid and temp-table fill count, including RDL-only results, applies
+it in the probe SQL through ``@min_cell``. Only rounding is relaxed for RDL-only
+exact evidence; handover/open output uses the formatter below. Structural
 counts of distinct codes, labels, fields, tables and columns remain exact, as do
 run metadata (timings, run dates and versions). Exception: a grid folding rare
 labels into "other" must omit the distinct-label total, which reveals how many
@@ -168,30 +180,42 @@ pending that decision, keep these controls. An approved extract is not changed.
 Floor and rounding
 ~~~~~~~~~~~~~~~~~~
 
-Use an effective floor F = max(7, assessment/approval threshold), interpreting
-any inclusive suppression boundary before taking that maximum. Counts from 1
-through F-1 show only ``<F`` (``<7`` at the default); never the exact count.
+Start with F = max(7, assessment/approval threshold), interpreting any inclusive
+suppression boundary before taking that maximum. If 7 < F <= 14, raise F to 15
+for this release. This final F is the display floor and SQL ``@min_cell``:
+counts from 1 through F-1 use **one token**, ``<F``, everywhere in the release,
+including coverage wording (``all but fewer than F``); never mix suppression
+tokens. Thus an assessment floor of 10 gives ``<15`` for every count from 1–14.
 An assessment may raise this floor, never lower it. If its threshold is unknown,
 ask and record the answer before sharing; do not assume that 7 is sufficient.
-Zero may show as ``about 0`` only after the differencing check below.
+Zero may show as ``about 0`` only after the differencing check below; if that
+check fails, show the same ``<F`` token, not a separate zero disclosure.
 
 For unsuppressed counts, select the step from the **exact integer**:
 
-* 7–14: ``between 7 and 14``; if F cuts into this band, suppress the whole band
-  rather than implying values below F.
+* 7–14 (only when F = 7): ``between 7 and 14``.
 * 15–99: nearest 5.
 * 100–999: nearest 10.
-* 1,000 and above: two significant figures, step = 10 ** (digits(n) - 2).
+* 1,000 and above: two significant figures, step = 10 ** (digits(n) - 2),
+  where digits(n) is the decimal digit count.
 
 Use decimal half-up, never binary floats or ties-to-even: for nonnegative n and
 step s, rounded = s * floor((2*n + s) / (2*s)), using integer arithmetic.
+For F >= 15, if 2*rounded - s < 2*F, show ``between F and X`` with
+X = rounded + s instead: this bounds the rounding interval at F and never
+shows or implies a value below it, even when rounded < F. Use this same
+floor-bounded range rule at every rounding tier, before unit formatting.
 Every displayed rounded count carries ``about``, even when rounding leaves it
-unchanged. Suppression tokens and the explicit low-end range are exceptions,
+unchanged. Suppression tokens and explicit count ranges are exceptions,
 not exact-count disclosures. The same qualifier applies to shown rounded shares
 and derived values, not to structural counts, metadata or band boundaries.
 Choose the display unit **after rounding**: below 1,000 use an integer; from
-1,000 use k, from 1,000,000 use M (then powers of 1,000 as needed). Preserve two
-significant figures for unit displays, including a trailing decimal zero.
+1,000 use k, from 1,000,000 use M, then B at 1,000,000,000 and T at
+1,000,000,000,000; larger values are out of scope, so omit them pending review.
+Preserve two significant figures for unit displays, including a trailing decimal
+zero, except when rounding carries to a new power of ten.
+The unit switch follows rounding, with no separate threshold: 995 at step 10
+already rounds to 1,000, and 995,000 at step 10,000 already rounds to 1,000,000.
 
 Boundary test table (F = 7; exact inputs are synthetic, not probe evidence)::
 
@@ -227,6 +251,23 @@ Boundary test table (F = 7; exact inputs are synthetic, not probe evidence)::
   999999 | about 1.0M
   1000000 | about 1.0M
 
+Raised-floor boundary table (assessment floor | exact | shown; synthetic)::
+
+  10 | 1 | <15
+  10 | 9 | <15
+  10 | 10 | <15
+  10 | 14 | <15
+  10 | 15 | between 15 and 20
+  10 | 18 | about 20
+  16 | 1 | <16
+  16 | 15 | <16
+  16 | 16 | between 16 and 20
+  16 | 17 | between 16 and 20
+  16 | 18 | about 20
+  21 | 20 | <21
+  21 | 21 | between 21 and 25
+  24 | 24 | between 24 and 30
+
 Unlike the guideline's random-rounding example, this rule is deterministic for
 reproducible header builds and provenance hashes. It is not differential privacy:
 rebuilding for a changed cohort, overlapping grids or old exact text can expose
@@ -242,9 +283,7 @@ Never write unquantified "almost all". Use only these coverage forms:
 * "about P% of about N (about R without)", with R using the count formatter
   (substitute its low-end range where required);
 * open end bands such as "more than 97%" or "under 0.05%", built from the exact
-  remainder and denominator. Widen or omit the band if, combined with all shown
-  evidence, it narrows a positive remainder below F; do not use a near-100%
-  rounded percentage to evade suppression.
+  remainder and denominator, only after the combined-disclosure check below.
 
 Preserve a checked equality as a claim in words: "for every cohort case",
 "equal to the cohort size" or "the rule removed no case", followed by a safely
@@ -253,15 +292,22 @@ Compute differences, ratios and shares from **exact operands**, then round the
 result, never subtract displayed operands. If the displayed difference is wrong
 by more than one rounding step for the exact difference, print the safely shown
 derived value as well; suppress it if small or disclosive. For shares/ratios use
-decimal half-up to two significant figures, subject to the coverage bands and
-combined-disclosure check; a positive result must not be shown as exact zero.
+decimal half-up to two significant figures. If a numerator or remainder is
+below F, never show the share/ratio as a number: use "all but fewer
+than F" where applicable, or an open band. A band, combined with all shown
+evidence, must not narrow that numerator or remainder more precisely than
+``<F``; widen it or omit it if it does. A share whose rounding reaches 0% or
+100% must use an open band, not a rounded endpoint; a checked equality remains
+a claim in words. These rules also apply to floor-bounded counts and their
+ratios, not just the default floor.
 
 Complementary controls
 ~~~~~~~~~~~~~~~~~~~~~~
 
 Check every total and part in **every file of the handover set**, including
-prose, SQL headers and any runbook that would accompany it, against grids, fill
-counts, other probes and prior releases. Mask another cell/part, coarsen or omit
+prose and SQL headers, against grids, fill counts, other probes and prior
+releases. Never request unsuppressed totals for subtraction; treat NULL/blank
+counts as parts. Mask another cell/part, coarsen or omit
 values whenever subtraction or combined rounding intervals could recover or
 narrow a masked count. Rounding alone is not proof of safety. Old exact text in
 git history remains a risk; editing the current header does not erase it.
@@ -273,28 +319,31 @@ row; apply the floor to that pooled count too, and omit labels that remain
 identifying through rarity even above F. Never show free text. A grid crosses at
 most two quasi-identifiers (for example age band, sex, facility or specialty)
 besides the measure. Mask MIN and MAX for small cells; take them only from dates,
-category codes and numeric ranges, then apply the date/range controls above.
+category codes and numeric ranges, never of an identifier, name or free-text
+column, then apply the date/range controls above.
 
 Provenance and lint
 ~~~~~~~~~~~~~~~~~~~
 
 Engineer rationale cites the stable probe result id and states the conclusion
 in words. Analyst-facing limitations add a safely shown value from that result.
-Cite its SQL revision and scoped population with the id; a rerun must not silently
-retarget old evidence or force a scope revision merely to refresh a number.
+Cite its SQL revision and scoped population with the id; if no stable probe
+result id exists yet, cite the results file, SQL revision and run date instead.
+A rerun must not silently retarget old evidence or force a scope revision merely
+to refresh a number.
 Use one shared formatter in a request's builder for every displayed value, not
 hand rounding. Check new results for changed conclusions before updating text.
 
 Lint contract for a probe sentence: fail on a bare integer of 7 or more or any
 comma-grouped integer. Accept formatted ``about`` values, approved range/band
-boundaries, suppression tokens and provenance/run-metadata tokens; a local
+boundaries, suppression tokens, ``all but fewer than F``, provenance/run-metadata
+tokens and fixed workbook format limits (1,048,575; 16,384; 32,767; 31); a local
 ``[structural-count]`` marker exempts only an explicitly identified structural
 count, never a population count or folded-label total. Review exemptions and
-coverage/equality claims as well as the numeric check. This is an authored review
-rule, not an installed lint tool; automated sentence classification and the
-shared builder formatter belong in the request/scaffold follow-up.
+coverage/equality claims as well as the numeric check. This lint will not catch
+bare population counts of 1–6; reviewers must reject those too. This is an
+authored review rule, not an installed lint tool; automated sentence
+classification and the shared builder formatter belong in the request/scaffold follow-up.
 
-Context only: issue #464 rule 8's retrofit of in-progress request repositories
-and data-analysis-scaffold #280's second-check runner are outside this catalog
-change. Do not retrofit released/handed-over repositories or claim runner
-coverage here. Delivery-format limits are a separate workstream (#463).
+Do not retrofit released or handed-over repositories. No runner enforces these
+controls yet; do not claim it does. Workbook limits: `delivery.rst <delivery.rst>`_.

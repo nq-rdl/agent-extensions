@@ -1,3 +1,3 @@
 kind: Added
-body: Specify deterministic probe rounding, coverage and evidence wording with offline boundary-table tests (#464).
+body: Specify probe floors and deterministic rounding with default and raised-floor boundary tests (#464).
 time: 2026-09-30T22:16:26.971633099Z

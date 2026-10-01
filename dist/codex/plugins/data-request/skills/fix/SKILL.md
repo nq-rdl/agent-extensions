@@ -67,6 +67,7 @@ or population in an existing `scope.json`, update it with `$data-request:bootstr
 Change the maintained source and regenerate the SQL; never hand-edit generated SQL.
 Then verify it as in *Verify the correction*.
 
+For counts in runbook/UAT evidence, apply guardrails `references/release.rst`, **Probe disclosure control**, before quoting or editing prose.
 Change the runbook and the UAT checklist (for example `specs/uat-checklist.md`) together
 with the SQL, in the same change. This includes a renamed validation or UAT output column:
 search the runbook, UAT checklist, validation SQL and tests for each old name and update

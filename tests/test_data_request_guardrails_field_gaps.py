@@ -451,7 +451,13 @@ class ReleaseConventions(unittest.TestCase):
         # #464 adds an explicit stricter probe floor, not a delivery threshold.
         delivery = self.ref.split("Probe disclosure control", 1)[0]
         numeric = re.compile(r"(?i)(?:threshold of|fewer than|less than|below|under|<)\s*\d+")
-        self.assertIsNone(numeric.search(delivery))
+        # Numeric delivery thresholds belong only to the request assessment.
+        # Probe-floor rules are centralised in release.rst, not either pointer.
+        for name, text in (("delivered aggregates", delivery),
+                           ("Release conventions", self.skill),
+                           ("performance.rst", ref("performance.rst"))):
+            with self.subTest(where=name):
+                self.assertIsNone(numeric.search(text))
         self.assertIn("F = max(7, assessment/approval threshold)", self.ref)
         self.assertIn("An assessment may raise this floor, never lower it", self.ref)
 

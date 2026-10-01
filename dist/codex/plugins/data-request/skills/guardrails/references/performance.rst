@@ -67,8 +67,9 @@ its perimeter, formatter and combined-disclosure review. Keep each probe:
 * **Aggregate-only.** It returns counts, ranges and codes, never patient rows.
 * **Disclosure-controlled.** Parameterise ``@min_cell`` using the effective floor
   in ``release.rst``, "Probe disclosure control"; apply that section before output.
-* **One bounded scan.** Group on narrow keys within the disclosure-control limits,
-  instead of a full-table aggregate over many columns. Avoid ``GROUPING SETS``
+* **One bounded scan.** Group on narrow keys within the disclosure-control limits
+  and take MIN and MAX samples per group, instead of a full-table aggregate over
+  many columns; apply the MIN/MAX restrictions in ``release.rst``. Avoid ``GROUPING SETS``
   combined with ``COUNT(DISTINCT ...)`` on a full scan: it reads the table more
   than once.
 * **Free of patient identifiers.** Never ask the operator to paste a column that can

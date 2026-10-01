@@ -62,6 +62,8 @@ branch:
 - the output manifest or schema: each delivered file, its columns and its row grain;
 - validation and UAT evidence: runbook, UAT checklist and validation outputs.
 
+For counts in that evidence, apply guardrails `references/release.rst`, **Probe disclosure control**, before quoting them.
+
 Then list the reviews and whether each describes the release:
 
 ```bash

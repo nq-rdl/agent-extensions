@@ -45,6 +45,7 @@ none is committed or run, except exempt probes, until a writable run publishes t
 
 For probe proposals and reported evidence, follow **Probe disclosure control** in
 `${CLAUDE_PLUGIN_ROOT}/skills/guardrails/references/release.rst`; gate exemption is not disclosure permission.
+
 **Exempt probes:** an operator probe is outside the hand-SQL gate only when it is
 aggregate-only, small-cell-suppressed and single-scan, returns no identifying
 values (no patient identifiers, no staff or person keys; clinician and resource
