@@ -89,7 +89,7 @@ class GuardHook(unittest.TestCase):
         self.assertEqual(decision(r)["permissionDecision"], "deny")
 
     def test_literal_token_assignment_is_denied_even_without_host(self):
-        r = run_hook(GUARD, bash_event("export RH_OFFLINE_TOKEN=eyJhbGciOiJIUzI1NiJ9.literal"), self.env)
+        r = run_hook(GUARD, bash_event("export RH_OFFLINE_TOKEN=eyJhbGciOiJIUzI1NiJ9.literal.signature"), self.env)
         d = decision(r)
         self.assertEqual(d["permissionDecision"], "deny")
         self.assertIn("/redhat:setup", d["permissionDecisionReason"])
@@ -102,8 +102,10 @@ class GuardHook(unittest.TestCase):
     def test_quoted_literal_token_assignment_is_denied(self):
         # Quoting is the conventional form — the guard must not be bypassable by it.
         for cmd in (
-            "export RH_OFFLINE_TOKEN='eyJhbGciOiJIUzI1NiJ9.literal'",
-            'RH_OFFLINE_TOKEN="eyJhbGciOiJIUzI1NiJ9.literal" bash "$S/rh-token.sh" --check',
+            "export RH_OFFLINE_TOKEN='eyJhbGciOiJIUzI1NiJ9.literal.signature'",
+            'RH_OFFLINE_TOKEN="eyJhbGciOiJIUzI1NiJ9.literal.signature" bash "$S/rh-token.sh" --check',
+            'RH_OFFLINE_TOKEN=' + 'aB0_' * 10,
+            'RH_OFFLINE_TOKEN="' + 'aB0_' * 10 + '"',
         ):
             with self.subTest(cmd=cmd):
                 d = decision(run_hook(GUARD, bash_event(cmd), self.env))
@@ -113,9 +115,72 @@ class GuardHook(unittest.TestCase):
     def test_empty_or_unset_assignment_passes(self):
         self.assert_passthrough(run_hook(GUARD, bash_event('RH_OFFLINE_TOKEN="" bash "$S/rh-preflight.sh"'), self.env))
 
-    def test_echoing_the_token_is_denied(self):
-        r = run_hook(GUARD, bash_event("echo $RH_OFFLINE_TOKEN"), self.env)
-        self.assertEqual(decision(r)["permissionDecision"], "deny")
+    def test_placeholder_assignments_and_setup_format_string_pass(self):
+        for cmd in (
+            "printf 'export RH_OFFLINE_TOKEN=%s\\n' \"$t\"",
+            "cat <<'EOF' > issue.md\nRH_OFFLINE_TOKEN=<token>\nRH_OFFLINE_TOKEN=…\nEOF",
+            "printf '%s\\n' 'RH_OFFLINE_TOKEN=<token>'",
+            "printf '%s\\n' 'RH_OFFLINE_TOKEN=…'",
+            "printf '%s\\n' 'RH_OFFLINE_TOKEN=xxx'",
+            "RH_OFFLINE_TOKEN=xxx",
+            "RH_OFFLINE_TOKEN=" + "a" * 39,
+        ):
+            with self.subTest(cmd=cmd):
+                self.assert_passthrough(run_hook(GUARD, bash_event(cmd), self.env))
+
+    def test_presence_checks_with_separate_print_segments_pass(self):
+        for cmd in (
+            '[ -n "${RH_OFFLINE_TOKEN:-}" ] && echo present',
+            '[ -n "${RH_OFFLINE_TOKEN:-}" ] && echo "present" || echo "not present"',
+            '[ -n "$RH_OFFLINE_TOKEN" ]; printf "%s" present',
+            '[ -n "$RH_OFFLINE_TOKEN" ] | echo present',
+            '[ -n "$RH_OFFLINE_TOKEN" ]\necho present',
+            'RH_OFFLINE_TOKEN="$RH_OFFLINE_TOKEN" echo present',
+        ):
+            with self.subTest(cmd=cmd):
+                self.assert_passthrough(run_hook(GUARD, bash_event(cmd), self.env))
+
+    def test_echoing_or_printf_of_the_token_is_denied_per_segment(self):
+        for cmd in (
+            'echo $RH_OFFLINE_TOKEN',
+            'echo "$RH_OFFLINE_TOKEN"',
+            'printf \'%s\' "$RH_OFFLINE_TOKEN"',
+            'echo "${RH_OFFLINE_TOKEN:-}"',
+            'true && echo "$RH_OFFLINE_TOKEN"',
+            'false || printf \'%s\' "$RH_OFFLINE_TOKEN"',
+            'true; echo "$RH_OFFLINE_TOKEN"',
+            'true | echo "$RH_OFFLINE_TOKEN"',
+            'true\nprintf \'%s\' "$RH_OFFLINE_TOKEN"',
+            'RH_CRED_SOURCES=env printf \'%s\' "$RH_OFFLINE_TOKEN"',
+            # Separators inside quoted arguments do not split the print from the expansion.
+            'printf \'%s;\' "$RH_OFFLINE_TOKEN"',
+            'printf \'a|b %s\' "$RH_OFFLINE_TOKEN"',
+            'echo "x && $RH_OFFLINE_TOKEN"',
+            'echo "a;b" "$RH_OFFLINE_TOKEN"',
+        ):
+            with self.subTest(cmd=cmd):
+                d = decision(run_hook(GUARD, bash_event(cmd), self.env))
+                self.assertEqual(d["permissionDecision"], "deny")
+                self.assertIn("Never print", d["permissionDecisionReason"])
+
+    def test_literal_deny_hint_loads_setup_note_format(self):
+        cmd = 'RH_OFFLINE_TOKEN=eyJhbGciOiJIUzI1NiJ9.literal.signature'
+        hint = decision(run_hook(GUARD, bash_event(cmd), self.env))["permissionDecisionReason"]
+        loader = 'eval "$(bw get notes redhat-credentials)"'
+        self.assertIn(loader, hint)
+        self.assertIn('bwe redhat-credentials', hint)
+        self.assertIn(loader, (REPO / 'skills/redhat-setup/SKILL.md').read_text())
+        bindir = Path(self.tmp.name) / 'bin'
+        bindir.mkdir()
+        bw = bindir / 'bw'
+        bw.write_text("#!/bin/sh\n[ \"$*\" = 'get notes redhat-credentials' ] || exit 1\n"
+                      "printf '%s\\n' 'export RH_OFFLINE_TOKEN=offline-test-token'\n")
+        bw.chmod(0o755)
+        env = dict(self.env, PATH=f"{bindir}:{self.env['PATH']}")
+        r = subprocess.run(['bash', '-c', loader + '; test "$RH_OFFLINE_TOKEN" = offline-test-token'],
+                           env=env, capture_output=True, text=True, timeout=30)
+        self.assertEqual((r.returncode, r.stdout, r.stderr), (0, '', ''))
+        self.assert_passthrough(run_hook(GUARD, bash_event(loader), self.env))
 
     def test_direct_sso_call_asks(self):
         r = run_hook(GUARD, bash_event("curl -X POST https://sso.redhat.com/auth/realms/redhat-external/protocol/openid-connect/token -d @body"), self.env)
@@ -206,6 +271,10 @@ class GuardHook(unittest.TestCase):
         for cmd in (
             "env | grep RH_OFFLINE_TOKEN",
             "printenv RH_OFFLINE_TOKEN",
+            "set | grep RH_OFFLINE_TOKEN",
+            "export -p | grep RH_OFFLINE_TOKEN",
+            "declare -p RH_OFFLINE_TOKEN",
+            "typeset -p RH_OFFLINE_TOKEN",
             'printf "%s" "$RH_OFFLINE_TOKEN" | wc -c',
             "cat ~/.config/redhat/offline-token",
             'curl -H "Authorization: Bearer $RH_OFFLINE_TOKEN" https://api.access.redhat.com/support/search/kcs?q=x',
@@ -226,7 +295,7 @@ class GuardHook(unittest.TestCase):
             if path:
                 (bindir / tool).symlink_to(path)
         env = clean_env(self.tmp.name, PATH=str(bindir))
-        d = decision(run_hook(GUARD, bash_event("export RH_OFFLINE_TOKEN=eyJhbGciOiJIUzI1NiJ9.literal"), env))
+        d = decision(run_hook(GUARD, bash_event("export RH_OFFLINE_TOKEN=eyJhbGciOiJIUzI1NiJ9.literal.signature"), env))
         self.assertEqual(d["permissionDecision"], "deny")
         self.assert_passthrough(run_hook(GUARD, bash_event("curl -sS https://example.com/"), env))
 
