@@ -126,6 +126,12 @@ These skills call Python directly (no CLI wrapper). Each has a `requirements.txt
 
 The Codex plugin exercises the vendored-runtime exception: it vendors the upstream Node.js `.mjs` runtime as-is, Bun is the local dev manager, it carries zero runtime npm dependencies, and Node.js >=18.18.0 is an external user prerequisite enforced by a first-use preflight. If such a runtime is ever packaged, GitHub Packages/ghcr is the org distribution channel.
 
+The Pi dispatch Fast-mode asset `skills/pi-dispatch/assets/service-tier.mjs` is a
+maintainer-approved exception (2026-10-01): small, dependency-free plain ESM loaded
+by the existing pi Node runtime via `pi -e`, not a standalone CLI or TypeScript.
+It only requests a user-approved priority service tier for guarded Codex Responses
+payloads; it never logs payloads. Shell orchestration remains Bash 3.2 + jq.
+
 MCP servers are authored in `mcp/*-go/` and distributed as prebuilt binaries under `plugins/<bundle>/bin/mcp/`. See `docs/ARCHITECTURE.md` for the full language and packaging policy.
 
 ## MCP Servers

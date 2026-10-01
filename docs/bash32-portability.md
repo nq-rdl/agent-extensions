@@ -14,6 +14,11 @@ storage before a file exists in the running session, atomic writes, optional
 Bitwarden Notes/custom-field seeding, path overrides/source filtering, preflight
 tool reporting, and narrowly scoped direct-decryption guard decisions. These run
 under both host Bash and the pinned Bash 3.2 fixture (not real sops/hardware).
+Pi dispatch cases run all target parsing, conservative overlap/cap waves,
+prompt rendering, worktree and launch argv (including opt-in Fast env/extension,
+offline catalog checks and requested-tier status), resume, status/CI, lock safety and
+read-only setup checks with local pi/wt/gh/git shims under both host Bash and the
+pinned Bash 3.2 fixture. No real workers, credentials or model calls are used.
 General unit-test discovery can still
 skip these fixtures on contributors' machines without container prerequisites.
 

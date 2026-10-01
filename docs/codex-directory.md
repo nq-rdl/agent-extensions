@@ -27,6 +27,7 @@ This report records missing evidence; it does not attest to publisher identity, 
 | obsidian | 3 | skills-only | No |
 | opencode-dev | 7 | skills+hooks | No |
 | pandera | 1 | skills-only | No |
+| pi | 2 | skills-only | No |
 | pixi | 1 | skills-only | No |
 | planning | 5 | skills-only | No |
 | playwright | 1 | local-mcp | No |
@@ -222,6 +223,15 @@ This report records missing evidence; it does not attest to publisher identity, 
 - Publisher must select supported availability regions
 
 ## pandera
+
+- Publisher must supply logo
+- Publisher must supply privacyPolicyURL
+- Publisher must supply termsOfServiceURL
+- Publisher identity and organization submission access are not recorded as verified
+- Record authenticated execution evidence for five positive and three negative task cases
+- Publisher must select supported availability regions
+
+## pi
 
 - Publisher must supply logo
 - Publisher must supply privacyPolicyURL

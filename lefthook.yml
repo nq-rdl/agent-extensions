@@ -133,6 +133,9 @@ pre-push:
     # Same hook-env leak as above. tests/codex/helpers.mjs also scrubs these on
     # import (see tests/codex/git-env-isolation.test.mjs); this is the outer guard.
     - name: codex-js-tests
+      # Pre-push glob alone selects all tracked files. Limit this heavyweight
+      # suite to the branch diff so unrelated skill-only pushes do not run it.
+      files: git diff --name-only origin/main...HEAD
       glob: "{plugins/codex/**,tests/codex/**,hooks/codex-*.sh}"
       run: env -u GIT_DIR -u GIT_WORK_TREE -u GIT_INDEX_FILE -u GIT_PREFIX -u GIT_COMMON_DIR node --test tests/codex/*.test.mjs
 

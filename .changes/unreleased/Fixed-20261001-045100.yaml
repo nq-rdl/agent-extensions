@@ -1,0 +1,3 @@
+kind: Fixed
+body: Scope the Codex JS pre-push suite to branch changes so unrelated skill-only pushes do not launch heavyweight brokers.
+time: 2026-10-01T04:51:00.540740202Z

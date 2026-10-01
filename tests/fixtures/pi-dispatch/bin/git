@@ -1,0 +1,7 @@
+#!/usr/bin/env bash
+set -eu
+if [ "$1" = -C ]; then
+    printf '%s\n' "$(< "$FIXTURE/branch")"
+elif [ "$1" = -c ]; then
+    printf 'worktree %s/worktree with spaces\nbranch refs/heads/%s\n\n' "$FIXTURE" "$(< "$FIXTURE/branch")"
+else printf 'Unexpected git call\n' >&2; exit 99; fi
