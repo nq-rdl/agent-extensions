@@ -116,6 +116,8 @@ the maintained source (step 1). Preserve unrelated edits.
 
 ### Runbook, UAT checklist and validation outputs
 
+For counts in runbook/UAT evidence, apply guardrails `references/release.rst`, **Probe disclosure control**, before quoting or editing prose.
+
 When an amendment changes what the runbook or the UAT checklist (for example
 `specs/uat-checklist.md`) describes, change them together with the SQL, in the same change.
 This includes an analyst-safe rename, reorder or drop of a column that a validation or UAT

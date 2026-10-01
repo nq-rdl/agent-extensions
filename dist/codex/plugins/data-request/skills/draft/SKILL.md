@@ -62,6 +62,10 @@ Deliver only the narrowest supported request; offer extras in hand-off, do not b
 **Co-develop:** present alternatives and effects to the owning engineer or analyst, obtain the
 decision, then proceed and flag. Infer mode if absent. Neither mode manufactures confirmation fields.
 
+Before proposing probes or carrying their evidence into headers, rationale or limitations,
+follow **Probe disclosure control** in
+`${PLUGIN_ROOT}/skills/guardrails/references/release.rst`.
+
 Before writing, apply guardrails `references/delivery.rst`: estimate each output's
 rows from available probe counts at the drafted grain and check text length bands.
 Record row/cell-limit risks and near-limit (within 10%) uncertainty as limitations

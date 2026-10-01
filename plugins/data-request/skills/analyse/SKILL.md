@@ -112,7 +112,7 @@ Unknown labels/thresholds remain unverified; do not fabricate confirmations to p
 
 The operator needs explicit authorisation to run approved probes before the delivery run.
 Returned counts inform UAT and the data dictionary; surprises go to the analyst, not an automatic
-cohort filter. Apply *After review* below for the separate authorised run and handoff.
+cohort filter. Before showing counts, apply guardrails `references/release.rst`, **Probe disclosure control**. Apply *After review* below for the separate authorised run and handoff.
 
 ## Existing review → update path (#130 §2)
 

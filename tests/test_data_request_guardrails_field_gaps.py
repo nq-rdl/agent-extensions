@@ -218,14 +218,16 @@ class PerformanceFallbacks(unittest.TestCase):
         self.assertIn("](references/performance.rst)", perf)
 
     def test_probe_design_rules(self):
-        for token in ("MIN and MAX", "GROUPING SETS", "COUNT(DISTINCT", "clinician",
+        for token in ("Probe disclosure control", "GROUPING SETS", "COUNT(DISTINCT", "clinician",
                       "local-only", "OBSERVED", "INFERRED"):
             with self.subTest(token=token):
                 self.assertIn(token, self.ref)
 
     def test_min_max_restricted_and_suppressed(self):
-        self.assertIn("never of an identifier, name or free-text column", self.ref)
-        self.assertIn("Suppress the MIN and MAX of a small cell", self.ref)
+        self.assertIn("release.rst#probe-disclosure-control", self.ref)
+        release = ref("release.rst")
+        self.assertIn("Mask MIN and MAX for small cells", release)
+        self.assertIn("take them only from dates, category codes and numeric ranges", release)
 
     def test_codes_are_category_codes_never_staff_keys(self):
         for text in (self.ref, flat(LIFTS.read_text())):
@@ -236,7 +238,8 @@ class PerformanceFallbacks(unittest.TestCase):
 
     def test_threshold_parameter_comes_from_the_assessment(self):
         self.assertIn("@min_cell", self.ref)
-        self.assertIn("de-identification assessment", self.ref)
+        self.assertIn("effective floor", self.ref)
+        self.assertIn("assessment/approval threshold", ref("release.rst"))
         self.assertNotIn("that the operator sets", self.ref)
 
     def test_read_isolation_rule(self):
@@ -444,13 +447,19 @@ class ReleaseConventions(unittest.TestCase):
             with self.subTest(token=token):
                 self.assertIn(token, self.ref)
         self.assertIn("](references/release.rst)", self.skill)
-        self.assertIn("de-identification assessment", self.skill)
-        self.assertIn("ask and record it", self.skill)
+        self.assertIn("Probe disclosure control", self.skill)
+        # #464 adds an explicit stricter probe floor, not a delivery threshold.
+        delivery = self.ref.split("Probe disclosure control", 1)[0]
         numeric = re.compile(r"(?i)(?:threshold of|fewer than|less than|below|under|<)\s*\d+")
-        for name, text in (("release section", self.skill), ("release.rst", self.ref),
+        # Numeric delivery thresholds belong only to the request assessment.
+        # Probe-floor rules are centralised in release.rst, not either pointer.
+        for name, text in (("delivered aggregates", delivery),
+                           ("Release conventions", self.skill),
                            ("performance.rst", ref("performance.rst"))):
             with self.subTest(where=name):
                 self.assertIsNone(numeric.search(text))
+        self.assertIn("F = max(7, assessment/approval threshold)", self.ref)
+        self.assertIn("An assessment may raise this floor, never lower it", self.ref)
 
 
 if __name__ == "__main__":

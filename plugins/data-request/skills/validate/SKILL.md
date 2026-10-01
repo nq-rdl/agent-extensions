@@ -42,7 +42,10 @@ age-band probe only for expensive requests with cited cost evidence; otherwise s
 This stage runs **no SQL** and must not connect to a database, inspect live catalogs or invoke
 an extract runner, even to test a proposed probe. Database-capable clients, credentials and an
 operator proposal are not execution authorisation. Mark every probe **proposed, not executed**;
-static validation does not establish plausibility. The authorised operator runs approved probes
+static validation does not establish plausibility. Check proposals and any cited results
+against **Probe disclosure control** in
+`${CLAUDE_PLUGIN_ROOT}/skills/guardrails/references/release.rst`, including the
+boundary table and probe-sentence lint contract. The authorised operator runs approved probes
 before the delivery run; retain unresolved thresholds/bounds as reasons not to run.
 
 Return findings with severity, SQL location, rule/requirement, observed evidence,
