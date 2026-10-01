@@ -3,7 +3,7 @@ license: CC-BY-4.0
 description: >-
   Check whether this machine can fetch Red Hat documentation and Customer Portal
   content, and when the personal Red Hat offline token is missing, guide the user
-  through generating it, storing it (Bitwarden, OS keychain, or a 0600 file),
+  through generating it, storing it (sops + age recommended, Bitwarden, OS keychain, or a 0600 file),
   loading it, and verifying it – without the secret ever entering the chat. Use
   when a Red Hat fetch reports "no offline token", "subscriber_only",
   "invalid_grant", or when onboarding a teammate to the redhat plugin.
@@ -13,7 +13,8 @@ compatibility: >-
   Red Hat SSO offline tokens from access.redhat.com/management/api (30-day idle
   expiry) as of 2026-08; Bitwarden CLI 2026.8.0 (source-verified sync/list/get/create/edit contract);
   macOS security(1) keychain; libsecret secret-tool on Linux; jq >= 1.6 (`--rawfile`);
-  bash or zsh for the paste prompts.
+  sops 3.13.3 (installed help + dummy stdin round-trip verified; >= 3.10 for age plugins/stdin);
+  age 1.3.2; bash 3.2+ for rh-store-sops.sh; bash or zsh for the paste prompts.
 allowed-tools: Bash, AskUserQuestion
 metadata:
   repo: https://github.com/nq-rdl/agent-extensions
@@ -31,6 +32,19 @@ the [official CLI documentation](https://bitwarden.com/help/cli/) and the
 [pinned lookup implementation](https://github.com/bitwarden/clients/blob/cli-v2026.8.0/apps/cli/src/commands/get.command.ts).
 The offline tests use shims; they do not replace verification against the installed CLI.
 
+Before relying on sops flags, verify `sops --version`, `sops --help`, and
+`sops encrypt --help` against the [canonical docs](https://getsops.io/docs/usage/common-operations/).
+Verified on **sops 3.13.3**: omit the positional filename to read stdin, supply
+`--filename-override` (required for stdin), and explicitly set input/output types.
+Do not use `-` as a filename or `--in-place` for stdin. The
+[3.10.0 changelog](https://github.com/getsops/sops/releases/tag/v3.10.0) introduced
+stdin encryption/decryption and age plugin support. Its
+[pinned implementation](https://github.com/getsops/sops/blob/v3.10.0/age/keysource.go)
+accepts `AGE-PLUGIN-` identities for decryption: this covers the age plugin protocol
+used by TPM and YubiKey plugins, with the plugin executable on `PATH`.
+Hardware TPM/YubiKey decryption was **not live-tested**; protocol/source verification
+is not evidence that a particular device, PIN, or user-presence policy works.
+
 ## 1. Check
 
 ```bash
@@ -38,10 +52,22 @@ S="${CLAUDE_PLUGIN_ROOT}/skills/fetch-docs/scripts"
 bash "$S/rh-preflight.sh" --json
 ```
 
-Report OS, fetcher, `bw`, and `credential` (a source name: `env`, `keychain`, `file`,
-`bitwarden`, or `none`). If `fetcher` is `none`, stop: curl must be installed first
+Report OS, fetcher, `bw`, `sops`, `age`, `age-plugin-tpm`, and `credential`
+(`env`, `keychain`, `sops`, `file`, `bitwarden`, or `none`).
+If `fetcher` is `none`, stop: curl must be installed first
 (`brew install curl` / `dnf install curl` / `apt install curl`). If `jq` is `no`, same.
-If `bw` is `no`, say so beside the Bitwarden option in step 3 (still list it first).
+If `bw` is `no`, say so beside the optional Bitwarden option; it is not required.
+If `sops` or `age` is `no`, offer `brew install sops age`, `sudo dnf install sops age`,
+or `sudo apt install sops age`, as appropriate. Package availability varies by
+release/repository: if unavailable or sops < 3.10, use the official
+[sops releases](https://github.com/getsops/sops/releases) and
+[age releases](https://github.com/FiloSottile/age/releases), not an unverified installer.
+Report `age-plugin-tpm` if present. On Linux with `/dev/tpmrm0` accessible, prefer
+TPM-backed storage; if missing, offer
+`go install github.com/foxboron/age-plugin-tpm/cmd/age-plugin-tpm@latest` or its
+[upstream binaries](https://github.com/Foxboron/age-plugin-tpm/releases).
+Check the installed plugin's help against its
+[usage docs](https://github.com/Foxboron/age-plugin-tpm#usage) before generating an identity.
 
 If `credential` is not `none`, verify and finish:
 
@@ -52,10 +78,13 @@ bash "$S/rh-token.sh" --check      # → source=<src> access_token=ok expires_in
 Exit `4` means Red Hat SSO rejected the token (`invalid_grant`, typically 30 days unused):
 continue at step 2 to regenerate.
 
-Exit `3` here means the source was found but yields no token (a `redhat-credentials` item
+Exit `3` here also covers sops decryption failure or an empty/missing
+`RH_OFFLINE_TOKEN` key: check identity discovery and plugin availability, then
+re-store at step 3. Never diagnose by decrypting into a tool call's output.
+Other empty sources include a `redhat-credentials` item
 with no token in Notes – `export RH_OFFLINE_TOKEN=…`, `RH_OFFLINE_TOKEN=…`, or a bare JWT –
 and no nonempty custom field `RH_OFFLINE_TOKEN` (text or hidden), or a token file whose
-first line is blank – only line 1 is read). The Bitwarden hint names the item
+first line is blank – only line 1 is read. The Bitwarden hint names the item
 (`RH_BW_ITEM` overrides the default) and the places checked, never values. Skip step 2
 if the user still has their token and re-store it at step 3 with the same source.
 
@@ -74,13 +103,74 @@ Tell the user, verbatim:
 
 Use `AskUserQuestion` exactly once, options in this order:
 
-- **Bitwarden personal vault (Recommended)** – team standard; syncs across machines.
+- **sops + age (Recommended)** – encrypted at rest, read per call; prefer a TPM-backed identity.
+- **Bitwarden personal vault** – optional master copy; syncs across machines.
 - **OS keychain** – macOS Keychain or Linux Secret Service; no vault needed.
 - **0600 file** – `${XDG_CONFIG_HOME:-$HOME/.config}/redhat/offline-token` (or `$RH_OFFLINE_TOKEN_FILE`);
   least preferred (plaintext at rest).
 
 The user runs the store command **in their own terminal** (not via `!`, whose output
-lands in the transcript). Give only the chosen block:
+lands in the transcript). Give only the chosen block. Expand `$S` to the installed scripts directory for
+commands given to the user (`CLAUDE_PLUGIN_ROOT` is not set in their terminal).
+
+**sops + age** (no `bw` needed):
+
+Use an existing identity if one exists; **never overwrite it**. sops discovers
+`$XDG_CONFIG_HOME/sops/age/keys.txt` (default `~/.config/sops/age/keys.txt`) on Linux;
+on macOS it also honours `XDG_CONFIG_HOME`, otherwise defaults to
+`~/Library/Application Support/sops/age/keys.txt`.
+A custom identity path needs `SOPS_AGE_KEY_FILE` in the agent's launch environment;
+prefer the default path to avoid that restart requirement. See
+[identity discovery](https://getsops.io/docs/usage/identities/age/).
+
+If a usable TPM is present, prefer this (no PIN for noninteractive per-call reads):
+
+```bash
+k="${XDG_CONFIG_HOME:-$HOME/.config}/sops/age/keys.txt"
+(umask 077; mkdir -p "${k%/*}" && [ ! -e "$k" ] && age-plugin-tpm --generate -o "$k" && chmod 600 "$k")
+r="$(age-plugin-tpm -y "$k")"  # public recipient only
+```
+
+Otherwise create a plain age identity (equivalent to
+`age-keygen -o ~/.config/sops/age/keys.txt` on default Linux):
+
+```bash
+case "$(uname -s)" in
+  Darwin) k="${XDG_CONFIG_HOME:-$HOME/Library/Application Support}/sops/age/keys.txt" ;;
+  *) k="${XDG_CONFIG_HOME:-$HOME/.config}/sops/age/keys.txt" ;;
+esac
+(umask 077; mkdir -p "${k%/*}" && [ ! -e "$k" ] && age-keygen -o "$k" && chmod 600 "$k")
+r="$(age-keygen -y "$k")"  # public recipient only; also works for an existing plain identity
+```
+
+Then, in the user's terminal, with `r` holding the **public** recipient:
+
+```bash
+bash "$S/rh-store-sops.sh" "$r"
+```
+
+The helper uses a hidden `IFS= read -rs t` prompt, a **builtin printf** pipe to
+`sops encrypt --age ... --input-type dotenv --output-type yaml --filename-override ...`,
+then a 0600 ciphertext temporary file + rename. No token in argv, history, transcript,
+or plaintext staging file. It disables tracing, rejects empty pastes, and leaves an
+existing file unchanged on failure. The destination is
+`${RH_OFFLINE_TOKEN_SOPS_FILE:-${XDG_CONFIG_HOME:-$HOME/.config}/redhat/offline-token.sops.yaml}`.
+It passes `--age` explicitly; no `.sops.yaml` change is needed.
+
+Optional Bitwarden seeding (only if it is already the user's master copy): unlock/sync
+in **this terminal**, then use the same helper:
+
+```bash
+s="$(bw unlock --raw)"; [ -n "$s" ] && export BW_SESSION="$s"; unset s
+if [ -n "${BW_SESSION:-}" ] && bw sync >/dev/null; then
+  bash "$S/rh-store-sops.sh" "$r" --from-bitwarden
+fi
+```
+
+This captures the single item's Notes/custom field through the credential resolver
+(same accepted layouts and Notes precedence below), never prints it, and feeds it to
+sops on stdin. Failed/ambiguous lookup or an empty token does not replace the file.
+No `eval` or intermediate plaintext file is used for seeding.
 
 **Bitwarden** (the `bitwarden:secrets` pattern – Secure Note named `redhat-credentials`):
 
@@ -172,9 +262,20 @@ The path honours `XDG_CONFIG_HOME` because the scripts resolve the same
   `eval "$(bw get notes redhat-credentials)"` (or `bwe redhat-credentials` from
   `bitwarden:secrets`). Tool calls inherit that environment; this load step does not
   read custom fields or bare JWT Notes.
-- **Keychain / file**: nothing to load – the scripts resolve them directly.
-- Resolution order is `env → keychain → file → bitwarden`; restrict with
-  `RH_CRED_SOURCES=env,file` if needed.
+- **sops / keychain / file**: nothing to load – the scripts resolve them directly.
+- Resolution order is `env → keychain → sops → file → bitwarden`; restrict with
+  `RH_CRED_SOURCES=env,sops` if needed (membership filter, not a custom ordering).
+
+| Source | Restart the agent after storing? |
+|---|---|
+| `env` | Yes: export before launching; another pane cannot update a running process. |
+| `bitwarden` | Yes if `BW_SESSION` was not exported before launch; vault edits alone need none. |
+| `sops` | No with the default identity/path and plugins already on PATH; read each call. |
+| `keychain` | No; Secret Service must be reachable on Linux. |
+| `file` | No; read each call. |
+
+Changing launch-time path overrides, `RH_CRED_SOURCES`, `SOPS_AGE_KEY_FILE`, or `PATH`
+also needs a restart. Creating the default sops file/identity does not.
 
 ## 5. Verify
 
@@ -188,7 +289,7 @@ only. Then hand back to `/redhat:fetch-docs`. If it prints `invalid_grant`, the 
 token is wrong or expired – regenerate (step 2) and re-store.
 
 If it exits `3`, first confirm storage completed: Bitwarden must report `stored` or
-`updated`, the file block must report `stored in ...`, and the keychain command must
+`updated`, the sops helper or file block must report `stored in ...`, and the keychain command must
 finish successfully. An empty paste, cancelled prompt, or failed write means step 3
 must be retried; do not diagnose a session problem until storage succeeds.
 
@@ -198,9 +299,28 @@ was found; after successful storage, check visibility to this session: for Bitwa
 must be in the environment `claude` was launched from – finish step 4 in that shell and
 restart `claude`, or have the user run the same `rh-token.sh --check` in the terminal where
 the vault is unlocked (give the expanded `$S` path; `CLAUDE_PLUGIN_ROOT` is not set there; it
-prints only the source and `expires_in`); for a file, `HOME`/`XDG_CONFIG_HOME` must match the
+prints only the source and `expires_in`); for sops, check the encrypted path and age
+identity discovery (without printing plaintext); for a file, `HOME`/`XDG_CONFIG_HOME` must match the
 path step 3 printed; for the Linux keychain, the Secret Service must be reachable from this
 session. "returned an empty token" means the store was found but holds no usable token –
 for Bitwarden, check the named item's Notes layouts and `RH_OFFLINE_TOKEN` custom field
 (text or hidden) listed in the message; re-store at step 3. Notes take precedence, so
 update or remove a stale Notes token when switching to a custom field.
+
+## Threat model
+
+| Setup | Encrypted at rest | Works per call (no restart) | Protects against same-user processes |
+|---|---|---|---|
+| `file` (0600) | ❌ | ✅ | ❌ |
+| `sops` + plain age key (`~/.config/sops/age/keys.txt`) | ✅ (file alone is useless) | ✅ | ❌ (key is next to it) |
+| `sops` + `age-plugin-tpm` | ✅; key cannot be taken off the machine | ✅ (without PIN) | ❌ (can still call `sops -d`) |
+| `sops` + `age-plugin-yubikey` | ✅ | ⚠️ needs touch/PIN | Partly (device policy dependent) |
+| `bitwarden` / `env` | ✅ in vault; env itself is not encrypted storage | ❌ must be set before launch | ❌ once loaded |
+
+A plain age key gives little extra same-machine protection over a 0600 file. It
+protects against the encrypted file leaking **alone** (backups, dotfiles, sync).
+TPM backing additionally prevents moving the key to another machine; retain a
+recovery plan (e.g. regenerate the Red Hat token) before TPM reset/host loss.
+No source is a general defense against same-user processes. The transcript guarantee
+is unchanged: the model never handles the token in chat, and the guard denies direct
+sops decryption of this token file. The lexical hook is not an OS security boundary.

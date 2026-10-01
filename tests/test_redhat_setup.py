@@ -304,7 +304,7 @@ class SetupSkillText(unittest.TestCase):
         self.assertIsNone(re.search(r"eyJ[A-Za-z0-9_-]{8,}\.", self.text))
 
     def test_storage_options_order_and_exact_commands(self):
-        markers = ("**Bitwarden personal vault (Recommended)**", "**OS keychain**", "**0600 file**")
+        markers = ("**sops + age (Recommended)**", "**Bitwarden personal vault**", "**OS keychain**", "**0600 file**")
         positions = []
         for m in markers:
             pos = self.text.find(m)
@@ -312,7 +312,7 @@ class SetupSkillText(unittest.TestCase):
             positions.append(pos)
         self.assertEqual(positions, sorted(positions), "storage options are out of the issue's order")
         # #270: the 0600 file is "documented as least-preferred" – on the option bullet itself
-        bullet = self.text[positions[2]:self.text.index("\n\n", positions[2])]
+        bullet = self.text[positions[3]:self.text.index("\n\n", positions[3])]
         self.assertRegex(bullet, r"least[- ]preferred")
         for needle in (
             'security add-generic-password -a "$USER" -s RH_OFFLINE_TOKEN -U -w',  # -U: re-store updates; -w last: prompts
@@ -347,6 +347,19 @@ class SetupSkillText(unittest.TestCase):
         self.assertTrue(self.fm["user-invocable"])
         self.assertIn("AskUserQuestion", self.fm["allowed-tools"])  # comma-separated scalar
         self.assertIn("30-day", self.fm["compatibility"])
+
+    def test_sops_docs_restart_threat_model_and_pin(self):
+        for needle in ("sops 3.13.3", "age 1.3.2", "--filename-override", "3.10.0 changelog",
+                       "AGE-PLUGIN-", "not live-tested", "Encrypted at rest",
+                       "Protects against same-user processes", "age-plugin-yubikey",
+                       "Restart the agent", "another pane", "env → keychain → sops → file → bitwarden",
+                       "sudo dnf install sops age", "sudo apt install sops age", "brew install sops age",
+                       "age-keygen -o", "age-plugin-tpm --generate", "--from-bitwarden"):
+            with self.subTest(needle=needle):
+                self.assertIn(needle, self.text)
+        step1 = self.text.split("## 1. Check", 1)[1].split("## 2.", 1)[0]
+        for tool in ("`sops`", "`age`", "`age-plugin-tpm`"):
+            self.assertIn(tool, step1)
 
     def test_step1_reports_bw(self):
         # The issue's check enumerates `bw` and rh-preflight.sh emits it; it decides whether the

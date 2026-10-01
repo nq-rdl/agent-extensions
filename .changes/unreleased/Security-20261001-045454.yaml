@@ -1,0 +1,3 @@
+kind: Security
+body: Guard direct sops decryption of the Red Hat token file and encrypt hidden pastes or Bitwarden seeds without plaintext staging.
+time: 2026-10-01T04:54:54.83029243Z

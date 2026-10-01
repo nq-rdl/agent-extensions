@@ -37,6 +37,8 @@ tok="$(rh_cred_token)"
 if [ -z "$tok" ]; then
   if [ "$src" = bitwarden ]; then
     echo "Credential source 'bitwarden' returned an empty token for item '$RH_BW_ITEM': checked Notes (export RH_OFFLINE_TOKEN=… / RH_OFFLINE_TOKEN=… or a bare JWT) and custom field RH_OFFLINE_TOKEN (text or hidden). $RH_SETUP_HINT" >&2
+  elif [ "$src" = sops ]; then
+    echo "Credential source 'sops' could not decrypt RH_OFFLINE_TOKEN or returned an empty token. Check the age identity (SOPS_AGE_KEY_FILE or sops/age/keys.txt), plugin availability, and encrypted file; re-store if needed. $RH_SETUP_HINT" >&2
   else
     echo "Credential source '$src' returned an empty token. $RH_SETUP_HINT" >&2
   fi

@@ -9,6 +9,11 @@ skip (including a skipped subtest). Its verbose output names the cases and
 reports the executed and skipped counts. Red Hat credential cases additionally
 exercise Bitwarden text/hidden custom fields, Notes precedence, and empty/missing
 fields with the pinned jq; the same cases run under the host Bash in general discovery.
+Sops shims cover source detection/missing CLI/file, empty/decrypt failure, hidden
+storage before a file exists in the running session, atomic writes, optional
+Bitwarden Notes/custom-field seeding, path overrides/source filtering, preflight
+tool reporting, and narrowly scoped direct-decryption guard decisions. These run
+under both host Bash and the pinned Bash 3.2 fixture (not real sops/hardware).
 General unit-test discovery can still
 skip these fixtures on contributors' machines without container prerequisites.
 

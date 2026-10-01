@@ -71,7 +71,7 @@ in your answer.
   of `Accept-Language`, cookies, or an explicit `/en/` path, and the page body is
   login-gated anyway. Use `view_uri` for provenance only; the API is the content route.
 - **Credentials never transit the model.** `rh-token.sh` resolves the offline token from
-  `RH_OFFLINE_TOKEN` → OS keychain → 0600 file → Bitwarden (`bw`, item
+  `RH_OFFLINE_TOKEN` → OS keychain → sops + age → 0600 file → Bitwarden (`bw`, item
   `redhat-credentials`), exchanges it at Red Hat SSO (`client_id=rhsm-api`,
   `grant_type=refresh_token`) for a 15-minute access token cached 0600, and hands curl a
   `-K` config. Never `echo` the token, never put it in argv, never ask the user to paste

@@ -2,16 +2,16 @@
 # Shared helpers for the redhat plugin scripts (sourced, not executed).
 # Portable across macOS bash 3.2 and Linux bash 5: no associative arrays,
 # no ${var,,}, no mapfile. Never prints a token to stdout unless the caller
-# explicitly asks via rh_cred_token (used only by rh-token.sh).
+# explicitly asks via rh_cred_token (captured by rh-token.sh / rh-store-sops.sh).
 
 { set +x +v; } 2>/dev/null   # a caller's bash -x or exported SHELLOPTS=xtrace would trace the token into stderr
 RH_SSO_TOKEN_URL='https://sso.redhat.com/auth/realms/redhat-external/protocol/openid-connect/token'
 RH_SSO_CLIENT_ID='rhsm-api'
 RH_KCS_API='https://api.access.redhat.com/support/search/kcs'
 RH_TOKEN_PAGE='https://access.redhat.com/management/api'
-RH_SETUP_HINT='Run /redhat:setup — it guides generating a personal Red Hat offline token and storing it (Bitwarden, OS keychain, or a 0600 file).'
+RH_SETUP_HINT='Run /redhat:setup — it guides generating a personal Red Hat offline token and storing it (sops + age recommended, Bitwarden, OS keychain, or a 0600 file).'
 RH_BW_ITEM="${RH_BW_ITEM:-redhat-credentials}"
-RH_CRED_SOURCES="${RH_CRED_SOURCES:-env,keychain,file,bitwarden}"
+RH_CRED_SOURCES="${RH_CRED_SOURCES:-env,keychain,sops,file,bitwarden}"
 
 rh_os() {
   case "$(uname -s 2>/dev/null)" in
@@ -36,6 +36,10 @@ rh_cred_file() {
   printf '%s\n' "${RH_OFFLINE_TOKEN_FILE:-${XDG_CONFIG_HOME:-$HOME/.config}/redhat/offline-token}"
 }
 
+rh_cred_sops_file() {
+  printf '%s\n' "${RH_OFFLINE_TOKEN_SOPS_FILE:-${XDG_CONFIG_HOME:-$HOME/.config}/redhat/offline-token.sops.yaml}"
+}
+
 rh_file_mode() { # octal permission bits of a file, GNU or BSD stat
   if stat -c %a "$1" >/dev/null 2>&1; then stat -c %a "$1"; else stat -f %Lp "$1" 2>/dev/null; fi
 }
@@ -49,7 +53,7 @@ rh_file_mtime() {
 
 _rh_source_enabled() { case ",$RH_CRED_SOURCES," in *",$1,"*) return 0 ;; *) return 1 ;; esac; }
 
-# Print the name of the first credential source that yields a token, or nothing.
+# Print the first detected credential source, or nothing (no sops decryption here).
 rh_cred_source() {
   local f
   if _rh_source_enabled env && [ -n "${RH_OFFLINE_TOKEN:-}" ]; then echo env; return 0; fi
@@ -58,6 +62,10 @@ rh_cred_source() {
       Darwin) if security find-generic-password -a "$USER" -s RH_OFFLINE_TOKEN -w >/dev/null 2>&1; then echo keychain; return 0; fi ;;
       *) if command -v secret-tool >/dev/null 2>&1 && [ -n "$(secret-tool lookup service redhat key RH_OFFLINE_TOKEN 2>/dev/null)" ]; then echo keychain; return 0; fi ;;
     esac
+  fi
+  if _rh_source_enabled sops && command -v sops >/dev/null 2>&1; then
+    f="$(rh_cred_sops_file)"
+    if [ -f "$f" ]; then echo sops; return 0; fi
   fi
   if _rh_source_enabled file; then
     f="$(rh_cred_file)"
@@ -70,8 +78,8 @@ rh_cred_source() {
   return 1
 }
 
-# Print the token itself. ONLY rh-token.sh may call this; callers must capture
-# into a variable and never echo it.
+# Print the token itself. ONLY rh-token.sh and rh-store-sops.sh (Bitwarden seeding)
+# may call this; callers must capture into a variable and never echo it.
 rh_cred_token() {
   local src f notes tok item
   src="$(rh_cred_source)" || return 1
@@ -82,6 +90,12 @@ rh_cred_token() {
         Darwin) security find-generic-password -a "$USER" -s RH_OFFLINE_TOKEN -w 2>/dev/null ;;
         *) secret-tool lookup service redhat key RH_OFFLINE_TOKEN 2>/dev/null ;;
       esac ;;
+    sops)
+      f="$(rh_cred_sops_file)"
+      # Suppress diagnostics (even a failing decrypt must not leak data). Discard
+      # partial stdout on failure; do not fall through to a lower-priority store.
+      tok="$(sops -d --extract '["RH_OFFLINE_TOKEN"]' "$f" 2>/dev/null)" || return 1
+      printf '%s\n' "$tok" ;;
     file)
       f="$(rh_cred_file)"
       case "$(rh_file_mode "$f")" in

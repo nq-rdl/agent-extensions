@@ -50,7 +50,7 @@ tool="$(field .tool_name)"; [ -n "$tool" ] || exit 0
 
 # A Red Hat host as a URL host or bare host word — not inside another host or a query value.
 RH_HOSTS="(^|//|[[:space:]\"'])(docs|access|api\\.access|sso)\\.redhat\\.com([/:?#[:space:]\"']|$)"
-SETUP='Run /redhat:setup — it guides generating a personal Red Hat offline token and storing it (Bitwarden, OS keychain, or a 0600 file).'
+SETUP='Run /redhat:setup — it guides generating a personal Red Hat offline token and storing it (sops + age recommended, Bitwarden, OS keychain, or a 0600 file).'
 
 if [ "$tool" = "WebFetch" ]; then
   printf '%s' "$(field .tool_input.url)" | grep -Eq "$RH_HOSTS" || exit 0
@@ -67,7 +67,7 @@ assigns=0;    has 'RH_OFFLINE_TOKEN=' && assigns=1
 expands=0;    has '\$\{?RH_OFFLINE_TOKEN' && expands=1
 dumps=0;      has "${CMDPOS}((env|set|declare|typeset)[[:space:]]*(\$|[|>;&])|(export|declare|typeset)[[:space:]]+-p|printenv([[:space:]]|\$))" && has 'RH_OFFLINE_TOKEN' && dumps=1
 reads_file=0; has "${CMDPOS}(cat|less|more|head|tail|bat|xxd|od|strings|grep|sed|awk|cp|scp)[[:space:]][^|;&]*redhat/offline-token" && reads_file=1
-[ "$touches_rh" = 1 ] || [ "$assigns" = 1 ] || [ "$expands" = 1 ] || [ "$dumps" = 1 ] || [ "$reads_file" = 1 ] || exit 0
+# sops decryption is checked below before the unrelated-command fast path.
 
 # Shared lexical segments for the print and fetcher checks (not a full shell parser).
 segments="$(printf '%s\n' "$cmd" | sed -e 's/&&/;/g' -e 's/||/;/g' | tr ';|' '\n\n')"
@@ -89,6 +89,20 @@ qsegments="$(printf '%s\n' "$cmd" | awk -v sq="'" -v dq='"' '{
   }
   if (q != "") printf "%s ", out; else print out
 } END { if (q != "") print "" }')"
+
+# Direct decryption of this credential is never sanctioned by a neighbouring script
+# invocation. Match sops in command position only (not git messages/grep/docs), and
+# restrict to the default file, the configured path, or its variable expansion.
+sops_file="${RH_OFFLINE_TOKEN_SOPS_FILE:-${XDG_CONFIG_HOME:-$HOME/.config}/redhat/offline-token.sops.yaml}"
+while IFS= read -r seg; do
+  if printf '%s' "$seg" | grep -Eq "${CMDPOS}([\"']?[^[:space:]]*/)?sops[\"']?[[:space:]]+([^|;&]*[[:space:]])?(-d|--decrypt|decrypt)([[:space:]]|\$)"; then
+    if printf '%s' "$seg" | grep -Eq 'redhat/offline-token\.sops\.yaml|\$\{?RH_OFFLINE_TOKEN_SOPS_FILE' \
+        || printf '%s' "$seg" | grep -Fq -- "$sops_file"; then
+      decide deny "Never decrypt the Red Hat offline-token sops file into the transcript. Use the plugin's rh-token.sh --check (source and expiry only)."
+    fi
+  fi
+done <<<"$qsegments"
+[ "$touches_rh" = 1 ] || [ "$assigns" = 1 ] || [ "$expands" = 1 ] || [ "$dumps" = 1 ] || [ "$reads_file" = 1 ] || exit 0
 
 # 1. Secret hygiene — checked first, applies even to plugin scripts.
 #    Only JWT-like or long base64url values count as literals; format strings and short
