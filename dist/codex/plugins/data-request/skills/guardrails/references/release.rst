@@ -183,9 +183,9 @@ Floor and rounding
 Start with F = max(7, assessment/approval threshold), interpreting any inclusive
 suppression boundary before taking that maximum. If 7 < F <= 14, raise F to 15
 for this release. This final F is the display floor and SQL ``@min_cell``:
-counts from 1 through F-1 use **one token**, ``<F``, everywhere in the release,
-including coverage wording (``all but fewer than F``); never mix suppression
-tokens. Thus an assessment floor of 10 gives ``<15`` for every count from 1–14.
+counts from 1 through F-1 use **one token**, ``<F``, throughout handover/open
+text, including coverage wording (``all but fewer than F``); never mix those
+tokens. Delivered extracts use the assessment's tokens. Thus an assessment floor of 10 gives ``<15`` for every count from 1–14.
 An assessment may raise this floor, never lower it. If its threshold is unknown,
 ask and record the answer before sharing; do not assume that 7 is sufficient.
 Zero may show as ``about 0`` only after the differencing check below; if that
@@ -201,10 +201,22 @@ For unsuppressed counts, select the step from the **exact integer**:
 
 Use decimal half-up, never binary floats or ties-to-even: for nonnegative n and
 step s, rounded = s * floor((2*n + s) / (2*s)), using integer arithmetic.
-For F >= 15, if 2*rounded - s < 2*F, show ``between F and X`` with
-X = rounded + s instead: this bounds the rounding interval at F and never
-shows or implies a value below it, even when rounded < F. Use this same
-floor-bounded range rule at every rounding tier, before unit formatting.
+For F >= 15, pool an initial interval: **every** n from F through Y shows
+``between F and Y``; counts above Y round normally. Derive Y from the exact
+preimages of the rounding function, using each input's own tier, not a step
+selected solely from F. For a displayed rounded value r, use S = the larger
+of its displayed-value step and the steps of its exact preimages when checking
+whether its implied interval lies above F: require 2*r - S >= 2*F.
+Start with the first qualifying rounded value r* at/above the floor and set Y
+to the greatest exact integer that rounds to r*. Within one tier that top is
+r* + ceil(s/2) - 1; verify the actual preimage across tier boundaries rather
+than applying that formula with the wrong step. If a later tier/unit transition
+would again imply a value below F, extend Y through that unsafe interval and
+the next qualifying interval; repeat until every display above Y is safe.
+Every shown positive count must have at least **three exact preimages** under
+this formatter for the same F; a singleton band is not safe. Check both this
+minimum and the implied interval, not just the displayed centre. Band bounds
+are full ungrouped integers, never k/M suffixes, even when F >= 1,000.
 Every displayed rounded count carries ``about``, even when rounding leaves it
 unchanged. Suppression tokens and explicit count ranges are exceptions,
 not exact-count disclosures. The same qualifier applies to shown rounded shares
@@ -257,16 +269,38 @@ Raised-floor boundary table (assessment floor | exact | shown; synthetic)::
   10 | 9 | <15
   10 | 10 | <15
   10 | 14 | <15
-  10 | 15 | between 15 and 20
-  10 | 18 | about 20
+  10 | 15 | between 15 and 22
+  10 | 22 | between 15 and 22
+  10 | 23 | about 25
   16 | 1 | <16
   16 | 15 | <16
-  16 | 16 | between 16 and 20
-  16 | 17 | between 16 and 20
-  16 | 18 | about 20
+  16 | 16 | between 16 and 22
+  16 | 22 | between 16 and 22
+  16 | 23 | about 25
+  17 | 16 | <17
+  17 | 17 | between 17 and 22
+  17 | 22 | between 17 and 22
+  17 | 23 | about 25
   21 | 20 | <21
-  21 | 21 | between 21 and 25
-  24 | 24 | between 24 and 30
+  21 | 21 | between 21 and 27
+  22 | 21 | <22
+  22 | 22 | between 22 and 27
+  22 | 27 | between 22 and 27
+  22 | 28 | about 30
+  24 | 24 | between 24 and 32
+  97 | 96 | <97
+  97 | 97 | between 97 and 114
+  97 | 99 | between 97 and 114
+  97 | 114 | between 97 and 114
+  97 | 115 | about 120
+  951 | 951 | between 951 and 1149
+  951 | 995 | between 951 and 1149
+  951 | 1149 | between 951 and 1149
+  951 | 1150 | about 1.2k
+  1000 | 999 | <1000
+  1000 | 1000 | between 1000 and 1149
+  1000 | 1149 | between 1000 and 1149
+  1000 | 1150 | about 1.2k
 
 Unlike the guideline's random-rounding example, this rule is deterministic for
 reproducible header builds and provenance hashes. It is not differential privacy:
@@ -281,7 +315,7 @@ Never write unquantified "almost all". Use only these coverage forms:
 * "all" only when the runner checked equality on exact counts;
 * "all but fewer than F" for a positive remainder below the effective floor;
 * "about P% of about N (about R without)", with R using the count formatter
-  (substitute its low-end range where required);
+  (substitute ``between 7 and 14`` or ``between F and Y`` where required);
 * open end bands such as "more than 97%" or "under 0.05%", built from the exact
   remainder and denominator, only after the combined-disclosure check below.
 
@@ -292,14 +326,17 @@ Compute differences, ratios and shares from **exact operands**, then round the
 result, never subtract displayed operands. If the displayed difference is wrong
 by more than one rounding step for the exact difference, print the safely shown
 derived value as well; suppress it if small or disclosive. For shares/ratios use
-decimal half-up to two significant figures. If a numerator or remainder is
-below F, never show the share/ratio as a number: use "all but fewer
+decimal half-up to two significant figures. If a numerator, denominator or
+remainder is below F, never show the share/ratio as a number: use "all but fewer
 than F" where applicable, or an open band. A band, combined with all shown
 evidence, must not narrow that numerator or remainder more precisely than
 ``<F``; widen it or omit it if it does. A share whose rounding reaches 0% or
 100% must use an open band, not a rounded endpoint; a checked equality remains
-a claim in words. These rules also apply to floor-bounded counts and their
-ratios, not just the default floor.
+a claim in words. When the exact denominator N is below 100, coarsen shares
+further (for example open bands or whole tens of percent), or omit them:
+two-significant-figure shares can pin a count within a shown band. Check the
+combined count/share preimages, not just each value alone. These rules also
+apply to floor-bounded counts and their ratios, not just the default floor.
 
 Complementary controls
 ~~~~~~~~~~~~~~~~~~~~~~
@@ -332,7 +369,12 @@ result id exists yet, cite the results file, SQL revision and run date instead.
 A rerun must not silently retarget old evidence or force a scope revision merely
 to refresh a number.
 Use one shared formatter in a request's builder for every displayed value, not
-hand rounding. Check new results for changed conclusions before updating text.
+ad hoc hand rounding. Until that formatter exists, apply the integer formula
+and boundary tables mechanically (an agent may compute them), and record
+``manual/interim formatting`` in the provenance. Ask the operator for formatted
+output where possible; this interim computation is permitted when only exact
+evidence is available, not permission to echo it. Check new results for changed
+conclusions before updating text.
 
 Lint contract for a probe sentence: fail on a bare integer of 7 or more or any
 comma-grouped integer. Accept formatted ``about`` values, approved range/band
