@@ -1,3 +1,0 @@
-kind: Fixed
-body: Data-request probe proposals use bounded materialisations per independent result set without repeating scans per label column (#467)
-time: 2026-09-30T05:47:09.759154554Z

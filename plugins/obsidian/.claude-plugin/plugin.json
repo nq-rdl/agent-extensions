@@ -1,6 +1,6 @@
 {
   "name": "obsidian",
-  "version": "0.36.2",
+  "version": "0.37.0",
   "description": "Obsidian — Bases databases, the CLI, and Obsidian-flavored Markdown",
   "author": {
     "name": "nq-rdl"

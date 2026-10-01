@@ -1,3 +1,0 @@
-kind: Fixed
-body: '`gh:changie` examples single-quote backticked bodies; double quotes made the shell drop the quoted words (#305)'
-time: 2026-09-29T05:42:31.376664194Z

@@ -1,3 +1,0 @@
-kind: Changed
-body: codex:report-defect copies the defect CLI's environment object as emitted instead of restating its fields (#308)
-time: 2026-09-29T05:36:31.454511796Z

@@ -1,3 +1,0 @@
-kind: Fixed
-body: '`gh:actions-go` states that setup-go v6+ keys its cache on `go.mod` and uses the v7 action majors (#305)'
-time: 2026-09-29T05:42:35.364213181Z

@@ -1,6 +1,6 @@
 {
   "name": "pandera",
-  "version": "0.36.2",
+  "version": "0.37.0",
   "description": "Pandera — dataframe schema validation and debugging for pandas and Polars",
   "author": {
     "name": "nq-rdl"

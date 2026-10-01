@@ -1,3 +1,0 @@
-kind: Fixed
-body: 'rust-explain: tooling.rst records the rustc version the trust-boundary claims were re-run with, and drops let-else from the edition-gated example'
-time: 2026-09-29T05:43:07.436483047Z

@@ -1,3 +1,0 @@
-kind: Fixed
-body: codex:cli-runtime reports failures instead of returning nothing, drops phrase-based --resume-last and stale CLI facts, and states the checked runtime requirement (#309)
-time: 2026-09-29T05:36:27.840732156Z

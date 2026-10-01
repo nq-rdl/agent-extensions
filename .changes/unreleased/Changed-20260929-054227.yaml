@@ -1,3 +1,0 @@
-kind: Changed
-body: '`gh:pre-commit` installs with the project tooling (pixi, uv, pipx) and applies to any repo with `.pre-commit-config.yaml` (#309)'
-time: 2026-09-29T05:42:27.596517637Z

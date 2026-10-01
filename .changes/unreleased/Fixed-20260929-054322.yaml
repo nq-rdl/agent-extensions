@@ -1,3 +1,0 @@
-kind: Fixed
-body: 'cc-hook: correct exit-2, plain-stdout, PermissionRequest, TaskCompleted, suppressOutput, HTTP body, and prompt-hook continueOnBlock contracts against the hooks reference (#305)'
-time: 2026-09-29T05:43:22.852510829Z

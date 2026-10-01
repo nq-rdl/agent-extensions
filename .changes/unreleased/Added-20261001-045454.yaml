@@ -1,3 +1,0 @@
-kind: Added
-body: Make sops + age the recommended Red Hat credential store, read per call without restarting the agent.
-time: 2026-10-01T04:54:54.827157492Z

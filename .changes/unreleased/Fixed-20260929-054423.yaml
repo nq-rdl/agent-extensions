@@ -1,3 +1,0 @@
-kind: Fixed
-body: Hook commands quote ${CLAUDE_PLUGIN_ROOT}, so plugins installed under a path with spaces run their hooks (#311)
-time: 2026-09-29T05:44:23.469130946Z

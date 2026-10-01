@@ -1,3 +1,0 @@
-kind: Fixed
-body: 'starrocks: compatibility states per-feature minimums (examples need v3.3.5+, Arrow Flight v3.5.1+); fixed INSERT INTO FILES, SHOW STATS META, resource group, skew join and cache details'
-time: 2026-09-29T05:41:49.351372156Z

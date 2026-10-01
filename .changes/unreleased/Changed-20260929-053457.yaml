@@ -1,3 +1,0 @@
-kind: Changed
-body: 'bitwarden: SKILL.md and shell-functions.rst route to scripts/bw-env.sh instead of carrying divergent copies; examples keep secrets out of argv and CI logs'
-time: 2026-09-29T05:34:57.239082137Z

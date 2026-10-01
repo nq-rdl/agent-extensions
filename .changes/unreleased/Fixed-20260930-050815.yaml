@@ -1,3 +1,0 @@
-kind: Fixed
-body: Data-request library release discovery uses a shared tag-list policy instead of duplicated current-baseline claims (#441)
-time: 2026-09-30T05:08:15.264028053Z

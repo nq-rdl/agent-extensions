@@ -1,3 +1,0 @@
-kind: Added
-body: 'quarto-alt-text: scripts/check-alt.sh checks rendered Quarto HTML for figure images without alt, leaked fig-alt text and unresolved @fig references'
-time: 2026-09-29T05:45:59.384083315Z

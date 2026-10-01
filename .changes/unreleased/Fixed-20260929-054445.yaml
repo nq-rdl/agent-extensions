@@ -1,3 +1,0 @@
-kind: Fixed
-body: 'r-lib-cran-extrachecks: label items as check, reviewer or convention; default devtools::check() skips the Title/Description checks, and pkg:::fun() examples are no longer advised (#304)'
-time: 2026-09-29T05:44:45.368218761Z

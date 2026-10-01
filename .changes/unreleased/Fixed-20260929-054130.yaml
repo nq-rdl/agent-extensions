@@ -1,3 +1,0 @@
-kind: Fixed
-body: 'argo-cd: install-cli.sh verifies against cli_checksums.txt (per-asset .sha256 files do not exist, so it always failed); obsolete Helm repo and missing OCI chart version replaced'
-time: 2026-09-29T05:41:30.700900533Z

@@ -1,3 +1,0 @@
-kind: Fixed
-body: Root lychee.toml excludes the private RDL Planning project board, which answers 404 to anonymous link checks (#301)
-time: 2026-09-29T04:10:28.557924241Z

@@ -1,6 +1,6 @@
 {
   "name": "tech-writing",
-  "version": "0.36.2",
+  "version": "0.37.0",
   "description": "Technical writing — developer docs, tutorials, ADRs, and guides",
   "author": {
     "name": "nq-rdl"

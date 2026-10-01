@@ -1,3 +1,0 @@
-kind: Fixed
-body: 'opencode-dev: SDK version pins live only in the sdk skill; plugin, tools, skill and delegate route there instead of copying them.'
-time: 2026-09-29T05:53:02.000000000Z

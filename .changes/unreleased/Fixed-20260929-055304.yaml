@@ -1,3 +1,0 @@
-kind: Fixed
-body: 'opencode-dev: singular plugin/tool dirs do load, the tools map is a legacy alias of permission, and delegate uses the documented --auto flag.'
-time: 2026-09-29T05:53:04.000000000Z

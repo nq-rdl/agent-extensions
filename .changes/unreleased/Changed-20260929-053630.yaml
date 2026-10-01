@@ -1,3 +1,0 @@
-kind: Changed
-body: codex:prompting drops text.verbosity and API-only migration advice the companion cannot use, and cites OpenAI's GPT-5.6 guide with a verification date (#305)
-time: 2026-09-29T05:36:30.249637571Z

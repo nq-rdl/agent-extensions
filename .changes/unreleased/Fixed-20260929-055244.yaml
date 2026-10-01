@@ -1,3 +1,0 @@
-kind: Fixed
-body: gh:address-comments commits only when the handoff authorizes it and returns a disposition per comment with the diff (#310)
-time: 2026-09-29T05:52:44.950365401Z

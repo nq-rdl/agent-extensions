@@ -1,3 +1,0 @@
-kind: Changed
-body: Hook installs are generated from canonical hooks/<plugin>/hooks.json; sync-plugins.sh --check fails on stale, missing, mode-drifted, unwired, or unresolved hook copies (#311)
-time: 2026-09-29T05:44:17.140903869Z

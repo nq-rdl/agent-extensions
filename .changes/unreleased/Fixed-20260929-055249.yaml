@@ -1,3 +1,0 @@
-kind: Fixed
-body: debug:diagnose worker outline reduced to reproduce, root cause, minimal fix, and a verified re-run (#310)
-time: 2026-09-29T05:52:49.372127293Z

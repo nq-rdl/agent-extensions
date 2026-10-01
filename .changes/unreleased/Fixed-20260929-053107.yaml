@@ -1,3 +1,0 @@
-kind: Fixed
-body: 'bitwarden: bw-env.sh stores .env values single-quoted so bwe loads spaces, quotes and dollar signs literally; works under set -u; bwunload works in zsh'
-time: 2026-09-29T05:31:07.673697519Z

@@ -1,3 +1,0 @@
-kind: Changed
-body: 'discover-plugins: procedure moved into SKILL.md; reads cc-setup''s marketplace list and reports a missing list instead of using an embedded copy (#310)'
-time: 2026-09-29T05:42:33.053930612Z

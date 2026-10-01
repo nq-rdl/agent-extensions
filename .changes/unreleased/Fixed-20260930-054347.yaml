@@ -1,3 +1,0 @@
-kind: Fixed
-body: Data-request keeps the TUH cohort default for transfer exclusions, admission-from/discharge-to fields and context-only facility mentions (#461)
-time: 2026-09-30T05:43:47.197002684Z

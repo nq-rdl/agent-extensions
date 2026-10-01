@@ -1,3 +1,0 @@
-kind: Fixed
-body: Makes Pixi task instructions include the executable dependency, verified with consumer repeats (#309)
-time: 2026-09-29T07:10:02.89825912Z

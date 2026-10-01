@@ -1,3 +1,0 @@
-kind: Fixed
-body: Reject analyst intake from a different approval even when scope has no document-level approval (#425)
-time: 2026-09-30T03:50:06.001467489Z

@@ -1,6 +1,6 @@
 {
   "name": "data-request",
-  "version": "0.36.2",
+  "version": "0.37.0",
   "description": "Data Request — triage, scope, lookup, map, draft, validate, fix and amend request SQL and Python, and draft analyst-approved release summaries, with shared RDL guardrails and human-confirmed review handoffs",
   "author": {
     "name": "nq-rdl"

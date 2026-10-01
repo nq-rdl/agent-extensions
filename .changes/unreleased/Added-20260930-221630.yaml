@@ -1,3 +1,0 @@
-kind: Added
-body: Add workflow-only data-request lookup with private evidence records and a fail-closed query-builder dependency (#469).
-time: 2026-09-30T22:16:30.918884528Z
