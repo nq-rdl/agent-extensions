@@ -56,6 +56,7 @@ class LookupContract(unittest.TestCase):
             text, r"\b(?:SELECT|JOIN|COLLATE|GETUTCDATE|GETDATE|BIGINT|WHERE|INSERT|UPDATE|DELETE)\b"
         )
         self.assertNotIn("```sql", text)
+        self.assertNotRegex(text, r"https://github\.com/nq-rdl/agent-extensions/blob/(?:main|master)/")
 
     def test_public_skill_contains_no_schema_or_sql_rules(self):
         for tree, text in self.texts():
@@ -104,7 +105,8 @@ class LookupContract(unittest.TestCase):
                 # Pre-lookup main's longest line is 372 columns; do not evade the
                 # lean body limit by joining prose into longer lines.
                 self.assertLessEqual(max(map(len, guard.splitlines())), 372)
-                for phrase in ("exempt under those operator-probe", "[lifts.rst](",
+                for phrase in ("exempt under those operator-probe",
+                               "skills/setup/references/lifts.rst` gives both rules in full.",
                                "bounded to a single scan", "feeds no delivered extract"):
                     self.assertIn(phrase, guard)
                 lifts = (root / f"{prefix}setup/references/lifts.rst").read_text()

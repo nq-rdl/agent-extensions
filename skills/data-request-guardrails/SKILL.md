@@ -94,7 +94,7 @@ An operator probe is exempt only when it is aggregate-only, small-cell suppresse
 bounded to a single scan, returns no patient identifier and no staff or person key,
 feeds no delivered extract, and records any `NOLOCK` or `READ UNCOMMITTED` use.
 **Code-discovery probes:** `/data-request:lookup` is exempt under those operator-probe
-conditions; [lifts.rst](https://github.com/nq-rdl/agent-extensions/blob/main/skills/data-request-setup/references/lifts.rst) gives both rules in full.
+conditions; `${CLAUDE_PLUGIN_ROOT}/skills/setup/references/lifts.rst` gives both rules in full.
 
 For N related datasets from one cohort, check the pinned `create_temp_table()`,
 `register_result()` and `execute_pipeline_results()` implementations first:
