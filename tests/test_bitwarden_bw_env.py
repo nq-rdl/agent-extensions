@@ -28,7 +28,7 @@ PACKAGED = REPO / "plugins" / "bitwarden" / "skills" / "secrets" / "scripts" / "
 
 FAKE_BW = r'''#!/usr/bin/env python3
 """Fake Bitwarden CLI for tests. State lives in $BW_STUB_DIR/items.json."""
-import base64, json, os, sys, uuid
+import base64, json, os, sys
 
 state = os.path.join(os.environ["BW_STUB_DIR"], "items.json")
 items = json.load(open(state)) if os.path.exists(state) else []
@@ -61,7 +61,9 @@ elif cmd == ["get", "template"]:
     print(json.dumps({"type": 1, "name": "Item name", "notes": "Some notes about this item.",
                       "secureNote": None, "fields": [], "login": None}))
 elif cmd == ["create", "item"]:
-    item = request(args[2:]); item["id"] = str(uuid.uuid4()); items.append(item); save()
+    # Deterministic fixture IDs cannot randomly contain fake secret markers.
+    item = request(args[2:]); item["id"] = "00000000-0000-4000-8000-%012d" % (len(items) + 1)
+    items.append(item); save()
     print(json.dumps(item))
 elif cmd == ["edit", "item"]:
     old = find(args[2]); new = request(args[3:]); new["id"] = old["id"]
@@ -210,6 +212,16 @@ class BwEnvRoundTrip(unittest.TestCase):
         for line in self.stored_notes()["fake-app-dev"].splitlines():
             if line.strip() and not line.lstrip().startswith("#"):
                 self.assertRegex(line, r"^export [A-Za-z_][A-Za-z0-9_]*=")
+
+    def test_stub_ids_are_distinct_and_cannot_mimic_secret_markers(self):
+        proc = self.sh("bwc first-item && bwc second-item")
+        self.assertEqual(proc.returncode, 0, proc.stderr)
+        self.assert_no_secret(proc)
+        items = json.loads((self.tmp / "state" / "items.json").read_text())
+        self.assertEqual([it["id"] for it in items], [
+            "00000000-0000-4000-8000-000000000001",
+            "00000000-0000-4000-8000-000000000002",
+        ])
 
     def test_bwu_updates_without_printing(self):
         (self.tmp / "work" / "new.env").write_text("PLAIN=FAKE-NEWVALUE-7777\n")
