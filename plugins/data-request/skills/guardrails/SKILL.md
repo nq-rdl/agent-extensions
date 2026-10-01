@@ -80,8 +80,9 @@ Read `${CLAUDE_PLUGIN_ROOT}/skills/setup/references/lifts.rst` for the record an
 publish commands. Capture silently, with no confirmation question mid-draft;
 classification and confirmation belong to `/data-request:lift` at close-out.
 **No published entry means no hand SQL.** A missing source is not proof of a gap.
-The ledger permits a pinned-deadline workaround, not overriding an explicit repository
-prohibition. Check the request's dependency pin before using an enhancement.
+The ledger permits a pinned-deadline workaround under this guidance, but does not
+override an explicit repository prohibition. Check the request's dependency pin
+before using an enhancement.
 
 A mapping run never initialises `.sqlreview/`; stages that own the store (setup,
 bootstrap, a writable draft) still `init` a missing one. When the task is read-only, the
@@ -92,8 +93,7 @@ run, except exempt probes, until a writable run publishes the entry.
 An operator probe is exempt only when it is aggregate-only, small-cell suppressed and
 bounded to a single scan, returns no patient identifier and no staff or person key,
 feeds no delivered extract, and records any `NOLOCK` or `READ UNCOMMITTED` use.
-**Code-discovery probes:** `/data-request:lookup` is exempt under those operator-probe
-conditions; `${CLAUDE_PLUGIN_ROOT}/skills/setup/references/lifts.rst` gives both rules in full.
+`lifts.rst` gives both rules and the `/data-request:lookup` code-discovery probe case in full.
 
 For N related datasets from one cohort, check the pinned `create_temp_table()`,
 `register_result()` and `execute_pipeline_results()` implementations first:

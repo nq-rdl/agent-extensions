@@ -6,7 +6,8 @@ description: >-
   event set, medication, diagnosis or procedure, or pathology task assay. Choose
   the lookup family and direction, generate a count-only probe for a human to run,
   then write a private lookup record for mapping. Never runs a database query or
-  chooses the clinical code set for the analyst.
+  chooses the clinical code set for the analyst. Use when an analyst needs a source
+  code and has no confirmed code list.
 argument-hint: '<lookup question or private lookup record>'
 user-invocable: true
 compatibility: >-
@@ -36,20 +37,21 @@ child repository of the request; never copy them into this catalog.
 
 The command and lookup documentation depend on
 [query-builder #231](https://github.com/nq-rdl/query-builder/issues/231).
-That issue is a proposal, not proof of an installed capability. Locate the
-private lookup docs through it and verify against the installed dependency pin,
+That issue is a proposal, not proof of an installed capability. Its private home
+is spec 020, `specs/020-iemr-code-lookup/` on branch `020-iemr-code-lookup`.
+Read that spec and its research; verify against the installed dependency pin,
 implementation, tests and current dataops DDL before generating a probe.
-Record exact source paths and revisions; do not invent a documentation path.
+Record exact source paths and revisions; draft docs do not establish released support.
 
 Use the private docs for the table chains and all storage/read rules. The private
 supporting sources are `rdl-ide-settings/snippets/SQL/`, the child-repository
-lookup probes cited in [the lookup proposal](https://github.com/nq-rdl/agent-extensions/issues/469)
-(including diagnosis/procedure discovery), query-builder spec 017 research R12/R13 (also
-unmerged when authored), and the dataops catalogue YAML/DDL. Historical snippets
-and probes are evidence to reconcile, not authority to copy SQL blindly.
+lookup probes located through private query-builder #231 and spec 020, query-builder
+spec 017 research R12/R13 (merged in nq-rdl/query-builder#198), and the dataops
+catalogue YAML/DDL. Historical snippets and probes are evidence to reconcile,
+not authority to copy SQL blindly.
 
-A very large order-detail table must be read only through a temp table of keys;
-see the private reference for the bounded read method. Consult that reference
+Read each very large table only through a temp table of keys; the private reference
+says which tables and how. Consult that reference
 for latest-row selection, identifier representation, label matching, validity,
 schema placement, collation and source-timezone handling. State no local rule
 from memory. If sources conflict or the docs leave a rule unresolved, show the
@@ -79,17 +81,21 @@ do not select a winner or patch the generated SQL.
    installed help without connecting to a database. At the interface level #231
    proposes order-type terms for forward discovery, order type and date bounds
    for reverse discovery, event terms/set expansion, and medication terms.
-   The command prints a count-only script to stdout and runs no query; the
-   proposed JSON format also supplies a manifest of labelled grids. Use only
-   options documented by the installed version, not guessed flags. Save the
-   invocation, pin, script and available grid manifest privately.
+   Invoke it only after the installed help/docs confirm it prints a count-only
+   script to stdout and opens no database connection; otherwise stop and hand off
+   to the engineer. The proposed JSON format supplies a manifest of labelled grids;
+   verify support before using it. Use only options documented by the installed
+   version, not guessed flags. Save the invocation, pin, script and available grid
+   manifest privately.
 
 **Dependency unavailable:** if the command, family, private reference or required
 rule is unavailable, do not write hand SQL. Stop, mark the lookup blocked and hand
 the question, terms, family, bounds and missing capability to the engineer.
-Alternatively use an existing engineer-reviewed probe only when it satisfies
-`/data-request:guardrails`; record its review evidence and provenance. This is
-not permission for the agent to invent a replacement query or run one.
+Alternatively use an existing engineer-reviewed probe unmodified, only when it
+satisfies `/data-request:guardrails`; record its review evidence and provenance.
+Any change to terms, bounds or SQL, or rerun of a generator with new terms, goes
+back to the engineer for review: that is hand SQL in effect. This is not permission
+for the agent to invent a replacement query or run one.
 
 ## Human run and paste-back
 
@@ -114,9 +120,10 @@ the analyst and technical/schema conflicts to the engineer.
 
 ## Private lookup record
 
-Write a Markdown record at an agreed path in the private child repository, not a
-new `.sqlreview` document type. Use the following fields (no live values belong
-in this public template):
+Ask the analyst/engineer where to keep the Markdown record in the private child
+repository and record the chosen path; there is no default path. Commit the record
+there so map can cite its path and revision. This is not a new `.sqlreview` document
+type. Use the following fields (no live values belong in this public template):
 
 - **Question and context:** request/intake/scope citation and revision, intended
   meaning, family, direction/route and rationale.
@@ -126,7 +133,8 @@ in this public template):
   pin, exact generation invocation, saved script and labelled-grid manifest path
   (or explicitly unavailable); for a fallback, engineer review evidence.
 - **Run:** actual execution date/time and timezone, environment, who ran it and
-  pasted-grid location. Never invent operator identity, execution or approval.
+  pasted-grid location. Use an operator handle, never an email or workstation
+  identity, following intake's actor rule. Never invent execution or approval.
 - **Candidates:** one row per code with its label, source table/resolver, matched
   term or expansion origin, labelled-grid citation and suppressed count as shown.
   Keep schema names and code values here privately, not in the skill.
@@ -141,5 +149,7 @@ silently replacing earlier evidence. No lookup code is promoted automatically
 into a resolver or concept registry.
 
 Hand the record path and revision to `/data-request:map` as the evidence for each
-code. Carry unresolved clinical decisions into the analyst's intake/questions;
-lookup does not confirm scope, publish an extract or release data.
+code. Analyst-selected codes become intake `topic: codes` decisions: cite the
+committed lookup record's path and revision in the rationale and preserve the
+analyst's actual confirmation. Carry unresolved clinical decisions into intake
+questions; lookup does not confirm scope, publish an extract or release data.
