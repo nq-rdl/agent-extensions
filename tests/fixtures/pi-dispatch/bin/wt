@@ -1,0 +1,6 @@
+#!/usr/bin/env bash
+set -eu
+[ "${1:-}" != --version ] || { printf 'wt 0.77.0\n'; exit; }
+jq -n --args '$ARGS.positional' -- "$@" > "$FIXTURE/wt.args"
+mkdir -p "$FIXTURE/worktree with spaces"
+printf '%s\n' "$3" > "$FIXTURE/branch"

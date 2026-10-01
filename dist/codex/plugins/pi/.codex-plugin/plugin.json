@@ -1,0 +1,33 @@
+{
+  "name": "pi",
+  "version": "0.36.2",
+  "description": "Pi worker orchestration — prerequisite setup, confirmed issue or free-text dispatch, overlap waves, bounded launches and PR status",
+  "author": {
+    "name": "nq-rdl"
+  },
+  "repository": "https://github.com/nq-rdl/agent-extensions",
+  "license": "MIT",
+  "keywords": [
+    "pi",
+    "worktrunk",
+    "orchestration",
+    "issues",
+    "worktrees",
+    "delegation"
+  ],
+  "skills": "./skills/",
+  "interface": {
+    "displayName": "Pi",
+    "shortDescription": "Confirmed pi workers in Worktrunk worktrees",
+    "longDescription": "Pi worker orchestration — prerequisite setup, confirmed issue or free-text dispatch, overlap waves, bounded launches and PR status",
+    "developerName": "nq-rdl",
+    "category": "Developer Tools",
+    "capabilities": [
+      "Skills"
+    ],
+    "defaultPrompt": [
+      "Use Pi to help with my task."
+    ],
+    "websiteURL": "https://github.com/nq-rdl/agent-extensions"
+  }
+}

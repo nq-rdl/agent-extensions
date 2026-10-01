@@ -1,0 +1,21 @@
+#!/usr/bin/env bash
+set -eu
+printf '%s\n' "$*" >> "$FIXTURE/gh.calls"
+case "$1 $2" in
+    'repo view') printf 'owner/repo\n' ;;
+    'auth status') exit "${AUTH_FAIL:-0}" ;;
+    'issue list')
+        if [ "${FILTER_FULL:-0}" = 1 ]; then jq -n '[range(1;1001)|{number:.}]'
+        else printf '[{"number":476},{"number":477},{"number":480}]\n'; fi ;;
+    'issue view')
+        jq -n --argjson n "$3" '{number:$n,title:("Task "+($n|tostring)),body:"Change shared/lib.sh",labels:[],state:"OPEN",blockedBy:[],comments:[{body:"Comment scope"}]}' ;;
+    'pr list')
+        [ "${GH_FAIL:-0}" = 0 ] || exit 1
+        if [ "${NO_PR:-0}" = 1 ]; then printf '[]\n'
+        else printf '[{"url":"https://github.com/owner/repo/pull/1","number":1,"state":"OPEN"}]\n'; fi ;;
+    'pr checks')
+        [ "${GH_FAIL:-0}" = 0 ] || exit 1
+        jq -n --arg b "${CI_BUCKET:-pending}" '[{name:"unit",state:"IN_PROGRESS",bucket:$b,link:"https://example.com/check"}]'
+        exit "${CHECK_EXIT:-8}" ;;
+    *) printf 'Unexpected gh call: %s\n' "$*" >&2; exit 99 ;;
+esac

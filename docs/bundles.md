@@ -53,6 +53,7 @@ Delegation outlines are optional skill references, not registered agent types.
 | [`lucid`](#lucid) | Yes | Yes | Lucid — visual collaboration boards and diagrams (Lucidchart / Lucidspark) via the hosted Lucid MCP server |
 | [`pandera`](#pandera) | Yes | Yes | Pandera — dataframe schema validation and debugging for pandas and Polars |
 | [`data-request`](#data-request) | Yes | Yes | Data Request — triage, scope, lookup, map, draft, validate, fix and amend request SQL and Python, and draft analyst-approved release summaries, with shared RDL guardrails and human-confirmed review handoffs |
+| [`pi`](#pi) | Yes | Yes | Pi worker orchestration — prerequisite setup, confirmed issue or free-text dispatch, overlap waves, bounded launches and PR status |
 
 ## Install
 
@@ -810,3 +811,19 @@ Data Request — triage, scope, lookup, map, draft, validate, fix and amend requ
 **Codex hooks:** Native command hooks; see [coverage and limitations](codex.md#hooks).
 
 **Claude Code hooks:** `data-request-preflight`, `data-request-guard`
+
+---
+
+## pi
+
+Pi worker orchestration — prerequisite setup, confirmed issue or free-text dispatch, overlap waves, bounded launches and PR status.
+
+**Claude Code skills**
+
+- `/pi:setup`
+- `/pi:dispatch`
+
+**Codex skills**
+
+- `$pi:setup`
+- `$pi:dispatch`

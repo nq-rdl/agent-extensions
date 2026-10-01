@@ -1,0 +1,30 @@
+schemaVersion: v1
+id: pi
+displayName: Pi
+description: Pi worker orchestration — prerequisite setup, confirmed issue or free-text dispatch, overlap waves, bounded launches and PR status
+keywords: [pi, worktrunk, orchestration, issues, worktrees, delegation]
+owners: [rdl]
+channels: [stable]
+skills:
+  - {source: pi-setup, leaf: setup}
+  - {source: pi-dispatch, leaf: dispatch}
+hooks: []
+prompts: []
+mcp: []
+targets:
+  claude:
+    enabled: true
+    pluginName: pi
+    marketplaceName: rdl-agent-extensions
+  codex:
+    enabled: true
+    pluginName: pi
+    marketplaceName: rdl-agent-extensions
+    category: Developer Tools
+    interface:
+      shortDescription: Confirmed pi workers in Worktrunk worktrees
+    components:
+      skills: true
+      mcp: false
+      hooks: false
+      apps: false

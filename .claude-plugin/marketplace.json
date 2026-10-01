@@ -490,6 +490,20 @@
         "handoff",
         "release"
       ]
+    },
+    {
+      "name": "pi",
+      "source": "./plugins/pi",
+      "description": "Pi worker orchestration — prerequisite setup, confirmed issue or free-text dispatch, overlap waves, bounded launches and PR status",
+      "version": "0.36.2",
+      "keywords": [
+        "pi",
+        "worktrunk",
+        "orchestration",
+        "issues",
+        "worktrees",
+        "delegation"
+      ]
     }
   ]
 }

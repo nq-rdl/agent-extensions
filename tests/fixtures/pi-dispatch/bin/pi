@@ -1,0 +1,15 @@
+#!/usr/bin/env bash
+set -eu
+jq -n --args '$ARGS.positional' -- "$@" > "$FIXTURE/pi.args"
+case "${1:-}" in
+    --version) printf '0.99.1\n'; exit ;;
+    --offline) printf 'provider model reasoning\n'; exit ;;
+    auth) exit "${AUTH_FAIL:-0}" ;;
+esac
+printf '%s\n' "$PWD" > "$FIXTURE/pi.cwd"
+printf '{"type":"session"}\n'
+printf '{"type":"tool_execution_start","toolName":"bash","args":{"command":"test quoted \\\"value\\\""}}\n'
+sleep "${PI_DELAY:-1}"
+printf '{"type":"message_end","message":{"stopReason":"error","content":[]}}\n'
+printf '{"type":"agent_settled"}\n'
+exit "${PI_EXIT:-0}"
