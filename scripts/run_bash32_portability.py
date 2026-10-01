@@ -21,6 +21,14 @@ CASES = (
     "test_redhat_sops.Bash32Sops.test_bitwarden_seed_notes_and_custom_field",
     "test_redhat_sops.Bash32Sops.test_path_override_order_filter_and_preflight_tools",
     "test_redhat_sops.Bash32Sops.test_guard_direct_decrypt_denied_only_for_token_file",
+    "test_redhat_fetch.Bash32Fetch.test_direct_html_and_html_single_without_credentials",
+    "test_redhat_fetch.Bash32Fetch.test_block_or_invalid_html_falls_back_to_source",
+    "test_redhat_fetch.Bash32Fetch.test_closed_product_falls_back_to_index_and_missing_credential",
+    "test_redhat_fetch.Bash32Fetch.test_source_failure_falls_back_to_index",
+    "test_redhat_fetch.Bash32Fetch.test_subscriber_only_valid_fresh_token_is_entitlement",
+    "test_redhat_fetch.Bash32Fetch.test_stale_cached_bearer_recovers_after_refresh",
+    "test_redhat_fetch.Bash32Fetch.test_failed_fresh_exchange_or_retry_does_not_blame_entitlement",
+    "test_redhat_fetch.Bash32Fetch.test_index_empty_or_subscriber_only_and_refresh_recovery",
 )
 
 

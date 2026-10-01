@@ -4,8 +4,9 @@ license: CC-BY-4.0
 description: 'Fetch Red Hat product documentation and Customer Portal knowledge base
   (KCS) content, including subscriber-only solutions, with the user''s own offline
   token. Use for a docs.redhat.com or access.redhat.com URL, a KCS id, or a Red Hat,
-  OpenShift, or Ansible Automation Platform docs lookup. Never WebFetch these hosts
-  (Akamai 403 or login page). Token setup: redhat:setup.'
+  OpenShift, or Ansible Automation Platform docs lookup. Never WebFetch these hosts;
+  use curl/wget via rh-fetch (possible Akamai block or login page). Token setup: redhat:setup;
+  entitlement is separate.'
 compatibility: Customer Portal search API (api.access.redhat.com/support/search/kcs)
   and Red Hat SSO offline-token exchange as of 2026-08; source-repo layouts of ansible/aap-docs
   (2.x branches) and openshift/openshift-docs (enterprise-4.x). Needs curl (or wget)
@@ -24,17 +25,18 @@ Delegation is optional. Read references/subagent.rst only when delegation is use
 
 # Red Hat docs — fetch by the route that works
 
-Red Hat's documentation is public but **`docs.redhat.com` returns HTTP 403 to every
-non-browser client** (Akamai bot fingerprinting — no User-Agent or header trick changes
-it, and evading it is out of scope). Subscriber-only knowledge base content needs the
-person's **own** Red Hat account. This skill's scripts pick the working route for you.
+Red Hat's documentation is public, but **`docs.redhat.com` may return HTTP 403**
+(Akamai edge handling varies). `rh-fetch.sh` tries a credential-free curl/wget GET
+first, accepting only HTTP 200 HTML with a usable `<article>` and no block-page markers.
+On failure it tries public source, then the KCS index. Do not evade a block.
+Subscriber-only knowledge base content needs the person's **own entitled** Red Hat account.
 
 | Target | Route | Credential |
 |---|---|---|
-| `docs.redhat.com/…/html/<book>/<page>#anchor` (also the legacy `access.redhat.com/documentation/<locale>/…` form) | The product's **open-source doc repo on GitHub** (AsciiDoc) | none |
+| `docs.redhat.com/…/html/<book>/<page>#anchor` or `html-single` (also legacy `access.redhat.com/documentation/<locale>/…`) | Direct article text → GitHub AsciiDoc → indexed `docs-text:` | none for direct/source; offline token for index |
 | `access.redhat.com/solutions/<id>`, `/articles/<id>`, `kcs:<id>` | Customer Portal **KCS search API** with `fq=id:` + Bearer token | offline token |
 | `search:<terms>` | KCS search API (metadata is public) | none |
-| `docs-text:<docs URL>` | *Experimental* — the KCS index's stored page text (keyed by page URL; `#anchor` ignored); only route for closed-source products (RHEL) | offline token |
+| `docs-text:<docs URL>` | *Experimental* — the KCS index's stored page text (keyed by page URL; `#anchor` ignored); fallback when direct/source routes fail | offline token |
 
 ## Do this
 
@@ -42,21 +44,24 @@ person's **own** Red Hat account. This skill's scripts pick the working route fo
 S="${PLUGIN_ROOT}/skills/fetch-docs/scripts"     # canonical in-repo: skills/redhat-docs-fetch/scripts
 bash "$S/rh-preflight.sh"                                # OS, fetcher, credential source (never the value)
 bash "$S/rh-fetch.sh" 'https://docs.redhat.com/en/documentation/red_hat_ansible_automation_platform/2.5/html/operating_ansible_automation_platform/assembly-configure-egress-proxy#proc-set-community-remote'
-bash "$S/rh-fetch.sh" --includes '<docs URL>'            # inline first-level include:: modules
+bash "$S/rh-fetch.sh" --includes '<docs URL>'            # inline first-level include:: modules on source fallback
 bash "$S/rh-fetch.sh" kcs:7137578                        # Markdown: Environment/Issue/Resolution/Root Cause/…
 bash "$S/rh-fetch.sh" --kind Solution --rows 5 'search:automation hub proxy 403'
 bash "$S/rh-token.sh" --check                            # source=… access_token=ok expires_in=900s
 ```
 
-Exit codes: `3` = no credential, not entitled, or the offline token was rejected (30-day
-idle expiry — the message says to regenerate) → tell the user to run **`$redhat:setup`**;
-`4` = unresolvable (unknown product/slug) → say so and offer `search:` / `docs-text:` /
-a browser. Render AsciiDoc to Markdown yourself; keep the `// source:` provenance line
-in your answer.
+Exit `3`: follow the message. Missing/rejected credentials need **`$redhat:setup`**;
+a successful fresh exchange followed by `subscriber_only` means missing entitlement,
+not a broken token. Review <https://access.redhat.com/management/subscriptions> and the
+free Developer Subscription for Individuals at <https://developers.redhat.com/>.
+Empty indexed text may instead mean the index has no body. Exit `4`: unresolvable;
+offer `search:` or a browser. Keep the `// source:` provenance line in your answer.
+Direct output is whole-article text (including for `html-single`); anchors are not
+narrowed. Select the requested section yourself. Source fallback is AsciiDoc to render.
 
 ## Non-obvious facts the scripts encode (don't work around them)
 
-- **URL → source file.** AAP: `ansible/aap-docs`, branch = version (`2.5`), files under
+- **URL → source file (fallback).** AAP: `ansible/aap-docs`, branch = version (`2.5`), files under
   `downstream/{assemblies,modules}/`; the page slug and every `#anchor` are **file names**
   (`proc-set-community-remote.adoc`) whose `[id=…]` equals the anchor. OpenShift:
   `openshift/openshift-docs`, branch `enterprise-<ver>`; the page slug is the assembly
@@ -69,8 +74,9 @@ in your answer.
   (`/rs/solutions/<id>`) is the decommissioned Strata API (HTTP 410). The body comes from
   the search endpoint filtered by id. `references/customer-portal-api.rst`.
 - **A bad Bearer token is silently ignored**: HTTP 200 with the literal string
-  `"subscriber_only"` in the body fields. `rh-fetch.sh` treats that as *not authenticated*
-  (exit 3); never conclude "the content is empty".
+  `"subscriber_only"` in the body fields. `rh-fetch.sh` exchanges a fresh token and
+  retries once: if placeholders persist, the account is *not entitled* (exit 3).
+  Exchange failures retain credential/network diagnostics; never call placeholders empty.
 - **`access.redhat.com` HTML redirects to a `/ja/` locale from some networks** regardless
   of `Accept-Language`, cookies, or an explicit `/en/` path, and the page body is
   login-gated anyway. Use `view_uri` for provenance only; the API is the content route.

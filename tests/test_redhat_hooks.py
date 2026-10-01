@@ -4,8 +4,7 @@ The hooks are shell (hooks/redhat-docs-*.sh, generated into plugins/redhat/scrip
 asserts the copies are byte-identical).
 Each test pipes a Claude Code event JSON through the hook with a sanitised environment
 (no RH_* variables, a throwaway HOME, credential sources restricted to `env`) and asserts
-the permissionDecision / additionalContext. No network: every path exercised here stops
-before any HTTP call.
+the permissionDecision / additionalContext. No network: HTTP paths use a curl shim; other paths stop before a request.
 """
 
 import json
@@ -430,7 +429,7 @@ class CredentialScripts(unittest.TestCase):
 
     def test_fetch_argument_validation(self):
         with tempfile.TemporaryDirectory() as tmp:
-            env = clean_env(tmp)
+            env = clean_env(tmp, PATH=self._fake_curl(tmp, "403", "Access Denied"))
             for args, needle in (
                 (["kcs:*"], "numeric"),
                 (["kcs:1 OR id:2"], "numeric"),
@@ -451,11 +450,11 @@ class CredentialScripts(unittest.TestCase):
 
     def test_fetch_usage_and_unknown_product(self):
         with tempfile.TemporaryDirectory() as tmp:
-            env = clean_env(tmp)
+            env = clean_env(tmp, PATH=self._fake_curl(tmp, "403", "Access Denied"))
             r = subprocess.run(["bash", str(SCRIPTS / "rh-fetch.sh")], capture_output=True, text=True, env=env)
             self.assertEqual(r.returncode, 1)
             r = subprocess.run(["bash", str(SCRIPTS / "rh-fetch.sh"), "https://docs.redhat.com/en/documentation/red_hat_enterprise_linux/9/html/book/page#anchor"], capture_output=True, text=True, env=env)
-            self.assertEqual(r.returncode, 4)
+            self.assertEqual(r.returncode, 3)  # automatic index fallback needs a credential
             # the docs-text: advice must name the page URL — the KCS index is keyed without the anchor
             self.assertIn("docs-text:https://docs.redhat.com/en/documentation/red_hat_enterprise_linux/9/html/book/page'", r.stderr)
             self.assertNotIn("page#anchor", r.stderr.split("docs-text:")[1])
@@ -463,8 +462,9 @@ class CredentialScripts(unittest.TestCase):
     def test_legacy_access_documentation_url_routes_like_docs(self):
         # access.redhat.com/documentation/<locale>/… 301s to docs.redhat.com; same product routing applies.
         with tempfile.TemporaryDirectory() as tmp:
-            r = subprocess.run(["bash", str(SCRIPTS / "rh-fetch.sh"), "https://access.redhat.com/documentation/en-us/red_hat_enterprise_linux/9/html/book/page"], capture_output=True, text=True, env=clean_env(tmp))
-            self.assertEqual(r.returncode, 4)
+            env = clean_env(tmp, PATH=self._fake_curl(tmp, "403", "Access Denied"))
+            r = subprocess.run(["bash", str(SCRIPTS / "rh-fetch.sh"), "https://access.redhat.com/documentation/en-us/red_hat_enterprise_linux/9/html/book/page"], capture_output=True, text=True, env=env)
+            self.assertEqual(r.returncode, 3)
             self.assertIn("No known public source repo for product 'red_hat_enterprise_linux'", r.stderr)
             self.assertNotIn("solution/article id", r.stderr)
 

@@ -16,7 +16,7 @@ done
 [ -n "$pre" ] || exit 0
 line="$(bash "$pre" 2>/dev/null)" || exit 0
 [ -n "$line" ] || exit 0
-ctx="Red Hat docs plugin preflight: $line. docs.redhat.com returns 403 to non-browser fetches; /redhat:fetch-docs (rh-fetch.sh) routes to the product's source repo or the Customer Portal API with curl."
+ctx="Red Hat docs plugin preflight: $line. docs.redhat.com may return an Akamai 403; /redhat:fetch-docs (rh-fetch.sh) tries direct HTML with curl/wget first, then the product's source repo and the Customer Portal API."
 if command -v jq >/dev/null 2>&1; then
   jq -nc --arg c "$ctx" '{hookSpecificOutput:{hookEventName:"SessionStart",additionalContext:$c}}'
 else

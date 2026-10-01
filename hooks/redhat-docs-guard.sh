@@ -2,7 +2,7 @@
 # PreToolUse guard (redhat plugin), matcher Bash|WebFetch. Fires only when the call targets a
 # Red Hat host or handles the offline token; everything else passes silently. Decisions via
 # permissionDecision JSON:
-#   WebFetch → Red Hat host                       deny  (Akamai 403; use /redhat:fetch-docs)
+#   WebFetch → Red Hat host                       deny  (possible Akamai block; use /redhat:fetch-docs)
 #   literal token on the command line             deny  (Bearer eyJ…, refresh_token=…, RH_OFFLINE_TOKEN=<token-like value>,
 #                                                        quoted or not; RH_OFFLINE_TOKEN="$(…)" / $VAR / `…` pass)
 #   printing/dumping/reading the token            deny  (echo/printf "$RH_OFFLINE_TOKEN", env|set|printenv dumps
@@ -54,7 +54,7 @@ SETUP='Run /redhat:setup — it guides generating a personal Red Hat offline tok
 
 if [ "$tool" = "WebFetch" ]; then
   printf '%s' "$(field .tool_input.url)" | grep -Eq "$RH_HOSTS" || exit 0
-  decide deny "WebFetch against Red Hat hosts gets an Akamai 403 (docs.redhat.com) or a locale-redirected, login-gated page (access.redhat.com). Use /redhat:fetch-docs: rh-fetch.sh routes docs.redhat.com URLs to the product's GitHub source and Customer Portal URLs to the KCS API with curl."
+  decide deny "WebFetch against Red Hat hosts may get an Akamai block (docs.redhat.com) or a locale-redirected, login-gated page (access.redhat.com). Use /redhat:fetch-docs: rh-fetch.sh tries direct HTML with curl/wget first, then GitHub source and the KCS API."
 fi
 [ "$tool" = "Bash" ] || exit 0
 cmd="$(field .tool_input.command)"; [ -n "$cmd" ] || exit 0
@@ -149,7 +149,7 @@ SANCTIONED="${CMDPOS}"'((bash|sh|source|\.)[[:space:]]+(-[A-Za-z]+[[:space:]]+)*
 INTERP="${CMDPOS}(python3?|pip3?|node|deno|bun|ruby|perl|php|http|https|httpie|xh|Invoke-WebRequest|iwr)([[:space:]]|\$)|requests\\.|urllib|fetch\\(|axios"
 #   FETCHER: curl/wget as a command word (a "curl" in a comment or argument does not count).
 FETCHER="${CMDPOS}(curl|wget)([[:space:]]|\$)"
-FETCH_DENY="Fetch Red Hat hosts with curl (preferred) or wget only — not python/requests/httpie/node. Use rh-fetch.sh from /redhat:fetch-docs, which also picks the route that actually works (docs.redhat.com is Akamai-blocked)."
+FETCH_DENY="Fetch Red Hat hosts with curl (preferred) or wget only — not python/requests/httpie/node. Use rh-fetch.sh from /redhat:fetch-docs, which tries direct HTML first and falls back when docs.redhat.com is Akamai-blocked."
 
 # 3. Fetcher policy per command segment: a segment that names a Red Hat host and is not itself a
 #    sanctioned-script invocation must not use a non-curl fetcher (a later "; bash rh-fetch.sh" or a

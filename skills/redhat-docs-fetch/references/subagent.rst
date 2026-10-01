@@ -87,18 +87,21 @@ Procedure
    a credential available, try ``docs-text:<url>`` before reporting the
    product as browser-only.
 
-2. **Credential gate** — if any step exits ``3``, stop and return this
-   blocker to the caller: which route needed a credential, the script's
-   message, and *"Run ``/redhat:setup`` to generate and store your
-   personal Red Hat offline token, then ask me again."* Do not retry,
-   guess, or work around.
+2. **Credential gate** — if any step exits ``3``, stop and return the route
+   and script message. For missing/rejected credentials, add *"Run
+   ``/redhat:setup`` to generate and store your personal Red Hat offline
+   token, then ask me again."* For placeholders after a successful fresh
+   exchange and retry, return the subscription-review guidance instead:
+   setup cannot add entitlement. Empty indexed text may mean no stored body.
+   Do not retry, guess, or work around.
 
 3. **Extract** — from AsciiDoc: render the requested ``[id=…]`` block
    (or the whole page) to Markdown; resolve obvious ``{attributes}``
    from the repo's ``_attributes/`` or ``downstream/attributes/`` files
    when they matter; keep procedure steps numbered and code blocks
-   intact. From KCS Markdown: keep the section headings the script
-   produced.
+   intact. From direct article text, select the requested section (anchors
+   are not narrowed by the script); preserve command whitespace. From KCS
+   Markdown: keep the section headings the script produced.
 
 4. **Answer** — the content, then a footer:
 

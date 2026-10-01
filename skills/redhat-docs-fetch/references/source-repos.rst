@@ -1,9 +1,11 @@
 docs.redhat.com → source repository map
 =======================================
 
-Verified 2026-08-27 (nq-rdl/agent-extensions#262). ``docs.redhat.com`` serves HTTP 403
-to curl/wget/WebFetch regardless of headers (Akamai edge, ``errors.edgesuite.net``
-reference); the AsciiDoc source on GitHub is the route for products that publish it.
+Updated 2026-10-01 from reported observations (#492): plain curl returned HTTP 200
+with the full article. The 2026-08-27 spike (#262) saw Akamai 403 responses instead.
+Edge/network/time can change the outcome; these are observations, not a guarantee.
+``rh-fetch.sh`` tries direct HTML first, then GitHub source and indexed text.
+This update was verified with offline fixtures, not a new live request.
 
 .. list-table::
    :header-rows: 1
@@ -37,15 +39,19 @@ reference); the AsciiDoc source on GitHub is the route for products that publish
      - **none public** (GitHub search: 0 hits; the ``redhat-documentation`` org holds
        style guides and tooling only)
      - —
-     - Closed. Try ``rh-fetch.sh 'docs-text:<url>'`` (experimental, authenticated) or a
-       browser.
+     - No public source. Direct HTML is tried first; indexed ``docs-text:<url>``
+       (experimental, authenticated) is the fallback, or use a browser.
 
 How ``rh-fetch.sh`` resolves a URL
 ----------------------------------
 
 1. Parse ``/<lang>/documentation/<product>/<ver>/<html|html-single>/<book>/<page>[#anchor]``.
-2. Map product → repo/branch (table above). ``html-single`` URLs need the ``#anchor``.
-3. Fetch the branch's git tree once (``gh api`` if logged in, else ``api.github.com`` —
+2. GET the page without credentials via curl/wget. Accept only HTTP 200 HTML with a
+   non-empty article and no ``edgesuite`` / ``Access Denied`` markers. Emit article
+   text, preserving preformatted whitespace and decoding common/numeric entities.
+   The whole article is returned even for ``#anchor`` / ``html-single`` URLs.
+3. If direct fails, map product → repo/branch (table above). Only the source fallback
+   needs an anchor for ``html-single``. Fetch the branch's git tree once (``gh api`` if logged in, else ``api.github.com`` —
    unauthenticated is limited to 60 requests/hour; cached 24 h in the runtime dir).
 4. Find ``<slug>.adoc`` in the tree (prefer ``downstream/`` for AAP). Anchors are resolved
    by ``resolve_anchor``: try ``<anchor>.adoc``, then strip ``_<suffix>`` from the right
@@ -56,4 +62,9 @@ How ``rh-fetch.sh`` resolves a URL
    first-level ``include::`` targets, trying repo-root, file-relative, and
    ``downstream/modules/`` bases, then a basename lookup.
 
-Provenance header emitted: ``// source: https://github.com/<repo>/blob/<ref>/<path>``.
+6. If the source route fails or has no known repository, try ``docs-text:`` automatically.
+   Missing credentials need setup; missing entitlement needs subscription review, not setup.
+
+Provenance header: ``// source: <docs URL>`` for direct HTML, or
+``// source: https://github.com/<repo>/blob/<ref>/<path>`` for source fallback.
+``--includes`` only affects AsciiDoc source fallback.
