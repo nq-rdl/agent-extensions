@@ -25,6 +25,7 @@ import os
 import platform
 import re
 import shutil
+import shlex
 import subprocess
 import sys
 import tempfile
@@ -108,7 +109,8 @@ def fake_bw(tmp: str, gated: bool = True, notes_fmt: str = "export RH_OFFLINE_TO
     """A minimal bw stand-in for the credential-resolution tests.
 
     ``get notes redhat-credentials`` prints ``notes_fmt`` (a printf format fed ``$FAKE_BW_TOKEN``);
-    when ``gated`` it does so only if BW_SESSION is set, like the real CLI. Every call appends
+    ``get item redhat-credentials`` prints ``$FAKE_BW_ITEM_JSON`` (default: no fields).
+    When ``gated`` it answers only if BW_SESSION is set, like the real CLI. Every call appends
     ``BW-ARGV: <argv>`` to ``$FAKE_LOG``.
     """
     gate = '[ -n "${BW_SESSION:-}" ] || { echo "Vault is locked." >&2; exit 1; }\n' if gated else ""
@@ -119,6 +121,7 @@ def fake_bw(tmp: str, gated: bool = True, notes_fmt: str = "export RH_OFFLINE_TO
         + gate
         + 'case "$*" in\n'
         f"  'get notes redhat-credentials') printf '{notes_fmt}' \"${{FAKE_BW_TOKEN:-}}\" ;;\n"
+        '  \'get item redhat-credentials\') if [ -n "${FAKE_BW_ITEM_JSON:-}" ]; then printf \'%s\\n\' "$FAKE_BW_ITEM_JSON"; else echo \'{}\'; fi ;;\n'
         "  *) echo 'Not found.' >&2; exit 1 ;;\n"
         "esac\n",
     )
@@ -374,6 +377,13 @@ class SetupSkillText(unittest.TestCase):
         self.assertIn("returned an empty token", step5)
         self.assertIn("step 3", step5)
 
+    def test_bitwarden_accepted_layouts_and_precedence(self):
+        for hint in ("Notes: `export RH_OFFLINE_TOKEN=…` or `RH_OFFLINE_TOKEN=…`",
+                     "bare JWT", "Custom field named exactly `RH_OFFLINE_TOKEN`",
+                     "**Text** or **Hidden**", "Notes win", "RH_BW_ITEM",
+                     "this load step does not", "single-item lookup rules"):
+            self.assertIn(hint, self.text)
+
     def test_check_only_stops_after_step_1_for_every_credential_state(self):
         self.assertIn("--check-only", self.fm["argument-hint"])
         step1 = self.text.split("## 1. Check", 1)[1].split("## 2.", 1)[0]
@@ -448,7 +458,98 @@ class DriftGuards(unittest.TestCase):
         self.assertIn("${XDG_CONFIG_HOME:-$HOME/.config}/redhat/offline-token", lib)
 
 
-class TokenCheck(unittest.TestCase):
+class BitwardenFieldCases:
+    """Same offline custom-field cases under host Bash and pinned Bash 3.2/BusyBox."""
+
+    def _field_check(self, tmp, env):
+        return token_check(env, "-x")
+
+    def _assert_field_case(self, notes_fmt, fields, expected=OFFLINE, *, uses_field=True):
+        with tempfile.TemporaryDirectory() as tmp:
+            fake_bw(tmp, notes_fmt=notes_fmt)
+            env = clean_env(
+                tmp, RH_CRED_SOURCES="bitwarden", BW_SESSION=SESSION, FAKE_BW_TOKEN=OFFLINE,
+                FAKE_BW_ITEM_JSON=json.dumps({"fields": fields}),
+                PATH=fake_curl(tmp, "200", OK_BODY), FAKE_LOG=str(Path(tmp) / "calls.log"),
+                FAKE_BODY_COPY=str(Path(tmp) / "body"),
+            )
+            r = self._field_check(tmp, env)
+            self.assertTrue(Path(env["FAKE_LOG"]).exists(), r.stderr)
+            log = Path(env["FAKE_LOG"]).read_text()
+            for secret in (OFFLINE, ACCESS, SESSION, "FIELD-SECRET-FAKE"):
+                self.assertNotIn(secret, r.stdout + r.stderr + log)
+            self.assertNotIn("--session", log)
+            self.assertEqual("BW-ARGV: get item redhat-credentials" in log, uses_field)
+            if expected:
+                self.assertEqual((r.returncode, r.stdout.strip()),
+                                 (0, "source=bitwarden access_token=ok expires_in=900s"), r.stderr)
+                self.assertIn("refresh_token=" + expected, Path(env["FAKE_BODY_COPY"]).read_text())
+            else:
+                self.assertEqual((r.returncode, r.stdout), (3, ""), r.stderr)
+                for hint in ("empty token", "redhat-credentials", "Notes", "export RH_OFFLINE_TOKEN=",
+                             "bare JWT", "custom field RH_OFFLINE_TOKEN", "text or hidden", "/redhat:setup"):
+                    self.assertIn(hint, r.stderr)
+                self.assertNotIn("ARGV:", log.replace("BW-ARGV:", "BW:"))
+                self.assertFalse(Path(env["FAKE_BODY_COPY"]).exists())
+
+    def test_bitwarden_text_field(self):
+        for notes in ("", "unrelated notes\\n", "export RH_OFFLINE_TOKEN=\\n"):
+            with self.subTest(notes=notes):
+                self._assert_field_case(notes, [
+                    {"name": "OTHER", "type": 0, "value": "FIELD-SECRET-FAKE"},
+                    {"name": "RH_OFFLINE_TOKEN", "type": 0, "value": OFFLINE},
+                ])
+
+    def test_bitwarden_hidden_field(self):
+        self._assert_field_case("", [{"name": "RH_OFFLINE_TOKEN", "type": 1, "value": OFFLINE}])
+
+    def test_bitwarden_notes_win_over_field(self):
+        for notes in ("export RH_OFFLINE_TOKEN=%s\\n", "RH_OFFLINE_TOKEN=%s\\n", "%s\\n"):
+            with self.subTest(notes=notes):
+                self._assert_field_case(notes, [
+                    {"name": "RH_OFFLINE_TOKEN", "type": 1, "value": "FIELD-SECRET-FAKE"},
+                ], uses_field=False)
+
+    def test_bitwarden_empty_field_exits_3(self):
+        for value in ("", None):
+            for field_type in (0, 1):
+                with self.subTest(value=value, field_type=field_type):
+                    self._assert_field_case("", [
+                        {"name": "RH_OFFLINE_TOKEN", "type": field_type, "value": value},
+                    ], expected="")
+
+    def test_bitwarden_missing_or_wrong_field_exits_3(self):
+        for fields in ([], [{"name": "rh_offline_token", "type": 0, "value": OFFLINE}],
+                       [{"name": "RH_OFFLINE_TOKEN", "type": 2, "value": "true"}]):
+            with self.subTest(fields=fields):
+                self._assert_field_case("unrelated notes\\n", fields, expected="")
+
+
+class Bash32Bitwarden(BitwardenFieldCases, unittest.TestCase):
+    def setUp(self):
+        from bash32_fixture import container_runtime, static_jq
+        if not container_runtime() or not static_jq():
+            self.skipTest("needs pinned Bash 3.2 image and BASH32_STATIC_JQ; see docs/bash32-portability.md")
+
+    def _field_check(self, tmp, env):
+        from bash32_fixture import run_container, static_jq
+        scripts = Path(tmp) / "scripts"
+        shutil.copytree(SCRIPTS, scripts)
+        shutil.copyfile(static_jq(), Path(tmp) / "bin" / "jq")
+        (Path(tmp) / "bin" / "jq").chmod(0o755)
+        # Mount only the disposable fixture at its existing path; no checkout or credentials.
+        fixture_env = {k: v for k, v in env.items()
+                       if k.startswith("FAKE_") or k in ("HOME", "XDG_CONFIG_HOME", "XDG_RUNTIME_DIR",
+                                                        "TMPDIR", "RH_CRED_SOURCES", "BW_SESSION")}
+        fixture_env["PATH"] = f"{tmp}/bin:/usr/local/bin:/usr/bin:/bin"
+        command = "set +e; env -i " + " ".join(shlex.quote(k + "=" + v) for k, v in fixture_env.items())
+        command += " bash -x " + shlex.quote(str(scripts / "rh-token.sh")) + " --check"
+        # Docker runs as root: remove its private 0700 cache before host-side cleanup.
+        command += "; status=$?; rm -rf " + shlex.quote(env["XDG_RUNTIME_DIR"]) + '; exit "$status"'
+        return run_container(tmp, tmp, command)
+
+
+class TokenCheck(BitwardenFieldCases, unittest.TestCase):
     """rh-token.sh --check and rh-preflight.sh as the skill drives them – offline, every source."""
 
     def assert_no_secret(self, *streams: str, secrets=(OFFLINE, ACCESS, SESSION)):
@@ -580,6 +681,38 @@ class TokenCheck(unittest.TestCase):
             r = token_check(env)
             self.assertEqual((r.returncode, r.stdout.strip()), (0, "source=bitwarden access_token=ok expires_in=900s"), r.stderr)
             self.assertNotIn(OFFLINE, r.stdout + r.stderr)
+
+    def test_bitwarden_field_uses_same_single_item_lookup(self):
+        for case in ("single", "duplicate", "missing", "override", "override-empty"):
+            with self.subTest(case=case), tempfile.TemporaryDirectory() as tmp:
+                state = fake_bw_vault(tmp)
+                item = {"id": "id-token", "name": "redhat-credentials", "type": 1, "notes": "",
+                        "fields": [{"name": "RH_OFFLINE_TOKEN", "type": 1, "value": OFFLINE}]}
+                if case != "missing":
+                    (state / "items" / "id-token.json").write_text(json.dumps(item))
+                if case == "duplicate":
+                    item["id"] = "id-other"
+                    (state / "items" / "id-other.json").write_text(json.dumps(item))
+                if case == "override-empty":
+                    item["fields"][0]["value"] = ""
+                    (state / "items" / "id-token.json").write_text(json.dumps(item))
+                env = clean_env(tmp, RH_CRED_SOURCES="bitwarden", BW_SESSION=SESSION,
+                                FAKE_BW_STATE=str(state), PATH=fake_curl(tmp, "200", OK_BODY))
+                if case.startswith("override"):
+                    env["RH_BW_ITEM"] = "id-token"
+                r = token_check(env)
+                self.assertEqual(r.returncode, 0 if case in ("single", "override") else 3, r.stderr)
+                self.assert_no_secret(r.stdout, r.stderr, (state / "calls.log").read_text())
+                calls = (state / "calls.log").read_text()
+                self.assertNotIn("bw list", calls)
+                if case in ("duplicate", "missing"):
+                    self.assertNotIn("bw get item", calls, "ambiguous/absent Notes lookup must stop")
+                else:
+                    self.assertIn("bw get item " + env.get("RH_BW_ITEM", "redhat-credentials"), calls)
+                if case == "override-empty":
+                    self.assertIn("item 'id-token'", r.stderr)
+                    self.assertIn("Notes", r.stderr)
+                    self.assertIn("custom field RH_OFFLINE_TOKEN", r.stderr)
 
     def test_bitwarden_note_without_token_line_exits_3(self):
         with tempfile.TemporaryDirectory() as tmp:

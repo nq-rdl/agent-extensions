@@ -33,7 +33,7 @@ class PortabilityGate(unittest.TestCase):
         result = subprocess.run([sys.executable, str(path)], env=env, capture_output=True,
                                 text=True, timeout=60)
         self.assertEqual(result.returncode, 1, result.stderr)
-        self.assertIn('skipped 3', result.stderr)
+        self.assertIn(f'skipped {len(self.runner().CASES)}', result.stderr)
 
     def test_skipped_subtest_fails(self):
         class MissingFixture(unittest.TestCase):

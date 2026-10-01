@@ -52,10 +52,12 @@ bash "$S/rh-token.sh" --check      # → source=<src> access_token=ok expires_in
 Exit `4` means Red Hat SSO rejected the token (`invalid_grant`, typically 30 days unused):
 continue at step 2 to regenerate.
 
-Exit `3` here means the source was found but yields no token (a `redhat-credentials` note
-without an `RH_OFFLINE_TOKEN=` line or with an empty value, or a token file whose first line
-is blank – only line 1 is read): skip step 2 if the user still has their token and re-store
-it at step 3 with the same source.
+Exit `3` here means the source was found but yields no token (a `redhat-credentials` item
+with no token in Notes – `export RH_OFFLINE_TOKEN=…`, `RH_OFFLINE_TOKEN=…`, or a bare JWT –
+and no nonempty custom field `RH_OFFLINE_TOKEN` (text or hidden), or a token file whose
+first line is blank – only line 1 is read). The Bitwarden hint names the item
+(`RH_BW_ITEM` overrides the default) and the places checked, never values. Skip step 2
+if the user still has their token and re-store it at step 3 with the same source.
 
 With `--check-only`, stop after this step whatever `credential` says.
 
@@ -81,6 +83,17 @@ The user runs the store command **in their own terminal** (not via `!`, whose ou
 lands in the transcript). Give only the chosen block:
 
 **Bitwarden** (the `bitwarden:secrets` pattern – Secure Note named `redhat-credentials`):
+
+The scripts accept these layouts on that item (a Login item also works):
+
+- Notes: `export RH_OFFLINE_TOKEN=…` or `RH_OFFLINE_TOKEN=…`.
+- Notes: a bare JWT on its own line (three base64url segments).
+- Custom field named exactly `RH_OFFLINE_TOKEN`, type **Text** or **Hidden**, holding the token.
+
+Notes win when both Notes and the custom field contain a token. The field is read only
+when Notes yield no token; an empty field still exits `3`. Keep exactly one matching
+item; both Notes and field lookups use the same Bitwarden single-item lookup rules.
+The block below stores the Notes layout.
 
 ```bash
 s="$(bw unlock --raw)"; [ -n "$s" ] && export BW_SESSION="$s"; unset s
@@ -153,10 +166,12 @@ The path honours `XDG_CONFIG_HOME` because the scripts resolve the same
 
 ## 4. Load
 
-- **Bitwarden**: before launching `claude`, in the shell: `export BW_SESSION="$(bw unlock --raw)"`
-  then `eval "$(bw get notes redhat-credentials)"` (or `bwe redhat-credentials` from
-  `bitwarden:secrets`). Tool calls inherit that environment. Alternatively leave
-  `BW_SESSION` exported and the scripts read the note on demand.
+- **Bitwarden**: before launching `claude`, in the shell: `export BW_SESSION="$(bw unlock --raw)"`.
+  Leave `BW_SESSION` exported and the scripts read Notes or the custom field on demand.
+  For the `export RH_OFFLINE_TOKEN=…` Notes layout only, you can instead use
+  `eval "$(bw get notes redhat-credentials)"` (or `bwe redhat-credentials` from
+  `bitwarden:secrets`). Tool calls inherit that environment; this load step does not
+  read custom fields or bare JWT Notes.
 - **Keychain / file**: nothing to load – the scripts resolve them directly.
 - Resolution order is `env → keychain → file → bitwarden`; restrict with
   `RH_CRED_SOURCES=env,file` if needed.
@@ -185,5 +200,7 @@ restart `claude`, or have the user run the same `rh-token.sh --check` in the ter
 the vault is unlocked (give the expanded `$S` path; `CLAUDE_PLUGIN_ROOT` is not set there; it
 prints only the source and `expires_in`); for a file, `HOME`/`XDG_CONFIG_HOME` must match the
 path step 3 printed; for the Linux keychain, the Secret Service must be reachable from this
-session. "returned an empty token" means the store was found but holds no usable line –
-re-store at step 3.
+session. "returned an empty token" means the store was found but holds no usable token –
+for Bitwarden, check the named item's Notes layouts and `RH_OFFLINE_TOKEN` custom field
+(text or hidden) listed in the message; re-store at step 3. Notes take precedence, so
+update or remove a stale Notes token when switching to a custom field.

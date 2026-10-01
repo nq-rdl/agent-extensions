@@ -34,7 +34,14 @@ if [ -z "$src" ]; then
   echo "No Red Hat offline token found (looked in: $RH_CRED_SOURCES). $RH_SETUP_HINT" >&2; exit 3
 fi
 tok="$(rh_cred_token)"
-if [ -z "$tok" ]; then echo "Credential source '$src' returned an empty token. $RH_SETUP_HINT" >&2; exit 3; fi
+if [ -z "$tok" ]; then
+  if [ "$src" = bitwarden ]; then
+    echo "Credential source 'bitwarden' returned an empty token for item '$RH_BW_ITEM': checked Notes (export RH_OFFLINE_TOKEN=… / RH_OFFLINE_TOKEN=… or a bare JWT) and custom field RH_OFFLINE_TOKEN (text or hidden). $RH_SETUP_HINT" >&2
+  else
+    echo "Credential source '$src' returned an empty token. $RH_SETUP_HINT" >&2
+  fi
+  exit 3
+fi
 
 body="$(mktemp "$cache/post.XXXXXX")"; out="$(mktemp "$cache/resp.XXXXXX")"
 trap 'rm -f "$body" "$out"' EXIT
