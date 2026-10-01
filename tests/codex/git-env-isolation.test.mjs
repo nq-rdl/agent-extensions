@@ -17,6 +17,7 @@ import { spawnSync } from "node:child_process";
 import { fileURLToPath, pathToFileURL } from "node:url";
 
 import { GIT_LOCAL_ENV_VARS, initGitRepo, makeTempDir, run, scrubGitEnv } from "./helpers.mjs";
+import { cleanupTestBrokers, findTestBrokers } from "./broker-cleanup.mjs";
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 const ROOT = path.resolve(HERE, "..", "..");
@@ -82,13 +83,16 @@ test("importing helpers.mjs clears inherited git and host-session variables", ()
   assert.deepEqual(JSON.parse(result.stdout), []);
 });
 
-test("git-heavy suites leave the repository named by a leaked hook env untouched", () => {
+test("git-heavy suites leave the hook repository untouched and no detached brokers alive", async () => {
   const decoy = makeDecoyRepo();
   const before = snapshot(decoy);
+  // Scope the leak guard to this subprocess tree, not other contributors' tests.
+  const tempRoot = makeTempDir();
 
   // Simulate the env git exports into a pre-push hook from a linked worktree.
   const hookEnv = {
     ...process.env,
+    TMPDIR: tempRoot,
     GIT_DIR: path.join(decoy, ".git"),
     GIT_WORK_TREE: decoy,
     GIT_INDEX_FILE: path.join(decoy, ".git", "index"),
@@ -98,7 +102,13 @@ test("git-heavy suites leave the repository named by a leaked hook env untouched
   const suites = GIT_HEAVY_SUITES.map((name) => path.join(HERE, name));
   const result = spawnWithEnv(["--test", ...suites], { cwd: ROOT, env: hookEnv });
 
-  const after = snapshot(decoy);
-  assert.deepEqual(after, before, "a test wrote to the repository named by GIT_DIR");
-  assert.equal(result.status, 0, `${result.stdout}\n${result.stderr}`);
+  try {
+    assert.deepEqual(findTestBrokers([tempRoot]), [], "nested broker-spawning suites leaked detached brokers");
+    const after = snapshot(decoy);
+    assert.deepEqual(after, before, "a test wrote to the repository named by GIT_DIR");
+    assert.equal(result.status, 0, `${result.stdout}\n${result.stderr}`);
+  } finally {
+    // A failing regression must not itself exhaust the machine.
+    await cleanupTestBrokers([tempRoot]);
+  }
 });
