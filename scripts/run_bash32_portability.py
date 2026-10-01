@@ -29,6 +29,13 @@ CASES = (
     "test_redhat_fetch.Bash32Fetch.test_stale_cached_bearer_recovers_after_refresh",
     "test_redhat_fetch.Bash32Fetch.test_failed_fresh_exchange_or_retry_does_not_blame_entitlement",
     "test_redhat_fetch.Bash32Fetch.test_index_empty_or_subscriber_only_and_refresh_recovery",
+    "test_redhat_sops_setup.Bash32Setup.test_install_preview_platform_packages_and_binary",
+    "test_redhat_sops_setup.Bash32Setup.test_install_failures_preserve_existing_binary",
+    "test_redhat_sops_setup.Bash32Setup.test_install_unsupported_arch_fails_before_actions",
+    "test_redhat_sops_setup.Bash32Setup.test_identity_paths_reuse_and_private_output",
+    "test_redhat_sops_setup.Bash32Setup.test_identity_symlink_failure_and_ambiguous_recipient",
+    "test_redhat_sops_setup.Bash32Setup.test_store_without_recipient_initializes_before_hidden_paste",
+    "test_redhat_sops_setup.Bash32Setup.test_tpm_detection_and_generation_with_offline_device",
 )
 
 

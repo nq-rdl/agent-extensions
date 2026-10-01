@@ -271,7 +271,7 @@ class Bash32Sops(SopsCases, unittest.TestCase):
         shutil.copyfile(static_jq(), bindir / "jq")
         (bindir / "jq").chmod(0o755)
         selected = {k: v for k, v in env.items() if k.startswith(("FAKE_", "RH_", "BW_")) or
-                    k in ("HOME", "XDG_CONFIG_HOME", "XDG_RUNTIME_DIR", "TMPDIR")}
+                    k in ("HOME", "XDG_CONFIG_HOME", "XDG_RUNTIME_DIR", "TMPDIR", "SOPS_AGE_KEY_FILE")}
         selected["PATH"] = f"{bindir}:/usr/local/bin:/usr/bin:/bin"
         script = script.replace(str(SCRIPTS), str(scripts)).replace(str(GUARD), str(guard))
         command = 'set +e; env -i ' + ' '.join(shlex.quote(k + '=' + v) for k, v in selected.items())

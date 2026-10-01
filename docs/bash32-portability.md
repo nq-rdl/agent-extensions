@@ -17,6 +17,11 @@ under both host Bash and the pinned Bash 3.2 fixture (not real sops/hardware).
 Red Hat fetch cases use curl/wget shims to exercise direct HTML validation/article
 extraction, source/index fallback order, fresh-token retries and entitlement versus
 credential diagnostics. No live Red Hat requests or real credentials are used.
+Red Hat setup shims additionally cover pinned raw-binary installs on Linux/macOS
+amd64/arm64, package-manager selection, preview-only behavior, checksum/download/
+version failures, private identity paths and reuse, symlink/concurrent-key refusal,
+recipient inference, and accessible/inaccessible TPM detection. These tests never
+run real package installs or upstream downloads; TPM generation uses a shim.
 Pi dispatch cases run all target parsing, conservative overlap/cap waves,
 prompt rendering, worktree and launch argv (including opt-in Fast env/extension,
 offline catalog checks and requested-tier status), resume, status/CI, lock safety and

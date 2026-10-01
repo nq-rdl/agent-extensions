@@ -15,7 +15,7 @@ compatibility: >-
   expiry) as of 2026-08; Bitwarden CLI 2026.8.0 (source-verified sync/list/get/create/edit contract);
   macOS security(1) keychain; libsecret secret-tool on Linux; jq >= 1.6 (`--rawfile`);
   sops 3.13.3 (installed help + dummy stdin round-trip verified; >= 3.10 for age plugins/stdin);
-  age 1.3.2; bash 3.2+ for rh-store-sops.sh; bash or zsh for the paste prompts.
+  age 1.3.2; bash 3.2+ for rh-*.sh helpers; bash or zsh for the paste prompts.
 allowed-tools: Bash, AskUserQuestion
 metadata:
   repo: https://github.com/nq-rdl/agent-extensions
@@ -53,17 +53,30 @@ S="${CLAUDE_PLUGIN_ROOT}/skills/fetch-docs/scripts"
 bash "$S/rh-preflight.sh" --json
 ```
 
-Report OS, fetcher, `bw`, `sops`, `age`, `age-plugin-tpm`, and `credential`
+Report OS, fetcher, `bw`, `sops`, `age`, `age-plugin-tpm`, `tpm` (`present`,
+`accessible`, or `none`) with any `tpm_hint`, and `credential`
 (`env`, `keychain`, `sops`, `file`, `bitwarden`, or `none`).
 If `fetcher` is `none`, stop: curl must be installed first
 (`brew install curl` / `dnf install curl` / `apt install curl`). If `jq` is `no`, same.
 If `bw` is `no`, say so beside the optional Bitwarden option; it is not required.
-If `sops` or `age` is `no`, offer `brew install sops age`, `sudo dnf install sops age`,
-or `sudo apt install sops age`, as appropriate. Package availability varies by
-release/repository: if unavailable or sops < 3.10, use the official
-[sops releases](https://github.com/getsops/sops/releases) and
-[age releases](https://github.com/FiloSottile/age/releases), not an unverified installer.
-Report `age-plugin-tpm` if present. On Linux with `/dev/tpmrm0` accessible, prefer
+If `sops` or `age` is `no` (or sops < 3.10), offer the user-terminal helper:
+
+```bash
+bash "$S/rh-install-sops-age.sh"        # preview; no downloads or changes
+bash "$S/rh-install-sops-age.sh" --yes  # only after user approves the plan
+```
+
+It selects brew/dnf/apt-get for **age only** (EL9 needs EPEL already enabled).
+It downloads the pinned sops 3.13.3 **raw binary**, not an rpm/deb: upstream's
+checksums do not cover packages. It requires one exact checksum entry and installs
+to `~/.local/bin/sops` only after verification. Unsupported OS/arch fails closed.
+Ensure that directory is on the user's and agent's PATH; restart after launch-PATH
+changes. Checksums over HTTPS are integrity checks, not independent publisher
+signature verification; cosign bundle verification is not implemented.
+For dnf errors, inspect repository/GPG diagnostics; unrelated broken repos can
+block any install. The helper prints a `--disablerepo=<broken-repo>` retry hint;
+it never enables repos or disables GPG verification automatically.
+Report `age-plugin-tpm` if present. On Linux with `/dev/tpmrm0` readable **and writable**, prefer
 TPM-backed storage; if missing, offer
 `go install github.com/foxboron/age-plugin-tpm/cmd/age-plugin-tpm@latest` or its
 [upstream binaries](https://github.com/Foxboron/age-plugin-tpm/releases).
@@ -124,31 +137,22 @@ A custom identity path needs `SOPS_AGE_KEY_FILE` in the agent's launch environme
 prefer the default path to avoid that restart requirement. See
 [identity discovery](https://getsops.io/docs/usage/identities/age/).
 
-If a usable TPM is present, prefer this (no PIN for noninteractive per-call reads):
+In the user's terminal:
 
 ```bash
-k="${XDG_CONFIG_HOME:-$HOME/.config}/sops/age/keys.txt"
-(umask 077; mkdir -p "${k%/*}" && [ ! -e "$k" ] && age-plugin-tpm --generate -o "$k" && chmod 600 "$k")
-r="$(age-plugin-tpm -y "$k")"  # public recipient only
+bash "$S/rh-store-sops.sh"
 ```
 
-Otherwise create a plain age identity (equivalent to
-`age-keygen -o ~/.config/sops/age/keys.txt` on default Linux):
-
-```bash
-case "$(uname -s)" in
-  Darwin) k="${XDG_CONFIG_HOME:-$HOME/Library/Application Support}/sops/age/keys.txt" ;;
-  *) k="${XDG_CONFIG_HOME:-$HOME/.config}/sops/age/keys.txt" ;;
-esac
-(umask 077; mkdir -p "${k%/*}" && [ ! -e "$k" ] && age-keygen -o "$k" && chmod 600 "$k")
-r="$(age-keygen -y "$k")"  # public recipient only; also works for an existing plain identity
-```
-
-Then, in the user's terminal, with `r` holding the **public** recipient:
-
-```bash
-bash "$S/rh-store-sops.sh" "$r"
-```
+Without a recipient, the store helper calls `rh-age-identity.sh`: reuse the existing
+identity or create it at the discovered path (including `SOPS_AGE_KEY_FILE`).
+New identities use umask 077 and mode 0600, and are published without overwriting
+even a concurrently created key. Symlink identities are refused. With an installed
+`age-plugin-tpm` and readable/writable `/dev/tpmrm0`, new keys use TPM generation
+(no PIN); otherwise they use `age-keygen`. Existing keys are never migrated.
+Generation/derivation errors stop before the token prompt. Multiple-key files need
+an explicit public recipient argument; the helper refuses ambiguous output.
+For identity creation alone, `bash "$S/rh-age-identity.sh"` prints **only** the public
+recipient. No `r` variable has to survive between pasted blocks.
 
 The helper uses a hidden `IFS= read -rs t` prompt, a **builtin printf** pipe to
 `sops encrypt --age ... --input-type dotenv --output-type yaml --filename-override ...`,
@@ -164,7 +168,7 @@ in **this terminal**, then use the same helper:
 ```bash
 s="$(bw unlock --raw)"; [ -n "$s" ] && export BW_SESSION="$s"; unset s
 if [ -n "${BW_SESSION:-}" ] && bw sync >/dev/null; then
-  bash "$S/rh-store-sops.sh" "$r" --from-bitwarden
+  bash "$S/rh-store-sops.sh" --from-bitwarden
 fi
 ```
 
