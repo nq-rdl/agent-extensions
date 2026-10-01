@@ -58,6 +58,7 @@ nav = [
         { "Completion record" = "skill-review/finish.md" },
         { "Claude Code" = "skill-review/claude-code.md" },
         { "Codex" = "skill-review/codex.md" },
+        { "Codex live integration pilot" = "skill-review/codex-live-430.md" },
         { "Delegation" = "skill-review/delegation.md" },
         { "Prompt-builder pilot" = "skill-review/prompt-builder.md" },
         { "GitHub workflows" = "skill-review/gh-workflows.md" },

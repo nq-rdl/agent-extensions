@@ -228,8 +228,9 @@ class ModelGuideFacts(unittest.TestCase):
             (SKILLS / "codex-review" / "SKILL.md").read_text(),
             section(GUIDE.read_text(), "Review commands"),
         ):
-            self.assertIn("0.159.1", text)
-            self.assertIn("persisted app-server", text)
+            self.assertRegex(text, r"\d{4}-\d{2}-\d{2} with CLI \d+\.\d+\.\d+")
+            self.assertIn("a persisted app-server probe", text)
+            self.assertIn("nq-rdl/agent-extensions#430", text)
             self.assertIn("ephemeral", text)
             self.assertIn("does not expose the reviewer model", text)
             self.assertNotIn("not verified against a live backend", text)

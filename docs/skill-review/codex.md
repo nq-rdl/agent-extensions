@@ -96,7 +96,7 @@ These must survive. "Where" names the owner after the change.
 | RV-4 | `/codex:review` is native review only and rejects focus text; its error names adversarial review | codex-review |
 | RV-5 | `/codex:adversarial-review` accepts and preserves focus text and challenges approach, design and assumptions | codex-adversarial-review |
 | RV-6 | Distinct command name, description, argument hint, framing and labels | both |
-| RV-7 | `review_model` applies to native review only (marked unverified against a live backend) | codex-review, codex-model-guide |
+| RV-7 | `review_model` applies to native review only ([#430 live evidence](codex-live-430.md), with ephemeral-review observability limits) | codex-review, codex-model-guide |
 
 ### Rescue and runtime (#309, #310)
 

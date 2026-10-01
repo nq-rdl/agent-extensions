@@ -3,7 +3,9 @@
 Follow-up to the [stubbed family review](codex.md), #312 and #320. Recorded
 2026-09-30, 22:14–22:18 UTC at source revision
 `c64b3c1371ebc0c6112004baafbf94fa499443ea`. No runtime code or model-tier
-policy changed; #201 remains separate.
+policy changed; #201 remains separate. Two distinguishing persisted probes
+were added on 2026-10-01 at `c1986ff6`, using the same CLI/runtime versions.
+Human question answers/cancellation remain unexecuted: [follow-up #475](https://github.com/nq-rdl/agent-extensions/issues/475).
 
 ## Protocol and evidence boundaries
 
@@ -34,11 +36,11 @@ and read-only sandboxes. Model evidence comes from `thread/start` responses,
 the model its name**. Native reviews spawn a separate reviewer: the parent
 thread model is not proof of the reviewer model.
 
-Scratch logs and authentication remain outside the checkout; only trimmed,
-non-secret evidence is recorded here. A CLI warning about inability to create
+Scratch logs and authentication were kept outside the checkout and are removed
+after delivery; only trimmed, non-secret evidence is recorded here. A CLI warning about inability to create
 PATH helper aliases under `/tmp` did not prevent completion. Fresh Codex homes
 also acquired CLI-managed plugin/cache files; these were not catalog installs.
-There were 13 top-level live invocations (11 Codex runs, including one rejected
+There were 15 top-level live invocations (13 Codex runs, including one rejected
 model and one interrupted turn, and two Claude runs). Availability, candidate,
 status and cancel commands are not additional model requests. One run per
 case: this is a small integration check, not a reliability benchmark.
@@ -59,13 +61,19 @@ above; review arguments are intentionally passed as **one string**.
 | native-override | Luna config plus `review_model = "gpt-5.6-sol"`; `node "$C" review '--wait --model luna --json'` | Parent Luna; actual ephemeral reviewer **not exposed** | Status 0: “The only change updates the exported constant from 1 to 2, with no evidence of affected callers, tests, or repository-specific invariants.” |
 | adversarial-override | Same Sol review override; `node "$C" adversarial-review '--wait --model luna --json'` | Thread response Luna; ordinary `turn/start.model: gpt-5.6-luna` | `verdict: approve`, `findings: []`; “No substantive, repository-grounded risk identified…” |
 | native-persist | Same override; `node probe-review.mjs` (recipe below) | **Reviewer** turn context: `gpt-5.6-sol`, source `subagent: review`; parent Luna | “The only change updates an exported constant from 1 to 2. No concrete defect or affected invariant is evident…” |
-| native-persist-default | Luna config without review override; same probe | Reviewer turn context: `gpt-5.6-luna` | “The change only updates the exported constant from 1 to 2, with no apparent correctness issue…” |
+| native-persist-explicit-luna (originally native-persist-default) | Luna config without review override; probe explicitly sets session model Luna, matching config | Reviewer turn context: `gpt-5.6-luna`; does not distinguish config default from explicit selection | “The change only updates the exported constant from 1 to 2, with no apparent correctness issue…” |
+| native-config-null | Luna config, no `review_model`; `node probe-review.mjs null` | `thread/start.model: null`; parent and reviewer child resolve to `gpt-5.6-luna` | Exit 0: “The change only updates the exported constant from 1 to 2, with no identifiable correctness issue in the available repository context.” |
+| native-explicit-terra | Luna config, no `review_model`; `node probe-review.mjs gpt-5.6-terra` | Explicit session Terra; parent and reviewer child: `gpt-5.6-terra`, not configured Luna | Exit 0: “The sole change updates the exported constant value and introduces no apparent correctness issue.” |
 | exec-native | Luna + Sol override; `codex exec review --uncommitted --json` | Reviewer turn context: `gpt-5.6-sol` | “The only change updates the exported constant from 1 to 2, with no surrounding code, tests, or documented invariant indicating that this introduces a defect.” |
-| native-sentinel | Luna + `review_model = "pilot-unavailable-model"`; `node "$C" review '--wait --model luna --json'` | Backend error names `pilot-unavailable-model`; proves companion attempted override, **no successful model completion** | Exit 1; helper says “Reviewer failed to output a response.” No retry |
-| explicit-resume | Configured case: `printf 'Reply exactly RESUME_OK. Do not use tools or change files.\n' \| node "$C" task --resume --json` | Same thread `01a0f462-7fd9-72d3-a6af-dbcc20b13605`; turn context Luna | `status: 0`, `rawOutput: RESUME_OK`, `touchedFiles: []` |
+| native-sentinel | Luna + `review_model = "pilot-unavailable-model"`; `node "$C" review '--wait --model luna --json'` | Warning and backend error name `pilot-unavailable-model`: for this companion-launched ephemeral native review with explicit `thread/start.model: gpt-5.6-luna`, Codex selected `review_model` for the review turn (**attempt only; no successful completion**) | Exit 1; helper says “Reviewer failed to output a response.” No retry |
+| explicit-resume | Configured case: `printf 'Reply exactly RESUME_OK. Do not use tools or change files.\n' \| node "$C" task --resume --json` | Same thread `<configured-thread-id>`; turn context Luna | `status: 0`, `rawOutput: RESUME_OK`, `touchedFiles: []` |
 | cancellation | Luna config; `node "$C" task --background --json 'Read-only: mentally enumerate 200 distinct short greetings and return the full list. Do not use tools or change files.'`, then `node "$C" cancel <jobId> --json` after `turn/started` | Thread selected Luna; cancelled before a completed turn/context/usage record | `status: cancelled`, `turnInterruptAttempted: true`, `turnInterrupted: true`; status confirms `pid: null`, `write: false` |
 | unavailable-review | Empty config; Claude command below, initially without `Bash(echo:*)` | Claude Sonnet 5; **no Codex model used** | Preflight permission denial; stops without review |
-| unavailable-review-retry | Same Claude command with `Bash(echo:*)` | Claude Sonnet 5; **no Codex model used** | Preflight and size check succeed; question unavailable; asks in text and stops without launching review |
+| unavailable-review-retry | Same Claude command with undeclared extra `Bash(echo:*)` grant | Claude Sonnet 5; **no Codex model used** | Preflight and size check proceed only under widened grants; question unavailable; asks in text and stops without launching review |
+
+Guide gap: the absent-config server default `gpt-6.1-sol` is absent from
+`codex:model-guide` and its alias table; [#477](https://github.com/nq-rdl/agent-extensions/issues/477)
+tracks that factual coverage gap without changing the table or #201 policy.
 
 ### Trimmed request/response evidence
 
@@ -89,16 +97,29 @@ Native override sends `thread/start.model: gpt-5.6-luna`, then:
 {"method":"review/start","params":{"delivery":"inline","target":{"type":"uncommittedChanges"}}}
 ```
 
-The persisted probe's child session (not its parent) records:
+The original persisted probe explicitly set session Luna even without a
+`review_model`, so its default-labelled case did not distinguish configuration
+inheritance from explicit selection. The two 2026-10-01 probes now do: with
+config Luna and no review override, `thread/start.model: null` resolves both
+parent and reviewer to Luna, while explicit `gpt-5.6-terra` resolves both to
+Terra. Each review child's `session_meta.source` is `subagent: review`, and its
+`turn_context.model` is the corresponding model. Usage below is the child's
+final cumulative `token_count`, not the parent's. The original companion
+`native-default` run did omit `--model`, but its ephemeral reviewer model was
+not directly observable.
+
+The Sol-override persisted probe's child session (not its parent) records:
 
 ```json
 {"type":"session_meta","payload":{"source":{"subagent":"review"},"cli_version":"0.159.1"}}
 {"type":"turn_context","payload":{"model":"gpt-5.6-sol","approval_policy":"never","sandbox_policy":{"type":"read-only"}}}
 ```
 
-The companion sentinel run reports on the wire:
+The companion sentinel run reports on the wire; the warning precedes
+`turn/started` and corroborates Codex's selection of the configured reviewer:
 
 ```text
+warning: Model metadata for `pilot-unavailable-model` not found. Defaulting to fallback metadata; this can degrade performance and cause issues.
 error: The 'pilot-unavailable-model' model is not supported when using Codex with a ChatGPT account.
 willRetry: false
 turn/completed: status failed
@@ -131,7 +152,9 @@ API prices or a model-tier policy from these numbers.
 | native-default / native-override | not exposed | — | — | — | unknown |
 | adversarial-override | 25,175 | 18,944 | 317 | 101 | unknown |
 | native-persist | 20,332 | 12,928 | 362 | 57 | unknown |
-| native-persist-default | 20,391 | 11,776 | 415 | 132 | unknown |
+| native-persist-explicit-luna | 20,391 | 11,776 | 415 | 132 | unknown |
+| native-config-null | 27,551 | 20,480 | 472 | 125 | unknown |
+| native-explicit-terra | 27,167 | 22,528 | 406 | 67 | unknown |
 | exec-native | 20,101 | 13,696 | 349 | 39 | unknown |
 | native-sentinel / cancellation | not exposed | — | — | — | unknown |
 | explicit-resume | 14,293 | 11,008 | 17 | 8 | unknown |
@@ -148,18 +171,31 @@ list-cost values, not independently reconciled billing.
 
 ## Unavailable interaction and remaining human checks
 
-The successful headless interaction check used:
+The headless retry reached the question boundary only with a grant wider than
+the shipped skill. The command below adds `--strict-mcp-config` for hardened
+reproduction; **both historical runs omitted that flag**:
 
 ```bash
-claude -p --plugin-dir "$P" --setting-sources local --model claude-sonnet-5 \
+claude -p --plugin-dir "$P" --setting-sources local --strict-mcp-config --model claude-sonnet-5 \
   --permission-mode dontAsk \
   --allowedTools 'Bash(node:*)' 'Bash(git:*)' 'Bash(echo:*)' Read Glob Grep AskUserQuestion \
   --output-format stream-json --verbose --max-turns 8 '/codex:review'
 ```
 
-The first run lacked the echo grant: the model appended `echo "EXIT:$?"` to
-preflight, permission was denied, and it stopped. The retry reached the size
-check (`1 file changed, 1 insertion(+), 1 deletion(-)`). Tool search for
+Both runs appended `echo "...EXIT:$?"` to the shipped Node preflight, and the
+retry also chained echo separators into the git size check. The skill declares
+`Bash(node:*)` and `Bash(git:*)`, **not `Bash(echo:*)`**. The shipped grants denied
+the composed preflight; the retry needed an undeclared extra echo grant to reach
+the size check (`1 file changed, 1 insertion(+), 1 deletion(-)`). This is a
+missing capability/permission-contract gap under #430, not shipped-contract
+success. [#476](https://github.com/nq-rdl/agent-extensions/issues/476) tracks exact-command/status
+handling versus deliberate allowed-tools review; this PR does not change grants.
+
+The original runs were not isolated from claude.ai connectors: init listed
+Gmail, Slack and Google Drive, and ToolSearch surfaced Slack tools. No connector
+operation executed; `dontAsk` prevented use. `--setting-sources local` alone did
+not isolate them. The strict-MCP reproduction above is not a new tested result;
+verify connector absence in init before running it. Tool search for
 `AskUserQuestion` returned “No matching deferred tools found.” Final reply:
 
 ```text
@@ -177,7 +213,7 @@ not executed as a purported answer.
 
 **Remaining manual steps (not passes):** in an interactive terminal, create a
 fresh fixture using the setup below and run
-`claude --plugin-dir "$P" --setting-sources local`. Leave normal permissions
+`claude --plugin-dir "$P" --setting-sources local --strict-mcp-config`. Leave normal permissions
 in place; approve only the necessary read-only preflight/companion commands.
 
 1. Enter `/codex:review`. Select **Wait for results**; check exactly one native
@@ -204,7 +240,9 @@ Use a new directory for every independent case. Do not reuse the catalog as
 ```bash
 P=/absolute/path/to/agent-extensions/plugins/codex
 C="$P/scripts/codex-companion.mjs"
-root=$(mktemp -d /tmp/pi-issue-430/repro.XXXXXX)
+export P
+root=$(mktemp -d "${TMPDIR:-/tmp}/codex-430.XXXXXX")
+trap 'rm -rf "$root"' EXIT
 mkdir -p "$root/repo" "$root/home" "$root/data"
 cp "$HOME/.codex/auth.json" "$root/home/auth.json"
 chmod 600 "$root/home/auth.json"
@@ -219,10 +257,64 @@ git add value.js; git commit -qm baseline
 printf 'export const value = 2;\n' > value.js
 ```
 
+The copied credentials **must be removed**: exit the reproduction shell to run
+the trap, or explicitly `cd /; rm -rf "$root"` after collecting scrubbed evidence.
+Do not publish authentication, untrimmed wire logs or private local paths.
+
+### Observational wire recorder
+
+Save the original recorder as `$root/codex-wrapper.mjs` (no local paths needed):
+
+```javascript
+import { spawn } from 'node:child_process';
+import fs from 'node:fs';
+const args = process.argv.slice(2);
+const child = spawn(process.env.REAL_CODEX, args, { stdio: ['pipe', 'pipe', 'pipe'] });
+function record(direction, chunk) {
+  fs.appendFileSync(process.env.WIRE_LOG,
+    JSON.stringify({ direction, text: chunk.toString() }) + '\n');
+}
+process.stdin.on('data', chunk => {
+  if (args[0] === 'app-server') record('request', chunk);
+  child.stdin.write(chunk);
+});
+process.stdin.on('end', () => child.stdin.end());
+child.stdout.on('data', chunk => {
+  if (args[0] === 'app-server') record('response', chunk);
+  process.stdout.write(chunk);
+});
+child.stderr.pipe(process.stderr);
+child.on('exit', code => process.exit(code ?? 1));
+for (const signal of ['SIGTERM', 'SIGINT']) {
+  process.on(signal, () => child.kill(signal));
+}
+```
+
+Resolve the real binary **before** prepending the shim, to avoid recursion:
+
+```bash
+export REAL_CODEX="$(command -v codex)" WIRE_LOG="$root/wire.jsonl"
+export WIRE_WRAPPER="$root/codex-wrapper.mjs"
+mkdir -p "$root/bin"
+printf '#!/bin/sh\nexec node "$WIRE_WRAPPER" "$@"\n' > "$root/bin/codex"
+chmod +x "$root/bin/codex"
+export PATH="$root/bin:$PATH"
+```
+
+Each recorded line contains `direction` and a raw text chunk. Reassemble chunks
+per direction, then split JSONL; chunks need not coincide with message lines.
+Keep the recorder enabled through runtime availability checks and model calls.
+It forwards stderr without recording it and never answers server/user questions.
+
+### Persisted probe
+
 The persisted probe used the vendored app-server client but deliberately changed
 `ephemeral` to `false` to expose reviewer metadata. It is **not an exact companion
 run**. Save this as `$root/probe-review.mjs` (outside the fixture repo), then run
-`node "$root/probe-review.mjs"` from the fixture:
+`node "$root/probe-review.mjs"` from the fixture (explicit Luna, as in the original
+probe). For the distinguishing runs use `node "$root/probe-review.mjs" null`
+and `node "$root/probe-review.mjs" gpt-5.6-terra`, each with Luna config and **no**
+`review_model`:
 
 ```javascript
 const { CodexAppServerClient } = await import(
@@ -236,7 +328,9 @@ client.setNotificationHandler(message => {
   if (message.method === 'turn/completed') done();
 });
 const response = await client.request('thread/start', {
-  cwd: process.cwd(), model: 'gpt-5.6-luna', approvalPolicy: 'never',
+  cwd: process.cwd(),
+  model: process.argv[2] === 'null' ? null : (process.argv[2] ?? 'gpt-5.6-luna'),
+  approvalPolicy: 'never',
   sandbox: 'read-only', ephemeral: false
 });
 console.log(JSON.stringify({ threadStart: response }));
@@ -264,10 +358,5 @@ No retry, model-tier, authorization, resume or argument contract was changed.
 The content regression guard was updated first (19 tests: one expected failure),
 then passed after the evidence wording and generated target refresh.
 
-Validation: `asctl repo-check` (117 skills), plugin validation, manifest and
-bundle-document drift checks, bundle references/grouping/consistency/exposure,
-`sync-plugins.sh --check`, changie length and `git diff --check` all passed.
-Pipeline unit tests: 1,511 tests, OK with one unrelated optional Bash 3.2/static
-jq prerequisite skip. Companion Node tests: 230 passed, zero skips. The first
-full Python run hit the harness's 240-second timeout; the complete rerun passed
-in 384 seconds. These deterministic tests do not close the human-question gap.
+Validation results are tracked in PR #471 rather than this evidence record.
+Deterministic tests do not close the human-question gap in #475.
