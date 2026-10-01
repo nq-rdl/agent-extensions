@@ -1,0 +1,3 @@
+kind: Fixed
+body: Narrow Red Hat guard token checks to token-like literals and print arguments in the same command segment; align the Bitwarden loader hint with setup.
+time: 2026-10-01T03:14:14.061741751Z

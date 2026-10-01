@@ -3,7 +3,7 @@
 # Red Hat host or handles the offline token; everything else passes silently. Decisions via
 # permissionDecision JSON:
 #   WebFetch → Red Hat host                       deny  (Akamai 403; use /redhat:fetch-docs)
-#   literal token on the command line             deny  (Bearer eyJ…, refresh_token=…, RH_OFFLINE_TOKEN=literal,
+#   literal token on the command line             deny  (Bearer eyJ…, refresh_token=…, RH_OFFLINE_TOKEN=<token-like value>,
 #                                                        quoted or not; RH_OFFLINE_TOKEN="$(…)" / $VAR / `…` pass)
 #   printing/dumping/reading the token            deny  (echo/printf "$RH_OFFLINE_TOKEN", env|set|printenv dumps
 #                                                        that mention it, cat/grep of the 0600 token file)
@@ -69,14 +69,21 @@ dumps=0;      has "${CMDPOS}((env|set|declare|typeset)[[:space:]]*(\$|[|>;&])|(e
 reads_file=0; has "${CMDPOS}(cat|less|more|head|tail|bat|xxd|od|strings|grep|sed|awk|cp|scp)[[:space:]][^|;&]*redhat/offline-token" && reads_file=1
 [ "$touches_rh" = 1 ] || [ "$assigns" = 1 ] || [ "$expands" = 1 ] || [ "$dumps" = 1 ] || [ "$reads_file" = 1 ] || exit 0
 
+# Shared lexical segments for the print and fetcher checks (not a full shell parser).
+segments="$(printf '%s\n' "$cmd" | sed -e 's/&&/;/g' -e 's/||/;/g' | tr ';|' '\n\n')"
+
 # 1. Secret hygiene — checked first, applies even to plugin scripts.
-#    A literal value is anything after "=" (and an optional opening quote) that is not an expansion.
-if has "RH_OFFLINE_TOKEN=[\"']?[^\$\`\"'[:space:]]"; then
-  decide deny "That puts a literal Red Hat token on the command line (and in this transcript). Load it from a secret store instead: export RH_OFFLINE_TOKEN=\"\$(bw get notes redhat-credentials)\" in your own shell, or use the OS keychain. $SETUP"
+#    Only JWT-like or long base64url values count as literals; format strings and short
+#    documentation placeholders (%s, <token>, …, xxx) are not secrets.
+if has "RH_OFFLINE_TOKEN=[\"']?(eyJ[A-Za-z0-9_-]*\.[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+|[A-Za-z0-9_-]{40,})"; then
+  decide deny "That puts a literal Red Hat token on the command line (and in this transcript). Load it from a secret store instead: eval \"\$(bw get notes redhat-credentials)\" (or bwe redhat-credentials) in your own shell, or use the OS keychain. $SETUP"
 fi
-if [ "$expands" = 1 ] && has "${CMDPOS}(echo|printf)([[:space:]]|\$)"; then
-  decide deny "Never print RH_OFFLINE_TOKEN — it would land in the transcript. Verify it with: rh-token.sh --check (reports source and expiry only)."
-fi
+while IFS= read -r seg; do
+  # The expansion must follow echo/printf, not occur in a test or an assignment prefix.
+  if printf '%s' "$seg" | grep -Eq "${CMDPOS}(echo|printf)[[:space:]]+.*"'\$\{?RH_OFFLINE_TOKEN'; then
+    decide deny "Never print RH_OFFLINE_TOKEN — it would land in the transcript. Verify it with: rh-token.sh --check (reports source and expiry only)."
+  fi
+done <<<"$segments"
 if [ "$dumps" = 1 ]; then
   decide deny "Never dump the environment around RH_OFFLINE_TOKEN (env/set/printenv/declare) — the value would land in the transcript. Verify it with: rh-token.sh --check."
 fi
@@ -111,7 +118,6 @@ FETCH_DENY="Fetch Red Hat hosts with curl (preferred) or wget only — not pytho
 # 3. Fetcher policy per command segment: a segment that names a Red Hat host and is not itself a
 #    sanctioned-script invocation must not use a non-curl fetcher (a later "; bash rh-fetch.sh" or a
 #    trailing "# rh-fetch.sh" comment does not launder it).
-segments="$(printf '%s\n' "$cmd" | sed -e 's/&&/;/g' -e 's/||/;/g' | tr ';|' '\n\n')"
 while IFS= read -r seg; do
   printf '%s' "$seg" | grep -Eq "$RH_HOSTS" || continue
   printf '%s' "$seg" | grep -Eq "$SANCTIONED" && continue
