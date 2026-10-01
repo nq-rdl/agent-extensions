@@ -6,6 +6,9 @@ and records research decisions in sibling ``answers.intake.json`` in that same
 pass. The engineer then runs bootstrap and draft. This is not a new stage or
 skill. The analyst's handoff names the branch and any questions still requiring
 the requester. Research gaps discovered later return to that analyst.
+For code discovery during this pass, use ``/data-request:lookup`` and cite its record
+in the ``rationale`` of a ``topic: codes`` decision. Cite the record, not its counts:
+``answers.intake.json`` is handover tier.
 
 The sidecar schema below is the shared contract with
 ``data-analysis-scaffold validate-answers answers.yaml`` and a generated child's

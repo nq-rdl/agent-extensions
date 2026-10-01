@@ -110,6 +110,18 @@ patient identifiers (guardrails, "Personal information"). A probe that returns r
 or identifiers, or that feeds an extract, is hand SQL and needs an entry.
 Guardrails' ``references/performance.rst`` gives the probe design rules.
 
+**Code-discovery probes:** ``/data-request:lookup`` probes returning only codes,
+labels and counts are exempt from the hand-SQL gate only under those same
+operator-probe conditions. Before proposing or reporting one, read **Probe disclosure
+control** in ``${CLAUDE_PLUGIN_ROOT}/skills/guardrails/references/release.rst`` for
+its floor, formatter, structural-count treatment, rare-label folding and perimeter
+rules. Gate exemption is not disclosure permission. Include matched-term provenance,
+not patient values, dates, identifiers or free-text results.
+The exemption waives only lift capture, not engineer review of a fallback probe,
+authorisation or disclosure controls. The agent never runs the lookup query;
+an authorised human runs it and pastes the labelled grids back. The private lookup
+record holds reviewed code evidence, not patient rows or a delivered extract.
+
 Increment the document revision on each publish. Each entry also has a revision:
 new candidates start at 1; changes to need, pin, inspected evidence (including units), shortfall,
 workaround or classification increment that entry revision. A human answer binds

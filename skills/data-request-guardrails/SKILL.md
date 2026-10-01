@@ -94,7 +94,7 @@ run, except exempt probes, until a writable run publishes the entry.
 An operator probe is exempt only when it is aggregate-only, small-cell suppressed and
 bounded to a single scan, returns no patient identifier and no staff or person key,
 feeds no delivered extract, and records any `NOLOCK` or `READ UNCOMMITTED` use.
-`lifts.rst` gives both rules in full.
+`lifts.rst` gives both rules and the `/data-request:lookup` code-discovery probe case in full.
 
 For N related datasets from one cohort, check the pinned `create_temp_table()`,
 `register_result()` and `execute_pipeline_results()` implementations first:

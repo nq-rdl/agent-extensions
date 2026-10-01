@@ -52,7 +52,7 @@ Delegation outlines are optional skill references, not registered agent types.
 | [`tech-writing`](#tech-writing) | Yes | Yes | Technical writing — developer docs, tutorials, ADRs, and guides |
 | [`lucid`](#lucid) | Yes | Yes | Lucid — visual collaboration boards and diagrams (Lucidchart / Lucidspark) via the hosted Lucid MCP server |
 | [`pandera`](#pandera) | Yes | Yes | Pandera — dataframe schema validation and debugging for pandas and Polars |
-| [`data-request`](#data-request) | Yes | Yes | Data Request — triage, scope, map, draft, validate, fix and amend request SQL and Python, and draft analyst-approved release summaries, with shared RDL guardrails and human-confirmed review handoffs |
+| [`data-request`](#data-request) | Yes | Yes | Data Request — triage, scope, lookup, map, draft, validate, fix and amend request SQL and Python, and draft analyst-approved release summaries, with shared RDL guardrails and human-confirmed review handoffs |
 
 ## Install
 
@@ -771,7 +771,7 @@ Pandera — dataframe schema validation and debugging for pandas and Polars.
 
 ## data-request
 
-Data Request — triage, scope, map, draft, validate, fix and amend request SQL and Python, and draft analyst-approved release summaries, with shared RDL guardrails and human-confirmed review handoffs.
+Data Request — triage, scope, lookup, map, draft, validate, fix and amend request SQL and Python, and draft analyst-approved release summaries, with shared RDL guardrails and human-confirmed review handoffs.
 
 **Claude Code skills**
 
@@ -781,6 +781,7 @@ Data Request — triage, scope, map, draft, validate, fix and amend request SQL 
 - `/data-request:explain`
 - `/data-request:release`
 - `/data-request:guardrails`
+- `/data-request:lookup`
 - `/data-request:map`
 - `/data-request:draft`
 - `/data-request:validate`
@@ -797,6 +798,7 @@ Data Request — triage, scope, map, draft, validate, fix and amend request SQL 
 - `$data-request:explain`
 - `$data-request:release`
 - `$data-request:guardrails`
+- `$data-request:lookup`
 - `$data-request:map`
 - `$data-request:draft`
 - `$data-request:validate`
