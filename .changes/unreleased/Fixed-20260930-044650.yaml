@@ -1,3 +1,0 @@
-kind: Fixed
-body: Data-request settles grain from intake, prior delivery or requested elements, treats bare answers defaults as unconfirmed, and flags stale grain once (#444)
-time: 2026-09-30T04:46:50.456636418Z

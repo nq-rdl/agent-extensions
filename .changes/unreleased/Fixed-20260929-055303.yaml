@@ -1,3 +1,0 @@
-kind: Fixed
-body: 'opencode-agent: removed text that Claude Code ran as a shell command when loading the skill, which made it fail to load without Bash.'
-time: 2026-09-29T05:53:03.000000000Z

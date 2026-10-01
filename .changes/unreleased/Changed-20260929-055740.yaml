@@ -1,3 +1,0 @@
-kind: Changed
-body: 'ansible: shorter trigger-first description; role-reference.rst is read for role work only, not before every playbook or inventory change'
-time: 2026-09-29T05:57:40.628469518Z

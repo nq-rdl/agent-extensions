@@ -1,6 +1,6 @@
 {
   "name": "kubernetes",
-  "version": "0.36.2",
+  "version": "0.37.0",
   "description": "Kubernetes — SRE-grade rollouts, HA design, and incident response",
   "author": {
     "name": "nq-rdl"

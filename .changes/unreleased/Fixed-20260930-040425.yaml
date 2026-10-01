@@ -1,3 +1,0 @@
-kind: Fixed
-body: Stops analyst hand-off when unpublished review work remains or review evidence is absent from the checked PR head (#447)
-time: 2026-09-30T04:04:25.660865836Z

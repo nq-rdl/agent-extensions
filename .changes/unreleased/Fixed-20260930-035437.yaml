@@ -1,3 +1,0 @@
-kind: Fixed
-body: Data-request review carryover preserves original decision actors, sources and date precision independently of later confirmations (#457)
-time: 2026-09-30T03:54:37.490921355Z

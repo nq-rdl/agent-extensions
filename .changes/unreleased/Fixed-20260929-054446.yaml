@@ -1,3 +1,0 @@
-kind: Fixed
-body: 'r-lib-cran-extrachecks: http URLs fail only by redirecting, cph is required only for non-author holders (reviewers still ask), and file URIs need CRAN''s incoming setting (#304)'
-time: 2026-09-29T05:44:46.373154978Z

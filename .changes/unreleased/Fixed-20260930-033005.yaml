@@ -1,3 +1,0 @@
-kind: Fixed
-body: Bootstrap checks SQL header decisions and limitations against scope items and shared open questions before publishing, with explicit provisional reconciliation (#433)
-time: 2026-09-30T03:30:05.000242195Z

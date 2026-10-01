@@ -1,6 +1,6 @@
 {
   "name": "prompting",
-  "version": "0.36.2",
+  "version": "0.37.0",
   "description": "Prompting — prompt engineering methodology and model-specific prompt and harness guidance",
   "author": {
     "name": "nq-rdl"

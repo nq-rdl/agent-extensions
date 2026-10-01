@@ -1,3 +1,0 @@
-kind: Fixed
-body: postgres:administer and mongodb:analyse workers inspect read-only by default and need explicit authorization before any database write (#310)
-time: 2026-09-29T05:52:43.845486483Z

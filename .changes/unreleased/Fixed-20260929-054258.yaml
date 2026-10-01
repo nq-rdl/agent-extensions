@@ -1,3 +1,0 @@
-kind: Fixed
-body: 'cc-agent-teams and cc-create-workflow: fix stale teammate, permission, resume, ultracode-off, and workflow limit details verified against Claude Code 2.1.284 docs (#305)'
-time: 2026-09-29T05:42:58.693807984Z

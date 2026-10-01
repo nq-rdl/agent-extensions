@@ -1,3 +1,0 @@
-kind: Changed
-body: shiny:bslib drops its duplicate theming reference and routes to shiny:bslib-theming, whose font and tool details move to references (#304)
-time: 2026-09-29T04:06:45.139642846Z

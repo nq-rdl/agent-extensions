@@ -1,3 +1,0 @@
-kind: Added
-body: New `sqlreview.sh remap` updates unchanged draft locations and logic ranges after SQL edits, leaving changed or ambiguous ranges for the human (#438)
-time: 2026-09-30T03:11:18.64867128Z

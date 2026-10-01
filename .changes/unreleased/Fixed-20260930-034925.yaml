@@ -1,3 +1,0 @@
-kind: Fixed
-body: SQL review recovery removes semantically identical drafts despite formatting or helper-owned header history (#450)
-time: 2026-09-30T03:49:25.184797452Z

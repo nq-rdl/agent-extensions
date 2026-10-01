@@ -1,3 +1,0 @@
-kind: Fixed
-body: 'codex: review Codex entrypoints no longer claim adversarial review supports staged or unstaged scope; /codex:review returns the focus-text rejection instead of rerunning (#307)'
-time: 2026-09-29T05:36:25.430830121Z

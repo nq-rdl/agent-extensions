@@ -1,3 +1,0 @@
-kind: Fixed
-body: 'cc-setup installs chosen plugins with --scope matching the setup scope, and copies its hook and marketplace list from its own skill directory (#305, #307)'
-time: 2026-09-29T05:43:14.123078047Z

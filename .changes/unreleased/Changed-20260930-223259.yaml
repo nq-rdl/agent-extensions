@@ -1,3 +1,0 @@
-kind: Changed
-body: Consolidate the prompt-builder delegation outline after a 16-run worker pilot, preserving caller handoff, source fidelity and visible Builder/Tester validation (#426).
-time: 2026-09-30T22:32:59.157233677Z

@@ -1,3 +1,0 @@
-kind: Security
-body: Question publication refuses draft paths with symlinks hidden before parent-directory components (#455)
-time: 2026-09-30T03:57:35.501871421Z

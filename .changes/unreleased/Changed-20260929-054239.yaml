@@ -1,3 +1,0 @@
-kind: Changed
-body: '`gh:document-release` commits, pushes or edits the PR body only when asked; a review request reports proposed edits (#307)'
-time: 2026-09-29T05:42:39.321235155Z

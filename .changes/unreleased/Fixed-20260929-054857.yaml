@@ -1,3 +1,0 @@
-kind: Fixed
-body: 'shiny-bslib: toasts, input_code_editor() and input_submit_textarea() are marked as needing bslib >= 0.10.0; the rest was checked against bslib 0.9.0 from the CRAN archive (#308)'
-time: 2026-09-29T05:48:57.164091678Z

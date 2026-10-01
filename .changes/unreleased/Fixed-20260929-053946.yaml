@@ -1,3 +1,0 @@
-kind: Fixed
-body: 'sops: examples match sops 3.13.3 - updatekeys -y, dotenv type flags for .env.enc, sops rotate for Vault key versions, --verbose placement, edit temp file and key lookup'
-time: 2026-09-29T05:39:46.258322764Z

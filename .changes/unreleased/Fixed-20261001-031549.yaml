@@ -1,3 +1,0 @@
-kind: Fixed
-body: 'redhat: Bitwarden credentials fall back to the RH_OFFLINE_TOKEN text or hidden custom field when Notes yield no token; setup and empty-token hints describe both layouts'
-time: 2026-10-01T03:15:49.717752465Z

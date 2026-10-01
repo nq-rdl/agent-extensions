@@ -1,6 +1,6 @@
 {
   "name": "writerside",
-  "version": "0.36.2",
+  "version": "0.37.0",
   "description": "Writerside — author and build JetBrains Writerside documentation",
   "author": {
     "name": "nq-rdl"

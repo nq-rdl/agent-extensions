@@ -1,6 +1,6 @@
 {
   "name": "playwright",
-  "version": "0.36.2",
+  "version": "0.37.0",
   "description": "Playwright — generate and debug end-to-end browser tests",
   "author": {
     "name": "nq-rdl"

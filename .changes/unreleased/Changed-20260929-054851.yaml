@@ -1,3 +1,0 @@
-kind: Changed
-body: 'r-expert, r-lib-cli, r-lib-lifecycle: trigger-first descriptions under 400 characters; r-expert routes to installed r:lib-* and shiny:* names and to mirai for parallel work (#306)'
-time: 2026-09-29T05:48:51.353544995Z

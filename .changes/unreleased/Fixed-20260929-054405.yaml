@@ -1,3 +1,0 @@
-kind: Fixed
-body: OpenCode and Spec Kit prompt hooks gate without jq or grep -P (tested on bash 3.2 with BusyBox) and stay silent on malformed input (#311)
-time: 2026-09-29T05:44:05.29380043Z

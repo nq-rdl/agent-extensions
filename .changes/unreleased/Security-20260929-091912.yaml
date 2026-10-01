@@ -1,3 +1,0 @@
-kind: Security
-body: Keeps the Bitwarden Login example token out of process arguments (#320)
-time: 2026-09-29T09:19:12.266078778Z

@@ -1,3 +1,0 @@
-kind: Changed
-body: 'r-lib-testing: description names testthat features and triggers; compatibility separates the testthat >= 3.0.0 minimum from per-feature versions and the tested 3.3.2 (#306, #308)'
-time: 2026-09-29T05:41:32.286746316Z

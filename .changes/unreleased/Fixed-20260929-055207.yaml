@@ -1,3 +1,0 @@
-kind: Fixed
-body: speckit-validate labels each finding as an installer rejection, a warning or a local check, and accepts before/after_converge hooks.
-time: 2026-09-29T05:52:07.704612619Z
