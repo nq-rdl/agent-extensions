@@ -218,9 +218,15 @@ class SopsCases:
                 'true && /usr/local/bin/sops -d ' + str(target),
                 'sops -d ' + str(target) + '; bash "$S/rh-token.sh" --check',
                 'bash "$S/rh-token.sh" --check; sops decrypt ' + str(target),
+                # Relative paths after cd, and commands that hand plaintext to a child.
+                'cd ~/.config/redhat && sops -d offline-token.sops.yaml',
+                'cd "$(dirname "$RH_OFFLINE_TOKEN_SOPS_FILE")" && sops -d "custom secret.yaml"',
+                'sops exec-env ~/.config/redhat/offline-token.sops.yaml env',
+                'sops exec-file "$RH_OFFLINE_TOKEN_SOPS_FILE" "cat {}"',
             ]
             allow = [
                 'sops -d other.sops.yaml', 'sops decrypt project/secrets.yaml',
+                'sops exec-env project/secrets.yaml make',
                 'git commit -m "deny sops -d ~/.config/redhat/offline-token.sops.yaml"',
                 'grep -rn "sops decrypt" skills/',
                 'echo "sops -d ~/.config/redhat/offline-token.sops.yaml"',

@@ -324,4 +324,4 @@ TPM backing additionally prevents moving the key to another machine; retain a
 recovery plan (e.g. regenerate the Red Hat token) before TPM reset/host loss.
 No source is a general defense against same-user processes. The transcript guarantee
 is unchanged: the model never handles the token in chat, and the guard denies direct
-sops decryption of this token file. The lexical hook is not an OS security boundary.
+sops decryption (including `exec-env`/`exec-file`) of this token file. The lexical hook is not an OS security boundary.

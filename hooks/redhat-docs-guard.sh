@@ -91,13 +91,16 @@ qsegments="$(printf '%s\n' "$cmd" | awk -v sq="'" -v dq='"' '{
 } END { if (q != "") print "" }')"
 
 # Direct decryption of this credential is never sanctioned by a neighbouring script
-# invocation. Match sops in command position only (not git messages/grep/docs), and
-# restrict to the default file, the configured path, or its variable expansion.
+# invocation. Match sops in command position only (not git messages/grep/docs), for
+# decrypt and exec-env/exec-file (which hand plaintext to another command). Match the
+# file by basename too, so `cd ~/.config/redhat && sops -d offline-token.sops.yaml`
+# is caught, plus the configured path and its variable expansion.
 sops_file="${RH_OFFLINE_TOKEN_SOPS_FILE:-${XDG_CONFIG_HOME:-$HOME/.config}/redhat/offline-token.sops.yaml}"
 while IFS= read -r seg; do
-  if printf '%s' "$seg" | grep -Eq "${CMDPOS}([\"']?[^[:space:]]*/)?sops[\"']?[[:space:]]+([^|;&]*[[:space:]])?(-d|--decrypt|decrypt)([[:space:]]|\$)"; then
-    if printf '%s' "$seg" | grep -Eq 'redhat/offline-token\.sops\.yaml|\$\{?RH_OFFLINE_TOKEN_SOPS_FILE' \
-        || printf '%s' "$seg" | grep -Fq -- "$sops_file"; then
+  if printf '%s' "$seg" | grep -Eq "${CMDPOS}([\"']?[^[:space:]]*/)?sops[\"']?[[:space:]]+([^|;&]*[[:space:]])?(-d|--decrypt|decrypt|exec-env|exec-file)([[:space:]]|\$)"; then
+    if printf '%s' "$seg" | grep -Eq 'offline-token\.sops\.yaml|\$\{?RH_OFFLINE_TOKEN_SOPS_FILE' \
+        || printf '%s' "$seg" | grep -Fq -- "$sops_file" \
+        || printf '%s' "$seg" | grep -Fq -- "${sops_file##*/}"; then
       decide deny "Never decrypt the Red Hat offline-token sops file into the transcript. Use the plugin's rh-token.sh --check (source and expiry only)."
     fi
   fi
