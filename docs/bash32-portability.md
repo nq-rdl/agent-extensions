@@ -6,7 +6,10 @@ fixture with Docker on the Ubuntu runner, then runs
 The dedicated runner lists every required case and fails on an empty or
 incomplete selection, a missing test, a failure, an expected failure, or any
 skip (including a skipped subtest). Its verbose output names the cases and
-reports the executed and skipped counts. General unit-test discovery can still
+reports the executed and skipped counts. Red Hat credential cases additionally
+exercise Bitwarden text/hidden custom fields, Notes precedence, and empty/missing
+fields with the pinned jq; the same cases run under the host Bash in general discovery.
+General unit-test discovery can still
 skip these fixtures on contributors' machines without container prerequisites.
 
 The cases exercise both installed prompt hooks' fire/no-fire paths, JSON-escaped

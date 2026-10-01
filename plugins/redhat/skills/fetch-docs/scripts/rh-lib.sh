@@ -73,7 +73,7 @@ rh_cred_source() {
 # Print the token itself. ONLY rh-token.sh may call this; callers must capture
 # into a variable and never echo it.
 rh_cred_token() {
-  local src f notes
+  local src f notes tok item
   src="$(rh_cred_source)" || return 1
   case "$src" in
     env) printf '%s\n' "$RH_OFFLINE_TOKEN" ;;
@@ -90,11 +90,18 @@ rh_cred_token() {
       esac
       head -1 "$f" | tr -d '[:space:]' ;;
     bitwarden)
-      notes="$(bw get notes "$RH_BW_ITEM" 2>/dev/null | tr -d '\r')"
+      notes="$(bw get notes "$RH_BW_ITEM" 2>/dev/null)" || return 1
+      notes="$(printf '%s\n' "$notes" | tr -d '\r')"
       # Accept `export RH_OFFLINE_TOKEN=…`, `RH_OFFLINE_TOKEN=…`, or a bare JWT line (three
       # base64url segments — a label-like line such as a date or a name is not a token).
-      printf '%s\n' "$notes" | sed -n 's/^[[:space:]]*\(export[[:space:]]\{1,\}\)\{0,1\}RH_OFFLINE_TOKEN=["'"'"']\{0,1\}\([^"'"'"'[:space:]]*\).*/\2/p' | head -1 | grep . \
-        || printf '%s\n' "$notes" | grep -m1 -E '^[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+$' ;;
+      tok="$(printf '%s\n' "$notes" | sed -n 's/^[[:space:]]*\(export[[:space:]]\{1,\}\)\{0,1\}RH_OFFLINE_TOKEN=["'"'"']\{0,1\}\([^"'"'"'[:space:]]*\).*/\2/p' | head -1 | grep . \
+        || printf '%s\n' "$notes" | grep -m1 -E '^[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+$')"
+      if [ -z "$tok" ]; then
+        # Same single-item lookup as get notes; never list/search and pick a result.
+        item="$(bw get item "$RH_BW_ITEM" 2>/dev/null)" || return 1
+        tok="$(printf '%s\n' "$item" | jq -r '.fields[]? | select(.name == "RH_OFFLINE_TOKEN" and (.type == 0 or .type == 1)) | .value // empty' 2>/dev/null | head -1)"
+      fi
+      printf '%s\n' "$tok" ;;
   esac
 }
 

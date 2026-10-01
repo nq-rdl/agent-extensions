@@ -9,6 +9,11 @@ CASES = (
     "test_installed_hooks.Bash32BusyBoxFallback.test_prompt_fallbacks_gate_without_jq_or_python",
     "test_installed_hooks.Bash32BusyBoxFallback.test_escaped_input",
     "test_cc_agent_teams_check_config.Bash32BusyBox.test_enable_disable_check_under_bash32",
+    "test_redhat_setup.Bash32Bitwarden.test_bitwarden_text_field",
+    "test_redhat_setup.Bash32Bitwarden.test_bitwarden_hidden_field",
+    "test_redhat_setup.Bash32Bitwarden.test_bitwarden_notes_win_over_field",
+    "test_redhat_setup.Bash32Bitwarden.test_bitwarden_empty_field_exits_3",
+    "test_redhat_setup.Bash32Bitwarden.test_bitwarden_missing_or_wrong_field_exits_3",
 )
 
 
