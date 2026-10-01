@@ -154,6 +154,8 @@ class ConfigTests(unittest.TestCase):
             "^https://api\\.access\\.redhat\\.com/(support|support/search/kcs|rs/solutions/)$",
             "^https://access\\.redhat\\.com/hydra/rest/search/kcs$",
             "^https://sso\\.redhat\\.com/auth/realms/redhat-external/protocol/openid-connect/token$",
+            # #492: Developer Portal homepage bot-blocked lychee with 403 locally.
+            "^https://developers\\.redhat\\.com/?$",
             # #301: the private RDL Planning board (README.md) answers 404 anonymously.
             "^https://github\\.com/orgs/nq-rdl/projects/1/?$",
         }

@@ -31,7 +31,13 @@ Gotchas (all observed 2026-08-27)
   ``q=*&fq=id:<id>&fl=…`` on the search endpoint.
 * **Metadata is public; bodies are entitled.** Unauthenticated (or with a bad token)
   the endpoint answers **HTTP 200** with body fields set to the literal
-  ``"subscriber_only"``. Status codes do not signal authentication; the placeholder does.
+  ``"subscriber_only"``. An authenticated account without the needed subscription also
+  gets placeholders (#492, reported 2026-10-01). The placeholder alone cannot distinguish
+  authentication from entitlement. ``rh-fetch.sh`` verifies a fresh token exchange and
+  retries once before diagnosing missing entitlement. Review subscriptions at
+  https://access.redhat.com/management/subscriptions or the free Developer Subscription
+  for Individuals at https://developers.redhat.com/ . Empty Documentation text can mean
+  either missing entitlement or that the index has no stored body.
 * **Locale redirect.** ``access.redhat.com/solutions/<id>`` 302s to ``/ja/…`` from some
   networks regardless of ``Accept-Language``, an ``rh_locale`` cookie, or an explicit
   ``/en/`` path (edge geo logic), and the HTML body is login-gated. Treat ``view_uri`` as

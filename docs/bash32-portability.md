@@ -14,6 +14,9 @@ storage before a file exists in the running session, atomic writes, optional
 Bitwarden Notes/custom-field seeding, path overrides/source filtering, preflight
 tool reporting, and narrowly scoped direct-decryption guard decisions. These run
 under both host Bash and the pinned Bash 3.2 fixture (not real sops/hardware).
+Red Hat fetch cases use curl/wget shims to exercise direct HTML validation/article
+extraction, source/index fallback order, fresh-token retries and entitlement versus
+credential diagnostics. No live Red Hat requests or real credentials are used.
 Pi dispatch cases run all target parsing, conservative overlap/cap waves,
 prompt rendering, worktree and launch argv (including opt-in Fast env/extension,
 offline catalog checks and requested-tier status), resume, status/CI, lock safety and

@@ -7,19 +7,20 @@
 #   https://docs.redhat.com/<lang>/documentation/<product>/<ver>/html/<book>/<page>[#anchor]
 #   https://docs.redhat.com/<lang>/documentation/<product>/<ver>/html-single/<book>/index#anchor
 #   https://access.redhat.com/documentation/<locale>/<product>/<ver>/html/…   (legacy host form)
-#        → the product's open-source doc repo on GitHub (docs.redhat.com itself returns
-#          Akamai 403 to every non-browser client). AsciiDoc source to stdout.
+#        → direct HTML article text first (no credentials); on failure, the product's
+#          GitHub AsciiDoc source, then docs-text. Akamai may block direct requests.
 #   https://access.redhat.com/solutions/<id> | /articles/<id> | kcs:<id>
 #        → Customer Portal KCS body via the search API (fq=id:), Bearer-authenticated
 #          through rh-token.sh. Markdown to stdout. Subscriber-only placeholders = exit 3.
 #   search:<terms>           → KCS search (no credential needed for metadata)
 #   docs-text:<docs URL>     → EXPERIMENTAL: the KCS index's stored text for a docs.redhat.com
 #                              page (Bearer-authenticated; any #anchor is ignored — the index is
-#                              keyed by page URL). The only route for closed-source products such
-#                              as RHEL if the index exposes text to your account.
+#                              keyed by page URL). Fallback for products without public source
+#                              if direct HTML fails and the index exposes text to your account.
 #
 # exit: 0 ok · 1 usage · 2 network/HTTP · 4 unresolvable
-#       3 no credential, not entitled, or offline token rejected (invalid_grant) → /redhat:setup
+#       3 no credential, not entitled, empty indexed text, or offline token rejected
+#         (invalid_grant). Only credential failures need /redhat:setup.
 set -u
 set -o pipefail   # a failed fetch on the left of "| emit" must surface as a non-zero exit
 here="$(cd "$(dirname "$0")" && pwd)"
@@ -52,6 +53,70 @@ urlenc() { jq -rn --arg s "$1" '$s|@uri'; }
 tmpf() { local f; f="$(mktemp "${TMPDIR:-/tmp}/rh-fetch.XXXXXX")" || { echo "mktemp failed in ${TMPDIR:-/tmp}" >&2; exit 2; }; chmod 600 "$f"; printf '%s\n' "$f"; }
 # rh-token.sh exit 4 (offline token rejected) is a credential problem for this script's callers: map to 3.
 curl_config() { local c; c="$("$here/rh-token.sh" --curl-config)" || { local rc=$?; [ "$rc" = 4 ] && rc=3; return "$rc"; }; printf '%s\n' "$c"; }
+
+# ---------- Direct public HTML route ----------
+direct_docs() { # <page URL> → article text; never send a Bearer token to this host
+  local url="$1" f meta code type rc
+  f="$(tmpf)"; meta="$(tmpf)"
+  if command -v curl >/dev/null 2>&1; then
+    curl -sS -L --connect-timeout 10 --max-time 60 -o "$f" -w '%{http_code}\n%{content_type}\n' "$url" > "$meta"
+    rc=$?
+    code="$(head -1 "$meta")"; type="$(tail -1 "$meta")"
+  else
+    wget -q -S --timeout=30 --tries=1 --content-on-error -O "$f" "$url" 2> "$meta"
+    rc=$?
+    code="$(sed -n 's/^ *HTTP\/[0-9.]* \([0-9]*\).*/\1/p' "$meta" | tail -1)"
+    type="$(awk '/^ *HTTP\// { type="" } tolower($0) ~ /^ *content-type:/ { sub(/^[^:]*:[[:space:]]*/, ""); type=$0 } END { print type }' "$meta")"
+  fi
+  if [ "$rc" != 0 ] || [ "$code" != 200 ] || ! printf '%s' "$type" | grep -Eqi '^(text/html|application/xhtml\+xml)(;|[[:space:]]|$)' \
+      || grep -Eqi 'edgesuite|access[[:space:]]+denied' "$f"; then
+    echo "Direct docs fetch unavailable (HTTP ${code:-unknown}); trying source repo, then docs-text." >&2
+    rm -f "$f" "$meta"; return 4
+  fi
+  # Bounded HTML-to-text plumbing for Red Hat's article wrapper, not a general renderer.
+  # Preserve preformatted whitespace and block boundaries; decode entities only AFTER
+  # stripping tags so escaped command arguments such as &lt;node&gt; survive.
+  jq -Rrs '
+    capture("<article\\b[^>]*>(?<body>.*?)</article\\s*>"; "im").body
+    | gsub("<!--.*?-->"; ""; "m")
+    | gsub("<(script|style)\\b[^>]*>.*?</(script|style)\\s*>"; ""; "im")
+    | gsub("</?(p|div|section|h[1-6]|pre|ul|ol|li|table|tr|blockquote)\\b[^>]*>|<br\\b[^>]*>"; "\n"; "i")
+    | gsub("</t[dh]\\s*>"; "\t"; "i") | gsub("<[^>]*>"; "")
+    | gsub("&lt;"; "<") | gsub("&gt;"; ">") | gsub("&quot;"; "\"")
+    | gsub("&apos;"; "\u0027") | gsub("&nbsp;"; " ")
+    | gsub("&#(?<n>[0-9]+|[xX][0-9a-fA-F]+);";
+        (.n | if test("^[xX]") then
+          ascii_downcase | .[1:] | explode | reduce .[] as $c (0; . * 16 + (if $c > 96 then $c - 87 else $c - 48 end))
+        else tonumber end) as $n
+        | if $n > 0 and $n <= 1114111 and ($n < 55296 or $n > 57343) then [$n] | implode else "�" end)
+    | gsub("&amp;"; "&")
+    | select(test("\\S"))' "$f" > "$meta"
+  rc=$?
+  if [ "$rc" != 0 ] || [ ! -s "$meta" ]; then
+    echo "Direct docs response has no usable article; trying source repo, then docs-text." >&2
+    rm -f "$f" "$meta"; return 4
+  fi
+  { echo "// source: $url"; echo "// fetched: $(date -u +%Y-%m-%dT%H:%M:%SZ) by rh-fetch.sh";
+    echo "// direct HTML: whole article (anchors are not narrowed; --includes applies only to source fallback)"; echo; cat "$meta"; } | emit
+  rc=$?; rm -f "$f" "$meta"; return "$rc"
+}
+
+route_docs() { # direct → source → indexed text
+  local url="$1" page_url rest form rc
+  page_url="${url%%#*}"; page_url="${page_url%%\?*}"
+  rest="${page_url#https://docs.redhat.com/}"; rest="${rest#*/documentation/}"
+  rest="${rest#*/}"; rest="${rest#*/}"; form="${rest%%/*}"
+  case "$form" in
+    html|html-single) ;;
+    *) echo "unrecognised docs.redhat.com URL form '$form' — expected /html/ or /html-single/; try docs-text:$page_url" >&2; return 4 ;;
+  esac
+  direct_docs "$page_url" && return 0
+  rc=$?; [ "$rc" = 4 ] || return "$rc"
+  route_docs_source "$url" && return 0
+  rc=$?; [ "$rc" = 2 ] || [ "$rc" = 4 ] || return "$rc"
+  echo "Source route unavailable; trying docs-text:$page_url" >&2
+  route_docs_text "$page_url"
+}
 
 # ---------- GitHub source-repo route ----------
 tree_paths() { # <repo> <ref> → path list (cached 24h)
@@ -105,7 +170,7 @@ no_source() { # <slug> <repo> <ref>
   echo "no '$1.adoc' in $2@$3 — the slug is not a file name here (OpenShift anchors carry a _{context} suffix, which was already tried); search the source: gh api -X GET search/code -f q='\"$1\" repo:$2'" >&2
 }
 
-route_docs() { # <url>
+route_docs_source() { # <url>
   local url="$1" rest product ver form book page anchor repo ref base tree path modpath f body rc page_url
   anchor="${url#*#}"; [ "$anchor" = "$url" ] && anchor=""
   page_url="${url%%#*}"; page_url="${page_url%%\?*}"   # what the KCS Documentation index is keyed by
@@ -120,7 +185,7 @@ route_docs() { # <url>
                                          repo=openshift/openshift-docs; ref="enterprise-$ver"; base="" ;;
     *)
       cat >&2 <<MSG
-No known public source repo for product '$product' (docs.redhat.com itself blocks non-browser fetches).
+No known public source repo for product '$product' (direct docs fetch was unavailable).
 Known: red_hat_ansible_automation_platform → ansible/aap-docs · openshift_container_platform → openshift/openshift-docs
 Satellite docs build from theforeman/foreman-documentation (guides/doc-<Title>/, BUILD=satellite) — search it with gh.
 RHEL and other closed products: try  rh-fetch.sh 'docs-text:$page_url'  (needs your offline token) or read the page in a browser.
@@ -180,21 +245,40 @@ MSG
 subscriber_only_fields() { # scalar "subscriber_only" or an array containing it
   jq -r '[.response.docs[0] | to_entries[] | select(.value == "subscriber_only" or ((.value|type) == "array" and (.value|index("subscriber_only")) != null)) | .key] | join(", ")' "$1"
 }
-not_entitled() { # <what> <fields>
-  echo "$1 returned subscriber_only for: $2. The API answers 200 even when the Bearer token is ignored, so this means your token was not accepted or your account is not entitled. Run: rh-token.sh --check   (then /redhat:setup if it fails)" >&2
+fresh_config() {
+  # Verify the stored offline token, then retry with the newly exchanged access token.
+  # A cached/ignored Bearer must not be mistaken for a missing entitlement.
+  "$here/rh-token.sh" --check >/dev/null || { local rc=$?; [ "$rc" = 4 ] && rc=3; return "$rc"; }
+  curl_config
+}
+entitlement_hint() {
+  echo "Review https://access.redhat.com/management/subscriptions and the free Developer Subscription for Individuals at https://developers.redhat.com/. Token setup does not add an entitlement." >&2
+}
+not_entitled() { # <what> <fields>; called only after fresh exchange + retry
+  echo "$1 returned subscriber_only for: $2 after a successful fresh token exchange and retry. Your account is not entitled to this content; the offline token is valid." >&2
+  entitlement_hint
 }
 
 route_kcs_id() { # <id>
-  local id="$1" cfg f code n so got
+  local id="$1" cfg f code n so got url rc
   case "$id" in ''|*[!0-9]*) echo "kcs:<id> needs a numeric solution/article id (got '$id')" >&2; exit 1 ;; esac
   cfg="$(curl_config)" || exit $?
   f="$(tmpf)"
-  code="$(rh_http_get "$RH_KCS_API?q=*&fq=id:$id&fl=id,documentKind,publishedTitle,view_uri,lastModifiedDate,solution_environment,issue,solution_resolution,solution_rootcause,solution_diagnosticsteps,body,abstract" "$f" "$cfg")"
+  url="$RH_KCS_API?q=*&fq=id:$id&fl=id,documentKind,publishedTitle,view_uri,lastModifiedDate,solution_environment,issue,solution_resolution,solution_rootcause,solution_diagnosticsteps,body,abstract"
+  code="$(rh_http_get "$url" "$f" "$cfg")"
   [ "$code" = "200" ] || { echo "KCS API: HTTP $code" >&2; rm -f "$f"; exit 2; }
   n="$(jq -r '.response.numFound // 0' "$f")"; [ "$n" -gt 0 ] || { echo "no KCS document with id $id" >&2; rm -f "$f"; exit 4; }
   got="$(jq -r '.response.docs[0].id // empty' "$f")"; [ "$got" = "$id" ] || { echo "KCS API returned document '$got' for id $id" >&2; rm -f "$f"; exit 4; }
   so="$(subscriber_only_fields "$f")"
-  if [ -n "$so" ]; then not_entitled "KCS $id" "$so"; rm -f "$f"; exit 3; fi
+  if [ -n "$so" ]; then
+    cfg="$(fresh_config)" || { rc=$?; rm -f "$f"; exit "$rc"; }
+    code="$(rh_http_get "$url" "$f" "$cfg")"
+    [ "$code" = 200 ] || { echo "KCS API retry: HTTP $code" >&2; rm -f "$f"; exit 2; }
+    got="$(jq -r '.response.docs[0].id // empty' "$f")"
+    [ "$got" = "$id" ] || { echo "KCS API retry did not return id $id" >&2; rm -f "$f"; exit 4; }
+    so="$(subscriber_only_fields "$f")"
+    if [ -n "$so" ]; then not_entitled "KCS $id" "$so"; rm -f "$f"; exit 3; fi
+  fi
   jq -r '
     def s: if type=="array" then join("\n") elif .==null then "" else tostring end;
     .response.docs[0] as $d |
@@ -214,22 +298,36 @@ route_search() { # <terms>
   rm -f "$f"
 }
 
+indexed_text() { # first NON-EMPTY field after normalising scalars/arrays
+  jq -r '
+    def s: if type=="array" then join("\n") elif .==null then "" else tostring end;
+    .response.docs[0] | [.docs_text_store, .large_text_store] | map(s) | map(select(length > 0)) | .[0] // empty' "$1"
+}
+
 route_docs_text() { # <docs url>
-  local url="$1" cfg f code n so
+  local url="$1" cfg f code n so query rc
   url="${url%%#*}"; url="${url%%\?*}"   # the index is keyed by page URL — a #anchor would match nothing
   cfg="$(curl_config)" || exit $?
   f="$(tmpf)"
-  code="$(rh_http_get "$RH_KCS_API?q=*&fq=id:$(urlenc "\"$url\"")&fl=publishedTitle,view_uri,docs_text_store,large_text_store" "$f" "$cfg")"
+  query="$RH_KCS_API?q=*&fq=id:$(urlenc "\"$url\"")&fl=publishedTitle,view_uri,docs_text_store,large_text_store"
+  code="$(rh_http_get "$query" "$f" "$cfg")"
   [ "$code" = "200" ] || { echo "KCS API: HTTP $code" >&2; rm -f "$f"; exit 2; }
   n="$(jq -r '.response.numFound // 0' "$f")"; [ "$n" -gt 0 ] || { echo "that URL is not in the KCS Documentation index" >&2; rm -f "$f"; exit 4; }
   so="$(subscriber_only_fields "$f")"
-  if [ -n "$so" ]; then not_entitled "docs-text for $url" "$so"; rm -f "$f"; exit 3; fi
-  # First NON-EMPTY of docs_text_store / large_text_store (jq's // only skips null/false, not "").
-  jq -r '
-    def s: if type=="array" then join("\n") elif .==null then "" else tostring end;
-    .response.docs[0] | [.docs_text_store, .large_text_store] | map(s) | map(select(length > 0)) | .[0] // empty' "$f" > "$f.txt"
+  indexed_text "$f" > "$f.txt"
+  if [ -n "$so" ] || [ ! -s "$f.txt" ]; then
+    cfg="$(fresh_config)" || { rc=$?; rm -f "$f" "$f.txt"; exit "$rc"; }
+    code="$(rh_http_get "$query" "$f" "$cfg")"
+    [ "$code" = 200 ] || { echo "KCS API retry: HTTP $code" >&2; rm -f "$f" "$f.txt"; exit 2; }
+    n="$(jq -r '.response.numFound // 0' "$f")"
+    [ "$n" -gt 0 ] || { echo "that URL is not in the KCS Documentation index on retry" >&2; rm -f "$f" "$f.txt"; exit 4; }
+    so="$(subscriber_only_fields "$f")"
+    if [ -n "$so" ]; then not_entitled "docs-text for $url" "$so"; rm -f "$f" "$f.txt"; exit 3; fi
+    indexed_text "$f" > "$f.txt"
+  fi
   if [ ! -s "$f.txt" ]; then
-    echo "Documentation text fields came back empty (experimental route — the index may not expose page text to your account). Use the source-repo route or a browser." >&2; rm -f "$f" "$f.txt"; exit 3
+    echo "Documentation text fields came back empty after a successful fresh token exchange and retry. The index may not store page text, or your account may lack the required entitlement. Try the direct docs URL or a browser." >&2
+    entitlement_hint; rm -f "$f" "$f.txt"; exit 3
   fi
   { jq -r '.response.docs[0] | "# \(.publishedTitle // "")\n\nSource: \(.view_uri // "")\n"' "$f"; cat "$f.txt"; } | emit || { rm -f "$f" "$f.txt"; exit 2; }
   rm -f "$f" "$f.txt"

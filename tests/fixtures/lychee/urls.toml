@@ -119,6 +119,21 @@ shipped = false
 repository = true
 
 [[cases]]
+url = "https://developers.redhat.com/"
+shipped = false
+repository = true
+
+[[cases]]
+url = "https://developers.redhat.com/articles/"
+shipped = false
+repository = false
+
+[[cases]]
+url = "https://developers.redhat.com.real.org/"
+shipped = false
+repository = false
+
+[[cases]]
 url = "https://www.conventionalcommits.org/en/v1.0.0/"
 shipped = false
 repository = false

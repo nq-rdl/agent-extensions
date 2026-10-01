@@ -49,10 +49,14 @@ exclude = [
   "^https://github\\.com/orgs/nq-rdl/projects/1/?$",
   # RDL Service Desk (access-controlled) — referenced by the new-service-request skill
   "^https://github\\.com/rdl-service-desk/service-desk",
-  # Red Hat: docs.redhat.com bot-blocks non-browser clients (Akamai 403 — see redhat plugin,
-  # nq-rdl/agent-extensions#261) and the API-token page is login-gated — referenced by the redhat skills
+  # Red Hat: docs.redhat.com may bot-block non-browser clients (Akamai — #261/#492),
+  # and the API-token page is login-gated — referenced by the redhat skills
   "^https?://docs\\.redhat\\.com/",
   "^https://access\\.redhat\\.com/management/api",
+  # Developer Portal homepage: lychee received 403 in the #492 pre-commit check
+  # (2026-10-01). Linked by redhat-docs-fetch SKILL.md/customer-portal-api.rst for
+  # Developer Subscription entitlement guidance; exclude only this bot-blocked root.
+  "^https://developers\\.redhat\\.com/?$",
   # Australian Government Style Manual — referenced by tech-writing-copyedit. lychee on
   # GitHub runners still fails with "HTTP/2 protocol error" (re-confirmed in run
   # 36407979723, 2026-09-28); curl, browsers and local lychee succeed.
