@@ -181,6 +181,18 @@ Native hook tests use copied caches with spaces in their paths and verify actual
 allow/deny/context outputs. No test installs this catalog into the contributor's
 active session.
 
+The offline companion suite runs with `node --test tests/codex/*.test.mjs`.
+Its shared helper tracks temp-directory ownership, shuts detached brokers down
+at file teardown (including failed tests), and uses bounded PID fallback before
+removing workspaces and broker socket/log directories. A process-exit hook adds
+best-effort forced cleanup. Ownership comes from live broker arguments, not
+possibly deleted or redirected session state. The nested git-environment suite
+also asserts that its broker-spawning tests leave no live brokers under its
+unique temp root; unrelated brokers are excluded. Dedicated fixtures cover
+failed tests, missing cwds, unresponsive brokers, and explicit process exit.
+These are test-harness changes only; vendored runtime session reuse and SessionEnd
+teardown are unchanged. No production idle timeout or missing-cwd watchdog is added.
+
 The runtime check also verifies client-visible skill metadata through `skills/list`.
 It does not exercise a desktop or IDE menu, or execute a model-driven skill workflow.
 

@@ -6,6 +6,8 @@ import os from "node:os";
 import path from "node:path";
 import process from "node:process";
 import { spawnSync } from "node:child_process";
+import { after } from "node:test";
+import { cleanupTestBrokers, killTestBrokersOnExit } from "./broker-cleanup.mjs";
 
 // Git exports GIT_DIR (and, depending on the hook, GIT_WORK_TREE, GIT_INDEX_FILE,
 // GIT_PREFIX, ...) into hooks, e.g. when pushing from a linked worktree. Inherited,
@@ -78,8 +80,28 @@ export function scrubHostSessionEnv(env) {
 scrubGitEnv(process.env);
 scrubHostSessionEnv(process.env);
 
+const tempDirs = new Set();
+
+// Runs even when a test assertion fails. Stop detached brokers before deleting
+// their workspaces; roots also cover nested cwds and private state locations.
+// Inline `node -e` import probes inherit NODE_TEST_CONTEXT from their parent,
+// but are not test files. Registering after() there would start a TAP reporter
+// and corrupt their JSON stdout.
+if (process.env.NODE_TEST_CONTEXT && process.argv[1]) {
+  after(async () => {
+    await cleanupTestBrokers([...tempDirs]);
+    for (const dir of tempDirs) fs.rmSync(dir, { recursive: true, force: true });
+    tempDirs.clear();
+  });
+}
+process.once("exit", () => {
+  if (tempDirs.size) killTestBrokersOnExit([...tempDirs]);
+});
+
 export function makeTempDir(prefix = "codex-plugin-test-") {
-  return fs.mkdtempSync(path.join(os.tmpdir(), prefix));
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), prefix));
+  tempDirs.add(dir);
+  return dir;
 }
 
 export function writeExecutable(filePath, source) {
