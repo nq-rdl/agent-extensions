@@ -14,14 +14,19 @@ required. Run relevant validation, with exact commands and honest results.
 Do not bypass git hooks, disable safety checks, or change permission settings.
 
 Test suites can be memory-heavy. Run only necessary suites, serially, and do not
-spawn additional workers. Never perform live or paid checks unless the user has
-explicitly authorised a specific isolated environment, call/budget cap, and
-credential cleanup plan. If blocked by missing information or authorization,
-return the blocker and questions to the orchestrator. Do not perform unauthorized
-actions; the orchestrator may provide answers and resume the work.
+spawn additional workers. Running the repository's standard commit/push hooks
+and CI is expected, including public no-credential link checks and non-blocking
+scans; never bypass them. This is distinct from live/paid checks: credentialed
+or billed calls to external services (such as model inference or testing with
+real service tokens) require explicit user authorisation of a specific isolated
+environment, call/budget cap, and credential cleanup plan. A hook or CI job that
+opts into such calls still needs that authorisation; do not enable it implicitly.
+If blocked by missing information or authorization, return the blocker and
+questions to the orchestrator. Do not perform unauthorized actions; the
+orchestrator may provide answers and resume the work.
 
 Commit with the repository's convention, push only {{BRANCH}}, and open a PR
-against main with these body sections: Summary, Changes, Validation (commands
+against {{PR_BASE}} with these body sections: Summary, Changes, Validation (commands
 and results), Decisions for review (judgement calls, unmet acceptance criteria,
 and follow-ups). {{LINKING}}
 

@@ -2,7 +2,7 @@
 license: MIT
 metadata:
   repo: https://github.com/nq-rdl/agent-extensions
-description: Dispatch confirmed GitHub issues or one free-text task to headless pi workers in Worktrunk worktrees. Use for Claude Code orchestration of implementation PRs, with triage, overlap waves, bounded concurrency and JSONL status; not for merging without authorisation or steering running workers.
+description: Dispatch confirmed GitHub issues or one free-text task to headless pi workers in Worktrunk worktrees. Use for Claude Code orchestration of implementation PRs, with triage, rolling slots, overlap strategies and JSONL status; not for merging without authorisation or steering running workers.
 compatibility: Verified pi 0.99.1 and wt 0.77.0; Fast catalog contract from Codex CLI 0.159.1 (2026-10-01). Bash 3.2+, jq >=1.6, Git and authenticated gh (CLI fields verified on 2.97.0). External pi provider credentials required.
 user-invocable: true
 argument-hint: "[--fast | --no-fast] <numbers | N-M | >=N | label:name | free text>"
@@ -39,24 +39,46 @@ and [Worktrunk docs](https://worktrunk.dev/) before relying on them after upgrad
    linked dependencies, and acceptance criteria; do not dispatch unresolved blockers.
 4. Predict touched paths from issue text **and a quick repository grep**. Set
    `paths` to repository-relative files or directory prefixes (no trailing slash).
-   Include shared generators/configuration likely to change, not just the skill
-   named in an issue. Unknown footprint `[]` serialises conservatively.
-   Run `waves PLAN.json`; inspect the resulting overlap/cap schedule.
-5. **Show every unit, classification/reason, predicted paths, branch, wave,
-   model/thinking, Fast choice/cost, state directory and cap. Ask the user to confirm exactly which
-   units to launch.** Resolve slug collisions with the user. Issue branches are
-   `issue-N`; free-text PRs have **no Closes line** and no new issue unless asked.
-   Save only selected dispatchable units in the approved plan. Recompute waves
-   if the selection, footprint, model or cap changes; reconfirm material changes.
+   Include hand-written sources and shared generators/configuration likely to
+   change, not just the skill named in an issue. Exclude the repository's
+   generated/derived outputs that its pipeline rebuilds; regenerate on rebase.
+   Unknown footprint `[]` overlaps everything conservatively.
+   Run `waves PLAN.json`; inspect `dependsOn` (overlapping predecessor branches).
+   Wave numbers are an advisory packing order, **not merge gates**: an empty
+   `dependsOn` in a later wave means cap-only overflow.
+5. **Show every unit, classification/reason, predicted paths, branch/PR base,
+   wave/dependsOn, overlap strategy/default, model/thinking, Fast choice/cost,
+   state directory and cap. Ask the user to confirm exactly which units to launch
+   and their strategies.** For each dependent unit offer:
+   - **parallel-then-rebase** — default for small, understood overlap without a
+     code dependency; launch when a slot opens, then resume after predecessors merge.
+   - **stacked** — base on a predecessor when its code is required; wait until
+     that implementation is committed, not merged. Review changes can invalidate
+     the stack; record the parent commit and PR base. Multiple parents need an
+     explicit integration plan, not an arbitrary base choice.
+   - **wait-for-merge** — default for heavy/unknown overlap or competing design
+     decisions; launch only after all overlapping predecessors merge.
+   Workers will run the repository's standard commit/push hooks and watch CI;
+   raise objections before launch. Resolve slug collisions with the user. Issue
+   branches are `issue-N`; free-text PRs have **no Closes line** and no new issue
+   unless asked. Save selected dispatchable units and strategies in the approved
+   plan. Recompute waves if selection, footprint, model or cap changes; reconfirm
+   material changes, including strategies/bases.
 
-## Execute one confirmed wave
+## Execute the confirmed plan with rolling slots
 
 Read [worker template](references/worker-prompt.rst) before rendering prompts.
-Create worktrees only for the current confirmed wave, after `git fetch origin`
-updates `origin/main`. Use `worktree BRANCH` (exact wt create/base/no-cd/no-hooks
-contract). Later overlapping waves wait for earlier PRs to be **reviewed and
-merged by the orchestrator with user authorisation**, then fetch updated main.
-An exited worker or green CI is not permission to advance a dependent wave.
+After `git fetch origin` updates `origin/main`, create worktrees for launchable
+units with `worktree BRANCH` (or the confirmed non-main base for a stack).
+Keep at most the approved cap running. When a worker exits, inspect status and
+memory, then launch the next eligible confirmed unit immediately; **cap-only
+units do not wait for PR review or merge**, even if their wave number is higher.
+Do not wait for every worker in a wave to finish. Apply the confirmed strategy
+for real overlaps: parallel-then-rebase may launch now; stacked needs its
+committed parent; only wait-for-merge gates launch on predecessor merges.
+Those merges must be **reviewed and performed by the orchestrator with user
+authorisation**; fetch updated main afterwards. An exited worker or green CI
+is not a merged dependency. The helper enforces slots, not strategy eligibility.
 
 Extract each selected unit to UNIT.json; render it with
 `render UNIT.json "$WORKTREE" > PROMPT`. Review the prompt, then call:
@@ -86,11 +108,15 @@ risk and let the user launch the **same helper** with `!bash ... launch ...
 --confirmed`, so PID/exit/log tracking and the cap still apply. Permission rules
 and Worktrunk approvals are the user's decision; never apply them silently.
 
-Print mode cannot steer a running worker. For an exited worker's CI follow-up,
-write a bounded follow-up prompt and launch again from the **same worktree**;
-the stable session ID resumes its history. `pi/<slug>` maps to `pi-<slug>` because
-pi 0.99.1 rejects `/` in session IDs; issue-N is unchanged. Do not use `--name`
-as a substitute for session identity. See helper contracts for resume logs.
+Print mode cannot steer a running worker. For an exited worker's CI or rebase
+follow-up, write a bounded follow-up prompt and launch again from the **same
+worktree**; the stable session ID resumes its history. For parallel-then-rebase,
+resume after predecessors merge; regenerate derived outputs, validate and update
+only that PR. Re-select Fast explicitly for every follow-up; it is not inherited.
+See helper contracts for bounded rebase and stacked-base instructions.
+`pi/<slug>` maps to `pi-<slug>` because pi 0.99.1 rejects `/` in session IDs;
+issue-N is unchanged. Do not use `--name` as a substitute for session identity.
+See helper contracts for resume logs.
 
 ## Review, authorised merge, cleanup
 
@@ -100,7 +126,8 @@ require green CI and repository reviews. An exit code 0 does not prove success
 Report judgement calls/deferred criteria under **Decisions for review**.
 Only the orchestrator may merge, using repo strategy **after explicit user
 authorisation**. Admin review bypass needs separate explicit session consent.
-If merging is not authorised, return PR URLs and leave dependent waves pending.
+If merging is not authorised, return PR URLs; leave wait-for-merge units and
+post-merge rebase follow-ups pending, not independent cap-only units.
 
 After a merge, offer `wt remove` for finished worktrees; inspect `git status
 --porcelain` first and never remove uncommitted work or a running worker's tree.
