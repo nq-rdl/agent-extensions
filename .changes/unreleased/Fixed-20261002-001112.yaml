@@ -1,0 +1,3 @@
+kind: Fixed
+body: Pi worker prompts expect standard repository hooks and CI without treating public checks as live/paid calls; credentialed or billed service tests still require explicit authorisation.
+time: 2026-10-02T00:11:12.493283236Z

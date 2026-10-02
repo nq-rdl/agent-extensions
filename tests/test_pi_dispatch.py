@@ -84,12 +84,22 @@ class SafetyText(unittest.TestCase):
         template = " ".join((ROOT / "skills/pi-dispatch/references/worker-prompt.rst").read_text().split())
         for value in ("human-only", "umbrella", "blocked", "quick repository grep",
                       "Ask the user to confirm", "user authorisation", "memory-heavy",
-                      "Create Unsafe Agents", "RPC"):
-            self.assertIn(value, dispatch)
+                      "Create Unsafe Agents", "RPC", "rolling slots", "dependsOn",
+                      "parallel-then-rebase", "stacked", "wait-for-merge",
+                      "generated/derived outputs", "shared generators/configuration"):
+            self.assertIn(value, " ".join(dispatch.split()))
         for value in ("Summary", "Changes", "Validation", "Decisions for review",
                       "Never merge", "AGENTS.md", "CONTRIBUTING.md", "isolated environment",
-                      "credential cleanup", "Do not bypass git hooks"):
+                      "credential cleanup", "Do not bypass git hooks",
+                      "standard commit/push hooks and CI is expected",
+                      "credentialed or billed calls", "do not enable it implicitly"):
             self.assertIn(value, template)
+        helpers = " ".join((ROOT / "skills/pi-dispatch/references/helpers.rst").read_text().split())
+        for value in ("worktree BRANCH [BASE]", "prBase", "SAME worktree",
+                      "stable session ID", "Fast must be re-selected explicitly",
+                      "git rebase --onto origin/main", "lease-protected push",
+                      "stop on unexpected design conflicts"):
+            self.assertIn(value, helpers)
         for value in ("never `--yes`", "without the user's approval", "--no-refresh",
                       "exact provider/id", "`!`", "config.json"):
             self.assertIn(value, setup)

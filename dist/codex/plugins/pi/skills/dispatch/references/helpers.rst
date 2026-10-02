@@ -47,24 +47,50 @@ classifications are dispatchable, human-only, umbrella, blocked; untriaged is
 not launchable. Inspect repository files/grep to supply path predictions; the
 helper does not infer semantic triage. Empty paths mean unknown and overlap
 with everything. Directory prefix overlap is supported; glob patterns are not.
-``waves PLAN.json`` emits the same units with wave numbers, or null for skipped
-units. Every overlapping predecessor precedes the current unit; a wave holds
-at most the configured cap. This is conservative and deterministic, not an
-optimising scheduler. The user approves the plan before worktree/launch calls.
+Predict hand-written paths, including shared generators and config; exclude
+outputs the repository's pipeline regenerates. Regenerate those after rebasing.
+``waves PLAN.json`` emits the same units with wave numbers (null for skipped
+units) and ``dependsOn`` lists of all earlier dispatchable branches whose paths
+overlap. Skipped units have an empty list and never become predecessors. This
+is direct path overlap, not inferred code dependencies or a transitive closure.
+For example, five independent units at cap 2 have waves 1/1/2/2/3 but all have
+``dependsOn: []``: later waves are cap-only and launchable when a slot opens,
+without waiting for review/merge or every worker in an earlier wave to finish.
+Every overlapping predecessor precedes the current unit in the advisory wave
+packing; each wave holds at most the cap. This conservative, deterministic
+packing is not a runtime scheduler. The orchestrator records a user-confirmed
+strategy for each dependent unit: parallel-then-rebase (default for small,
+understood overlap), stacked for actual code dependencies, or wait-for-merge
+(default for heavy/unknown overlap or competing design decisions). Only the
+last strategy requires merged predecessors before launch. User approval covers
+selected units, strategies and bases before worktree/launch calls; the launch
+helper does not enforce dependency eligibility.
 
 Execution
 ---------
 
-``worktree BRANCH`` invokes exactly
-``wt switch --create BRANCH --base origin/main --no-cd --no-hooks``. The created
-path is resolved through Git porcelain, respecting Worktrunk's path template.
-Existing branches/collisions fail; do not clobber. Fetch main in the orchestrator
-before each wave. No project hook approval is implied by skipping create hooks.
+``worktree BRANCH [BASE]`` defaults to origin/main and invokes exactly
+``wt switch --create BRANCH --base BASE --no-cd --no-hooks``. The created path
+is resolved through Git porcelain, respecting Worktrunk's path template.
+Existing branches/collisions or missing bases fail; do not clobber. Fetch origin
+before creating launchable worktrees. No project hook approval is implied by
+skipping create hooks; workers still run the repository's commit/push hooks.
+
+For a confirmed stack, once the parent worker commits its implementation, use
+``worktree issue-SECOND issue-FIRST`` (or a verified fetched parent ref), record
+that parent commit, and set ``prBase: "issue-FIRST"`` on the child unit so its
+PR targets the parent branch. Review changes to the parent may require a bounded
+child follow-up; reconfirm material changes. Do not invent a multi-parent base.
+After the parent merges, retarget the child PR to main and rebase only its own
+commits onto updated origin/main using the recorded parent boundary (important
+for squash merges). Workers still never merge.
 
 ``render UNIT.json WORKTREE`` reads the RST worker template, replaces fixed
 markers literally, and appends the brief. Only dispatchable units render.
-Issue units get a Closes directive; free text forbids it. The template directs
-workers to read repo rules instead of duplicating a particular repo's pipeline.
+Issue units get a Closes directive; free text forbids it. Optional ``prBase``
+defaults to main; stacked plans must explicitly select the parent PR branch.
+The template directs workers to read repo rules instead of duplicating a
+particular repo's pipeline.
 
 ``launch UNIT.json WORKTREE PROMPT MODEL --confirmed [--fast]`` validates the unit and
 worktree branch, then acquires a directory lock and checks active recorded PIDs
@@ -93,6 +119,38 @@ while a launcher is active. If a runner is killed abruptly, status reports an
 unknown exit code; new launches fail closed. Inspect children and logs before
 manually archiving that unit's metadata to clear the unresolved state. Never
 clear metadata while its worker or test descendants are still running.
+
+Bounded rebase follow-up
+------------------------
+
+After overlapping predecessors merge with user authorisation, wait for the
+child worker to exit and resume it in the SAME worktree via the same launch
+command/unit/branch. The stable session ID reopens its history; archived logs
+preserve the previous invocation. The ordinary cap and memory rules still apply.
+Fast must be re-selected explicitly: omit --fast for normal usage, or pass it
+only after renewed explicit selection of approved Fast usage/cost. Previous
+metadata or session history does not enable Fast on a follow-up.
+
+Write a short follow-up prompt rather than rerunning the full implementation.
+Name the predecessor PRs/commits and existing child PR, constrain conflict
+resolution to the confirmed scope, specify the repository's regeneration and
+relevant validation commands, and stop on unexpected design conflicts. Example::
+
+  Stay in <original worktree> on <child branch>, using existing PR <number>.
+  Predecessor PRs <numbers> are merged. Read repo rules, require a clean tree,
+  fetch origin and rebase onto origin/main. Resolve only confirmed overlap in
+  <hand-written paths>; stop and report any new design decision. Regenerate
+  derived outputs with <repo pipeline>, run <relevant validation> serially,
+  and report exact results. Update only this PR and watch CI. Never merge,
+  bypass hooks, change permissions, remove worktrees or run unapproved live checks.
+
+For stacks, replace the plain rebase instruction with
+``git rebase --onto origin/main <recorded-parent-commit>`` after verifying that
+boundary, and retarget the PR to main. The prompt must explicitly include user
+approval for any history-rewriting push: verify the expected remote head and
+use a lease-protected push only to the child branch; never force unconditionally.
+If approval, a clean tree or a safe boundary is missing, report the blocker
+instead of guessing. Rebuild generated conflicts, do not hand-edit the outputs.
 
 Observation
 -----------

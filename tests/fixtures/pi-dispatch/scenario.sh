@@ -36,7 +36,18 @@ parse)
     ;;
 waves)
     printf '%s\n' '[{"branch":"a","classification":"dispatchable","paths":["shared"]},{"branch":"b","classification":"dispatchable","paths":["other"]},{"branch":"c","classification":"dispatchable","paths":["third"]},{"branch":"d","classification":"dispatchable","paths":["shared/lib.sh"]},{"branch":"e","classification":"human-only","paths":[]},{"branch":"f","classification":"umbrella","paths":[]},{"branch":"g","classification":"blocked","paths":[]},{"branch":"h","classification":"dispatchable","paths":[]}]' > plan.json
-    run waves plan.json | jq -e 'map(.wave)==[1,1,2,2,null,null,null,3]'
+    run waves plan.json | jq -e 'map(.wave)==[1,1,2,2,null,null,null,3] and map(.dependsOn)==[[],[],[],["a"],[],[],[],["a","b","c","d"]]'
+    # Cap-only overflow never acquires overlap dependencies, even across waves.
+    jq -n '[range(1;6) | {branch:("issue-"+tostring),classification:"dispatchable",paths:[("source/"+tostring)]}]' > independent.json
+    run waves independent.json | jq -e 'map(.wave)==[1,1,2,2,3] and all(.[];.dependsOn==[])'
+    PI_DISPATCH_CAP=1 run waves independent.json | jq -e 'map(.wave)==[1,2,3,4,5] and all(.[];.dependsOn==[])'
+    # Exact and nested overlaps retain ALL direct predecessors across waves;
+    # similarly named sibling prefixes do not overlap. Recompute stale metadata.
+    printf '%s\n' '[{"branch":"a","classification":"dispatchable","paths":["src"]},{"branch":"b","classification":"dispatchable","paths":["src/lib"]},{"branch":"c","classification":"dispatchable","paths":["src/lib/a.sh"]},{"branch":"d","classification":"dispatchable","paths":["src-extra"]},{"branch":"e","classification":"dispatchable","paths":["src/lib"],"dependsOn":["stale"],"wave":99}]' > nested.json
+    run waves nested.json | jq -e 'map(.wave)==[1,2,3,1,4] and map(.dependsOn)==[[],["a"],["a","b"],[],["a","b","c"]]'
+    # Unknown footprints overlap both ways; skipped unknown units do not gate.
+    printf '%s\n' '[{"branch":"skip","classification":"blocked","paths":[]},{"branch":"unknown","classification":"dispatchable","paths":[]},{"branch":"known","classification":"dispatchable","paths":["file"]}]' > unknown.json
+    run waves unknown.json | jq -e 'map(.wave)==[null,1,2] and map(.dependsOn)==[[],[],["unknown"]]'
     PI_DISPATCH_CAP=0 run waves plan.json > rejected 2>&1 && exit 1
     ;;
 render)
@@ -45,6 +56,9 @@ render)
     grep -F "Work ONLY in $WT" prompt
     grep -F 'Include Closes #476' prompt
     grep -F 'Never merge' prompt
+    grep -F 'against main with these body sections' prompt
+    grep -F "Running the repository's standard commit/push hooks" prompt
+    grep -F 'credentialed' prompt
     grep -F '$(touch BAD)' prompt
     test ! -e BAD
     prepare pi/tighten-lychee null
@@ -52,6 +66,18 @@ render)
     ! grep -F 'Include Closes #' prompt
     jq '.classification="blocked"' unit.json > blocked.json
     run render blocked.json "$WT" > rejected 2>&1 && exit 1
+    # A confirmed stack passes a non-main base as ONE literal argv element.
+    WT=$(run worktree issue-477 issue-476)
+    jq -e '.==["switch","--create","issue-477","--base","issue-476","--no-cd","--no-hooks"]' wt.args
+    unit issue-477 477
+    jq '.prBase="issue-476"' unit.json > stacked.json
+    run render stacked.json "$WT" > prompt
+    grep -F 'against issue-476 with these body sections' prompt
+    WT=$(run worktree issue-478 'parent;$(touch BAD)')
+    jq -e '.[4]=="parent;$(touch BAD)"' wt.args
+    test ! -e BAD
+    run worktree issue-479 --bad > rejected 2>&1 && exit 1
+    run worktree issue-479 '' > rejected 2>&1 && exit 1
     ;;
 launch)
     prepare pi/tighten-lychee null
@@ -122,7 +148,10 @@ cap)
     prepare issue-477 477
     run launch unit.json "$WT" prompt provider/model:high --confirmed > rejected 2>&1 && exit 1
     wait_exit "${meta%.json}.exit"
-    run launch unit.json "$WT" prompt provider/model:high --confirmed > second
+    # Later-wave independent work can launch while the earlier PR is still open.
+    run status | jq -e '.workers[0].pr.state=="OPEN" and .workers[0].ci=="pending"'
+    jq '.wave=2 | .dependsOn=[]' unit.json > next.json
+    run launch next.json "$WT" prompt provider/model:high --confirmed > second
     wait_exit "$(< second)" # metadata is created immediately
     wait_exit "${meta%/*}/issue-477.exit"
     # The default cap admits exactly two simultaneous workers, not three.
