@@ -80,8 +80,11 @@ def report(results, rules=None, invocations=None, column_kind=None):
 
 @unittest.skipUnless(shutil.which("jq"), "jq is required")
 class SkillSpectorOwaspTest(unittest.TestCase):
-    def merge(self, reports):
-        """Write {skill: report} as <skill>.report, merge, and return the SARIF."""
+    def merge(self, reports, expected=()):
+        """Write {skill: report} as <skill>.report, merge, and return the SARIF.
+
+        ``expected`` lists the skills scan.sh would pass; empty merges every report.
+        """
         with tempfile.TemporaryDirectory() as tmp:
             outdir = Path(tmp) / "out"
             outdir.mkdir()
@@ -90,7 +93,7 @@ class SkillSpectorOwaspTest(unittest.TestCase):
                 (outdir / f"{name}.report").write_text(text)
             dest = Path(tmp) / "merged.sarif"
             subprocess.run(
-                [str(TOOLS / "merge-sarif.sh"), str(outdir), str(dest)],
+                [str(TOOLS / "merge-sarif.sh"), str(outdir), str(dest), *expected],
                 check=True,
                 capture_output=True,
                 text=True,
@@ -237,6 +240,26 @@ class SkillSpectorOwaspTest(unittest.TestCase):
         self.assertIn("| `alpha` | partial | 50.0% | static_parse_limit ×2 |", out)
         self.assertIn("| `gamma` | failed |", out)
         self.assertNotIn("`beta`", out)
+
+    def test_missing_or_invalid_reports_count_as_failed(self):
+        # A scan that raised before writing SARIF must not vanish from the totals.
+        merged = self.merge(
+            {
+                "alpha": report([], invocations=[invocation()]),
+                "broken": "not sarif",
+            },
+            expected=("alpha", "broken", "ghost"),
+        )
+        invocations = merged["runs"][0]["invocations"]
+        self.assertEqual([i["properties"]["skill"] for i in invocations], ["alpha", "broken", "ghost"])
+        reasons = [
+            i["toolExecutionNotifications"][0]["properties"]["reasonCode"]
+            for i in invocations[1:]
+        ]
+        self.assertEqual(reasons, ["report_invalid", "report_missing"])
+        out = self.summary(merged)
+        self.assertIn("1 of 3 skills fully inspected, 2 incomplete (2 failed)", out)
+        self.assertIn("| `ghost` | failed | 0% | report_missing ×1 |", out)
 
     def test_summary_without_invocations_says_not_reported(self):
         merged = self.merge({"alpha": report([result("PE2")])})

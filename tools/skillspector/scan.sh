@@ -131,7 +131,7 @@ set -e
 if [ -n "$want_output" ]; then
   out_path="${REPO_ROOT}/${SKILLSPECTOR_OUTPUT}"
   if [ "$FORMAT" = "sarif" ]; then
-    if ! "$SCRIPT_DIR/merge-sarif.sh" "$OUTDIR" "$out_path"; then
+    if ! "$SCRIPT_DIR/merge-sarif.sh" "$OUTDIR" "$out_path" "${skills[@]}"; then
       echo "error: failed to merge the per-skill SARIF reports." >&2
       exit 2
     fi

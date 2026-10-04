@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 #
-# Usage: merge-sarif.sh <outdir> <dest>
+# Usage: merge-sarif.sh <outdir> <dest> [skill ...]
 #
 # Combine the per-skill SARIF reports (<outdir>/<skill>.report) written by
 # scan.sh into a SARIF document with a SINGLE run at <dest>, prepending each finding's
@@ -12,7 +12,7 @@
 # Every result is also downgraded to SARIF level "note" so the code-scanning PR
 # check GitHub auto-creates from the upload never gates the PR (see the inline
 # comment at the result-collection step below). Per-skill files that are not
-# valid SARIF (e.g. an empty report from a failed scan) are skipped.
+# valid SARIF (e.g. an empty report from a failed scan) contribute no findings.
 #
 # Each rule and result is also classified against the OWASP Agentic Skills Top
 # 10 using owasp-ast10.json (exact rule id first, then the id's family prefix):
@@ -25,25 +25,49 @@
 # skill's invocations, tagged with properties.skill and with notification
 # locations prefixed like findings. Invocations carry executionSuccessful,
 # analysisCompleteness and the warnings for files that were only partially
-# inspected, which owasp-summary.sh reports.
+# inspected, which owasp-summary.sh reports. scan.sh passes the skills it
+# expected to scan; a skill whose report is missing or not valid SARIF gets a
+# failed placeholder invocation, so it still counts as not inspected. Without
+# skill arguments, every <outdir>/*.report is merged.
 #
 # Called by scan.sh; standalone so the merge and OWASP classification are
 # unit-tested without Docker (tests/test_skillspector_owasp.py). Needs jq.
 set -euo pipefail
 
-if [ "$#" -ne 2 ]; then
-  echo "usage: $0 <outdir> <dest>" >&2
+if [ "$#" -lt 2 ]; then
+  echo "usage: $0 <outdir> <dest> [skill ...]" >&2
   exit 2
 fi
 OWASP_MAP="$(cd "$(dirname "$0")" && pwd)/owasp-ast10.json"
 outdir="$1" dest="$2"
+shift 2
+if [ "$#" -eq 0 ]; then # no expected skills given: merge whatever reports exist
+  for f in "$outdir"/*.report; do
+    [ -f "$f" ] && set -- "$@" "$(basename "$f" .report)"
+  done
+fi
 schema="" version="" tool=""
 parts="$(mktemp)"
 trap 'rm -f "$parts"' EXIT
-for f in "$outdir"/*.report; do
-  [ -f "$f" ] || continue
-  jq -e '.runs[0]' "$f" >/dev/null 2>&1 || continue # skip non-SARIF/empty reports
-  name="$(basename "$f" .report)"
+for name in "$@"; do
+  f="$outdir/$name.report"
+  if ! jq -e '.runs[0]' "$f" >/dev/null 2>&1; then
+    # Missing or non-SARIF report (e.g. the scan raised before writing one):
+    # record a failed invocation so the skill is counted as not inspected.
+    reason=report_invalid
+    [ -f "$f" ] || reason=report_missing
+    jq -nc --arg skill "$name" --arg reason "$reason" '{
+      rules: [], results: [],
+      invocations: [ {
+        executionSuccessful: false,
+        toolExecutionNotifications: [ {
+          message: { text: "SkillSpector produced no valid SARIF report for this skill." },
+          level: "warning",
+          properties: { reasonCode: $reason } } ],
+        properties: { skill: $skill,
+          analysisCompleteness: { isComplete: false, status: "failed", coveragePercent: 0 } } } ] }' >>"$parts"
+    continue
+  fi
   if [ -z "$schema" ]; then # capture the SARIF envelope + tool from the first run
     schema="$(jq -r '."$schema" // empty' "$f")"
     version="$(jq -r '.version // empty' "$f")"
