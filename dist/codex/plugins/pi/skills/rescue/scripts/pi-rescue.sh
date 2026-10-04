@@ -114,9 +114,11 @@ task)
     set -- "$@" --model "$MODEL" --no-approve
     [ "$WRITE" -eq 1 ] || set -- "$@" --tools "$READ_ONLY_TOOLS"
     [ -z "$THINKING" ] || set -- "$@" --thinking "$THINKING"
-    # pi treats any message starting with "@" as a file attachment, even after
-    # "--"; a leading space keeps the request literal text.
-    case "$TEXT" in @*) TEXT=" $TEXT" ;; esac
+    # pi treats a message starting with "@" as a file attachment (even after
+    # "--") and one starting with "/" as a command, skill or prompt template.
+    # Both checks test the raw text (pi 1.0.2 does not trim it), so a leading
+    # space keeps the request literal.
+    case "$TEXT" in @*|/*) TEXT=" $TEXT" ;; esac
     cd "$ROOT"
     tmp=$(mktemp -d)
     trap 'rm -rf "$tmp"' EXIT

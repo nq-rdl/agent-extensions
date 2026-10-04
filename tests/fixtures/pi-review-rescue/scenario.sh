@@ -151,6 +151,9 @@ rescue)
     # A request starting with "@" stays literal text, not an attachment.
     cd repo; PI_OUT=../ok.txt expect 0 bash "$Q" task --resume-last -- @alice look at this; cd ..
     jq -e '.[-1] == " @alice look at this"' "$FIXTURE/pi.args" >/dev/null || fail "leading @ forwarded as attachment"
+    # So does one starting with "/", which pi would run as a command or template.
+    cd repo; PI_OUT=../ok.txt expect 0 bash "$Q" task --resume-last -- /mcp status please; cd ..
+    jq -e '.[-1] == " /mcp status please"' "$FIXTURE/pi.args" >/dev/null || fail "leading / forwarded as a command"
     # A fresh run starts and records a new session.
     cd repo; sleep 1; PI_OUT=../ok.txt expect 0 bash "$Q" task again; cd ..
     second=$(jq -r '.[(index("--session-id")) + 1]' "$FIXTURE/pi.args")
