@@ -127,7 +127,7 @@ pre-push:
     # their git commands against THIS repo (rewriting refs, HEAD, index and
     # config), so clear them. CI runs with none of them set.
     - name: python-unit-tests
-      glob: "{scripts/**,tests/**}"
+      glob: "{scripts/**,tests/**,tools/skillspector/**}"
       run: env -u GIT_DIR -u GIT_WORK_TREE -u GIT_INDEX_FILE pixi run python3 -m unittest discover -s tests -p 'test_*.py'
 
     # Same hook-env leak as above. tests/codex/helpers.mjs also scrubs these on

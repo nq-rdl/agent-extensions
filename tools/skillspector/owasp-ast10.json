@@ -1,0 +1,53 @@
+{
+  "$comment": "Maps SkillSpector rule IDs to the OWASP Agentic Skills Top 10 (AST10) risk taxonomy. Read by scan.sh (SARIF tagging) and owasp-summary.sh (CI summary). A rule resolves by exact ID in `rules` first, then by its family prefix (the rule ID with trailing digits removed) in `families`. Rule IDs that resolve to neither are reported as unmapped so this table can be extended. NOTE: SkillSpector's own `AST1`..`AST10` rule IDs are its behavioral Python-AST analyzer, unrelated to the OWASP AST01..AST10 risks; OWASP IDs are always zero-padded and namespaced `owasp-ast10/` in SARIF output.",
+  "source": {
+    "project": "https://owasp.org/projects/agentic-skills-top-10",
+    "pages": "https://owasp.github.io/www-project-agentic-skills-top-10",
+    "repository": "https://github.com/OWASP/www-project-agentic-skills-top-10",
+    "commit": "d6f7d7d0de314f52a83a85d1828e06ab096e595c"
+  },
+  "risks": {
+    "AST01": { "name": "Malicious Skills", "severity": "Critical" },
+    "AST02": { "name": "Supply Chain Compromise", "severity": "Critical" },
+    "AST03": { "name": "Over-Privileged Skills", "severity": "High" },
+    "AST04": { "name": "Insecure Metadata", "severity": "High" },
+    "AST05": { "name": "Untrusted External Instructions", "severity": "High" },
+    "AST06": { "name": "Weak Isolation", "severity": "High" },
+    "AST07": { "name": "Update Drift", "severity": "Medium" },
+    "AST08": { "name": "Poor Scanning", "severity": "Medium" },
+    "AST09": { "name": "No Governance", "severity": "Medium" },
+    "AST10": { "name": "Cross-Platform Reuse", "severity": "Medium" }
+  },
+  "families": {
+    "P": { "risk": "AST01", "why": "Prompt injection, hidden or harmful instructions, and prompt leakage in skill prose" },
+    "E": { "risk": "AST01", "why": "Data, credential, or conversation exfiltration" },
+    "MP": { "risk": "AST01", "why": "Memory poisoning that persists attacker instructions" },
+    "RA": { "risk": "AST01", "why": "Rogue-agent self-modification and persistence" },
+    "TT": { "risk": "AST01", "why": "Taint flows from secrets or external input into exfiltration or execution sinks" },
+    "YR": { "risk": "AST01", "why": "YARA malware, webshell, miner, or hack-tool signatures" },
+    "AS": { "risk": "AST01", "why": "Snooping on agent configuration, MCP configuration, or installed skills" },
+    "AR": { "risk": "AST01", "why": "Anti-refusal statements that suppress agent safety behaviour" },
+    "SC": { "risk": "AST02", "why": "Unpinned, vulnerable, typosquatted, or remotely fetched dependencies and artifacts" },
+    "PE": { "risk": "AST03", "why": "Excess permissions, sudo/root, or credential-path access" },
+    "EA": { "risk": "AST03", "why": "Excessive agency: unrestricted tools, no human in the loop, scope creep" },
+    "TM": { "risk": "AST03", "why": "Tool parameter abuse, chaining, and unsafe defaults" },
+    "AST": { "risk": "AST03", "why": "Skill code invokes exec/eval/subprocess-class primitives with the host agent's privileges" },
+    "OH": { "risk": "AST03", "why": "Unvalidated model output reaches shell, SQL, or cross-context sinks" },
+    "LP": { "risk": "AST03", "why": "Least-privilege violations between declared and used capabilities" },
+    "BH": { "risk": "AST03", "why": "Bundled hooks or settings that run commands or grant permissions automatically" },
+    "TR": { "risk": "AST04", "why": "Broad, shadowing, or generic trigger metadata" },
+    "TP": { "risk": "AST04", "why": "Tool poisoning through hidden, deceptive, or mismatched metadata" },
+    "DS": { "risk": "AST04", "why": "Insecure deserialization (the parsing layer of AST04)" },
+    "SSRF": { "risk": "AST06", "why": "Requests to cloud metadata, internal networks, or dynamic targets: unconstrained network egress" }
+  },
+  "rules": {
+    "AST8": { "risk": "AST01", "why": "Execution chain fed by a dynamic or encoded source" },
+    "AST9": { "risk": "AST01", "why": "Reflective access to an execution sink, a deliberate evasion technique" },
+    "AST10": { "risk": "AST04", "why": "Insecure deserialization (SkillSpector rule AST10, not OWASP AST10)" },
+    "TT6": { "risk": "AST04", "why": "Untrusted data flows into an insecure deserializer" },
+    "TM4": { "risk": "AST06", "why": "Privileged, hostPath, or host-namespace workloads break isolation" },
+    "LP1": { "risk": "AST04", "why": "Capabilities used but not declared: metadata understates permissions" },
+    "LP3": { "risk": "AST04", "why": "No permission declaration although capabilities are used" },
+    "BH2": { "risk": "AST01", "why": "Bundled hook sends local or event content to a remote destination" }
+  }
+}
