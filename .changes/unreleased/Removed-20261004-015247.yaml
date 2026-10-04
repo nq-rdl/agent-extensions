@@ -1,0 +1,3 @@
+kind: Removed
+body: 'Breaking change: /planning:record-decision no longer exists. Because of the Removed fragment, changie batch auto would pick a major version bump.'
+time: 2026-10-04T01:52:47.91352949Z
