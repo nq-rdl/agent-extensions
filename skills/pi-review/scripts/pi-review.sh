@@ -220,14 +220,28 @@ prompt|run)
     pi -p --mode text --no-session --no-approve --tools "$READ_ONLY_TOOLS" \
         --model "$MODEL" --append-system-prompt "$tmp/rubric.md" \
         @"$tmp/request.md" "Review the change described in the attached request." \
-        </dev/null >"$tmp/final.txt" || rc=$?
+        </dev/null >"$tmp/final.txt" 2>"$tmp/stderr.txt" || rc=$?
+    # Failure reports carry pi's stderr (invalid model, expired login, ...):
+    # the skill returns this stdout verbatim, so the cause must be in it.
+    stderr_block() {
+        if [ -s "$tmp/stderr.txt" ]; then
+            printf '\nstderr:\n\n```text\n'; cat "$tmp/stderr.txt"; printf '\n```\n'
+        fi
+    }
     if [ "$rc" -ne 0 ]; then
         printf '# Pi Review\n\nTarget: %s\nModel: %s\n\npi exited with status %s.\n' "$TARGET" "$MODEL" "$rc"
-        [ -s "$tmp/final.txt" ] && { printf '\nOutput:\n\n```text\n'; cat "$tmp/final.txt"; printf '\n```\n'; }
+        if [ -s "$tmp/final.txt" ]; then
+            printf '\nOutput:\n\n```text\n'; cat "$tmp/final.txt"; printf '\n```\n'
+        fi
+        stderr_block
         exit 1
     fi
-    if [ "$RAW_JSON" -eq 1 ]; then cat "$tmp/final.txt"; exit 0; fi
-    render "$tmp/final.txt" "$TARGET" "$MODEL" || exit 1
+    if [ "$RAW_JSON" -eq 1 ]; then cat "$tmp/final.txt"; cat "$tmp/stderr.txt" >&2; exit 0; fi
+    if ! render "$tmp/final.txt" "$TARGET" "$MODEL"; then
+        stderr_block
+        exit 1
+    fi
+    cat "$tmp/stderr.txt" >&2
     ;;
 *)
     die "usage: pi-review.sh run|prompt [--base REF] [--scope auto|working-tree|branch] [--model M] [--json] | render FILE TARGET MODEL"

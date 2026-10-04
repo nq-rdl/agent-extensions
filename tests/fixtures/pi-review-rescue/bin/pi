@@ -39,5 +39,6 @@ if [ -n "$open_id" ]; then
     fi
 fi
 [ -z "${PI_OUT:-}" ] || cat "$PI_OUT"
+[ -z "${PI_ERR:-}" ] || printf '%s\n' "$PI_ERR" >&2
 if [ -n "$new_id" ] && [ "${PI_EXIT:-0}" = 0 ]; then printf '%s\n' "$new_id" >> "$FIXTURE/pi.sessions"; fi
 exit "${PI_EXIT:-0}"

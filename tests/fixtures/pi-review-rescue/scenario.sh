@@ -118,7 +118,14 @@ review-worktree)
     cd repo
     printf 'boom\n' > ../boom.txt
     PI_OUT=../boom.txt PI_EXIT=3 expect 1 bash "$R" run; has "pi exited with status 3"; has "boom"
-    PI_OUT=../boom.txt expect 1 bash "$R" run; has "not the expected review JSON"
+    # pi's stderr diagnosis is part of the failure report the skill returns.
+    PI_ERR="Model not found: openai-codex/nope" PI_EXIT=1 expect 1 bash "$R" run
+    has "pi exited with status 1"; has "Model not found: openai-codex/nope"
+    PI_OUT=../boom.txt PI_ERR="warning: odd output" expect 1 bash "$R" run
+    has "not the expected review JSON"; has "warning: odd output"
+    # On success stderr stays on stderr, out of the rendered review.
+    PI_OUT=../review.json PI_ERR="note: cached" expect 0 bash "$R" run
+    lacks "note: cached"; has "note: cached" err
     ;;
 rescue)
     # Runs under Bash 3.2 too: only rev-parse is needed, via a shim there.
