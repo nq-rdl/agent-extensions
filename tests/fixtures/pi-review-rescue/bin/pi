@@ -42,4 +42,6 @@ fi
 [ -z "${PI_ERR:-}" ] || printf '%s\n' "$PI_ERR" >&2
 [ -z "$new_id" ] || echo "Warning: No project session found with id '$new_id'; creating a new session with that id." >&2
 if [ -n "$new_id" ] && [ "${PI_EXIT:-0}" = 0 ]; then printf '%s\n' "$new_id" >> "$FIXTURE/pi.sessions"; fi
+# PI_DELAY: stay "running" (same PID) so tests can signal the helper mid-run.
+if [ -n "${PI_DELAY:-}" ]; then printf '%s\n' "$$" > "$FIXTURE/pi.pid"; exec sleep "$PI_DELAY"; fi
 exit "${PI_EXIT:-0}"

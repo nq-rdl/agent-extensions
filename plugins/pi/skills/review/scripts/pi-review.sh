@@ -70,6 +70,10 @@ default_base() {
 # TARGET, and EMPTY=1 when there is nothing to review. Call it plainly, never
 # in an if/||/&& context: that would disable set -e for every git call here.
 TARGET="" EMPTY=0
+# A plain unified patch whatever the user's presentation settings: external
+# diff drivers (diff.external, GIT_EXTERNAL_DIFF) could emit nothing or a
+# different format, and color.diff=always would embed ANSI codes.
+DIFF_OPTS="--no-ext-diff --no-color"
 collect() {
     local out=$1 diff=$2 mb f size status
     if [ "$SCOPE" = auto ]; then
@@ -88,33 +92,34 @@ collect() {
         # combined), so pi sees the final state, not intermediate patches. An
         # unborn HEAD compares against the empty tree.
         if git rev-parse -q --verify HEAD >/dev/null; then
-            git diff HEAD >"$diff" || die "git diff HEAD failed"
+            git diff $DIFF_OPTS HEAD >"$diff" || die "git diff HEAD failed"
         else
-            git diff "$(git hash-object -t tree /dev/null)" >"$diff" || die "git diff against the empty tree failed"
+            git diff $DIFF_OPTS "$(git hash-object -t tree /dev/null)" >"$diff" \
+                || die "git diff against the empty tree failed"
         fi
         # NUL-delimited: default output quotes unusual names, which git diff
         # would then fail to open. --no-index exits 1 for "differences".
         git ls-files -z --others --exclude-standard | while IFS= read -r -d '' f; do
             rc=0
-            git diff --no-index -- /dev/null "$f" || rc=$?
+            git diff $DIFF_OPTS --no-index -- /dev/null "$f" || rc=$?
             [ "$rc" -le 1 ] || exit "$rc"
         done >>"$diff" || die "git diff of untracked files failed"
         if [ ! -s "$diff" ]; then EMPTY=1; return 0; fi
         printf 'Status:\n' >"$out"
-        git status --short --untracked-files=all >>"$out" || die "git status failed"
+        git -c color.status=false status --short --untracked-files=all >>"$out" || die "git status failed"
     else
         [ -n "$BASE" ] || BASE=$(default_base)
         git rev-parse -q --verify "$BASE^{commit}" >/dev/null || die "unknown base ref: $BASE"
         mb=$(git merge-base "$BASE" HEAD) || die "no merge base between $BASE and HEAD"
         TARGET="branch diff against $BASE"
-        git diff "$mb" HEAD >"$diff" || die "git diff $mb HEAD failed"
+        git diff $DIFF_OPTS "$mb" HEAD >"$diff" || die "git diff $mb HEAD failed"
         if [ ! -s "$diff" ]; then EMPTY=1; return 0; fi
         # One status check per command: a { ...; } || die group would only
         # see the last command's status.
         printf 'Merge base: %s\n\nCommits:\n' "$mb" >"$out"
-        git log --oneline "$mb..HEAD" >>"$out" || die "git log failed"
+        git log --no-color --oneline "$mb..HEAD" >>"$out" || die "git log failed"
         printf '\nFiles:\n' >>"$out"
-        git diff --stat "$mb" HEAD >>"$out" || die "git diff --stat failed"
+        git diff $DIFF_OPTS --stat "$mb" HEAD >>"$out" || die "git diff --stat failed"
     fi
     size=$(wc -c <"$diff" | tr -d ' ')
     {
@@ -223,10 +228,16 @@ prompt|run)
     awk 'NR == 1 && /^<!--/ { skip = 1 } skip { if (/^-->$/) skip = 0; next } { print }' \
         "$RUBRIC" >"$tmp/rubric.md"
     rc=0
+    # Run pi as a child so TERM/INT stop it too instead of orphaning it.
     pi -p --mode text --no-session --no-approve --tools "$READ_ONLY_TOOLS" \
         --model "$MODEL" --append-system-prompt "$tmp/rubric.md" \
         @"$tmp/request.md" "Review the change described in the attached request." \
-        </dev/null >"$tmp/final.txt" 2>"$tmp/stderr.txt" || rc=$?
+        </dev/null >"$tmp/final.txt" 2>"$tmp/stderr.txt" &
+    PI_PID=$!
+    trap 'kill -TERM "$PI_PID" 2>/dev/null || true; wait "$PI_PID" 2>/dev/null || true; exit 143' TERM
+    trap 'kill -TERM "$PI_PID" 2>/dev/null || true; wait "$PI_PID" 2>/dev/null || true; exit 130' INT
+    wait "$PI_PID" || rc=$?
+    trap - TERM INT
     # Failure reports carry pi's stderr (invalid model, expired login, ...):
     # the skill returns this stdout verbatim, so the cause must be in it.
     stderr_block() {

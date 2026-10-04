@@ -29,6 +29,26 @@ noarg() { if jq -e --arg a "$1" 'index($a) != null' "$FIXTURE/pi.args" >/dev/nul
 after() { jq -e --arg f "$1" --arg v "$2" '(index($f)) as $i | $i != null and .[$i + 1] == $v' "$FIXTURE/pi.args" >/dev/null \
     || fail "pi args lack $1 $2: $(cat "$FIXTURE/pi.args")"; }
 
+# signal_run LOCKDIR CMD...: start CMD with a long-running fake pi, TERM the
+# helper once pi is up, and require that pi is gone and LOCKDIR (if given) was
+# held during the run and released afterwards.
+signal_run() {
+    local lockdir=$1 hpid rc=0 i=0; shift
+    rm -f "$FIXTURE/pi.pid"
+    PI_DELAY=30 "$@" </dev/null >"$FIXTURE/sig.out" 2>"$FIXTURE/sig.err" &
+    hpid=$!
+    while [ ! -s "$FIXTURE/pi.pid" ] && [ "$i" -lt 100 ]; do sleep 0.1; i=$((i + 1)); done
+    [ -s "$FIXTURE/pi.pid" ] || fail "fake pi never started"
+    [ -z "$lockdir" ] || [ -d "$lockdir" ] || fail "run lock not held while pi runs"
+    kill -TERM "$hpid"
+    wait "$hpid" || rc=$?
+    [ "$rc" -eq 143 ] || fail "helper exit $rc after TERM, want 143"
+    if kill -0 "$(cat "$FIXTURE/pi.pid")" 2>/dev/null; then
+        kill "$(cat "$FIXTURE/pi.pid")"; fail "pi child survived the helper's TERM"
+    fi
+    [ -z "$lockdir" ] || [ ! -d "$lockdir" ] || fail "run lock left after TERM"
+}
+
 repo() {
     rm -rf repo; mkdir repo; cd repo
     git init -q -b main; git config user.name T; git config user.email t@example.com
@@ -91,6 +111,16 @@ review-branch)
     expect 2 bash "$R" run --base base; has "git log failed" err
     [ ! -f "$FIXTURE/pi.args" ] || fail "pi ran after git log failed"
     git config --unset log.date; cd ..
+    # External diff drivers and forced colour cannot change the review input.
+    rm -f pi.request
+    cd repo; GIT_EXTERNAL_DIFF=true PI_OUT=../review.json expect 0 bash "$R" run --base base; cd ..
+    lacks "Nothing to review"; has "+two" pi.request
+    cd repo; git config color.diff always; git config color.ui always
+    PI_OUT=../review.json expect 0 bash "$R" run --base base
+    git config --unset color.diff; git config --unset color.ui; cd ..
+    lacks "$(printf '\033')[" pi.request
+    # TERM to the helper stops pi too.
+    cd repo; signal_run "" bash "$R" run --base base; cd ..
     # Default base resolves to main when origin is absent.
     cd repo; PI_OUT=../review.json expect 0 bash "$R" run; has "Target: branch diff against main"; cd ..
     ;;
@@ -118,6 +148,10 @@ review-worktree)
     printf 'odd content\n' > "caf\303\251 name.txt"
     PI_OUT=../review.json expect 0 bash "$R" run; cd ..
     has "+odd content" pi.request
+    # Forced colour stays out of the status section too.
+    cd repo; git config color.ui always; PI_OUT=../review.json expect 0 bash "$R" run
+    git config --unset color.ui; cd ..
+    lacks "$(printf '\033')[" pi.request
     # Truncation keeps a bounded request and says so.
     cd repo; printf 'two\n' > a.txt
     PI_REVIEW_MAX_DIFF_BYTES=10 PI_OUT=../review.json expect 0 bash "$R" run; cd ..
@@ -225,6 +259,8 @@ rescue)
     rmdir "$LDIR/run-$held.lock"
     PI_OUT=../ok.txt expect 0 bash "$Q" task --resume-last more
     [ ! -d "$LDIR/run-$held.lock" ] || fail "resume left its run lock"
+    # TERM during a resume stops pi before the session lock is released.
+    signal_run "$LDIR/run-$held.lock" bash "$Q" task --resume-last long
     # Other pi stderr on a fresh run is still relayed.
     PI_OUT=../ok.txt PI_ERR="real warning" expect 0 bash "$Q" task -- keep stderr; has "real warning" err
     lacks "No project session found" err

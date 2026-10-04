@@ -138,7 +138,15 @@ task)
     fi
     rc=0
     # pi -p reads a non-TTY stdin to EOF; an open host pipe would hang it.
-    pi "$@" -- "$TEXT" </dev/null >"$tmp/out" 2>"$tmp/err" || rc=$?
+    # Run pi as a child: on TERM/INT stop it and wait for it to exit before
+    # the EXIT trap releases the session lock, so no orphaned pi keeps
+    # appending to a session another resume could then open.
+    pi "$@" -- "$TEXT" </dev/null >"$tmp/out" 2>"$tmp/err" &
+    PI_PID=$!
+    trap 'kill -TERM "$PI_PID" 2>/dev/null || true; wait "$PI_PID" 2>/dev/null || true; exit 143' TERM
+    trap 'kill -TERM "$PI_PID" 2>/dev/null || true; wait "$PI_PID" 2>/dev/null || true; exit 130' INT
+    wait "$PI_PID" || rc=$?
+    trap - TERM INT
     # Match pi's own startup diagnostics exactly, never answer text: a missing
     # session fails with this stderr line, and a session found only in another
     # project prints a fork prompt (first stdout line, ending "[y/N] ") and
