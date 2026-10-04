@@ -1,0 +1,10 @@
+{
+  "name": "adr",
+  "version": "0.37.0",
+  "description": "Architecture decision records — consent-gated MADR 4.0.0 capture, supersession, retrieval, and spec archival",
+  "author": {
+    "name": "nq-rdl"
+  },
+  "repository": "https://github.com/nq-rdl/agent-extensions",
+  "license": "MIT"
+}

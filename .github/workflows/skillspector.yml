@@ -1,3 +1,5 @@
+# NVIDIA SkillSpector static scan of skills/, with findings classified against
+# the OWASP Agentic Skills Top 10 (issue #259; docs/security-scanning.md).
 name: SkillSpector
 
 on:
@@ -51,3 +53,18 @@ jobs:
           else
             echo "SkillSpector failed to run (exit $SCAN_EXIT): tool/execution error. Informational — this check does not gate the PR." >> "$GITHUB_STEP_SUMMARY"
           fi
+
+      # Findings per OWASP Agentic Skills Top 10 risk (AST01-AST10), from the
+      # owasp-ast10/* tags scan.sh adds; mapping and coverage notes are in
+      # tools/skillspector/owasp-ast10.json and docs/security-scanning.md.
+      # Informational like the steps above, so a summary error never fails the check.
+      - name: OWASP Agentic Skills Top 10 summary
+        if: always() && hashFiles('skillspector.sarif') != ''
+        continue-on-error: true
+        run: |
+          {
+            echo ""
+            echo "### OWASP Agentic Skills Top 10"
+            echo ""
+            tools/skillspector/owasp-summary.sh skillspector.sarif
+          } >> "$GITHUB_STEP_SUMMARY"

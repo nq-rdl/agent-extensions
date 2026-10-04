@@ -1,0 +1,3 @@
+kind: Added
+body: Tag SkillSpector findings with their OWASP Agentic Skills Top 10 risk in code scanning and summarise them per risk in the CI job summary.
+time: 2026-10-04T00:28:47.718779628Z

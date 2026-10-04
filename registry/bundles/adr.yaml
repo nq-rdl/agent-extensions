@@ -1,0 +1,35 @@
+schemaVersion: v1
+id: adr
+displayName: ADR
+description: Architecture decision records — consent-gated MADR 4.0.0 capture, supersession, retrieval, and spec archival
+keywords: [adr, madr, architecture, decisions, documentation]
+owners:
+  - rdl
+channels:
+  - stable
+skills:
+  - {source: architecture-decision-records, leaf: record}
+hooks: []
+prompts: []
+mcp: []
+targets:
+  claude:
+    enabled: true
+    pluginName: adr
+    marketplaceName: rdl-agent-extensions
+
+  codex:
+    enabled: true
+    pluginName: adr
+    marketplaceName: rdl-agent-extensions
+    category: Developer Tools
+    components:
+      skills: true
+      mcp: false
+      hooks: false
+      apps: false
+    interface:
+      shortDescription: Record and retrieve architecture decisions
+      defaultPrompt:
+      - Record this architecture decision as an ADR.
+      - Why did we choose this approach?

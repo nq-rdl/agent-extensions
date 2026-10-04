@@ -1,0 +1,33 @@
+{
+  "name": "adr",
+  "version": "0.37.0",
+  "description": "Architecture decision records — consent-gated MADR 4.0.0 capture, supersession, retrieval, and spec archival",
+  "author": {
+    "name": "nq-rdl"
+  },
+  "repository": "https://github.com/nq-rdl/agent-extensions",
+  "license": "MIT",
+  "keywords": [
+    "adr",
+    "madr",
+    "architecture",
+    "decisions",
+    "documentation"
+  ],
+  "skills": "./skills/",
+  "interface": {
+    "displayName": "ADR",
+    "shortDescription": "Record and retrieve architecture decisions",
+    "longDescription": "Architecture decision records — consent-gated MADR 4.0.0 capture, supersession, retrieval, and spec archival",
+    "developerName": "nq-rdl",
+    "category": "Developer Tools",
+    "capabilities": [
+      "Skills"
+    ],
+    "defaultPrompt": [
+      "Record this architecture decision as an ADR.",
+      "Why did we choose this approach?"
+    ],
+    "websiteURL": "https://github.com/nq-rdl/agent-extensions"
+  }
+}

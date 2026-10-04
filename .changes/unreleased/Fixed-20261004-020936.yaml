@@ -1,0 +1,3 @@
+kind: Fixed
+body: Count SkillSpector reports without inspection completeness as unknown, not omitted, in the CI completeness summary.
+time: 2026-10-04T02:09:36.402134233Z

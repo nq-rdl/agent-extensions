@@ -91,7 +91,7 @@ Claude uses `/plugin:skill`; Codex uses `$plugin:skill` for bundles enabled in t
 | Former agent | Owning skill | Canonical delegation outline |
 |---|---|---|
 | `address-comments` | `gh:address-comments` | `skills/address-comments/references/subagent.rst` |
-| `adr-generator` | `planning:record-decision` | `skills/adr-generator/references/subagent.rst` |
+| `adr-generator` | `adr:record` | `skills/architecture-decision-records/references/subagent.rst` |
 | `arch-linux-expert` | `arch-linux:maintain` | `skills/arch-linux-expert/references/subagent.rst` |
 | `codex-rescue` | `codex:rescue` | `skills/codex-rescue/references/subagent.rst` |
 | `context-architect` | `planning:sequence` | `skills/context-architect/references/subagent.rst` |

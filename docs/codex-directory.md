@@ -7,6 +7,7 @@ This report records missing evidence; it does not attest to publisher identity, 
 
 | Plugin | Skills | Submission route | Submission ready |
 |---|---:|---|:---:|
+| adr | 1 | skills-only | No |
 | ansible | 1 | skills-only | No |
 | arch-linux | 1 | skills-only | No |
 | argo-cd | 2 | skills-only | No |
@@ -29,7 +30,7 @@ This report records missing evidence; it does not attest to publisher identity, 
 | pandera | 1 | skills-only | No |
 | pi | 4 | skills-only | No |
 | pixi | 1 | skills-only | No |
-| planning | 5 | skills-only | No |
+| planning | 4 | skills-only | No |
 | playwright | 1 | local-mcp | No |
 | postgres | 1 | skills-only | No |
 | prompting | 2 | skills-only | No |
@@ -46,6 +47,15 @@ This report records missing evidence; it does not attest to publisher identity, 
 | terraform | 3 | skills-only | No |
 | testcontainers | 1 | skills-only | No |
 | writerside | 1 | skills-only | No |
+
+## adr
+
+- Publisher must supply logo
+- Publisher must supply privacyPolicyURL
+- Publisher must supply termsOfServiceURL
+- Publisher identity and organization submission access are not recorded as verified
+- Record authenticated execution evidence for five positive and three negative task cases
+- Publisher must select supported availability regions
 
 ## ansible
 
