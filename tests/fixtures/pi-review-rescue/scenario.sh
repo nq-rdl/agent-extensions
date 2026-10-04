@@ -217,7 +217,9 @@ rescue)
     arg -p; after --mode text; arg --no-approve; after --tools read,grep,find,ls; after --model "$MODEL"
     jq -e '.[-2] == "--" and .[-1] == "Reply exactly PILOT_OK."' "$FIXTURE/pi.args" >/dev/null || fail "task text"
     first=$(jq -r '.[(index("--session-id")) + 1]' "$FIXTURE/pi.args")
-    case "$first" in rescue-*) ;; *) fail "session id $first" ;; esac
+    # Fixed-width IDs: none can be a prefix of another (pi --session falls back
+    # to prefix matches).
+    printf '%s\n' "$first" | grep -qE '^rescue-[0-9]{8}T[0-9]{6}Z-[0-9]{10}$' || fail "session id $first"
     cd repo
     expect 0 bash "$Q" candidate; OUT --arg s "$first" '.available and .session == $s' || fail "candidate after run"
     # Resume reuses the session; --write drops the read-only tool list.

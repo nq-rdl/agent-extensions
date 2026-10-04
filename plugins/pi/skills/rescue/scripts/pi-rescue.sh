@@ -103,8 +103,11 @@ task)
         [ -s "$STATE" ] || die "No previous pi rescue session was found for this repository." 1
         SESSION=$(cat "$STATE")
     else
-        # pi session IDs must not contain "/".
-        SESSION="rescue-$(date -u +%Y%m%dT%H%M%SZ)-$$"
+        # pi session IDs must not contain "/". Every ID has the same length
+        # (zero-padded PID) so none is a prefix of another: pi's --session
+        # falls back to prefix matches, and a deleted session must not resolve
+        # to a different one (e.g. same-second PIDs 123 and 1234).
+        SESSION="rescue-$(date -u +%Y%m%dT%H%M%SZ)-$(printf '%010d' "$$")"
     fi
     # Fresh runs create the session by exact ID. Resumes use --session, which
     # fails when the session no longer exists instead of silently starting an
