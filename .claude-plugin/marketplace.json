@@ -409,13 +409,25 @@
     {
       "name": "planning",
       "source": "./plugins/planning",
-      "description": "Planning — implementation strategy, technical-spike validation, file-level sequencing, API/repo architecture, and ADRs",
+      "description": "Planning — implementation strategy, technical-spike validation, file-level sequencing, and API/repo architecture",
       "version": "0.37.0",
       "keywords": [
         "planning",
         "architecture",
-        "adr",
         "spike"
+      ]
+    },
+    {
+      "name": "adr",
+      "source": "./plugins/adr",
+      "description": "Architecture decision records — consent-gated MADR 4.0.0 capture, supersession, retrieval, and spec archival",
+      "version": "0.37.0",
+      "keywords": [
+        "adr",
+        "madr",
+        "architecture",
+        "decisions",
+        "documentation"
       ]
     },
     {

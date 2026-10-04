@@ -1,0 +1,3 @@
+kind: Added
+body: Choose MADR 4.0.0 over Structured MADR for ADRs. New logs use NNNN-title.md in docs/adr; existing logs keep their own name style and format.
+time: 2026-10-04T01:29:49.990149782Z

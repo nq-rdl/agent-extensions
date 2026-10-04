@@ -1,5 +1,5 @@
-Subagent outline: adr-generator
-===============================
+Subagent outline: architecture-decision-records
+===============================================
 
 Read this outline only when delegation is useful or the user requests a subagent.
 It is a prompt reference, not an automatically registered agent. The main agent
@@ -48,8 +48,14 @@ removing temporary files the worker created, and tearing down the worker's own
 test fixtures. The worker does that work. In the handoff, the parent names the
 steps that it will run itself.
 
-Required capabilities: Read, Write, Edit, Grep, Glob. Map these capability names to tools available in
-the current host; this list is guidance, not a runtime permission configuration.
+State in the handoff whether the user has already approved writing records.
+Without that approval the worker drafts only and returns the drafts; the
+skill's consent gate is never satisfied by the worker itself.
+
+Required capabilities: Read, Grep, Glob, Bash (for ``scripts/adr-scan.sh`` and
+``git log``); Write and Edit only when writing was approved. Map these
+capability names to tools available in the current host; this list is
+guidance, not a runtime permission configuration.
 
 Return the requested result with evidence, changed paths (if any), checks run,
 and unresolved limitations. The parent verifies the result before presenting it.
@@ -58,71 +64,28 @@ Do not recursively delegate unless the assigned task explicitly calls for it.
 Worker procedure
 ----------------
 
-ADR Generator
-=============
+Typical delegated tasks are backfilling records from several merged specs or
+PRs, and auditing an existing log with ``adr-scan.sh check``.
 
-This specialized agent creates comprehensive **Architectural Decision
-Records (ADRs)** that document technical decisions with structured
-formatting for both AI parsing and human readability.
-
-Key Workflow Steps
-------------------
-
-The agent follows a systematic process:
-
-1. **Information Gathering** — Collects decision title, context, chosen
-   solution, alternatives, and stakeholders from the user's initial
-   prompt or interactive prompting. Validates completeness before
-   proceeding.
-
-2. **Numbering** — Checks existing ADRs in ``docs/adr/`` (relative to
-   the repository root), or the repo's existing ADR directory, via the
-   Read and Glob tools to assign the next sequential 4-digit number (0001,
-   0002, etc.).
-
-3. **Document Generation** — Creates markdown files with standardized
-   structure, using coded bullet points (3-letter codes + 3-digit
-   numbers) for structured parsing.
-
-Required ADR Structure
-----------------------
-
-Each ADR includes:
-
-- **Front Matter** — YAML metadata with title, status, date, authors,
-  and supersession tracking
-- **Status** — Proposed, Accepted, Rejected, Superseded, or Deprecated
-- **Context** — Problem statement and constraints
-- **Decision** — Chosen solution with rationale
-- **Consequences** — Positive (POS-001+) and negative (NEG-001+) impacts
-- **Alternatives Considered** — At least 2-3 options with rejection
-  reasons
-- **Implementation Notes** — Practical guidance and success metrics
-- **References** — Related ADRs, documentation, and standards
-
-File Naming
------------
-
-Format: ``adr-NNNN-[title-slug].md``
-
-Example: ``adr-0042-authentication-strategy.md``
-
-Files save to ``docs/adr/`` (relative to the repository root, not the
-filesystem root), or to the repo's existing ADR directory. Follow the
-repo's existing ADR format when one exists; a structured MADR ADR skill
-is proposed separately in
-https://github.com/nq-rdl/agent-extensions/issues/202.
-
-Quality Standards
------------------
-
-The agent verifies sequential numbering, complete sections, honest
-trade-off documentation, clarity of language, and proper formatting
-before finalizing deliverables.
+1. Run ``scripts/adr-scan.sh next`` and ``list`` from the repository root to
+   learn the directory, name style, index and next number. When drafting
+   several records, assign numbers sequentially from ``next=`` and report them
+   as provisional: the parent confirms them before any write.
+2. For each candidate decision, follow SKILL.md "Record a decision" and, for
+   specs, ``references/spec-archival.rst``. Cite the source of every driver,
+   option and consequence. Write ``Not recorded — <question>`` instead of
+   guessing, and collect those questions for the parent.
+3. Apply the SKILL.md quality check to each draft.
+4. Return: one entry per draft with proposed path, number, status, the draft
+   text (or the written path when writing was approved), its evidence sources,
+   and open questions. Include the ``adr-scan.sh check`` output when files were
+   written.
 
 Provenance
 ----------
 
 SPDX-License-Identifier: MIT
 
-Adapted from https://github.com/github/awesome-copilot/blob/main/agents/adr-generator.agent.md
+Consolidates the former ``adr-generator`` outline (adapted from
+https://github.com/github/awesome-copilot/blob/main/agents/adr-generator.agent.md)
+into the MADR 4.0.0 workflow of this skill.

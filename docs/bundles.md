@@ -47,7 +47,8 @@ Delegation outlines are optional skill references, not registered agent types.
 | [`rdl-team`](#rdl-team) | Yes | Yes | RDL team workflows — repository context, spec-kit delivery, and onboarding |
 | [`playwright`](#playwright) | Yes | Yes | Playwright — generate and debug end-to-end browser tests |
 | [`testcontainers`](#testcontainers) | Yes | Yes | Testcontainers — integration tests against real services in throwaway containers |
-| [`planning`](#planning) | Yes | Yes | Planning — implementation strategy, technical-spike validation, file-level sequencing, API/repo architecture, and ADRs |
+| [`planning`](#planning) | Yes | Yes | Planning — implementation strategy, technical-spike validation, file-level sequencing, and API/repo architecture |
+| [`adr`](#adr) | Yes | Yes | Architecture decision records — consent-gated MADR 4.0.0 capture, supersession, retrieval, and spec archival |
 | [`debug`](#debug) | Yes | Yes | Debugging and cleanup — systematic diagnosis and tech-debt removal |
 | [`tech-writing`](#tech-writing) | Yes | Yes | Technical writing — developer docs, tutorials, ADRs, and guides |
 | [`lucid`](#lucid) | Yes | Yes | Lucid — visual collaboration boards and diagrams (Lucidchart / Lucidspark) via the hosted Lucid MCP server |
@@ -690,14 +691,13 @@ Testcontainers — integration tests against real services in throwaway containe
 
 ## planning
 
-Planning — implementation strategy, technical-spike validation, file-level sequencing, API/repo architecture, and ADRs.
+Planning — implementation strategy, technical-spike validation, file-level sequencing, and API/repo architecture.
 
 **Claude Code skills**
 
 - `/planning:strategy`
 - `/planning:sequence`
 - `/planning:architecture`
-- `/planning:record-decision`
 - `/planning:research`
 
 **Codex skills**
@@ -705,8 +705,21 @@ Planning — implementation strategy, technical-spike validation, file-level seq
 - `$planning:strategy`
 - `$planning:sequence`
 - `$planning:architecture`
-- `$planning:record-decision`
 - `$planning:research`
+
+---
+
+## adr
+
+Architecture decision records — consent-gated MADR 4.0.0 capture, supersession, retrieval, and spec archival.
+
+**Claude Code skills**
+
+- `/adr:record`
+
+**Codex skills**
+
+- `$adr:record`
 
 ---
 

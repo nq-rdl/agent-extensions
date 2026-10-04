@@ -6,6 +6,7 @@ import unittest
 from pathlib import Path
 
 CASES = (
+    "test_adr_scan.Bash32Scan.test_next_list_check_under_bash32",
     "test_pi_dispatch.Bash32.test_offline_contracts",
     "test_installed_hooks.Bash32BusyBoxFallback.test_prompt_fallbacks_gate_without_jq_or_python",
     "test_installed_hooks.Bash32BusyBoxFallback.test_escaped_input",
