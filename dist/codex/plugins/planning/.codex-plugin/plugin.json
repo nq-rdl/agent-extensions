@@ -1,7 +1,7 @@
 {
   "name": "planning",
   "version": "0.37.0",
-  "description": "Planning — implementation strategy, technical-spike validation, file-level sequencing, API/repo architecture, and ADRs",
+  "description": "Planning — implementation strategy, technical-spike validation, file-level sequencing, and API/repo architecture",
   "author": {
     "name": "nq-rdl"
   },
@@ -10,14 +10,13 @@
   "keywords": [
     "planning",
     "architecture",
-    "adr",
     "spike"
   ],
   "skills": "./skills/",
   "interface": {
     "displayName": "Planning",
     "shortDescription": "Planning tools and workflows",
-    "longDescription": "Planning — implementation strategy, technical-spike validation, file-level sequencing, API/repo architecture, and ADRs",
+    "longDescription": "Planning — implementation strategy, technical-spike validation, file-level sequencing, and API/repo architecture",
     "developerName": "nq-rdl",
     "category": "Developer Tools",
     "capabilities": [

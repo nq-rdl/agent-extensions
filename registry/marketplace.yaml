@@ -55,6 +55,7 @@ order:
   - playwright
   - testcontainers
   - planning
+  - adr
   - debug
   - tech-writing
   - lucid
