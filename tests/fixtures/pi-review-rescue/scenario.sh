@@ -78,6 +78,22 @@ render)
     printf '{"findings":[1],"overall_correctness":"patch is incorrect"}\n' > odd.json
     expect 1 bash "$R" render odd.json t m; has "not the expected review JSON"; has '"findings":[1]'
     lacks "Verdict:"
+    # An unknown verdict, or a finding missing a required field or with a
+    # malformed location or priority, is not a review either.
+    printf '{"findings":[],"overall_correctness":"banana"}\n' > verdict.json
+    expect 1 bash "$R" render verdict.json t m; has "not the expected review JSON"; lacks "Verdict:"
+    for f in 'del(.title)' '.title = ""' 'del(.body)' '.body = 3' 'del(.code_location)' \
+            '.code_location.absolute_file_path = "a.sh"' 'del(.code_location.line_range)' \
+            '.code_location.line_range.start = 0' 'del(.code_location.line_range.end)' \
+            '.code_location.line_range.end = 4' '.code_location.line_range.start = 5.5' \
+            '.priority = 7' '.priority = "1"' '{}'; do
+        jq ".findings[0] |= ($f)" review.json > malformed.json
+        expect 1 bash "$R" render malformed.json t m
+        has "not the expected review JSON"; lacks "Verdict:"
+    done
+    # priority is optional: null or absent renders without a tag.
+    jq '.findings[0].priority = null | del(.findings[1].priority)' review.json > nopri.json
+    expect 0 bash "$R" render nopri.json t m; has "- Keep the guard — /repo/a.sh:5-7"
     ;;
 review-args)
     repo; cd repo

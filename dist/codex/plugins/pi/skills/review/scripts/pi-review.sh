@@ -164,21 +164,32 @@ render() {
         sed -n '/^[[:space:]]*{/,$p' "$file" | sed '/^[[:space:]]*```[[:space:]]*$/,$d' >"$json"
     fi
     # Slurp so empty input (no JSON found) fails instead of passing vacuously.
-    if jq -s -e 'length == 1 and (.[0].findings | type) == "array"
-            and all(.[0].findings[]; type == "object")
-            and (.[0].overall_correctness | type) == "string"' "$json" >/dev/null 2>&1 \
+    # Every field the rubric's schema requires must be present and well-formed
+    # (priority stays optional), so a malformed answer takes the raw path.
+    if jq -s -e '
+        def line: type == "number" and . >= 1 and . == floor;
+        def finding: type == "object"
+            and (.title | type) == "string" and (.title | length) > 0
+            and (.body | type) == "string"
+            and (.priority == null or (.priority | IN(0, 1, 2, 3)))
+            and (.code_location | type) == "object"
+            and (.code_location.absolute_file_path | type) == "string"
+            and (.code_location.absolute_file_path | startswith("/"))
+            and (.code_location.line_range | type) == "object"
+            and (.code_location.line_range.start | line)
+            and (.code_location.line_range.end | line)
+            and .code_location.line_range.end >= .code_location.line_range.start;
+        length == 1 and (.[0].findings | type) == "array"
+            and all(.[0].findings[]; finding)
+            and (.[0].overall_correctness | IN("patch is correct", "patch is incorrect"))' \
+            "$json" >/dev/null 2>&1 \
         && jq -r --arg target "$target" --arg model "$model" '
-        def pri: if (.priority | type) == "number" then .priority else 9 end;
-        def title: (.title // "untitled" | tostring) as $t
-                   | if ($t | test("^\\[P[0-3]\\]")) or ((.priority | type) != "number")
-                     then $t else "[P\(.priority)] \($t)" end;
-        def where: (.code_location.absolute_file_path // "?" | tostring)
-                   + (if .code_location.line_range.start then
-                        ":\(.code_location.line_range.start)"
-                        + (if (.code_location.line_range.end // .code_location.line_range.start)
-                              != .code_location.line_range.start
-                           then "-\(.code_location.line_range.end)" else "" end)
-                      else "" end);
+        def pri: .priority // 9;
+        def title: if (.title | test("^\\[P[0-3]\\]")) or .priority == null
+                   then .title else "[P\(.priority)] \(.title)" end;
+        def where: .code_location as $c | $c.line_range as $r
+                   | "\($c.absolute_file_path):\($r.start)"
+                     + (if $r.end != $r.start then "-\($r.end)" else "" end);
         "# Pi Review", "",
         "Target: \($target)",
         "Model: \($model)",
@@ -190,7 +201,7 @@ render() {
         else "Full review comments:", "",
              (.findings | sort_by(pri)[]
               | "- \(title) — \(where)",
-                (.body // "" | tostring | split("\n") | map("  " + .) | join("\n")),
+                (.body | split("\n") | map("  " + .) | join("\n")),
                 "")
         end' "$json" >"$out" 2>/dev/null; then
         cat "$out"
