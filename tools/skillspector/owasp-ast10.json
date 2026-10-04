@@ -38,7 +38,9 @@
     "TR": { "risk": "AST04", "why": "Broad, shadowing, or generic trigger metadata" },
     "TP": { "risk": "AST04", "why": "Tool poisoning through hidden, deceptive, or mismatched metadata" },
     "DS": { "risk": "AST04", "why": "Insecure deserialization (the parsing layer of AST04)" },
-    "SSRF": { "risk": "AST06", "why": "Requests to cloud metadata, internal networks, or dynamic targets: unconstrained network egress" }
+    "SSRF": { "risk": "AST06", "why": "Requests to cloud metadata, internal networks, or dynamic targets: unconstrained network egress" },
+    "RP": { "risk": "AST07", "why": "MCP rug-pull: unpinned external references or servers, and manifest changes that expand privileges" },
+    "AE": { "risk": "AST08", "why": "Artifact evasion signals and artifacts the scanner could not completely inspect" }
   },
   "rules": {
     "AST8": { "risk": "AST01", "why": "Execution chain fed by a dynamic or encoded source" },

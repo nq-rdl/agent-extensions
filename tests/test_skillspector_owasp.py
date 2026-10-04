@@ -147,7 +147,7 @@ class SkillSpectorOwaspTest(unittest.TestCase):
             rows[re.sub(r"^\[(AST\d\d) .*", r"\1", label)] = count
         self.assertEqual(rows["AST01"], "0")  # P1 is suppressed
         self.assertEqual(rows["AST03"], "2")
-        self.assertEqual(rows["AST07"], "no SkillSpector rule")
+        self.assertEqual(rows["AST05"], "no SkillSpector rule")
         self.assertEqual(rows[next(k for k in rows if k.startswith("Unmapped"))], "1")
 
     def test_summary_omits_unmapped_row_when_none(self):

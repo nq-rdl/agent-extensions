@@ -63,23 +63,23 @@ maps to OWASP AST04.
 | AST03 Over-Privileged Skills | `PE`, `EA`, `TM`, `AST1`–`AST7`, `OH`, `LP2`/`LP4`, `BH1`/`BH3`/`BH4` |
 | AST04 Insecure Metadata | `TR`, `TP`, `DS`, `LP1`/`LP3`, `AST10`, `TT6` |
 | AST06 Weak Isolation | `SSRF`, `TM4` |
+| AST07 Update Drift | `RP` MCP rug-pull: unpinned references and manifest changes |
+| AST08 Poor Scanning | `AE` artifact evasion, and artifacts the scanner could not completely inspect |
 
 ## Risks without a static rule
 
-Five risks have no SkillSpector rule in static mode. The summary table marks
-them "no SkillSpector rule". The repository addresses them through process:
+AST05, AST09, and AST10 have no SkillSpector rule in static mode. The summary
+table marks them "no SkillSpector rule". The repository addresses them, and
+supplements the partial rule coverage of AST06–AST08, through process:
 
 | OWASP risk | How this repo addresses it |
 |---|---|
 | AST05 Untrusted External Instructions | Links in skills are checked by lychee on PRs and by weekly [link monitoring](link-monitoring.md). Link checks show availability, not content integrity. |
+| AST06 Weak Isolation | Sandboxing and permissions belong to the host agent (Claude Code or Codex), not the skill. The `SSRF` and `TM4` rules only flag code patterns that weaken isolation. |
 | AST07 Update Drift | Plugin trees are generated copies of `skills/`, and the drift checks (`sync-plugins.sh --check`, `generate_manifests.py --check`) keep them identical. Releases go through a reviewed PR that stamps `VERSION`. |
 | AST08 Poor Scanning | SkillSpector checks both the code and the natural-language layer of a skill, and `asctl repo-check` validates skill structure. The optional LLM stage is not used (`--no-llm`), so intent coverage is reduced. |
 | AST09 No Governance | `registry/bundles/` is the inventory of what ships, `check_exposure.py` enforces it, changes need PR review and a changie fragment, and alerts collect in the Security tab. |
 | AST10 Cross-Platform Reuse | One canonical `skills/` tree generates both the Claude Code and Codex packages; see [Codex](codex.md). |
-
-AST06 also depends on the runtime: sandboxing and permissions belong to the
-host agent (Claude Code or Codex), not the skill. The `SSRF` and `TM4` rules
-only flag code patterns that weaken isolation.
 
 ## Upgrading SkillSpector
 
