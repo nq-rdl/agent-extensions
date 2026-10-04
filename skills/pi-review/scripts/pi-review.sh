@@ -56,8 +56,9 @@ resolve_model() {
 default_base() {
     local ref
     ref=$(git symbolic-ref -q --short refs/remotes/origin/HEAD 2>/dev/null || true)
-    if [ -n "$ref" ]; then printf '%s\n' "$ref"; return; fi
-    for ref in origin/main origin/master main master; do
+    # origin/HEAD can dangle (e.g. after a default-branch rename and a prune);
+    # only use it when it resolves, else try the usual names.
+    for ref in $ref origin/main origin/master main master; do
         if git rev-parse -q --verify "$ref^{commit}" >/dev/null 2>&1; then
             printf '%s\n' "$ref"; return
         fi
@@ -70,10 +71,12 @@ default_base() {
 # TARGET, and EMPTY=1 when there is nothing to review. Call it plainly, never
 # in an if/||/&& context: that would disable set -e for every git call here.
 TARGET="" EMPTY=0
-# A plain unified patch whatever the user's presentation settings: external
-# diff drivers (diff.external, GIT_EXTERNAL_DIFF) could emit nothing or a
-# different format, and color.diff=always would embed ANSI codes.
-DIFF_OPTS="--no-ext-diff --no-color"
+# A plain unified patch of the source files pi can read, whatever the user's
+# settings: external diff drivers (diff.external, GIT_EXTERNAL_DIFF) could emit
+# nothing or another format, textconv drivers would report converted lines at
+# coordinates that do not exist in the files, and color.diff=always would
+# embed ANSI codes.
+DIFF_OPTS="--no-ext-diff --no-textconv --no-color"
 collect() {
     local out=$1 diff=$2 mb f size status
     if [ "$SCOPE" = auto ]; then

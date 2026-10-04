@@ -121,6 +121,11 @@ review-branch)
     lacks "$(printf '\033')[" pi.request
     # TERM to the helper stops pi too.
     cd repo; signal_run "" bash "$R" run --base base; cd ..
+    # A dangling origin/HEAD falls back to the usual base names.
+    cd repo; git update-ref refs/remotes/origin/gone HEAD
+    git symbolic-ref refs/remotes/origin/HEAD refs/remotes/origin/gone; git update-ref -d refs/remotes/origin/gone
+    PI_OUT=../review.json expect 0 bash "$R" run; has "Target: branch diff against main"
+    git symbolic-ref --delete refs/remotes/origin/HEAD; cd ..
     # Default base resolves to main when origin is absent.
     cd repo; PI_OUT=../review.json expect 0 bash "$R" run; has "Target: branch diff against main"; cd ..
     ;;
@@ -161,13 +166,19 @@ review-worktree)
     # prompt mode prints the whole diff (its temporary files vanish on exit).
     cd repo; PI_REVIEW_MAX_DIFF_BYTES=10 expect 0 bash "$R" prompt; cd ..
     has "+two"; has "+odd content"; lacks "diff truncated"; lacks "The complete diff is"
-    # A failing git diff aborts; it never reads as "Nothing to review".
+    # textconv drivers are ignored: the request holds source lines, even when
+    # the converter fails or would hide the change.
     cd repo
     printf '*.txt diff=boom\n' > .git/info/attributes; git config diff.boom.textconv false
-    rm -f "$FIXTURE/pi.args"
-    expect 2 bash "$R" run; has "git diff" err; lacks "Nothing to review"
-    [ ! -f "$FIXTURE/pi.args" ] || fail "pi ran after git diff failed"
+    PI_OUT=../review.json expect 0 bash "$R" run; lacks "Nothing to review"
+    git config diff.boom.textconv true; PI_OUT=../review.json expect 0 bash "$R" run
     rm .git/info/attributes; git config --unset diff.boom.textconv; cd ..
+    has "+two" pi.request
+    # A failing git diff aborts; it never reads as "Nothing to review".
+    cd repo; git config diff.algorithm bogus; rm -f "$FIXTURE/pi.args"
+    expect 2 bash "$R" run; has "failed" err; lacks "Nothing to review"
+    [ ! -f "$FIXTURE/pi.args" ] || fail "pi ran after git diff failed"
+    git config --unset diff.algorithm; cd ..
     # pi failure and unexpected output both exit 1 and show the raw output.
     cd repo
     printf 'boom\n' > ../boom.txt
