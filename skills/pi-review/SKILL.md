@@ -27,8 +27,10 @@ Raw arguments: `$ARGUMENTS`
 The helper is [pi-review.sh](scripts/pi-review.sh); `S` below is this skill's
 `scripts/` directory. It sends the [OpenAI Codex review rubric](assets/review-rubric.md)
 as an appended system prompt and the diff as the request, and runs pi with
-`--tools read,grep,find,ls`, `--no-session` and `--no-approve`. The rubric is
-written for OpenAI models; other providers' prompting is not tuned yet.
+`--tools read,grep,find,ls`, `--no-session` and `--no-approve`. Diffs over
+150 KB are truncated in the request, which names a temporary file holding the
+complete diff for pi to read. The rubric is written for OpenAI models; other
+providers' prompting is not tuned yet.
 
 ## Before running
 

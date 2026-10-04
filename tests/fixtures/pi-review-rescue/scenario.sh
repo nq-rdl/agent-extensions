@@ -89,9 +89,17 @@ review-worktree)
     PI_OUT=../review.json expect 0 bash "$R" run
     has "Target: working tree"; cd ..
     has "+two" pi.request; has "+new file" pi.request; has "?? untracked.txt" pi.request
+    # Names git would quote (non-ASCII, spaces) must still reach the diff.
+    cd repo; rm untracked.txt; git checkout -q -- a.txt
+    printf 'odd content\n' > "caf\303\251 name.txt"
+    PI_OUT=../review.json expect 0 bash "$R" run; cd ..
+    has "+odd content" pi.request
     # Truncation keeps a bounded request and says so.
-    cd repo; PI_REVIEW_MAX_DIFF_BYTES=10 PI_OUT=../review.json expect 0 bash "$R" run; cd ..
-    has "diff truncated after 10 bytes" pi.request
+    cd repo; printf 'two\n' > a.txt
+    PI_REVIEW_MAX_DIFF_BYTES=10 PI_OUT=../review.json expect 0 bash "$R" run; cd ..
+    has "diff truncated after 10 of" pi.request; has "The complete diff is" pi.request
+    # The complete diff stays readable for the whole pi run.
+    has "+two" pi.fulldiff; has "+odd content" pi.fulldiff
     # pi failure and unexpected output both exit 1 and show the raw output.
     cd repo
     printf 'boom\n' > ../boom.txt
@@ -100,7 +108,11 @@ review-worktree)
     ;;
 rescue)
     # Runs under Bash 3.2 too: only rev-parse is needed, via a shim there.
-    if ! command -v git >/dev/null 2>&1; then export PATH="$PWD/gitshim:$PATH"; mkdir -p repo; else repo; fi
+    if ! command -v git >/dev/null 2>&1; then
+        export PATH="$PWD/gitshim:$PATH"; mkdir -p repo gitshim-active
+    else
+        repo
+    fi
     cd repo
     expect 0 bash "$Q" candidate; OUT '.available == false' || fail "candidate before any run"
     expect 2 bash "$Q" task investigate; has "no model" err
@@ -127,7 +139,21 @@ rescue)
     second=$(jq -r '.[(index("--session-id")) + 1]' "$FIXTURE/pi.args")
     [ "$second" != "$first" ] || fail "fresh run reused the session"
     cd repo; expect 0 bash "$Q" candidate; OUT --arg s "$second" '.session == $s' || fail "last session"
-    PI_EXIT=4 expect 4 bash "$Q" task fails
+    # A fresh run that fails keeps the previous resumable session.
+    PI_EXIT=4 expect 4 bash "$Q" task fails; has "kept the previous resumable session" err
+    expect 0 bash "$Q" candidate; OUT --arg s "$second" '.session == $s' || fail "failed run moved the pointer"
+    # Paths that sanitize alike (x/a/b, x/a-b) keep separate pointers.
+    if [ ! -d "$FIXTURE/gitshim-active" ] && command -v git >/dev/null 2>&1 && git --version >/dev/null 2>&1; then
+        for d in "$FIXTURE/x/a/b" "$FIXTURE/x/a-b"; do
+            mkdir -p "$d"; (cd "$d" && git init -q)
+        done
+        (cd "$FIXTURE/x/a/b" && PI_OUT="$FIXTURE/ok.txt" expect 0 bash "$Q" task one)
+        ab=$(jq -r '.[(index("--session-id")) + 1]' "$FIXTURE/pi.args")
+        (cd "$FIXTURE/x/a-b" && expect 0 bash "$Q" candidate)
+        OUT '.available == false' || fail "x/a-b sees x/a/b's session"
+        (cd "$FIXTURE/x/a/b" && expect 0 bash "$Q" candidate)
+        OUT --arg s "$ab" '.session == $s' || fail "x/a/b lost its own session"
+    fi
     ;;
 *) fail "unknown case $1" ;;
 esac

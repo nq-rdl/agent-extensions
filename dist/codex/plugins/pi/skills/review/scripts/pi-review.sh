@@ -62,12 +62,12 @@ default_base() {
     die "cannot find a base branch; pass --base REF"
 }
 
-# collect writes the review request body to $1 and sets TARGET; returns 3 when
-# there is nothing to review.
+# collect OUT DIFF: write the review request body to OUT and the complete diff
+# to DIFF (kept for the pi run, so a truncated request can point at it). Sets
+# TARGET; returns 3 when there is nothing to review.
 TARGET=""
 collect() {
-    local out=$1 diff mb f
-    diff=$(mktemp)
+    local out=$1 diff=$2 mb f size
     if [ "$SCOPE" = auto ]; then
         if [ -n "$BASE" ]; then
             SCOPE=branch
@@ -81,10 +81,12 @@ collect() {
         TARGET="working tree (staged, unstaged and untracked changes)"
         git diff --cached >"$diff"
         git diff >>"$diff"
-        git ls-files --others --exclude-standard | while IFS= read -r f; do
+        # NUL-delimited: default output quotes unusual names, which git diff
+        # would then fail to open.
+        git ls-files -z --others --exclude-standard | while IFS= read -r -d '' f; do
             git diff --no-index -- /dev/null "$f" || true
         done >>"$diff"
-        if [ ! -s "$diff" ]; then rm -f "$diff"; return 3; fi
+        [ -s "$diff" ] || return 3
         {
             printf 'Status:\n'
             git status --short --untracked-files=all
@@ -95,7 +97,7 @@ collect() {
         mb=$(git merge-base "$BASE" HEAD) || die "no merge base between $BASE and HEAD"
         TARGET="branch diff against $BASE"
         git diff "$mb" HEAD >"$diff"
-        if [ ! -s "$diff" ]; then rm -f "$diff"; return 3; fi
+        [ -s "$diff" ] || return 3
         {
             printf 'Merge base: %s\n\nCommits:\n' "$mb"
             git log --oneline "$mb..HEAD"
@@ -103,17 +105,18 @@ collect() {
             git diff --stat "$mb" HEAD
         } >"$out"
     fi
+    size=$(wc -c <"$diff" | tr -d ' ')
     {
         printf '\n<diff>\n'
-        if [ "$(wc -c <"$diff")" -gt "$MAX_DIFF_BYTES" ]; then
+        if [ "$size" -gt "$MAX_DIFF_BYTES" ]; then
             head -c "$MAX_DIFF_BYTES" "$diff"
-            printf '\n[diff truncated after %s bytes; read the remaining changed files with the read tool]\n' "$MAX_DIFF_BYTES"
+            printf '\n[diff truncated after %s of %s bytes. The complete diff is %s:\n' "$MAX_DIFF_BYTES" "$size" "$diff"
+            printf 'read the rest of it with the read tool (offset/limit) before concluding.]\n'
         else
             cat "$diff"
         fi
         printf '</diff>\n'
     } >>"$out"
-    rm -f "$diff"
 }
 
 # request writes the full user request to $1 (TARGET must already be set).
@@ -190,7 +193,7 @@ prompt|run)
     tmp=$(mktemp -d)
     trap 'rm -rf "$tmp"' EXIT
     rc=0
-    collect "$tmp/body" || rc=$?
+    collect "$tmp/body" "$tmp/full.diff" || rc=$?
     if [ "$rc" -eq 3 ]; then
         printf 'Nothing to review: no changes in the %s.\n' "$([ "$SCOPE" = branch ] && echo "branch diff" || echo "working tree")"
         exit 0

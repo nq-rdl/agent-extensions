@@ -9,8 +9,9 @@
 # Read-only by default (--tools read,grep,find,ls); --write enables pi's
 # default tools (read, bash, edit, write). Neither is a sandbox. --resume-last
 # reuses the checkout's last rescue session; otherwise a new session starts and
-# becomes the last one. Model: --model, else "model" in the approved
-# pi-dispatch config (/pi:setup). pi's final message is printed unchanged.
+# becomes the last one only if pi exits 0, so a failed start keeps the previous
+# pointer. Model: --model, else "model" in the approved pi-dispatch config
+# (/pi:setup). pi's final message is printed unchanged.
 #
 # Exit codes: pi's own status for a task run; 1 no session to resume;
 # 2 usage, configuration or repository error.
@@ -21,11 +22,22 @@ READ_ONLY_TOOLS="read,grep,find,ls"
 
 die() { printf 'pi-rescue: %s\n' "$1" >&2; exit "${2:-2}"; }
 
+# digest TEXT: a hex digest of TEXT, using whichever SHA-256 tool exists.
+digest() {
+    if command -v sha256sum >/dev/null 2>&1; then printf '%s' "$1" | sha256sum | cut -c1-16
+    elif command -v shasum >/dev/null 2>&1; then printf '%s' "$1" | shasum -a 256 | cut -c1-16
+    else printf '%s' "$1" | cksum | tr ' ' '-'
+    fi
+}
+
 # One state directory per checkout: pi stores sessions per working directory.
+# The key is a readable, shortened path plus a digest of the full path, so
+# paths such as /a/b and /a-b never share a pointer.
 state_file() {
     local root key
     root=$(git rev-parse --show-toplevel 2>/dev/null) || die "not inside a git repository"
-    key=$(printf '%s' "$root" | tr -c 'A-Za-z0-9._-' '-' | sed 's/^-*//')
+    key=$(printf '%s' "$root" | tr -c 'A-Za-z0-9._-' '-' | sed 's/^-*//' | cut -c1-80)
+    key="$key-$(digest "$root")"
     STATE_DIR="${PI_RESCUE_STATE_DIR:-${XDG_STATE_HOME:-$HOME/.local/state}/pi-rescue/$key}"
     STATE="$STATE_DIR/last-session"
     ROOT=$root
@@ -75,16 +87,25 @@ task)
     else
         # pi session IDs must not contain "/".
         SESSION="rescue-$(date -u +%Y%m%dT%H%M%SZ)-$$"
-        (umask 077; mkdir -p "$STATE_DIR")
-        printf '%s\n' "$SESSION" >"$STATE.tmp"
-        mv "$STATE.tmp" "$STATE"
     fi
     set -- -p --mode text --session-id "$SESSION" --model "$MODEL" --no-approve
     [ "$WRITE" -eq 1 ] || set -- "$@" --tools "$READ_ONLY_TOOLS"
     [ -z "$THINKING" ] || set -- "$@" --thinking "$THINKING"
     cd "$ROOT"
+    rc=0
     # pi -p reads a non-TTY stdin to EOF; an open host pipe would hang it.
-    exec pi "$@" -- "$TEXT" </dev/null
+    pi "$@" -- "$TEXT" </dev/null || rc=$?
+    if [ "$RESUME" -eq 0 ]; then
+        if [ "$rc" -eq 0 ]; then
+            (umask 077; mkdir -p "$STATE_DIR")
+            printf '%s\n' "$SESSION" >"$STATE.tmp"
+            mv "$STATE.tmp" "$STATE"
+        else
+            printf 'pi-rescue: pi exited %s; kept the previous resumable session (this run used %s)\n' \
+                "$rc" "$SESSION" >&2
+        fi
+    fi
+    exit "$rc"
     ;;
 *)
     die "usage: pi-rescue.sh candidate | task [--write] [--resume-last] [--model M] [--thinking LEVEL] [--] TEXT"

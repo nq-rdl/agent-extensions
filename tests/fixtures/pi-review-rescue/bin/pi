@@ -5,11 +5,17 @@ set -eu
 if [ -p /dev/stdin ]; then echo "fake pi: stdin is a pipe; real pi would block" >&2; exit 97; fi
 jq -n --args '$ARGS.positional' -- "$@" > "$FIXTURE/pi.args"
 printf '%s\n' "$PWD" > "$FIXTURE/pi.cwd"
+rm -f "$FIXTURE/pi.request" "$FIXTURE/pi.fulldiff"
 prev=""
 for a in "$@"; do
     case "$prev" in --append-system-prompt) cp "$a" "$FIXTURE/pi.system" ;; esac
     case "$a" in @*) cp "${a#@}" "$FIXTURE/pi.request" ;; esac
     prev=$a
 done
+# A truncated review request names the complete diff; it must exist during the run.
+if [ -f "$FIXTURE/pi.request" ]; then
+    full=$(sed -n 's/.*The complete diff is \(.*\):$/\1/p' "$FIXTURE/pi.request" | head -1)
+    [ -z "$full" ] || cp "$full" "$FIXTURE/pi.fulldiff"
+fi
 [ -z "${PI_OUT:-}" ] || cat "$PI_OUT"
 exit "${PI_EXIT:-0}"
