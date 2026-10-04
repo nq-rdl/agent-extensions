@@ -64,14 +64,16 @@ default_base() {
 
 # collect OUT DIFF: write the review request body to OUT and the complete diff
 # to DIFF (kept for the pi run, so a truncated request can point at it). Sets
-# TARGET; returns 3 when there is nothing to review.
-TARGET=""
+# TARGET, and EMPTY=1 when there is nothing to review. Call it plainly, never
+# in an if/||/&& context: that would disable set -e for every git call here.
+TARGET="" EMPTY=0
 collect() {
-    local out=$1 diff=$2 mb f size
+    local out=$1 diff=$2 mb f size status
     if [ "$SCOPE" = auto ]; then
+        status=$(git status --porcelain --untracked-files=all) || die "git status failed"
         if [ -n "$BASE" ]; then
             SCOPE=branch
-        elif [ -n "$(git status --porcelain --untracked-files=all)" ]; then
+        elif [ -n "$status" ]; then
             SCOPE=working-tree
         else
             SCOPE=branch
@@ -79,31 +81,33 @@ collect() {
     fi
     if [ "$SCOPE" = working-tree ]; then
         TARGET="working tree (staged, unstaged and untracked changes)"
-        git diff --cached >"$diff"
-        git diff >>"$diff"
+        git diff --cached >"$diff" || die "git diff --cached failed"
+        git diff >>"$diff" || die "git diff failed"
         # NUL-delimited: default output quotes unusual names, which git diff
-        # would then fail to open.
+        # would then fail to open. --no-index exits 1 for "differences".
         git ls-files -z --others --exclude-standard | while IFS= read -r -d '' f; do
-            git diff --no-index -- /dev/null "$f" || true
-        done >>"$diff"
-        [ -s "$diff" ] || return 3
+            rc=0
+            git diff --no-index -- /dev/null "$f" || rc=$?
+            [ "$rc" -le 1 ] || exit "$rc"
+        done >>"$diff" || die "git diff of untracked files failed"
+        if [ ! -s "$diff" ]; then EMPTY=1; return 0; fi
         {
             printf 'Status:\n'
             git status --short --untracked-files=all
-        } >"$out"
+        } >"$out" || die "git status failed"
     else
         [ -n "$BASE" ] || BASE=$(default_base)
         git rev-parse -q --verify "$BASE^{commit}" >/dev/null || die "unknown base ref: $BASE"
         mb=$(git merge-base "$BASE" HEAD) || die "no merge base between $BASE and HEAD"
         TARGET="branch diff against $BASE"
-        git diff "$mb" HEAD >"$diff"
-        [ -s "$diff" ] || return 3
+        git diff "$mb" HEAD >"$diff" || die "git diff $mb HEAD failed"
+        if [ ! -s "$diff" ]; then EMPTY=1; return 0; fi
         {
             printf 'Merge base: %s\n\nCommits:\n' "$mb"
             git log --oneline "$mb..HEAD"
             printf '\nFiles:\n'
             git diff --stat "$mb" HEAD
-        } >"$out"
+        } >"$out" || die "git log/diff --stat failed"
     fi
     size=$(wc -c <"$diff" | tr -d ' ')
     {
@@ -133,28 +137,26 @@ request() {
 }
 
 # render FILE TARGET MODEL: print the final message as a Codex-style review.
+# Every step checks its own status (callers use render in an || context, where
+# set -e is off); on any failure print the raw message and return 1.
 render() {
-    local file=$1 target=$2 model=$3 json
+    local file=$1 target=$2 model=$3 json out
     json=$(mktemp)
+    out=$(mktemp)
     # Accept bare JSON, or JSON wrapped in a fence or short prose.
     if ! jq -e . "$file" >"$json" 2>/dev/null; then
         sed -n '/^[[:space:]]*{/,$p' "$file" | sed '/^[[:space:]]*```[[:space:]]*$/,$d' >"$json"
     fi
     # Slurp so empty input (no JSON found) fails instead of passing vacuously.
-    if ! jq -s -e 'length == 1 and (.[0].findings | type) == "array"
-            and (.[0].overall_correctness | type) == "string"' "$json" >/dev/null 2>&1; then
-        printf '# Pi Review\n\nTarget: %s\nModel: %s\n\npi returned output that is not the expected review JSON.\n\nRaw final message:\n\n```text\n' "$target" "$model"
-        cat "$file"
-        printf '\n```\n'
-        rm -f "$json"
-        return 1
-    fi
-    jq -r --arg target "$target" --arg model "$model" '
+    if jq -s -e 'length == 1 and (.[0].findings | type) == "array"
+            and all(.[0].findings[]; type == "object")
+            and (.[0].overall_correctness | type) == "string"' "$json" >/dev/null 2>&1 \
+        && jq -r --arg target "$target" --arg model "$model" '
         def pri: if (.priority | type) == "number" then .priority else 9 end;
-        def title: (.title // "untitled") as $t
+        def title: (.title // "untitled" | tostring) as $t
                    | if ($t | test("^\\[P[0-3]\\]")) or ((.priority | type) != "number")
                      then $t else "[P\(.priority)] \($t)" end;
-        def where: (.code_location.absolute_file_path // "?")
+        def where: (.code_location.absolute_file_path // "?" | tostring)
                    + (if .code_location.line_range.start then
                         ":\(.code_location.line_range.start)"
                         + (if (.code_location.line_range.end // .code_location.line_range.start)
@@ -167,15 +169,23 @@ render() {
         "Verdict: \(.overall_correctness)"
           + (if .overall_confidence_score then " (confidence \(.overall_confidence_score))" else "" end),
         "",
-        (.overall_explanation // empty), "",
+        (.overall_explanation // empty | tostring), "",
         if (.findings | length) == 0 then "No findings."
         else "Full review comments:", "",
              (.findings | sort_by(pri)[]
               | "- \(title) — \(where)",
-                (.body // "" | split("\n") | map("  " + .) | join("\n")),
+                (.body // "" | tostring | split("\n") | map("  " + .) | join("\n")),
                 "")
-        end' "$json"
-    rm -f "$json"
+        end' "$json" >"$out" 2>/dev/null; then
+        cat "$out"
+        rm -f "$json" "$out"
+        return 0
+    fi
+    printf '# Pi Review\n\nTarget: %s\nModel: %s\n\npi returned output that is not the expected review JSON.\n\nRaw final message:\n\n```text\n' "$target" "$model"
+    cat "$file"
+    printf '\n```\n'
+    rm -f "$json" "$out"
+    return 1
 }
 
 cmd=${1:-}
@@ -192,9 +202,8 @@ prompt|run)
     cd "$root"
     tmp=$(mktemp -d)
     trap 'rm -rf "$tmp"' EXIT
-    rc=0
-    collect "$tmp/body" "$tmp/full.diff" || rc=$?
-    if [ "$rc" -eq 3 ]; then
+    collect "$tmp/body" "$tmp/full.diff"
+    if [ "$EMPTY" -eq 1 ]; then
         printf 'Nothing to review: no changes in the %s.\n' "$([ "$SCOPE" = branch ] && echo "branch diff" || echo "working tree")"
         exit 0
     fi

@@ -54,6 +54,10 @@ render)
     expect 1 bash "$R" render bad.txt t m; has "not the expected review JSON"; has "not json"
     : > empty.txt
     expect 1 bash "$R" render empty.txt t m; has "not the expected review JSON"
+    # Valid top-level shape with malformed findings must not render partially.
+    printf '{"findings":[1],"overall_correctness":"patch is incorrect"}\n' > odd.json
+    expect 1 bash "$R" render odd.json t m; has "not the expected review JSON"; has '"findings":[1]'
+    lacks "Verdict:"
     ;;
 review-args)
     repo; cd repo
@@ -100,6 +104,13 @@ review-worktree)
     has "diff truncated after 10 of" pi.request; has "The complete diff is" pi.request
     # The complete diff stays readable for the whole pi run.
     has "+two" pi.fulldiff; has "+odd content" pi.fulldiff
+    # A failing git diff aborts; it never reads as "Nothing to review".
+    cd repo
+    printf '*.txt diff=boom\n' > .git/info/attributes; git config diff.boom.textconv false
+    rm -f "$FIXTURE/pi.args"
+    expect 2 bash "$R" run; has "git diff" err; lacks "Nothing to review"
+    [ ! -f "$FIXTURE/pi.args" ] || fail "pi ran after git diff failed"
+    rm .git/info/attributes; git config --unset diff.boom.textconv; cd ..
     # pi failure and unexpected output both exit 1 and show the raw output.
     cd repo
     printf 'boom\n' > ../boom.txt
@@ -133,7 +144,10 @@ rescue)
     expect 0 bash "$Q" candidate; OUT --arg s "$first" '.available and .session == $s' || fail "candidate after run"
     # Resume reuses the session; --write drops the read-only tool list.
     PI_OUT=../ok.txt expect 0 bash "$Q" task --resume-last --write --thinking low -- apply the fix; cd ..
-    after --session-id "$first"; noarg --tools; after --thinking low
+    after --session "$first"; noarg --session-id; noarg --tools; after --thinking low
+    # A request starting with "@" stays literal text, not an attachment.
+    cd repo; PI_OUT=../ok.txt expect 0 bash "$Q" task --resume-last -- @alice look at this; cd ..
+    jq -e '.[-1] == " @alice look at this"' "$FIXTURE/pi.args" >/dev/null || fail "leading @ forwarded as attachment"
     # A fresh run starts and records a new session.
     cd repo; sleep 1; PI_OUT=../ok.txt expect 0 bash "$Q" task again; cd ..
     second=$(jq -r '.[(index("--session-id")) + 1]' "$FIXTURE/pi.args")
@@ -142,6 +156,15 @@ rescue)
     # A fresh run that fails keeps the previous resumable session.
     PI_EXIT=4 expect 4 bash "$Q" task fails; has "kept the previous resumable session" err
     expect 0 bash "$Q" candidate; OUT --arg s "$second" '.session == $s' || fail "failed run moved the pointer"
+    # A session found only in another project is not resumed (pi would just
+    # print a fork prompt and exit 0); the stale pointer is dropped.
+    PI_GLOBAL=1 expect 1 bash "$Q" task --resume-last more; has "no longer exists" err; lacks "Fork this session"
+    expect 0 bash "$Q" candidate; OUT '.available == false' || fail "stale pointer kept"
+    # A saved session that pi no longer has fails loudly instead of starting empty.
+    PI_OUT=../ok.txt expect 0 bash "$Q" task third
+    : > "$FIXTURE/pi.sessions"
+    expect 1 bash "$Q" task --resume-last more; has "no longer exists" err
+    expect 0 bash "$Q" candidate; OUT '.available == false' || fail "missing session pointer kept"
     # Paths that sanitize alike (x/a/b, x/a-b) keep separate pointers.
     if [ ! -d "$FIXTURE/gitshim-active" ] && command -v git >/dev/null 2>&1 && git --version >/dev/null 2>&1; then
         for d in "$FIXTURE/x/a/b" "$FIXTURE/x/a-b"; do

@@ -13,8 +13,9 @@
 # pointer. Model: --model, else "model" in the approved pi-dispatch config
 # (/pi:setup). pi's final message is printed unchanged.
 #
-# Exit codes: pi's own status for a task run; 1 no session to resume;
-# 2 usage, configuration or repository error.
+# Exit codes: pi's own status for a task run; 1 no session to resume (none
+# saved, or the saved one no longer exists); 2 usage, configuration or
+# repository error. pi's stdout and stderr are relayed after it exits.
 set -euo pipefail
 
 CONFIG="${XDG_CONFIG_HOME:-$HOME/.config}/pi-dispatch/config.json"
@@ -88,18 +89,41 @@ task)
         # pi session IDs must not contain "/".
         SESSION="rescue-$(date -u +%Y%m%dT%H%M%SZ)-$$"
     fi
-    set -- -p --mode text --session-id "$SESSION" --model "$MODEL" --no-approve
+    # Fresh runs create the session by exact ID. Resumes use --session, which
+    # fails when the session no longer exists instead of silently starting an
+    # empty one (as --session-id would).
+    if [ "$RESUME" -eq 1 ]; then
+        set -- -p --mode text --session "$SESSION"
+    else
+        set -- -p --mode text --session-id "$SESSION"
+    fi
+    set -- "$@" --model "$MODEL" --no-approve
     [ "$WRITE" -eq 1 ] || set -- "$@" --tools "$READ_ONLY_TOOLS"
     [ -z "$THINKING" ] || set -- "$@" --thinking "$THINKING"
+    # pi treats any message starting with "@" as a file attachment, even after
+    # "--"; a leading space keeps the request literal text.
+    case "$TEXT" in @*) TEXT=" $TEXT" ;; esac
     cd "$ROOT"
+    tmp=$(mktemp -d)
+    trap 'rm -rf "$tmp"' EXIT
     rc=0
     # pi -p reads a non-TTY stdin to EOF; an open host pipe would hang it.
-    pi "$@" -- "$TEXT" </dev/null || rc=$?
+    pi "$@" -- "$TEXT" </dev/null >"$tmp/out" 2>"$tmp/err" || rc=$?
+    if [ "$RESUME" -eq 1 ] && { grep -q "No session found matching" "$tmp/err" \
+            || grep -q "Session found in different project" "$tmp/out"; }; then
+        # The saved session is gone (or now belongs to another project, where
+        # pi would only ask to fork it): drop the stale pointer and say so.
+        rm -f "$STATE"
+        die "the saved pi rescue session $SESSION no longer exists for this checkout; start a new session" 1
+    fi
+    cat "$tmp/out"
+    cat "$tmp/err" >&2
     if [ "$RESUME" -eq 0 ]; then
         if [ "$rc" -eq 0 ]; then
+            # A per-run temporary file keeps concurrent updates from colliding.
             (umask 077; mkdir -p "$STATE_DIR")
-            printf '%s\n' "$SESSION" >"$STATE.tmp"
-            mv "$STATE.tmp" "$STATE"
+            printf '%s\n' "$SESSION" >"$STATE.$$.tmp"
+            mv "$STATE.$$.tmp" "$STATE"
         else
             printf 'pi-rescue: pi exited %s; kept the previous resumable session (this run used %s)\n' \
                 "$rc" "$SESSION" >&2

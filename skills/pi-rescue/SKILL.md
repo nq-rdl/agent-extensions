@@ -45,6 +45,8 @@ The helper is [pi-rescue.sh](scripts/pi-rescue.sh); `S` below is this skill's
   session to continue: start nothing and ask what pi should do.
 - A new session becomes the resumable one only when pi exits 0; a failed
   start keeps the previous session, and the helper says so on stderr.
+- If a resume reports that the saved session no longer exists, report that and
+  ask whether to start a new session; do not retry with a new one silently.
 - `--write` only when the request asks pi to fix, implement or change files.
   Investigation, diagnosis, review and research stay read-only. Continuing a
   session does not authorise edits by itself.
