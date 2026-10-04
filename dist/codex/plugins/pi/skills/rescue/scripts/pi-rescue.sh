@@ -44,6 +44,20 @@ state_file() {
     ROOT=$root
 }
 
+# lock / unlock: serialize pointer replacement and deletion between concurrent
+# runs in one checkout (mkdir is atomic). A lock older than ~10s of waiting is
+# reported rather than broken.
+lock() {
+    local i=0
+    (umask 077; mkdir -p "$STATE_DIR")
+    while ! mkdir "$STATE_DIR/.lock" 2>/dev/null; do
+        i=$((i + 1))
+        [ "$i" -lt 100 ] || die "pointer lock $STATE_DIR/.lock is held; remove it if no rescue is running"
+        sleep 0.1
+    done
+}
+unlock() { rmdir "$STATE_DIR/.lock" 2>/dev/null || true; }
+
 cmd=${1:-}
 [ "$#" -gt 0 ] && shift
 case "$cmd" in
@@ -109,21 +123,37 @@ task)
     rc=0
     # pi -p reads a non-TTY stdin to EOF; an open host pipe would hang it.
     pi "$@" -- "$TEXT" </dev/null >"$tmp/out" 2>"$tmp/err" || rc=$?
-    if [ "$RESUME" -eq 1 ] && { grep -q "No session found matching" "$tmp/err" \
-            || grep -q "Session found in different project" "$tmp/out"; }; then
-        # The saved session is gone (or now belongs to another project, where
-        # pi would only ask to fork it): drop the stale pointer and say so.
-        rm -f "$STATE"
+    # Match pi's own startup diagnostics exactly, never answer text: a missing
+    # session fails with this stderr line, and a session found only in another
+    # project prints a fork prompt (first stdout line, ending "[y/N] ") and
+    # exits 0 without stdin, before any model call. Answers end with a newline
+    # (console.log); the prompt never does.
+    stale=0
+    if [ "$RESUME" -eq 1 ]; then
+        # Unanchored so colour codes (FORCE_COLOR) cannot hide the match.
+        if [ "$rc" -eq 1 ] && grep -qF "No session found matching '$SESSION'" "$tmp/err"; then
+            stale=1
+        elif [ "$rc" -eq 0 ] && head -n 1 "$tmp/out" | grep -qF 'Session found in different project: ' \
+                && [ "$(tail -c 6 "$tmp/out")" = "[y/N] " ]; then
+            stale=1
+        fi
+    fi
+    if [ "$stale" -eq 1 ]; then
+        # Drop the pointer only if it still names this session: a concurrent
+        # fresh run may already have replaced it.
+        lock
+        [ "$(cat "$STATE" 2>/dev/null || true)" != "$SESSION" ] || rm -f "$STATE"
+        unlock
         die "the saved pi rescue session $SESSION no longer exists for this checkout; start a new session" 1
     fi
     cat "$tmp/out"
     cat "$tmp/err" >&2
     if [ "$RESUME" -eq 0 ]; then
         if [ "$rc" -eq 0 ]; then
-            # A per-run temporary file keeps concurrent updates from colliding.
-            (umask 077; mkdir -p "$STATE_DIR")
+            lock
             printf '%s\n' "$SESSION" >"$STATE.$$.tmp"
             mv "$STATE.$$.tmp" "$STATE"
+            unlock
         else
             printf 'pi-rescue: pi exited %s; kept the previous resumable session (this run used %s)\n' \
                 "$rc" "$SESSION" >&2

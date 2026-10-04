@@ -104,6 +104,9 @@ review-worktree)
     has "diff truncated after 10 of" pi.request; has "The complete diff is" pi.request
     # The complete diff stays readable for the whole pi run.
     has "+two" pi.fulldiff; has "+odd content" pi.fulldiff
+    # prompt mode prints the whole diff (its temporary files vanish on exit).
+    cd repo; PI_REVIEW_MAX_DIFF_BYTES=10 expect 0 bash "$R" prompt; cd ..
+    has "+two"; has "+odd content"; lacks "diff truncated"; lacks "The complete diff is"
     # A failing git diff aborts; it never reads as "Nothing to review".
     cd repo
     printf '*.txt diff=boom\n' > .git/info/attributes; git config diff.boom.textconv false
@@ -160,11 +163,24 @@ rescue)
     # print a fork prompt and exit 0); the stale pointer is dropped.
     PI_GLOBAL=1 expect 1 bash "$Q" task --resume-last more; has "no longer exists" err; lacks "Fork this session"
     expect 0 bash "$Q" candidate; OUT '.available == false' || fail "stale pointer kept"
-    # A saved session that pi no longer has fails loudly instead of starting empty.
+    # An answer that merely quotes pi's diagnostics is still an answer.
     PI_OUT=../ok.txt expect 0 bash "$Q" task third
+    third=$(jq -r '.[(index("--session-id")) + 1]' "$FIXTURE/pi.args")
+    printf 'Session found in different project: is what pi prints [y/N] \n' > ../quote.txt
+    PI_OUT=../quote.txt expect 0 bash "$Q" task --resume-last explain the stale check
+    has "is what pi prints"
+    expect 0 bash "$Q" candidate; OUT --arg s "$third" '.session == $s' || fail "quoted diagnostic dropped the pointer"
+    # A saved session that pi no longer has fails loudly instead of starting empty.
     : > "$FIXTURE/pi.sessions"
     expect 1 bash "$Q" task --resume-last more; has "no longer exists" err
     expect 0 bash "$Q" candidate; OUT '.available == false' || fail "missing session pointer kept"
+    # A fresh run that replaces the pointer while a stale resume is running keeps it.
+    PI_OUT=../ok.txt expect 0 bash "$Q" task fourth
+    PTR=$(grep -rlxF "$(jq -r '.[(index("--session-id")) + 1]' "$FIXTURE/pi.args")" "$XDG_STATE_HOME/pi-rescue")
+    : > "$FIXTURE/pi.sessions"
+    PTR=$PTR PI_DURING='printf "rescue-newer\n" > "$PTR"' expect 1 bash "$Q" task --resume-last more
+    expect 0 bash "$Q" candidate; OUT '.session == "rescue-newer"' || fail "stale cleanup removed a newer pointer"
+    [ ! -d "$(dirname "$PTR")/.lock" ] || fail "pointer lock left behind"
     # Paths that sanitize alike (x/a/b, x/a-b) keep separate pointers.
     if [ ! -d "$FIXTURE/gitshim-active" ] && command -v git >/dev/null 2>&1 && git --version >/dev/null 2>&1; then
         for d in "$FIXTURE/x/a/b" "$FIXTURE/x/a-b"; do

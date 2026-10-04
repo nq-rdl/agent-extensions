@@ -26,6 +26,8 @@ for a in "$@"; do
     case "$prev" in --session-id) new_id=$a ;; --session) open_id=$a ;; esac
     prev=$a
 done
+# PI_DURING: shell snippet run while "pi" is working (concurrency tests).
+[ -z "${PI_DURING:-}" ] || eval "$PI_DURING"
 if [ -n "$open_id" ]; then
     if [ "${PI_GLOBAL:-0}" = 1 ]; then
         printf 'Session found in different project: /elsewhere\nFork this session into current directory? [y/N] '

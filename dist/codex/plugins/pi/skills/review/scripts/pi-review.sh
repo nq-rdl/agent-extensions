@@ -3,7 +3,8 @@
 # the OpenAI Codex native review rubric (assets/review-rubric.md). Bash 3.2 + jq.
 #
 #   pi-review.sh run    [--base REF] [--scope auto|working-tree|branch] [--model M] [--json]
-#   pi-review.sh prompt [--base REF] [--scope ...]   print the review request, no pi call
+#   pi-review.sh prompt [--base REF] [--scope ...]   print the review request (never
+#                                                     truncated), no pi call
 #   pi-review.sh render FILE TARGET MODEL            render a saved final message
 #
 # --wait/--background are accepted and ignored: the host decides how to run us.
@@ -112,7 +113,8 @@ collect() {
     size=$(wc -c <"$diff" | tr -d ' ')
     {
         printf '\n<diff>\n'
-        if [ "$size" -gt "$MAX_DIFF_BYTES" ]; then
+        # prompt mode prints the whole diff: its temporary files vanish on exit.
+        if [ "$cmd" != prompt ] && [ "$size" -gt "$MAX_DIFF_BYTES" ]; then
             head -c "$MAX_DIFF_BYTES" "$diff"
             printf '\n[diff truncated after %s of %s bytes. The complete diff is %s:\n' "$MAX_DIFF_BYTES" "$size" "$diff"
             printf 'read the rest of it with the read tool (offset/limit) before concluding.]\n'
