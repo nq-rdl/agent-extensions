@@ -39,14 +39,42 @@ def result(rule_id, uri="SKILL.md", suppressed=False):
     return r
 
 
-def report(results, rules=None):
+def invocation(complete=True, successful=True, reasons=()):
+    """A SkillSpector-shaped invocation with completeness and notifications."""
+    return {
+        "executionSuccessful": successful,
+        "toolExecutionNotifications": [
+            {
+                "message": {"text": reason},
+                "level": "warning",
+                "locations": [{"physicalLocation": {"artifactLocation": {"uri": "SKILL.md"}}}],
+                "properties": {"reasonCode": reason, "fatal": False},
+            }
+            for reason in reasons
+        ],
+        "properties": {
+            "analysisCompleteness": {
+                "isComplete": complete,
+                "status": "complete" if complete else "partial",
+                "coveragePercent": 100.0 if complete else 50.0,
+            }
+        },
+    }
+
+
+def report(results, rules=None, invocations=None, column_kind=None):
     driver = {"name": "skillspector", "version": "test"}
     if rules is not None:
         driver["rules"] = [{"id": r, "shortDescription": {"text": r}} for r in rules]
+    run = {"tool": {"driver": driver}, "results": results}
+    if column_kind:
+        run["columnKind"] = column_kind
+    if invocations is not None:
+        run["invocations"] = invocations
     return {
         "$schema": "https://json.schemastore.org/sarif-2.1.0.json",
         "version": "2.1.0",
-        "runs": [{"tool": {"driver": driver}, "results": results}],
+        "runs": [run],
     }
 
 
@@ -143,6 +171,8 @@ class SkillSpectorOwaspTest(unittest.TestCase):
         )
         rows = {}
         for line in self.summary(merged).splitlines()[2:]:
+            if not line.startswith("| "):
+                break
             label, count = [c.strip() for c in line.strip("|").split("|")]
             rows[re.sub(r"^\[(AST\d\d) .*", r"\1", label)] = count
         self.assertEqual(rows["AST01"], "0")  # P1 is suppressed
@@ -153,6 +183,64 @@ class SkillSpectorOwaspTest(unittest.TestCase):
     def test_summary_omits_unmapped_row_when_none(self):
         merged = self.merge({"alpha": report([result("PE2")])})
         self.assertNotIn("Unmapped", self.summary(merged))
+
+    def test_merge_keeps_unicode_column_kind(self):
+        # SkillSpector counts columns in code points; without columnKind SARIF
+        # consumers assume UTF-16 units and misplace findings after an emoji.
+        finding = result("P1")
+        finding["locations"][0]["physicalLocation"]["region"].update(
+            {"startColumn": 3, "endColumn": 9}
+        )
+        merged = self.merge(
+            {"alpha": report([finding], column_kind="unicodeCodePoints")}
+        )
+        run = merged["runs"][0]
+        self.assertEqual(run["columnKind"], "unicodeCodePoints")
+        region = run["results"][0]["locations"][0]["physicalLocation"]["region"]
+        self.assertEqual((region["startColumn"], region["endColumn"]), (3, 9))
+
+    def test_merge_omits_column_kind_when_scanner_does(self):
+        merged = self.merge({"alpha": report([result("P1")])})
+        self.assertNotIn("columnKind", merged["runs"][0])
+
+    def test_merge_keeps_per_skill_invocations(self):
+        merged = self.merge(
+            {
+                "alpha": report([], invocations=[invocation(False, reasons=["static_parse_limit"])]),
+                "beta": report([], invocations=[invocation()]),
+            }
+        )
+        invocations = merged["runs"][0]["invocations"]
+        self.assertEqual([i["properties"]["skill"] for i in invocations], ["alpha", "beta"])
+        self.assertFalse(invocations[0]["properties"]["analysisCompleteness"]["isComplete"])
+        note = invocations[0]["toolExecutionNotifications"][0]
+        self.assertEqual(
+            note["locations"][0]["physicalLocation"]["artifactLocation"]["uri"],
+            "skills/alpha/SKILL.md",
+        )
+
+    def test_summary_reports_incomplete_inspection(self):
+        merged = self.merge(
+            {
+                "alpha": report(
+                    [],
+                    invocations=[
+                        invocation(False, reasons=["static_parse_limit", "static_parse_limit"])
+                    ],
+                ),
+                "beta": report([], invocations=[invocation()]),
+                "gamma": report([], invocations=[invocation(successful=False)]),
+            }
+        )
+        out = self.summary(merged)
+        self.assertIn("1 of 3 skills fully inspected, 2 incomplete (1 failed)", out)
+        self.assertIn("| `alpha` | partial | 50.0% | static_parse_limit ×2 |", out)
+        self.assertIn("| `gamma` | failed |", out)
+        self.assertNotIn("`beta`", out)
+
+    def test_summary_without_invocations_says_not_reported(self):
+        merged = self.merge({"alpha": report([result("PE2")])})
+        self.assertIn("Inspection completeness: not reported", self.summary(merged))
 
 
 if __name__ == "__main__":

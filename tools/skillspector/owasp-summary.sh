@@ -10,7 +10,9 @@
 #
 # Counts exclude suppressed results. A risk with no mapped SkillSpector rule
 # family is marked "no SkillSpector rule": static scanning cannot evidence it, and
-# docs/security-scanning.md records how the repo addresses it instead.
+# docs/security-scanning.md records how the repo addresses it instead. A
+# completeness line (and a collapsible per-skill table) follows, so zero counts
+# are not mistaken for full coverage when files were only partially inspected.
 #
 # Exit codes: 0 = summary written, 2 = missing jq or unreadable SARIF.
 set -euo pipefail
@@ -44,5 +46,30 @@ jq -r --slurpfile map "$map" '
         + (if any($covered[]; . == $id) then (count($id) | tostring) else "no SkillSpector rule" end)
         + " |" ),
     ( count("unmapped") as $n
-      | if $n > 0 then "| Unmapped SkillSpector rules (extend `tools/skillspector/owasp-ast10.json`) | \($n) |" else empty end )
+      | if $n > 0 then "| Unmapped SkillSpector rules (extend `tools/skillspector/owasp-ast10.json`) | \($n) |" else empty end ),
+    "",
+    # Inspection completeness, from the per-skill invocations merge-sarif.sh
+    # keeps: a zero count above is only meaningful for fully inspected files.
+    ( [ .runs[].invocations[]? ] as $inv
+      | if ($inv | length) == 0 then "Inspection completeness: not reported by the scanner."
+        else
+          ( [ $inv[] | select(.executionSuccessful == false) ] | length ) as $failed
+          | [ $inv[] | select(.executionSuccessful == false
+                or .properties.analysisCompleteness.isComplete == false) ] as $partial
+          | "Inspection completeness: \(($inv | length) - ($partial | length)) of \($inv | length) skills fully inspected, \($partial | length) incomplete (\($failed) failed).",
+            ( if ($partial | length) > 0 then
+                "",
+                "<details><summary>Incompletely inspected skills</summary>",
+                "",
+                "| Skill | Status | Coverage | Reasons |",
+                "|---|---|---|---|",
+                ( $partial[]
+                  | (.properties.analysisCompleteness // {}) as $c
+                  | ([ .toolExecutionNotifications[]?.properties.reasonCode // empty ]
+                      | group_by(.) | map("\(.[0]) ×\(length)") | join(", ")) as $reasons
+                  | "| `\(.properties.skill // "?")` | \(if .executionSuccessful == false then "failed" else ($c.status // "?") end) | \($c.coveragePercent // "?")% | \(if $reasons == "" then "—" else $reasons end) |" ),
+                "",
+                "</details>"
+              else empty end )
+        end )
 ' "$sarif"

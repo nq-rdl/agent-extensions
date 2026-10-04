@@ -20,6 +20,13 @@
 # "owasp-ast10/<id>" tag; rules gain the same tag and a helpUri to the OWASP
 # risk page, so code scanning can filter alerts by OWASP risk.
 #
+# The merged run keeps the scanner's columnKind (SkillSpector reports columns in
+# Unicode code points; SARIF otherwise assumes UTF-16 code units) and every
+# skill's invocations, tagged with properties.skill and with notification
+# locations prefixed like findings. Invocations carry executionSuccessful,
+# analysisCompleteness and the warnings for files that were only partially
+# inspected, which owasp-summary.sh reports.
+#
 # Called by scan.sh; standalone so the merge and OWASP classification are
 # unit-tested without Docker (tests/test_skillspector_owasp.py). Needs jq.
 set -euo pipefail
@@ -53,14 +60,22 @@ for f in "$outdir"/*.report; do
   # informational alerts without failing the PR check. Real per-skill severity
   # is still surfaced by the terminal scan (the lefthook pre-push hook) and
   # reflected in this script's aggregate exit code.
-  jq -c --arg p "skills/$name/" '{
+  jq -c --arg p "skills/$name/" --arg skill "$name" '
+    def prefixed: (. // [])
+      | map( if (.physicalLocation.artifactLocation.uri | type) == "string"
+             then .physicalLocation.artifactLocation.uri = ($p + .physicalLocation.artifactLocation.uri)
+             else . end );
+    {
+    columnKind: ([ .runs[].columnKind // empty ] | first),
     rules: [ .runs[].tool.driver.rules[]? ],
     results: [ .runs[].results[]?
       | .level = "note"
-      | .locations = ( (.locations // [])
-          | map( if (.physicalLocation.artifactLocation.uri | type) == "string"
-                 then .physicalLocation.artifactLocation.uri = ($p + .physicalLocation.artifactLocation.uri)
-                 else . end ) ) ] }' "$f" >>"$parts"
+      | .locations |= prefixed ],
+    invocations: [ .runs[].invocations[]?
+      | .properties = ((.properties // {}) + { skill: $skill })
+      | if .toolExecutionNotifications
+        then .toolExecutionNotifications |= map(if .locations then .locations |= prefixed else . end)
+        else . end ] }' "$f" >>"$parts"
 done
 [ -n "$schema" ] || schema="https://json.schemastore.org/sarif-2.1.0.json"
 [ -n "$version" ] || version="2.1.0"
@@ -83,5 +98,8 @@ jq -n --arg schema "$schema" --arg version "$version" \
           | .properties.tags = tagged($r)
           | if $r == "unmapped" then .
             else .helpUri = ($m.source.pages + "/" + ($r | ascii_downcase)) end)) as $rules
+  | ([ $parts[].columnKind // empty ] | first) as $columnKind
   | { "$schema": $schema, version: $version,
-      runs: [ { tool: ($tool | .driver.rules = $rules), results: $results } ] }' >"$dest"
+      runs: [ { tool: ($tool | .driver.rules = $rules), results: $results }
+              + (if $columnKind then { columnKind: $columnKind } else {} end)
+              + { invocations: [ $parts[].invocations[] ] } ] }' >"$dest"
