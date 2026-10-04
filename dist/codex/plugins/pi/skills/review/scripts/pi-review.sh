@@ -10,7 +10,8 @@
 # Any other argument (focus text) is rejected: this is a native review only.
 # Model: --model, else "model" in the approved pi-dispatch config (/pi:setup).
 # pi runs with --tools read,grep,find,ls, --no-session and --no-approve; the
-# diff is embedded in the request because those tools cannot run git.
+# diff is embedded in the request because those tools cannot run git. stdin is
+# /dev/null: pi -p reads a non-TTY stdin to EOF, so an open pipe would hang it.
 #
 # Exit codes: 0 review rendered (or nothing to review), 1 pi failed or returned
 # an unexpected shape, 2 usage, configuration or repository error.
@@ -205,7 +206,7 @@ prompt|run)
     pi -p --mode text --no-session --no-approve --tools "$READ_ONLY_TOOLS" \
         --model "$MODEL" --append-system-prompt "$tmp/rubric.md" \
         @"$tmp/request.md" "Review the change described in the attached request." \
-        >"$tmp/final.txt" || rc=$?
+        </dev/null >"$tmp/final.txt" || rc=$?
     if [ "$rc" -ne 0 ]; then
         printf '# Pi Review\n\nTarget: %s\nModel: %s\n\npi exited with status %s.\n' "$TARGET" "$MODEL" "$rc"
         [ -s "$tmp/final.txt" ] && { printf '\nOutput:\n\n```text\n'; cat "$tmp/final.txt"; printf '\n```\n'; }

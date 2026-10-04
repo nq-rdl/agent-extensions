@@ -83,7 +83,8 @@ task)
     [ "$WRITE" -eq 1 ] || set -- "$@" --tools "$READ_ONLY_TOOLS"
     [ -z "$THINKING" ] || set -- "$@" --thinking "$THINKING"
     cd "$ROOT"
-    exec pi "$@" -- "$TEXT"
+    # pi -p reads a non-TTY stdin to EOF; an open host pipe would hang it.
+    exec pi "$@" -- "$TEXT" </dev/null
     ;;
 *)
     die "usage: pi-rescue.sh candidate | task [--write] [--resume-last] [--model M] [--thinking LEVEL] [--] TEXT"

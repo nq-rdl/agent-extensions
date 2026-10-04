@@ -16,7 +16,8 @@ config() { mkdir -p "$XDG_CONFIG_HOME/pi-dispatch"; jq -n --arg m "$MODEL" '{mod
 # $FIXTURE/out and $FIXTURE/err, outside the repo so they never count as changes.
 expect() {
     local want=$1 rc=0; shift
-    "$@" >"$FIXTURE/out" 2>"$FIXTURE/err" || rc=$?
+    # Feed a pipe on stdin, as a host harness may: the helpers must detach it.
+    : | "$@" >"$FIXTURE/out" 2>"$FIXTURE/err" || rc=$?
     [ "$rc" -eq "$want" ] || fail "exit $rc, want $want: $* :: $(cat "$FIXTURE/out" "$FIXTURE/err")"
 }
 # File arguments below are names inside $FIXTURE (default: out).

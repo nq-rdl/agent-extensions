@@ -1,6 +1,8 @@
 #!/usr/bin/env bash
 # Fake pi: records arguments, cwd and attached files; prints $PI_OUT; exits $PI_EXIT.
 set -eu
+# Real pi -p reads a non-TTY stdin until EOF, so the helpers must not pass a pipe.
+if [ -p /dev/stdin ]; then echo "fake pi: stdin is a pipe; real pi would block" >&2; exit 97; fi
 jq -n --args '$ARGS.positional' -- "$@" > "$FIXTURE/pi.args"
 printf '%s\n' "$PWD" > "$FIXTURE/pi.cwd"
 prev=""
