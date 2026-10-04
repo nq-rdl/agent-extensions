@@ -66,6 +66,10 @@ review-args)
     printf 'two\n' > a.txt
     expect 2 bash "$R" run; has "no model" err
     [ ! -f "$FIXTURE/pi.args" ] || fail "pi ran without a model"
+    PI_REVIEW_MAX_DIFF_BYTES=lots expect 2 bash "$R" run; has "whole number of bytes" err
+    mkdir -p "$XDG_CONFIG_HOME/pi-dispatch"; printf '{not json' > "$XDG_CONFIG_HOME/pi-dispatch/config.json"
+    expect 2 bash "$R" run; has "cannot read the default model" err
+    rm "$XDG_CONFIG_HOME/pi-dispatch/config.json"
     ;;
 review-branch)
     repo; config; cd repo
@@ -82,6 +86,11 @@ review-branch)
     # Raw JSON passthrough and an explicit model override.
     cd repo; PI_OUT=../review.json expect 0 bash "$R" run --base base --json --model openai/gpt-x; cd ..
     OUT '.overall_correctness' || fail "--json output"; after --model openai/gpt-x
+    # A failing git log aborts instead of sending incomplete metadata.
+    cd repo; git config log.date bogus-format; rm -f "$FIXTURE/pi.args"
+    expect 2 bash "$R" run --base base; has "git log failed" err
+    [ ! -f "$FIXTURE/pi.args" ] || fail "pi ran after git log failed"
+    git config --unset log.date; cd ..
     # Default base resolves to main when origin is absent.
     cd repo; PI_OUT=../review.json expect 0 bash "$R" run; has "Target: branch diff against main"; cd ..
     ;;
@@ -137,6 +146,8 @@ rescue)
     cd repo
     expect 0 bash "$Q" candidate; OUT '.available == false' || fail "candidate before any run"
     expect 2 bash "$Q" task investigate; has "no model" err
+    mkdir -p "$XDG_CONFIG_HOME/pi-dispatch"; printf '{not json' > "$XDG_CONFIG_HOME/pi-dispatch/config.json"
+    expect 2 bash "$Q" task investigate; has "cannot read the default model" err
     config
     expect 2 bash "$Q" task; has "task text is required" err
     expect 2 bash "$Q" task --wait look; has "host routing flag" err
@@ -145,6 +156,7 @@ rescue)
     printf 'PILOT_OK\n' > ../ok.txt
     PI_OUT=../ok.txt expect 0 bash "$Q" task -- Reply exactly PILOT_OK.
     [ "$(cat "$FIXTURE/out")" = PILOT_OK ] || fail "stdout not verbatim"
+    lacks "No project session found" err
     cd ..
     arg -p; after --mode text; arg --no-approve; after --tools read,grep,find,ls; after --model "$MODEL"
     jq -e '.[-2] == "--" and .[-1] == "Reply exactly PILOT_OK."' "$FIXTURE/pi.args" >/dev/null || fail "task text"
@@ -191,6 +203,9 @@ rescue)
     PTR=$PTR PI_DURING='printf "rescue-newer\n" > "$PTR"' expect 1 bash "$Q" task --resume-last more
     expect 0 bash "$Q" candidate; OUT '.session == "rescue-newer"' || fail "stale cleanup removed a newer pointer"
     [ ! -d "$(dirname "$PTR")/.lock" ] || fail "pointer lock left behind"
+    # Other pi stderr on a fresh run is still relayed.
+    PI_OUT=../ok.txt PI_ERR="real warning" expect 0 bash "$Q" task -- keep stderr; has "real warning" err
+    lacks "No project session found" err
     # Paths that sanitize alike (x/a/b, x/a-b) keep separate pointers.
     if [ ! -d "$FIXTURE/gitshim-active" ] && command -v git >/dev/null 2>&1 && git --version >/dev/null 2>&1; then
         for d in "$FIXTURE/x/a/b" "$FIXTURE/x/a-b"; do

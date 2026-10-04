@@ -42,11 +42,13 @@ parse_opts() {
         esac
     done
     case "$SCOPE" in auto|working-tree|branch) ;; *) die "--scope must be auto, working-tree or branch" ;; esac
+    case "$MAX_DIFF_BYTES" in ""|*[!0-9]*) die "PI_REVIEW_MAX_DIFF_BYTES must be a whole number of bytes" ;; esac
 }
 
 resolve_model() {
     if [ -z "$MODEL" ] && [ -f "$CONFIG" ]; then
-        MODEL=$(jq -r '.model // empty' "$CONFIG" 2>/dev/null || true)
+        MODEL=$(jq -r '.model // empty | strings' "$CONFIG" 2>/dev/null) \
+            || die "cannot read the default model from $CONFIG; rerun /pi:setup or pass --model"
     fi
     [ -n "$MODEL" ] || die "no model: pass --model provider/id[:thinking] or approve a default with /pi:setup"
 }
@@ -92,10 +94,8 @@ collect() {
             [ "$rc" -le 1 ] || exit "$rc"
         done >>"$diff" || die "git diff of untracked files failed"
         if [ ! -s "$diff" ]; then EMPTY=1; return 0; fi
-        {
-            printf 'Status:\n'
-            git status --short --untracked-files=all
-        } >"$out" || die "git status failed"
+        printf 'Status:\n' >"$out"
+        git status --short --untracked-files=all >>"$out" || die "git status failed"
     else
         [ -n "$BASE" ] || BASE=$(default_base)
         git rev-parse -q --verify "$BASE^{commit}" >/dev/null || die "unknown base ref: $BASE"
@@ -103,12 +103,12 @@ collect() {
         TARGET="branch diff against $BASE"
         git diff "$mb" HEAD >"$diff" || die "git diff $mb HEAD failed"
         if [ ! -s "$diff" ]; then EMPTY=1; return 0; fi
-        {
-            printf 'Merge base: %s\n\nCommits:\n' "$mb"
-            git log --oneline "$mb..HEAD"
-            printf '\nFiles:\n'
-            git diff --stat "$mb" HEAD
-        } >"$out" || die "git log/diff --stat failed"
+        # One status check per command: a { ...; } || die group would only
+        # see the last command's status.
+        printf 'Merge base: %s\n\nCommits:\n' "$mb" >"$out"
+        git log --oneline "$mb..HEAD" >>"$out" || die "git log failed"
+        printf '\nFiles:\n' >>"$out"
+        git diff --stat "$mb" HEAD >>"$out" || die "git diff --stat failed"
     fi
     size=$(wc -c <"$diff" | tr -d ' ')
     {

@@ -47,6 +47,7 @@ state_file() {
 # lock / unlock: serialize pointer replacement and deletion between concurrent
 # runs in one checkout (mkdir is atomic). A lock older than ~10s of waiting is
 # reported rather than broken.
+LOCKED=0
 lock() {
     local i=0
     (umask 077; mkdir -p "$STATE_DIR")
@@ -55,8 +56,9 @@ lock() {
         [ "$i" -lt 100 ] || die "pointer lock $STATE_DIR/.lock is held; remove it if no rescue is running"
         sleep 0.1
     done
+    LOCKED=1
 }
-unlock() { rmdir "$STATE_DIR/.lock" 2>/dev/null || true; }
+unlock() { LOCKED=0; rmdir "$STATE_DIR/.lock" 2>/dev/null || true; }
 
 cmd=${1:-}
 [ "$#" -gt 0 ] && shift
@@ -91,7 +93,8 @@ task)
     case "$THINKING" in ""|off|minimal|low|medium|high|xhigh|max) ;;
         *) die "--thinking must be off, minimal, low, medium, high, xhigh or max" ;; esac
     if [ -z "$MODEL" ] && [ -f "$CONFIG" ]; then
-        MODEL=$(jq -r '.model // empty' "$CONFIG" 2>/dev/null || true)
+        MODEL=$(jq -r '.model // empty | strings' "$CONFIG" 2>/dev/null) \
+            || die "cannot read the default model from $CONFIG; rerun /pi:setup or pass --model"
     fi
     [ -n "$MODEL" ] || die "no model: pass --model provider/id[:thinking] or approve a default with /pi:setup"
     command -v pi >/dev/null 2>&1 || die "pi is not on PATH; run /pi:setup"
@@ -121,7 +124,8 @@ task)
     case "$TEXT" in @*|/*) TEXT=" $TEXT" ;; esac
     cd "$ROOT"
     tmp=$(mktemp -d)
-    trap 'rm -rf "$tmp"' EXIT
+    # Never leave the pointer lock behind, whatever ends the run.
+    trap 'rm -rf "$tmp"; [ "$LOCKED" -eq 0 ] || unlock' EXIT
     rc=0
     # pi -p reads a non-TTY stdin to EOF; an open host pipe would hang it.
     pi "$@" -- "$TEXT" </dev/null >"$tmp/out" 2>"$tmp/err" || rc=$?
@@ -149,7 +153,13 @@ task)
         die "the saved pi rescue session $SESSION no longer exists for this checkout; start a new session" 1
     fi
     cat "$tmp/out"
-    cat "$tmp/err" >&2
+    if [ "$RESUME" -eq 0 ]; then
+        # pi announces every new --session-id; that is expected here, not news.
+        grep -vF "No project session found with id '$SESSION'; creating a new session with that id." \
+            "$tmp/err" >&2 || true
+    else
+        cat "$tmp/err" >&2
+    fi
     if [ "$RESUME" -eq 0 ]; then
         if [ "$rc" -eq 0 ]; then
             lock
