@@ -1,6 +1,6 @@
 {
   "name": "adr",
-  "version": "0.37.0",
+  "version": "0.38.0",
   "description": "Architecture decision records — consent-gated MADR 4.0.0 capture, supersession, retrieval, and spec archival",
   "author": {
     "name": "nq-rdl"
