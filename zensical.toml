@@ -53,6 +53,7 @@ nav = [
     { "Data-request permissions" = "data-request-permissions.md" },
     { "External marketplaces" = "external-marketplaces.md" },
     { "Link monitoring" = "link-monitoring.md" },
+    { "Security scanning" = "security-scanning.md" },
     { "Skill review (epic #312)" = [
         { "Progressive-disclosure pilots" = "progressive-disclosure-pilots.md" },
         { "Completion record" = "skill-review/finish.md" },

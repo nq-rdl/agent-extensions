@@ -220,7 +220,7 @@ CI runs `validate.yml` on every PR/push to main. It checks:
 Three more workflows run on PRs alongside `validate.yml`:
 - `changelog-check.yml` — fails if no changie fragment was added (bypass with the `skip-changelog` label), and lints each *added* fragment's body against the 200-char per-fragment cap (`scripts/check_changie_length.py`, which also fails on fragments whose YAML does not parse)
 - `link-check.yml` — external (HTTP) link check with lychee, advisory for merging: a PR that changes `skills/**/*.md`, `skills/**/*.rst`, the workflow, `skills/lychee/scripts/check-links.sh`, or either `lychee.toml` triggers an uncached scan of all skill Markdown and RST using the root `lychee.toml` (narrow, commented exclusions; see `CONTRIBUTING.md` → "Example URLs and placeholders"). It can also be run by `workflow_dispatch`. Generated `plugins/**` and `dist/**` copies are not scanned
-- `skillspector.yml` — NVIDIA SkillSpector scan over `skills/`; informational, uploads SARIF to code scanning (non-gating)
+- `skillspector.yml` — NVIDIA SkillSpector scan over `skills/`; informational, uploads SARIF to code scanning (non-gating) with each finding tagged by its OWASP Agentic Skills Top 10 risk (`tools/skillspector/owasp-ast10.json`; see `docs/security-scanning.md`)
 
 The same checks run locally via `lefthook` (see Setup commands).
 

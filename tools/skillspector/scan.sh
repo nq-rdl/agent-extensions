@@ -20,7 +20,8 @@
 #   SKILLSPECTOR_FORMAT  Output format: terminal|json|markdown|sarif (default: terminal).
 #   SKILLSPECTOR_OUTPUT  Report filename (relative to repo root). When set, the
 #                        per-skill reports are combined and written there (SARIF
-#                        runs are merged with repository-relative paths).
+#                        runs are merged with repository-relative paths and
+#                        tagged with OWASP Agentic Skills Top 10 risk ids).
 #   SKILLSPECTOR_SKIP    Set to 1 to skip the scan entirely (escape hatch).
 #
 # Exit codes: 0 = clean, 1 = a finding (risk_score > 50 for some skill), 2 =
@@ -28,13 +29,13 @@
 # some skill). Both callers (the CI workflow and the pre-push hook) report
 # findings for visibility but do not fail on them — findings surface as
 # code-scanning alerts via the CI SARIF upload, emitted at SARIF level "note" so
-# the auto-created code-scanning PR check stays informational (see merge_sarif).
+# the auto-created code-scanning PR check stays informational (see merge-sarif.sh).
 set -euo pipefail
 
-# Pinned for reproducible, supply-chain-safe scans. No upstream release tags
-# exist, so we pin to a commit SHA. Bump this (or override via SKILLSPECTOR_REF)
-# to upgrade.
-SKILLSPECTOR_REF="${SKILLSPECTOR_REF:-a5092dd9b9521ff57a9b53612bb129ce78019002}"
+# Pinned for reproducible, supply-chain-safe scans. We pin to a commit SHA
+# (main as of 2026-10-02). Bump this (or override via SKILLSPECTOR_REF) to
+# upgrade, and check owasp-ast10.json still covers any new rule families.
+SKILLSPECTOR_REF="${SKILLSPECTOR_REF:-35270064e42230dbc566e4134c55b5d581355db3}"
 # Docker tags allow only [A-Za-z0-9_.-] and must not start with '.' or '-'; a
 # branch ref like "feature/foo" would otherwise produce an invalid tag. Derive a
 # sanitized tag from the ref (the unmodified ref is still used for the git build
@@ -67,6 +68,7 @@ if ! docker image inspect "$IMAGE" >/dev/null 2>&1; then
 fi
 
 REPO_ROOT="$(git rev-parse --show-toplevel)"
+SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 SKILLS_DIR="$REPO_ROOT/skills"
 
 # Enumerate the immediate skill directories (those with a SKILL.md), portably
@@ -81,60 +83,6 @@ if [ "${#skills[@]}" -eq 0 ]; then
   echo "skillspector: no skills found under skills/; nothing to scan." >&2
   exit 0
 fi
-
-# merge_sarif <outdir> <dest>: combine the per-skill SARIF reports in <outdir>
-# into a SARIF document with a SINGLE run at <dest>, prepending each finding's
-# location with its "skills/<name>/" prefix (SkillSpector emits paths relative to
-# the scanned skill dir, e.g. "SKILL.md"). One run is required: the CodeQL
-# upload-sarif action rejects multiple runs that share one category. SkillSpector
-# emits no tool.driver.rules and references rules only by ruleId string (no
-# ruleIndex), so the results concatenate directly with no rule/index remapping.
-# Every result is also downgraded to SARIF level "note" so the code-scanning PR
-# check GitHub auto-creates from the upload never gates the PR (see the inline
-# comment at the result-collection step below). Per-skill files that are not
-# valid SARIF (e.g. an empty report from a failed scan) are skipped.
-merge_sarif() {
-  local outdir="$1" dest="$2"
-  local results_acc schema="" version="" tool="" f name
-  results_acc="$(mktemp)"
-  echo '[]' >"$results_acc"
-  for f in "$outdir"/*.report; do
-    [ -f "$f" ] || continue
-    jq -e '.runs[0]' "$f" >/dev/null 2>&1 || continue # skip non-SARIF/empty reports
-    name="$(basename "$f" .report)"
-    if [ -z "$schema" ]; then # capture the SARIF envelope + tool from the first run
-      schema="$(jq -r '."$schema" // empty' "$f")"
-      version="$(jq -r '.version // empty' "$f")"
-      tool="$(jq -c '.runs[0].tool' "$f")"
-    fi
-    # Collect this skill's results, prefixing each relative finding location uri
-    # and downgrading every result to SARIF level "note". The downgrade is what
-    # actually keeps SkillSpector non-gating: uploading the SARIF makes GitHub
-    # code scanning auto-create a separate PR check (named "skillspector", owned
-    # by the GitHub Advanced Security app) that fails on any *new* "error"-level
-    # alert — independent of this workflow's own continue-on-error / informational
-    # summary. Emitting every finding at "note" keeps them visible in the Security
-    # tab (category "skillspector") as informational alerts without failing the PR
-    # check. Real per-skill severity is still surfaced by the terminal scan (the
-    # lefthook pre-push hook) and reflected in this script's aggregate exit code.
-    jq --arg p "skills/$name/" '
-      [ .runs[].results[]?
-        | .level = "note"
-        | .locations = ( (.locations // [])
-            | map( if (.physicalLocation.artifactLocation.uri | type) == "string"
-                   then .physicalLocation.artifactLocation.uri = ($p + .physicalLocation.artifactLocation.uri)
-                   else . end ) ) ]' "$f" >"$f.res"
-    jq -s '.[0] + .[1]' "$results_acc" "$f.res" >"$results_acc.next"
-    mv "$results_acc.next" "$results_acc"
-  done
-  [ -n "$schema" ] || schema="https://json.schemastore.org/sarif-2.1.0.json"
-  [ -n "$version" ] || version="2.1.0"
-  [ -n "$tool" ] || tool='{"driver":{"name":"skillspector"}}'
-  jq -n --arg schema "$schema" --arg version "$version" \
-    --argjson tool "$tool" --slurpfile results "$results_acc" \
-    '{ "$schema": $schema, version: $version, runs: [ { tool: $tool, results: $results[0] } ] }' >"$dest"
-  rm -f "$results_acc"
-}
 
 # Per-skill reports land here (a host temp dir, mounted read-write into the
 # container). The repo itself is mounted read-only — we never write into it.
@@ -183,7 +131,10 @@ set -e
 if [ -n "$want_output" ]; then
   out_path="${REPO_ROOT}/${SKILLSPECTOR_OUTPUT}"
   if [ "$FORMAT" = "sarif" ]; then
-    merge_sarif "$OUTDIR" "$out_path"
+    if ! "$SCRIPT_DIR/merge-sarif.sh" "$OUTDIR" "$out_path" "${skills[@]}"; then
+      echo "error: failed to merge the per-skill SARIF reports." >&2
+      exit 2
+    fi
   else
     # Non-SARIF output: concatenate the per-skill reports verbatim.
     : >"$out_path"
