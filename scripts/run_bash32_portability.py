@@ -8,6 +8,7 @@ from pathlib import Path
 CASES = (
     "test_adr_scan.Bash32Scan.test_next_list_check_under_bash32",
     "test_pi_dispatch.Bash32.test_offline_contracts",
+    "test_pi_review_rescue.Bash32.test_offline_contracts",
     "test_installed_hooks.Bash32BusyBoxFallback.test_prompt_fallbacks_gate_without_jq_or_python",
     "test_installed_hooks.Bash32BusyBoxFallback.test_escaped_input",
     "test_cc_agent_teams_check_config.Bash32BusyBox.test_enable_disable_check_under_bash32",

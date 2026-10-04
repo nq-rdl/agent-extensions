@@ -506,7 +506,7 @@
     {
       "name": "pi",
       "source": "./plugins/pi",
-      "description": "Pi worker orchestration — prerequisite setup, confirmed issue or free-text dispatch, overlap waves, bounded launches and PR status",
+      "description": "Pi worker orchestration — prerequisite setup, confirmed issue or free-text dispatch, overlap waves, bounded launches, PR status, and Codex-style review and rescue",
       "version": "0.37.0",
       "keywords": [
         "pi",
@@ -514,7 +514,9 @@
         "orchestration",
         "issues",
         "worktrees",
-        "delegation"
+        "delegation",
+        "review",
+        "rescue"
       ]
     }
   ]
