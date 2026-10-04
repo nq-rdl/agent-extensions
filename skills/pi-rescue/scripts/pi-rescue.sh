@@ -124,8 +124,18 @@ task)
     case "$TEXT" in @*|/*) TEXT=" $TEXT" ;; esac
     cd "$ROOT"
     tmp=$(mktemp -d)
-    # Never leave the pointer lock behind, whatever ends the run.
-    trap 'rm -rf "$tmp"; [ "$LOCKED" -eq 0 ] || unlock' EXIT
+    # Never leave a lock behind, whatever ends the run.
+    RUN_LOCK=""
+    trap 'rm -rf "$tmp"; [ "$LOCKED" -eq 0 ] || unlock; [ -z "$RUN_LOCK" ] || rmdir "$RUN_LOCK" 2>/dev/null || true' EXIT
+    if [ "$RESUME" -eq 1 ]; then
+        # Two runs appending to one pi session fork its conversation, so a
+        # resume holds a per-session lock for the whole run and a second one is
+        # refused rather than queued (runs can take minutes).
+        (umask 077; mkdir -p "$STATE_DIR")
+        mkdir "$STATE_DIR/run-$SESSION.lock" 2>/dev/null \
+            || die "another rescue run is already using session $SESSION; wait for it to finish or start a new session" 1
+        RUN_LOCK="$STATE_DIR/run-$SESSION.lock"
+    fi
     rc=0
     # pi -p reads a non-TTY stdin to EOF; an open host pipe would hang it.
     pi "$@" -- "$TEXT" </dev/null >"$tmp/out" 2>"$tmp/err" || rc=$?

@@ -95,13 +95,24 @@ review-branch)
     cd repo; PI_OUT=../review.json expect 0 bash "$R" run; has "Target: branch diff against main"; cd ..
     ;;
 review-worktree)
-    repo; config; cd repo
+    # A repository without commits is reviewed against the empty tree.
+    rm -rf fresh; mkdir fresh; cd fresh; git init -q; config; printf 'first\n' > f.txt; git add f.txt
+    PI_OUT=../review.json expect 0 bash "$R" run; cd ..
+    has "+first" pi.request; rm -f pi.args
+    repo; cd repo
     expect 0 bash "$R" run; has "Nothing to review"
     [ ! -f "$FIXTURE/pi.args" ] || fail "pi ran with nothing to review"
     printf 'two\n' > a.txt; printf 'new file\n' > untracked.txt
     PI_OUT=../review.json expect 0 bash "$R" run
     has "Target: working tree"; cd ..
     has "+two" pi.request; has "+new file" pi.request; has "?? untracked.txt" pi.request
+    # Staged and unstaged edits are reviewed as one final state: a staged
+    # change that the working tree reverts is not in the request.
+    cd repo; rm untracked.txt; printf 'staged-only\n' > a.txt; git add a.txt; printf 'one\n' > a.txt
+    expect 0 bash "$R" run; has "Nothing to review"
+    printf 'final\n' > a.txt; PI_OUT=../review.json expect 0 bash "$R" run; cd ..
+    has "+final" pi.request; lacks "staged-only" pi.request
+    cd repo; git reset -q; git checkout -q -- a.txt; printf 'new file\n' > untracked.txt; cd ..
     # Names git would quote (non-ASCII, spaces) must still reach the diff.
     cd repo; rm untracked.txt; git checkout -q -- a.txt
     printf 'odd content\n' > "caf\303\251 name.txt"
@@ -203,6 +214,17 @@ rescue)
     PTR=$PTR PI_DURING='printf "rescue-newer\n" > "$PTR"' expect 1 bash "$Q" task --resume-last more
     expect 0 bash "$Q" candidate; OUT '.session == "rescue-newer"' || fail "stale cleanup removed a newer pointer"
     [ ! -d "$(dirname "$PTR")/.lock" ] || fail "pointer lock left behind"
+    # A resume while another run holds the same session is refused, and the
+    # holder's lock survives the refusal.
+    PI_OUT=../ok.txt expect 0 bash "$Q" task lock-test
+    held=$(jq -r '.[(index("--session-id")) + 1]' "$FIXTURE/pi.args")
+    LDIR=$(dirname "$(grep -rlxF "$held" "$XDG_STATE_HOME/pi-rescue")")
+    mkdir "$LDIR/run-$held.lock"
+    expect 1 bash "$Q" task --resume-last more; has "already using session $held" err
+    [ -d "$LDIR/run-$held.lock" ] || fail "refused resume removed the holder's lock"
+    rmdir "$LDIR/run-$held.lock"
+    PI_OUT=../ok.txt expect 0 bash "$Q" task --resume-last more
+    [ ! -d "$LDIR/run-$held.lock" ] || fail "resume left its run lock"
     # Other pi stderr on a fresh run is still relayed.
     PI_OUT=../ok.txt PI_ERR="real warning" expect 0 bash "$Q" task -- keep stderr; has "real warning" err
     lacks "No project session found" err

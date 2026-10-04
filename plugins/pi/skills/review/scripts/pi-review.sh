@@ -84,8 +84,14 @@ collect() {
     fi
     if [ "$SCOPE" = working-tree ]; then
         TARGET="working tree (staged, unstaged and untracked changes)"
-        git diff --cached >"$diff" || die "git diff --cached failed"
-        git diff >>"$diff" || die "git diff failed"
+        # One diff from HEAD to the working tree (staged and unstaged edits
+        # combined), so pi sees the final state, not intermediate patches. An
+        # unborn HEAD compares against the empty tree.
+        if git rev-parse -q --verify HEAD >/dev/null; then
+            git diff HEAD >"$diff" || die "git diff HEAD failed"
+        else
+            git diff "$(git hash-object -t tree /dev/null)" >"$diff" || die "git diff against the empty tree failed"
+        fi
         # NUL-delimited: default output quotes unusual names, which git diff
         # would then fail to open. --no-index exits 1 for "differences".
         git ls-files -z --others --exclude-standard | while IFS= read -r -d '' f; do
