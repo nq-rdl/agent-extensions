@@ -1,3 +1,0 @@
-kind: Removed
-body: Remove planning:record-decision (adr-generator); adr:record replaces it. Existing docs/adr files, including adr-NNNN-slug.md names, are read and left unchanged.
-time: 2026-10-04T01:29:48.985620914Z

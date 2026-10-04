@@ -1,3 +1,0 @@
-kind: Fixed
-body: Try direct Red Hat documentation HTML before source/index fallbacks; reject block pages and preserve article text with provenance.
-time: 2026-10-01T07:21:59.222078031Z

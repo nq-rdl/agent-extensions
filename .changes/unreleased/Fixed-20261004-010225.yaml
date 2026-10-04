@@ -1,3 +1,0 @@
-kind: Fixed
-body: Keep SkillSpector column units and per-skill inspection completeness in the merged SARIF, and report incomplete inspection in the CI summary.
-time: 2026-10-04T01:02:25.824881799Z

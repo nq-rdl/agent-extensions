@@ -1,3 +1,0 @@
-kind: Added
-body: 'Add adr-scan.sh to find the ADR directory and the next number, which is never reused: index rows, deleted files and other branches keep theirs.'
-time: 2026-10-04T01:29:47.981011276Z
