@@ -139,8 +139,10 @@ the user asks for it.
 5. **Show and confirm** under the consent gate, then write. If a user-confirmed
    new directory has no index, create
    [assets/index-template.md](assets/index-template.md) as `README.md` there.
-6. **Update the index.** Add one row: `| [NNNN](NNNN-title.md) | Title | status
-   | YYYY-MM-DD |`. If the repository has an `index.md` (adr-log, log4brains),
+6. **Update the index.** Add one row: `| [NNNN](<file>) | Title | status |
+   YYYY-MM-DD |`. `<file>` is the exact basename just written, so it includes
+   the `adr-` prefix when `style=adr-NNNN-`. `check` matches index links to
+   file names exactly. If the repository has an `index.md` (adr-log, log4brains),
    or a generated log marked `<!-- adrlog -->`, follow that convention or its
    generator instead.
 7. **Verify.** Run `adr-scan.sh check`. Confirm every relative link in the new
@@ -151,7 +153,8 @@ the user asks for it.
 Accepted and rejected records are immutable. A change of mind is a new record.
 
 - **Supersede.** Write the new record under the consent gate. Its More
-  Information says `Supersedes [ADR-NNNN](NNNN-old.md)` with the reason. In the
+  Information says `Supersedes [ADR-NNNN](<old-file>)` with the reason, where
+  `<old-file>` is the old record's actual basename from `list`. In the
   old record, change only two front-matter fields: `status: "superseded by
   ADR-MMMM"` (MADR expresses supersession only through status) and `date`.
   Nygard-style records get the same status line under `## Status`, followed by

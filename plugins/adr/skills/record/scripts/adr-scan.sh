@@ -9,10 +9,11 @@
 #          files in git history on every local and fetched ref. Deleted or
 #          unmerged records therefore keep their numbers.
 #   list   tab-separated rows: number, status, date, title, path.
-#   check  reports duplicate numbers and records missing from the index;
-#          exits 1 when it finds either.
+#   check  exits 1 for duplicate numbers, records missing from the index, or
+#          a live record reusing a number the index reserves for another
+#          file. Reports reserved numbers and git-history name changes.
 #
-# Bash 3.2 compatible; needs only POSIX find/sed/awk/sort and optional git.
+# Bash 3.2 compatible; needs only POSIX sed/awk/grep/sort and optional git.
 set -eu
 
 ROOT=""
@@ -44,8 +45,10 @@ ADR_RE='^(adr-)?[0-9][0-9][0-9][0-9]+-.*\.md$'
 adr_files() {
   # $1 = directory; prints matching basenames, one per line.
   [ -d "$1" ] || return 0
-  find "$1" -maxdepth 1 -type f -name '*.md' 2>/dev/null |
-    sed 's|.*/||' | grep -E "$ADR_RE" | sort || true
+  for p in "$1"/*.md; do
+    [ -f "$p" ] || continue
+    printf '%s\n' "${p##*/}"
+  done | grep -E "$ADR_RE" | sort || true
 }
 
 CANDIDATES="docs/adr docs/decisions doc/adr docs/architecture/decisions docs/architecture-decisions adr decisions"
@@ -69,6 +72,11 @@ if [ -z "$DIR" ]; then
 fi
 DIR="${DIR:-docs/adr}"
 DIR="${DIR%/}"
+# .adr-dir is repository-controlled: accept only a relative path inside the
+# repository, never one that a command could parse as an option.
+case "$DIR" in
+  -*|/*|..|../*|*/..|*/../*) die "unsafe ADR directory: $DIR (use a relative path inside the repository)" ;;
+esac
 
 INDEX=""
 for name in README.md index.md; do
@@ -80,17 +88,26 @@ number_of() {
   printf '%s\n' "$1" | sed -E 's/^adr-//; s/^([0-9]+).*/\1/'
 }
 
+index_links() {
+  # Basenames linked from the index, e.g. (0001-use-x.md).
+  [ -n "$INDEX" ] || return 0
+  grep -oE '\((adr-)?[0-9]{4,}-[A-Za-z0-9._-]*\.md\)' "$INDEX" 2>/dev/null | tr -d '()' || true
+}
+
+history_files() {
+  # ADR basenames that ever existed under $DIR on any local or fetched ref.
+  git rev-parse --git-dir >/dev/null 2>&1 || return 0
+  git log --all --format= --name-only -- "$DIR" 2>/dev/null |
+    sed 's|.*/||' | grep -E "$ADR_RE" | sort -u || true
+}
+
 used_numbers() {
   adr_files "$DIR" | while IFS= read -r f; do number_of "$f"; done
   if [ -n "$INDEX" ]; then
     grep -oE '(adr-)?[0-9]{4,}-[A-Za-z0-9._-]*\.md|ADR-[0-9]{4,}' "$INDEX" 2>/dev/null |
       sed -E 's/^ADR-//; s/^adr-//; s/^([0-9]+).*/\1/' || true
   fi
-  if git rev-parse --git-dir >/dev/null 2>&1; then
-    git log --all --format= --name-only -- "$DIR" 2>/dev/null |
-      sed 's|.*/||' | grep -E "$ADR_RE" |
-      while IFS= read -r f; do number_of "$f"; done || true
-  fi
+  history_files | while IFS= read -r f; do number_of "$f"; done
 }
 
 case "$MODE" in
@@ -148,9 +165,32 @@ case "$MODE" in
         printf '%s\n' "$unindexed"
         problems=1
       fi
-      for f in $(grep -oE '\((adr-)?[0-9]{4,}-[A-Za-z0-9._-]*\.md\)' "$INDEX" | tr -d '()' || true); do
+      index_links | while IFS= read -r f; do
         [ -f "$DIR/$f" ] || printf 'reserved %s (indexed, file absent; number stays used)\n' "$f"
       done
+    fi
+    # A number belongs to one file for good. An index row for another name is
+    # a reservation, so a live file reusing it fails. A different name in git
+    # history may be a rename, so it is reported without failing.
+    reuse=$( {
+      adr_files "$DIR" | awk '{ print "live\t" $0 }'
+      index_links | awk '{ print "index\t" $0 }'
+      history_files | awk '{ print "history\t" $0 }'
+    } | awk -F '\t' '
+      { n = $2; sub(/^adr-/, "", n); sub(/-.*/, "", n); key = n SUBSEP $2; names[key] = 1
+        if ($1 == "live") { live[key] = 1; owners[n] = owners[n] (owners[n] == "" ? "" : " ") $2 }
+        else if ($1 == "index") indexed[key] = 1 }
+      END {
+        for (key in names) {
+          split(key, part, SUBSEP)
+          if (owners[part[1]] == "" || live[key]) continue
+          if (indexed[key]) printf "reused %s: %s (indexed) and %s\n", part[1], part[2], owners[part[1]]
+          else printf "history %s: %s (git history) and %s; renamed or reused?\n", part[1], part[2], owners[part[1]]
+        }
+      }' | sort)
+    if [ -n "$reuse" ]; then
+      printf '%s\n' "$reuse"
+      if printf '%s\n' "$reuse" | grep -q '^reused '; then problems=1; fi
     fi
     exit "$problems"
     ;;

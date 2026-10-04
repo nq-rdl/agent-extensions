@@ -142,6 +142,51 @@ class ScanCases:
             r = self.run_scan(root, "check")
             self.assertEqual((r.returncode, r.stdout), (0, ""), r.stderr)
 
+    def test_check_fails_when_a_live_file_reuses_a_reserved_number(self):
+        with tempfile.TemporaryDirectory() as root:
+            write(root, "docs/adr/0002-new.md", MADR.format(status="proposed", title="New"))
+            write(root, "docs/adr/README.md",
+                  "| [0002](0002-old.md) | Old | accepted | 2026-01-02 |\n"
+                  "| [0002](0002-new.md) | New | proposed | 2026-01-03 |\n")
+            r = self.run_scan(root, "check")
+            self.assertEqual(r.returncode, 1, r.stdout + r.stderr)
+            self.assertIn("reused 0002: 0002-old.md (indexed) and 0002-new.md", r.stdout)
+
+    def test_check_reports_history_name_change_without_failing(self):
+        with tempfile.TemporaryDirectory() as root:
+            self.git(root, "init", "-q", "-b", "main")
+            write(root, "docs/adr/0001-old-title.md", MADR.format(status="accepted", title="A"))
+            self.git(root, "add", "-A")
+            self.git(root, "commit", "-qm", "a")
+            self.git(root, "mv", "docs/adr/0001-old-title.md", "docs/adr/0001-new-title.md")
+            self.git(root, "commit", "-qm", "rename")
+            write(root, "docs/adr/README.md", "| [0001](0001-new-title.md) | A | accepted | 2026-01-02 |\n")
+            r = self.run_scan(root, "check")
+            self.assertEqual(r.returncode, 0, r.stdout + r.stderr)
+            self.assertIn("history 0001: 0001-old-title.md (git history) and 0001-new-title.md", r.stdout)
+
+    def test_unsafe_adr_dir_is_rejected_before_use(self):
+        for value in ("-delete", "/etc", "../outside", "docs/../../x"):
+            with self.subTest(value=value), tempfile.TemporaryDirectory() as root:
+                write(root, ".adr-dir", value + "\n")
+                keep = Path(root) / "keep.md"
+                keep.write_text("x")
+                r = self.run_scan(root, "list")
+                self.assertEqual(r.returncode, 2, r.stdout)
+                self.assertIn("unsafe ADR directory", r.stderr)
+                self.assertTrue(keep.exists())
+
+    def test_scan_does_not_depend_on_find(self):
+        # macOS find lacks GNU -maxdepth; the scanner must not need find at all.
+        with tempfile.TemporaryDirectory() as root, tempfile.TemporaryDirectory() as bindir:
+            fake = Path(bindir) / "find"
+            fake.write_text("#!/bin/sh\necho 'find: -maxdepth: unknown primary' >&2\nexit 1\n")
+            fake.chmod(0o755)
+            write(root, "docs/adr/0003-a.md", MADR.format(status="accepted", title="A"))
+            env = {"PATH": f"{bindir}:{os.environ['PATH']}"}
+            kv = parse(self.execute(root, ["next"], extra_env=env).stdout)
+            self.assertEqual(kv["next"], "0004")
+
     def test_bad_arguments_exit_2(self):
         with tempfile.TemporaryDirectory() as root:
             self.assertEqual(self.run_scan(root).returncode, 2)
@@ -149,9 +194,9 @@ class ScanCases:
 
 
 class HostScan(ScanCases, unittest.TestCase):
-    def execute(self, root, args):
-        return subprocess.run(["bash", str(SCRIPT), "--root", root, *args],
-                              capture_output=True, text=True, env={**os.environ, **GIT_ENV})
+    def execute(self, root, args, extra_env=None):
+        return subprocess.run(["bash", str(SCRIPT), "--root", root, *args], capture_output=True,
+                              text=True, env={**os.environ, **GIT_ENV, **(extra_env or {})})
 
 
 class Bash32Scan(unittest.TestCase):

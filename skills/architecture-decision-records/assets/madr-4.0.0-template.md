@@ -50,7 +50,7 @@ Chosen option: "{option title, verbatim from Considered Options}", because {just
 
 ## More Information
 
-{Links: related ADRs as relative links (`[ADR-NNNN](NNNN-slug.md)`), "Supersedes `[ADR-NNNN](NNNN-slug.md)`", the PR or merge commit. Reconsider-when triggers. For a retrospective record: "Decided around YYYY-MM; recorded retrospectively on YYYY-MM-DD from <source>."}
+{Links: related ADRs as relative links to their actual file names (`[ADR-NNNN](<file>)`), "Supersedes `[ADR-NNNN](<old-file>)`", the PR or merge commit. Reconsider-when triggers. For a retrospective record: "Decided around YYYY-MM; recorded retrospectively on YYYY-MM-DD from <source>."}
 
 <!--
 Adapted from MADR 4.0.0 template/adr-template.md

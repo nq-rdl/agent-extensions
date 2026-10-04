@@ -73,9 +73,24 @@ at a branch:
 
    https://github.com/<owner>/<repo>/tree/<merge-sha>/specs/<NNN-slug>
 
-Find the merge commit with ``git log --diff-filter=A --format=%H -1 -- specs/<NNN-slug>``
-on the main branch, or from the PR. If the repository has no forge URL, record
-the commit SHA and path as plain text.
+Prefer the PR's own merge commit, which is correct for merge, squash and rebase
+merges:
+
+.. code-block:: bash
+
+   gh pr view <pr> --json mergeCommit --jq .mergeCommit.oid
+
+Without a PR, look the commit up on the main branch's first-parent history.
+``--first-parent`` keeps the search on mainline, so a merge commit (whose diff
+against its first parent adds the spec) is found instead of the feature-branch
+commit that first created the directory:
+
+.. code-block:: bash
+
+   git log --first-parent --diff-filter=A --format=%H -1 <main-branch> -- specs/<NNN-slug>
+
+If the repository has no forge URL, record the commit SHA and path as plain
+text.
 
 After archiving
 ---------------

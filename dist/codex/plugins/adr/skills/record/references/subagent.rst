@@ -52,7 +52,10 @@ State in the handoff whether the user has already approved writing records.
 Without that approval the worker drafts only and returns the drafts; the
 skill's consent gate is never satisfied by the worker itself.
 
-Required capabilities: Read, Grep, Glob, Bash (for ``scripts/adr-scan.sh`` and
+Pass the resolved installed skill directory (``<skill-dir>``) in the handoff.
+The scanner ships with the skill, not with the target repository.
+
+Required capabilities: Read, Grep, Glob, Bash (for ``<skill-dir>/scripts/adr-scan.sh`` and
 ``git log``); Write and Edit only when writing was approved. Map these
 capability names to tools available in the current host; this list is
 guidance, not a runtime permission configuration.
@@ -67,8 +70,9 @@ Worker procedure
 Typical delegated tasks are backfilling records from several merged specs or
 PRs, and auditing an existing log with ``adr-scan.sh check``.
 
-1. Run ``scripts/adr-scan.sh next`` and ``list`` from the repository root to
-   learn the directory, name style, index and next number. When drafting
+1. Run ``bash <skill-dir>/scripts/adr-scan.sh next`` and ``list`` from the
+   target repository root (or pass ``--root``) to learn the directory, name
+   style, index and next number. When drafting
    several records, assign numbers sequentially from ``next=`` and report them
    as provisional: the parent confirms them before any write.
 2. For each candidate decision, follow SKILL.md "Record a decision" and, for
