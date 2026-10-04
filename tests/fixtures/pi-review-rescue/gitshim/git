@@ -1,0 +1,6 @@
+#!/usr/bin/env bash
+# Minimal git for the Bash 3.2 image (no git there): only rev-parse --show-toplevel.
+case "$*" in
+    "rev-parse --show-toplevel") printf '%s\n' "$FIXTURE/repo" ;;
+    *) echo "git shim: unsupported: $*" >&2; exit 2 ;;
+esac

@@ -1,7 +1,7 @@
 {
   "name": "pi",
   "version": "0.37.0",
-  "description": "Pi worker orchestration — prerequisite setup, confirmed issue or free-text dispatch, overlap waves, bounded launches and PR status",
+  "description": "Pi worker orchestration — prerequisite setup, confirmed issue or free-text dispatch, overlap waves, bounded launches, PR status, and Codex-style review and rescue",
   "author": {
     "name": "nq-rdl"
   },
@@ -13,13 +13,15 @@
     "orchestration",
     "issues",
     "worktrees",
-    "delegation"
+    "delegation",
+    "review",
+    "rescue"
   ],
   "skills": "./skills/",
   "interface": {
     "displayName": "Pi",
     "shortDescription": "Confirmed pi workers in Worktrunk worktrees",
-    "longDescription": "Pi worker orchestration — prerequisite setup, confirmed issue or free-text dispatch, overlap waves, bounded launches and PR status",
+    "longDescription": "Pi worker orchestration — prerequisite setup, confirmed issue or free-text dispatch, overlap waves, bounded launches, PR status, and Codex-style review and rescue",
     "developerName": "nq-rdl",
     "category": "Developer Tools",
     "capabilities": [

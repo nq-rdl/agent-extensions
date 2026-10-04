@@ -1,13 +1,15 @@
 schemaVersion: v1
 id: pi
 displayName: Pi
-description: Pi worker orchestration — prerequisite setup, confirmed issue or free-text dispatch, overlap waves, bounded launches and PR status
-keywords: [pi, worktrunk, orchestration, issues, worktrees, delegation]
+description: Pi worker orchestration — prerequisite setup, confirmed issue or free-text dispatch, overlap waves, bounded launches, PR status, and Codex-style review and rescue
+keywords: [pi, worktrunk, orchestration, issues, worktrees, delegation, review, rescue]
 owners: [rdl]
 channels: [stable]
 skills:
   - {source: pi-setup, leaf: setup}
   - {source: pi-dispatch, leaf: dispatch}
+  - {source: pi-review, leaf: review}
+  - {source: pi-rescue, leaf: rescue}
 hooks: []
 prompts: []
 mcp: []

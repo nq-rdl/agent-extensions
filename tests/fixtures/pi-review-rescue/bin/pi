@@ -1,0 +1,13 @@
+#!/usr/bin/env bash
+# Fake pi: records arguments, cwd and attached files; prints $PI_OUT; exits $PI_EXIT.
+set -eu
+jq -n --args '$ARGS.positional' -- "$@" > "$FIXTURE/pi.args"
+printf '%s\n' "$PWD" > "$FIXTURE/pi.cwd"
+prev=""
+for a in "$@"; do
+    case "$prev" in --append-system-prompt) cp "$a" "$FIXTURE/pi.system" ;; esac
+    case "$a" in @*) cp "${a#@}" "$FIXTURE/pi.request" ;; esac
+    prev=$a
+done
+[ -z "${PI_OUT:-}" ] || cat "$PI_OUT"
+exit "${PI_EXIT:-0}"

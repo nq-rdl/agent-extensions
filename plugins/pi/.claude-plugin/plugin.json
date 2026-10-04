@@ -1,7 +1,7 @@
 {
   "name": "pi",
   "version": "0.37.0",
-  "description": "Pi worker orchestration — prerequisite setup, confirmed issue or free-text dispatch, overlap waves, bounded launches and PR status",
+  "description": "Pi worker orchestration — prerequisite setup, confirmed issue or free-text dispatch, overlap waves, bounded launches, PR status, and Codex-style review and rescue",
   "author": {
     "name": "nq-rdl"
   },
