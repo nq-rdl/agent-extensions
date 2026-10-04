@@ -261,8 +261,24 @@ class SkillSpectorOwaspTest(unittest.TestCase):
         self.assertIn("1 of 3 skills fully inspected, 2 incomplete (2 failed)", out)
         self.assertIn("| `ghost` | failed | 0% | report_missing ×1 |", out)
 
-    def test_summary_without_invocations_says_not_reported(self):
-        merged = self.merge({"alpha": report([result("PE2")])})
+    def test_valid_report_without_invocations_counts_as_unknown(self):
+        # A report with findings but no completeness metadata must not shrink
+        # the denominator or read as fully inspected.
+        merged = self.merge(
+            {
+                "alpha": report([result("PE2")]),
+                "beta": report([], invocations=[invocation()]),
+            }
+        )
+        invocations = merged["runs"][0]["invocations"]
+        self.assertEqual([i["properties"]["skill"] for i in invocations], ["alpha", "beta"])
+        self.assertIsNone(invocations[0]["properties"]["analysisCompleteness"]["isComplete"])
+        out = self.summary(merged)
+        self.assertIn("1 of 2 skills fully inspected, 1 incomplete (0 failed, 1 unknown)", out)
+        self.assertIn("| `alpha` | unknown | ? | completeness_unknown ×1 |", out)
+
+    def test_summary_without_any_reports_says_not_reported(self):
+        merged = self.merge({})
         self.assertIn("Inspection completeness: not reported", self.summary(merged))
 
 

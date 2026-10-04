@@ -27,7 +27,8 @@
 # analysisCompleteness and the warnings for files that were only partially
 # inspected, which owasp-summary.sh reports. scan.sh passes the skills it
 # expected to scan; a skill whose report is missing or not valid SARIF gets a
-# failed placeholder invocation, so it still counts as not inspected. Without
+# failed placeholder invocation, so it still counts as not inspected; a valid
+# report without invocations gets an "unknown" completeness placeholder. Without
 # skill arguments, every <outdir>/*.report is merged.
 #
 # Called by scan.sh; standalone so the merge and OWASP classification are
@@ -95,11 +96,21 @@ for name in "$@"; do
     results: [ .runs[].results[]?
       | .level = "note"
       | .locations |= prefixed ],
-    invocations: [ .runs[].invocations[]?
+    invocations: ([ .runs[].invocations[]?
       | .properties = ((.properties // {}) + { skill: $skill })
       | if .toolExecutionNotifications
         then .toolExecutionNotifications |= map(if .locations then .locations |= prefixed else . end)
-        else . end ] }' "$f" >>"$parts"
+        else . end ]
+      # A valid report without invocations (e.g. an older scanner) still
+      # counts: its completeness is unknown, never assumed complete.
+      | if length > 0 then . else [ {
+          executionSuccessful: true,
+          toolExecutionNotifications: [ {
+            message: { text: "SkillSpector reported no inspection completeness for this skill." },
+            level: "warning",
+            properties: { reasonCode: "completeness_unknown" } } ],
+          properties: { skill: $skill,
+            analysisCompleteness: { isComplete: null, status: "unknown" } } } ] end) }' "$f" >>"$parts"
 done
 [ -n "$schema" ] || schema="https://json.schemastore.org/sarif-2.1.0.json"
 [ -n "$version" ] || version="2.1.0"

@@ -54,9 +54,12 @@ jq -r --slurpfile map "$map" '
       | if ($inv | length) == 0 then "Inspection completeness: not reported by the scanner."
         else
           ( [ $inv[] | select(.executionSuccessful == false) ] | length ) as $failed
+          # Only an explicit isComplete == true counts as fully inspected.
           | [ $inv[] | select(.executionSuccessful == false
-                or .properties.analysisCompleteness.isComplete == false) ] as $partial
-          | "Inspection completeness: \(($inv | length) - ($partial | length)) of \($inv | length) skills fully inspected, \($partial | length) incomplete (\($failed) failed).",
+                or .properties.analysisCompleteness.isComplete != true) ] as $partial
+          | ( [ $partial[] | select(.executionSuccessful != false
+                and .properties.analysisCompleteness.isComplete == null) ] | length ) as $unknown
+          | "Inspection completeness: \(($inv | length) - ($partial | length)) of \($inv | length) skills fully inspected, \($partial | length) incomplete (\($failed) failed\(if $unknown > 0 then ", \($unknown) unknown" else "" end)).",
             ( if ($partial | length) > 0 then
                 "",
                 "<details><summary>Incompletely inspected skills</summary>",
@@ -67,7 +70,7 @@ jq -r --slurpfile map "$map" '
                   | (.properties.analysisCompleteness // {}) as $c
                   | ([ .toolExecutionNotifications[]?.properties.reasonCode // empty ]
                       | group_by(.) | map("\(.[0]) ×\(length)") | join(", ")) as $reasons
-                  | "| `\(.properties.skill // "?")` | \(if .executionSuccessful == false then "failed" else ($c.status // "?") end) | \($c.coveragePercent // "?")% | \(if $reasons == "" then "—" else $reasons end) |" ),
+                  | "| `\(.properties.skill // "?")` | \(if .executionSuccessful == false then "failed" else ($c.status // "?") end) | \(if $c.coveragePercent == null then "?" else "\($c.coveragePercent)%" end) | \(if $reasons == "" then "—" else $reasons end) |" ),
                 "",
                 "</details>"
               else empty end )

@@ -42,7 +42,9 @@ The merged run also keeps each skill's SARIF `invocations` (tagged
 completeness, and warnings for files SkillSpector inspected only partially,
 for example when a reference is missing or a parse limit was hit. Below the
 risk table, the job summary states how many skills were fully inspected and
-lists the incomplete ones in a collapsible table. A zero count only covers
+lists the rest in a collapsible table. A skill whose report is missing or
+invalid counts as failed. A valid report without completeness data counts as
+unknown and is never treated as fully inspected. A zero count only covers
 what was inspected. The run keeps SkillSpector's `columnKind`
 (`unicodeCodePoints`), so finding columns stay correct after emoji and other
 non-BMP characters.
