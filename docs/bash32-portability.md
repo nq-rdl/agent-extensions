@@ -27,6 +27,9 @@ prompt rendering, worktree and launch argv (including opt-in Fast env/extension,
 offline catalog checks and requested-tier status), resume, status/CI, lock safety and
 read-only setup checks with local pi/wt/gh/git shims under both host Bash and the
 pinned Bash 3.2 fixture. No real workers, credentials or model calls are used.
+Cloudflare Web Search cases run the request shape, stdin-only token delivery,
+local limit checks, credential errors and API error reporting against a curl
+shim with the pinned jq. No Cloudflare requests or real tokens are used.
 General unit-test discovery can still
 skip these fixtures on contributors' machines without container prerequisites.
 

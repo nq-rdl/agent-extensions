@@ -14,6 +14,7 @@ This report records missing evidence; it does not attest to publisher identity, 
 | bitwarden | 1 | skills-only | No |
 | charm-tui | 1 | skills-only | No |
 | claude-code | 9 | skills+hooks | No |
+| cloudflare | 1 | skills-only | No |
 | codex | 13 | skills+hooks | No |
 | data-request | 14 | skills+hooks | No |
 | debug | 2 | skills-only | No |
@@ -103,6 +104,15 @@ This report records missing evidence; it does not attest to publisher identity, 
 - Publisher must select supported availability regions
 
 ## claude-code
+
+- Publisher must supply logo
+- Publisher must supply privacyPolicyURL
+- Publisher must supply termsOfServiceURL
+- Publisher identity and organization submission access are not recorded as verified
+- Record authenticated execution evidence for five positive and three negative task cases
+- Publisher must select supported availability regions
+
+## cloudflare
 
 - Publisher must supply logo
 - Publisher must supply privacyPolicyURL
