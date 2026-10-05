@@ -795,7 +795,7 @@ class DirectoryArtifacts(unittest.TestCase):
 
     def test_readiness_does_not_claim_external_acceptance(self):
         data = directory.report(REPO)
-        self.assertEqual(len(data["plugins"]), 41)
+        self.assertEqual(len(data["plugins"]), 40)
         pi = next(x for x in data["plugins"] if x["plugin"] == "pi")
         self.assertEqual(pi["route"], "skills-only")
         self.assertTrue(all(p["packageReady"] for p in data["plugins"]))

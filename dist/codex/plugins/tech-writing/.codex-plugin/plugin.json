@@ -1,7 +1,7 @@
 {
   "name": "tech-writing",
   "version": "0.38.0",
-  "description": "Technical writing — developer docs, tutorials, ADRs, and guides",
+  "description": "Technical writing — developer docs, tutorials, ADRs, guides, and docs drift checks",
   "author": {
     "name": "nq-rdl"
   },
@@ -11,13 +11,15 @@
     "docs",
     "technical-writing",
     "style-guide",
-    "copyedit"
+    "copyedit",
+    "drift",
+    "ci"
   ],
   "skills": "./skills/",
   "interface": {
     "displayName": "Technical Writing",
     "shortDescription": "Technical writing — developer docs, tutorials, ADRs, and guides",
-    "longDescription": "Technical writing — developer docs, tutorials, ADRs, and guides",
+    "longDescription": "Technical writing — developer docs, tutorials, ADRs, guides, and docs drift checks",
     "developerName": "nq-rdl",
     "category": "Developer Tools",
     "capabilities": [

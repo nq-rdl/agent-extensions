@@ -1,8 +1,8 @@
 schemaVersion: v1
 id: tech-writing
 displayName: Technical Writing
-description: Technical writing — developer docs, tutorials, ADRs, and guides
-keywords: [docs, technical-writing, style-guide, copyedit]
+description: Technical writing — developer docs, tutorials, ADRs, guides, and docs drift checks
+keywords: [docs, technical-writing, style-guide, copyedit, drift, ci]
 owners:
   - rdl
 channels:
@@ -10,6 +10,7 @@ channels:
 skills:
   - {source: tech-writing-copyedit, leaf: copyedit}   # → /tech-writing:copyedit
   - {source: se-technical-writer, leaf: author}
+  - {source: tech-writing-drift-check, leaf: drift-check}   # → /tech-writing:drift-check (read-only CI check)
 hooks: [stylepedia-reminder]
 prompts: []
 mcp: []

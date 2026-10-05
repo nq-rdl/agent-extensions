@@ -50,8 +50,7 @@ Delegation outlines are optional skill references, not registered agent types.
 | [`planning`](#planning) | Yes | Yes | Planning — implementation strategy, technical-spike validation, file-level sequencing, and API/repo architecture |
 | [`adr`](#adr) | Yes | Yes | Architecture decision records — consent-gated MADR 4.0.0 capture, supersession, retrieval, and spec archival |
 | [`debug`](#debug) | Yes | Yes | Debugging and cleanup — systematic diagnosis and tech-debt removal |
-| [`tech-writing`](#tech-writing) | Yes | Yes | Technical writing — developer docs, tutorials, ADRs, and guides |
-| [`docs-drift`](#docs-drift) | Yes | Yes | Docs drift — read-only CI check that a pull request keeps the docs in line with the code |
+| [`tech-writing`](#tech-writing) | Yes | Yes | Technical writing — developer docs, tutorials, ADRs, guides, and docs drift checks |
 | [`lucid`](#lucid) | Yes | Yes | Lucid — visual collaboration boards and diagrams (Lucidchart / Lucidspark) via the hosted Lucid MCP server |
 | [`pandera`](#pandera) | Yes | Yes | Pandera — dataframe schema validation and debugging for pandas and Polars |
 | [`data-request`](#data-request) | Yes | Yes | Data Request — triage, scope, lookup, map, draft, validate, fix and amend request SQL and Python, and draft analyst-approved release summaries, with shared RDL guardrails and human-confirmed review handoffs |
@@ -742,35 +741,23 @@ Debugging and cleanup — systematic diagnosis and tech-debt removal.
 
 ## tech-writing
 
-Technical writing — developer docs, tutorials, ADRs, and guides.
+Technical writing — developer docs, tutorials, ADRs, guides, and docs drift checks.
 
 **Claude Code skills**
 
 - `/tech-writing:copyedit`
 - `/tech-writing:author`
+- `/tech-writing:drift-check`
 
 **Codex skills**
 
 - `$tech-writing:copyedit`
 - `$tech-writing:author`
+- `$tech-writing:drift-check`
 
 **Codex hooks:** Native command hooks; see [coverage and limitations](codex.md#hooks).
 
 **Claude Code hooks:** `stylepedia-reminder`
-
----
-
-## docs-drift
-
-Docs drift — read-only CI check that a pull request keeps the docs in line with the code.
-
-**Claude Code skills**
-
-- `/docs-drift:check`
-
-**Codex skills**
-
-- `$docs-drift:check`
 
 ---
 

@@ -1,5 +1,5 @@
 ---
-name: docs-drift-check
+name: tech-writing-drift-check
 license: CC-BY-4.0
 description: >-
   Read-only check that a pull request leaves the project docs in line with the
@@ -9,13 +9,14 @@ description: >-
   updates, use /gh:document-release.
 compatibility: >-
   Result schema is JSON Schema draft-07 (assets/result.schema.json), as Claude
-  Code --json-schema and the Agent SDK expect.
+  Code --json-schema and the Agent SDK expect. In CI, run with
+  disableAllHooks: true; the tech-writing plugin ships Stop review hooks.
 allowed-tools: Read, Grep, Glob
 metadata:
   repo: https://github.com/nq-rdl/agent-extensions
 ---
 
-# Docs Drift Check
+# Drift Check
 
 Outcome: one JSON object that matches
 [`assets/result.schema.json`](assets/result.schema.json) and says whether the
@@ -38,6 +39,15 @@ A deterministic step after you decides what to post or fail; you only judge.
 - **Evidence only.** Each finding names a changed source path and a doc path
   that you read. If you could not read what a finding needs, leave it out and
   say so in `summary`.
+
+## CI callers
+
+The tech-writing plugin ships `Stop` and `SubagentStop` agent hooks that
+review copyedit work. They must not run in this check: each one is an extra
+model call over a transcript that holds untrusted PR content. A CI job that
+loads the plugin with `--plugin-dir` must also pass
+`--settings '{"disableAllHooks":true}'`. Grant only `Read`, `Grep`, `Glob`
+and `Skill`, and pass the result schema with `--json-schema`.
 
 ## 1. Inputs
 

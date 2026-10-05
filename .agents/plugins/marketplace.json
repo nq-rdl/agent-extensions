@@ -437,18 +437,6 @@
       "category": "Developer Tools"
     },
     {
-      "name": "docs-drift",
-      "source": {
-        "source": "local",
-        "path": "./dist/codex/plugins/docs-drift"
-      },
-      "policy": {
-        "installation": "AVAILABLE",
-        "authentication": "ON_INSTALL"
-      },
-      "category": "Developer Tools"
-    },
-    {
       "name": "lucid",
       "source": {
         "source": "local",

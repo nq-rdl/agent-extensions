@@ -58,7 +58,6 @@ order:
   - adr
   - debug
   - tech-writing
-  - docs-drift
   - lucid
   - pandera
   - data-request
