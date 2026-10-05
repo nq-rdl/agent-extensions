@@ -1,0 +1,32 @@
+{
+  "name": "docs-drift",
+  "version": "0.38.0",
+  "description": "Docs drift — read-only CI check that a pull request keeps the docs in line with the code",
+  "author": {
+    "name": "nq-rdl"
+  },
+  "repository": "https://github.com/nq-rdl/agent-extensions",
+  "license": "MIT",
+  "keywords": [
+    "docs",
+    "drift",
+    "ci",
+    "pull-request",
+    "review"
+  ],
+  "skills": "./skills/",
+  "interface": {
+    "displayName": "Docs Drift",
+    "shortDescription": "Docs drift — check that a pull request keeps the docs in line",
+    "longDescription": "Docs drift — read-only CI check that a pull request keeps the docs in line with the code",
+    "developerName": "nq-rdl",
+    "category": "Developer Tools",
+    "capabilities": [
+      "Skills"
+    ],
+    "defaultPrompt": [
+      "Use Docs Drift to check whether this pull request needs documentation changes."
+    ],
+    "websiteURL": "https://github.com/nq-rdl/agent-extensions"
+  }
+}

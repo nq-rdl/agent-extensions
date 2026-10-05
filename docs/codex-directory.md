@@ -18,6 +18,7 @@ This report records missing evidence; it does not attest to publisher identity, 
 | data-request | 14 | skills+hooks | No |
 | debug | 2 | skills-only | No |
 | defuddle | 1 | skills-only | No |
+| docs-drift | 1 | skills-only | No |
 | gh | 12 | skills-only | No |
 | git | 1 | skills-only | No |
 | go | 5 | skills-only | No |
@@ -140,6 +141,15 @@ This report records missing evidence; it does not attest to publisher identity, 
 - Publisher must select supported availability regions
 
 ## defuddle
+
+- Publisher must supply logo
+- Publisher must supply privacyPolicyURL
+- Publisher must supply termsOfServiceURL
+- Publisher identity and organization submission access are not recorded as verified
+- Record authenticated execution evidence for five positive and three negative task cases
+- Publisher must select supported availability regions
+
+## docs-drift
 
 - Publisher must supply logo
 - Publisher must supply privacyPolicyURL

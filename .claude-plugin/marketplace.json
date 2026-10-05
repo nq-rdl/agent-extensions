@@ -454,6 +454,19 @@
       ]
     },
     {
+      "name": "docs-drift",
+      "source": "./plugins/docs-drift",
+      "description": "Docs drift — read-only CI check that a pull request keeps the docs in line with the code",
+      "version": "0.38.0",
+      "keywords": [
+        "docs",
+        "drift",
+        "ci",
+        "pull-request",
+        "review"
+      ]
+    },
+    {
       "name": "lucid",
       "source": "./plugins/lucid",
       "description": "Lucid — visual collaboration boards and diagrams (Lucidchart / Lucidspark) via the hosted Lucid MCP server",

@@ -1,0 +1,41 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "docs-drift-check result",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["verdict", "summary", "docs_checked", "findings", "injection_suspected", "injection_notes"],
+  "properties": {
+    "verdict": {
+      "type": "string",
+      "enum": ["current", "needs-changes", "unable-to-assess"]
+    },
+    "summary": { "type": "string", "maxLength": 600 },
+    "docs_checked": {
+      "type": "array",
+      "maxItems": 200,
+      "items": { "type": "string", "maxLength": 200 }
+    },
+    "findings": {
+      "type": "array",
+      "maxItems": 25,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["kind", "doc", "location", "source", "issue", "suggestion"],
+        "properties": {
+          "kind": {
+            "type": "string",
+            "enum": ["missing", "contradicted", "stale", "unbacked-claim", "structure"]
+          },
+          "doc": { "type": "string", "maxLength": 200 },
+          "location": { "type": "string", "maxLength": 200 },
+          "source": { "type": "string", "maxLength": 200 },
+          "issue": { "type": "string", "maxLength": 400 },
+          "suggestion": { "type": "string", "maxLength": 400 }
+        }
+      }
+    },
+    "injection_suspected": { "type": "boolean" },
+    "injection_notes": { "type": "string", "maxLength": 400 }
+  }
+}

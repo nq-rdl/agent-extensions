@@ -1,0 +1,3 @@
+kind: Added
+body: 'New `docs-drift` plugin: `/docs-drift:check` is a read-only CI check that a pull request keeps README, CONTRIBUTING, SECURITY and docs/ in line with the code, returning one JSON verdict'
+time: 2026-10-05T00:20:04.867049317Z

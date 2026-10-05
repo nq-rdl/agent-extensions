@@ -1,0 +1,36 @@
+schemaVersion: v1
+id: docs-drift
+displayName: Docs Drift
+description: Docs drift — read-only CI check that a pull request keeps the docs in line with the code
+keywords: [docs, drift, ci, pull-request, review]
+owners:
+  - rdl
+channels:
+  - stable
+# One read-only skill and no hooks, so a CI job can load this plugin with
+# --plugin-dir without the tech-writing Stop/SubagentStop review hooks.
+skills:
+  - {source: docs-drift-check, leaf: check}   # → /docs-drift:check
+hooks: []
+prompts: []
+mcp: []
+targets:
+  claude:
+    enabled: true
+    pluginName: docs-drift
+    marketplaceName: rdl-agent-extensions
+
+  codex:
+    enabled: true
+    pluginName: docs-drift
+    marketplaceName: rdl-agent-extensions
+    category: Developer Tools
+    components:
+      skills: true
+      mcp: false
+      hooks: false
+      apps: false
+    interface:
+      shortDescription: Docs drift — check that a pull request keeps the docs in line
+      defaultPrompt:
+      - Use Docs Drift to check whether this pull request needs documentation changes.
