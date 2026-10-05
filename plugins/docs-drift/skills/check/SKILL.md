@@ -4,8 +4,8 @@ description: >-
   Read-only check that a pull request leaves the project docs in line with the
   code: compare the diff with README, CONTRIBUTING, SECURITY and docs/, and
   return one JSON verdict with evidence. Built for unattended CI on untrusted PR
-  content; also works locally. Never edits, commits or comments. To fix drift
-  instead, use /gh:document-release.
+  content; also works locally. Never edits, commits or comments; for doc
+  updates, use /gh:document-release.
 compatibility: >-
   Result schema is JSON Schema draft-07 (assets/result.schema.json), as Claude
   Code --json-schema and the Agent SDK expect.
