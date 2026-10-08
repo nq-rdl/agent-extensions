@@ -77,9 +77,157 @@ class Sources(unittest.TestCase):
         (self.p.root / "payload").write_bytes(payload)
         self.p.commit("builder update")
 
-    def test_two_commit_delta_and_impact_use_authenticated_renders(self):
+    def test_status_without_working_sql(self):
         self.publish_generated()
+        r = run(["status", "--json"], self.p.root)
+        self.assertEqual(r.returncode, 0, r.stderr)
+        self.assertEqual(json.loads(r.stdout)["reviews"][0]["state"], "current")
+        self.change_builder(b"-- header\nSELECT 1;\nSELECT 3;\n")
+        r = run(["status", "--json"], self.p.root)
+        self.assertEqual(json.loads(r.stdout)["reviews"][0]["state"], "header-only")
         self.change_builder(b"SELECT 2;\nSELECT 3;\n")
+        r = run(["status", "--json"], self.p.root)
+        self.assertEqual(json.loads(r.stdout)["reviews"][0]["state"], "stale")
+        self.assertEqual(git(self.p.root, "log", "--all", "--format=%H", "--", "sql/request.sql").stdout, "")
+
+    def test_materialize_exact_revision(self):
+        draft, doc = self.publish_generated()
+        self.change_builder(b"SELECT 2;\nSELECT 3;\n")
+        doc = dict(doc, revision=2, **json.loads(self.fingerprint().stdout))
+        doc["assumptions"][0]["confirmed_revision"] = 2
+        draft.write_text(json.dumps(doc))
+        r = run(["publish", "sql__request", "review", str(draft)], self.p.root)
+        self.assertEqual(r.returncode, 0, r.stdout + r.stderr)
+        with tempfile.TemporaryDirectory() as tmp:
+            output = Path(tmp) / "explained.sql"
+            for revision, data in ((1, b"SELECT 1;\nSELECT 3;\n"), (2, b"SELECT 2;\nSELECT 3;\n")):
+                r = run(["materialize", "sql__request", "review", str(revision), str(output)], self.p.root)
+                self.assertEqual(r.returncode, 0, r.stdout + r.stderr)
+                self.assertEqual(output.read_bytes(), data)
+                output.unlink()
+            r = run(["materialize", "sql__request", "review", "3", str(output)], self.p.root)
+            self.assertEqual(r.returncode, 6, r.stdout + r.stderr)
+            self.assertFalse(output.exists())
+        self.assertEqual(list((self.p.root / ".sqlreview").rglob("*.sql")), [])
+
+    def test_materialize_refuses_in_repo_output(self):
+        self.publish_generated()
+        for output in (self.p.root / "leaked.sql", self.p.root / ".sqlreview/reviews/sql__request/source.sql"):
+            r = run(["materialize", "sql__request", "review", "1", str(output)], self.p.root)
+            self.assertEqual(r.returncode, 2, r.stdout + r.stderr)
+            self.assertFalse(output.exists())
+
+    def test_unknown_render_cannot_complete(self):
+        draft, doc = self.publish_generated()
+        doc["sql_sha256"] = "0" * 64
+        draft.with_name("review.json").write_text(json.dumps(doc))
+        r = run(["status", "--json"], self.p.root)
+        self.assertEqual(r.returncode, 0, r.stderr)
+        self.assertEqual(json.loads(r.stdout)["reviews"][0]["state"], "no-baseline")
+        with tempfile.TemporaryDirectory() as tmp:
+            output = Path(tmp) / "unproved.sql"
+            r = run(["materialize", "sql__request", "review", "1", str(output)], self.p.root)
+            self.assertEqual(r.returncode, 6, r.stdout + r.stderr)
+            self.assertFalse(output.exists())
+        doc["sql_sha256"] = hashlib.sha256(b"SELECT 1;\nSELECT 3;\n").hexdigest()
+        draft.with_name("review.json").write_text(json.dumps(doc))
+        self.change_builder(b"SELECT 2;\nSELECT 3;\n")
+        (self.p.root / "render.sh").write_text("#!/bin/sh\nexit 1\n")
+        self.p.commit("unavailable render")
+        r = run(["status", "--json"], self.p.root)
+        self.assertEqual(r.returncode, 2, r.stdout + r.stderr)
+        self.assertNotIn('"current"', r.stdout)
+
+    def test_release_ref_uses_historical_builder(self):
+        draft, doc = self.publish_generated()
+        reviewed = doc["git_commit"]
+        self.change_builder(b"SELECT 2;\nSELECT 3;\n")
+        for ref, expected, applies in ((reviewed, 0, "current"), ("HEAD", 10, "changed")):
+            r = subprocess.run(["bash", str(SCRIPTS / "release.sh"), "evidence", ref],
+                               cwd=self.p.root, capture_output=True, text=True)
+            self.assertEqual(r.returncode, expected, r.stdout + r.stderr)
+            row = json.loads(r.stdout)["reviews"][0]
+            self.assertEqual(row["applies"], applies)
+            self.assertTrue(row["reviewed_commit_in_ref"])
+        doc["sql_sha256"] = "0" * 64
+        draft.with_name("review.json").write_text(json.dumps(doc))
+        r = subprocess.run(["bash", str(SCRIPTS / "release.sh"), "evidence", reviewed],
+                           cwd=self.p.root, capture_output=True, text=True)
+        self.assertEqual(r.returncode, 10, r.stdout + r.stderr)
+        self.assertEqual(json.loads(r.stdout)["reviews"][0]["applies"], "unavailable")
+        self.assertEqual(list((self.p.root / ".sqlreview").rglob("*.sql")), [])
+
+    def test_generated_header_decision_unproved(self):
+        from test_sql_review_header_carry import SQL, R
+        self.generated(SQL.encode())
+        doc = review_doc("sql__request", **json.loads(self.fingerprint().stdout),
+                         assumptions=[item("A1", "Use discharged stays", rationale=R,
+                            location={"lines": [8, 8]}, status="candidate", confirmed_by=None,
+                            confirmed_at=None, confirmed_revision=None)], limitations=[])
+        draft = self.p.write_json("sql__request", "review.draft.json", doc)
+        with tempfile.TemporaryDirectory() as tmp:
+            output = Path(tmp) / "notes.sql"
+            output.write_text(SQL)
+            r = run(["notes", str(output), "--against", str(draft), "--confirmed-by", "engineer-login"], self.p.root)
+            self.assertEqual(r.returncode, 0, r.stdout + r.stderr)
+            result = json.loads(r.stdout)
+            self.assertEqual(result["header_carry_over"], [])
+            self.assertEqual(result["header_walk"][0]["id"], "A1")
+            self.assertIn("generated", result["header_walk"][0]["why"])
+
+    def test_state_and_release_operational_failure_is_visible(self):
+        self.publish_generated()
+        with tempfile.TemporaryDirectory() as bindir, tempfile.TemporaryDirectory() as tmp:
+            shim = Path(bindir) / "cp"
+            shim.write_text(f'#!/bin/sh\ncase "$2" in */recorded.sql) exit 1;; esac\nexec {shutil.which("cp")} "$@"\n')
+            shim.chmod(0o755)
+            env = dict(os.environ, PATH=bindir + os.pathsep + os.environ["PATH"], TMPDIR=tmp)
+            for script, args in ((SCRIPTS / "sqlreview.sh", ["status", "--json"]),
+                                 (SCRIPTS / "release.sh", ["evidence", "HEAD"]),
+                                 (SCRIPTS / "sqlreview.sh", ["materialize", "sql__request", "review", "1", str(Path(tmp) / "out.sql")])):
+                r = subprocess.run(["bash", str(script), *args], cwd=self.p.root, env=env, capture_output=True, text=True)
+                self.assertEqual(r.returncode, 2, r.stdout + r.stderr)
+                self.assertNotIn('"current"', r.stdout)
+                self.assertEqual(list(Path(tmp).iterdir()), [])
+
+    def test_release_metadata_does_not_hide_dirty_sources(self):
+        self.publish_generated()
+        target = self.p.root / ".sqlreview/releases/v1/release.json"
+        target.parent.mkdir(parents=True)
+        target.write_text('{}')
+        r = run(["status", "--json"], self.p.root)
+        self.assertEqual(r.returncode, 0, r.stdout + r.stderr)
+        self.assertEqual(json.loads(r.stdout)["reviews"][0]["state"], "current")
+        (self.p.root / "payload").write_bytes(b"SELECT 4;\n")
+        r = run(["status", "--json"], self.p.root)
+        self.assertEqual(r.returncode, 2, r.stdout + r.stderr)
+        self.assertIn("uncommitted source changes", r.stderr)
+
+    def test_materialize_scope_and_header_revision_keep_original_bytes(self):
+        self.generated(b"SELECT 1;\n")
+        fp = json.loads(self.fingerprint().stdout)
+        scope = scope_doc("sql__request", **fp)
+        draft = self.p.write_json("sql__request", "scope.draft.json", scope)
+        r = run(["publish", "sql__request", "scope", str(draft)], self.p.root)
+        self.assertEqual(r.returncode, 0, r.stdout + r.stderr)
+        self.change_builder(b"-- corrected header\nSELECT 1;\n")
+        r = run(["publish", "sql__request", "scope", str(draft.with_name("scope.json"))], self.p.root)
+        self.assertEqual(r.returncode, 0, r.stdout + r.stderr)
+        with tempfile.TemporaryDirectory() as tmp:
+            output = Path(tmp) / "scope.sql"
+            r = run(["materialize", "sql__request", "scope", "1", str(output)], self.p.root)
+            self.assertEqual(r.returncode, 0, r.stdout + r.stderr)
+            self.assertEqual(output.read_bytes(), b"SELECT 1;\n")
+            output.unlink()
+            alias = Path(tmp) / "alias"
+            alias.symlink_to(self.p.root, target_is_directory=True)
+            r = run(["materialize", "sql__request", "scope", "1", str(alias / "leak.sql")], self.p.root)
+            self.assertEqual(r.returncode, 2, r.stdout + r.stderr)
+            self.assertFalse((self.p.root / "leak.sql").exists())
+
+    def test_two_commit_delta_and_impact_use_authenticated_renders(self):
+        self.publish_generated(b"SELECT 1; -- shared_identifier\nSELECT shared_identifier;\n")
+        self.change_builder(b"SELECT 2; -- shared_identifier\nSELECT shared_identifier;\n")
         with tempfile.TemporaryDirectory() as tmp:
             for command, expected in (("delta", 10), ("impact", 0)):
                 r = run([command, "sql__request"], self.p.root, env={"TMPDIR": tmp})
@@ -87,6 +235,8 @@ class Sources(unittest.TestCase):
                 if command == "delta":
                     self.assertIn("-SELECT 1;", r.stdout)
                     self.assertIn("+SELECT 2;", r.stdout)
+                else:
+                    self.assertIn("shared_identifier\tline 2\tSELECT shared_identifier;", r.stdout)
                 self.assertEqual(list(Path(tmp).iterdir()), [])
         self.assertEqual(list((self.p.root / ".sqlreview").rglob("*.sql")), [])
 
@@ -177,7 +327,38 @@ class Sources(unittest.TestCase):
         draft = self.p.write_json("sql__request", "scope.draft.json", dict(doc, revision=2))
         with tempfile.TemporaryDirectory() as bindir:
             shim = Path(bindir) / "git"
-            shim.write_text(f'#!/bin/sh\ncase "$*" in *cat-file*) exit 2;; esac\nexec {shutil.which("git")} "$@"\n')
+            shim.write_text(f'#!/bin/sh\ncase "$*" in *cat-file*|*ls-tree*) exit 2;; esac\nexec {shutil.which("git")} "$@"\n')
+            shim.chmod(0o755)
+            r = run(["carryforward", "sql__request", "scope", str(draft)], self.p.root,
+                    env={"PATH": bindir + os.pathsep + os.environ["PATH"]})
+            self.assertEqual(r.returncode, 2, r.stdout + r.stderr)
+            self.assertNotIn("sql-absent", r.stdout)
+
+    def test_missing_manifest_tree_object_cannot_certify_sql_absence(self):
+        self.generated()
+        doc = scope_doc("sql__request", "sql/request.sql", sql_sha256=None)
+        self.p.write_json("sql__request", "scope.json", doc)
+        draft = self.p.write_json("sql__request", "scope.draft.json", dict(doc, revision=2))
+        tree = git(self.p.root, "rev-parse", "HEAD:sql").stdout.strip()
+        loose = git(self.p.root, "rev-parse", "--git-path", f"objects/{tree[:2]}/{tree[2:]}").stdout.strip()
+        (self.p.root / loose).unlink()
+        status = git(self.p.root, "status", "--porcelain=v1")
+        self.assertEqual(status.returncode, 0)
+        lookup = subprocess.run(["git", "cat-file", "-e", "HEAD:sql/provenance.json"],
+                                cwd=self.p.root, capture_output=True)
+        self.assertEqual(lookup.returncode, 128)
+        r = run(["carryforward", "sql__request", "scope", str(draft)], self.p.root)
+        self.assertEqual(r.returncode, 2, r.stdout + r.stderr)
+        self.assertNotIn("sql-absent", r.stdout)
+
+    def test_absence_tree_lookup_exit_128_is_operational(self):
+        self.p.commit()
+        doc = scope_doc("sql__request", "sql/request.sql", sql_sha256=None)
+        self.p.write_json("sql__request", "scope.json", doc)
+        draft = self.p.write_json("sql__request", "scope.draft.json", dict(doc, revision=2))
+        with tempfile.TemporaryDirectory() as bindir:
+            shim = Path(bindir) / "git"
+            shim.write_text(f'#!/bin/sh\ncase "$*" in *cat-file*|*ls-tree*) exit 128;; esac\nexec {shutil.which("git")} "$@"\n')
             shim.chmod(0o755)
             r = run(["carryforward", "sql__request", "scope", str(draft)], self.p.root,
                     env={"PATH": bindir + os.pathsep + os.environ["PATH"]})

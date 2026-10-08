@@ -28,6 +28,7 @@
 #   lifts-stale SLUG --tag TAG                  read-only JSON nudges for units newly present at a stable library tag
 #                                              uses authenticated gh GETs; unavailable evidence is unknown, never absent
 #   fingerprint SQL                            fresh clean-HEAD render: hashes, commit, git_dirty:false, sql_provenance
+#   materialize SLUG scope|review REVISION OUTPUT  authenticate exact revision into an external file; caller deletes it
 #   snapshot SLUG SQL                          verify final review against committed renders; no SQL writes
 #   delta SLUG [scope|review]                  body binding + full hashes; exit 0 full/header-only, 10 body change, 6 no baseline
 #   carryover SLUG DRAFT                       review draft items matching confirmed, still-valid scope items (JSON)
@@ -161,7 +162,7 @@ cmd_init() {
 
 # ---------------------------------------------------------------------------------------------
 cmd_status() {
-  local json=0 verbose=0 d slug state reason migrate schema lifts rows="[]" f missing=""
+  local json=0 verbose=0 d slug state reason migrate schema lifts rows="[]" f missing="" state_row
   while [ $# -gt 0 ]; do
     case "$1" in --json) json=1 ;; --verbose) verbose=1 ;; *) usage ;; esac
     shift
@@ -182,8 +183,9 @@ cmd_status() {
     for d in "$SR_REVIEWS"/*/; do
       [ -d "$d" ] || continue
       slug="$(basename "$d")"
+      state_row="$(sr_state "$slug")" || exit 2
       IFS="$(printf '\t')" read -r state SR_SQL_PATH SR_REVISION <<EOF
-$(sr_state "$slug")
+$state_row
 EOF
       lifts="{}"
       if [ -f "$d/lifts.json" ]; then
@@ -624,6 +626,36 @@ cmd_fingerprint() (
 )
 
 # ---------------------------------------------------------------------------------------------
+cmd_materialize() (
+  [ $# -eq 4 ] || usage
+  sr_need_jq
+  sr_require_root
+  local slug="$1" kind="$2" revision="$3" output doc current work
+  sr_safe_slug "$slug"
+  case "$kind" in scope|review) ;; *) usage ;; esac
+  case "$revision" in ""|*[!0-9]*|0|0*) sr_die 2 "revision must be a positive integer" ;; esac
+  case "$4" in /*) output="$(sr_normpath "$4")" ;; *) sr_die 2 "output must be absolute and outside the git tree" ;; esac
+  sr_source_context || exit 2
+  sr_no_symlinks "$output" || exit 2
+  case "$output" in "$SR_SOURCE_TOP"|"$SR_SOURCE_TOP"/*) sr_die 2 "output must be outside the git tree" ;; esac
+  [ ! -e "$output" ] || [ -f "$output" ] || sr_die 2 "output is not a regular file"
+  current="$SR_REVIEWS/$slug/$kind.json"
+  sr_no_symlinks "$current" || exit 2
+  if [ -f "$current" ] && [ "$(jq -r '.revision' "$current")" = "$revision" ]; then doc="$current"
+  else doc="$SR_REVIEWS/$slug/history/$kind/$revision.json"; fi
+  sr_no_symlinks "$doc" || exit 2
+  [ -f "$doc" ] || sr_die 6 "recorded $kind revision $revision unavailable"
+  cmd_check "$doc" >/dev/null || sr_die 4 "invalid recorded $kind revision"
+  jq -e --arg slug "$slug" --arg kind "$kind" --argjson revision "$revision" \
+    '.slug == $slug and .kind == $kind and .revision == $revision' "$doc" >/dev/null || sr_die 4 "recorded revision identity differs"
+  work="$(sr_source_workspace)" || exit 2
+  trap 'rm -rf "$work"' EXIT
+  trap 'exit 2' HUP INT TERM
+  cp "$doc" "$work/document.json" || exit 2
+  sr_source_auth "$work/document.json" "$work/recorded.sql" || exit $?
+  cp "$work/recorded.sql" "$output" || sr_die 2 "cannot copy authenticated render to output"
+)
+
 cmd_snapshot() (
   [ $# -eq 2 ] || usage
   sr_need_jq
@@ -1189,17 +1221,44 @@ _scope_notes() { # scope-draft optional-question-draft parsed-notes
 # fail closed; unrelated PR merges with identical path blobs do not invalidate evidence.
 _header_decisions() ( # SQL DRAFT intended-human-confirmer parsed-notes
   local sql="$1" draft="$2" actor="$3" parsed="$4" root rel tmp commit epoch parents start safe=true row_safe path_sha=""
+  local project source_rel source_sql generated=false manifest entry
   # Replacement refs/grafts are not evidence of the original object ancestry.
   export GIT_NO_REPLACE_OBJECTS=1
-  tmp="$(mktemp -d)" || return 2
+  project="$(sr_find_root)" || project=""
+  if [ -n "$project" ]; then
+    SR_ROOT="$project"
+    tmp="$(sr_source_workspace)" || return 2
+  else tmp="$(mktemp -d)" || return 2; fi
   trap 'rm -rf "$tmp"' EXIT
   trap 'exit 2' HUP INT TERM
   : > "$tmp/rows" || return 2
-  if root="$(git -C "$(dirname "$sql")" rev-parse --show-toplevel 2>/dev/null)"; then
-    rel="$(cd "$(dirname "$sql")" && pwd -P)/$(basename "$sql")"
-    rel="${rel#"$root"/}"
+  # Publication supplies temporary authenticated bytes. Resolve their maintained
+  # path from the draft's project, rather than treating the temporary file as source.
+  if [ -n "$project" ]; then
+    rel="$(jq -r '.sql_path' "$draft")"
+    source_sql="$project/$rel"
+  else source_sql="$sql"; fi
+  if root="$(git -C "${project:-$(dirname "$source_sql")}" rev-parse --show-toplevel 2>/dev/null)"; then
+    source_rel="$(sr_abspath "$source_sql")"
+    source_rel="${source_rel#"$root"/}"
+    [ -n "$project" ] || rel="$source_rel"
+    case "$(cd "$tmp" && pwd -P)" in "$root"|"$root"/*) sr_die 2 "temporary header evidence must be outside the git tree" ;; esac
     path_sha="$(sr_sha256 "$sql")"
-    git -C "$root" log --full-history --topo-order --reverse --format='%H %ct %P' HEAD -- ":(literal)$rel" > "$tmp/history" 2>/dev/null || safe=false
+    if jq -e '.sql_provenance.mode == "rendered"' "$draft" >/dev/null; then generated=true; safe=false; fi
+    manifest=""
+    # The provenance manifest belongs at the project SQL directory, not beside
+    # arbitrary nested SQL paths. A declared generated source has no complete
+    # committed rendered-header history yet, so fresh decisions require a walk.
+    if [ -n "$project" ]; then
+      manifest="${project#"$root"}"
+      manifest="${manifest#/}"
+      manifest="${manifest:+$manifest/}sql/provenance.json"
+      if git -C "$root" show "HEAD:$manifest" > "$tmp/manifest" 2>/dev/null; then
+        entry="$(jq -r --arg p "$rel" '.requests[$p].source // ""' "$tmp/manifest")" || safe=false
+        case "$entry" in builder|cohort|spec) generated=true; safe=false ;; hand-written) ;; *) safe=false ;; esac
+      fi
+    fi
+    git -C "$root" log --full-history --topo-order --reverse --format='%H %ct %P' HEAD -- ":(literal)$source_rel" ${manifest:+":(literal)$manifest"} > "$tmp/history" 2>/dev/null || safe=false
     [ "$(git -C "$root" rev-parse --is-shallow-repository 2>/dev/null)" = false ] || safe=false
     local grafts blob parent parent_blob changes
     grafts="$(git -C "$root" rev-parse --git-path info/grafts)"
@@ -1209,25 +1268,34 @@ _header_decisions() ( # SQL DRAFT intended-human-confirmer parsed-notes
     while read -r commit epoch parents; do
       [ -n "$commit" ] || continue
       row_safe=true
+      if [ -n "$manifest" ]; then
+        git -C "$root" ls-tree -r "$commit" -- "$manifest" > "$tmp/manifest-tree" 2>/dev/null || safe=false
+        if [ -s "$tmp/manifest-tree" ]; then
+          if git -C "$root" show "$commit:$manifest" > "$tmp/manifest" 2>/dev/null; then
+            entry="$(jq -r --arg p "$rel" '.requests[$p].source // ""' "$tmp/manifest")" || row_safe=false
+            case "$entry" in hand-written) ;; *) row_safe=false ;; esac
+          else safe=false; fi
+        fi
+      fi
       # Git simplification must not hide an alternate-parent edit or a path move.
       changes="$(git -C "$root" diff-tree --root --no-commit-id -r -M -m "$commit" 2>/dev/null)" || row_safe=false
-      if printf '%s\n' "$changes" | awk -F '\t' -v path="$rel" '$1 ~ / R[0-9]+$/ && ($2 == path || $3 == path) { found=1 } END { exit !found }'; then row_safe=false; fi
+      if printf '%s\n' "$changes" | awk -F '\t' -v path="$source_rel" '$1 ~ / R[0-9]+$/ && ($2 == path || $3 == path) { found=1 } END { exit !found }'; then row_safe=false; fi
       case "$parents" in
         *" "*)
-          blob="$(git -C "$root" rev-parse "$commit:$rel" 2>/dev/null)" || blob=absent
+          blob="$(git -C "$root" rev-parse "$commit:$source_rel" 2>/dev/null)" || blob=absent
           for parent in $parents; do
-            parent_blob="$(git -C "$root" rev-parse "$parent:$rel" 2>/dev/null)" || parent_blob=absent
+            parent_blob="$(git -C "$root" rev-parse "$parent:$source_rel" 2>/dev/null)" || parent_blob=absent
             [ "$parent_blob" = "$blob" ] || row_safe=false
           done ;;
       esac
-      if git -C "$root" show "$commit:$rel" > "$tmp/sql" 2>/dev/null; then
+      if git -C "$root" show "$commit:$source_rel" > "$tmp/sql" 2>/dev/null; then
         bash "$SR_SCRIPT_DIR/sqlreview.sh" notes "$tmp/sql" > "$tmp/notes" 2>/dev/null || { printf 'null\n' > "$tmp/notes"; row_safe=false; }
         start="$(sr_body_start "$tmp/sql")" || { start=0; row_safe=false; }
       else
         printf 'null\n' > "$tmp/notes"; start=0; row_safe=false
         # An absent path can precede a new source; an unreadable existing object can
         # hide an earlier source and invalidates ancestry availability globally.
-        git -C "$root" ls-tree -r "$commit" -- "$rel" > "$tmp/path-tree" 2>/dev/null || safe=false
+        git -C "$root" ls-tree -r "$commit" -- "$source_rel" > "$tmp/path-tree" 2>/dev/null || safe=false
         [ ! -s "$tmp/path-tree" ] || safe=false
       fi
       # Append one file-backed JSON row per revision; SQL/history never enter argv.
@@ -1239,8 +1307,9 @@ _header_decisions() ( # SQL DRAFT intended-human-confirmer parsed-notes
   else root=""; rel=""; safe=false; fi
   start="$(sr_body_start "$sql")" || start=0
   printf '%s\n' "$parsed" | jq -L "$SR_SCRIPT_DIR" --slurpfile draft "$draft" --rawfile sql "$sql" \
-    --arg actor "$actor" --arg path "$rel" --arg sha "$path_sha" --argjson safe "$safe" --argjson start "$start" --slurpfile history "$tmp/rows" \
-    'include "sqlreview-header"; header_candidates($draft[0]; $sql; $actor; $path; $sha; $safe; $start; $history)'
+    --argjson generated "$generated" --arg actor "$actor" --arg path "$rel" --arg sha "$path_sha" --argjson safe "$safe" --argjson start "$start" --slurpfile history "$tmp/rows" \
+    'include "sqlreview-header"; header_candidates($draft[0]; $sql; $actor; $path; $sha; $safe; $start; $history)
+      | if $generated then .header_walk |= map(.why = "generated source has no proven committed rendered-header history; confirm ordinarily") else . end'
 )
 
 # ---------------------------------------------------------------------------------------------
@@ -1369,6 +1438,7 @@ case "$cmd" in
   guard) cmd_guard "$@" ;;
   lifts-stale) cmd_lifts_stale "$@" ;;
   fingerprint) cmd_fingerprint "$@" ;;
+  materialize) cmd_materialize "$@" ;;
   snapshot) cmd_snapshot "$@" ;;
   delta) cmd_delta "$@" ;;
   impact) cmd_impact "$@" ;;

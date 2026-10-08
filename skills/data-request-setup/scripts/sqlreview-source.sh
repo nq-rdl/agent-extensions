@@ -39,13 +39,13 @@ sr_source_clean() {
   while IFS= read -r -d '' entry; do
     status="${entry:0:2}"; path="${entry:3}"
     case "$path" in
-      "$store"/reviews/*|"$store"/templates/*|"$store"/ledger.json|"$store"/.gitignore) ;;
+      "$store"/reviews/*|"$store"/releases/*|"$store"/templates/*|"$store"/ledger.json|"$store"/.gitignore) ;;
       *) rm -f "$tmp"; sr_source_error "uncommitted source changes; commit builder/configuration/pins before fingerprinting"; return 2 ;;
     esac
     case "$status" in *R*|*C*)
       IFS= read -r -d '' other || { rm -f "$tmp"; return 2; }
       case "$other" in
-        "$store"/reviews/*|"$store"/templates/*|"$store"/ledger.json|"$store"/.gitignore) ;;
+        "$store"/reviews/*|"$store"/releases/*|"$store"/templates/*|"$store"/ledger.json|"$store"/.gitignore) ;;
         *) rm -f "$tmp"; sr_source_error "uncommitted source rename"; return 2 ;;
       esac ;;
     esac

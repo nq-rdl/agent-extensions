@@ -238,52 +238,54 @@ sr_doc_for() { # <slug> -> path
   else return 1; fi
 }
 
-# State of one review directory, from bytes on disk (never from git). Prints
-# "<state>\t<sql_path>\t<revision>" so a caller can `IFS=$'\t' read -r state sql rev`.
-#   scoped       scope.json only
-#   missing      the SQL file is gone
-#   no-baseline  review.json but no source.sql snapshot
-#   stale        source.sql differs from the current SQL
-#   current      identical
-sr_state() { # <slug>
+# State uses authenticated committed sources, never generated working output or snapshots.
+# no-baseline means unavailable historical provenance; operational errors propagate as 2.
+sr_state() ( # <slug> -> state, sql_path, revision
   sr_safe_slug "$1"
-  local d="$SR_REVIEWS/$1" doc sql rev state
+  local d="$SR_REVIEWS/$1" doc sql rev state work bound rc kind
   doc="$(sr_doc_for "$1")" || {
     if [ -f "$d/review.draft.json" ] || [ -f "$d/scope.draft.json" ]; then printf 'draft\t\t\n'; else printf 'invalid\t\t\n'; fi
     return 0
   }
-  sr_no_symlinks "$d/source.sql" || exit 2
   cmd_check "$doc" >/dev/null || { printf 'invalid\t\t\n'; return 0; }
-  if [ "$(jq -r .kind "$doc")" != lifts ]; then
+  kind="$(jq -r .kind "$doc")"
+  if [ "$kind" != lifts ]; then
     bash "$SR_SCRIPT_DIR/sqlreview.sh" questions "$1" >/dev/null 2>&1 || { printf 'invalid\t\t\n'; return 0; }
   fi
-  sql="$(jq -r '.sql_path // ""' "$doc" 2>/dev/null)"
+  sql="$(jq -r '.sql_path // ""' "$doc")"
   sr_safe_sql "$sql"
-  rev="$(jq -r '.revision // ""' "$doc" 2>/dev/null)"
-  case "$doc" in
-    */scope.json)
-      state="scoped"
-      if jq -e '.sql_sha256 != null' "$doc" >/dev/null; then
-        if [ ! -f "$SR_ROOT/$sql" ]; then state="missing"
-        else
-          local bound
-          sr_binding "$doc" "$SR_ROOT/$sql" "$d/scope.source.sql"; bound=$?
-          case "$bound" in 0) ;; 10) state="scoped-header-only" ;; *) state="stale" ;; esac
-        fi
-      fi ;;
-    */lifts.json) state="lifts" ;;
-    *)
-      if [ ! -f "$SR_ROOT/$sql" ]; then state="missing"
-      elif [ ! -f "$d/source.sql" ]; then state="no-baseline"
-      elif [ -f "$d/rebind-required" ]; then state="stale"
-      else
-        local bound
-        sr_binding "$doc" "$SR_ROOT/$sql" "$d/source.sql"; bound=$?
-        case "$bound" in 0) state="current" ;; 10) state="header-only" ;; *) state="stale" ;; esac
-      fi ;;
-  esac
+  rev="$(jq -r '.revision // ""' "$doc")"
+  if [ "$kind" = lifts ]; then state=lifts
+  elif [ -f "$d/rebind-required" ]; then state=stale
+  elif [ "$kind" = scope ] && jq -e '.sql_sha256 == null' "$doc" >/dev/null; then state=scoped
+  else
+    work="$(sr_source_workspace)" || return 2
+    trap 'rm -rf "$work"' EXIT
+    trap 'exit 2' HUP INT TERM
+    sr_source_auth "$doc" "$work/recorded.sql"; rc=$?
+    case "$rc" in
+      6) state=no-baseline ;;
+      0)
+        sr_source_clean || return 2
+        sr_source_path_absent HEAD "$sql"; rc=$?
+        case "$rc" in
+          0) state=missing ;;
+          1)
+            sr_source_render HEAD "$sql" "$work/current.sql" || return 2
+            sr_binding "$doc" "$work/current.sql" "$work/recorded.sql"; bound=$?
+            case "$bound" in
+              0) if [ "$kind" = scope ]; then state=scoped; else state=current; fi ;;
+              10) if [ "$kind" = scope ]; then state=scoped-header-only; else state=header-only; fi ;;
+              *) state=stale ;;
+            esac
+            sr_source_clean || return 2 ;;
+          *) return 2 ;;
+        esac ;;
+      *) return 2 ;;
+    esac
+  fi
   printf '%s\t%s\t%s\n' "$state" "$sql" "$rev"
-}
+)
 
 # Why a review is invalid or missing, on one line (empty otherwise). Kept apart from sr_state:
 # tab-separated reads collapse empty fields, and invalid rows have no sql_path or revision.
@@ -308,9 +310,11 @@ sr_state_reason() { # <slug> <state>
       case "$violations" in *"binding mismatch"*)
         why="$why; the slug is not derived from any current path — rebind with: sqlreview.sh move --slug $slug <sql path>" ;;
       esac ;;
+    no-baseline)
+      why="recorded SQL source cannot be authenticated — reassess with /data-request:analyse --update" ;;
     missing)
       sql="$(jq -r '.sql_path // ""' "$(sr_doc_for "$slug")" 2>/dev/null)"
-      why="sql_path target missing: $sql — if it moved, run: sqlreview.sh move '$sql' <new path>" ;;
+      why="committed SQL source missing: $sql — if it moved, run: sqlreview.sh move '$sql' <new path>" ;;
   esac
   printf '%s\n' "$why"
 }
@@ -329,22 +333,32 @@ sr_source_workspace() (
 
 # Authenticated absence means HEAD has neither a maintained source nor a declared
 # generated path. This is only used for a scope whose recorded hash is null.
-sr_source_path_absent() {
-  local commit manifest path entry status
+sr_source_path_absent() (
+  local commit manifest path entry status work row name manifest_present=false
   sr_source_context || return 2
   commit="$(git -C "$SR_SOURCE_TOP" rev-parse --verify "$1^{commit}")" || return 2
   path="${SR_SOURCE_PREFIX:+$SR_SOURCE_PREFIX/}$2"
-  git -C "$SR_SOURCE_TOP" cat-file -e "$commit:$path" 2>/dev/null && return 1
-  [ "$?" = 128 ] || return 2
   manifest="${SR_SOURCE_PREFIX:+$SR_SOURCE_PREFIX/}sql/provenance.json"
-  if git -C "$SR_SOURCE_TOP" cat-file -e "$commit:$manifest" 2>/dev/null; then
+  work="$(sr_source_workspace)" || return 2
+  trap 'rm -rf "$work"' EXIT
+  trap 'exit 2' HUP INT TERM
+  # A failed path lookup cannot distinguish absent paths from unreadable objects.
+  # Enumerate the complete tree successfully before interpreting a missing entry;
+  # -t includes directories, and NUL records preserve every literal filename.
+  git -C "$SR_SOURCE_TOP" ls-tree -r -t -z --full-tree "$commit" > "$work/tree" || {
+    sr_source_error "cannot inspect committed source tree; SQL absence unavailable"; return 2;
+  }
+  while IFS= read -r -d '' row; do
+    name="${row#*$'\t'}"
+    [ "$name" != "$path" ] || return 1
+    [ "$name" != "$manifest" ] || manifest_present=true
+  done < "$work/tree"
+  if [ "$manifest_present" = true ]; then
     entry="$(git -C "$SR_SOURCE_TOP" show "$commit:$manifest")" || return 2
     printf '%s' "$entry" | jq -e --arg p "$2" '.schema == 1 and (.requests | type == "object") and (.requests | has($p) | not)' >/dev/null || {
       status=$?
       case "$status" in 1|4|5) return 1 ;; *) return 2 ;; esac
     }
-  else
-    [ "$?" = 128 ] || return 2
   fi
   return 0
-}
+)

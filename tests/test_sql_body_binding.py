@@ -87,7 +87,7 @@ class BodyBinding(unittest.TestCase):
         (self.d / "review.json").write_text(json.dumps(corrupted))
         self.sql.write_text(NEW)
         self.p.commit("header")
-        self.assertIn("stale", run(["status"], self.p.root).stdout)
+        self.assertIn("no-baseline", run(["status"], self.p.root).stdout)
         self.assertNotEqual(self.publish(corrupted).returncode, 0)
         self.assertNotEqual(run(["snapshot", "q", "q.sql"], self.p.root).returncode, 0)
 
@@ -215,18 +215,23 @@ class ScopeBodyState(unittest.TestCase):
             corrupt = json.loads(scope.read_text())
             corrupt["sql_sha256"] = "0" * 64
             scope.write_text(json.dumps(corrupt))
-            self.assertIn("stale", run(["status"], p.root).stdout)
+            self.assertIn("no-baseline", run(["status"], p.root).stdout)
 
     def test_scope_baseline_symlink_is_not_binding_evidence(self):
         with tempfile.TemporaryDirectory() as tmp:
             p = Project(tmp)
-            p.sql("q.sql", NEW)
+            sql = p.sql("q.sql", OLD)
+            p.commit()
+            fp = json.loads(run(["fingerprint", "q.sql"], p.root).stdout)
             d = p.review_dir("q")
-            p.write_json("q", "scope.json", scope_doc("q", "q.sql", sql_sha256=sha(OLD), sql_body_sha256=sha(BODY)))
-            outside = Path(tmp) / "outside.sql"
-            outside.write_text(OLD)
-            (d / "scope.source.sql").symlink_to(outside)
-            self.assertIn("stale", run(["status"], p.root).stdout)
+            p.write_json("q", "scope.json", scope_doc("q", **fp))
+            sql.write_text(NEW)
+            p.commit("header")
+            with tempfile.TemporaryDirectory() as outside:
+                target = Path(outside) / "outside.sql"
+                target.write_text("unrelated SQL")
+                (d / "scope.source.sql").symlink_to(target)
+                self.assertIn("scoped-header-only", run(["status"], p.root).stdout)
 
     def test_missing_original_commit_cannot_be_saved_by_claimed_body_digest(self):
         with tempfile.TemporaryDirectory() as tmp:
