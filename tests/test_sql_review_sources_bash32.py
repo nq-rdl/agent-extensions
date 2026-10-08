@@ -155,6 +155,51 @@ class Bash32Sources(unittest.TestCase):
 
 
 class HostGitFixture(unittest.TestCase):
+    def test_copied_git_transport_clone_and_fetch_without_host_helpers(self):
+        if platform.system() != "Linux" or platform.machine() not in ("x86_64", "amd64"):
+            self.skipTest("host Git transport fixture requires Linux amd64")
+        from bash32_fixture import copy_host_git
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            project = fixture(tmp)
+            copy_host_git(root, tmp)
+            for name in ("empty-exec-path", "home", "runtime", "config", "cache", "data", "state"):
+                (root / name).mkdir()
+            # A complete replacement environment and empty exec-path prevent installed
+            # git-upload-pack/pack helpers from masking missing fixture dependencies.
+            env = {"PATH": str(root / "bin"), "HOME": str(root / "home"),
+                   "TMPDIR": str(root / "runtime"), "XDG_CONFIG_HOME": str(root / "config"),
+                   "XDG_CACHE_HOME": str(root / "cache"), "XDG_DATA_HOME": str(root / "data"),
+                   "XDG_STATE_HOME": str(root / "state"), "LC_ALL": "C", "LANG": "C", "TZ": "UTC",
+                   "GIT_CONFIG_NOSYSTEM": "1", "GIT_CONFIG_GLOBAL": "/dev/null",
+                   "GIT_EXEC_PATH": str(root / "empty-exec-path"), "GIT_TRACE": str(root / "git.trace")}
+            copied_git = str(root / "bin/git")
+            exec_path = subprocess.run([copied_git, "--exec-path"], env=env, text=True, capture_output=True, check=True)
+            self.assertEqual(exec_path.stdout.strip(), str(root / "empty-exec-path"))
+            clone = root / "clone"
+            cloned = subprocess.run([copied_git, "-c", "core.hooksPath=/dev/null", "clone", "--no-local",
+                                     "--no-checkout", str(project), str(clone)],
+                                    env=env, text=True, capture_output=True)
+            self.assertEqual(cloned.returncode, 0, cloned.stdout + cloned.stderr)
+            self.assertTrue(list((clone / ".git/objects/pack").glob("*.pack")))
+            checkout = subprocess.run([copied_git, "-C", str(clone), "-c", "core.hooksPath=/dev/null",
+                                       "checkout", "--detach", "HEAD"], env=env, text=True, capture_output=True)
+            self.assertEqual(checkout.returncode, 0, checkout.stdout + checkout.stderr)
+            self.assertEqual((clone / "payload").read_bytes(), b"SELECT 1;\nSELECT 3;\n")
+            (project / "payload").write_text("SELECT 99;\n")
+            subprocess.run(["git", "-C", str(project), "add", "payload"], check=True)
+            subprocess.run(["git", "-C", str(project), "-c", "commit.gpgsign=false", "commit", "-qm", "transport update"], check=True)
+            fetched = subprocess.run([copied_git, "-C", str(clone), "fetch", "origin"],
+                                     env=env, text=True, capture_output=True)
+            self.assertEqual(fetched.returncode, 0, fetched.stdout + fetched.stderr)
+            updated = subprocess.run([copied_git, "-C", str(clone), "checkout", "--detach", "FETCH_HEAD"],
+                                     env=env, text=True, capture_output=True)
+            self.assertEqual(updated.returncode, 0, updated.stdout + updated.stderr)
+            self.assertEqual((clone / "payload").read_bytes(), b"SELECT 99;\n")
+            trace = (root / "git.trace").read_text()
+            for subprocess_name in ("upload-pack", "pack-objects", "index-pack"):
+                self.assertIn(subprocess_name, trace)
+
     def test_isolated_git_preflight_exposes_corrupt_checkout_error_without_sql(self):
         if platform.system() != "Linux" or platform.machine() not in ("x86_64", "amd64"):
             self.skipTest("host Git preflight requires Linux amd64")

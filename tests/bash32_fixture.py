@@ -111,6 +111,10 @@ def copy_host_git(directory, target):
         # Trust only this disposable fixture; modern local clone checks its .git too.
         "-c", "safe.directory=" + target + "/project",
         "-c", "safe.directory=" + target + "/project/.git"))
-    wrapper = bindir / "git"
-    wrapper.write_text('#!/bin/sh\nexec ' + command + ' "$@"\n')
-    wrapper.chmod(0o755)
+    # Local paths can use Git's transport clone (e.g. when mounted source ownership
+    # differs). Its upload-pack subprocess must also use the copied ELF runtime;
+    # the minimal container has neither host exec-path helpers nor their loader.
+    for name, subcommand in (("git", ""), ("git-upload-pack", " upload-pack")):
+        wrapper = bindir / name
+        wrapper.write_text('#!/bin/sh\nexec ' + command + subcommand + ' "$@"\n')
+        wrapper.chmod(0o755)
