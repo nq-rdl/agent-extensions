@@ -1,11 +1,13 @@
 """Real committed adapters under host Bash and the strict Bash 3.2 fixture."""
 import json
 import os
+import platform
 import shutil
 import subprocess
 import tempfile
 import unittest
 from pathlib import Path
+from unittest.mock import patch
 
 from test_sql_review_scripts import Project, review_doc, item, REPO
 from bash32_fixture import container_runtime, static_jq, run_container
@@ -108,12 +110,57 @@ class Bash32Sources(unittest.TestCase):
 
 class HostGitFixture(unittest.TestCase):
     def test_real_git_copy_is_self_contained(self):
+        if platform.system() != "Linux" or platform.machine() not in ("x86_64", "amd64"):
+            self.skipTest("host Git copy smoke test requires Linux amd64")
         from bash32_fixture import copy_host_git
         with tempfile.TemporaryDirectory() as tmp:
             copy_host_git(Path(tmp), tmp)
             r = subprocess.run([str(Path(tmp) / "bin/git"), "--version"], capture_output=True, text=True)
             self.assertEqual(r.returncode, 0, r.stderr)
             self.assertTrue(r.stdout.startswith("git version "))
+
+
+class HostGitPlatformContract(unittest.TestCase):
+    def test_ordinary_smoke_skips_unsupported_hosts_before_copying(self):
+        for system, machine in (("Darwin", "x86_64"), ("Darwin", "arm64"),
+                                ("Linux", "aarch64"), ("Linux", "arm64")):
+            with self.subTest(system=system, machine=machine):
+                with patch("bash32_fixture.platform.system", return_value=system), \
+                     patch("bash32_fixture.platform.machine", return_value=machine), \
+                     patch("bash32_fixture.copy_host_git") as copy:
+                    result = unittest.TestResult()
+                    HostGitFixture("test_real_git_copy_is_self_contained").run(result)
+                self.assertEqual(result.testsRun, 1)
+                self.assertEqual(len(result.skipped), 1)
+                self.assertEqual(result.errors, [])
+                self.assertEqual(result.failures, [])
+                copy.assert_not_called()
+
+    def test_ordinary_smoke_executes_copy_on_supported_linux_aliases(self):
+        for machine in ("x86_64", "amd64"):
+            with self.subTest(machine=machine):
+                with patch("bash32_fixture.platform.system", return_value="Linux"), \
+                     patch("bash32_fixture.platform.machine", return_value=machine), \
+                     patch("bash32_fixture.copy_host_git") as copy, \
+                     patch("test_sql_review_sources_bash32.subprocess.run") as execute:
+                    execute.return_value = subprocess.CompletedProcess([], 0, "git version fixture\n", "")
+                    result = unittest.TestResult()
+                    HostGitFixture("test_real_git_copy_is_self_contained").run(result)
+                self.assertTrue(result.wasSuccessful(), result.errors + result.failures)
+                self.assertEqual(result.skipped, [])
+                copy.assert_called_once()
+                self.assertEqual(execute.call_args.args[0][-1], "--version")
+
+    def test_strict_copy_still_rejects_unsupported_hosts(self):
+        from bash32_fixture import copy_host_git
+        for system, machine in (("Darwin", "x86_64"), ("Linux", "aarch64")):
+            with self.subTest(system=system, machine=machine):
+                with patch("bash32_fixture.platform.system", return_value=system), \
+                     patch("bash32_fixture.platform.machine", return_value=machine), \
+                     patch("bash32_fixture.subprocess.run") as execute:
+                    with self.assertRaisesRegex(RuntimeError, "requires Linux amd64 host Git"):
+                        copy_host_git(Path("unused"), "/w")
+                    execute.assert_not_called()
 
 
 if __name__ == "__main__":
