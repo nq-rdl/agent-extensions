@@ -27,8 +27,9 @@ Here $ARGUMENTS means the user’s supplied skill arguments. Codex does not popu
 # Data Request — setup
 
 The **Data Engineer** runs setup once per project. The **Data Analyst** fills
-`answers.yaml` and its optional `answers.intake.json` sidecar in one pass, then
-hands the research decisions to the engineer for bootstrap and draft.
+`answers.yaml` and its optional `answers.intake.json` sidecar in one pass, guided by
+`$data-request:intake` (the analyst's interview, which needs no setup), then hands the
+research decisions to the engineer for bootstrap (the engineer's interview) and draft.
 See [analyst intake contract](references/analyst-intake.rst). The shared list's recorded
 TUH facility house default is imported by bootstrap without a fresh question;
 read [recurring decisions](references/recurring-decisions.rst) for its upstream marker,

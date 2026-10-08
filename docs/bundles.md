@@ -53,7 +53,7 @@ Delegation outlines are optional skill references, not registered agent types.
 | [`tech-writing`](#tech-writing) | Yes | Yes | Technical writing — developer docs, tutorials, ADRs, and guides |
 | [`lucid`](#lucid) | Yes | Yes | Lucid — visual collaboration boards and diagrams (Lucidchart / Lucidspark) via the hosted Lucid MCP server |
 | [`pandera`](#pandera) | Yes | Yes | Pandera — dataframe schema validation and debugging for pandas and Polars |
-| [`data-request`](#data-request) | Yes | Yes | Data Request — triage, scope, lookup, map, draft, validate, fix and amend request SQL and Python, and draft analyst-approved release summaries, with shared RDL guardrails and human-confirmed review handoffs |
+| [`data-request`](#data-request) | Yes | Yes | Data Request — triage, analyst intake, scope, lookup, map, draft, validate, fix and amend request SQL and Python, and draft analyst-approved release summaries, with shared RDL guardrails and human-confirmed review handoffs |
 | [`pi`](#pi) | Yes | Yes | Pi worker orchestration — prerequisite setup, confirmed issue or free-text dispatch, overlap waves, bounded launches, PR status, and Codex-style review and rescue |
 
 ## Install
@@ -785,11 +785,12 @@ Pandera — dataframe schema validation and debugging for pandas and Polars.
 
 ## data-request
 
-Data Request — triage, scope, lookup, map, draft, validate, fix and amend request SQL and Python, and draft analyst-approved release summaries, with shared RDL guardrails and human-confirmed review handoffs.
+Data Request — triage, analyst intake, scope, lookup, map, draft, validate, fix and amend request SQL and Python, and draft analyst-approved release summaries, with shared RDL guardrails and human-confirmed review handoffs.
 
 **Claude Code skills**
 
 - `/data-request:setup`
+- `/data-request:intake`
 - `/data-request:bootstrap`
 - `/data-request:analyse`
 - `/data-request:explain`
@@ -807,6 +808,7 @@ Data Request — triage, scope, lookup, map, draft, validate, fix and amend requ
 **Codex skills**
 
 - `$data-request:setup`
+- `$data-request:intake`
 - `$data-request:bootstrap`
 - `$data-request:analyse`
 - `$data-request:explain`

@@ -20,10 +20,12 @@ Curated reusable agent skills packaged as self-contained plugins. Claude Code an
 See [`docs/bundles.md`](docs/bundles.md) for the full subject list.
 
 For the `data-request` workflow, the Data Engineer runs `setup` once per project.
-The Data Analyst fills `answers.yaml` and its optional `answers.intake.json`
-sidecar in the same pass, then hands the branch to the engineer for `bootstrap`
-and `draft`. Bootstrap carries answered research decisions with analyst
-confirmation; missing research answers return to the analyst. See the
+The Data Analyst runs `intake`, the analyst's interview: it fills `answers.yaml`
+and its optional `answers.intake.json` sidecar in one pass and needs no `setup`.
+The analyst then hands the branch to the engineer for `bootstrap`, the engineer's
+interview, and `draft`. Bootstrap carries answered research decisions with analyst
+confirmation and asks the engineer only about technical scope; missing research
+answers return to the analyst for an `intake` re-run. See the
 [shared intake contract](skills/data-request-setup/references/analyst-intake.rst).
 Approved enquiries build all requested elements; the analyst checks approval
 coverage at review. See [approval and runtime permissions](docs/data-request-permissions.md)

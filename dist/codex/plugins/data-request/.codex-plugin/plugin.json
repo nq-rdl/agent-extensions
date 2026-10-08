@@ -1,7 +1,7 @@
 {
   "name": "data-request",
   "version": "0.38.0",
-  "description": "Data Request — triage, scope, lookup, map, draft, validate, fix and amend request SQL and Python, and draft analyst-approved release summaries, with shared RDL guardrails and human-confirmed review handoffs",
+  "description": "Data Request — triage, analyst intake, scope, lookup, map, draft, validate, fix and amend request SQL and Python, and draft analyst-approved release summaries, with shared RDL guardrails and human-confirmed review handoffs",
   "author": {
     "name": "nq-rdl"
   },
@@ -10,6 +10,7 @@
   "keywords": [
     "data-request",
     "triage",
+    "intake",
     "sql",
     "python",
     "cohort",
@@ -28,7 +29,7 @@
   "interface": {
     "displayName": "Data Request",
     "shortDescription": "Develop and review SQL; fix request SQL and Python",
-    "longDescription": "Data Request — triage, scope, lookup, map, draft, validate, fix and amend request SQL and Python, and draft analyst-approved release summaries, with shared RDL guardrails and human-confirmed review handoffs",
+    "longDescription": "Data Request — triage, analyst intake, scope, lookup, map, draft, validate, fix and amend request SQL and Python, and draft analyst-approved release summaries, with shared RDL guardrails and human-confirmed review handoffs",
     "developerName": "nq-rdl",
     "category": "Developer Tools",
     "capabilities": [

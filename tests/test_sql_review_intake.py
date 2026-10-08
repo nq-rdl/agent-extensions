@@ -402,7 +402,7 @@ class Intake(unittest.TestCase):
                 "map": ("Data Engineer",), "validate": ("Data Engineer",),
                 "fix": ("Data Engineer",), "lift": ("Data Engineer",),
                 "explain": ("Data Analyst",), "release": ("Data Analyst",),
-                "amend": ("Data Analyst",), "lookup": ("Data Analyst",),
+                "amend": ("Data Analyst",), "lookup": ("Data Analyst",), "intake": ("Data Analyst",),
                 "triage": ("Data Analyst", "Data Engineer"),
                 "guardrails": ("Data Engineer", "Data Analyst"),
             }

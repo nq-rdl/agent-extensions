@@ -17,7 +17,7 @@ BUNDLE = REPO / "registry" / "bundles" / "data-request.yaml"
 PLUGIN = REPO / "plugins" / "data-request"
 RECORD_STAGES = ("setup", "bootstrap", "analyse", "explain", "release")
 SKILLS = {leaf: REPO / "skills" / f"data-request-{leaf}"
-          for leaf in (*RECORD_STAGES, "guardrails", "lookup", "map", "draft", "validate", "fix", "amend", "lift",
+          for leaf in (*RECORD_STAGES, "intake", "guardrails", "lookup", "map", "draft", "validate", "fix", "amend", "lift",
                        "triage")}
 
 

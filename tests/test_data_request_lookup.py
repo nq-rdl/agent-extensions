@@ -43,7 +43,7 @@ class LookupContract(unittest.TestCase):
                                "ICD-10-AM, ACHI, SNOMED CT", "pathology task",
                                "Forward", "Reverse", "short date window",
                                "rdl-ide-settings/snippets/SQL/", "R12/R13", "dataops",
-                               "analyst-intake.rst", "no separate intake skill"):
+                               "analyst-intake.rst", "data-request:intake"):
                     self.assertIn(phrase, text)
                 self.assertIn("https://github.com/nq-rdl/query-builder/issues/231", text)
                 self.assertIn("Read each very large table only through a temp table of keys", text)

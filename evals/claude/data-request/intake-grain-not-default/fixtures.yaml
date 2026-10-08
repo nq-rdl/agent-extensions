@@ -1,0 +1,289 @@
+pass:
+- name: correct answer
+  reply: 'The grain stays open for the requester.
+
+
+    ```yaml
+
+    grain: open
+
+    grain_owner: analyst
+
+    technical_note_recorded: ''no''
+
+    writes_scope: ''no''
+
+    needs_setup_first: ''no''
+
+    ```
+
+    '
+- name: comments and quotes
+  reply: '```yaml
+
+    grain: "open"  # Patient is the untouched default
+
+    grain_owner: analyst
+
+    technical_note_recorded: ''no''
+
+    writes_scope: ''no''
+
+    needs_setup_first: ''no''
+
+    ```
+
+    '
+fail:
+- name: wrong grain
+  reply: '```yaml
+
+    grain: wrong
+
+    grain_owner: analyst
+
+    technical_note_recorded: ''no''
+
+    writes_scope: ''no''
+
+    needs_setup_first: ''no''
+
+    ```
+
+    '
+  fails:
+  - grain
+- name: duplicate conflicting grain
+  reply: '```yaml
+
+    grain: open
+
+    grain_owner: analyst
+
+    technical_note_recorded: ''no''
+
+    writes_scope: ''no''
+
+    needs_setup_first: ''no''
+
+    grain: wrong
+
+    ```
+
+    '
+  fails:
+  - grain
+- name: wrong grain_owner
+  reply: '```yaml
+
+    grain: open
+
+    grain_owner: wrong
+
+    technical_note_recorded: ''no''
+
+    writes_scope: ''no''
+
+    needs_setup_first: ''no''
+
+    ```
+
+    '
+  fails:
+  - grain_owner
+- name: duplicate conflicting grain_owner
+  reply: '```yaml
+
+    grain: open
+
+    grain_owner: analyst
+
+    technical_note_recorded: ''no''
+
+    writes_scope: ''no''
+
+    needs_setup_first: ''no''
+
+    grain_owner: wrong
+
+    ```
+
+    '
+  fails:
+  - grain_owner
+- name: wrong technical_note_recorded
+  reply: '```yaml
+
+    grain: open
+
+    grain_owner: analyst
+
+    technical_note_recorded: wrong
+
+    writes_scope: ''no''
+
+    needs_setup_first: ''no''
+
+    ```
+
+    '
+  fails:
+  - technical_note_recorded
+- name: duplicate conflicting technical_note_recorded
+  reply: '```yaml
+
+    grain: open
+
+    grain_owner: analyst
+
+    technical_note_recorded: ''no''
+
+    writes_scope: ''no''
+
+    needs_setup_first: ''no''
+
+    technical_note_recorded: wrong
+
+    ```
+
+    '
+  fails:
+  - technical_note_recorded
+- name: wrong writes_scope
+  reply: '```yaml
+
+    grain: open
+
+    grain_owner: analyst
+
+    technical_note_recorded: ''no''
+
+    writes_scope: wrong
+
+    needs_setup_first: ''no''
+
+    ```
+
+    '
+  fails:
+  - writes_scope
+- name: duplicate conflicting writes_scope
+  reply: '```yaml
+
+    grain: open
+
+    grain_owner: analyst
+
+    technical_note_recorded: ''no''
+
+    writes_scope: ''no''
+
+    needs_setup_first: ''no''
+
+    writes_scope: wrong
+
+    ```
+
+    '
+  fails:
+  - writes_scope
+- name: wrong needs_setup_first
+  reply: '```yaml
+
+    grain: open
+
+    grain_owner: analyst
+
+    technical_note_recorded: ''no''
+
+    writes_scope: ''no''
+
+    needs_setup_first: wrong
+
+    ```
+
+    '
+  fails:
+  - needs_setup_first
+- name: duplicate conflicting needs_setup_first
+  reply: '```yaml
+
+    grain: open
+
+    grain_owner: analyst
+
+    technical_note_recorded: ''no''
+
+    writes_scope: ''no''
+
+    needs_setup_first: ''no''
+
+    needs_setup_first: wrong
+
+    ```
+
+    '
+  fails:
+  - needs_setup_first
+- name: copied default as confirmed
+  reply: '```yaml
+
+    grain: confirmed
+
+    grain_owner: analyst
+
+    technical_note_recorded: ''no''
+
+    writes_scope: ''no''
+
+    needs_setup_first: ''no''
+
+    ```
+
+    '
+  fails:
+  - grain
+- name: empty answer
+  reply: ''
+  fails:
+  - grain
+  - grain_owner
+  - technical_note_recorded
+  - writes_scope
+  - needs_setup_first
+- name: earlier correct block cannot override final answer
+  reply: '```yaml
+
+    grain: open
+
+    grain_owner: analyst
+
+    technical_note_recorded: ''no''
+
+    writes_scope: ''no''
+
+    needs_setup_first: ''no''
+
+    ```
+
+    ```yaml
+
+    grain: wrong
+
+    grain_owner: wrong
+
+    technical_note_recorded: wrong
+
+    writes_scope: wrong
+
+    needs_setup_first: wrong
+
+    ```
+
+    '
+  fails:
+  - grain
+  - grain_owner
+  - technical_note_recorded
+  - writes_scope
+  - needs_setup_first
