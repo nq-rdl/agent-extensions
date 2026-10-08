@@ -8,7 +8,7 @@ import tempfile
 import unittest
 from pathlib import Path
 
-from test_sql_review_scripts import Project, REPO, git, run, review_doc
+from test_sql_review_scripts import Project, REPO, git, run, review_doc, scope_doc, item
 
 SCRIPTS = REPO / "skills/data-request-setup/scripts"
 ADAPTER = '''#!/usr/bin/env bash
@@ -17,6 +17,15 @@ set -eu
 [ "$3" = --output ]
 cat payload > "$4"
 '''
+
+
+def committed(project):
+    """Commit fixture inputs when changed; retain HEAD for repeated reads."""
+    git(project.root, "add", "-A")
+    pending = subprocess.run(["git", "diff", "--cached", "--quiet"], cwd=project.root, capture_output=True)
+    if pending.returncode:
+        git(project.root, "commit", "-q", "-m", "fixture sources")
+    return git(project.root, "rev-parse", "HEAD").stdout.strip()
 
 
 class Sources(unittest.TestCase):
@@ -52,6 +61,196 @@ class Sources(unittest.TestCase):
                                cwd=self.p.root, env=env, capture_output=True, text=True)
             data = target.read_bytes() if target.is_file() else None
             return r, data
+
+    def publish_generated(self, payload=b"SELECT 1;\nSELECT 3;\n"):
+        self.generated(payload)
+        fp = json.loads(self.fingerprint().stdout)
+        doc = review_doc("sql__request", **fp,
+                         assumptions=[item("A1", "Retain this range", location={"lines": [2, 2]})],
+                         limitations=[], logic=[])
+        draft = self.p.write_json("sql__request", "review.draft.json", doc)
+        r = run(["publish", "sql__request", "review", str(draft)], self.p.root)
+        self.assertEqual(r.returncode, 0, r.stdout + r.stderr)
+        return draft, doc
+
+    def change_builder(self, payload):
+        (self.p.root / "payload").write_bytes(payload)
+        self.p.commit("builder update")
+
+    def test_two_commit_delta_and_impact_use_authenticated_renders(self):
+        self.publish_generated()
+        self.change_builder(b"SELECT 2;\nSELECT 3;\n")
+        with tempfile.TemporaryDirectory() as tmp:
+            for command, expected in (("delta", 10), ("impact", 0)):
+                r = run([command, "sql__request"], self.p.root, env={"TMPDIR": tmp})
+                self.assertEqual(r.returncode, expected, r.stdout + r.stderr)
+                if command == "delta":
+                    self.assertIn("-SELECT 1;", r.stdout)
+                    self.assertIn("+SELECT 2;", r.stdout)
+                self.assertEqual(list(Path(tmp).iterdir()), [])
+        self.assertEqual(list((self.p.root / ".sqlreview").rglob("*.sql")), [])
+
+    def test_shifted_remap_and_unchanged_range_carry_retain_confirmation(self):
+        draft, prior = self.publish_generated()
+        self.change_builder(b"SET NOCOUNT ON;\nSELECT 2;\nSELECT 3;\n")
+        doc = dict(prior, revision=2, **json.loads(self.fingerprint().stdout))
+        draft.write_text(json.dumps(doc))
+        r = run(["remap", "sql__request", str(draft)], self.p.root)
+        self.assertEqual(r.returncode, 0, r.stdout + r.stderr)
+        doc = json.loads(draft.read_text())
+        self.assertEqual(doc["assumptions"][0]["location"]["lines"], [3, 3])
+        r = run(["carryforward", "sql__request", "review", str(draft)], self.p.root)
+        self.assertEqual(r.returncode, 0, r.stdout + r.stderr)
+        row = json.loads(r.stdout)["carry"][0]
+        self.assertEqual(row["basis"], "lines-unchanged")
+        for key in ("confirmed_by", "confirmed_at", "confirmed_revision"):
+            self.assertEqual(row["set"][key], prior["assumptions"][0][key])
+        self.assertEqual(row["set"]["carried_from_revision"], 1)
+        doc["assumptions"][0].update(row["set"])
+        draft.write_text(json.dumps(doc))
+        r = run(["publish", "sql__request", "review", str(draft)], self.p.root)
+        self.assertEqual(r.returncode, 0, r.stdout + r.stderr)
+        self.assertEqual(list((self.p.root / ".sqlreview").rglob("*.sql")), [])
+
+    def test_corrupt_previous_hash_cannot_carry(self):
+        draft, doc = self.publish_generated()
+        final = draft.with_name("review.json")
+        doc["sql_sha256"] = "0" * 64
+        final.write_text(json.dumps(doc))
+        r = run(["carryforward", "sql__request", "review", str(draft)], self.p.root)
+        self.assertEqual(r.returncode, 6, r.stdout + r.stderr)
+        self.assertIn("full SHA mismatch", r.stderr)
+
+    def test_missing_commit_is_not_sql_absent(self):
+        draft, doc = self.publish_generated()
+        doc["git_commit"] = "f" * 40
+        doc["sql_provenance"]["commit"] = doc["git_commit"]
+        draft.with_name("review.json").write_text(json.dumps(doc))
+        for command in (["carryforward", "sql__request", "review", str(draft)],
+                        ["carryover", "sql__request", str(draft)], ["delta", "sql__request"]):
+            if command[0] == "carryover":
+                scope = scope_doc("sql__request", "sql/request.sql", sql_sha256=doc["sql_sha256"],
+                                  git_commit=doc["git_commit"])
+                self.p.write_json("sql__request", "scope.json", scope)
+            r = run(command, self.p.root)
+            self.assertEqual(r.returncode, 6, r.stdout + r.stderr)
+            self.assertNotIn("sql-absent", r.stdout)
+
+    def test_no_sql_scope_keeps_intent_carry(self):
+        self.p.commit()
+        doc = scope_doc("sql__request", "sql/request.sql", sql_sha256=None)
+        self.p.write_json("sql__request", "scope.json", doc)
+        draft = self.p.write_json("sql__request", "scope.draft.json", dict(doc, revision=2))
+        r = run(["carryforward", "sql__request", "scope", str(draft)], self.p.root)
+        self.assertEqual(r.returncode, 0, r.stdout + r.stderr)
+        self.assertEqual(json.loads(r.stdout)["carry"][0]["basis"], "sql-absent")
+        r = run(["delta", "sql__request"], self.p.root)
+        self.assertEqual(r.returncode, 6, r.stdout + r.stderr)
+
+    def test_changed_governed_lines_refused_at_publish(self):
+        draft, prior = self.publish_generated()
+        self.change_builder(b"SELECT 1;\nSELECT 4;\n")
+        doc = dict(prior, revision=2, **json.loads(self.fingerprint().stdout))
+        doc["assumptions"][0].update(carried_from_revision=1, carried_basis="lines-unchanged")
+        draft.write_text(json.dumps(doc))
+        before = draft.with_name("review.json").read_bytes()
+        r = run(["publish", "sql__request", "review", str(draft)], self.p.root)
+        self.assertEqual(r.returncode, 4, r.stdout + r.stderr)
+        self.assertIn("governed lines changed", r.stdout + r.stderr)
+        self.assertEqual(draft.with_name("review.json").read_bytes(), before)
+
+    def test_carry_historical_output_failure_stays_operational(self):
+        draft, _ = self.publish_generated()
+        with tempfile.TemporaryDirectory() as bindir, tempfile.TemporaryDirectory() as tmp:
+            shim = Path(bindir) / "cp"
+            shim.write_text(f'#!/bin/sh\ncase "$2" in */carry-base.sql) exit 1;; esac\nexec {shutil.which("cp")} "$@"\n')
+            shim.chmod(0o755)
+            r = run(["carryforward", "sql__request", "review", str(draft)], self.p.root,
+                    env={"PATH": bindir + os.pathsep + os.environ["PATH"], "TMPDIR": tmp})
+            self.assertEqual(r.returncode, 2, r.stdout + r.stderr)
+            self.assertEqual(list(Path(tmp).iterdir()), [])
+
+    def test_absence_git_failure_cannot_certify_no_sql(self):
+        self.p.commit()
+        doc = scope_doc("sql__request", "sql/request.sql", sql_sha256=None)
+        self.p.write_json("sql__request", "scope.json", doc)
+        draft = self.p.write_json("sql__request", "scope.draft.json", dict(doc, revision=2))
+        with tempfile.TemporaryDirectory() as bindir:
+            shim = Path(bindir) / "git"
+            shim.write_text(f'#!/bin/sh\ncase "$*" in *cat-file*) exit 2;; esac\nexec {shutil.which("git")} "$@"\n')
+            shim.chmod(0o755)
+            r = run(["carryforward", "sql__request", "scope", str(draft)], self.p.root,
+                    env={"PATH": bindir + os.pathsep + os.environ["PATH"]})
+            self.assertEqual(r.returncode, 2, r.stdout + r.stderr)
+            self.assertNotIn("sql-absent", r.stdout)
+
+    def test_fresh_reassessment_can_replace_unavailable_prior_evidence(self):
+        draft, prior = self.publish_generated()
+        final = draft.with_name("review.json")
+        broken = dict(prior, sql_sha256="0" * 64)
+        final.write_text(json.dumps(broken))
+        doc = dict(prior, revision=2)
+        doc["assumptions"][0].update(confirmed_revision=2)
+        draft.write_text(json.dumps(doc))
+        r = run(["publish", "sql__request", "review", str(draft)], self.p.root)
+        self.assertEqual(r.returncode, 0, r.stdout + r.stderr)
+        self.assertEqual(json.loads(final.read_text())["revision"], 2)
+
+    def test_scope_delta_selector_uses_scope_with_existing_review(self):
+        self.generated(b"SELECT 1;\n")
+        fp = json.loads(self.fingerprint().stdout)
+        scope = scope_doc("sql__request", **fp)
+        self.p.write_json("sql__request", "scope.json", scope)
+        self.change_builder(b"SELECT 2;\n")
+        self.p.write_json("sql__request", "review.json", review_doc("sql__request", **json.loads(self.fingerprint().stdout)))
+        r = run(["delta", "sql__request"], self.p.root)
+        self.assertEqual(r.returncode, 0, r.stdout + r.stderr)
+        r = run(["delta", "sql__request", "scope"], self.p.root)
+        self.assertEqual(r.returncode, 10, r.stdout + r.stderr)
+        self.assertIn("-SELECT 1;", r.stdout)
+        self.assertIn("+SELECT 2;", r.stdout)
+
+    def test_moved_path_delta_refuses_binding_without_fabricated_diff(self):
+        self.publish_generated()
+        r = run(["move", "sql/request.sql", "sql/new.sql"], self.p.root)
+        self.assertEqual(r.returncode, 0, r.stdout + r.stderr)
+        for command in ("delta", "impact"):
+            r = run([command, "sql__new"], self.p.root)
+            self.assertEqual(r.returncode, 10, r.stdout + r.stderr)
+            self.assertIn("requires reassessment", r.stdout)
+            self.assertNotIn("sha256=", r.stdout)
+            self.assertNotIn("SELECT", r.stdout)
+
+    def test_remap_signal_cleanup_keeps_published_and_draft_inputs(self):
+        draft, _ = self.publish_generated()
+        before = draft.read_bytes()
+        final = draft.with_name("review.json")
+        published = final.read_bytes()
+        with tempfile.TemporaryDirectory() as bindir, tempfile.TemporaryDirectory() as tmp:
+            shim = Path(bindir) / "diff"
+            shim.write_text('#!/bin/sh\nkill -TERM "$PPID"\nexit 2\n')
+            shim.chmod(0o755)
+            r = run(["remap", "sql__request", str(draft)], self.p.root,
+                    env={"PATH": bindir + os.pathsep + os.environ["PATH"], "TMPDIR": tmp})
+            self.assertNotEqual(r.returncode, 0)
+            self.assertEqual(draft.read_bytes(), before)
+            self.assertEqual(final.read_bytes(), published)
+            self.assertEqual(list(Path(tmp).iterdir()), [])
+        self.assertEqual(list((self.p.root / ".sqlreview").rglob("*.sql")), [])
+
+    def test_remap_concurrent_input_change_refused(self):
+        draft, _ = self.publish_generated()
+        self.change_builder(b"-- shifted\nSELECT 1;\nSELECT 3;\n")
+        with tempfile.TemporaryDirectory() as bindir, tempfile.TemporaryDirectory() as tmp:
+            shim = Path(bindir) / "diff"
+            shim.write_text(f'#!/bin/sh\nprintf "concurrent work" > "{draft}"\nexec {shutil.which("diff")} "$@"\n')
+            shim.chmod(0o755)
+            r = run(["remap", "sql__request", str(draft)], self.p.root,
+                    env={"PATH": bindir + os.pathsep + os.environ["PATH"], "TMPDIR": tmp})
+            self.assertEqual(r.returncode, 2, r.stdout + r.stderr)
+            self.assertIn("inputs changed", r.stderr)
+            self.assertEqual(draft.read_text(), "concurrent work")
+            self.assertEqual(list(Path(tmp).iterdir()), [])
 
     def test_auth_distinguishes_missing_evidence_from_operational_output_failure(self):
         head = self.generated()

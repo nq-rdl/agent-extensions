@@ -123,17 +123,17 @@ class GrainRendering(unittest.TestCase):
                 sql = p.sql("q.sql", "select admission_id from admissions;\n")
                 original_sql = sql.read_bytes()
                 p.commit()
-                sha = json.loads(invoke("fingerprint", "q.sql"))["sql_sha256"]
+                fp = json.loads(invoke("fingerprint", "q.sql"))
                 grain = item("A-grain", "One row per admission.",
                              rationale="Prior delivery admissions.csv at v1.0.0 uses admission keys.")
-                doc = review_doc("q", "q.sql", sql_sha256=sha, grain="one row per admission",
+                doc = review_doc("q", **fp, grain="one row per admission",
                                  assumptions=[grain], limitations=[], open_questions=[])
                 draft = p.write_json("q", "review.draft.json", doc)
                 invoke("publish", "q", "review", str(draft))
                 invoke("snapshot", "q", "q.sql")
                 prior_bytes = (draft.parent / "review.json").read_bytes()
                 for revision, change in ((2, "add drift"), (3, "retire drift"), (4, "change grain")):
-                    self.assertIn("unchanged since the reviewed snapshot", invoke("delta", "q"))
+                    self.assertIn("unchanged since the reviewed source", invoke("delta", "q"))
                     doc["revision"] = revision
                     doc["changes"].append({"revision": revision, "at": "2026-09-30T10:00:00Z",
                                            "by": "engineer-login", "summary": change})
@@ -179,9 +179,9 @@ class GrainRendering(unittest.TestCase):
                     self.assertEqual(rendered.count("L-grain-answers"), int(change == "add drift"))
                     self.assertIn(doc["grain"], rendered)
                     self.assertEqual(sql.read_bytes(), original_sql)
-                    self.assertEqual((draft.parent / "source.sql").read_bytes(), original_sql)
-                self.assertEqual(sorted(f.name for f in (draft.parent / "history").iterdir()),
-                                 ["1.sql", "2.sql", "3.sql", "4.sql"])
+                    self.assertEqual(list((p.root / ".sqlreview").rglob("*.sql")), [])
+                self.assertEqual(sorted(f.name for f in (draft.parent / "history" / "review").iterdir()),
+                                 ["1.json", "2.json", "3.json"])
 
     def test_confirmed_patient_admission_presentation_and_finer_detail_are_visible_and_carry_once(self):
         for tree in TREES:
@@ -213,6 +213,7 @@ class GrainRendering(unittest.TestCase):
                     d = scope_doc(sql_sha256=None, assumptions=[])
                     draft = p.write_json(d["slug"], "scope.draft.json", d)
                     draft.write_text(invoke("intake", str(source), "1", str(draft)))
+                    p.commit()
                     invoke("publish", d["slug"], "scope", str(draft))
                     invoke("render", d["slug"], "scope")
                     rendered = (draft.parent / "scope.md").read_text()
@@ -264,6 +265,7 @@ class GrainRendering(unittest.TestCase):
                          "confirmed_at": "2026-09-29T10:00:00Z", "confirmed_revision": 1}
                 d = scope_doc(sql_sha256=None, assumptions=[grain], limitations=[drift])
                 draft = p.write_json(d["slug"], "scope.draft.json", d)
+                p.commit()
                 invoke("publish", d["slug"], "scope", str(draft))
                 d["revision"] = 2
                 draft.write_text(json.dumps(d))

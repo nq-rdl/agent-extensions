@@ -11,6 +11,8 @@ import json
 import tempfile
 import unittest
 
+from test_sql_review_sources import committed
+
 try:  # `unittest discover -s tests` puts tests/ on sys.path; `-m unittest tests.x` does not
     from test_sql_review_scripts import SQL_V1, Project, item, review_doc, run, scope_doc
 except ModuleNotFoundError:
@@ -124,6 +126,9 @@ class Base(unittest.TestCase):
         self.draft = self.d / "draft.json"
 
     def publish(self, doc, *flags, expected=0):
+        commit = committed(self.p)
+        if doc.get("sql_sha256"):
+            doc = dict(doc, git_commit=commit, git_dirty=False)
         self.draft.write_text(json.dumps(doc))
         r = run(["publish", *flags, "q", doc["kind"], str(self.draft)], self.p.root)
         self.assertEqual(r.returncode, expected, r.stdout + r.stderr)
@@ -138,6 +143,7 @@ class Base(unittest.TestCase):
         return r
 
     def carryforward(self, kind, doc, expected=0):
+        committed(self.p)
         self.draft.write_text(json.dumps(doc))
         r = run(["carryforward", "q", kind, str(self.draft)], self.p.root)
         self.assertEqual(r.returncode, expected, r.stdout + r.stderr)
@@ -145,7 +151,7 @@ class Base(unittest.TestCase):
 
 
 class ReviewPublish(Base):
-    """Review revisions: prior review.json + source.sql (written by snapshot after publish)."""
+    """Review revisions: prior review.json + authenticated immutable source."""
 
     def review(self, revision, sql=SQL_V1, **over):
         return review_doc("q", "q.sql", revision=revision, sql_sha256=sha(sql), **over)
@@ -227,19 +233,25 @@ class ReviewPublish(Base):
         self.refused(self.review(2, assumptions=[carried(a1, 2), carried(a2, 2), carried(dict(l1, id="A3"), 2)],
                                  limitations=[]), "A3")
 
-    def test_baseline_that_disagrees_with_the_prior_sha_is_not_evidence(self):
+    def test_corrupt_previous_hash_cannot_carry(self):
         self.edit(UNRELATED_EDIT)
-        (self.d / "source.sql").write_text(UNRELATED_EDIT)  # not the bytes revision 1 recorded
+        prior = json.loads((self.d / "review.json").read_text())
+        prior["sql_sha256"] = "0" * 64
+        (self.d / "review.json").write_text(json.dumps(prior))
         a1, a2 = self.v1["assumptions"]
         l1, = self.v1["limitations"]
-        self.refused(self.rev2(fresh(a1, 2), carried(a2, 2), fresh(l1, 2), UNRELATED_EDIT), "A2")
+        r = self.publish(self.rev2(fresh(a1, 2), carried(a2, 2), fresh(l1, 2), UNRELATED_EDIT), expected=6)
+        self.assertIn("full SHA mismatch", r.stderr)
 
-    def test_missing_baseline_refuses_located_items_after_an_edit(self):
+    def test_missing_commit_refuses_located_items_after_an_edit(self):
         self.edit(UNRELATED_EDIT)
-        (self.d / "source.sql").unlink()
+        prior = json.loads((self.d / "review.json").read_text())
+        prior["git_commit"] = "f" * 40
+        (self.d / "review.json").write_text(json.dumps(prior))
         a1, a2 = self.v1["assumptions"]
         l1, = self.v1["limitations"]
-        self.refused(self.rev2(fresh(a1, 2), carried(a2, 2), fresh(l1, 2), UNRELATED_EDIT), "A2")
+        r = self.publish(self.rev2(fresh(a1, 2), carried(a2, 2), fresh(l1, 2), UNRELATED_EDIT), expected=6)
+        self.assertIn("commit unavailable", r.stderr)
 
     def test_chained_carry_keeps_the_original_confirmation(self):
         a1, a2 = self.v1["assumptions"]
@@ -270,7 +282,7 @@ class ReviewPublish(Base):
 
 
 class ScopePublish(Base):
-    """Scope revisions: prior scope.json + scope.source.sql (copied by bootstrap after publish)."""
+    """Scope revisions: prior scope.json + authenticated immutable source."""
 
     def scope(self, revision, sql=SQL_V1, **over):
         return scope_doc("q", "q.sql", revision=revision, sql_sha256=sha(sql) if sql else None, **over)
@@ -278,8 +290,6 @@ class ScopePublish(Base):
     def publish_v1(self, sql=SQL_V1):
         self.v1 = items_v1()
         self.publish(self.scope(1, sql=sql, **self.v1))
-        if sql is not None:
-            (self.d / "scope.source.sql").write_text(sql)
 
     def test_line_shift_and_unrelated_edit_carry(self):
         self.publish_v1()
@@ -299,14 +309,17 @@ class ScopePublish(Base):
                                                                     carried(a2, 2)],
                                 limitations=[carried(l1, 2)]))
 
-    def test_baseline_sha_disagreement_is_refused(self):
+    def test_recorded_scope_sha_disagreement_is_refused(self):
         self.publish_v1()
-        (self.d / "scope.source.sql").write_text(UNRELATED_EDIT)
+        prior = json.loads((self.d / "scope.json").read_text())
+        prior["sql_sha256"] = "0" * 64
+        (self.d / "scope.json").write_text(json.dumps(prior))
         self.sql.write_text(UNRELATED_EDIT)
         a1, a2 = self.v1["assumptions"]
         l1, = self.v1["limitations"]
-        self.refused(self.scope(2, sql=UNRELATED_EDIT, assumptions=[fresh(a1, 2), carried(a2, 2)],
-                                limitations=[fresh(l1, 2)]), "A2")
+        r = self.publish(self.scope(2, sql=UNRELATED_EDIT, assumptions=[fresh(a1, 2), carried(a2, 2)],
+                                   limitations=[fresh(l1, 2)]), expected=6)
+        self.assertIn("full SHA mismatch", r.stderr)
 
     def test_scope_written_before_the_sql_carries_null_location_items(self):
         self.sql.unlink()
@@ -372,6 +385,7 @@ class CarryForwardHelper(Base):
                                                     "confirmed_at": "2026-09-23T00:00:00Z", "confirmed_revision": 2}))
         bad = json.loads(json.dumps(doc))
         bad["assumptions"][0].update(out["carry"][0]["set"])  # A1 was offered in bulk, not carried
+        bad["git_commit"] = committed(self.p)
         self.draft.write_text(json.dumps(bad))
         r = run(["publish", "q", "review", str(self.draft)], self.p.root)
         self.assertEqual(r.returncode, 4, r.stdout + r.stderr)

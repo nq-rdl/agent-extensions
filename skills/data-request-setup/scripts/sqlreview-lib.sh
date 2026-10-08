@@ -314,3 +314,37 @@ sr_state_reason() { # <slug> <state>
   esac
   printf '%s\n' "$why"
 }
+
+# Private consumer inputs must never live within the repository, even with a local TMPDIR.
+sr_source_workspace() (
+  sr_source_context || exit 2
+  umask 077
+  local work
+  work="$(mktemp -d "${TMPDIR:-/tmp}/sqlreview-inputs.XXXXXX")" || exit 2
+  case "$(cd "$work" && pwd -P)" in "$SR_SOURCE_TOP"|"$SR_SOURCE_TOP"/*)
+    rm -rf "$work"; sr_source_error "temporary inputs must be outside the git tree"; exit 2 ;;
+  esac
+  printf '%s\n' "$work"
+)
+
+# Authenticated absence means HEAD has neither a maintained source nor a declared
+# generated path. This is only used for a scope whose recorded hash is null.
+sr_source_path_absent() {
+  local commit manifest path entry status
+  sr_source_context || return 2
+  commit="$(git -C "$SR_SOURCE_TOP" rev-parse --verify "$1^{commit}")" || return 2
+  path="${SR_SOURCE_PREFIX:+$SR_SOURCE_PREFIX/}$2"
+  git -C "$SR_SOURCE_TOP" cat-file -e "$commit:$path" 2>/dev/null && return 1
+  [ "$?" = 128 ] || return 2
+  manifest="${SR_SOURCE_PREFIX:+$SR_SOURCE_PREFIX/}sql/provenance.json"
+  if git -C "$SR_SOURCE_TOP" cat-file -e "$commit:$manifest" 2>/dev/null; then
+    entry="$(git -C "$SR_SOURCE_TOP" show "$commit:$manifest")" || return 2
+    printf '%s' "$entry" | jq -e --arg p "$2" '.schema == 1 and (.requests | type == "object") and (.requests | has($p) | not)' >/dev/null || {
+      status=$?
+      case "$status" in 1|4|5) return 1 ;; *) return 2 ;; esac
+    }
+  else
+    [ "$?" = 128 ] || return 2
+  fi
+  return 0
+}

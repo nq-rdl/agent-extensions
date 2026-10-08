@@ -29,7 +29,7 @@
 #                                              uses authenticated gh GETs; unavailable evidence is unknown, never absent
 #   fingerprint SQL                            fresh clean-HEAD render: hashes, commit, git_dirty:false, sql_provenance
 #   snapshot SLUG SQL                          verify final review against committed renders; no SQL writes
-#   delta SLUG                                 body binding + full hashes; exit 0 full/header-only, 10 body change, 6 no baseline
+#   delta SLUG [scope|review]                  body binding + full hashes; exit 0 full/header-only, 10 body change, 6 no baseline
 #   carryover SLUG DRAFT                       review draft items matching confirmed, still-valid scope items (JSON)
 #   intake FILE REVISION [DRAFT]              read analyst answers sidecar; optional collision-safe scope draft merge
 #                                              missing FILE is a legacy no-op; invalid intake exits 4; never writes
@@ -516,7 +516,11 @@ cmd_publish() (
   fi
   if [ "$header_only" = false ] && [ "$already" = false ]; then
     jq -e --argjson previous "$previous" '.revision == ($previous + 1)' "$tmp" >/dev/null || sr_die 4 "revision must follow the existing document (first revision is 1)"
+    local needs_carry=false
     if [ "$kind" != lifts ]; then
+      needs_carry="$(jq -r 'any((.assumptions[], .limitations[]); .carried_from_revision != null)' "$tmp")" || sr_die 2 "cannot inspect carried confirmations"
+    fi
+    if [ "$needs_carry" = true ]; then
       # A carried confirmation must be proved from the prior revision and its SQL.
       local violations
       _carry_context "$slug" "$kind" "$rel"
@@ -657,21 +661,27 @@ cmd_snapshot() (
 # ---------------------------------------------------------------------------------------------
 # Shared by delta and impact: sets SR_BASE, SR_CUR, SR_SQL_PATH; returns 0 unchanged, 10 changed.
 _delta_prepare() {
-  local slug="$1" doc
+  local slug="$1" kind="${2:-}" doc
   sr_need_jq
   sr_require_root
   sr_safe_slug "$slug"
   [ -d "$SR_REVIEWS/$slug" ] || sr_die 2 "no review directory for slug '$slug'"
-  doc="$(sr_doc_for "$slug")" || sr_die 2 "reviews/$slug/ has no review.json or scope.json"
+  if [ -n "$kind" ]; then
+    case "$kind" in scope|review) ;; *) usage ;; esac
+    doc="$SR_REVIEWS/$slug/$kind.json"
+    sr_no_symlinks "$doc" || exit 2
+    [ -f "$doc" ] || sr_die 6 "no published $kind source evidence"
+  else
+    doc="$(sr_doc_for "$slug")" || sr_die 2 "reviews/$slug/ has no review.json or scope.json"
+  fi
   cmd_check "$doc" >/dev/null || sr_die 4 "invalid document"
   SR_SQL_PATH="$(jq -r '.sql_path // ""' "$doc")"
   sr_safe_sql "$SR_SQL_PATH"
-  SR_BASE="$SR_REVIEWS/$slug/source.sql"
-  SR_CUR="$SR_ROOT/$SR_SQL_PATH"
-  sr_no_symlinks "$SR_BASE" || exit 2
-  [ -f "$SR_BASE" ] || sr_die 6 "no baseline: reviews/$slug/source.sql is missing, so there is nothing to diff against — run a full /data-request:analyse (it records the snapshot)"
-  [ -f "$SR_CUR" ] || sr_die 2 "the reviewed SQL no longer exists: $SR_SQL_PATH (moved? see: sqlreview.sh move)"
-  [ ! -f "$SR_REVIEWS/$slug/rebind-required" ] || return 10
+  SR_BASE="$work/base.sql"
+  SR_CUR="$work/current.sql"
+  sr_source_auth "$doc" "$SR_BASE" || exit $?
+  sr_source_clean || exit 2
+  sr_source_render HEAD "$SR_SQL_PATH" "$SR_CUR" || exit 2
   local binding
   sr_binding "$doc" "$SR_CUR" "$SR_BASE"; binding=$?
   [ "$binding" = 10 ] && { printf 'header-only revision; SQL body unchanged\n'; return 0; }
@@ -679,23 +689,40 @@ _delta_prepare() {
   return 10
 }
 
-cmd_delta() {
-  [ $# -eq 1 ] || usage
-  local rc
-  _delta_prepare "$1"; rc=$?
+cmd_delta() (
+  [ $# -eq 1 ] || [ $# -eq 2 ] || usage
+  local rc work
+  case "${2:-}" in ""|scope|review) ;; *) usage ;; esac
+  sr_require_root
+  sr_safe_slug "$1"
+  if [ -f "$SR_REVIEWS/$1/rebind-required" ]; then
+    printf 'SQL path moved; binding requires reassessment before comparison\n'; return 10
+  fi
+  work="$(sr_source_workspace)" || exit 2
+  trap 'rm -rf "$work"' EXIT
+  trap 'exit 2' HUP INT TERM
+  _delta_prepare "$@"; rc=$?
   printf 'baseline_sha256=%s current_sha256=%s sql_path=%s\n' "$(sr_sha256 "$SR_BASE")" "$(sr_sha256 "$SR_CUR")" "$SR_SQL_PATH"
   if [ "$rc" -eq 0 ] && cmp -s "$SR_BASE" "$SR_CUR"; then
-    printf 'unchanged since the reviewed snapshot\n'; return 0
+    printf 'unchanged since the reviewed source\n'; return 0
   fi
   local diff_rc
-  diff -u -L "reviewed (reviews/$1/source.sql)" -L "current ($SR_SQL_PATH)" "$SR_BASE" "$SR_CUR"; diff_rc=$?
-  [ "$diff_rc" -le 1 ] || sr_die 2 "cannot diff the reviewed snapshot against current SQL"
+  diff -u -L "reviewed ($1 recorded source)" -L "current ($SR_SQL_PATH)" "$SR_BASE" "$SR_CUR"; diff_rc=$?
+  [ "$diff_rc" -le 1 ] || sr_die 2 "cannot diff the reviewed source against current SQL"
   return "$rc"
-}
+)
 
-cmd_impact() {
+cmd_impact() (
   [ $# -eq 1 ] || usage
-  local rc changed idents ident
+  local rc changed idents ident work diff_rc
+  sr_require_root
+  sr_safe_slug "$1"
+  if [ -f "$SR_REVIEWS/$1/rebind-required" ]; then
+    printf 'SQL path moved; binding requires reassessment before comparison\n'; return 10
+  fi
+  work="$(sr_source_workspace)" || exit 2
+  trap 'rm -rf "$work"' EXIT
+  trap 'exit 2' HUP INT TERM
   _delta_prepare "$1"; rc=$?
   if [ "$rc" -eq 0 ]; then
     if cmp -s "$SR_BASE" "$SR_CUR"; then
@@ -708,15 +735,17 @@ cmd_impact() {
   printf '# impact hints — HEURISTIC. Identifiers that appear in the changed lines, traced to unchanged lines\n'
   printf '# that mention them. This suggests where to look; it does not prove anything unaffected. Every\n'
   printf '# assumption and limitation is reassessed on an update regardless of this list.\n'
+  diff -u "$SR_BASE" "$SR_CUR" > "$work/diff"; diff_rc=$?
+  [ "$diff_rc" -le 1 ] || sr_die 2 "cannot diff the reviewed source against current SQL"
   # Line numbers (in the current file) that belong to the diff hunks.
-  changed="$(diff -u "$SR_BASE" "$SR_CUR" | awk '
+  changed="$(awk '
     /^@@/ { split($3, p, ","); n = substr(p[1], 2) + 0; next }
     /^\+\+\+/ || /^---/ { next }
     /^\+/ { print n; n++; next }
     /^-/ { next }
-    { n++ }')"
+    { n++ }' "$work/diff")"
   # Identifiers on added/removed lines, minus SQL keywords and common functions.
-  idents="$(diff -u "$SR_BASE" "$SR_CUR" | awk '/^[+-]/ && !/^(\+\+\+|---)/' | sed 's/^[+-]//' \
+  idents="$(awk '/^[+-]/ && !/^(\+\+\+|---)/' "$work/diff" | sed 's/^[+-]//' \
     | tr -c 'A-Za-z0-9_\n' '\n' | grep -E '^[A-Za-z_][A-Za-z0-9_]*$' | sort -u \
     | grep -Eivx 'select|from|where|join|left|right|inner|outer|full|cross|on|as|with|group|by|order|having|limit|offset|and|or|not|null|is|in|exists|between|like|case|when|then|else|end|union|all|distinct|count|sum|min|max|avg|coalesce|cast|over|partition|asc|desc|true|false|into|insert|update|delete|set|values|create|table|view|temp|temporary|if|top|using|natural|except|intersect|fetch|first|next|rows|only|int|integer|varchar|text|date|timestamp|numeric|decimal|boolean' || true)"
   for ident in $idents; do
@@ -727,7 +756,7 @@ cmd_impact() {
     done
   done
   return 0
-}
+)
 
 # ---------------------------------------------------------------------------------------------
 # Which review-draft items restate a confirmed item of the current scope revision (same list, same
@@ -787,40 +816,23 @@ cmd_intake() {
   fi
 }
 
-cmd_carryover() {
+cmd_carryover() (
   [ $# -eq 2 ] || usage
   sr_need_jq
   sr_require_root
-  local slug="$1" draft="$2" scope base sql cur scope_sha="" base_sha="" cur_sha="" have_base=false
-  local body_same=false before_sql=false
+  local slug="$1" draft="$2" scope base sql cur scope_sha cur_sha have_base body_same before_sql work
   sr_safe_slug "$slug"
   [ -f "$draft" ] || sr_die 2 "no such draft: $draft"
   jq -e 'type == "object"' "$draft" >/dev/null 2>&1 || sr_die 4 "invalid JSON: $draft"
-  scope="$SR_REVIEWS/$slug/scope.json"
-  base="$SR_REVIEWS/$slug/scope.source.sql"
-  sr_no_symlinks "$scope" || exit 2
-  sr_no_symlinks "$base" || exit 2
-  if [ -f "$scope" ]; then
-    cmd_check "$scope" >/dev/null || sr_die 4 "scope.json is invalid; see sqlreview.sh check"
-    sql="$(jq -r .sql_path "$scope")"
-    scope_sha="$(jq -r '.sql_sha256 // "" | strings' "$scope")"
-  else
-    scope=/dev/null  # nothing to carry over: every draft item is walked
-    sql="$(jq -r '.sql_path // "" | strings' "$draft")"
-  fi
-  if [ -n "$sql" ]; then
-    sr_safe_sql "$sql"
-    cur="$SR_ROOT/$sql"
-    [ -f "$cur" ] && cur_sha="$(sr_sha256 "$cur")"
-  fi
-  if [ "$scope" != /dev/null ] && [ -f "$base" ]; then
-    base_sha="$(sr_sha256 "$base")"
-    # A baseline that disagrees with the SHA the scope recorded is not evidence of anything.
-    if [ -z "$scope_sha" ] || [ "$scope_sha" = "$base_sha" ]; then have_base=true; scope_sha="$base_sha"; fi
-  fi
-  # Scope-first: framed and confirmed before any SQL existed, so there is no SQL to compare with.
-  if [ "$scope" != /dev/null ] && [ -z "$scope_sha" ] && [ ! -f "$base" ]; then before_sql=true; fi
-  if [ "$have_base" = true ] && [ -n "$cur_sha" ] && sr_body_same "$base" "$cur"; then body_same=true; fi
+  sql="$(jq -r '.sql_path // "" | strings' "$draft")"
+  sr_safe_sql "$sql"
+  work="$(sr_source_workspace)" || exit 2
+  trap 'rm -rf "$work"' EXIT
+  trap 'exit 2' HUP INT TERM
+  _carry_context "$slug" scope "$sql"
+  scope="$CF_PRIOR" base="$CF_BASE" cur="$CF_CUR"
+  scope_sha="$CF_PRIOR_SHA" cur_sha="$CF_CUR_SHA" have_base="$CF_HAVE_BASE"
+  body_same="$CF_BODY_SAME" before_sql="$CF_PRIOR_ABSENT"
   jq -n --slurpfile scope "$scope" --slurpfile draft "$draft" \
     --rawfile base "$([ "$have_base" = true ] && echo "$base" || echo /dev/null)" \
     --rawfile cur "$([ -n "$cur_sha" ] && echo "$cur" || echo /dev/null)" \
@@ -850,33 +862,47 @@ cmd_carryover() {
        carry_over_intent: [$rows[] | select(.basis == "scope-before-sql" or .basis == "intent-unchanged")],
        walk: [$rows[] | select(.basis == null) | {kind, id, why}
               + (if has("decided") then {decided} else {} end)]}'
-}
+)
 
 # ---------------------------------------------------------------------------------------------
 # Evidence for carrying scope/review confirmations forward (#348), shared by publish and
-# carryforward. The previous published <kind>.json is the prior revision; its baseline is the SQL
-# bytes recorded after that publish (analyse: snapshot → source.sql; bootstrap: scope.source.sql),
-# counted only when its SHA256 equals the prior document's sql_sha256 (when it recorded one).
+# carryforward. The previous published <kind>.json is the prior revision; its immutable source
+# is reconstructed and authenticated against the full recorded SHA before any comparison.
 # Sets CF_KIND, CF_PRIOR, CF_BASE, CF_CUR (a path or /dev/null), CF_HAVE_BASE, CF_HAVE_CUR, CF_PRIOR_SHA,
 # CF_CUR_SHA and CF_BODY_SAME (baseline and current SQL differ at most in the leading comment header, #366).
 _carry_context() { # <slug> <scope|review> <sql_path>
-  local d="$SR_REVIEWS/$1" base_sha
-  CF_KIND="$2" CF_PRIOR=/dev/null CF_CUR=/dev/null CF_HAVE_BASE=false CF_HAVE_CUR=false CF_PRIOR_SHA="" CF_CUR_SHA=""
-  CF_BODY_SAME=false
-  if [ "$2" = review ]; then CF_BASE="$d/source.sql"; else CF_BASE="$d/scope.source.sql"; fi
+  local d="$SR_REVIEWS/$1" absent=1
+  CF_KIND="$2" CF_PRIOR=/dev/null CF_BASE=/dev/null CF_CUR=/dev/null
+  CF_HAVE_BASE=false CF_HAVE_CUR=false CF_PRIOR_SHA="" CF_CUR_SHA=""
+  CF_BODY_SAME=false CF_PRIOR_ABSENT=false CF_CUR_ABSENT=false
   sr_no_symlinks "$d/$2.json" || exit 2
-  sr_no_symlinks "$CF_BASE" || exit 2
   if [ -f "$d/$2.json" ]; then
     cmd_check "$d/$2.json" >/dev/null || sr_die 4 "existing $2.json is invalid; see sqlreview.sh check"
     CF_PRIOR="$d/$2.json"
     CF_PRIOR_SHA="$(jq -r '.sql_sha256 // "" | strings' "$CF_PRIOR")"
+    if [ "$2" = scope ] && [ -z "$CF_PRIOR_SHA" ]; then
+      CF_PRIOR_ABSENT=true
+    else
+      CF_BASE="$work/carry-base.sql"
+      sr_source_auth "$CF_PRIOR" "$CF_BASE" || exit $?
+      CF_HAVE_BASE=true
+    fi
   fi
-  if [ -f "$SR_ROOT/$3" ]; then CF_CUR="$SR_ROOT/$3"; CF_HAVE_CUR=true; CF_CUR_SHA="$(sr_sha256 "$CF_CUR")"; fi
-  if [ "$CF_PRIOR" != /dev/null ] && [ -f "$CF_BASE" ]; then
-    base_sha="$(sr_sha256 "$CF_BASE")"
-    if [ -z "$CF_PRIOR_SHA" ] || [ "$CF_PRIOR_SHA" = "$base_sha" ]; then CF_HAVE_BASE=true; CF_PRIOR_SHA="$base_sha"; fi
+  sr_source_clean || exit 2
+  # Only a scope explicitly framed before SQL may treat a committed undeclared path
+  # as absent. Missing historical evidence above always fails authentication.
+  if [ "$CF_PRIOR_ABSENT" = true ] || { [ "$CF_KIND" = scope ] && [ "$CF_PRIOR" = /dev/null ]; }; then
+    sr_source_path_absent HEAD "$3"; absent=$?
   fi
-  [ "$CF_HAVE_BASE" = true ] || CF_BASE=/dev/null
+  [ "$absent" -le 1 ] || exit 2
+  if [ "$absent" = 0 ]; then
+    CF_CUR_ABSENT=true
+  else
+    CF_CUR="$work/carry-current.sql"
+    sr_source_render HEAD "$3" "$CF_CUR" || exit 2
+    CF_HAVE_CUR=true
+    CF_CUR_SHA="$(sr_sha256 "$CF_CUR")" || exit 2
+  fi
   if [ "$CF_HAVE_BASE" = true ] && [ "$CF_HAVE_CUR" = true ] && sr_body_same "$CF_BASE" "$CF_CUR"; then CF_BODY_SAME=true; fi
 }
 
@@ -886,18 +912,21 @@ _carry_jq() { # <draft> <filter> [jq options...]
   shift 2
   jq -r -L "$SR_SCRIPT_DIR" "$@" --slurpfile prior "$CF_PRIOR" --rawfile base "$CF_BASE" --rawfile cur "$CF_CUR" \
     --argjson have_base "$CF_HAVE_BASE" --argjson have_cur "$CF_HAVE_CUR" --arg prior_sha "$CF_PRIOR_SHA" --arg cur_sha "$CF_CUR_SHA" \
-    --argjson body_same "$CF_BODY_SAME" --arg cf_kind "$CF_KIND" \
+    --argjson body_same "$CF_BODY_SAME" --argjson prior_absent "$CF_PRIOR_ABSENT" --argjson cur_absent "$CF_CUR_ABSENT" --arg cf_kind "$CF_KIND" \
     "include \"sqlreview-carry\";
      {kind: \$cf_kind, prior: \$prior[0], base: (if \$have_base then \$base else null end), cur: (if \$have_cur then \$cur else null end),
-      prior_sha: \$prior_sha, cur_sha: \$cur_sha, body_unchanged: \$body_same} as \$ctx | $filter" "$draft"
+      prior_sha: \$prior_sha, cur_sha: \$cur_sha, prior_absent: \$prior_absent, cur_absent: \$cur_absent, body_unchanged: \$body_same} as \$ctx | $filter" "$draft"
 }
 
 # Which draft items may keep the confirmation of the previous published revision (#348). Read-only.
-cmd_carryforward() {
+cmd_carryforward() (
   [ $# -eq 3 ] || usage
   sr_need_jq
   sr_require_root
-  local slug="$1" kind="$2" draft="$3" sql
+  local slug="$1" kind="$2" draft="$3" sql work
+  work="$(sr_source_workspace)" || exit 2
+  trap 'rm -rf "$work"' EXIT
+  trap 'exit 2' HUP INT TERM
   sr_safe_slug "$slug"
   case "$kind" in scope|review) ;; *) usage ;; esac
   [ -f "$draft" ] || sr_die 2 "no such draft: $draft"
@@ -914,7 +943,7 @@ cmd_carryforward() {
        carry: [$rows[] | select(.basis != null) | {kind, id, basis, set}],
        bulk: [$rows[] | select(.basis == null and .bulk) | {kind, id, text, rationale, location, why}],
        walk: [$rows[] | select(.basis == null and (.bulk | not)) | {kind, id, why}]}' --arg document "$kind"
-}
+)
 
 # Draft range plumbing only: diff authentic baseline bytes against frozen current SQL.
 # Match ranges by published item id/logic step, so retries cannot apply an offset twice.
@@ -922,7 +951,7 @@ cmd_remap() (
   [ $# -ge 1 ] && [ $# -le 2 ] || usage
   sr_need_jq
   sr_require_root
-  local slug="$1" draft="${2:-}" kind prior base sql work input code had_draft=false
+  local slug="$1" draft="${2:-}" kind prior sql work input code had_draft=false
   sr_safe_slug "$slug"
   if [ -z "$draft" ]; then
     prior="$(sr_doc_for "$slug")" || sr_die 6 "no published scope/review baseline"
@@ -948,22 +977,22 @@ cmd_remap() (
   fi
   case "$kind" in scope|review) ;; *) sr_die 4 "remap requires scope or review" ;; esac
   prior="$SR_REVIEWS/$slug/$kind.json"
-  base="$SR_REVIEWS/$slug/source.sql"
-  [ "$kind" != scope ] || base="$SR_REVIEWS/$slug/scope.source.sql"
-  sr_no_symlinks "$prior" && sr_no_symlinks "$base" || exit 2
-  [ -f "$prior" ] && [ -f "$base" ] || sr_die 6 "no published $kind baseline"
+  sr_no_symlinks "$prior" || exit 2
+  [ -f "$prior" ] || sr_die 6 "no published $kind source evidence"
   cmd_check "$prior" >/dev/null || sr_die 4 "published $kind is invalid"
   sql="$(jq -r .sql_path "$prior")"
   sr_safe_sql "$sql"
-  [ -f "$SR_ROOT/$sql" ] || sr_die 2 "no such SQL: $sql"
+  [ ! -f "$SR_REVIEWS/$slug/rebind-required" ] || sr_die 6 "SQL path moved; reassess before remapping"
   jq -e --arg s "$slug" --arg k "$kind" --arg p "$sql" '
-    .slug == $s and .kind == $k and .sql_path == $p' "$input" >/dev/null || sr_die 4 "draft slug/kind/sql_path must match published baseline"
-  work="$(mktemp -d "$SR_REVIEWS/$slug/.remap.XXXXXX")" || sr_die 2 "mktemp failed"
-  trap 'rm -rf "$work"' EXIT
+    .slug == $s and .kind == $k and .sql_path == $p' "$input" >/dev/null || sr_die 4 "draft slug/kind/sql_path must match published source"
+  work="$(sr_source_workspace)" || exit 2
+  trap 'rm -rf "$work"; [ -z "${staged:-}" ] || rm -f "$staged"' EXIT
   trap 'exit 2' HUP INT TERM
-  cp "$input" "$work/draft.json" && cp "$prior" "$work/prior.json" &&
-    cp "$base" "$work/base.sql" && cp "$SR_ROOT/$sql" "$work/current.sql" || sr_die 2 "cannot stage remap inputs"
-  [ "$(sr_sha256 "$work/base.sql")" = "$(jq -r .sql_sha256 "$work/prior.json")" ] || sr_die 2 "published baseline is corrupt or unauthenticated"
+  cp "$input" "$work/draft.json" && cp "$prior" "$work/prior.json" || sr_die 2 "cannot stage remap inputs"
+  sr_source_auth "$work/prior.json" "$work/base.sql" || exit $?
+  sr_source_clean || exit 2
+  sr_source_render HEAD "$sql" "$work/current.sql" || exit 2
+  local head="$SR_SOURCE_COMMIT" staged=""
   jq -e -L "$SR_SCRIPT_DIR" 'include "sqlreview-remap"; remap_valid' "$work/draft.json" >/dev/null || sr_die 4 "invalid draft ranges"
   LC_ALL=C diff -U 0 "$work/base.sql" "$work/current.sql" > "$work/diff"
   code=$?
@@ -976,12 +1005,21 @@ cmd_remap() (
       include "sqlreview-remap"; remap_result' "$work/draft.json" > "$work/result.json" || sr_die 2 "cannot compute line map"
   jq '.draft' "$work/result.json" > "$work/remapped.json" || sr_die 2 "cannot stage remapped draft"
   # Refuse concurrent edits rather than overwriting work or publishing a map for stale SQL.
-  cmp -s "$prior" "$work/prior.json" && cmp -s "$base" "$work/base.sql" &&
-    cmp -s "$SR_ROOT/$sql" "$work/current.sql" && cmp -s "$input" "$work/draft.json" || sr_die 2 "remap inputs changed; retry"
+  cmp -s "$prior" "$work/prior.json" && cmp -s "$input" "$work/draft.json" &&
+    [ "$(git -C "$SR_ROOT" rev-parse HEAD)" = "$head" ] || sr_die 2 "remap inputs changed; retry"
+  sr_source_clean || sr_die 2 "remap inputs changed; retry"
   sr_no_symlinks "$draft" || exit 2
   if [ "$had_draft" = false ] && [ -e "$draft" ]; then sr_die 2 "draft appeared during remap; retry"; fi
   if ! cmp -s "$draft" "$work/remapped.json"; then
-    mv "$work/remapped.json" "$draft" || sr_die 2 "cannot replace draft"
+    # JSON-only sibling staging keeps the final rename on the destination filesystem.
+    staged="$(mktemp "$SR_REVIEWS/$slug/.remap-json.XXXXXX")" || sr_die 2 "mktemp failed"
+    cp "$work/remapped.json" "$staged" || sr_die 2 "cannot stage remapped draft"
+    cmp -s "$prior" "$work/prior.json" && cmp -s "$input" "$work/draft.json" &&
+      [ "$(git -C "$SR_ROOT" rev-parse HEAD)" = "$head" ] || sr_die 2 "remap inputs changed; retry"
+    sr_source_clean || sr_die 2 "remap inputs changed; retry"
+    sr_no_symlinks "$draft" || exit 2
+    if [ "$had_draft" = false ] && [ -e "$draft" ]; then sr_die 2 "draft appeared during remap; retry"; fi
+    mv "$staged" "$draft" || sr_die 2 "cannot replace draft"
   fi
   jq '.report' "$work/result.json"
 )
