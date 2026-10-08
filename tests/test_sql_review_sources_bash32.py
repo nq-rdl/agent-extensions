@@ -2,6 +2,7 @@
 import json
 import os
 import platform
+import stat
 import shutil
 import subprocess
 import tempfile
@@ -134,6 +135,11 @@ class HostSources(unittest.TestCase):
                 env={**os.environ, "PROJECT": str(project), "FIXTURE": tmp}, timeout=120)
             self.assertEqual(r.returncode, 0, r.stdout + r.stderr)
             self.assertIn("source-contract-ok", r.stdout)
+            history = project / ".sqlreview/reviews/sql__request/history"
+            self.assertEqual(history.stat().st_uid, os.getuid())
+            self.assertEqual(history.stat().st_gid, os.getgid())
+            self.assertEqual(stat.S_IMODE(history.stat().st_mode), 0o700)
+        self.assertFalse(Path(tmp).exists())
 
 
 class Bash32Sources(unittest.TestCase):
@@ -144,14 +150,21 @@ class Bash32Sources(unittest.TestCase):
     def test_adapter_historical_publish_and_carry(self):
         from bash32_fixture import copy_host_git
         with tempfile.TemporaryDirectory() as tmp:
-            fixture(tmp)
+            project = fixture(tmp)
             shutil.copyfile(static_jq(), Path(tmp) / "jq")
             (Path(tmp) / "jq").chmod(0o755)
             copy_host_git(Path(tmp), "/w")
-            command = 'export PATH=/w/bin:/w:$PATH PROJECT=/w/project FIXTURE=/w; ' + GIT_PREFLIGHT + SCENARIO
-            r = run_container(tmp, "/w", command)
+            # Preserve private 0700 review history while keeping bind-mount output
+            # owned by the host caller, who must remove the disposable fixture.
+            command = 'export PATH=/w/bin:/w:$PATH PROJECT=/w/project FIXTURE=/w HOME=/w XDG_CONFIG_HOME=/w/config; ' + GIT_PREFLIGHT + SCENARIO
+            r = run_container(tmp, "/w", command, user=f"{os.getuid()}:{os.getgid()}")
             self.assertEqual(r.returncode, 0, r.stdout + r.stderr)
             self.assertIn("source-contract-ok", r.stdout)
+            history = project / ".sqlreview/reviews/sql__request/history"
+            self.assertEqual(history.stat().st_uid, os.getuid())
+            self.assertEqual(history.stat().st_gid, os.getgid())
+            self.assertEqual(stat.S_IMODE(history.stat().st_mode), 0o700)
+        self.assertFalse(Path(tmp).exists())
 
 
 class HostGitFixture(unittest.TestCase):
@@ -283,6 +296,42 @@ class HostGitFixture(unittest.TestCase):
             r = subprocess.run([str(Path(tmp) / "bin/git"), "--version"], capture_output=True, text=True)
             self.assertEqual(r.returncode, 0, r.stderr)
             self.assertTrue(r.stdout.startswith("git version "))
+
+
+class SourceContainerOwnership(unittest.TestCase):
+    def test_container_user_option_precedes_image_and_defaults_unchanged(self):
+        from bash32_fixture import BASH32_IMAGE
+        with patch("bash32_fixture.container_runtime", return_value="fixture-docker"), \
+             patch("bash32_fixture.subprocess.run") as execute:
+            run_container("/fixture", "/w", "true", user="1001:1001")
+            args = execute.call_args.args[0]
+            self.assertEqual(args[args.index("--user") + 1], "1001:1001")
+            self.assertLess(args.index("--user"), args.index(BASH32_IMAGE))
+            self.assertIn("--network=none", args)
+            self.assertIn("--pull=never", args)
+            run_container("/fixture", "/w", "true")
+            self.assertNotIn("--user", execute.call_args.args[0])
+
+    def test_source_fixture_selects_actual_caller_uid_gid(self):
+        def host_scenario(directory, target, command, *, user):
+            # The launcher boundary is substituted, but run the real scenario and
+            # its caller-owned private-history/cleanup assertions on the host.
+            return subprocess.run(["bash", "-c", SCENARIO], text=True, capture_output=True,
+                                  env={**os.environ, "PROJECT": str(Path(directory) / "project"),
+                                       "FIXTURE": directory}, timeout=120)
+
+        with tempfile.TemporaryDirectory() as tmp:
+            jq = Path(tmp) / "input-jq"
+            jq.write_bytes(b"fixture-jq")
+            with patch("test_sql_review_sources_bash32.container_runtime", return_value="fixture-docker"), \
+                 patch("test_sql_review_sources_bash32.static_jq", return_value=str(jq)), \
+                 patch("bash32_fixture.copy_host_git"), \
+                 patch("test_sql_review_sources_bash32.run_container") as launch:
+                launch.side_effect = host_scenario
+                result = unittest.TestResult()
+                Bash32Sources("test_adapter_historical_publish_and_carry").run(result)
+            self.assertTrue(result.wasSuccessful(), result.errors + result.failures)
+            self.assertEqual(launch.call_args.kwargs.get("user"), f"{os.getuid()}:{os.getgid()}")
 
 
 class HostGitPlatformContract(unittest.TestCase):

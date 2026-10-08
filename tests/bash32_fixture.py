@@ -59,15 +59,16 @@ def static_jq():
     return path
 
 
-def run_container(tmp, target, command, *, readonly=False, payload=None):
+def run_container(tmp, target, command, *, readonly=False, payload=None, user=None):
     runtime = container_runtime()
     if not runtime:
         raise RuntimeError("Bash 3.2 needs Docker/Podman with the pinned image pulled")
     # :Z labels only the disposable copy; never relabel the working tree.
     options = "ro,Z" if readonly else "Z"
+    user_args = [] if user is None else ["--user", user]
     return subprocess.run(
         [runtime, "run", "--rm", "--pull=never", "--platform=linux/amd64",
-         "-i", "--network=none", "-v", f"{tmp}:{target}:{options}",
+         "-i", "--network=none"] + user_args + ["-v", f"{tmp}:{target}:{options}",
          BASH32_IMAGE, "bash", "-c",
          'set -euo pipefail; test "${BASH_VERSINFO[0]}.${BASH_VERSINFO[1]}" = 3.2; '
          'sed --help 2>&1 | grep BusyBox >/dev/null; ' + command],
