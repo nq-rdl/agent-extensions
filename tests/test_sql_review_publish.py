@@ -265,6 +265,52 @@ class Publish(unittest.TestCase):
         self.assertEqual((self.final / "review.json").read_bytes(), before)
         self.assert_no_sql_records()
 
+    def test_recorded_render_copy_failure_is_operational_for_publish_and_snapshot(self):
+        fp = self.generated()
+        doc = self.generated_doc(fp)
+        self.assertEqual(self.publish(doc, "sql__request").returncode, 0)
+        before = (self.final / "review.json").read_bytes()
+        self.draft.write_text(json.dumps(doc))
+        with tempfile.TemporaryDirectory() as binpath:
+            shim = Path(binpath) / "cp"
+            shim.write_text(f'#!/bin/sh\ncase "$2" in */recorded.sql) exit 1;; esac\nexec {shutil.which("cp")} "$@"\n')
+            shim.chmod(0o755)
+            env = dict(os.environ, PATH=binpath + os.pathsep + os.environ["PATH"])
+            for args in (("publish", "sql__request", "review", str(self.draft)),
+                         ("snapshot", "sql__request", "sql/request.sql")):
+                with self.subTest(command=args[0]):
+                    result = subprocess.run(["bash", str(self.script), *args],
+                                            cwd=self.workspace, env=env, capture_output=True, text=True)
+                    self.assertEqual(result.returncode, 2, result.stderr)
+                    self.assertIn("cannot write caller output", result.stderr)
+                    self.assertNotIn("reassess", result.stderr)
+                    self.assertEqual((self.final / "review.json").read_bytes(), before)
+        self.assert_no_sql_records()
+
+    def test_history_rename_is_local_with_cross_filesystem_tmpdir(self):
+        if not Path("/dev/shm").is_dir() or not os.access("/dev/shm", os.W_OK):
+            self.skipTest("separate-filesystem temporary directory unavailable")
+        if os.stat(self.workspace).st_dev == os.stat("/dev/shm").st_dev:
+            self.skipTest("/dev/shm and project share a filesystem")
+        fp = self.generated()
+        doc = self.generated_doc(fp)
+        self.assertEqual(self.publish(doc, "sql__request").returncode, 0)
+        before = (self.final / "review.json").read_bytes()
+        self.draft.write_text(json.dumps(self.generated_doc(fp, revision=2)))
+        with tempfile.TemporaryDirectory(dir="/dev/shm") as external, tempfile.TemporaryDirectory() as binpath:
+            shim = Path(binpath) / "mv"
+            shim.write_text(f'#!/bin/sh\ncase "$2" in */history/*/*.json) '
+                            '[ "$(dirname "$1")" = "$(dirname "$2")" ] || exit 93;; esac\n'
+                            f'exec {shutil.which("mv")} "$@"\n')
+            shim.chmod(0o755)
+            env = dict(os.environ, PATH=binpath + os.pathsep + os.environ["PATH"], TMPDIR=external)
+            result = subprocess.run(["bash", str(self.script), "publish", "sql__request", "review", str(self.draft)],
+                                    cwd=self.workspace, env=env, capture_output=True, text=True)
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertEqual((self.final / "history/review/1.json").read_bytes(), before)
+        self.assertFalse(list(self.final.rglob(".history.*")))
+        self.assert_no_sql_records()
+
     def test_scope_then_review_publish_snapshot_and_render(self):
         scope = scope_doc("q", "q.sql")
         result = self.publish(scope)

@@ -435,7 +435,7 @@ cmd_publish() (
   [ $# -eq 3 ] || usage
   sr_need_jq
   sr_require_root
-  local slug="$1" kind="$2" draft="$3" dest tmp rel previous work history="" history_added=false committed=false
+  local slug="$1" kind="$2" draft="$3" dest tmp rel previous work history="" history_tmp="" history_added=false committed=false
   local original_dest="" original_draft head="" current_sql="" header_only=false already=false proposed_sha=""
   sr_safe_slug "$slug"
   case "$kind" in scope|review|lifts) ;; *) usage ;; esac
@@ -448,7 +448,7 @@ cmd_publish() (
   tmp="$(mktemp "$SR_REVIEWS/$slug/.publish.XXXXXX")" || sr_die 2 "mktemp failed"
   umask 077
   work=""
-  trap 'if [ "$history_added" = true ] && [ "$committed" = false ] && { [ ! -f "$dest" ] || [ "$(sr_sha256 "$dest" 2>/dev/null)" != "$proposed_sha" ]; }; then rm -f "$history"; fi; rm -f "$tmp"; [ -z "$work" ] || rm -rf "$work"' EXIT
+  trap 'if [ "$history_added" = true ] && [ "$committed" = false ] && { [ ! -f "$dest" ] || [ "$(sr_sha256 "$dest" 2>/dev/null)" != "$proposed_sha" ]; }; then rm -f "$history"; fi; rm -f "$tmp"; [ -z "$history_tmp" ] || rm -f "$history_tmp"; [ -z "$work" ] || rm -rf "$work"' EXIT
   work="$(mktemp -d "${TMPDIR:-/tmp}/sqlreview-publish.XXXXXX")" || sr_die 2 "mktemp failed"
   trap 'exit 2' HUP INT TERM
   original_draft="$(sr_sha256 "$draft")"
@@ -483,7 +483,7 @@ cmd_publish() (
     sr_source_clean || exit 2
     # Reconstruct and authenticate the original full bytes before considering a body match,
     # even when HEAD's full hash is identical. Legacy records use the same authentication.
-    sr_source_auth "$tmp" "$work/recorded.sql" || sr_die 6 "recorded SQL evidence unavailable; reassess before publishing"
+    sr_source_auth "$tmp" "$work/recorded.sql" || exit $?
     sr_source_render HEAD "$rel" "$work/current.sql" || exit 2
     head="$SR_SOURCE_COMMIT"; current_mode="$SR_SOURCE_MODE"; current_prefix="$SR_SOURCE_PREFIX"
     current_sql="$work/current.sql"
@@ -559,7 +559,9 @@ cmd_publish() (
     history="$SR_REVIEWS/$slug/history/$kind/$previous.json"
     sr_no_symlinks "$history" || exit 2
     [ ! -e "$history" ] || { [ -f "$history" ] && cmp -s "$dest" "$history"; } || sr_die 2 "$kind history conflict"
-    cp "$dest" "$work/previous.json" || sr_die 2 "cannot stage $kind history"
+    mkdir -p "$(dirname "$history")" || sr_die 2 "cannot create $kind history"
+    history_tmp="$(mktemp "$(dirname "$history")/.history.XXXXXX")" || sr_die 2 "cannot stage $kind history"
+    cp "$dest" "$history_tmp" || sr_die 2 "cannot stage $kind history"
   fi
   # Refuse stale work after rendering and validation, before any history/final mutation.
   [ "$(sr_sha256 "$draft")" = "$original_draft" ] || sr_die 2 "draft changed during publication"
@@ -580,14 +582,14 @@ cmd_publish() (
   proposed_sha="$(sr_sha256 "$tmp")"
   if [ -n "$history" ] && [ -e "$history" ]; then
     sr_no_symlinks "$history" || exit 2
-    [ -f "$history" ] && cmp -s "$work/previous.json" "$history" || sr_die 2 "$kind history changed during publication"
+    [ -f "$history" ] && cmp -s "$history_tmp" "$history" || sr_die 2 "$kind history changed during publication"
   fi
   if [ -n "$history" ] && [ ! -e "$history" ]; then
     mkdir -p "$(dirname "$history")" || sr_die 2 "cannot create $kind history"
     sr_no_symlinks "$history" || exit 2
     # Set rollback intent before the move so a trapped signal cannot leave history advanced.
     history_added=true
-    mv "$work/previous.json" "$history" || sr_die 2 "cannot retain $kind history"
+    mv "$history_tmp" "$history" || sr_die 2 "cannot retain $kind history"
   fi
   mv "$tmp" "$dest" || sr_die 2 "cannot publish document"
   committed=true
@@ -638,7 +640,7 @@ cmd_snapshot() (
   trap 'exit 2' HUP INT TERM
   original="$(sr_sha256 "$doc")"
   cp "$doc" "$work/review.json" || sr_die 2 "cannot stage review verification"
-  sr_source_auth "$work/review.json" "$work/recorded.sql" || sr_die 6 "recorded SQL evidence unavailable; reassess before snapshot verification"
+  sr_source_auth "$work/review.json" "$work/recorded.sql" || exit $?
   sr_source_render HEAD "$rel" "$work/current.sql" || exit 2
   head="$SR_SOURCE_COMMIT"
   sr_binding "$work/review.json" "$work/current.sql" "$work/recorded.sql"; binding=$?

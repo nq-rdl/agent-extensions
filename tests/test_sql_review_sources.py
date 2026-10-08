@@ -3,6 +3,7 @@ import hashlib
 import json
 import os
 import subprocess
+import shutil
 import tempfile
 import unittest
 from pathlib import Path
@@ -41,15 +42,52 @@ class Sources(unittest.TestCase):
     def fingerprint(self):
         return run(["fingerprint", "sql/request.sql"], self.p.root)
 
-    def source_call(self, function, *args):
+    def source_call(self, function, *args, overrides=None):
         with tempfile.TemporaryDirectory() as output:
             target = Path(output) / "out.sql"
             env = dict(os.environ, SR_ROOT=str(self.p.root), SR_SCRIPT_DIR=str(SCRIPTS))
+            env.update(overrides or {})
             r = subprocess.run(["bash", "-c", '. "$SR_SCRIPT_DIR/sqlreview-lib.sh"; '
                                 + function + ' "$@"', "source", *map(str, args), str(target)],
                                cwd=self.p.root, env=env, capture_output=True, text=True)
             data = target.read_bytes() if target.is_file() else None
             return r, data
+
+    def test_auth_distinguishes_missing_evidence_from_operational_output_failure(self):
+        head = self.generated()
+        doc = review_doc("sql__request", "sql/request.sql", git_commit=head,
+                         sql_sha256=hashlib.sha256(b"SELECT 1;\n").hexdigest())
+        path = self.p.write_json("sql__request", "review.json", doc)
+        with tempfile.TemporaryDirectory() as binpath:
+            shim = Path(binpath) / "cp"
+            shim.write_text(f'#!/bin/sh\ncase "$2" in */out.sql) exit 1;; esac\nexec {shutil.which("cp")} "$@"\n')
+            shim.chmod(0o755)
+            r, data = self.source_call("sr_source_auth", path,
+                                       overrides={"PATH": binpath + os.pathsep + os.environ["PATH"]})
+            self.assertEqual(r.returncode, 2, r.stderr)
+            self.assertIsNone(data)
+        for commit, full in (("f" * 40, doc["sql_sha256"]), (head, "0" * 64)):
+            doc.update(git_commit=commit, sql_sha256=full)
+            path.write_text(json.dumps(doc))
+            r, _ = self.source_call("sr_source_auth", path)
+            self.assertEqual(r.returncode, 6, r.stderr)
+
+    def test_auth_preserves_hash_and_adapter_config_tool_failures(self):
+        head = self.generated()
+        doc = review_doc("sql__request", "sql/request.sql", git_commit=head,
+                         sql_sha256=hashlib.sha256(b"SELECT 1;\n").hexdigest())
+        path = self.p.write_json("sql__request", "review.json", doc)
+        for tool in ("sha256sum", "jq"):
+            with self.subTest(tool=tool), tempfile.TemporaryDirectory() as binpath:
+                shim = Path(binpath) / tool
+                if tool == "jq":
+                    shim.write_text(f'#!/bin/sh\ncase "$*" in *sql_render.command*) exit 127;; esac\nexec {shutil.which("jq")} "$@"\n')
+                else:
+                    shim.write_text('#!/bin/sh\nexit 1\n')
+                shim.chmod(0o755)
+                r, _ = self.source_call("sr_source_auth", path,
+                                        overrides={"PATH": binpath + os.pathsep + os.environ["PATH"]})
+                self.assertEqual(r.returncode, 2, r.stderr)
 
     def test_generated_sql_absent_from_git(self):
         head = self.generated()
@@ -200,7 +238,7 @@ class Sources(unittest.TestCase):
         doc["sql_body_sha256"] = hashlib.sha256(b"SELECT 1;\n").hexdigest()
         path.write_text(json.dumps(doc))
         r, _ = self.source_call("sr_source_auth", path)
-        self.assertEqual(r.returncode, 2)
+        self.assertEqual(r.returncode, 6)
         self.assertIn("full SHA", r.stderr)
 
     def test_source_symlinks_and_replacement_refs_refused(self):
@@ -249,7 +287,7 @@ class Sources(unittest.TestCase):
                               (head, "false"), (head, {})):
             doc.update(git_commit=commit, git_dirty=dirty); path.write_text(json.dumps(doc))
             r, data = self.source_call("sr_source_auth", path)
-            self.assertEqual(r.returncode, 2)
+            self.assertEqual(r.returncode, 6)
             self.assertIsNone(data)
 
     def test_tracked_source_uses_exact_git_blob_with_checkout_attributes(self):
@@ -333,7 +371,7 @@ cat payload > "$4"
                 doc["git_dirty"] = None
             path.write_text(json.dumps(doc))
             r, data = self.source_call("sr_source_auth", path)
-            self.assertEqual(r.returncode, 2)
+            self.assertEqual(r.returncode, 6)
             self.assertIsNone(data)
         doc["git_dirty"] = False; path.write_text(json.dumps(doc))
         self.assertEqual(self.source_call("sr_source_auth", path)[0].returncode, 0)
