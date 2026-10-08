@@ -1,6 +1,6 @@
 # Hash-only SQL review records — issue #505
 
-Status: proposed; implementation awaits design review.
+Status: design approved by Josh on 2026-10-08; implementation plan awaits review.
 
 ## Intent and acceptance
 
@@ -169,8 +169,8 @@ human confirmation records, questions, lift history and unrelated files.
 
 ## Implementation boundary
 
-This PR currently proposes the design only. It does not close #505 and does
-not change shipped behavior. After approval, write the implementation plan,
-then implement on this branch. Scaffold#290 supplies the production render
+This PR currently contains design and planning only. It does not close #505
+and does not change shipped behavior. After implementation-plan review,
+implement on this branch. Scaffold#290 supplies the production render
 adapter; test this repository against a deterministic fixture adapter and
 report production integration as pending until the scaffold contract is met.
