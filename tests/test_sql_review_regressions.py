@@ -20,7 +20,9 @@ class ReviewRegressions(unittest.TestCase):
         self.d = self.p.review_dir('q')
 
     def reviewed(self):
-        self.p.write_json('q', 'review.json', review_doc('q', 'q.sql'))
+        self.p.commit()
+        fp = json.loads(run(['fingerprint', 'q.sql'], self.p.root).stdout)
+        self.p.write_json('q', 'review.json', review_doc('q', **fp))
         self.assertEqual(run(['snapshot', 'q', 'q.sql'], self.p.root).returncode, 0)
 
     def test_unsafe_paths_and_slugs_are_rejected(self):
@@ -79,21 +81,25 @@ class ReviewRegressions(unittest.TestCase):
         stream = json.dumps(review_doc('q', 'q.sql')) * 2
         self.assertEqual(run(['check', '--stdin'], self.p.root, stdin=stream).returncode, 4)
 
-    def test_failed_write_or_changed_fingerprint_does_not_advance_baseline(self):
+    def test_failed_write_or_changed_fingerprint_does_not_advance_provenance(self):
         self.reviewed()
+        final = self.d / 'review.json'
+        original = final.read_bytes()
         (self.p.root / 'q.sql').write_text(SQL_V2)
-        # Final Write did not happen: the old final document cannot authorize new bytes.
+        self.p.commit("body change")
+        # The published old JSON cannot authorize the new body.
         result = run(['snapshot', 'q', 'q.sql'], self.p.root)
-        self.assertEqual(result.returncode, 2)
-        self.assertEqual((self.d / 'source.sql').read_text(), SQL_V1)
+        self.assertEqual(result.returncode, 2, result.stderr)
+        self.assertEqual(final.read_bytes(), original)
         self.assertEqual(run(['delta', 'q'], self.p.root).returncode, 10)
-        # A final Write succeeds but snapshot has not run: never report current.
-        self.p.write_json('q', 'review.json', review_doc('q', 'q.sql', revision=2))
-        self.assertEqual(run(['delta', 'q'], self.p.root).returncode, 10)
-        self.assertEqual(run(['snapshot', 'q', 'q.sql'], self.p.root).returncode, 0)
-        self.assertEqual((self.d / 'history/1.sql').read_text(), SQL_V1)
-        self.assertEqual((self.d / 'history/2.sql').read_text(), SQL_V2)
+        self.assertFalse(list(self.d.rglob('*.sql')))
+        fp = json.loads(run(['fingerprint', 'q.sql'], self.p.root).stdout)
+        draft = self.p.write_json('q', 'review.draft.json', review_doc('q', revision=2, **fp))
+        self.assertEqual(run(['publish', 'q', 'review', str(draft)], self.p.root).returncode, 0)
         self.assertEqual(run(['delta', 'q'], self.p.root).returncode, 0)
+        self.assertEqual(run(['snapshot', 'q', 'q.sql'], self.p.root).returncode, 0)
+        self.assertEqual((self.d / 'history/review/1.json').read_bytes(), original)
+        self.assertFalse(list(self.d.rglob('*.sql')))
 
     def test_move_invalidates_unchanged_sql_and_removes_render(self):
         self.reviewed()
@@ -156,11 +162,11 @@ class ReviewRegressions(unittest.TestCase):
         result = run_hook(GUARD, write_event(self.d / 'review.json', json.dumps(review_doc()), self.p.root), env_for())
         self.assertEqual(decision(result)['permissionDecision'], 'deny')
 
-    def test_snapshot_rejects_destination_directory(self):
-        self.p.write_json('q', 'review.json', review_doc('q', 'q.sql'))
+    def test_snapshot_verification_does_not_modify_legacy_destination_directory(self):
+        self.reviewed()
         (self.d / 'source.sql').mkdir()
         result = run(['snapshot', 'q', 'q.sql'], self.p.root)
-        self.assertEqual(result.returncode, 2)
+        self.assertEqual(result.returncode, 0, result.stderr)
         self.assertEqual(list((self.d / 'source.sql').iterdir()), [])
 
     def test_move_refuses_symlink_marker_before_mutation(self):
@@ -176,12 +182,12 @@ class ReviewRegressions(unittest.TestCase):
             self.assertFalse((self.d.parent / 'renamed').exists())
             self.assertEqual(target.stat().st_mtime_ns, before)
 
-    def test_snapshot_refuses_symlink_history(self):
-        self.p.write_json('q', 'review.json', review_doc('q', 'q.sql'))
+    def test_snapshot_verification_never_touches_legacy_symlink_history(self):
+        self.reviewed()
         with tempfile.TemporaryDirectory() as outside:
             (self.d / 'history').symlink_to(outside)
             result = run(['snapshot', 'q', 'q.sql'], self.p.root)
-            self.assertEqual(result.returncode, 2)
+            self.assertEqual(result.returncode, 0, result.stderr)
             self.assertEqual(list(Path(outside).iterdir()), [])
             self.assertFalse((self.d / 'source.sql').exists())
             self.assertEqual(list(self.d.glob('.snapshot.*')), [])

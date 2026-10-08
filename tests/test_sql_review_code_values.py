@@ -73,6 +73,34 @@ class CodeValues(unittest.TestCase):
         doc["extension"] = {"header_revisions": copy.deepcopy(doc["header_revisions"])}
         self.assertEqual(len(self.code_rows(doc, "--ste")), 3)
 
+    def test_source_provenance_metadata_is_not_prose(self):
+        commit = "b123456789b" + "b" * 29
+        provenance = {"mode": "rendered", "project_root": "projects/request_" + DIGITS,
+                      "commit": commit}
+        doc = review_doc(git_commit=commit, sql_provenance=provenance,
+                         header_revisions=[{"sql_sha256": "a" * 64,
+                                            "at": "2026-10-08T00:00:00Z", "revision": 1,
+                                            "git_commit": commit, "git_dirty": False,
+                                            "sql_provenance": provenance}])
+        for flags in ((), ("--ste",)):
+            result = self.lint(doc, *flags)
+            self.assertEqual((result.returncode, result.stdout), (0, ""))
+        doc["purpose"] = "Use " + DIGITS
+        self.assertEqual(len(self.code_rows(doc, "--ste")), 1)
+
+    def test_source_provenance_exemptions_validate_format_and_exact_location(self):
+        commit = "b123456789b" + "b" * 29
+        provenance = {"mode": "rendered", "project_root": "projects/request_" + DIGITS,
+                      "commit": commit}
+        base = review_doc(git_commit=commit, sql_provenance=provenance)
+        for field, bad in (("commit", "Use " + DIGITS), ("project_root", "../request_" + DIGITS)):
+            doc = copy.deepcopy(base)
+            doc["sql_provenance"][field] = bad
+            self.assertEqual(len(self.code_rows(doc, "--ste")), 1)
+        doc = copy.deepcopy(base)
+        doc["extension"] = {"sql_provenance": provenance}
+        self.assertEqual(len(self.code_rows(doc, "--ste")), 2)
+
     def test_metadata_exemptions_are_validated_and_location_specific(self):
         for over in ({"sql_sha256": "not a hash " + DIGITS},
                      {"sql_body_sha256": "not a hash " + DIGITS},

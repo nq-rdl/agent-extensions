@@ -120,7 +120,7 @@ class BootstrapHeader(unittest.TestCase):
         self.p.commit()
         fp = run(["fingerprint", "q.sql"], self.p.root)
         self.assertEqual(fp.returncode, 0, fp.stderr)
-        self.scope.update({k: v for k, v in json.loads(fp.stdout).items() if k in ("sql_sha256", "sql_body_sha256")})
+        self.scope.update(json.loads(fp.stdout))
         self.draft.write_text(json.dumps(self.scope))
         out = self.compared()
         self.assertEqual(out["unmatched_header"], [])

@@ -1,4 +1,4 @@
-"""Header edits preserve binding without relaxing snapshots or human decisions (#432)."""
+"""Header edits retain authenticated committed provenance and human decisions."""
 import hashlib
 import json
 import tempfile
@@ -23,6 +23,8 @@ class BodyBinding(unittest.TestCase):
         self.p = Project(self.tmp.name)
         self.sql = self.p.sql("q.sql", OLD)
         self.d = self.p.review_dir("q")
+        self.p.commit()
+        self.fp = json.loads(run(["fingerprint", "q.sql"], self.p.root).stdout)
 
     def publish(self, doc):
         draft = self.d / "draft.json"
@@ -30,11 +32,10 @@ class BodyBinding(unittest.TestCase):
         return run(["publish", "q", doc["kind"], str(draft)], self.p.root)
 
     def doc(self, kind="review", **over):
-        return (review_doc if kind == "review" else scope_doc)("q", "q.sql", sql_sha256=sha(OLD),
-                                                               sql_body_sha256=sha(BODY), **over)
+        values = dict(self.fp, **over)
+        return (review_doc if kind == "review" else scope_doc)("q", **values)
 
     def test_fingerprint_keeps_both_hashes(self):
-        self.p.commit()
         fp = json.loads(run(["fingerprint", "q.sql"], self.p.root).stdout)
         self.assertEqual(fp["sql_sha256"], sha(OLD))
         self.assertEqual(fp["sql_body_sha256"], sha(BODY))
@@ -42,9 +43,9 @@ class BodyBinding(unittest.TestCase):
     def test_header_publish_snapshot_status_delta_and_render(self):
         for kind in ("scope", "review"):
             self.assertEqual(self.publish(self.doc(kind)).returncode, 0)
-        (self.d / "scope.source.sql").write_text(OLD)
         self.assertEqual(run(["snapshot", "q", "q.sql"], self.p.root).returncode, 0)
         self.sql.write_text(NEW)
+        self.p.commit("header")
         self.assertIn("header-only", run(["status"], self.p.root).stdout)
         delta = run(["delta", "q"], self.p.root)
         self.assertEqual(delta.returncode, 0, delta.stderr)
@@ -73,29 +74,37 @@ class BodyBinding(unittest.TestCase):
         run(["snapshot", "q", "q.sql"], self.p.root)
         for changed in (BODY.replace("1", "2"), BODY.replace("comment", "changed"), BODY + "\n", BODY.replace("\n", "\r\n")):
             self.sql.write_bytes(("-- new header\n" + changed).encode())
+            self.p.commit("body")
             self.assertNotEqual(self.publish(self.doc()).returncode, 0)
             self.assertIn("stale", run(["status"], self.p.root).stdout)
             self.assertEqual(run(["delta", "q"], self.p.root).returncode, 10)
 
-    def test_corrupt_snapshot_cannot_be_saved_by_body_match(self):
+    def test_corrupt_recorded_hash_cannot_be_saved_by_body_match(self):
         self.assertEqual(self.publish(self.doc()).returncode, 0)
         run(["snapshot", "q", "q.sql"], self.p.root)
-        (self.d / "source.sql").write_text(NEW)  # even header corruption destroys full-file evidence
+        corrupted = json.loads((self.d / "review.json").read_text())
+        corrupted["sql_sha256"] = "0" * 64
+        (self.d / "review.json").write_text(json.dumps(corrupted))
         self.sql.write_text(NEW)
+        self.p.commit("header")
         self.assertIn("stale", run(["status"], self.p.root).stdout)
-        self.assertNotEqual(self.publish(self.doc()).returncode, 0)
+        self.assertNotEqual(self.publish(corrupted).returncode, 0)
         self.assertNotEqual(run(["snapshot", "q", "q.sql"], self.p.root).returncode, 0)
 
-    def test_legacy_full_hash_is_not_silently_upgraded_without_baseline(self):
+    def test_legacy_full_hash_authenticates_source_before_header_binding(self):
         legacy = self.doc()
         del legacy["sql_body_sha256"]
         self.sql.write_text(NEW)
-        self.assertNotEqual(self.publish(legacy).returncode, 0)
+        self.p.commit("header")
+        self.assertEqual(self.publish(legacy).returncode, 0)
+        stored = json.loads((self.d / "review.json").read_text())
+        self.assertEqual(stored["sql_sha256"], sha(OLD))
 
     def test_body_match_cannot_carry_changed_assumption(self):
         self.assertEqual(self.publish(self.doc()).returncode, 0)
         run(["snapshot", "q", "q.sql"], self.p.root)
         self.sql.write_text(NEW)
+        self.p.commit("header")
         changed = self.doc(revision=2)
         changed["assumptions"][0].update(text="Changed meaning", confirmed_revision=1,
                                       carried_from_revision=1)
@@ -133,6 +142,7 @@ class BindingIntegrity(BodyBinding):
         self.assertEqual(self.publish(self.doc()).returncode, 0)
         run(["snapshot", "q", "q.sql"], self.p.root)
         self.sql.write_text(NEW)
+        self.p.commit("header")
         self.assertEqual(self.publish(self.doc()).returncode, 0)
         original = (self.d / "review.json").read_bytes()
         for history in ([], [{"sql_sha256": "1" * 64, "at": "fake"}]):
@@ -152,56 +162,59 @@ class BindingIntegrity(BodyBinding):
 
 
 class ScopeBodyState(unittest.TestCase):
-    def test_existing_scope_header_republish_requires_original_baseline(self):
+    def test_existing_scope_header_republish_requires_authenticated_original_commit(self):
         for legacy in (False, True):
             with self.subTest(legacy=legacy), tempfile.TemporaryDirectory() as tmp:
                 p = Project(tmp)
                 sql = p.sql("q.sql", OLD)
-                d = p.review_dir("q")
-                doc = scope_doc("q", "q.sql", sql_sha256=sha(OLD))
-                if not legacy:
-                    doc["sql_body_sha256"] = sha(BODY)
+                p.commit()
+                fp = json.loads(run(["fingerprint", "q.sql"], p.root).stdout)
+                doc = scope_doc("q", **fp)
+                if legacy:
+                    del doc["sql_body_sha256"]
+                    del doc["sql_provenance"]
                 published = p.write_json("q", "scope.json", doc)
-                original = published.read_bytes()
                 sql.write_text(NEW)
-                result = run(["publish", "q", "scope", str(published)], p.root)
-                self.assertEqual(result.returncode, 2, result.stdout + result.stderr)
-                self.assertEqual(published.read_bytes(), original)
-                # Restoring authenticated original bytes enables the same-revision path.
-                (d / "scope.source.sql").write_text(OLD)
+                p.commit("header")
                 result = run(["publish", "q", "scope", str(published)], p.root)
                 self.assertEqual(result.returncode, 0, result.stderr)
-                self.assertEqual(json.loads(published.read_text())["revision"], 1)
-                self.assertEqual((d / "scope.source.sql").read_text(), OLD)
+                saved = json.loads(published.read_text())
+                self.assertEqual(saved["revision"], 1)
+                self.assertEqual(saved["sql_sha256"], fp["sql_sha256"])
+                self.assertFalse(list((p.root / ".sqlreview").rglob("*.sql")))
 
-    def test_missing_scope_baseline_allows_full_reassessment_with_current_fingerprint(self):
+    def test_missing_scope_source_evidence_allows_full_reassessment_with_current_fingerprint(self):
         with tempfile.TemporaryDirectory() as tmp:
             p = Project(tmp)
             p.sql("q.sql", NEW)
+            p.commit()
             p.write_json("q", "scope.json", scope_doc("q", "q.sql", sql_sha256=sha(OLD),
                                                        sql_body_sha256=sha(BODY)))
-            fresh = scope_doc("q", "q.sql", revision=2, sql_sha256=sha(NEW), sql_body_sha256=sha(BODY))
-            for item in fresh["assumptions"] + fresh["limitations"]:
-                item["confirmed_revision"] = 2
+            fp = json.loads(run(["fingerprint", "q.sql"], p.root).stdout)
+            fresh = scope_doc("q", revision=2, **fp)
             draft = p.write_json("q", "scope.draft.json", fresh)
             result = run(["publish", "q", "scope", str(draft)], p.root)
             self.assertEqual(result.returncode, 0, result.stderr)
+            self.assertTrue((draft.parent / "history/scope/1.json").is_file())
 
-    def test_scope_alone_retains_header_binding_and_refuses_body_or_snapshot_corruption(self):
+    def test_scope_alone_retains_header_binding_and_refuses_body_or_record_corruption(self):
         with tempfile.TemporaryDirectory() as tmp:
             p = Project(tmp)
             sql = p.sql("q.sql", OLD)
-            d = p.review_dir("q")
-            doc = scope_doc("q", "q.sql", sql_sha256=sha(OLD), sql_body_sha256=sha(BODY))
-            p.write_json("q", "scope.json", doc)
-            baseline = d / "scope.source.sql"
-            baseline.write_text(OLD)
+            p.commit()
+            fp = json.loads(run(["fingerprint", "q.sql"], p.root).stdout)
+            scope = p.write_json("q", "scope.json", scope_doc("q", **fp))
             sql.write_text(NEW)
+            p.commit("header")
             self.assertIn("scoped-header-only", run(["status"], p.root).stdout)
             sql.write_text(NEW.replace("SELECT 1", "SELECT 2"))
+            p.commit("body")
             self.assertIn("stale", run(["status"], p.root).stdout)
             sql.write_text(NEW)
-            baseline.write_text(NEW)
+            p.commit("restore body")
+            corrupt = json.loads(scope.read_text())
+            corrupt["sql_sha256"] = "0" * 64
+            scope.write_text(json.dumps(corrupt))
             self.assertIn("stale", run(["status"], p.root).stdout)
 
     def test_scope_baseline_symlink_is_not_binding_evidence(self):
@@ -215,15 +228,16 @@ class ScopeBodyState(unittest.TestCase):
             (d / "scope.source.sql").symlink_to(outside)
             self.assertIn("stale", run(["status"], p.root).stdout)
 
-    def test_header_body_match_cannot_create_a_historical_snapshot_without_original_bytes(self):
+    def test_missing_original_commit_cannot_be_saved_by_claimed_body_digest(self):
         with tempfile.TemporaryDirectory() as tmp:
             p = Project(tmp)
             p.sql("q.sql", NEW)
+            p.commit()
             d = p.review_dir("q")
             doc = review_doc("q", "q.sql", sql_sha256=sha(OLD), sql_body_sha256=sha(BODY))
             draft = d / "review.draft.json"
             draft.write_text(json.dumps(doc))
-            self.assertEqual(run(["publish", "q", "review", str(draft)], p.root).returncode, 0)
-            result = run(["snapshot", "q", "q.sql"], p.root)
-            self.assertNotEqual(result.returncode, 0)
-            self.assertFalse((d / "source.sql").exists())
+            result = run(["publish", "q", "review", str(draft)], p.root)
+            self.assertEqual(result.returncode, 6, result.stderr)
+            self.assertFalse((d / "review.json").exists())
+            self.assertFalse(list(d.rglob("*.sql")))
