@@ -117,6 +117,42 @@ class Sources(unittest.TestCase):
             self.assertEqual(r.returncode, 2, r.stdout + r.stderr)
             self.assertFalse(output.exists())
 
+    def test_materialize_replaces_external_hardlink_without_modifying_repository(self):
+        self.publish_generated()
+        alias = self.p.root / ".sqlreview/reviews/sql__request/alias.sql"
+        original = b"preserve repository bytes\n"
+        alias.write_bytes(original)
+        with tempfile.TemporaryDirectory() as tmp:
+            output = Path(tmp) / "explained.sql"
+            os.link(alias, output)
+            self.assertEqual(alias.stat().st_ino, output.stat().st_ino)
+            r = run(["materialize", "sql__request", "review", "1", str(output)], self.p.root)
+            self.assertEqual(r.returncode, 0, r.stdout + r.stderr)
+            self.assertEqual(output.read_bytes(), b"SELECT 1;\nSELECT 3;\n")
+            self.assertEqual(alias.read_bytes(), original)
+            self.assertNotEqual(alias.stat().st_ino, output.stat().st_ino)
+            self.assertEqual(list(Path(tmp).iterdir()), [output])
+
+    def test_materialize_failed_output_publication_preserves_existing_alias(self):
+        self.publish_generated()
+        alias = self.p.root / ".sqlreview/reviews/sql__request/alias.sql"
+        original = b"preserve repository bytes\n"
+        alias.write_bytes(original)
+        for operation in ("cp", "mv"):
+            with self.subTest(operation=operation), tempfile.TemporaryDirectory() as bindir, tempfile.TemporaryDirectory() as tmp:
+                output = Path(tmp) / "explained.sql"
+                os.link(alias, output)
+                shim = Path(bindir) / operation
+                pattern = '*/.sqlreview-materialize.*' if operation == "cp" else str(output)
+                shim.write_text(f'#!/bin/sh\ncase "$2" in {pattern}) exit 1;; esac\nexec {shutil.which(operation)} "$@"\n')
+                shim.chmod(0o755)
+                r = run(["materialize", "sql__request", "review", "1", str(output)], self.p.root,
+                        env={"PATH": bindir + os.pathsep + os.environ["PATH"]})
+                self.assertEqual(r.returncode, 2, r.stdout + r.stderr)
+                self.assertEqual(alias.read_bytes(), original)
+                self.assertEqual(output.read_bytes(), original)
+                self.assertEqual(list(Path(tmp).iterdir()), [output])
+
     def test_unknown_render_cannot_complete(self):
         draft, doc = self.publish_generated()
         doc["sql_sha256"] = "0" * 64

@@ -79,6 +79,7 @@ class IntakeReviewRegressions(unittest.TestCase):
                 draft = p.write_json(d["slug"], "scope.draft.json", d)
                 first = self.successful(tree, p.root, "intake", str(source), "1", str(draft))
                 draft.write_text(first)
+                p.commit("maintained intake")
                 self.successful(tree, p.root, "publish", d["slug"], "scope", str(draft))
                 d = json.loads(first)
                 d["revision"] = 2
@@ -103,6 +104,7 @@ class IntakeReviewRegressions(unittest.TestCase):
                         draft.write_text(merged_text)
                         repeated = self.successful(tree, p.root, "intake", str(source), "2", str(draft))
                         self.assertEqual(json.loads(repeated), merged)
+                p.commit("updated maintained intake")
                 self.successful(tree, p.root, "publish", d["slug"], "scope", str(draft))
                 self.successful(tree, p.root, "render", d["slug"], "scope")
                 rendered = (draft.parent / "scope.md").read_text()
@@ -248,6 +250,7 @@ class Intake(unittest.TestCase):
             d = scope_doc(assumptions=[a], sql_sha256=None,
                           open_questions=imported["analyst_questions"])
             draft = p.write_json(d["slug"], "scope.draft.json", d)
+            p.commit("maintained intake")
             result = run(["publish", d["slug"], "scope", str(draft)], p.root)
             self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
             self.assertEqual(run(["render", d["slug"], "scope"], p.root).returncode, 0)
@@ -312,6 +315,7 @@ class Intake(unittest.TestCase):
                 # Engineer and analyst confirmations coexist; config labels identify neither.
                 engineer_item = next(a for a in merged["assumptions"] if a["id"] == "A1")
                 self.assertEqual(engineer_item["confirmed_by"], "engineer-login")
+                p.commit("maintained intake")
                 invoke("publish", d["slug"], "scope", str(draft))
                 published = json.loads((draft.parent / "scope.json").read_text())
                 self.assertEqual(published, merged)

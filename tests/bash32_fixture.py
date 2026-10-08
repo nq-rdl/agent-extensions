@@ -5,6 +5,9 @@ This is not native macOS/BSD coverage. See docs/bash32-portability.md for proven
 """
 import hashlib
 import os
+import platform
+import re
+import shlex
 import shutil
 import subprocess
 import urllib.request
@@ -69,3 +72,38 @@ def run_container(tmp, target, command, *, readonly=False, payload=None):
          'set -euo pipefail; test "${BASH_VERSINFO[0]}.${BASH_VERSINFO[1]}" = 3.2; '
          'sed --help 2>&1 | grep BusyBox >/dev/null; ' + command],
         input=payload, capture_output=True, text=True, timeout=180)
+
+
+def copy_host_git(directory, target):
+    """Copy Linux amd64 Git and its ELF runtime, without installs or network.
+
+    Git is an external fixture dependency, not a pinned portability target.
+    The container still supplies pinned Bash 3.2/BusyBox and verified static jq.
+    Unsupported/missing Git fails the selected case; strict CI never accepts skips.
+    """
+    if platform.system() != "Linux" or platform.machine() not in ("x86_64", "amd64"):
+        raise RuntimeError("SQL-source fixture requires Linux amd64 host Git")
+    executable = shutil.which("git")
+    if not executable:
+        raise RuntimeError("SQL-source fixture requires host Git")
+    probe = subprocess.run(["ldd", executable], check=True, capture_output=True, text=True)
+    libraries = re.findall(r"(?:=>\s+|^\s*)(/[^\s]+)", probe.stdout, re.MULTILINE)
+    loaders = [path for path in libraries if Path(path).name.startswith("ld-linux-")]
+    if len(loaders) != 1 or "not found" in probe.stdout:
+        raise RuntimeError("SQL-source fixture requires complete glibc Git runtime")
+    runtime = directory / "git-runtime"
+    runtime.mkdir()
+    shutil.copyfile(executable, runtime / "git")
+    (runtime / "git").chmod(0o755)
+    for library in libraries:
+        destination = runtime / Path(library).name
+        shutil.copyfile(library, destination)
+        destination.chmod(0o755)
+    bindir = directory / "bin"
+    bindir.mkdir(exist_ok=True)
+    prefix = target + "/git-runtime"
+    command = " ".join(shlex.quote(v) for v in (
+        prefix + "/" + Path(loaders[0]).name, "--library-path", prefix, prefix + "/git"))
+    wrapper = bindir / "git"
+    wrapper.write_text('#!/bin/sh\nexec ' + command + ' "$@"\n')
+    wrapper.chmod(0o755)

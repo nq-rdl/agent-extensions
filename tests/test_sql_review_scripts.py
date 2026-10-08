@@ -190,16 +190,18 @@ class Status(unittest.TestCase):
             p.sql("reports/monthly.sql", SQL_V1)
             p.sql("reports/weekly.sql", SQL_V1)
             p.sql("audits/gone.sql", SQL_V1)
+            p.commit("initial maintained SQL")
             for slug, path in (("reports__monthly", "reports/monthly.sql"), ("reports__weekly", "reports/weekly.sql"),
-                               ("audits__gone", "audits/gone.sql"), ("reports__nobase", "reports/nobase.sql")):
-                p.write_json(slug, "review.json", review_doc(slug, path))
-            run(["snapshot", "reports__monthly", "reports/monthly.sql"], p.root)
-            run(["snapshot", "reports__weekly", "reports/weekly.sql"], p.root)
-            run(["snapshot", "audits__gone", "audits/gone.sql"], p.root)
+                               ("audits__gone", "audits/gone.sql")):
+                fp = json.loads(run(["fingerprint", path], p.root).stdout)
+                p.write_json(slug, "review.json", review_doc(slug, **fp))
+                self.assertEqual(run(["snapshot", slug, path], p.root).returncode, 0)
             (p.root / "reports" / "weekly.sql").write_text(SQL_V2)
             (p.root / "audits" / "gone.sql").unlink()
             p.sql("reports/nobase.sql", SQL_V1)
-            p.write_json("reports__planned", "scope.json", scope_doc("reports__planned", "reports/planned.sql"))
+            p.commit("changed maintained sources")
+            p.write_json("reports__nobase", "review.json", review_doc("reports__nobase", "reports/nobase.sql"))
+            p.write_json("reports__planned", "scope.json", scope_doc("reports__planned", "reports/planned.sql", sql_sha256=None))
             j = json.loads(run(["status", "--json"], p.root).stdout)
             states = {r["slug"]: r["state"] for r in j["reviews"]}
             self.assertEqual(states, {
@@ -307,10 +309,12 @@ class Fingerprint(unittest.TestCase):
 class SnapshotDelta(unittest.TestCase):
     def _reviewed(self, p, path="reports/monthly.sql", slug="reports__monthly"):
         p.sql(path, SQL_V1)
-        p.write_json(slug, "review.json", review_doc(slug, path))
+        p.commit("reviewed maintained source")
+        fp = json.loads(run(["fingerprint", path], p.root).stdout)
+        p.write_json(slug, "review.json", review_doc(slug, **fp))
         r = run(["snapshot", slug, path], p.root)
         self.assertEqual(r.returncode, 0, r.stderr)
-        self.assertEqual((p.root / ".sqlreview" / "reviews" / slug / "source.sql").read_text(), SQL_V1)
+        self.assertEqual(list((p.root / ".sqlreview").rglob("*.sql")), [])
 
     def test_unchanged_exits_0_changed_exits_10(self):
         with tempfile.TemporaryDirectory() as tmp:
@@ -319,29 +323,31 @@ class SnapshotDelta(unittest.TestCase):
             r = run(["delta", "reports__monthly"], p.root)
             self.assertEqual(r.returncode, 0, r.stderr)
             (p.root / "reports" / "monthly.sql").write_text(SQL_V2)
+            p.commit("changed maintained source")
             r = run(["delta", "reports__monthly"], p.root)
             self.assertEqual(r.returncode, 10)
             self.assertIn("-WITH stays AS", r.stdout)
             self.assertIn("+WITH completed AS", r.stdout)
             self.assertIn("baseline_sha256=", r.stdout)
 
-    def test_baseline_is_bytes_not_git(self):
-        # dirty, untracked, reverted-to-HEAD and no-git all behave the same: bytes vs bytes.
+    def test_committed_baseline_refuses_dirty_untracked_and_no_git_sources(self):
         with tempfile.TemporaryDirectory() as tmp:
             p = Project(tmp)
-            f = p.sql("reports/monthly.sql", SQL_V2)          # HEAD will hold V2
-            git(p.root, "add", "-A")
-            git(p.root, "commit", "-q", "-m", "v2")
-            f.write_text(SQL_V1)                               # reviewed content is the dirty V1
-            p.write_json("reports__monthly", "review.json", review_doc())
-            run(["snapshot", "reports__monthly", "reports/monthly.sql"], p.root)
+            self._reviewed(p)
+            f = p.root / "reports/monthly.sql"
+            f.write_text(SQL_V2)
+            self.assertEqual(run(["delta", "reports__monthly"], p.root).returncode, 2)
+            git(p.root, "checkout", "--", "reports/monthly.sql")
             self.assertEqual(run(["delta", "reports__monthly"], p.root).returncode, 0)
-            git(p.root, "checkout", "--", "reports/monthly.sql")   # revert to HEAD → differs from baseline
-            self.assertEqual(run(["delta", "reports__monthly"], p.root).returncode, 10)
+            p.sql("untracked.sql", SQL_V1)
+            self.assertEqual(run(["fingerprint", "untracked.sql"], p.root).returncode, 2)
+            self.assertEqual(run(["delta", "reports__monthly"], p.root).returncode, 2)
         with tempfile.TemporaryDirectory() as tmp:
             p = Project(tmp, git_repo=False)
-            self._reviewed(p, "untracked.sql", "untracked")
-            self.assertEqual(run(["delta", "untracked"], p.root).returncode, 0)
+            p.sql("q.sql", SQL_V1)
+            p.write_json("q", "review.json", review_doc("q", "q.sql"))
+            self.assertEqual(run(["fingerprint", "q.sql"], p.root).returncode, 2)
+            self.assertEqual(run(["snapshot", "q", "q.sql"], p.root).returncode, 2)
 
     def test_no_baseline_exits_6_missing_sql_exits_2(self):
         with tempfile.TemporaryDirectory() as tmp:
@@ -350,7 +356,7 @@ class SnapshotDelta(unittest.TestCase):
             p.write_json("reports__monthly", "review.json", review_doc())
             r = run(["delta", "reports__monthly"], p.root)
             self.assertEqual(r.returncode, 6)
-            self.assertIn("baseline", r.stderr)
+            self.assertIn("immutable source evidence", r.stderr)
             self._reviewed(p)
             (p.root / "reports" / "monthly.sql").unlink()
             self.assertEqual(run(["delta", "reports__monthly"], p.root).returncode, 2)
@@ -365,11 +371,14 @@ class Impact(unittest.TestCase):
         with tempfile.TemporaryDirectory() as tmp:
             p = Project(tmp)
             p.sql("q.sql", self.SQL)
-            p.write_json("q", "review.json", review_doc("q", "q.sql"))
+            p.commit("maintained source")
+            fp = json.loads(run(["fingerprint", "q.sql"], p.root).stdout)
+            p.write_json("q", "review.json", review_doc("q", **fp))
             run(["snapshot", "q", "q.sql"], p.root)
             # Line 2 changes: the projected columns now name month and ward_id, which unchanged
             # lines 7, 9 and 10 depend on. `wards` is untouched and must not be traced.
             (p.root / "q.sql").write_text(self.SQL.replace("SELECT * FROM adm.stays", "SELECT id, ward_id, month FROM adm.stays"))
+            p.commit("changed projection")
             r = run(["impact", "q"], p.root)
             self.assertEqual(r.returncode, 0, r.stderr)
             self.assertIn("heuristic", r.stdout.lower())
@@ -385,7 +394,10 @@ class Impact(unittest.TestCase):
             p.sql("q.sql", SQL_V1)
             p.write_json("q", "review.json", review_doc("q", "q.sql"))
             self.assertEqual(run(["impact", "q"], p.root).returncode, 6)
-            run(["snapshot", "q", "q.sql"], p.root)
+            p.commit("maintained source")
+            fp = json.loads(run(["fingerprint", "q.sql"], p.root).stdout)
+            p.write_json("q", "review.json", review_doc("q", **fp))
+            self.assertEqual(run(["snapshot", "q", "q.sql"], p.root).returncode, 0)
             r = run(["impact", "q"], p.root)
             self.assertEqual(r.returncode, 0)
             self.assertIn("no change", r.stdout.lower())

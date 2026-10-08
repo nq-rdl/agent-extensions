@@ -630,7 +630,7 @@ cmd_materialize() (
   [ $# -eq 4 ] || usage
   sr_need_jq
   sr_require_root
-  local slug="$1" kind="$2" revision="$3" output doc current work
+  local slug="$1" kind="$2" revision="$3" output doc current work staged=""
   sr_safe_slug "$slug"
   case "$kind" in scope|review) ;; *) usage ;; esac
   case "$revision" in ""|*[!0-9]*|0|0*) sr_die 2 "revision must be a positive integer" ;; esac
@@ -649,11 +649,19 @@ cmd_materialize() (
   jq -e --arg slug "$slug" --arg kind "$kind" --argjson revision "$revision" \
     '.slug == $slug and .kind == $kind and .revision == $revision' "$doc" >/dev/null || sr_die 4 "recorded revision identity differs"
   work="$(sr_source_workspace)" || exit 2
-  trap 'rm -rf "$work"' EXIT
+  trap '[ -z "$staged" ] || rm -f "$staged"; rm -rf "$work"' EXIT
   trap 'exit 2' HUP INT TERM
   cp "$doc" "$work/document.json" || exit 2
   sr_source_auth "$work/document.json" "$work/recorded.sql" || exit $?
-  cp "$work/recorded.sql" "$output" || sr_die 2 "cannot copy authenticated render to output"
+  # Never truncate an existing output inode: an external hard link may share
+  # that inode with an in-repository file. Stage a fresh sibling and rename it.
+  umask 077
+  staged="$(mktemp "$(dirname "$output")/.sqlreview-materialize.XXXXXX")" || sr_die 2 "cannot stage authenticated output"
+  cp "$work/recorded.sql" "$staged" || sr_die 2 "cannot copy authenticated render to output"
+  sr_no_symlinks "$output" || exit 2
+  [ ! -e "$output" ] || [ -f "$output" ] || sr_die 2 "output is not a regular file"
+  mv "$staged" "$output" || sr_die 2 "cannot publish authenticated output"
+  staged=""
 )
 
 cmd_snapshot() (

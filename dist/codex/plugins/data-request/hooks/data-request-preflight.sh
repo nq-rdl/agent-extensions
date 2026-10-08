@@ -52,9 +52,9 @@ elif [ "$rc" -eq 0 ] && [ -n "$status" ]; then
              (.counts.scoped // 0 | select(. > 0) | "\(.) scoped (bootstrap only)"),
              (.counts["scoped-header-only"] // 0 | select(. > 0) | "\(.) scoped-header-only (\(names("scoped-header-only"))) — /data-request:bootstrap: inspect the header diff and notes, then record the header revision if confirmations remain unchanged"),
              (.counts.stale // 0 | select(. > 0) | "\(.) stale (\(names("stale")))"),
-             (.counts["no-baseline"] // 0 | select(. > 0) | "\(.) without a baseline (\(names("no-baseline")))"),
+             (.counts["no-baseline"] // 0 | select(. > 0) | "\(.) without authenticated source evidence (\(names("no-baseline")))"),
              (.counts.missing // 0 | select(. > 0) | "\(.) whose SQL is missing (\(names("missing")))") ] | join(", "))
-        + ". Stale or baseline-less reviews need /data-request:analyse --update before /data-request:explain; a missing SQL file is rebound with sqlreview.sh move."
+        + ". Stale or source-unavailable reviews need /data-request:analyse --update before /data-request:explain; a moved committed SQL source is rebound with sqlreview.sh move."
       end' 2>/dev/null)"
 fi
 [ -n "$ctx" ] || exit 0

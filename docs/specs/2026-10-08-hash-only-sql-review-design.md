@@ -1,7 +1,7 @@
 # Hash-only SQL review records — issue #505
 
 Status: design approved by Josh on 2026-10-08, including separate maintainer
-migration delivery; implementation plan awaits review.
+migration delivery and subagent-driven implementation; implementation in progress.
 
 ## Intent and acceptance
 
@@ -183,9 +183,8 @@ the maintainer includes deletions and audit hashes in each child's reviewed PR.
 
 ## Implementation boundary
 
-This PR currently contains design and planning only. It does not close #505
-and does not change shipped behavior. After implementation-plan review,
-implement on this branch. Scaffold#290 supplies the production render
+This PR implements the hash-only review runtime and its workflow instructions.
+It does not close #505 until the production adapter is verified. Scaffold#290 supplies the production render
 adapter; test this repository against a deterministic fixture adapter and
 report production integration as pending until the scaffold contract is met.
 The one-off child migration has a separate completion record; no child is

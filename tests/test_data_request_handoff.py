@@ -100,55 +100,68 @@ class HandoffContracts(unittest.TestCase):
 class CommittedHandoffEvidence(unittest.TestCase):
     """Execute the documented gate against a checked PR SHA, not merely local HEAD."""
 
-    def test_review_and_snapshot_must_match_checked_head(self):
+    def test_review_and_committed_render_must_match_checked_head(self):
+        from test_sql_review_scripts import Project, review_doc, run as helper_run
+        from test_sql_review_sources import ADAPTER
         handoff = (REPO / "skills/data-request-triage/references/handoff.rst").read_text()
         block = re.search(r"\.\. code-block:: bash\n\n((?:     .*\n|\n)+)", handoff)
         self.assertIsNotNone(block, "hand-off needs an executable committed-evidence gate")
         gate = textwrap.dedent(block.group(1))
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)
+            project = Project(root)
+            (root / "sql").mkdir()
+            (root / ".gitignore").write_text("sql/request.sql\n")
+            (root / "payload").write_text("SELECT 1;\n")
+            (root / "render.sh").write_text(ADAPTER)
+            config = root / ".sqlreview/config.json"
+            doc = json.loads(config.read_text())
+            doc["sql_render"] = {"command": ["bash", "render.sh"]}
+            config.write_text(json.dumps(doc))
+            (root / "sql/provenance.json").write_text(json.dumps({"schema": 1, "requests": {
+                "sql/request.sql": {"source": "builder"}}}))
+            project.commit()
+            fp = json.loads(helper_run(["fingerprint", "sql/request.sql"], root).stdout)
+            draft = project.write_json("sql__request", "review.draft.json", review_doc(
+                "sql__request", **fp, logic=[], open_questions=[]))
+            result = helper_run(["publish", "sql__request", "review", str(draft)], root)
+            self.assertEqual(result.returncode, 0, result.stderr)
+            draft.unlink()
+            checked = project.commit("checked review")
             env = {k: v for k, v in os.environ.items() if not k.startswith("GIT_")}
-            env["SLUG"] = "q"
+            env.update(SLUG="sql__request", PR_HEAD=checked, RUN_COMMIT=checked,
+                       S=str(REPO / "skills/data-request-setup/scripts"))
+            review = draft.with_name("review.json")
+            original = review.read_bytes()
 
-            def git(*args):
-                return subprocess.run(["git", *args], cwd=root, env=env,
-                                      text=True, capture_output=True, check=True).stdout.strip()
-
-            git("init", "-q")
-            git("config", "user.name", "Fixture")
-            git("config", "user.email", "fixture@example.test")
-            directory = root / ".sqlreview/reviews/q"
-            directory.mkdir(parents=True)
-            review = directory / "review.json"
-            snapshot = directory / "source.sql"
-            review.write_text('{"revision": 1}\n')
-            snapshot.write_text("select 1;\n")
-            git("add", ".sqlreview")
-            git("commit", "-qm", "checked review")
-            env["PR_HEAD"] = git("rev-parse", "HEAD")
-
-            def run(expected):
+            def execute(expected):
                 result = subprocess.run(["bash", "-c", gate], cwd=root, env=env,
                                         capture_output=True, text=True)
-                self.assertEqual(result.returncode, expected, result.stderr)
+                self.assertEqual(result.returncode, expected, result.stdout + result.stderr)
 
-            run(0)
-            review.write_text('{"revision": 2}\n')
-            run(4)  # uncommitted review
-            git("add", ".sqlreview")
-            git("commit", "-qm", "local unpublished review")
-            run(4)  # clean local HEAD is not the checked PR head
-            review.write_text('{"revision": 1}\n')
-            snapshot.write_text("select 2;\n")
-            run(4)  # matching review alone is insufficient
-            snapshot.write_text("select 1;\n")
-            run(0)
+            execute(0)  # SQL never existed in a Git tree or review store.
+            review.write_text(review.read_text().replace('"revision": 1', '"revision": 2', 1))
+            execute(4)  # Uncommitted review differs from checked PR head.
+            project.commit("local unpublished review")
+            execute(4)  # A clean local HEAD is not the checked PR head.
+            review.write_bytes(original)
+            (root / "payload").write_text("SELECT 2;\n")
+            execute(2)  # Uncommitted maintained sources cannot supply fresh evidence.
+            (root / "payload").write_text("SELECT 1;\n")
+            execute(0)
             env["SLUG"] = "untracked"
-            new = root / ".sqlreview/reviews/untracked"
-            new.mkdir()
-            (new / "review.json").write_text(review.read_text())
-            (new / "source.sql").write_text(snapshot.read_text())
-            run(4)  # evidence absent from the checked commit
+            other = project.review_dir("untracked") / "review.json"
+            other.write_bytes(original)
+            execute(4)  # The checked commit must contain the actual reviewed record.
+            other.unlink()
+            env["SLUG"] = "sql__request"
+            corrupt = json.loads(original)
+            corrupt["sql_sha256"] = "0" * 64
+            review.write_text(json.dumps(corrupt))
+            env["PR_HEAD"] = project.commit("corrupt reviewed hash")
+            env["RUN_COMMIT"] = env["PR_HEAD"]
+            execute(10)  # Checked identity alone cannot authenticate SQL provenance.
+            self.assertEqual(list((root / ".sqlreview").rglob("*.sql")), [])
 
 
 class HandoffEvalFixtures(unittest.TestCase):
