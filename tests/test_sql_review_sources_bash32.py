@@ -12,6 +12,40 @@ from unittest.mock import patch
 from test_sql_review_scripts import Project, review_doc, item, REPO
 from bash32_fixture import container_runtime, static_jq, run_container
 
+# Diagnose only Git's synthetic fixture checkout, before any adapter/SQL execution.
+# Mirror sr_source_isolated's environment and the clone/checkout argv exactly.
+GIT_PREFLIGHT = r'''
+set -euo pipefail
+probe="$(mktemp -d /tmp/sqlreview-git-probe.XXXXXX)"
+trap 'rm -rf "$probe"' EXIT
+mkdir "$probe/home" "$probe/runtime" "$probe/config" "$probe/cache" "$probe/data" "$probe/state"
+head="$(git -C "$PROJECT" rev-parse --verify HEAD)"
+fixture_git_isolated() {
+  env -i PATH="$PATH" HOME="$probe/home" TMPDIR="$probe/runtime" \
+    XDG_CONFIG_HOME="$probe/config" XDG_CACHE_HOME="$probe/cache" \
+    XDG_DATA_HOME="$probe/data" XDG_STATE_HOME="$probe/state" \
+    LC_ALL=C LANG=C TZ=UTC GIT_CONFIG_NOSYSTEM=1 GIT_CONFIG_GLOBAL=/dev/null "$@"
+}
+if fixture_git_isolated git -c core.hooksPath=/dev/null clone --quiet --shared --no-checkout "$PROJECT" "$probe/tree" > "$probe/git.log" 2>&1; then
+  :
+else
+  rc=$?
+  printf 'fixture Git clone failed (exit %s)\n' "$rc" >&2
+  cat "$probe/git.log" >&2
+  exit "$rc"
+fi
+if fixture_git_isolated git -C "$probe/tree" -c core.hooksPath=/dev/null -c core.autocrlf=false checkout --quiet --detach "$head" >> "$probe/git.log" 2>&1; then
+  :
+else
+  rc=$?
+  printf 'fixture Git checkout failed (exit %s)\n' "$rc" >&2
+  cat "$probe/git.log" >&2
+  exit "$rc"
+fi
+rm -rf "$probe"
+trap - EXIT
+'''
+
 SCENARIO = r'''
 set -euo pipefail
 cd "$PROJECT"
@@ -114,13 +148,33 @@ class Bash32Sources(unittest.TestCase):
             shutil.copyfile(static_jq(), Path(tmp) / "jq")
             (Path(tmp) / "jq").chmod(0o755)
             copy_host_git(Path(tmp), "/w")
-            command = 'export PATH=/w/bin:/w:$PATH PROJECT=/w/project FIXTURE=/w; ' + SCENARIO
+            command = 'export PATH=/w/bin:/w:$PATH PROJECT=/w/project FIXTURE=/w; ' + GIT_PREFLIGHT + SCENARIO
             r = run_container(tmp, "/w", command)
             self.assertEqual(r.returncode, 0, r.stdout + r.stderr)
             self.assertIn("source-contract-ok", r.stdout)
 
 
 class HostGitFixture(unittest.TestCase):
+    def test_isolated_git_preflight_exposes_corrupt_checkout_error_without_sql(self):
+        if platform.system() != "Linux" or platform.machine() not in ("x86_64", "amd64"):
+            self.skipTest("host Git preflight requires Linux amd64")
+        from bash32_fixture import copy_host_git
+        with tempfile.TemporaryDirectory() as tmp:
+            project = fixture(tmp)
+            copy_host_git(Path(tmp), tmp)
+            env = {**os.environ, "PROJECT": str(project),
+                   "PATH": str(Path(tmp) / "bin") + os.pathsep + os.environ["PATH"]}
+            success = subprocess.run(["bash", "-c", GIT_PREFLIGHT], env=env, text=True, capture_output=True)
+            self.assertEqual(success.returncode, 0, success.stdout + success.stderr)
+            tree = subprocess.run(["git", "-C", str(project), "rev-parse", "HEAD^{tree}"],
+                                  text=True, capture_output=True, check=True).stdout.strip()
+            (project / ".git/objects" / tree[:2] / tree[2:]).unlink()
+            failed = subprocess.run(["bash", "-c", GIT_PREFLIGHT], env=env, text=True, capture_output=True)
+            self.assertNotEqual(failed.returncode, 0)
+            self.assertIn("fixture Git checkout failed", failed.stderr)
+            self.assertIn("fatal:", failed.stderr)
+            self.assertNotIn("SELECT", failed.stdout + failed.stderr)
+
     def test_fixture_ownership_trust_resets_inherited_safe_directories(self):
         if platform.system() != "Linux" or platform.machine() not in ("x86_64", "amd64"):
             self.skipTest("host Git copy ownership test requires Linux amd64")
@@ -159,6 +213,16 @@ class HostGitFixture(unittest.TestCase):
                                      str(project), str(Path(tmp) / "clone")],
                                     env=env, text=True, capture_output=True)
             self.assertEqual(cloned.returncode, 0, cloned.stdout + cloned.stderr)
+            # The hook also marks the newly created destination unowned. It stays
+            # refused unless that one disposable path is explicitly trusted.
+            checkout = [str(Path(tmp) / "bin/git"), "-C", str(Path(tmp) / "clone")]
+            refused_clone = subprocess.run(checkout + ["checkout", "--detach", "HEAD"],
+                                           env=env, text=True, capture_output=True)
+            self.assertEqual(refused_clone.returncode, 128, refused_clone.stdout + refused_clone.stderr)
+            trusted_clone = subprocess.run(checkout + ["-c", "safe.directory=" + str(Path(tmp) / "clone"),
+                                                       "checkout", "--detach", "HEAD"],
+                                           env=env, text=True, capture_output=True)
+            self.assertEqual(trusted_clone.returncode, 0, trusted_clone.stdout + trusted_clone.stderr)
             r = subprocess.run(["bash", str(Path(tmp) / "setup/scripts/sqlreview.sh"),
                                 "fingerprint", "sql/request.sql"], cwd=project,
                                env=env, text=True, capture_output=True)
