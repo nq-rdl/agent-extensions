@@ -117,6 +117,7 @@ class BootstrapHeader(unittest.TestCase):
                             "\n    rationale: " + self.scope["assumptions"][0]["rationale"] +
                             "\nlimitations:\n  - " + self.scope["limitations"][0]["text"] +
                             "\n    consequence: " + self.scope["limitations"][0]["rationale"] + "\n*/\n" + SQL_V1)
+        self.p.commit()
         fp = run(["fingerprint", "q.sql"], self.p.root)
         self.assertEqual(fp.returncode, 0, fp.stderr)
         self.scope.update({k: v for k, v in json.loads(fp.stdout).items() if k in ("sql_sha256", "sql_body_sha256")})

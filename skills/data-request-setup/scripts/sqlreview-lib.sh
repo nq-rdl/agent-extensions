@@ -224,6 +224,8 @@ sr_binding() { # <document> <current SQL> <optional baseline>; 0 full, 10 header
 
 sr_now() { date -u +%Y-%m-%dT%H:%M:%SZ; }
 
+. "$SR_SCRIPT_DIR/sqlreview-source.sh"
+
 # The authoritative document of a review directory: review.json, else scope.json, else nothing.
 sr_doc_for() { # <slug> -> path
   sr_safe_slug "$1"

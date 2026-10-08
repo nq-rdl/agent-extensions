@@ -122,6 +122,7 @@ class GrainRendering(unittest.TestCase):
 
                 sql = p.sql("q.sql", "select admission_id from admissions;\n")
                 original_sql = sql.read_bytes()
+                p.commit()
                 sha = json.loads(invoke("fingerprint", "q.sql"))["sql_sha256"]
                 grain = item("A-grain", "One row per admission.",
                              rationale="Prior delivery admissions.csv at v1.0.0 uses admission keys.")

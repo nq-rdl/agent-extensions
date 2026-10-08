@@ -48,6 +48,7 @@ class ReviewRegressions(unittest.TestCase):
         self.assertEqual(len(slugs), len(set(slugs)))
 
     def test_nested_cwd_resolves_project_paths(self):
+        self.p.commit()
         nested = self.p.root / 'nested'
         nested.mkdir()
         result = run(['fingerprint', 'q.sql'], nested)

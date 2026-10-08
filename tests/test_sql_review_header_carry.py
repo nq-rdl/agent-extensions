@@ -294,6 +294,7 @@ class HeaderCarry(unittest.TestCase):
     def publish_answered(self):
         self.answered()
         self.doc["schemaVersion"] = 2
+        self.p.commit("commit review setup")
         fp = json.loads(run(["fingerprint", "q.sql"], self.p.root).stdout)
         self.doc["sql_body_sha256"] = fp["sql_body_sha256"]
         self.draft.write_text(json.dumps(self.doc))

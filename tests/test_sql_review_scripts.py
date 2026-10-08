@@ -96,6 +96,11 @@ class Project:
         p.write_text(text)
         return p
 
+    def commit(self, message="source"):
+        git(self.root, "add", "-A")
+        git(self.root, "commit", "-q", "-m", message)
+        return git(self.root, "rev-parse", "HEAD").stdout.strip()
+
     def review_dir(self, slug):
         d = self.root / ".sqlreview" / "reviews" / slug
         d.mkdir(parents=True, exist_ok=True)
@@ -289,15 +294,14 @@ class Fingerprint(unittest.TestCase):
             self.assertEqual(j["git_commit"], head)
             self.assertFalse(j["git_dirty"])
             f.write_text(SQL_V2)
-            self.assertTrue(json.loads(run(["fingerprint", "reports/monthly.sql"], p.root).stdout)["git_dirty"])
+            self.assertEqual(run(["fingerprint", "reports/monthly.sql"], p.root).returncode, 2)
             self.assertEqual(run(["fingerprint", "nope.sql"], p.root).returncode, 2)
 
     def test_without_git(self):
         with tempfile.TemporaryDirectory() as tmp:
             p = Project(tmp, git_repo=False)
             p.sql("q.sql", SQL_V1)
-            j = json.loads(run(["fingerprint", "q.sql"], p.root).stdout)
-            self.assertIsNone(j["git_commit"])
+            self.assertEqual(run(["fingerprint", "q.sql"], p.root).returncode, 2)
 
 
 class SnapshotDelta(unittest.TestCase):

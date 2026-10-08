@@ -110,6 +110,15 @@ if type != "object" then "document is not a JSON object"
 else
   .revision as $rev
   | identity_violations,
+    (if has("sql_provenance") then
+      if (.sql_provenance | type) != "object" then "sql_provenance must be an object"
+      elif (.sql_provenance.mode != "rendered" and .sql_provenance.mode != "tracked") or
+           ((.sql_provenance.project_root == "" or (.sql_provenance.project_root | path_ok)) | not) or
+           (.sql_provenance.commit | type != "string") then "invalid sql_provenance mode, project_root or commit"
+      elif (.sql_provenance.commit | test("^[0-9a-f]{40}$|^[0-9a-f]{64}$") | not) or
+           .sql_provenance.commit != .git_commit or .git_dirty != false or .sql_sha256 == null
+      then "sql_provenance requires clean SQL bound to the same immutable git_commit" else empty end
+    else empty end),
     (if (.sql_path | path_ok | not) then "sql_path must be a normalized project-relative path" else empty end),
     (if (.slug | nonempty | not) or (.slug | test("^[A-Za-z0-9_%.-]+$") | not) or .slug == "." or .slug == ".." then "unsafe slug" else empty end),
     (if (.sql_path | path_ok) and .slug != (.sql_path | path_slug) and .slug != (.sql_path | legacy_path_slug) then "slug/sql_path binding mismatch" else empty end),

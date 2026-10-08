@@ -1,6 +1,6 @@
 # Hash-only SQL Review Implementation Plan
 
-> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development or superpowers:executing-plans to implement this plan task-by-task. Direct implementation in this session is recommended; execution choice awaits plan review.
+> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development to implement this plan task-by-task. Josh selected this execution method on 2026-10-08.
 
 **Goal:** Resolve #505 by retaining reproducible hashes and source commits while preserving SQL diffs, confirmation evidence and release checks.
 
@@ -86,7 +86,7 @@
 - [ ] Run `pixi run python3 -m unittest discover -s tests -p 'test_*.py'`, `pixi run bash scripts/validate-plugins.sh`, `pixi run bash scripts/sync-plugins.sh data-request --check`, `go -C tools/asctl test ./...`, build asctl and run `repo-check`, and `git diff --check`. Run strict Bash 3.2 preparation/execution from `docs/bash32-portability.md`; skips do not prove portability. Confirm the sync script's option ordering before its check invocation.
 - [ ] Review the complete diff against all acceptance items; independently review using the selected execution workflow. Update PR title/body to final implemented behavior, validation results and scaffold integration status. Push the branch and resolve applicable CI failures; leave the PR unmerged. Do not claim production scaffold integration or close #505 until its required adapter is verified.
 
-## Separate Rollout A: Maintainer cleanup utility and child PRs
+## Task 6: Separate maintainer cleanup utility (Rollout A)
 
 This is a rollout deliverable, separate from the five packaged-runtime tasks.
 The utility can be reviewed in this branch; execution in child repositories
@@ -103,9 +103,7 @@ requires the affected-repo inventory and corresponding operator handoff.
 
 ## Review and execution handoff
 
-The spec and separate migration delivery are approved. This revised plan
-awaits review before runtime implementation. No affected child repos have
-been changed or marked migrated.
-Recommended method: implement directly in this session using executing-plans,
-then review the whole branch independently. The tasks share one rendering and
-provenance interface, so implementing them in sequence avoids interface drift.
+The spec, separate migration delivery and subagent-driven execution are
+approved. Implementation proceeds sequentially with a fresh implementer and
+task reviewer, followed by an independent whole-branch review. No affected
+child repos have been changed or marked migrated.

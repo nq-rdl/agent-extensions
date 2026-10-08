@@ -27,7 +27,7 @@
 #   guard string-sql on|off                    set only guard.require_lift_for_string_sql in config.json
 #   lifts-stale SLUG --tag TAG                  read-only JSON nudges for units newly present at a stable library tag
 #                                              uses authenticated gh GETs; unavailable evidence is unknown, never absent
-#   fingerprint SQL                            {sql_path, sql_sha256, sql_body_sha256, git_commit, git_dirty}
+#   fingerprint SQL                            fresh clean-HEAD render: hashes, commit, git_dirty:false, sql_provenance
 #   snapshot SLUG SQL                          verify final review SHA, retain history, advance source.sql
 #   delta SLUG                                 body binding + full hashes; exit 0 full/header-only, 10 body change, 6 no baseline
 #   carryover SLUG DRAFT                       review draft items matching confirmed, still-valid scope items (JSON)
@@ -566,24 +566,27 @@ cmd_publish() (
 )
 
 # ---------------------------------------------------------------------------------------------
-cmd_fingerprint() {
+cmd_fingerprint() (
   [ $# -eq 1 ] || usage
   sr_need_jq
   sr_require_root
-  local rel abs sha body="" commit="" dirty=false
+  local rel sha body="" tmp
   rel="$(sr_relpath "$1")" || exit $?
   sr_safe_sql "$rel"
-  abs="$SR_ROOT/$rel"
-  [ -f "$abs" ] || sr_die 2 "no such file: $rel"
-  sha="$(sr_sha256 "$abs")"
-  body="$(sr_body_sha256 "$abs" || true)"
-  if git -C "$SR_ROOT" rev-parse --is-inside-work-tree >/dev/null 2>&1; then
-    commit="$(git -C "$SR_ROOT" rev-parse HEAD 2>/dev/null || true)"
-    [ -n "$(git -C "$SR_ROOT" status --porcelain --untracked-files=all -- "$rel" 2>/dev/null)" ] && dirty=true
-  fi
-  jq -n --arg p "$rel" --arg sha "$sha" --arg body "$body" --arg c "$commit" --argjson dirty "$dirty" \
-    '{sql_path: $p, sql_sha256: $sha, sql_body_sha256: (if $body == "" then null else $body end), git_commit: (if $c == "" then null else $c end), git_dirty: $dirty}'
-}
+  sr_source_clean || exit 2
+  umask 077
+  tmp="$(mktemp -d "${TMPDIR:-/tmp}/sqlreview-fingerprint.XXXXXX")" || exit 2
+  trap 'rm -rf "$tmp"' EXIT
+  trap 'exit 130' INT
+  trap 'exit 143' TERM HUP
+  sr_source_render HEAD "$rel" "$tmp/render.sql" || exit 2
+  sha="$(sr_sha256 "$tmp/render.sql")"
+  body="$(sr_body_sha256 "$tmp/render.sql" || true)"
+  jq -n --arg p "$rel" --arg sha "$sha" --arg body "$body" --arg c "$SR_SOURCE_COMMIT" \
+    --arg mode "$SR_SOURCE_MODE" --arg prefix "$SR_SOURCE_PREFIX" \
+    '{sql_path: $p, sql_sha256: $sha, sql_body_sha256: (if $body == "" then null else $body end), git_commit: $c, git_dirty: false,
+      sql_provenance: {mode: $mode, project_root: $prefix, commit: $c}}'
+)
 
 # ---------------------------------------------------------------------------------------------
 cmd_snapshot() {

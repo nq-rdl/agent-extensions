@@ -34,6 +34,7 @@ class BodyBinding(unittest.TestCase):
                                                                sql_body_sha256=sha(BODY), **over)
 
     def test_fingerprint_keeps_both_hashes(self):
+        self.p.commit()
         fp = json.loads(run(["fingerprint", "q.sql"], self.p.root).stdout)
         self.assertEqual(fp["sql_sha256"], sha(OLD))
         self.assertEqual(fp["sql_body_sha256"], sha(BODY))
