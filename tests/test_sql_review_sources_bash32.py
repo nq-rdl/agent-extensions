@@ -121,6 +121,23 @@ class Bash32Sources(unittest.TestCase):
 
 
 class HostGitFixture(unittest.TestCase):
+    def test_fixture_ownership_trust_resets_inherited_safe_directories(self):
+        if platform.system() != "Linux" or platform.machine() not in ("x86_64", "amd64"):
+            self.skipTest("host Git copy ownership test requires Linux amd64")
+        with tempfile.TemporaryDirectory() as tmp:
+            inherited = Path(tmp) / "gitconfig"
+            inherited.write_text('[safe]\n\tdirectory = *\n')
+            configurations = (
+                {"GIT_CONFIG_COUNT": "1", "GIT_CONFIG_KEY_0": "safe.directory", "GIT_CONFIG_VALUE_0": "*"},
+                {"GIT_CONFIG_PARAMETERS": "'safe.directory'='*'"},
+                {"GIT_CONFIG_GLOBAL": str(inherited)},
+                {"SUDO_UID": str(os.getuid())},
+            )
+            for inherited_env in configurations:
+                with self.subTest(configuration=next(iter(inherited_env))), patch.dict(os.environ, inherited_env):
+                    # Exercise actual copied Git, refusal, clone and fingerprint in each environment.
+                    self.test_fixture_ownership_trust_is_exact_and_allows_fingerprint()
+
     def test_fixture_ownership_trust_is_exact_and_allows_fingerprint(self):
         if platform.system() != "Linux" or platform.machine() not in ("x86_64", "amd64"):
             self.skipTest("host Git copy ownership test requires Linux amd64")

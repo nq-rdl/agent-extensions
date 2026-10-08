@@ -104,6 +104,9 @@ def copy_host_git(directory, target):
     prefix = target + "/git-runtime"
     command = " ".join(shlex.quote(v) for v in (
         prefix + "/" + Path(loaders[0]).name, "--library-path", prefix, prefix + "/git",
+        # Reset inherited protected trust (runner config may contain broader paths).
+        # These command-local values follow inherited config/environment entries.
+        "-c", "safe.directory=",
         # The host-created repository may have a different owner in the container.
         # Trust only this disposable fixture; modern local clone checks its .git too.
         "-c", "safe.directory=" + target + "/project",
