@@ -4,7 +4,7 @@
 
 **Goal:** Resolve #505 by retaining reproducible hashes and source commits while preserving SQL diffs, confirmation evidence and release checks.
 
-**Architecture:** One shared Bash helper reconstructs committed sources into private temporary storage. Existing consumers authenticate those renders instead of snapshot files; JSON history retains revision identities. Migration preserves legacy hashes even when an old commit cannot reproduce them.
+**Architecture:** One shared Bash helper reconstructs committed sources into private temporary storage. Existing consumers authenticate those renders instead of snapshot files; JSON history retains revision identities. A separate unbundled maintainer utility preserves legacy hashes and cleans existing child repos.
 
 **Tech Stack:** Bash 3.2-compatible shell, jq >= 1.6, git; pixi-managed Python for tests and packaging. SQL generation remains in the child's runtime.
 
@@ -13,19 +13,20 @@
 ## Global Constraints
 
 - Bash 3.2 + jq; no new Python runtime in shipped review helpers, no `eval`.
-- `.sqlreview/` contains no SQL text files, including temporary render/diff inputs.
+- New workflows write no SQL text files under `.sqlreview/`, including temporary render/diff inputs; existing copies are removed separately.
 - Authenticate full recorded SHA before body/line binding; unavailable evidence never means unchanged or SQL absent.
 - New SQL-bound records reference committed sources; scope-before-SQL retains null-hash behavior.
 - No git history rewrite, automatic child push, extract execution or database connection.
 - Edit canonical `skills/` and `hooks/`; regenerate both published skill trees.
 - Production scaffold adapter belongs to scaffold#290; use a real committed fixture adapter here and report that integration boundary.
+- Migration utility/runbook stay outside `skills/`, `plugins/` and `dist/codex/`; no migration subcommand or migration instructions in the packaged skill.
 
 ## Review Focus
 
 1. Project root below git root: historical renders must use the correct committed prefix (Task 1).
 2. Paths/argv with spaces, quotes, Unicode or newlines: preserve argv and exact SQL bytes (Task 1).
 3. Legacy scaffold manifest hashes normalize BOM/CRLF/trailing blank lines: do not confuse manifest hashes with the review's exact-byte SHA (Task 1).
-4. Interruption or concurrent edits: keep published JSON/hash evidence intact; remove temporary SQL (Tasks 2, 5).
+4. Interruption or concurrent edits: keep published JSON/hash evidence intact; remove temporary SQL (Task 2 and separate Rollout A).
 5. Missing or corrupt historical source: no automatic `sql-absent`, header-only match or line carry (Tasks 3, 4).
 
 ## Task 1: Shared render and provenance interface
@@ -48,6 +49,7 @@
 
 - [ ] Write `Publish.test_rendered_publication_without_snapshots`, `test_revision_history_retains_hash_and_commit`, `test_history_conflict_preserves_final`, `test_failed_publication_preserves_history`, `test_snapshot_is_idempotent_verification`: assert zero `.sql` files and zero `.sql` additions in staged `.sqlreview/` diffs after scope and review publication/snapshot.
 - [ ] Add header-only tests that preserve the original full SHA/confirmation and record current header hash plus source commit; corrupt recorded full hashes must refuse publication even with matching body hashes. Test source changes between fingerprint and publish and publication interrupted before replacement.
+- [ ] Add legacy-record tests with no `sql_provenance`: authenticate only a recorded clean commit reproducing the full hash; null/dirty/mismatched evidence refuses historical proof without consulting any cleanup index.
 - [ ] Run the named test files and observe the expected snapshot-dependent failures before implementation.
 - [ ] Replace snapshot writes with authenticated render binding; validate helper-owned provenance consistency. Preflight history conflicts, preserve prior JSON atomically, then replace final JSON. Re-check source/document identity before replacement. Keep lifts publication and question semantics intact.
 - [ ] Run the publication/body/header/regression suites; update assertions that explicitly require SQL copies to assert provenance/history instead. Commit this task.
@@ -74,30 +76,36 @@
 - [ ] Keep tracked-source header-history proof. For generated-source histories that cannot prove all intermediate committed rendered headers, emit no fresh header-decision eligibility and require ordinary confirmation. Preserve other valid carry bases and existing malformed-header rules.
 - [ ] Change the guard to refuse direct writes of legacy snapshot paths and update preflight hints. Run completion, hook, notes, header and release tests; commit this task.
 
-## Task 5: Preserve legacy hashes and remove SQL copies
-
-**Files:** Create `skills/data-request-setup/scripts/sqlreview-migrate.sh`, `tests/test_sql_review_snapshot_migration.py`; modify `sqlreview.sh` dispatch and `skills/data-request-setup/assets/sqlreview/` with a store `.gitignore`.
-
-**Interfaces:** `sqlreview.sh migrate-snapshots [--check]` delegates to migration helpers. Per-slug `legacy-snapshot-hashes.json` has schemaVersion 1 and `snapshots` keyed by relative legacy path, each with `sql_sha256` and reconstruction status (`available`/`unavailable`); retain recorded commit when known. Documents gain helper-owned provenance only when their exact recorded full hash is reconstructed successfully.
-
-- [ ] Write tests for check-only byte preservation, successful/idempotent removal, null/dirty/mismatched commit preservation, orphan `history/7.sql` SHA preservation, malformed JSON/symlink/nonregular refusal, legacy index conflict and interruption after index persistence. Assert confirmation/question/lift/report bytes remain unchanged except documented provenance additions.
-- [ ] Run migration tests to confirm missing-command failures. Preflight all slugs before changing files; compute and atomically persist all hash evidence before deleting the first SQL copy. A rerun verifies existing index entries rather than overwriting conflicts. Remove only named legacy files; never rewrite history or push/stage a child.
-- [ ] Install ignore rules `/reviews/**/source.sql`, `/reviews/**/scope.source.sql`, `/reviews/**/history/*.sql` without replacing custom rules. Fresh init supplies them too. Render availability errors are recorded as unavailable; invalid store/path errors stop before removal.
-- [ ] Run migration and setup/legacy regression suites; assert no removed snapshot hash is lost. Commit this task.
-
-## Task 6: Workflow instructions, packaging and full verification
+## Task 5: Workflow instructions, packaging and full verification
 
 **Files:** Modify `skills/data-request-{setup,bootstrap,analyse,explain}/SKILL.md` and relevant `.rst` references, including `references/codex.rst` when present; update `docs/data-request-permissions.md` if runtime guidance needs the adapter; add a Changie fragment. Regenerate `plugins/data-request/` and `dist/codex/plugins/data-request/`. Extend `scripts/run_bash32_portability.py`, `tests/bash32_fixture.py` as needed and add `tests/test_sql_review_sources_bash32.py`.
 
-- [ ] Add content tests that fail on workflow instructions copying snapshots or assuming generated SQL is tracked, and Bash 3.2 fixture cases exercising adapter argv, historical render, publish, carry and migration.
-- [ ] Run them to observe expected failures. Update workflows to commit maintained source, fingerprint/render for review, publish/hash verification, temporary historical materialization and migration. Include migration's unavailable-evidence recovery and scaffold adapter prerequisite. Keep new skill bodies within 500 lines and references within each installed skill.
+- [ ] Add content tests that fail on workflow instructions copying snapshots or assuming generated SQL is tracked, and Bash 3.2 fixture cases exercising adapter argv, historical render, publish and carry. Assert no migration command, utility or runbook appears in either generated plugin tree.
+- [ ] Run them to observe expected failures. Update workflows to commit maintained source, fingerprint/render for review, publish/hash verification and temporary historical materialization. Include historical-evidence reassessment and the scaffold adapter prerequisite; exclude rollout instructions. Add fresh-store ignore rules `/reviews/**/source.sql`, `/reviews/**/scope.source.sql`, `/reviews/**/history/*.sql`. Keep new skill bodies within 500 lines and references within each installed skill.
 - [ ] Refresh copies with `pixi run bash scripts/sync-plugins.sh data-request`. Create a Changie entry under 200 body characters; remove `skip-changelog` from PR #506 when runtime work is present.
 - [ ] Run `pixi run python3 -m unittest discover -s tests -p 'test_*.py'`, `pixi run bash scripts/validate-plugins.sh`, `pixi run bash scripts/sync-plugins.sh data-request --check`, `go -C tools/asctl test ./...`, build asctl and run `repo-check`, and `git diff --check`. Run strict Bash 3.2 preparation/execution from `docs/bash32-portability.md`; skips do not prove portability. Confirm the sync script's option ordering before its check invocation.
 - [ ] Review the complete diff against all acceptance items; independently review using the selected execution workflow. Update PR title/body to final implemented behavior, validation results and scaffold integration status. Push the branch and resolve applicable CI failures; leave the PR unmerged. Do not claim production scaffold integration or close #505 until its required adapter is verified.
 
+## Separate Rollout A: Maintainer cleanup utility and child PRs
+
+This is a rollout deliverable, separate from the five packaged-runtime tasks.
+The utility can be reviewed in this branch; execution in child repositories
+requires the affected-repo inventory and corresponding operator handoff.
+
+**Files:** Create `scripts/migrate_sqlreview_snapshots.sh`, `docs/sqlreview-snapshot-cleanup.md`, `tests/test_sql_review_snapshot_migration.py`. No changes to `sqlreview.sh` dispatch or installed skill instructions.
+
+**Interfaces:** `bash scripts/migrate_sqlreview_snapshots.sh --root CHILD [--check]`. The child's passive audit file `docs/maintenance/sqlreview-snapshot-hashes.json` has schemaVersion 1 and `snapshots` keyed by project-relative legacy path, each containing `sql_sha256`. The runtime does not consume this file; existing scope/review JSON stays byte-for-byte unchanged.
+
+- [ ] Write tests for check-only byte preservation, successful/idempotent removal, null/dirty commit record preservation, orphan `history/7.sql` SHA preservation, malformed JSON/symlink/nonregular refusal, audit-index conflict, custom ignore preservation and interruption after hash persistence. Assert confirmation/question/lift/report bytes remain unchanged.
+- [ ] Run migration tests to confirm missing-utility failures. Preflight all candidates before changing files; compute and atomically persist all hash evidence before deleting the first SQL copy. A rerun verifies index entries rather than overwriting conflicts. Remove only named legacy files; never stage/commit/push a child or rewrite history.
+- [ ] Add snapshot ignore rules to existing stores without replacing custom content. Document inventory, check/apply, hash-preservation inspection and normal child-PR review in the maintainer runbook. Do not infer commits, add provenance or refresh human confirmations.
+- [ ] Run utility tests and verify it/runbook are absent from regenerated plugin trees. Record cleanup delivery separately from runtime completion; existing children remain pending until their individual PRs are verified.
+
 ## Review and execution handoff
 
-The spec is approved. This plan awaits review before runtime implementation.
+The spec and separate migration delivery are approved. This revised plan
+awaits review before runtime implementation. No affected child repos have
+been changed or marked migrated.
 Recommended method: implement directly in this session using executing-plans,
 then review the whole branch independently. The tasks share one rendering and
 provenance interface, so implementing them in sequence avoids interface drift.

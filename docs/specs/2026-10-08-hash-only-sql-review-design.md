@@ -1,6 +1,7 @@
 # Hash-only SQL review records — issue #505
 
-Status: design approved by Josh on 2026-10-08; implementation plan awaits review.
+Status: design approved by Josh on 2026-10-08, including separate maintainer
+migration delivery; implementation plan awaits review.
 
 ## Intent and acceptance
 
@@ -10,8 +11,9 @@ retain hashes and reproducible source commits instead of generated SQL under
 carried confirmations against the earlier revision. No existing git history is
 rewritten. Hand-written SQL remains in its maintained location in git.
 
-After bootstrap, analyse, publish and snapshot, `.sqlreview/` contains no SQL
-text files, including intermediate files. Historical and current SQL used for
+New workflows write no SQL text files under `.sqlreview/`, including
+intermediate files. Existing copies are removed by the separate rollout below.
+Historical and current SQL used for
 comparison exist only in private temporary directories outside the repository.
 An unavailable historical render is reported as unavailable, never unchanged.
 
@@ -122,27 +124,38 @@ its rendered header history. Until that history can be proved, refuse fresh
 header-decision carry eligibility and require ordinary item confirmation;
 other valid carry bases continue to work.
 
-## Migration
+## One-off migration delivery
 
-Add `sqlreview.sh migrate-snapshots [--check]`. Dry-run lists planned removals
-and evidence availability without changing files. The apply command preflights
-all candidate files and JSON, rejects symlinks/nonregular files, computes each
-legacy snapshot's SHA, and preserves it in JSON before deleting any SQL.
+Migration is a maintainer rollout, not a packaged skill capability. Supply a
+repository utility at `scripts/migrate_sqlreview_snapshots.sh`, with
+`--root <child project> [--check]`, and a maintainer runbook under `docs/`.
+Neither is copied into Claude/Codex plugins, referenced by ordinary skill
+instructions, nor exposed as a `sqlreview.sh` subcommand. Run it on reviewable
+PR branches in the affected child repos. A later scaffold `copier update`
+migration may invoke the same cleanup contract instead of maintaining another
+implementation; wiring that rollout is outside this repository's runtime work.
 
-Retain each existing document's recorded full SHA verbatim. Preserve hashes
-for otherwise orphaned `history/*.sql` in a helper-owned legacy hash index.
-Never guess which commit produced a dirty or null-commit snapshot. Mark such
-revisions as unavailable for reconstruction and require reassessment when a
-historical proof is needed. A matching render at a recorded commit may promote
-that revision to reproducible provenance; a mismatch preserves the original
-hash and reports unavailable evidence.
+Dry-run lists planned removals without changing files. Apply preflights all
+candidate files and JSON, rejects symlinks/nonregular files, computes each
+legacy snapshot's SHA, and atomically preserves the hashes in the child's
+`docs/maintenance/sqlreview-snapshot-hashes.json` before deleting any SQL.
+This passive audit index preserves orphaned `history/*.sql` hashes too; the
+skill runtime neither loads nor maintains it. Leave scope/review JSON and all
+human confirmation fields byte-for-byte unchanged. Do not guess source commits,
+add confirmation evidence or promote legacy records during cleanup.
 
-Remove `source.sql`, `scope.source.sql` and `history/*.sql` from the working
-tree. The deletions are included in the child's normal reviewed commit; no
-git history rewrite or automatic child push occurs. Install a per-store
-`.gitignore` for legacy snapshot paths so an interrupted older workflow does
-not accidentally add a new SQL copy. Re-runs are idempotent. Preserve reports,
-human confirmation records, questions, lift history and unrelated files.
+The ongoing runtime can authenticate a legacy record using its recorded hash
+and clean, reproducible commit without requiring new provenance fields. A
+dirty/null commit, unavailable source or mismatched render requires
+reassessment when historical evidence is needed; the cleanup index cannot
+authorize a carry or supply missing SQL.
+
+Remove only `source.sql`, `scope.source.sql` and `history/*.sql` from the working
+tree, preserving reports, questions, lift history and unrelated files. Preserve
+existing ignore rules and add legacy snapshot exclusions. Fresh setup includes
+the same exclusions as prevention, without migration instructions. Re-runs are
+idempotent. The utility never stages, commits, pushes or rewrites git history;
+the maintainer includes deletions and audit hashes in each child's reviewed PR.
 
 ## Validation for implementation
 
@@ -159,9 +172,10 @@ human confirmation records, questions, lift history and unrelated files.
 - Verify header-only binding and fresh header-decision refusal when historical
   decision provenance is unavailable; preserve scope-before-SQL behavior.
 - Release and explain work when generated SQL is absent from all git trees.
-- Migration preserves every recorded/hash-only revision, removes SQL copies,
-  handles orphan history, refuses unsafe paths, and is repeatable.
-- Interrupted publication/migration preserves published JSON and hash evidence;
+- The separate maintainer utility preserves every recorded/hash-only revision,
+  removes SQL copies, handles orphan history, refuses unsafe paths, and is
+  repeatable. Neither published plugin contains the utility or its runbook.
+- Interrupted publication/cleanup preserves published JSON and hash evidence;
   temporary SQL remains outside the project and is cleaned up.
 - Run existing review, carry, header, remap, release, hook and pipeline tests;
   update snapshot-specific assertions to the new public contract. Run the
@@ -174,3 +188,5 @@ and does not change shipped behavior. After implementation-plan review,
 implement on this branch. Scaffold#290 supplies the production render
 adapter; test this repository against a deterministic fixture adapter and
 report production integration as pending until the scaffold contract is met.
+The one-off child migration has a separate completion record; no child is
+considered migrated merely because the new skill is installed.
