@@ -4,6 +4,7 @@ import json
 import os
 import subprocess
 import shutil
+import shlex
 import tempfile
 import unittest
 from pathlib import Path
@@ -89,6 +90,50 @@ class Sources(unittest.TestCase):
         r = run(["status", "--json"], self.p.root)
         self.assertEqual(json.loads(r.stdout)["reviews"][0]["state"], "stale")
         self.assertEqual(git(self.p.root, "log", "--all", "--format=%H", "--", "sql/request.sql").stdout, "")
+
+    def test_status_refuses_clean_commit_after_current_render(self):
+        self.publish_generated()
+        for header in (False, True):
+            with self.subTest(header_only=header), tempfile.TemporaryDirectory() as bindir:
+                self.change_builder(b"-- header\nSELECT 1;\nSELECT 3;\n" if header else b"SELECT 1;\nSELECT 3;\n")
+                before = git(self.p.root, "rev-parse", "HEAD").stdout
+                shim = Path(bindir) / "cp"
+                shim.write_text('#!/bin/sh\n' + shlex.quote(shutil.which("cp")) + ' "$@" || exit $?\n'
+                    'case "$2" in */current.sql)\n'
+                    '  cd ' + shlex.quote(str(self.p.root)) + '\n'
+                    "  printf 'SELECT 99;\\n' > payload\n"
+                    '  git add payload && git -c commit.gpgsign=false commit -qm "concurrent source"\n'
+                    'esac\n')
+                shim.chmod(0o755)
+                r = run(["status", "--json"], self.p.root,
+                        env={"PATH": bindir + os.pathsep + os.environ["PATH"]})
+                self.assertNotEqual(git(self.p.root, "rev-parse", "HEAD").stdout, before)
+                self.assertEqual(git(self.p.root, "status", "--porcelain").stdout, "")
+                self.assertEqual(r.returncode, 2, r.stdout + r.stderr)
+                self.assertIn("source commit changed during state check", r.stderr)
+                self.assertNotIn('"state": "current"', r.stdout)
+
+    def test_status_refuses_clean_commit_after_absence_lookup(self):
+        self.publish_generated()
+        (self.p.root / "sql/provenance.json").unlink()
+        self.p.commit("remove generated declaration")
+        before = git(self.p.root, "rev-parse", "HEAD").stdout
+        with tempfile.TemporaryDirectory() as bindir:
+            shim = Path(bindir) / "git"
+            real_git = shlex.quote(shutil.which("git"))
+            shim.write_text('#!/bin/sh\n' + real_git + ' "$@" || exit $?\n'
+                'case "$*" in *"ls-tree -r -t -z"*)\n'
+                '  cd ' + shlex.quote(str(self.p.root)) + '\n'
+                "  printf 'SELECT 99;\\n' > payload\n"
+                '  ' + real_git + ' add payload && ' + real_git + ' -c commit.gpgsign=false commit -qm "concurrent source"\n'
+                'esac\n')
+            shim.chmod(0o755)
+            r = run(["status", "--json"], self.p.root,
+                    env={"PATH": bindir + os.pathsep + os.environ["PATH"]})
+        self.assertNotEqual(git(self.p.root, "rev-parse", "HEAD").stdout, before)
+        self.assertEqual(git(self.p.root, "status", "--porcelain").stdout, "")
+        self.assertEqual(r.returncode, 2, r.stdout + r.stderr)
+        self.assertIn("source commit changed during state check", r.stderr)
 
     def test_materialize_exact_revision(self):
         draft, doc = self.publish_generated()
@@ -544,6 +589,46 @@ class Sources(unittest.TestCase):
         r = self.fingerprint()
         self.assertEqual(r.returncode, 0, r.stderr)
         self.assertEqual(json.loads(r.stdout)["sql_sha256"], hashlib.sha256(payload).hexdigest())
+        self.assertFalse((self.p.root / "injection").exists())
+
+    def test_fingerprint_tracked_newline_path_preserves_literal_bytes(self):
+        rel = "sql/line\nbreak\\name.sql"
+        path = self.p.sql(rel, "SELECT 1;\n")
+        self.p.commit("newline tracked path")
+        r = run(["fingerprint", "sql/./discard/../line\nbreak\\name.sql"], self.p.root)
+        self.assertEqual(r.returncode, 0, r.stderr)
+        fp = json.loads(r.stdout)
+        self.assertEqual(fp["sql_path"], rel)
+        self.assertEqual(fp["sql_sha256"], hashlib.sha256(path.read_bytes()).hexdigest())
+        slug = run(["slug", rel], self.p.root)
+        self.assertEqual(slug.returncode, 0, slug.stderr)
+        self.assertEqual(slug.stdout.strip(), "sql__line%0Abreak%5Cname")
+        doc = review_doc(slug.stdout.strip(), **fp, logic=[], assumptions=[], limitations=[], open_questions=[])
+        draft = self.p.write_json(slug.stdout.strip(), "review.draft.json", doc)
+        self.assertEqual(run(["check", str(draft)], self.p.root).returncode, 0)
+
+    def test_fingerprint_generated_newline_path_and_argv(self):
+        rel = "sql/line\nbreak\\name.sql"
+        literal = "literal \"quoted\"\n$(touch injection)\\end"
+        payload = b"SELECT 1;\r\n"
+        self.generated(payload)
+        (self.p.root / "sql/provenance.json").write_text(json.dumps({"schema": 1,
+            "requests": {rel: {"source": "builder"}}}))
+        cfg = self.p.root / ".sqlreview/config.json"
+        doc = json.loads(cfg.read_text())
+        doc["sql_render"]["command"] += [literal]
+        cfg.write_text(json.dumps(doc))
+        (self.p.root / "render.sh").write_text('#!/usr/bin/env bash\nset -eu\n'
+            '[ "$1" = ' + shlex.quote(literal) + ' ]; shift\n'
+            '[ "$1" = --sql-path ] && [ "$2" = ' + shlex.quote(rel) + ' ]\n'
+            '[ "$3" = --output ]\ncat payload > "$4"\n')
+        self.p.commit("newline generated path and argv")
+        r = run(["fingerprint", rel], self.p.root)
+        self.assertEqual(r.returncode, 0, r.stderr)
+        fp = json.loads(r.stdout)
+        self.assertEqual(fp["sql_path"], rel)
+        self.assertEqual(fp["sql_sha256"], hashlib.sha256(payload).hexdigest())
+        self.assertEqual(fp["sql_provenance"]["mode"], "rendered")
         self.assertFalse((self.p.root / "injection").exists())
 
     def test_dirty_source_refused(self):

@@ -16,7 +16,14 @@ SCENARIO = r'''
 set -euo pipefail
 cd "$PROJECT"
 S="$FIXTURE/setup/scripts"
-# Config argv contains a spaced literal argument. Adapter checks it and normalized paths.
+# Config argv contains spaces, quotes, a newline and a literal backslash.
+# The adapter checks exact argv and SQL paths under the pinned shell too.
+newline_path="$(printf 'sql/line\nbreak.sql')"
+bash "$S/sqlreview.sh" fingerprint "$newline_path" > "$FIXTURE/newline.json"
+jq -e --arg p "$newline_path" '.sql_path==$p and .sql_provenance.mode=="rendered"' "$FIXTURE/newline.json"
+tracked_path="$(printf 'sql/tracked\nname.sql')"
+bash "$S/sqlreview.sh" fingerprint "$tracked_path" > "$FIXTURE/tracked.json"
+jq -e --arg p "$tracked_path" '.sql_path==$p and .sql_provenance.mode=="tracked"' "$FIXTURE/tracked.json"
 bash "$S/sqlreview.sh" fingerprint sql/request.sql > "$FIXTURE/fingerprint.json"
 jq -s '.[0] * .[1]' "$FIXTURE/base.json" "$FIXTURE/fingerprint.json" > .sqlreview/reviews/sql__request/review.draft.json
 bash "$S/sqlreview.sh" publish sql__request review .sqlreview/reviews/sql__request/review.draft.json
@@ -59,19 +66,24 @@ def fixture(directory):
     (project / "sql").mkdir()
     (project / ".gitignore").write_text("sql/request.sql\n")
     (project / "payload").write_text("SELECT 1;\nSELECT 3;\n")
-    (project / "render.sh").write_text('''#!/usr/bin/env bash
+    (project / "render.sh").write_text(r'''#!/usr/bin/env bash
 set -eu
-[ "$1" = 'literal argument' ] && [ "$2" = --sql-path ] && [ "$3" = sql/request.sql ]
+[ "$1" = 'literal argument
+"quoted"\end' ] && [ "$2" = --sql-path ]
+case "$3" in sql/request.sql|'sql/line
+break.sql') ;; *) exit 2;; esac
 [ "$4" = --output ]
 case "$5" in /*) ;; *) exit 2;; esac
 cat payload > "$5"
 ''')
     config = project / ".sqlreview/config.json"
     d = json.loads(config.read_text())
-    d["sql_render"] = {"command": ["bash", "render.sh", "literal argument"]}
+    d["sql_render"] = {"command": ["bash", "render.sh", 'literal argument\n"quoted"\\end']}
     config.write_text(json.dumps(d))
     (project / "sql/provenance.json").write_text(json.dumps({"schema": 1, "requests": {
-        "sql/request.sql": {"source": "builder"}}}))
+        "sql/request.sql": {"source": "builder"}, "sql/line\nbreak.sql": {"source": "builder"},
+        "sql/tracked\nname.sql": {"source": "hand-written"}}}))
+    (project / "sql/tracked\nname.sql").write_text("SELECT 7;\n")
     p.commit()
     p.review_dir("sql__request")
     (tmp / "base.json").write_text(json.dumps(review_doc("sql__request", "sql/request.sql",
@@ -109,6 +121,33 @@ class Bash32Sources(unittest.TestCase):
 
 
 class HostGitFixture(unittest.TestCase):
+    def test_fixture_ownership_trust_is_exact_and_allows_fingerprint(self):
+        if platform.system() != "Linux" or platform.machine() not in ("x86_64", "amd64"):
+            self.skipTest("host Git copy ownership test requires Linux amd64")
+        from bash32_fixture import copy_host_git
+        with tempfile.TemporaryDirectory() as tmp:
+            project = fixture(tmp)
+            unrelated = Path(tmp) / "unrelated"
+            unrelated.mkdir()
+            subprocess.run(["git", "init", "-q", str(unrelated)], check=True)
+            copy_host_git(Path(tmp), tmp)
+            env = {**os.environ, "GIT_TEST_ASSUME_DIFFERENT_OWNER": "1",
+                   "PATH": str(Path(tmp) / "bin") + os.pathsep + os.environ["PATH"]}
+            # Real Git's test hook exercises ownership refusal without chown/root/container.
+            refused = subprocess.run([str(Path(tmp) / "bin/git"), "-C", str(unrelated), "status"],
+                                     env=env, text=True, capture_output=True)
+            self.assertEqual(refused.returncode, 128, refused.stdout + refused.stderr)
+            self.assertIn("dubious ownership", refused.stderr)
+            cloned = subprocess.run([str(Path(tmp) / "bin/git"), "clone", "--shared", "--no-checkout",
+                                     str(project), str(Path(tmp) / "clone")],
+                                    env=env, text=True, capture_output=True)
+            self.assertEqual(cloned.returncode, 0, cloned.stdout + cloned.stderr)
+            r = subprocess.run(["bash", str(Path(tmp) / "setup/scripts/sqlreview.sh"),
+                                "fingerprint", "sql/request.sql"], cwd=project,
+                               env=env, text=True, capture_output=True)
+            self.assertEqual(r.returncode, 0, r.stdout + r.stderr)
+            self.assertEqual(json.loads(r.stdout)["sql_provenance"]["mode"], "rendered")
+
     def test_real_git_copy_is_self_contained(self):
         if platform.system() != "Linux" or platform.machine() not in ("x86_64", "amd64"):
             self.skipTest("host Git copy smoke test requires Linux amd64")

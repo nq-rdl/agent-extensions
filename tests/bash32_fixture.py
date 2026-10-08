@@ -103,7 +103,11 @@ def copy_host_git(directory, target):
     bindir.mkdir(exist_ok=True)
     prefix = target + "/git-runtime"
     command = " ".join(shlex.quote(v) for v in (
-        prefix + "/" + Path(loaders[0]).name, "--library-path", prefix, prefix + "/git"))
+        prefix + "/" + Path(loaders[0]).name, "--library-path", prefix, prefix + "/git",
+        # The host-created repository may have a different owner in the container.
+        # Trust only this disposable fixture; modern local clone checks its .git too.
+        "-c", "safe.directory=" + target + "/project",
+        "-c", "safe.directory=" + target + "/project/.git"))
     wrapper = bindir / "git"
     wrapper.write_text('#!/bin/sh\nexec ' + command + ' "$@"\n')
     wrapper.chmod(0o755)

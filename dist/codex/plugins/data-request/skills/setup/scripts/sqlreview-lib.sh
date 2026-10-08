@@ -21,18 +21,20 @@ sr_need_jq() {
 # Collapse "." and ".." segments and duplicate slashes in an absolute path, without touching the
 # filesystem (the path may not exist yet — bootstrap names SQL that is still to be written).
 sr_normpath() {
-  printf '%s\n' "$1" | awk -F/ '{
-    n = 0
-    for (i = 1; i <= NF; i++) {
-      if ($i == "" || $i == ".") continue
-      if ($i == "..") { if (n > 0) n--; continue }
-      parts[++n] = $i
-    }
-    out = ""
-    for (i = 1; i <= n; i++) out = out "/" parts[i]
-    if (out == "") out = "/"
-    print out
-  }'
+  # Split only on slashes: line-oriented tools rewrite newline-containing names,
+  # and awk -v would also interpret backslash escapes in the path.
+  local rest="$1" part out=""
+  while :; do
+    part="${rest%%/*}"
+    case "$part" in
+      ""|.) ;;
+      ..) out="${out%/*}" ;;
+      *) out="$out/$part" ;;
+    esac
+    [ "$rest" != "$part" ] || break
+    rest="${rest#*/}"
+  done
+  printf '%s\n' "${out:-/}"
 }
 
 # Absolute, normalised form of a path given on the command line (relative paths resolve
@@ -242,7 +244,7 @@ sr_doc_for() { # <slug> -> path
 # no-baseline means unavailable historical provenance; operational errors propagate as 2.
 sr_state() ( # <slug> -> state, sql_path, revision
   sr_safe_slug "$1"
-  local d="$SR_REVIEWS/$1" doc sql rev state work bound rc kind
+  local d="$SR_REVIEWS/$1" doc sql rev state work bound rc kind head
   doc="$(sr_doc_for "$1")" || {
     if [ -f "$d/review.draft.json" ] || [ -f "$d/scope.draft.json" ]; then printf 'draft\t\t\n'; else printf 'invalid\t\t\n'; fi
     return 0
@@ -267,20 +269,25 @@ sr_state() ( # <slug> -> state, sql_path, revision
       6) state=no-baseline ;;
       0)
         sr_source_clean || return 2
-        sr_source_path_absent HEAD "$sql"; rc=$?
+        head="$(git -C "$SR_ROOT" rev-parse --verify HEAD)" || return 2
+        sr_source_path_absent "$head" "$sql"; rc=$?
         case "$rc" in
           0) state=missing ;;
           1)
-            sr_source_render HEAD "$sql" "$work/current.sql" || return 2
+            sr_source_render "$head" "$sql" "$work/current.sql" || return 2
             sr_binding "$doc" "$work/current.sql" "$work/recorded.sql"; bound=$?
             case "$bound" in
               0) if [ "$kind" = scope ]; then state=scoped; else state=current; fi ;;
               10) if [ "$kind" = scope ]; then state=scoped-header-only; else state=header-only; fi ;;
               *) state=stale ;;
             esac
-            sr_source_clean || return 2 ;;
+            ;;
           *) return 2 ;;
-        esac ;;
+        esac
+        sr_source_clean || return 2
+        [ "$(git -C "$SR_ROOT" rev-parse --verify HEAD)" = "$head" ] || {
+          sr_source_error "source commit changed during state check; retry"; return 2;
+        } ;;
       *) return 2 ;;
     esac
   fi
