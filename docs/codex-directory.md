@@ -43,7 +43,7 @@ This report records missing evidence; it does not attest to publisher identity, 
 | sops | 1 | skills-only | No |
 | speckit-dev | 4 | skills+hooks | No |
 | starrocks | 1 | skills-only | No |
-| tech-writing | 2 | skills+hooks | No |
+| tech-writing | 3 | skills+hooks | No |
 | terraform | 3 | skills-only | No |
 | testcontainers | 1 | skills-only | No |
 | writerside | 1 | skills-only | No |

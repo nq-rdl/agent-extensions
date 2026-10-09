@@ -1,0 +1,3 @@
+kind: Added
+body: '`/tech-writing:drift-check`: read-only CI check that a pull request keeps README, CONTRIBUTING, SECURITY and docs/ in line with the code; returns one JSON verdict. CI runs need disableAllHooks'
+time: 2026-10-05T00:20:04.867049317Z

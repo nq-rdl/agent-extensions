@@ -444,13 +444,15 @@
     {
       "name": "tech-writing",
       "source": "./plugins/tech-writing",
-      "description": "Technical writing — developer docs, tutorials, ADRs, and guides",
+      "description": "Technical writing — developer docs, tutorials, ADRs, guides, and docs drift checks",
       "version": "0.38.0",
       "keywords": [
         "docs",
         "technical-writing",
         "style-guide",
-        "copyedit"
+        "copyedit",
+        "drift",
+        "ci"
       ]
     },
     {
