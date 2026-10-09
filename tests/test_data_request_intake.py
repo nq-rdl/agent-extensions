@@ -46,7 +46,7 @@ class IntakeContracts(unittest.TestCase):
                 body = flat(skill(tree, "intake"))
                 for token in ("**Data Analyst**", "analyst-intake.rst", "answers.intake.json",
                               "Never write `.sqlreview/`, `scope.json`", "data-request:setup`: the engineer runs it later",
-                              "validate_answers.py", "validate-answers", "never report a pass",
+                              "validate_answers.py", "validate-answers", "never report a pass", "only the approved copier run",
                               "data-request:lookup`", "not its counts", "Leave open", "open_questions",
                               "Never an email", "confirm nothing"):
                     self.assertIn(token, body)
@@ -64,26 +64,40 @@ class IntakeContracts(unittest.TestCase):
             self.assertIn(lane, interview)
         self.assertIn("TUH house default", interview)
 
-    def test_answers_field_ownership_and_request_template_seed(self):
+    def test_answers_field_ownership(self):
         for tree in TREES:
             with self.subTest(tree=tree):
-                body = flat(skill(tree, "intake"))
-                fill = body.split("## Fill `answers.yaml` in the same pass", 1)[1].split("## Write and validate", 1)[0]
                 rows = {line.split("|")[1].strip(): line.split("|")[3].strip()
                         for line in skill(tree, "intake").read_text().splitlines()
                         if line.startswith("| `") or line.startswith("| research")}
-                self.assertEqual(rows["`request_id`"], "Never sets it (see below)")
-                self.assertEqual(rows["`license`, `platform`, `include_*`, `use_*` flags"], "Never touches them")
+                self.assertIn("`THHSRDLENQ-<n>`, no zero padding", rows["`request_id`"])
                 self.assertIn("never from a default", rows["`measurement_granularity`"])
                 self.assertIn("keeps the sidecar's approval equal", rows["`approval_number`, `governance_type`"])
-                for token in ("rdl-service-desk/request-template", "starts the central bootstrap",
-                              "`Patient`, `Admission`, `Encounter` or `Observation`",
-                              "set `request_id` last, in the same commit as `answers.intake.json`",
-                              "is not verified to keep the sidecar"):
-                    self.assertIn(token, fill)
-                validate = body.split("## Validate before and after", 1)[1].split("## Gather the evidence", 1)[0]
-                self.assertIn(".github/scripts/validate_answers.py", validate)
-                self.assertIn("its pass is not a sidecar pass", validate)
+                engineer = [v for k, v in rows.items() if k.startswith("`license`")]
+                self.assertEqual(engineer, ["Never changes them; shows them before the render"])
+                required = [k for k in rows if "`requestor_email`" in k]
+                self.assertEqual(len(required), 1)
+                body = flat(skill(tree, "intake"))
+                self.assertIn("`Patient`, `Admission`, `Encounter` or `Observation`", body)
+                self.assertIn("This skill does not create repositories.", body)
+                self.assertNotIn("starts the central bootstrap", body)
+
+    def test_render_step_is_approved_pinned_copy_over_the_seed(self):
+        for tree in TREES:
+            with self.subTest(tree=tree):
+                body = flat(skill(tree, "intake"))
+                render = body.split("## Render the scaffold (after approval)", 1)[1].split("## A cohort supplied", 1)[0]
+                for token in ("only when the analyst approves", "Never render from a branch",
+                              "copier copy --trust --overwrite --defaults --vcs-ref <tag> --data-file answers.yaml",
+                              "gh:nq-rdl/data-analysis-scaffold", "not `recopy` or `update`",
+                              "data-science-template", "already records `nq-rdl/data-analysis-scaffold`",
+                              "`answers.intake.json` unchanged", "analyst_intake.py",
+                              "report that the sidecar was not validated", "do not run it"):
+                    self.assertIn(token, render)
+                cohort = body.split("## A cohort supplied by the requester", 1)[1].split("## Write and validate", 1)[0]
+                for token in ("by shape only", "Never ask for, open, read, copy or print the file",
+                              "data/00_raw/", "dvc add", "dvc push", "only the `.dvc` pointer"):
+                    self.assertIn(token, cohort)
 
     def test_rerun_keeps_unchanged_confirmations_and_names_changed_ids(self):
         body = flat(skill(TREES[0], "intake"))

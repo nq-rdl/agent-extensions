@@ -21,7 +21,8 @@ See [`docs/bundles.md`](docs/bundles.md) for the full subject list.
 
 For the `data-request` workflow, the Data Engineer runs `setup` once per project.
 The Data Analyst runs `intake`, the analyst's interview: it fills `answers.yaml`
-and its optional `answers.intake.json` sidecar in one pass and needs no `setup`.
+and its optional `answers.intake.json` sidecar in one pass, needs no `setup`, and,
+on the analyst's approval, renders the scaffold over a `request-template` repository with copier.
 The analyst then hands the branch to the engineer for `bootstrap`, the engineer's
 interview, and `draft`. Bootstrap carries answered research decisions with analyst
 confirmation and asks the engineer only about technical scope; missing research

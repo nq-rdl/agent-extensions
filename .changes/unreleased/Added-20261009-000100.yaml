@@ -1,3 +1,3 @@
 kind: Added
-body: 'data-request intake owns only analyst answers.yaml fields, and handles the request-template seed form and its request_id trigger (#504).'
+body: 'data-request intake fills analyst answers.yaml fields, renders the scaffold over a request-template copy with copier on approval and records supplied cohorts by shape (#504).'
 time: 2026-10-09T00:01:00.000000000Z

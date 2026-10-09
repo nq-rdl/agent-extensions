@@ -3,14 +3,17 @@ license: CC-BY-4.0
 description: >-
   Interview the Data Analyst on the research decisions of a data request — cohort and age
   limits, code-set edges, outcomes and windows, identifiers and presentation, governance and
-  the grain — and write answers.intake.json (schema 1) in the same pass that fills answers.yaml.
-  Needs no .sqlreview/. Re-running walks through what changed. Use before the engineer's
+  the grain — then fill answers.yaml, write answers.intake.json (schema 1) and, on approval,
+  render the data-analysis-scaffold over a request-template repo with copier. Needs no
+  .sqlreview/. Re-running walks through what changed. Use before the engineer's
   /data-request:bootstrap, whenever an analyst fills or revises answers.yaml.
 argument-hint: '[answers.yaml path] [--update]'
 user-invocable: true
 compatibility: >-
   answers.intake.json schemaVersion 1, validated by data-analysis-scaffold validate-answers or a
-  generated child's scripts/validate_answers.py. Python 3 optional (validation only).
+  generated child's scripts/validate_answers.py (sidecar checks are on scaffold main, in no
+  release up to v0.5.0). copier >= 9.15 and GitHub access to nq-rdl/data-analysis-scaffold for
+  the render step; Python 3 with PyYAML for validation.
 allowed-tools: Bash, Read, Glob, Grep, Write, Edit, AskUserQuestion
 metadata:
   repo: https://github.com/nq-rdl/agent-extensions
@@ -27,10 +30,15 @@ interview; `/data-request:bootstrap` is the engineer's. It is not a separate sta
 Arguments: `$ARGUMENTS` — the answers file (default `answers.yaml` at the repository root).
 The sidecar is always its sibling `answers.intake.json`.
 
+Before this skill: Power Automate opens the enquiry issue in `rdl-service-desk/service-desk`,
+and the analyst creates the request repository from `rdl-service-desk/request-template` with
+GitHub's template button and opens it in the session. This skill does not create repositories.
+
 Read `${CLAUDE_PLUGIN_ROOT}/skills/setup/references/analyst-intake.rst` first. It is the
-schema contract shared with `validate-answers`; this skill does not restate it. Writes are
-limited to `answers.yaml` and `answers.intake.json`. Never write `.sqlreview/`, `scope.json`
-or SQL, and do not require `/data-request:setup`: the engineer runs it later.
+schema contract shared with `validate-answers`; this skill does not restate it. It writes
+`answers.yaml` and `answers.intake.json`; only the approved copier run writes anything else.
+Never write `.sqlreview/`, `scope.json` or SQL, and do not require `/data-request:setup`: the
+engineer runs it later.
 
 ## Validate before and after
 
@@ -41,7 +49,8 @@ python .github/scripts/validate_answers.py answers.yaml     # request-template s
 ```
 
 Run one before the interview (an existing sidecar can already be invalid) and again after
-every write. Both validate the sibling sidecar too. Diagnostics name fields, never values.
+every write. The first two validate the sibling sidecar too, but only from a scaffold that
+ships `scripts/analyst_intake.py`. Diagnostics name fields, never values.
 If neither command is available, say that validation did not run; never report a pass.
 The seed's `.github/scripts/validate_answers.py` checks required fields and choices only:
 it never reads the sidecar, so its pass is not a sidecar pass.
@@ -113,29 +122,59 @@ Field ownership — write a field only where this table allows it:
 | Field | Owner | This skill |
 |---|---|---|
 | `answers.intake.json` | Analyst | Writes all of it |
+| `request_id` | Analyst | The enquiry number from the service-desk issue, as issued: `THHSRDLENQ-<n>`, no zero padding |
 | `approval_number`, `governance_type` | Analyst | Asks under governance; writes after confirmation; keeps the sidecar's approval equal |
 | `measurement_granularity` | Analyst | Sets it from the grain answer, never from a default |
-| `project_title` | Analyst | Fills it when blank, after confirmation |
-| research text (`inclusion_criteria`, `exclusion_criteria`, `requested_data_elements`) | Analyst | Fills or corrects from answers, after confirmation |
-| `request_id` | Analyst | Never sets it (see below) |
-| `license`, `platform`, `include_*`, `use_*` flags | Engineer / defaults | Never touches them |
+| `short_title`, `project_title`, `project_description`, `delivery_outcomes`, `requestor_name`, `requestor_email` | Analyst | Fills from the enquiry, after confirmation |
+| research text (`inclusion_criteria`, `exclusion_criteria`, `requested_data_elements`, `ehr_sources`) | Analyst | Fills or corrects from answers, after confirmation |
+| `license`, `platform`, `include_*`, `use_*`, `framework_ref`, `engineering_reviewers` | Engineer / defaults | Never changes them; shows them before the render |
 
-### The request-template seed
+A `request-template` copy holds a short form without most of these fields: add them. The
+rendered project's validator requires every field in the first five rows, and copier
+renders a missing one as its placeholder text. `measurement_granularity` is blank in the
+seed: map the grain answer to `Patient`, `Admission`, `Encounter` or `Observation`. If no
+choice fits the clinical unit, ask which to use and keep the exact unit in the sidecar.
 
-A copy of `rdl-service-desk/request-template` holds a short form: `request_id`,
-`project_title`, `approval_number`, `governance_type`, `measurement_granularity`, plus the
-engineer's `license`, `platform` and flags. It has no research text fields. A committed
-non-empty `request_id` starts the central bootstrap; empty means waiting. So:
+## Render the scaffold (after approval)
 
-- `measurement_granularity` is blank and required, not a default: map the grain answer to
-  one of `Patient`, `Admission`, `Encounter` or `Observation`. If no choice fits the
-  clinical unit, ask the analyst which to use and keep the precise unit in the sidecar's
-  `unit` and `text`.
-- Finish the intake before `request_id` is filled. Tell the analyst to set `request_id`
-  last, in the same commit as `answers.intake.json`.
-- The bootstrap's `copier update` is not verified to keep the sidecar. Tell the analyst to
-  check that the bootstrap PR still contains `answers.intake.json`, and to tell the engineer
-  if it does not.
+A `request-template` copy is a thin seed. Rendering the scaffold over it gives the project
+its pipeline, validator and DVC layout, which a supplied cohort needs. Do it once, after the
+sidecar validates, and only when the analyst approves:
+
+1. Skip this section when `.copier-answers.yml` already records `nq-rdl/data-analysis-scaffold`:
+   the project is rendered. A later answers change goes to the engineer as `copier update`.
+2. Pin the release: list tags with `git ls-remote --tags
+   https://github.com/nq-rdl/data-analysis-scaffold.git` and propose the newest `v*` tag.
+   Never render from a branch.
+3. Show the analyst the command, the tag and the engineer-owned values it will use, and ask
+   for approval. The approval covers committing `answers.yaml` and the sidecar on a branch
+   first, so the render is a separate, reviewable diff:
+
+   ```bash
+   copier copy --trust --overwrite --defaults --vcs-ref <tag> --data-file answers.yaml \
+     gh:nq-rdl/data-analysis-scaffold .
+   ```
+
+   `copier copy`, not `recopy` or `update`: the seed's `.copier-answers.yml` names the
+   retired `rdl-service-desk/data-science-template`, which copier 9.15 cannot render.
+   `--trust` runs the template's post-generation task.
+4. Check the result with `git status` and `git diff`: `answers.yaml` and
+   `answers.intake.json` unchanged; `.copier-answers.yml` names the scaffold and the tag; the
+   seed's release workflows under `.github/` unchanged. Then run the rendered validator
+   (`python scripts/validate_answers.py answers.yaml`). If the rendered `scripts/` has no
+   `analyst_intake.py`, report that the sidecar was not validated.
+5. Commit the render only when the analyst asks. `pixi run setup` (DVC remote and
+   credentials) is the analyst's or engineer's, on the VM; do not run it.
+
+## A cohort supplied by the requester
+
+When the requester supplies the cohort (a file of participants), record a `cohort` decision
+that describes it by shape only: who supplies it, its columns, an approximate row count and
+any instalments. Never ask for, open, read, copy or print the file: it holds identifiers.
+After the render, give the analyst these steps to run on the VM: `pixi run setup` if the DVC
+remote is not set, place the file under `data/00_raw/`, `dvc add` it, `dvc push`, and commit
+only the `.dvc` pointer. The engineer declares the cohort with query-builder's supplied-cohort
+support and joins to it; name the file and its `.dvc` pointer in the hand-off.
 
 ## Write and validate
 
@@ -167,8 +206,9 @@ When `answers.intake.json` exists (or `--update`):
 
 Show the analyst a short note for the engineer:
 
-- the branch and the two file paths, and the validation result (which validator ran, and
-  whether it covered the sidecar);
+- the branch, the two file paths, the scaffold tag rendered (or why not), and the validation
+  result (which validator ran, and whether it covered the sidecar);
+- for a supplied cohort, the file's `.dvc` pointer path, or that it is still to come;
 - the decisions by topic, the grain (`one row per <unit>`) and finer outputs;
 - the open questions that wait on the requester;
 - any technical notes the analyst volunteered;
