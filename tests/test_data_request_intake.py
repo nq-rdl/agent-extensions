@@ -64,6 +64,27 @@ class IntakeContracts(unittest.TestCase):
             self.assertIn(lane, interview)
         self.assertIn("TUH house default", interview)
 
+    def test_answers_field_ownership_and_request_template_seed(self):
+        for tree in TREES:
+            with self.subTest(tree=tree):
+                body = flat(skill(tree, "intake"))
+                fill = body.split("## Fill `answers.yaml` in the same pass", 1)[1].split("## Write and validate", 1)[0]
+                rows = {line.split("|")[1].strip(): line.split("|")[3].strip()
+                        for line in skill(tree, "intake").read_text().splitlines()
+                        if line.startswith("| `") or line.startswith("| research")}
+                self.assertEqual(rows["`request_id`"], "Never sets it (see below)")
+                self.assertEqual(rows["`license`, `platform`, `include_*`, `use_*` flags"], "Never touches them")
+                self.assertIn("never from a default", rows["`measurement_granularity`"])
+                self.assertIn("keeps the sidecar's approval equal", rows["`approval_number`, `governance_type`"])
+                for token in ("rdl-service-desk/request-template", "starts the central bootstrap",
+                              "`Patient`, `Admission`, `Encounter` or `Observation`",
+                              "set `request_id` last, in the same commit as `answers.intake.json`",
+                              "is not verified to keep the sidecar"):
+                    self.assertIn(token, fill)
+                validate = body.split("## Validate before and after", 1)[1].split("## Gather the evidence", 1)[0]
+                self.assertIn(".github/scripts/validate_answers.py", validate)
+                self.assertIn("its pass is not a sidecar pass", validate)
+
     def test_rerun_keeps_unchanged_confirmations_and_names_changed_ids(self):
         body = flat(skill(TREES[0], "intake"))
         rerun = body.split("## Re-run: walk what changed", 1)[1].split("## Hand over", 1)[0]

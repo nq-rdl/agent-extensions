@@ -41,11 +41,14 @@ or SQL, and do not require `$data-request:setup`: the engineer runs it later.
 ```bash
 pixi run python scripts/validate_answers.py answers.yaml    # generated child
 data-analysis-scaffold validate-answers answers.yaml        # otherwise, when installed
+python .github/scripts/validate_answers.py answers.yaml     # request-template seed: answers.yaml only
 ```
 
 Run one before the interview (an existing sidecar can already be invalid) and again after
 every write. Both validate the sibling sidecar too. Diagnostics name fields, never values.
 If neither command is available, say that validation did not run; never report a pass.
+The seed's `.github/scripts/validate_answers.py` checks required fields and choices only:
+it never reads the sidecar, so its pass is not a sidecar pass.
 
 ## Gather the evidence
 
@@ -109,6 +112,35 @@ the grain answer against `measurement_granularity`), show the field and the prop
 and write it only when the analyst agrees. Offer each correction once. If the analyst
 corrects `approval_number`, the sidecar takes the corrected value.
 
+Field ownership — write a field only where this table allows it:
+
+| Field | Owner | This skill |
+|---|---|---|
+| `answers.intake.json` | Analyst | Writes all of it |
+| `approval_number`, `governance_type` | Analyst | Asks under governance; writes after confirmation; keeps the sidecar's approval equal |
+| `measurement_granularity` | Analyst | Sets it from the grain answer, never from a default |
+| `project_title` | Analyst | Fills it when blank, after confirmation |
+| research text (`inclusion_criteria`, `exclusion_criteria`, `requested_data_elements`) | Analyst | Fills or corrects from answers, after confirmation |
+| `request_id` | Analyst | Never sets it (see below) |
+| `license`, `platform`, `include_*`, `use_*` flags | Engineer / defaults | Never touches them |
+
+### The request-template seed
+
+A copy of `rdl-service-desk/request-template` holds a short form: `request_id`,
+`project_title`, `approval_number`, `governance_type`, `measurement_granularity`, plus the
+engineer's `license`, `platform` and flags. It has no research text fields. A committed
+non-empty `request_id` starts the central bootstrap; empty means waiting. So:
+
+- `measurement_granularity` is blank and required, not a default: map the grain answer to
+  one of `Patient`, `Admission`, `Encounter` or `Observation`. If no choice fits the
+  clinical unit, ask the analyst which to use and keep the precise unit in the sidecar's
+  `unit` and `text`.
+- Finish the intake before `request_id` is filled. Tell the analyst to set `request_id`
+  last, in the same commit as `answers.intake.json`.
+- The bootstrap's `copier update` is not verified to keep the sidecar. Tell the analyst to
+  check that the bootstrap PR still contains `answers.intake.json`, and to tell the engineer
+  if it does not.
+
 ## Write and validate
 
 Write `answers.intake.json` as one complete document (`schemaVersion: 1`, `approval_number`,
@@ -139,7 +171,8 @@ When `answers.intake.json` exists (or `--update`):
 
 Show the analyst a short note for the engineer:
 
-- the branch and the two file paths, and the validation result;
+- the branch and the two file paths, and the validation result (which validator ran, and
+  whether it covered the sidecar);
 - the decisions by topic, the grain (`one row per <unit>`) and finer outputs;
 - the open questions that wait on the requester;
 - any technical notes the analyst volunteered;
