@@ -91,7 +91,7 @@ class IntakeContracts(unittest.TestCase):
                               "copier copy --trust --overwrite --defaults --vcs-ref <tag> --data-file answers.yaml",
                               "gh:nq-rdl/data-analysis-scaffold", "not `recopy` or `update`",
                               "data-science-template", "already records `nq-rdl/data-analysis-scaffold`",
-                              "`answers.intake.json` unchanged", "analyst_intake.py",
+                              "`answers.intake.json` unchanged", "analyst_intake.py", "v0.5.1 or later",
                               "report that the sidecar was not validated", "do not run it"):
                     self.assertIn(token, render)
                 cohort = body.split("## A cohort supplied by the requester", 1)[1].split("## Write and validate", 1)[0]

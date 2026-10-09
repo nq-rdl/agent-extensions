@@ -11,9 +11,9 @@ argument-hint: '[answers.yaml path] [--update]'
 user-invocable: true
 compatibility: >-
   answers.intake.json schemaVersion 1, validated by data-analysis-scaffold validate-answers or a
-  generated child's scripts/validate_answers.py (sidecar checks are on scaffold main, in no
-  release up to v0.5.0). copier >= 9.15 and GitHub access to nq-rdl/data-analysis-scaffold for
-  the render step; Python 3 with PyYAML for validation.
+  generated child's scripts/validate_answers.py (sidecar checks from scaffold v0.5.1). Render
+  step verified with copier 9.18.2, scaffold v0.5.1 and request-template 47b702d; needs
+  copier >= 9.15 and GitHub access to nq-rdl/data-analysis-scaffold. Python 3 with PyYAML.
 allowed-tools: Bash, Read, Glob, Grep, Write, Edit, AskUserQuestion
 metadata:
   repo: https://github.com/nq-rdl/agent-extensions
@@ -144,8 +144,9 @@ sidecar validates, and only when the analyst approves:
 1. Skip this section when `.copier-answers.yml` already records `nq-rdl/data-analysis-scaffold`:
    the project is rendered. A later answers change goes to the engineer as `copier update`.
 2. Pin the release: list tags with `git ls-remote --tags
-   https://github.com/nq-rdl/data-analysis-scaffold.git` and propose the newest `v*` tag.
-   Never render from a branch.
+   https://github.com/nq-rdl/data-analysis-scaffold.git` and propose the newest `v*` tag,
+   v0.5.1 or later: the first release whose rendered validator checks the sidecar. Never
+   render from a branch.
 3. Show the analyst the command, the tag and the engineer-owned values it will use, and ask
    for approval. The approval covers committing `answers.yaml` and the sidecar on a branch
    first, so the render is a separate, reviewable diff:
