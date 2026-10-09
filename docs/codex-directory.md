@@ -15,7 +15,7 @@ This report records missing evidence; it does not attest to publisher identity, 
 | charm-tui | 1 | skills-only | No |
 | claude-code | 9 | skills+hooks | No |
 | codex | 13 | skills+hooks | No |
-| data-request | 14 | skills+hooks | No |
+| data-request | 15 | skills+hooks | No |
 | debug | 2 | skills-only | No |
 | defuddle | 1 | skills-only | No |
 | gh | 12 | skills-only | No |
