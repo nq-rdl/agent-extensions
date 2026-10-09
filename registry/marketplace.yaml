@@ -30,6 +30,7 @@ order:
   - obsidian
   - writerside
   - defuddle
+  - cloudflare
   - gh
   - git
   - terraform
