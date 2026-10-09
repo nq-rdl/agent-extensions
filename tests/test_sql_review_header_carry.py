@@ -33,13 +33,14 @@ class HeaderCarry(unittest.TestCase):
 
     def commit(self, at):
         env = dict(os.environ, GIT_AUTHOR_DATE=at, GIT_COMMITTER_DATE=at)
-        subprocess.run(["git", "add", "q.sql"], cwd=self.p.root, check=True, capture_output=True)
+        subprocess.run(["git", "add", "-A"], cwd=self.p.root, check=True, capture_output=True)
         subprocess.run(["git", "commit", "-qm", "SQL decision"], cwd=self.p.root, env=env, check=True, capture_output=True)
         return subprocess.check_output(["git", "rev-parse", "HEAD"], cwd=self.p.root, text=True).strip()
 
     def notes(self, actor="engineer-login", refresh=True):
         if refresh:
             self.doc["sql_sha256"] = hashlib.sha256(self.sql.read_bytes()).hexdigest()
+            self.doc["git_commit"] = subprocess.run(["git", "rev-parse", "--verify", "HEAD"], cwd=self.p.root, text=True, capture_output=True).stdout.strip() or None
         self.draft.write_text(json.dumps(self.doc))
         args = ["notes", str(self.sql), "--against", str(self.draft)]
         if actor is not None:
@@ -64,6 +65,19 @@ class HeaderCarry(unittest.TestCase):
         out = self.notes(actor, refresh)
         self.assertEqual(out["header_carry_over"], [])
         self.assertEqual([i["id"] for i in out["header_walk"]], ["A1"])
+
+    def test_manifest_only_generated_interval_requires_ordinary_confirmation(self):
+        manifest = self.p.root / "sql/provenance.json"
+        manifest.parent.mkdir()
+        for mode, at in (("builder", "2026-09-25T10:00:00Z"), ("hand-written", "2026-09-26T10:00:00Z")):
+            manifest.write_text(json.dumps({"schema": 1, "requests": {"q.sql": {"source": mode}}}))
+            self.commit(at)
+        self.walked()
+
+    def test_rendered_record_never_supplies_fresh_tracked_header_eligibility(self):
+        commit = subprocess.check_output(["git", "rev-parse", "HEAD"], cwd=self.p.root, text=True).strip()
+        self.doc["sql_provenance"] = {"commit": commit, "mode": "rendered", "project_root": ""}
+        self.walked()
 
     def test_same_day_named_decision_is_candidate_without_confirmation(self):
         self.eligible()
@@ -213,7 +227,7 @@ class HeaderCarry(unittest.TestCase):
         subprocess.run(["git", "commit", "-qm", "side"], cwd=self.p.root, env=env, check=True, capture_output=True)
         if revert:
             self.sql.write_text(SQL)
-            subprocess.run(["git", "add", "q.sql"], cwd=self.p.root, check=True, capture_output=True)
+            subprocess.run(["git", "add", "-A"], cwd=self.p.root, check=True, capture_output=True)
             subprocess.run(["git", "commit", "-qm", "revert side SQL"], cwd=self.p.root, env=env, check=True, capture_output=True)
         subprocess.run(["git", "checkout", "-q", branch], cwd=self.p.root, check=True, capture_output=True)
         subprocess.run(["git", "merge", "--no-ff", "-m", "merge", "side"], cwd=self.p.root, env=env, check=True, capture_output=True)
@@ -285,6 +299,8 @@ class HeaderCarry(unittest.TestCase):
     def test_publish_rechecks_after_candidate_discovery(self):
         self.answered()
         self.sql.write_text(SQL.replace("IS NOT NULL", "IS NULL"))
+        self.commit("2026-09-30T12:00:00Z")
+        self.doc.update(json.loads(run(["fingerprint", "q.sql"], self.p.root).stdout))
         self.doc["sql_sha256"] = hashlib.sha256(self.sql.read_bytes()).hexdigest()
         self.draft.write_text(json.dumps(self.doc))
         r = run(["publish", "q", "review", str(self.draft)], self.p.root)
@@ -294,8 +310,9 @@ class HeaderCarry(unittest.TestCase):
     def publish_answered(self):
         self.answered()
         self.doc["schemaVersion"] = 2
+        # Setup and maintained SQL were already committed at the decision date.
         fp = json.loads(run(["fingerprint", "q.sql"], self.p.root).stdout)
-        self.doc["sql_body_sha256"] = fp["sql_body_sha256"]
+        self.doc.update(fp)
         self.draft.write_text(json.dumps(self.doc))
         r = run(["publish", "q", "review", str(self.draft)], self.p.root)
         self.assertEqual(r.returncode, 0, r.stdout + r.stderr)
@@ -306,31 +323,36 @@ class HeaderCarry(unittest.TestCase):
     def test_header_only_republish_rejects_missing_changed_or_malformed_decision(self):
         dest = self.publish_answered()
         original = dest.read_bytes()
-        snapshot = (dest.parent / "source.sql").read_bytes()
+        original_sha = json.loads(dest.read_text())["sql_sha256"]
         for text in (SQL_V1, SQL.replace(R, R + " changed"), SQL.replace("rationale:", "unexpected:")):
             with self.subTest(text=text):
                 self.sql.write_text(text)
+                self.commit("2026-09-30T12:00:00Z")
                 r = run(["publish", "q", "review", str(dest)], self.p.root)
                 self.assertEqual(r.returncode, 4, r.stdout + r.stderr)
                 self.assertEqual(dest.read_bytes(), original)
-                self.assertEqual((dest.parent / "source.sql").read_bytes(), snapshot)
+                self.assertEqual(json.loads(dest.read_text())["sql_sha256"], original_sha)
+                self.assertEqual(list(dest.parent.rglob("*.sql")), [])
 
     def test_header_only_republish_allows_unchanged_decision_and_is_idempotent(self):
         dest = self.publish_answered()
-        snapshot = (dest.parent / "source.sql").read_bytes()
+        original_sha = json.loads(dest.read_text())["sql_sha256"]
         self.sql.write_text(SQL.replace("assumptions:", "assumptions: "))
+        self.commit("2026-09-30T12:00:00Z")
         r = run(["publish", "q", "review", str(dest)], self.p.root)
         self.assertEqual(r.returncode, 0, r.stdout + r.stderr)
-        self.assertIn("published header revision", r.stdout)
+        self.assertIn("published\t", r.stdout)
         published = json.loads(dest.read_text())
         self.assertEqual(published["revision"], 1)
         self.assertEqual(published["assumptions"], self.doc["assumptions"])
         self.assertEqual(len(published["header_revisions"]), 1)
-        self.assertEqual((dest.parent / "source.sql").read_bytes(), snapshot)
+        self.assertEqual(published["sql_sha256"], original_sha)
+        self.assertEqual(list(dest.parent.rglob("*.sql")), [])
         r = run(["publish", "q", "review", str(dest)], self.p.root)
         self.assertEqual(r.returncode, 0, r.stdout + r.stderr)
         self.assertIn("already published", r.stdout)
         self.sql.write_text(SQL_V1)
+        self.commit("2026-10-01T12:00:00Z")
         r = run(["publish", "q", "review", str(dest)], self.p.root)
         self.assertEqual(r.returncode, 4, r.stdout + r.stderr)
         self.assertEqual(json.loads(dest.read_text()), published)
@@ -418,6 +440,8 @@ class HeaderCarry(unittest.TestCase):
         r = run(["snapshot", "q", "q.sql"], self.p.root)
         self.assertEqual(r.returncode, 0, r.stdout + r.stderr)
         self.sql.write_text(SQL.replace("SELECT month,", "SELECT calendar_month,"))
+        self.commit("2026-09-30T12:00:00Z")
+        self.doc.update(json.loads(run(["fingerprint", "q.sql"], self.p.root).stdout))
         self.doc["revision"] = 2
         self.doc["sql_sha256"] = hashlib.sha256(self.sql.read_bytes()).hexdigest()
         self.draft.write_text(json.dumps(self.doc))
@@ -439,6 +463,8 @@ class HeaderCarry(unittest.TestCase):
                 self.doc = copy.deepcopy(original)
                 target = Path(installed) / "setup"
                 shutil.copytree(REPO / tree, target)
+                # Canonical runtime in a real installed layout; package-byte sync is checked separately.
+                shutil.copytree(REPO / "skills/data-request-setup/scripts", target / "scripts", dirs_exist_ok=True)
                 script = target / "scripts/sqlreview.sh"
                 self.notes()
                 r = subprocess.run(["bash", str(script), "notes", "q.sql", "--against", str(self.draft),

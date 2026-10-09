@@ -3,7 +3,7 @@ Shared questions (#437)
 
 ``.sqlreview/reviews/<slug>/questions.json`` is the single mutable question
 record. Scope and review remain SQL-bound documents: question closure changes
-neither their bytes, revisions, confirmations nor SQL snapshots. Never run
+neither their bytes, revisions, confirmations nor SQL provenance. Never run
 carryforward merely to close a question. A resulting change in cohort meaning
 still requires bootstrap/analyse; the closure itself does not approve SQL.
 

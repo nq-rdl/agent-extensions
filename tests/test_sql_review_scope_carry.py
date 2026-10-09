@@ -27,6 +27,8 @@ import tempfile
 import unittest
 from pathlib import Path
 
+from test_sql_review_sources import committed
+
 try:  # `unittest discover -s tests` puts tests/ on sys.path; `-m unittest tests.x` does not
     from test_sql_review_scripts import REPO, SQL_V1, Project, item, review_doc, run, scope_doc
 except ModuleNotFoundError:
@@ -90,18 +92,23 @@ class Base(unittest.TestCase):
         self.draft = self.d / "draft.json"
 
     def publish(self, doc, *flags, expected=0):
+        commit = committed(self.p)
+        if doc.get("sql_sha256"):
+            doc = dict(doc, git_commit=commit, git_dirty=False)
         self.draft.write_text(json.dumps(doc))
         r = run(["publish", *flags, "q", doc["kind"], str(self.draft)], self.p.root)
         self.assertEqual(r.returncode, expected, r.stdout + r.stderr)
         return r
 
     def carryforward(self, kind, doc):
+        committed(self.p)
         self.draft.write_text(json.dumps(doc))
         r = run(["carryforward", "q", kind, str(self.draft)], self.p.root)
         self.assertEqual(r.returncode, 0, r.stdout + r.stderr)
         return json.loads(r.stdout)
 
     def carryover(self, doc):
+        committed(self.p)
         self.draft.write_text(json.dumps(doc))
         r = run(["carryover", "q", str(self.draft)], self.p.root)
         self.assertEqual(r.returncode, 0, r.stdout + r.stderr)
@@ -114,11 +121,9 @@ class Base(unittest.TestCase):
         return review_doc("q", "q.sql", revision=revision, sql_sha256=sha(sql), **over)
 
     def publish_scope_v1(self, sql=SQL_V1):
-        """Bootstrap rev 1; with SQL, bootstrap then copies scope.source.sql."""
+        """Bootstrap rev 1; SQL evidence comes from its immutable commit."""
         self.v1 = scope_items()
         self.publish(self.scope(1, sql=sql, **self.v1))
-        if sql is not None:
-            (self.d / "scope.source.sql").write_text(sql)
 
     @staticmethod
     def basis(rows):
@@ -383,6 +388,7 @@ class BodyComparison(Base):
         self.publish(self.review(1, before, **v1))
         self.assertEqual(run(["snapshot", "q", "q.sql"], self.p.root).returncode, 0)
         self.sql.write_bytes(after.encode())
+        committed(self.p)
         a1 = v1["assumptions"][0]
         self.draft.write_text(json.dumps(self.review(2, after, assumptions=[candidate(a1)], limitations=[])))
         r = run(["carryforward", "q", "review", str(self.draft)], self.p.root, env=env)
@@ -426,7 +432,8 @@ class BodyComparison(Base):
         # awk failing (and printing nothing) for both files must not compare two empty digests.
         stub = Path(self.tmp.name) / "stub-bin"
         stub.mkdir()
-        (stub / "awk").write_text("#!/bin/sh\nexit 1\n")
+        import shutil
+        (stub / "awk").write_text(f'#!/bin/sh\ncase "$*" in *hstart*) exit 1;; esac\nexec {shutil.which("awk")} "$@"\n')
         (stub / "awk").chmod(stat.S_IRWXU)
         env = {"PATH": f"{stub}{os.pathsep}{os.environ['PATH']}"}
         out = self.verdict(SQL_V1, CODE_EDIT, env=env)
@@ -443,6 +450,7 @@ class ReviewBulk(Base):
         self.publish(self.review(1, SQL_V1, **self.v1))
         self.assertEqual(run(["snapshot", "q", "q.sql"], self.p.root).returncode, 0)
         self.sql.write_text(CODE_EDIT)
+        committed(self.p)
 
     def test_unchanged_null_location_items_are_offered_in_bulk(self):
         a1, a2 = self.v1["assumptions"]
@@ -466,7 +474,7 @@ class ReviewBulk(Base):
         self.assertEqual(out["walk"], [])
 
     def test_scope_location_added_is_walked_not_bulk(self):
-        self.p.write_json("q", "scope.json", scope_doc("q", "q.sql", sql_sha256=sha(CODE_EDIT), **scope_items()))
+        self.p.write_json("q", "scope.json", scope_doc("q", "q.sql", sql_sha256=sha(CODE_EDIT), git_commit=committed(self.p), **scope_items()))
         a1, _ = self.v1["assumptions"]
         out = self.carryforward("scope", self.scope(2, sql=CODE_EDIT, assumptions=[candidate(a1, location={"lines": [5, 7]})],
                                                     limitations=[]))

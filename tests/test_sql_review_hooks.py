@@ -11,6 +11,7 @@ copy, the way an installed plugin runs, and asserts the permissionDecision / add
 
 import json
 import os
+import shutil
 import subprocess
 import tempfile
 import unittest
@@ -129,14 +130,23 @@ class GuardHook(unittest.TestCase):
                 self.assertEqual(d["permissionDecision"], "deny")
                 self.assertIn("Write", d["permissionDecisionReason"])
 
-    def test_drafts_state_and_snapshot_are_exempt(self):
+    def test_drafts_and_state_are_exempt(self):
         for name, content in (("review.draft.json", json.dumps(review_doc(assumptions=[item("A1", "x", status="pending")]))),
-                              ("explain.json", "{}"), ("source.sql", SQL_V1)):
+                              ("explain.json", "{}")):
             with self.subTest(name):
                 self.assert_passthrough(run_hook(GUARD, write_event(self.reviews / "s" / name, content, self.root), self.env))
                 if name == "explain.json":  # checked whole for its analyst identity (#419)
                     continue
                 self.assert_passthrough(run_hook(GUARD, edit_event(self.reviews / "s" / name, self.root), self.env))
+
+    def test_legacy_snapshot_paths_are_denied(self):
+        for name in ("source.sql", "scope.source.sql", "history/1.sql"):
+            for event in (write_event(self.reviews / "s" / name, SQL_V1, self.root),
+                          edit_event(self.reviews / "s" / name, self.root)):
+                with self.subTest(name=name, tool=event["tool_name"]):
+                    result = decision(run_hook(GUARD, event, self.env))
+                    self.assertEqual(result["permissionDecision"], "deny")
+                    self.assertIn("legacy SQL snapshot", result["permissionDecisionReason"])
 
     def test_rendered_markdown_is_denied(self):
         for name in ("review.md", "scope.md"):
@@ -204,35 +214,44 @@ class PreflightHook(unittest.TestCase):
                 sql = p.sql("q.sql", old)
                 doc = (review_doc if kind == "review" else scope_doc)(
                     "q", "q.sql", sql_sha256=hashlib.sha256(old.encode()).hexdigest())
+                p.commit()
+                doc.update(json.loads(run_helper(["fingerprint", "q.sql"], p.root).stdout))
                 p.write_json("q", f"{kind}.json", doc)
-                baseline = p.review_dir("q") / ("source.sql" if kind == "review" else "scope.source.sql")
-                baseline.write_text(old)
                 sql.write_text(old.replace("original", "corrected"))
+                p.commit("corrected header")
                 status = json.loads(run_helper(["status", "--json"], p.root).stdout)
                 self.assertEqual(status["reviews"][0]["state"], state)
                 # Both canonical and installed hook entrypoints must expose the new states.
-                for hook in (PREFLIGHT, PLUGIN / "hooks/data-request-preflight.sh"):
-                    r = run_hook(hook, {"cwd": str(p.root)}, env_for())
-                    self.assertEqual(r.returncode, 0, r.stderr)
-                    ctx = decision(r)["additionalContext"]
-                    self.assertIn("1 " + state, ctx)
-                    self.assertIn("(q)", ctx)
-                    self.assertIn(workflow, ctx)
-                    self.assertIn("inspect", ctx.lower())
-                    self.assertIn("record", ctx.lower())
-                    self.assertIn("header revision", ctx.lower())
+                with tempfile.TemporaryDirectory() as cache:
+                    installed = Path(cache) / "data-request"
+                    shutil.copytree(PLUGIN, installed)
+                    shutil.copytree(REPO / "skills/data-request-setup/scripts", installed / "skills/setup/scripts", dirs_exist_ok=True)
+                    shutil.copy2(PREFLIGHT, installed / "hooks/data-request-preflight.sh")
+                    hooks = (PREFLIGHT, installed / "hooks/data-request-preflight.sh")
+                    for hook in hooks:
+                        r = run_hook(hook, {"cwd": str(p.root)}, env_for(installed))
+                        self.assertEqual(r.returncode, 0, r.stderr)
+                        ctx = decision(r)["additionalContext"]
+                        self.assertIn("1 " + state, ctx)
+                        self.assertIn("(q)", ctx)
+                        self.assertIn(workflow, ctx)
+                        self.assertIn("inspect", ctx.lower())
+                        self.assertIn("record", ctx.lower())
+                        self.assertIn("header revision", ctx.lower())
 
     def test_initialised_project_reports_counts_and_stale_slugs(self):
         with tempfile.TemporaryDirectory() as tmp:
             p = Project(tmp)
             p.sql("reports/monthly.sql", SQL_V1)
             p.sql("reports/weekly.sql", SQL_V1)
-            p.write_json("reports__monthly", "review.json", review_doc())
-            p.write_json("reports__weekly", "review.json", review_doc("reports__weekly", "reports/weekly.sql"))
+            p.commit()
+            p.write_json("reports__monthly", "review.json", review_doc(**json.loads(run_helper(["fingerprint", "reports/monthly.sql"], p.root).stdout)))
+            p.write_json("reports__weekly", "review.json", review_doc("reports__weekly", **json.loads(run_helper(["fingerprint", "reports/weekly.sql"], p.root).stdout)))
             run_helper(["snapshot", "reports__monthly", "reports/monthly.sql"], p.root)
             run_helper(["snapshot", "reports__weekly", "reports/weekly.sql"], p.root)
             (p.root / "reports" / "weekly.sql").write_text(SQL_V2)
-            r = run_hook(PREFLIGHT, {"hook_event_name": "SessionStart", "cwd": str(p.root)}, env_for())
+            p.commit("weekly source change")
+            r = run_hook(PREFLIGHT, {"hook_event_name": "SessionStart", "cwd": str(p.root)}, env_for(None))
             self.assertEqual(r.returncode, 0, r.stderr)
             out = json.loads(r.stdout)["hookSpecificOutput"]
             self.assertEqual(out["hookEventName"], "SessionStart")

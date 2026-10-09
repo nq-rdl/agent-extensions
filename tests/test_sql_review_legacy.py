@@ -63,7 +63,7 @@ class LegacyReviews(unittest.TestCase):
         j = json.loads((d / "review.json").read_text())
         self.assertEqual((j["slug"], j["sql_path"]), (NEW_SLUG, NEW_PATH))
         row = json.loads(self.status("--json").stdout)["reviews"][0]
-        self.assertEqual((row["slug"], row["state"]), (NEW_SLUG, "no-baseline"))
+        self.assertEqual((row["slug"], row["state"]), (NEW_SLUG, "stale"))
 
     def test_move_by_slug_refuses_bad_input(self):
         for args, rc in ((["--slug", "nope", NEW_PATH], 2), (["--slug", "../x", NEW_PATH], 2),

@@ -24,7 +24,7 @@ A ``basis`` is the evidence that an item's confirmation still holds.
    ``lines-unchanged`` there.
 ``scope-before-sql``
    ``carryover`` only. The scope was confirmed before the SQL existed (``sql_sha256: null``, no
-   baseline). The review adds each item's first ``location``.
+   SQL source). The review adds each item's first ``location``.
 ``intent-unchanged``
    The SQL changed under a scope item with no location. A scope item states intent, not SQL
    lines. In ``carryforward "$SLUG" scope`` it carries without a question; in ``carryover`` it
@@ -58,7 +58,7 @@ text, rationale, basis and ``location`` lines:
 ``carry_over_intent``
    The SQL changed or did not exist when the scope was confirmed (``intent-unchanged``,
    ``scope-before-sql``). Also move to the walk any item that a changed part of the SQL touches.
-   Show a one-line summary of the SQL delta since ``scope.source.sql`` (or "SQL written after the
+   Show a one-line summary of the SQL delta since the authenticated historical scope render (or "SQL written after the
    scope"). Options: **Carry over all** / **Walk each individually**, neither recommended.
 
 Copy each row's optional ``decided`` object onto the draft item verbatim, separate from the new confirmer.
@@ -84,7 +84,7 @@ human identities. Read the source and ask the human; never treat ``roles`` or
 ``recorded_by`` as the confirmer.
 
 Proof checks the selected source, every subsequent relevant path revision and the
-working tree, not just HEAD. Readable pre-source header/merge/time failures do not
+committed maintained source history, not just HEAD. Readable pre-source header/merge/time failures do not
 poison a new decision; missing ancestry or objects still fail closed. The exact unique
 governed snippet and its body prefix must survive; later lines may change, and leading comments may grow. Repeated snippets, relocation, body-prefix
 changes, missing objects, shallow ancestry, nonmonotonic source times and path renames
@@ -98,3 +98,7 @@ separate existing origin to match the helper's source; walk the mismatch. Publis
 re-proves the basis and requires confirmation fields but cannot authenticate an answer.
 Later carryforward preserves ``decided`` and uses its normal ``set`` fields, not a
 fresh header claim. Changed or unproven items remain in the per-item walk.
+
+Generated header decisions require proved maintained-source/rendered-header history; when
+that proof is unavailable, use ordinary item confirmation, not fresh header-decision carry.
+Missing or corrupt historical SHA evidence requires reassessment before all SQL-bound carry.

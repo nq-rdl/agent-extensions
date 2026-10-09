@@ -110,6 +110,15 @@ if type != "object" then "document is not a JSON object"
 else
   .revision as $rev
   | identity_violations,
+    (if has("sql_provenance") then
+      if (.sql_provenance | type) != "object" then "sql_provenance must be an object"
+      elif (.sql_provenance.mode != "rendered" and .sql_provenance.mode != "tracked") or
+           ((.sql_provenance.project_root == "" or (.sql_provenance.project_root | path_ok)) | not) or
+           (.sql_provenance.commit | type != "string") then "invalid sql_provenance mode, project_root or commit"
+      elif (.sql_provenance.commit | test("^[0-9a-f]{40}$|^[0-9a-f]{64}$") | not) or
+           .sql_provenance.commit != .git_commit or .git_dirty != false or .sql_sha256 == null
+      then "sql_provenance requires clean SQL bound to the same immutable git_commit" else empty end
+    else empty end),
     (if (.sql_path | path_ok | not) then "sql_path must be a normalized project-relative path" else empty end),
     (if (.slug | nonempty | not) or (.slug | test("^[A-Za-z0-9_%.-]+$") | not) or .slug == "." or .slug == ".." then "unsafe slug" else empty end),
     (if (.sql_path | path_ok) and .slug != (.sql_path | path_slug) and .slug != (.sql_path | legacy_path_slug) then "slug/sql_path binding mismatch" else empty end),
@@ -123,6 +132,16 @@ else
     (if .kind == "scope" and .sql_sha256 != null and (.sql_sha256 | (type == "string" and test("^[0-9a-f]{64}$")) | not) then "scope sql_sha256 must be null or a SHA256" else empty end),
     (("sql_body_sha256") as $key | if has($key) and .[$key] != null and (.[$key] | (type == "string" and test("^[0-9a-f]{64}$")) | not) then "\($key) must be null or a SHA256" else empty end),
     (if has("header_revisions") and ((.header_revisions | type) != "array" or (.header_revisions | all(.[]; type == "object" and (.sql_sha256 | type == "string" and test("^[0-9a-f]{64}$")) and (.at | nonempty)) | not)) then "header_revisions must contain full SHA256 and timestamp" else empty end),
+    (if (.header_revisions | type) == "array" then
+      .header_revisions[] | select(type == "object" and has("sql_provenance")) |
+      if (.sql_provenance | type) != "object" then "header revision sql_provenance must be an object"
+      elif (.sql_provenance.mode != "rendered" and .sql_provenance.mode != "tracked") or
+           ((.sql_provenance.project_root == "" or (.sql_provenance.project_root | path_ok)) | not) or
+           (.sql_provenance.commit | type != "string") then "invalid header revision SQL provenance"
+      elif (.sql_provenance.commit | test("^[0-9a-f]{40}$|^[0-9a-f]{64}$") | not) or
+           .sql_provenance.commit != .git_commit or .git_dirty != false
+      then "header revision provenance requires clean matching immutable git_commit" else empty end
+    else empty end),
     (.revision as $rev
   | req("schemaVersion"), req("kind"), req("slug"), req("sql_path"), req("revision"),
     (if .kind != "lifts" then req("assumptions"), req("limitations") else empty end),

@@ -4,6 +4,8 @@ import json
 import tempfile
 import unittest
 
+from test_sql_review_sources import committed
+
 from test_sql_review_scripts import Project, SQL_V1, item, review_doc, run, scope_doc
 
 SCOPE_ITEMS = dict(
@@ -36,11 +38,13 @@ class CarryOver(unittest.TestCase):
         ])))
 
     def scope(self, baseline=SQL_V1, **over):
-        self.p.write_json("q", "scope.json", scope_doc("q", "q.sql", **SCOPE_ITEMS, **over))
-        if baseline is not None:
-            (self.d / "scope.source.sql").write_text(baseline)
+        commit = committed(self.p)
+        evidence = {"git_commit": commit, "sql_sha256": hashlib.sha256(baseline.encode()).hexdigest()} if baseline is not None else {"git_commit": commit}
+        evidence.update(over)
+        self.p.write_json("q", "scope.json", scope_doc("q", "q.sql", **SCOPE_ITEMS, **evidence))
 
     def carryover(self, expected=0):
+        committed(self.p)
         r = run(["carryover", "q", str(self.draft)], self.p.root)
         self.assertEqual(r.returncode, expected, r.stdout + r.stderr)
         return json.loads(r.stdout) if expected == 0 else r
@@ -76,16 +80,12 @@ class CarryOver(unittest.TestCase):
         self.assertEqual([(c["id"], c["basis"]) for c in out["carry_over_intent"]], [("A1", "intent-unchanged")])
         self.assertIn("A2", {w["id"] for w in out["walk"]})
 
-    def test_recorded_scope_sha_is_honoured_and_a_disagreeing_baseline_is_ignored(self):
+    def test_recorded_scope_sha_is_honoured_without_snapshots(self):
         self.scope(baseline=None, sql_sha256=hashlib.sha256(SQL_V1.encode()).hexdigest())
         self.assertEqual(len(self.carryover()["carry_over"]), 2)
         self.scope(baseline="something else\n", sql_sha256="0" * 64)
-        out = self.carryover()
-        self.assertFalse(out["sql_unchanged"])
-        self.assertFalse(out["sql_body_unchanged"])
-        # no evidence for located A2; A1 states intent (#366)
-        self.assertEqual(out["carry_over"], [])
-        self.assertEqual([(c["id"], c["basis"]) for c in out["carry_over_intent"]], [("A1", "intent-unchanged")])
+        out = self.carryover(expected=6)
+        self.assertIn("full SHA mismatch", out.stderr)
 
     def test_scope_first_without_baseline_carries_over(self):
         # sql_sha256 null and no scope.source.sql: the scope was confirmed before the SQL existed.
@@ -97,12 +97,10 @@ class CarryOver(unittest.TestCase):
         self.assertEqual([(c["id"], c["basis"]) for c in out["carry_over_intent"]],
                          [("A1", "scope-before-sql"), ("A2", "scope-before-sql")])
 
-    def test_recorded_sha_without_baseline_walks_located_items_after_an_edit(self):
+    def test_corrupt_recorded_scope_hash_refuses_carry(self):
         self.scope(baseline=None, sql_sha256="0" * 64)
-        out = self.carryover()
-        self.assertFalse(out["scope_before_sql"])
-        self.assertEqual(out["carry_over"], [])
-        self.assertEqual([(c["id"], c["basis"]) for c in out["carry_over_intent"]], [("A1", "intent-unchanged")])
+        out = self.carryover(expected=6)
+        self.assertIn("full SHA mismatch", out.stderr)
 
     def test_without_scope_every_item_is_walked(self):
         out = self.carryover()
@@ -118,12 +116,8 @@ class CarryOver(unittest.TestCase):
                 scoped = dict(assumptions=[item("S1", "Keep the source grain", decided=origin)],
                               limitations=[item("S2", "Source omits transfers", decided=origin)])
                 self.p.write_json("q", "scope.json", scope_doc(
-                    "q", "q.sql", schemaVersion=2, **scoped))
-                baseline = self.d / "scope.source.sql"
-                if before_sql:
-                    baseline.unlink(missing_ok=True)
-                else:
-                    baseline.write_text(SQL_V1)
+                    "q", "q.sql", schemaVersion=2, git_commit=committed(self.p),
+                    sql_sha256=None if before_sql else hashlib.sha256(SQL_V1.encode()).hexdigest(), **scoped))
                 draft = review_doc("q", "q.sql", schemaVersion=2,
                     sql_sha256=hashlib.sha256(SQL_V1.encode()).hexdigest(),
                     assumptions=[draft_item("A1", "Keep the source grain", "because")],
@@ -144,6 +138,7 @@ class CarryOver(unittest.TestCase):
                     target.update(decided=row["decided"], status="confirmed",
                                   confirmed_by="review-confirmer", confirmed_at="2026-09-30T04:00:00Z",
                                   confirmed_revision=1)
+                draft.update(json.loads(run(["fingerprint", "q.sql"], self.p.root).stdout))
                 self.draft.write_text(json.dumps(draft))
                 result = run(["publish", "q", "review", str(self.draft)], self.p.root)
                 self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
