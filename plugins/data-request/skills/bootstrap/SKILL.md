@@ -229,6 +229,12 @@ for it, and leave inclusions, entry events and data elements alone. A request th
 exclusion, or an engineer who overrides the default for one criterion, gets the normal row with no
 `upstream`, confirmed afresh. See `${CLAUDE_PLUGIN_ROOT}/skills/setup/references/recurring-decisions.rst`.
 
+After the first delivery the default no longer holds, yet carry-forward keeps its rows, and their
+reason would still say first pass. On the first update after a delivery, walk every row whose `upstream` is `broad-first-pass`
+with the engineer, who re-confirms it: `not-applied` with the engineer's own reason, or the state
+the SQL now gives it. Either way, drop the `upstream`: a fresh confirmation, with no `decided`. The scope
+never carries a first-pass reason into a later release.
+
 Only one scope per repository carries `criteria_status`: the one that owns the request's criteria.
 Another scope in the repository leaves it out. Before publish, check the draft:
 

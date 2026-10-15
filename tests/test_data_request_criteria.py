@@ -90,6 +90,17 @@ class BootstrapCriteriaStates(unittest.TestCase):
                               "references/recurring-decisions.rst"):
                     self.assertIn(token, rule)
 
+    def test_broad_first_pass_rows_are_reconfirmed_after_the_first_delivery(self):
+        for tree in TREES:
+            with self.subTest(tree=tree):
+                rule = self.criteria(tree)
+                for token in ("After the first delivery", "carry-forward keeps",
+                              "walk every row whose `upstream` is `broad-first-pass`",
+                              "re-confirms it", "`not-applied` with the engineer's own reason",
+                              "drop the `upstream`", "a fresh confirmation",
+                              "never carries a first-pass reason into a later release"):
+                    self.assertIn(token, rule)
+
     def test_row_filters_rdl_adds_stay_assumptions(self):
         for tree in TREES:
             with self.subTest(tree=tree):
