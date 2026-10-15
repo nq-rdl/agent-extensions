@@ -239,7 +239,7 @@ class SkillContract(unittest.TestCase):
     def test_record_and_render(self):
         for tree in SKILL:
             with self.subTest(tree=tree):
-                text = flat(section(self.body(tree), "## 6. Record and render"))
+                text = flat(section(self.body(tree), "## 7. Record and render"))
                 self.assertIn(".sqlreview/releases/<tag>/release.json", text)
                 self.assertIn('bash "$S/release.sh" check', text)
                 self.assertIn('bash "$S/release.sh" render', text)
@@ -271,6 +271,133 @@ class WorkedExample(unittest.TestCase):
                        "blocking discrepancy"):
             self.assertIn(phrase, text)
         self.assertIn("THHSAQUIRE-99", text, "use the fictional 9xxx range")
+
+
+class CriteriaTableSkill(unittest.TestCase):
+    """Spec 017 (US3): the skill's criteria-table step, in every tree."""
+
+    HEADING = "## 6. Criteria in this release"
+
+    def step(self, tree):
+        return flat(section(frontmatter(SKILL[tree])[1], self.HEADING))
+
+    def test_step_sits_between_the_decisions_and_the_record(self):
+        for tree in SKILL:
+            with self.subTest(tree=tree):
+                body = frontmatter(SKILL[tree])[1]
+                self.assertLess(body.index("## 5. The analyst decides each claim"), body.index(self.HEADING))
+                self.assertLess(body.index(self.HEADING), body.index("## 7. Record and render"))
+
+    def test_describes_the_table_and_its_placement(self):
+        for tree in SKILL:
+            with self.subTest(tree=tree):
+                text = self.step(tree)
+                self.assertIn("`## Criteria in this release`", text)
+                self.assertIn("before **Extraction Assumptions / Important limitations**", text)
+                for column in ("ID", "Researcher's request", "This release", "Change since <previous tag>"):
+                    self.assertIn(column, text)
+                self.assertIn("entry event, inclusions, exclusions, data elements", text)
+                self.assertIn("`rows`", text)
+                self.assertIn("`criteria` object", text)
+
+    def test_fingerprints_come_from_the_validator_run_by_the_agent(self):
+        for tree in SKILL:
+            with self.subTest(tree=tree):
+                text = self.step(tree)
+                self.assertIn("`git show <tag>:answers.yaml`", text)
+                self.assertIn("temporary directory", text)
+                self.assertIn("beside it", text)
+                self.assertIn("pixi run python scripts/validate_answers.py", text)
+                self.assertIn("data-analysis-scaffold validate-answers", text)
+                self.assertIn("--fingerprints", text)
+                self.assertIn('bash "$S/release.sh" criteria "<tag>" --fingerprints', text)
+                self.assertIn("--answers-invalid", text)
+                self.assertIn("non-zero", text)
+                self.assertIn("`release.sh` runs no Python and never runs the validator", text)
+                self.assertIn("`fingerprints-unchecked`", text)
+
+    def test_previous_tag_rule(self):
+        for tree in SKILL:
+            with self.subTest(tree=tree):
+                text = self.step(tree)
+                self.assertIn("`previous_tag`", text)
+                self.assertIn("greatest earlier stable `X.Y.Z` release whose record is in the tag's tree", text)
+                self.assertIn("never a prerelease, a later tag or the working tree", text)
+                self.assertIn("header reads `Change`", text)
+
+    def test_analyst_decides_each_row_on_the_note_only(self):
+        for tree in SKILL:
+            with self.subTest(tree=tree):
+                text = self.step(tree)
+                for option in ("**Accept (Recommended)**", "**Reword**", "**Reject**"):
+                    self.assertIn(option, text)
+                self.assertIn("`proposed_note`", text)
+                self.assertIn("`final_note`", text)
+                self.assertIn("The researcher's wording is never editable", text)
+                self.assertIn("Do not reword `text`", text)
+                self.assertIn("decisions carry over while the proposed note is unchanged", text)
+                self.assertIn("`decided_by`", text)
+
+    def test_rejection_goes_back_to_the_engineer_and_holds(self):
+        for tree in SKILL:
+            with self.subTest(tree=tree):
+                text = self.step(tree)
+                self.assertIn("`note-rejected:<id>`", text)
+                self.assertIn("back to the engineer", text)
+                self.assertIn("fix the scope", text)
+                self.assertIn('re-run `release.sh criteria`', text)
+                self.assertIn("never drops the row", text)
+
+    def test_held_table_is_never_presented_as_final(self):
+        for tree in SKILL:
+            with self.subTest(tree=tree):
+                text = self.step(tree)
+                self.assertIn("exit 10", text)
+                for reason in ("review-stale", "state-missing:<id>", "fingerprint-mismatch:<field>",
+                               "owning-scope-ambiguous", "note-rejected:<id>", "answers-invalid",
+                               "fingerprints-unchecked"):
+                    self.assertIn(f"`{reason}`", text)
+                self.assertIn("`Criteria table held: <reasons>`", text)
+                self.assertIn("fails `release.sh check` only when the record is `approved`", text)
+                self.assertIn("keep the record `draft`", text)
+                self.assertIn("never present a held table as final", text)
+
+    def test_criterion_claims_stay_out_of_the_limitations(self):
+        for tree in SKILL:
+            with self.subTest(tree=tree):
+                text = self.step(tree)
+                self.assertIn("Never repeat a criterion in the limitations", text)
+                self.assertIn("a scope source whose `item` is a criterion id", text)
+                self.assertIn("hidden from the draft body", text)
+                self.assertIn("still blocks approval", text)
+                self.assertIn("resolve those claims too", text)
+
+    def test_legacy_repository_gets_the_one_line(self):
+        for tree in SKILL:
+            with self.subTest(tree=tree):
+                text = self.step(tree)
+                self.assertIn("`Criteria are not itemised for this request.`", text)
+                self.assertIn("prints `null`", text)
+                self.assertIn("the rest of the body is unchanged", text)
+
+    def test_record_shape_carries_the_criteria_object(self):
+        for tree in SKILL:
+            with self.subTest(tree=tree):
+                text = flat(section(frontmatter(SKILL[tree])[1], "## 7. Record and render"))
+                self.assertIn('"criteria"', text)
+                self.assertIn("`held_reasons`", text)
+
+    def test_worked_example_walks_the_table(self):
+        for tree, path in EXAMPLE.items():
+            with self.subTest(tree=tree):
+                text = flat(path.read_text())
+                self.assertIn("Criteria in this release", text)
+                self.assertIn("git show v1.1.0:answers.yaml", text)
+                self.assertIn("--fingerprints", text)
+                self.assertIn("`note-rejected:E2`", text)
+                self.assertIn("Criteria table held", text)
+                self.assertIn("Criteria are not itemised for this request.", text)
+                self.assertIn("THHSAQUIRE-99", text)
 
 
 # --- helper: evidence -----------------------------------------------------------------------
@@ -1317,6 +1444,8 @@ CASES = {
                                "blocker-missing-element"},
     "release-technical-limitation": {"include-l4", "internal-l3", "claims-no-sql-jargon",
                                      "claims-current-record"},
+    "release-criteria-table": {"table-before-limitations", "researcher-wording-unchanged",
+                               "held-not-final"},
 }
 NODE = shutil.which("node")
 NODE_SCRIPT = """
