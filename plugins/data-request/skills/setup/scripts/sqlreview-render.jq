@@ -34,7 +34,7 @@ def table(a; heading):
   end;
 def criteria_note: if .state == "flagged" and .flag != null then "`\(.flag.output).\(.flag.column)`" else (.reason // "") end;
 def criteria_table(a):
-  if (a | length) == 0 then ""
+  if (a | length) == 0 then "_none recorded_"
   else "| ID | State | Note |\n|---|---|---|\n"
        + (a | sort_by(crit_status_order) | map("| \(.criterion | cell) | \(.state | cell) | \(criteria_note | cell) |") | join("\n"))
   end;

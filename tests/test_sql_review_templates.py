@@ -120,10 +120,6 @@ class StatusReportsMissingTemplates(unittest.TestCase):
         self.assertEqual(json.loads(self.status("--json").stdout)["missing_templates"], [])
 
 
-if __name__ == "__main__":
-    unittest.main()
-
-
 class RenderScopeCriteria(unittest.TestCase):
     """Spec 017 (T031): the bundled scope.md renders `criteria_status` as an ID/State/Note table."""
 
@@ -182,11 +178,11 @@ class RenderScopeCriteria(unittest.TestCase):
         self.assertIn("| I1 | not-applied | a &#124; b<br>second line |", md)
         self.assertIn("| E1 | flagged | `pat&#124;ients.col<br>x` |", md)
 
-    def test_scope_without_criteria_status_renders_an_empty_section(self):
+    def test_scope_without_criteria_status_renders_none_recorded(self):
         for over in ({}, {"criteria_status": []}):
             r, md = self.render(**over)
             self.assertEqual(r.stderr, "")
-            self.assertIn("## Criteria\n\n\n\n## Assumptions", md)
+            self.assertIn("## Criteria\n\n_none recorded_\n\n## Assumptions", md)
             self.assertNotIn("{{", md)
             self.assertNotIn("| ID | State |", md)
 
@@ -207,3 +203,7 @@ class RenderScopeCriteria(unittest.TestCase):
         r, md = self.render(criteria_status=[row("N1", "applied")])
         self.assertEqual(r.stderr.strip(), "sqlreview: unknown placeholder(s) left in place: {{not_a_thing}}")
         self.assertIn("{{not_a_thing}}", md)
+
+
+if __name__ == "__main__":
+    unittest.main()
