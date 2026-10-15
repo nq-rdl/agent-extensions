@@ -43,7 +43,7 @@ Tell me the state each criterion would get.
 End your reply with one fenced `yaml` block with exactly these top-level keys:
 
 - `N1`, `I1`, `E2`, `D1`, `D2`, `D3`: the state recorded for that criterion
-- `E1`: the state recorded for E1, or `unresolved` when no row can be recorded yet
+- `E1`: the state recorded for E1 in this revision
 - `E2_flag`: the output and column that carry the E2 flag, as `<output>.<column>`
 - `D1_reason_inputs`: the ids of the criteria that the D1 reason names as delivered inputs, comma-separated with no spaces
 - `analyst_question`: `yes` when you raise an `Analyst question:` for the analyst, otherwise `no`

@@ -2,8 +2,8 @@ fail:
 - fails:
   - researcher-applies-gated
   name: researcher-applies without applied_by or a question
-  reply: 'E1 has no applied_by, so researcher-applies is not recorded. One Analyst question goes to the
-    analyst through /data-request:intake.
+  reply: 'E1 has no applied_by, so it is not-applied for this iteration. One Analyst question goes to
+    the analyst through /data-request:intake.
 
 
     ```yaml
@@ -34,8 +34,8 @@ fail:
 - fails:
   - researcher-applies-gated
   name: researcher-applies even with a question
-  reply: 'E1 has no applied_by, so researcher-applies is not recorded. One Analyst question goes to the
-    analyst through /data-request:intake.
+  reply: 'E1 has no applied_by, so it is not-applied for this iteration. One Analyst question goes to
+    the analyst through /data-request:intake.
 
 
     ```yaml
@@ -65,9 +65,9 @@ fail:
     '
 - fails:
   - researcher-applies-gated
-  name: E1 unresolved but no question raised
-  reply: 'E1 has no applied_by, so researcher-applies is not recorded. One Analyst question goes to the
-    analyst through /data-request:intake.
+  name: E1 not-applied but no question raised
+  reply: 'E1 has no applied_by, so it is not-applied for this iteration. One Analyst question goes to
+    the analyst through /data-request:intake.
 
 
     ```yaml
@@ -76,7 +76,7 @@ fail:
 
     I1: applied
 
-    E1: unresolved
+    E1: not-applied
 
     E2: flagged
 
@@ -98,8 +98,8 @@ fail:
 - fails:
   - criteria-states
   name: entry event not applied
-  reply: 'E1 has no applied_by, so researcher-applies is not recorded. One Analyst question goes to the
-    analyst through /data-request:intake.
+  reply: 'E1 has no applied_by, so it is not-applied for this iteration. One Analyst question goes to
+    the analyst through /data-request:intake.
 
 
     ```yaml
@@ -108,7 +108,7 @@ fail:
 
     I1: applied
 
-    E1: unresolved
+    E1: not-applied
 
     E2: flagged
 
@@ -130,8 +130,8 @@ fail:
 - fails:
   - criteria-states
   name: flagged exclusion recorded as applied
-  reply: 'E1 has no applied_by, so researcher-applies is not recorded. One Analyst question goes to the
-    analyst through /data-request:intake.
+  reply: 'E1 has no applied_by, so it is not-applied for this iteration. One Analyst question goes to
+    the analyst through /data-request:intake.
 
 
     ```yaml
@@ -140,7 +140,7 @@ fail:
 
     I1: applied
 
-    E1: unresolved
+    E1: not-applied
 
     E2: applied
 
@@ -162,8 +162,8 @@ fail:
 - fails:
   - criteria-states
   name: derived element recorded as delivered
-  reply: 'E1 has no applied_by, so researcher-applies is not recorded. One Analyst question goes to the
-    analyst through /data-request:intake.
+  reply: 'E1 has no applied_by, so it is not-applied for this iteration. One Analyst question goes to
+    the analyst through /data-request:intake.
 
 
     ```yaml
@@ -172,7 +172,7 @@ fail:
 
     I1: applied
 
-    E1: unresolved
+    E1: not-applied
 
     E2: flagged
 
@@ -194,8 +194,8 @@ fail:
 - fails:
   - criteria-states
   name: delivered data element left without a state
-  reply: 'E1 has no applied_by, so researcher-applies is not recorded. One Analyst question goes to the
-    analyst through /data-request:intake.
+  reply: 'E1 has no applied_by, so it is not-applied for this iteration. One Analyst question goes to
+    the analyst through /data-request:intake.
 
 
     ```yaml
@@ -204,7 +204,7 @@ fail:
 
     I1: applied
 
-    E1: unresolved
+    E1: not-applied
 
     E2: flagged
 
@@ -226,8 +226,8 @@ fail:
 - fails:
   - flag-names-output-and-column
   name: flag names the column only
-  reply: 'E1 has no applied_by, so researcher-applies is not recorded. One Analyst question goes to the
-    analyst through /data-request:intake.
+  reply: 'E1 has no applied_by, so it is not-applied for this iteration. One Analyst question goes to
+    the analyst through /data-request:intake.
 
 
     ```yaml
@@ -236,7 +236,7 @@ fail:
 
     I1: applied
 
-    E1: unresolved
+    E1: not-applied
 
     E2: flagged
 
@@ -258,8 +258,8 @@ fail:
 - fails:
   - flag-names-output-and-column
   name: flag names another output
-  reply: 'E1 has no applied_by, so researcher-applies is not recorded. One Analyst question goes to the
-    analyst through /data-request:intake.
+  reply: 'E1 has no applied_by, so it is not-applied for this iteration. One Analyst question goes to
+    the analyst through /data-request:intake.
 
 
     ```yaml
@@ -268,7 +268,7 @@ fail:
 
     I1: applied
 
-    E1: unresolved
+    E1: not-applied
 
     E2: flagged
 
@@ -290,8 +290,8 @@ fail:
 - fails:
   - derived-element-reason
   name: derived reason names no delivered input
-  reply: 'E1 has no applied_by, so researcher-applies is not recorded. One Analyst question goes to the
-    analyst through /data-request:intake.
+  reply: 'E1 has no applied_by, so it is not-applied for this iteration. One Analyst question goes to
+    the analyst through /data-request:intake.
 
 
     ```yaml
@@ -300,7 +300,7 @@ fail:
 
     I1: applied
 
-    E1: unresolved
+    E1: not-applied
 
     E2: flagged
 
@@ -322,8 +322,8 @@ fail:
 - fails:
   - researcher-applies-gated
   name: duplicate conflicting E1
-  reply: 'E1 has no applied_by, so researcher-applies is not recorded. One Analyst question goes to the
-    analyst through /data-request:intake.
+  reply: 'E1 has no applied_by, so it is not-applied for this iteration. One Analyst question goes to
+    the analyst through /data-request:intake.
 
 
     ```yaml
@@ -332,7 +332,7 @@ fail:
 
     I1: applied
 
-    E1: unresolved
+    E1: not-applied
 
     E2: flagged
 
@@ -359,8 +359,8 @@ fail:
   - derived-element-reason
   - researcher-applies-gated
   name: earlier correct block cannot override final answer
-  reply: 'E1 has no applied_by, so researcher-applies is not recorded. One Analyst question goes to the
-    analyst through /data-request:intake.
+  reply: 'E1 has no applied_by, so it is not-applied for this iteration. One Analyst question goes to
+    the analyst through /data-request:intake.
 
 
     ```yaml
@@ -369,7 +369,7 @@ fail:
 
     I1: applied
 
-    E1: unresolved
+    E1: not-applied
 
     E2: flagged
 
@@ -387,7 +387,7 @@ fail:
 
     ```
 
-    E1 has no applied_by, so researcher-applies is not recorded. One Analyst question goes to the analyst
+    E1 has no applied_by, so it is not-applied for this iteration. One Analyst question goes to the analyst
     through /data-request:intake.
 
 
@@ -425,8 +425,8 @@ fail:
   reply: ''
 pass:
 - name: correct answer
-  reply: 'E1 has no applied_by, so researcher-applies is not recorded. One Analyst question goes to the
-    analyst through /data-request:intake.
+  reply: 'E1 has no applied_by, so it is not-applied for this iteration. One Analyst question goes to
+    the analyst through /data-request:intake.
 
 
     ```yaml
@@ -435,7 +435,7 @@ pass:
 
     I1: applied
 
-    E1: unresolved
+    E1: not-applied
 
     E2: flagged
 
@@ -455,8 +455,8 @@ pass:
 
     '
 - name: spaces, comments and quotes
-  reply: 'E1 has no applied_by, so researcher-applies is not recorded. One Analyst question goes to the
-    analyst through /data-request:intake.
+  reply: 'E1 has no applied_by, so it is not-applied for this iteration. One Analyst question goes to
+    the analyst through /data-request:intake.
 
 
     ```yaml
@@ -465,7 +465,7 @@ pass:
 
     I1: applied
 
-    E1: ''unresolved''  # no row yet
+    E1: ''not-applied''  # analyst question open
 
     E2: flagged
 

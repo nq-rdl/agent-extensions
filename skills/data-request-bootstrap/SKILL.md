@@ -206,9 +206,11 @@ engineer confirms what the SQL does or will do. The analyst's wording stays as i
 - `flagged` names the delivered output and column that carry the flag, as
   `flag: {"output": "<output>", "column": "<column>"}`. The column must be one the SQL delivers.
 - `researcher-applies` needs `applied_by: researcher` on that criterion in the sidecar. Without it,
-  do not record the state. Put one `Analyst question:` for the analyst to answer through
-  `/data-request:intake`, which sets `applied_by`. Continue independent work and leave the criterion
-  without a row: `criteria` reports it until the answer arrives. An engineer's confirmation is not that answer.
+  record `not-applied` for this iteration, with a reason that names the open analyst question on who
+  applies it. Put one `Analyst question:` for the analyst to answer through `/data-request:intake`,
+  which sets `applied_by`. The scope can publish meanwhile. Once the sidecar has `applied_by: researcher`,
+  a later revision may record `researcher-applies`, confirmed afresh. An engineer's confirmation is not
+  that answer.
 - A derived data element the researcher computes (a length of stay from delivered admission and
   discharge datetimes) is `not-delivered`. Its reason names the delivered inputs.
 
@@ -218,7 +220,8 @@ assumption, reported under "Extraction Assumptions / Important limitations". Do 
 in that section.
 
 **House default:** `broad-first-pass` applies without asking, like `tuh-facility`, when the request is
-on its first pass (no earlier delivery exists for it). Read it with `recurring-decisions.sh list`. Give
+on its first pass (no earlier delivery exists for it). When it is not, the default is not applied and
+exclusions get ordinary engineer-confirmed rows. Read it with `recurring-decisions.sh list`. Give
 each exclusion that the request does not override a row with state `not-applied`, `reason` the
 decision's `proposal.text` and `upstream: {"source": "recurring-decision", "id": "broad-first-pass"}`.
 Copy `confirmed_by` and `confirmed_at` from its `house_default`, set `confirmed_revision` to the import

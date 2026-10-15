@@ -77,7 +77,7 @@ confirmation or edit the final JSON. Lint cannot grant confirmation. A reworded 
 item no longer matches its scope text, so it is walked.
 
 Some decisions recur in every enquiry (#362). Before you put candidate items to the engineer, run
-`bash "$S/recurring-decisions.sh" match ".sqlreview/reviews/$SLUG/review.draft.json"`. For each other match,
+`bash "$S/recurring-decisions.sh" match ".sqlreview/reviews/$SLUG/review.draft.json"`. For each other match without a `house_default`,
 show the prior enquiries, offer the listed wording and mark the item `upstream`, as
 `${CLAUDE_PLUGIN_ROOT}/skills/setup/references/recurring-decisions.rst` says. The engineer still confirms each other item;
 the exact recorded TUH house default is not a fresh facility question. Preserve its upstream origin,

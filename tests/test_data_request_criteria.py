@@ -64,10 +64,14 @@ class BootstrapCriteriaStates(unittest.TestCase):
             with self.subTest(tree=tree):
                 rule = self.criteria(tree)
                 for token in ("`researcher-applies` needs `applied_by: researcher` on that criterion in the sidecar",
-                              "do not record the state", "one `Analyst question:`",
-                              "data-request:intake`, which sets `applied_by`", "leave the criterion without a row",
+                              "record `not-applied` for this iteration",
+                              "names the open analyst question on who applies it", "one `Analyst question:`",
+                              "data-request:intake`, which sets `applied_by`", "The scope can publish meanwhile",
+                              "a later revision may record `researcher-applies`, confirmed afresh",
                               "An engineer's confirmation is not that answer"):
                     self.assertIn(token, rule)
+                for gone in ("do not record the state", "without a row"):
+                    self.assertNotIn(gone, rule)
 
     def test_broad_first_pass_default_for_exclusions(self):
         for tree in TREES:
@@ -81,6 +85,8 @@ class BootstrapCriteriaStates(unittest.TestCase):
                               "set `confirmed_revision` to the import revision", "put no `decided` on the row",
                               "Invent no other confirmer", "leave inclusions, entry events and data elements alone",
                               "overrides the default for one criterion", "confirmed afresh",
+                              "When it is not, the default is not applied and exclusions get ordinary "
+                              "engineer-confirmed rows",
                               "references/recurring-decisions.rst"):
                     self.assertIn(token, rule)
 
@@ -110,6 +116,7 @@ class BootstrapCriteriaStates(unittest.TestCase):
             with self.subTest(tree=tree):
                 body = text(tree, "bootstrap")
                 self.assertIn("For each other match without a `house_default`", body)
+                self.assertIn("For each other match without a `house_default`", text(tree, "analyse"))
 
 
 class RecurringDecisionsReference(unittest.TestCase):
