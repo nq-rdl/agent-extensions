@@ -200,10 +200,13 @@ the record again. A rejected row fails `release.sh check` unless the embedded ta
 with `note-rejected:<id>`, on a draft record too. The table never drops the row.
 
 **Held.** `release.sh criteria` ends with exit 10 and `status` is `held` for any of these `held_reasons`:
-`review-stale`, `state-missing:<id>`, `fingerprint-mismatch:<field>`, `owning-scope-ambiguous`,
+`no-owning-scope`, `review-stale`, `state-missing:<id>`, `fingerprint-mismatch:<field>`, `owning-scope-ambiguous`,
 `note-rejected:<id>`, `answers-invalid` and `fingerprints-unchecked`. A free-text mismatch goes
 back to `/data-request:intake`; the others go to the engineer, except `fingerprints-unchecked`,
-which the analyst fixes by re-running the step above. `answers-invalid` means the tag's
+which the analyst fixes by re-running the step above. `no-owning-scope` means the tag's sidecar itemises live criteria but no scope carries their states (a scope
+published before the analyst itemised): the engineer must run `/data-request:bootstrap` to record criteria states,
+and a new tag follows. It comes with `state-missing:<id>` for each live criterion, whose row shows the
+researcher's request with no state; such a table is never "not itemised". `answers-invalid` means the tag's
 `answers.yaml` failed validation and the tag cannot change, so it needs an engineer or intake fix
 and a new tag. The body then shows
 one line, `Criteria table held: <reasons>`, with no partial table. A held table, or any row whose
@@ -217,9 +220,11 @@ resolve those claims too; the record still needs a kept non-criterion claim unde
 **Extraction Assumptions / Important limitations**. A row filter RDL added on its own (test
 patients, cancelled admissions) is not a criterion: it stays a limitation.
 
-**Not itemised.** With no schema 2 sidecar, or no owning scope, `release.sh criteria` prints
+**Not itemised.** With no sidecar, a schema 1 sidecar, or a schema 2 sidecar with no live criterion and no scope carrying criteria states, `release.sh criteria` prints
 `null`. Write `"criteria": null` (or omit it). The body then carries one line, `Criteria are not
-itemised for this request.`, and the rest of the body is unchanged.
+itemised for this request.`, and the rest of the body is unchanged. Run inside the repository,
+`release.sh check` rejects an approved record without a criteria table when the sidecar at its
+commit has a live criterion.
 
 ## 7. Record and render
 

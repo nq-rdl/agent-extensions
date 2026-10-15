@@ -98,6 +98,11 @@ or one line saying why it has none. The falls repository above holds only a lega
 line ``Criteria are not itemised for this request.`` before the limitations, and nothing else in it
 changes.
 
+Had the analyst itemised the criteria after the engineer published the scope, the tag would carry
+live criteria with no scope recording their states. ``release.sh criteria`` then holds the table,
+``Criteria table held: no-owning-scope, state-missing:N1, …``, never "not itemised", and the
+engineer runs ``/data-request:bootstrap`` to record the states before a new tag.
+
 A second fictional enquiry, THHSAQUIRE-9937, an abdominal aortic aneurysm cohort, has itemised
 criteria and a second release, ``v1.1.0`` (``v1.0.0`` is its first). The steps:
 

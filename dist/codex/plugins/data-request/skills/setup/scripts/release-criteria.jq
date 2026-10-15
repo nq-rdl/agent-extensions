@@ -5,8 +5,9 @@
 # criteria vocabulary (sqlreview-criteria.jq). Diagnostics name ids, fields and reasons, never values.
 #
 # `criteria` object: {previous_tag, scope: {slug, revision} | null, status: complete | held,
-# held_reasons: [...], rows: [...]}; null (or an absent `criteria`) is a legacy request, rendered as
-# one "not itemised" line. A row: {id, kind, text, state, proposed_note, final_note, decision,
+# held_reasons: [...], rows: [...]}; null (or an absent `criteria`) is a legacy request (no
+# sidecar, a schema 1 sidecar, or no live criterion at the tag), rendered as one "not itemised"
+# line; `release.sh check` rejects an approved null when the tag's sidecar has a live criterion. A row: {id, kind, text, state, proposed_note, final_note, decision,
 # change, previous_state?, replaced_by?, decided_by?, decided_at?}. `state` is the owning scope's
 # state at the tag, "withdrawn" for a criterion the researcher withdrew, or null (held) when no
 # usable state is recorded. Decisions follow the claims: pending, accepted, reworded, rejected.
@@ -36,16 +37,17 @@ def rc_criterion_claim:
 
 # Held reasons in contract order; the rank sorts them, then ids in criteria order.
 def rc_reason_rank:
-  if . == "review-stale" then [0, 0, 0]
-  elif startswith("state-missing:") then [1] + (.[14:] | {id: ., kind: crit_kind_of_id} | crit_order)
-  elif startswith("fingerprint-mismatch:") then [2, (.[21:] as $f | rc_fp_fields | index([$f])), 0]
-  elif . == "owning-scope-ambiguous" then [3, 0, 0]
-  elif startswith("note-rejected:") then [4] + (.[14:] | {id: ., kind: crit_kind_of_id} | crit_order)
-  elif . == "answers-invalid" then [5, 0, 0]
-  else [6, 0, 0] end;
+  if . == "no-owning-scope" then [0, 0, 0]
+  elif . == "review-stale" then [1, 0, 0]
+  elif startswith("state-missing:") then [2] + (.[14:] | {id: ., kind: crit_kind_of_id} | crit_order)
+  elif startswith("fingerprint-mismatch:") then [3, (.[21:] as $f | rc_fp_fields | index([$f])), 0]
+  elif . == "owning-scope-ambiguous" then [4, 0, 0]
+  elif startswith("note-rejected:") then [5] + (.[14:] | {id: ., kind: crit_kind_of_id} | crit_order)
+  elif . == "answers-invalid" then [6, 0, 0]
+  else [7, 0, 0] end;
 def rc_reason_ok:
   type == "string"
-  and (test("^(review-stale|owning-scope-ambiguous|answers-invalid|fingerprints-unchecked)\\z")
+  and (test("^(no-owning-scope|review-stale|owning-scope-ambiguous|answers-invalid|fingerprints-unchecked)\\z")
        or test("^(state-missing|note-rejected):[NIED][1-9][0-9]*\\z")
        or (startswith("fingerprint-mismatch:") and (.[21:] as $f | rc_fp_fields | index([$f])) != null));
 
@@ -71,7 +73,9 @@ def rc_note:
 
 # Inputs (all JSON):
 #   $intake    `sqlreview.sh intake` output for answers.intake.json at the tag (criteria, fingerprints)
-#   $scopes    [{slug, revision, criteria_status}] for every scope at the tag carrying criteria_status
+#   $scopes    [{slug, revision, criteria_status}] for every scope at the tag carrying criteria_status;
+#              none, while a criterion is live, holds the table (no-owning-scope): the criteria are
+#              itemised but no scope records their states, so "not itemised" would be false (FR-017)
 #   $stale     true when the owning scope's review does not apply to the tag
 #   $previous  {tag, criteria} of the previous release (research R9), or null
 #   $current   the `criteria` of this tag's record in the working tree (its analyst decisions), or null
@@ -79,7 +83,7 @@ def rc_note:
 #   $mode      "fingerprints", "answers-invalid" or "unchecked"
 def rc_build($intake; $scopes; $stale; $previous; $current; $fp; $mode):
   ($intake.criteria // []) as $crit
-  | if ($crit | length) == 0 or ($scopes | length) == 0 then null
+  | if ($crit | length) == 0 or (($scopes | length) == 0 and ($crit | crit_live | length) == 0) then null
     else
       ($scopes | if length == 1 then .[0] else null end) as $scope
       | (reduce (($scope.criteria_status // []) | if type == "array" then .[] else empty end) as $r
@@ -116,8 +120,9 @@ def rc_build($intake; $scopes; $stale; $previous; $current; $fp; $mode):
                       decided_by: $was.decided_by, decided_at: $was.decided_at}
             else . + {final_note: null, decision: "pending"} end
         ] | sort_by(crit_order) as $rows
-      | [ (if $scope != null and $stale then "review-stale" else empty end),
-          (if $scope == null then empty
+      | [ (if ($scopes | length) == 0 then "no-owning-scope" else empty end),
+          (if $scope != null and $stale then "review-stale" else empty end),
+          (if ($scopes | length) > 1 then empty
            else $rows[] | select(.state == null) | "state-missing:\(.id)" end),
           (if $mode == "fingerprints" then
              rc_fp_fields[] as $f | select($fp[$f] != $intake.fingerprints[$f]) | "fingerprint-mismatch:\($f)"
@@ -199,6 +204,8 @@ def rc_errors:
          elif $held and ($reasons | length) == 0 then "criteria: a held table needs held_reasons"
          elif ($held | not) and ($reasons | length) > 0 then "criteria: a complete table has no held_reasons"
          else empty end),
+        (if $c.scope != null and ($reasons | type) == "array" and ($reasons | index(["no-owning-scope"])) != null
+         then "criteria: a no-owning-scope table names no scope" else empty end),
         (if ($c.rows | type) == "array" then empty else "criteria: rows must be an array" end),
         ($rows[] | if type == "object" then rc_row_errors($held; $reasons) else "criteria: every row must be an object" end),
         # Only a well-formed id is named; a malformed one is reported by rc_row_errors without its value.

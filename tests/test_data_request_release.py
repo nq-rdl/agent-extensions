@@ -377,7 +377,7 @@ class CriteriaTableSkill(unittest.TestCase):
             with self.subTest(tree=tree):
                 text = self.step(tree)
                 self.assertIn("exit 10", text)
-                for reason in ("review-stale", "state-missing:<id>", "fingerprint-mismatch:<field>",
+                for reason in ("no-owning-scope", "review-stale", "state-missing:<id>", "fingerprint-mismatch:<field>",
                                "owning-scope-ambiguous", "note-rejected:<id>", "answers-invalid",
                                "fingerprints-unchecked"):
                     self.assertIn(f"`{reason}`", text)
@@ -385,6 +385,16 @@ class CriteriaTableSkill(unittest.TestCase):
                 self.assertIn("fails `release.sh check` only when the record is `approved`", text)
                 self.assertIn("keep the record `draft`", text)
                 self.assertIn("never present a held table as final", text)
+
+    def test_no_owning_scope_goes_to_the_engineer_through_bootstrap(self):
+        for tree in SKILL:
+            with self.subTest(tree=tree):
+                text = self.step(tree)
+                self.assertIn("`no-owning-scope` means the tag's sidecar itemises live criteria but no scope "
+                              "carries their states", text)
+                self.assertIn("run `/data-request:bootstrap` to record criteria states", text)
+                self.assertIn("never \"not itemised\"", text)
+                self.assertIn("`release.sh check` rejects an approved record without a criteria table", text)
 
     def test_criterion_claims_stay_out_of_the_limitations(self):
         for tree in SKILL:
@@ -403,6 +413,9 @@ class CriteriaTableSkill(unittest.TestCase):
                 self.assertIn("`Criteria are not itemised for this request.`", text)
                 self.assertIn("prints `null`", text)
                 self.assertIn("the rest of the body is unchanged", text)
+                self.assertIn("With no sidecar, a schema 1 sidecar, or a schema 2 sidecar with no live criterion "
+                              "and no scope carrying criteria states", text)
+                self.assertNotIn("or no owning scope", text)
 
     def test_record_shape_carries_the_criteria_object(self):
         for tree in SKILL:
@@ -422,6 +435,7 @@ class CriteriaTableSkill(unittest.TestCase):
                 self.assertIn("Criteria table held", text)
                 self.assertIn("Criteria are not itemised for this request.", text)
                 self.assertIn("THHSAQUIRE-99", text)
+                self.assertIn("``Criteria table held: no-owning-scope, state-missing:N1", text)
 
 
 # --- helper: evidence -----------------------------------------------------------------------
@@ -1247,10 +1261,68 @@ class CriteriaTable(unittest.TestCase):
         self.p.tag("0.1.1")
         self.held("0.1.1", ["review-stale", "state-missing:E2", "answers-invalid"], ["--answers-invalid"])
 
+    def test_held_no_owning_scope(self):
+        """Itemised criteria with no scope carrying criteria_status (the scope was published before
+        the criteria were itemised) hold the table: never "not itemised" (FR-017, SC-001)."""
+        self.p.scope(None)
+        self.p.commit("scope without criteria_status")
+        self.p.tag("0.1.1")
+        live = ["N1", "I1", "I2", "E1", "E2", "E10", "D3"]
+        t = self.held("0.1.1", ["no-owning-scope"] + [f"state-missing:{i}" for i in live])
+        self.assertIsNone(t["scope"])
+        rows = self.by_id(t)
+        self.assertEqual([r["id"] for r in t["rows"]], ["N1", "I1", "I2", "E1", "E2", "E5", "E10", "D3"])
+        for i in live:
+            self.assertEqual((rows[i]["state"], rows[i]["proposed_note"], rows[i]["decision"]), (None, None, "pending"))
+        self.assertEqual(rows["I1"]["text"], "Adults with AAA diagnosis at TUH | ward A", "text verbatim")
+        self.assertEqual(rows["E5"]["state"], "withdrawn")
+        # The other reasons still apply, after it in contract order.
+        self.held("0.1.1", ["no-owning-scope"] + [f"state-missing:{i}" for i in live] + ["answers-invalid"],
+                  ["--answers-invalid"])
+
+    def test_no_owning_scope_reason_names_no_scope(self):
+        t = self.p.table("0.1.0")
+        t.update(status="held", held_reasons=["no-owning-scope"])
+        code, out = violations(record(status="draft", criteria=t))
+        self.assertEqual(code, 4, out)
+        self.assertIn("criteria: a no-owning-scope table names no scope", out)
+
+    def test_check_rejects_an_approved_record_without_the_table_its_tag_itemises(self):
+        """An approved record with no criteria object, at a tag whose sidecar has live criteria."""
+        commit = git(self.p.root, "rev-parse", "0.1.0^{commit}")
+        for criteria in (None, "absent"):
+            with self.subTest(criteria=criteria):
+                doc = record(tag="0.1.0", commit=commit, criteria=None)
+                if criteria == "absent":
+                    del doc["criteria"]
+                r = run(RELEASE, ["check", "--stdin"], self.p.root, stdin=json.dumps(doc))
+                self.assertEqual(r.returncode, 4, r.stdout + r.stderr)
+                self.assertIn("approved: criteria are itemised at 0.1.0; embed the release.sh criteria table",
+                              r.stdout)
+                self.assertNotIn(SECRET, r.stdout + r.stderr)
+                doc["status"] = "draft"
+                r = run(RELEASE, ["check", "--stdin"], self.p.root, stdin=json.dumps(doc))
+                self.assertEqual(r.returncode, 0, r.stdout + r.stderr)
+        # Nothing live at the tag (every criterion withdrawn, or no sidecar): a null table is right.
+        self.p.sidecar([dict(c, withdrawn=withdrawn()) for c in CRITERIA_V1])
+        self.p.commit("all withdrawn")
+        self.p.tag("0.1.1")
+        (self.p.root / "answers.intake.json").unlink()
+        self.p.commit("no sidecar")
+        self.p.tag("0.1.2")
+        for tag in ("0.1.1", "0.1.2"):
+            with self.subTest(tag=tag):
+                doc = record(tag=tag, commit=git(self.p.root, "rev-parse", f"{tag}^{{commit}}"), criteria=None)
+                r = run(RELEASE, ["check", "--stdin"], self.p.root, stdin=json.dumps(doc))
+                self.assertEqual(r.returncode, 0, r.stdout + r.stderr)
+
     def test_legacy_repository_is_not_itemised(self):
+        def all_withdrawn():
+            self.p.sidecar([dict(c, withdrawn=withdrawn()) for c in CRITERIA_V1])
+            self.p.scope(None)
         cases = {"no sidecar": lambda: (self.p.root / "answers.intake.json").unlink(),
                  "schema 1": lambda: self.p.sidecar(None, schema=1),
-                 "no owning scope": lambda: self.p.scope(None)}
+                 "schema 2, no live criteria, no owning scope": all_withdrawn}
         for n, (name, change) in enumerate(cases.items()):
             with self.subTest(name):
                 self.p.sidecar(CRITERIA_V1)

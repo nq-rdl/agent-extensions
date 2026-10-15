@@ -19,7 +19,9 @@
 #                            REF (null when the review has none or git cannot tell).
 #   check FILE | check --stdin
 #                            validate a release record (.sqlreview/releases/<tag>/release.json):
-#                            one violation per line, exit 4; "ok" otherwise
+#                            one violation per line, exit 4; "ok" otherwise. Inside the project,
+#                            an approved record without a criteria table fails when the sidecar
+#                            at its commit has a live criterion
 #   render FILE              the paste-ready release body (Markdown) from a valid record; a draft
 #                            shows its pending claims and open questions. Before the limitations
 #                            comes "## Criteria in this release" (the criteria table), or one line:
@@ -34,8 +36,10 @@
 #                            note is unchanged. FILE is validate-answers --fingerprints output for
 #                            answers.yaml at TAG; --answers-invalid says that validation failed;
 #                            with neither the table is held (fingerprints-unchecked). Prints null
-#                            when the criteria are not itemised (no schema 2 sidecar with criteria,
-#                            or no owning scope at TAG). Runs no Python. Exit 10 when held.
+#                            when the criteria are not itemised (no sidecar, a schema 1 sidecar,
+#                            or no live criterion at TAG); live criteria with no scope carrying
+#                            criteria_status hold the table (no-owning-scope). Runs no Python.
+#                            Exit 10 when held.
 #
 # Exit codes: 0 ok · 1 usage · 2 error (unknown ref or slug, no jq or git) · 3 not initialised ·
 # 4 invalid record · 10 at least one review does not apply to REF (evidence), or the criteria
@@ -165,11 +169,36 @@ def render:
      | if length == 0 then "" else "\n## Open questions (resolve before release)\n\n" + join("\n") + "\n" end);
 '
 
+# An approved record with no criteria table, at a commit whose answers.intake.json is a schema 2
+# sidecar with a live criterion: `release.sh criteria` gives such a tag a table (held, at worst, as
+# no-owning-scope), so null there would tell the researcher "not itemised" falsely (FR-017). Read
+# only when the record sits in a .sqlreview/ project whose git history holds its commit; elsewhere
+# (a record checked outside its repository) the held table from `criteria` is the gate.
+rl_itemised_without_table() { # <record file>; prints the violation, returns 4 when found
+  local commit tag root
+  commit="$(jq -r 'select(type == "object" and .status == "approved" and .criteria == null) | .commit | strings' "$1" 2>/dev/null)"
+  case "$commit" in ""|*[!0-9a-f]*) return 0 ;; esac
+  command -v git >/dev/null 2>&1 || return 0
+  root="$(sr_find_root)" || return 0
+  commit="$(git -C "$root" rev-parse --verify --quiet "$commit^{commit}" 2>/dev/null)" || return 0
+  git -C "$root" cat-file -e "$commit:answers.intake.json" 2>/dev/null || return 0
+  git -C "$root" show "$commit:answers.intake.json" 2>/dev/null |
+    jq -e '.schemaVersion == 2 and any(.criteria | if type == "array" then .[] else empty end;
+             type == "object" and .withdrawn == null)' >/dev/null 2>&1 || return 0
+  tag="$(jq -r '.tag | strings | select(test("^[A-Za-z0-9][A-Za-z0-9._-]*$"))' "$1" 2>/dev/null)"
+  printf 'approved: criteria are itemised at %s; embed the release.sh criteria table\n' "${tag:-the release commit}"
+  return 4
+}
+
 # Validate a record read from $1 (a file) and print its violations; returns 4 when any.
 rl_check_file() {
-  local out
+  local out more
   out="$(jq -r -L "$SR_SCRIPT_DIR" "$RL_JQ"' release_errors' "$1" 2>/dev/null)" || { printf 'not valid JSON\n'; return 4; }
-  [ -z "$out" ] || { printf '%s\n' "$out"; return 4; }
+  more="$(rl_itemised_without_table "$1")"
+  [ -z "$out" ] && [ -z "$more" ] && return 0
+  [ -z "$out" ] || printf '%s\n' "$out"
+  [ -z "$more" ] || printf '%s\n' "$more"
+  return 4
 }
 
 cmd_check() {
