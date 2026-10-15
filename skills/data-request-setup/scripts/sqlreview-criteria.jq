@@ -16,6 +16,9 @@
 #   crit_reason_required    the states that need a `reason`
 #   <criterion> | crit_order  sort key for `sort_by(crit_order)`: kind order, then numeric id
 #                           (so E10 follows E2)
+#   <id> | crit_kind_of_id  the kind an id prefix names (null for anything else)
+#   <status row> | crit_status_order  crit_order for a scope `criteria_status` row, which carries
+#                           `criterion` (the id) but no `kind`: the kind comes from the id prefix
 #   <criteria> | crit_live  the criteria without `withdrawn`
 def crit_kinds: ["entry_event", "inclusion", "exclusion", "data_element"];
 def crit_prefix:
@@ -37,4 +40,7 @@ def crit_reason_required: ["partially-applied", "not-applied", "not-delivered", 
 def crit_order:
   .kind as $k | .id as $id
   | [((crit_kinds | index([$k])) // 99), ((try ($id[1:] | tonumber) catch 0) // 0)];
+def crit_kind_of_id:
+  if type == "string" then {"N": "entry_event", "I": "inclusion", "E": "exclusion", "D": "data_element"}[.[0:1]] else null end;
+def crit_status_order: {id: .criterion, kind: (.criterion | crit_kind_of_id)} | crit_order;
 def crit_live: map(select(.withdrawn == null));

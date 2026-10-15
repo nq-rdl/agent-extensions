@@ -149,6 +149,35 @@ class Ordering(unittest.TestCase):
         self.assertEqual(got, ["I1", "I2"])
 
 
+class StatusOrder(unittest.TestCase):
+    """criteria_status rows carry `criterion` but no `kind`: the kind comes from the id prefix."""
+
+    def test_kind_of_id_maps_each_prefix(self):
+        got = jq('["N1", "I2", "E3", "D4", "X1", "", 7] | map(crit_kind_of_id)')
+        self.assertEqual(got, ["entry_event", "inclusion", "exclusion", "data_element", None, None, None])
+
+    def test_kind_of_id_agrees_with_crit_prefix(self):
+        for kind in KINDS:
+            self.assertEqual(jq("(%s | crit_prefix) + \"5\" | crit_kind_of_id" % json.dumps(kind)), kind)
+
+    def test_status_rows_sort_by_kind_then_numeric_id(self):
+        ids = ["D1", "E10", "I2", "N1", "E2", "I10", "D12", "I1", "N2", "E1", "D2"]
+        rows = [{"criterion": i, "state": "applied"} for i in ids]
+        got = [r["criterion"] for r in jq("sort_by(crit_status_order)", json.dumps(rows))]
+        self.assertEqual(got, ["N1", "N2", "I1", "I2", "I10", "E1", "E2", "E10", "D1", "D2", "D12"])
+
+    def test_status_order_matches_crit_order_of_the_equivalent_criterion(self):
+        self.assertEqual(
+            jq('{criterion: "E10", state: "applied"} | crit_status_order'),
+            jq('{id: "E10", kind: "exclusion"} | crit_order'),
+        )
+
+    def test_unrecognised_status_rows_sort_last(self):
+        rows = [{"criterion": "Z1"}, {"criterion": "D1"}]
+        got = [r["criterion"] for r in jq("sort_by(crit_status_order)", json.dumps(rows))]
+        self.assertEqual(got, ["D1", "Z1"])
+
+
 class Live(unittest.TestCase):
     def test_live_drops_withdrawn_and_keeps_order(self):
         items = [

@@ -1348,7 +1348,7 @@ cmd_render() {
     question_doc="$(cmd_questions "$slug" "$kind")" || return $?
     question_rows="$(printf '%s' "$question_doc" | jq -c .questions)"
   fi
-  vars="$(jq -c --argjson question_rows "$question_rows" --slurpfile cfgs "$cfg" -f "$SR_SCRIPT_DIR/sqlreview-render.jq" "$doc")" || sr_die 2 "render failed for reviews/$slug/$kind.json"
+  vars="$(jq -c -L "$SR_SCRIPT_DIR" --argjson question_rows "$question_rows" --slurpfile cfgs "$cfg" -f "$SR_SCRIPT_DIR/sqlreview-render.jq" "$doc")" || sr_die 2 "render failed for reviews/$slug/$kind.json"
   rendered="$(jq -r -n --rawfile tpl "$tpl" --argjson vars "$vars" \
     'reduce ($vars | keys[]) as $k ($tpl; gsub("\\{\\{\($k)\\}\\}"; $vars[$k]))')" || sr_die 2 "render failed for reviews/$slug/$kind.json"
   if jq -e '(.header_revisions // []) | length > 0' "$doc" >/dev/null; then
