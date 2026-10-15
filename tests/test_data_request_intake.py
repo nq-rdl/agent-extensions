@@ -15,7 +15,9 @@ TREES = (REPO / "skills", REPO / "plugins/data-request/skills", REPO / "dist/cod
 CASES = {
     "intake-grain-not-default": {"grain", "grain_owner", "technical_note_recorded", "writes_scope",
                                  "needs_setup_first"},
+    "intake-itemise-criteria": {"inclusion_ids", "new_wording", "kept_id", "new_id", "dropped"},
 }
+CRITERIA_FIELDS = ("cohort_entry_event", "inclusion_criteria", "exclusion_criteria", "requested_data_elements")
 
 
 def flat(path):
@@ -124,6 +126,55 @@ class IntakeContracts(unittest.TestCase):
         readme = flat(REPO / "README.md")
         self.assertIn("The Data Analyst runs `intake`, the analyst's interview", readme)
         self.assertIn("`bootstrap`, the engineer's interview", readme)
+
+
+class IntakeSchema2Contracts(unittest.TestCase):
+    """Spec 017: the interview itemises criteria and writes sidecar schema 2 (tokens, not behaviour)."""
+
+    def test_skill_itemises_criteria_into_schema_2(self):
+        for tree in TREES:
+            with self.subTest(tree=tree):
+                text = flat(skill(tree, "intake"))
+                frontmatter = yaml.safe_load(skill(tree, "intake").read_text().split("---", 2)[1])
+                self.assertIn("answers.intake.json (schema 2)", " ".join(frontmatter["description"].split()))
+                self.assertNotIn("(schema 1)", " ".join(frontmatter["description"].split()))
+                interview = text.split("## The interview", 1)[1].split("## Recording a decision", 1)[0]
+                for field in CRITERIA_FIELDS:
+                    self.assertIn(f"`{field}`", interview)
+                for token in ("Itemise the four free-text answers", "the researcher's own wording",
+                              "Ask `applied_by` only where the request is unclear",
+                              "ask which item fixes the index date", "no entry event is stated",
+                              "`N`, `I`, `E` and `D`"):
+                    self.assertIn(token, interview)
+                rerun = text.split("## Re-run: walk what changed", 1)[1].split("## Hand over", 1)[0]
+                for token in ("Never renumber", "never reuse an `id`", "rewording", "change of meaning",
+                              "withdraw", "`replaced_by`", "fresh confirmation", "classify"):
+                    self.assertIn(token, rerun)
+                write = text.split("## Write and validate", 1)[1].split("## Re-run: walk what changed", 1)[0]
+                for token in ("`schemaVersion: 2`", "installed `validate-answers` accepts schema 2",
+                              "validate-answers answers.yaml --fingerprints", "store the JSON as `fingerprints`",
+                              "Never compute a fingerprint by hand", "`criteria`"):
+                    self.assertIn(token, write)
+                self.assertIn("confirm nothing", text)
+                self.assertIn("open_questions", text.split("confirm nothing", 1)[1][:200])
+
+    def test_analyst_intake_reference_documents_schema_2(self):
+        for tree in TREES:
+            with self.subTest(tree=tree):
+                text = flat(skill(tree, "setup", "references/analyst-intake.rst"))
+                self.assertIn("Schema version 2", text)
+                self.assertLess(text.index("Schema version 1"), text.index("Schema version 2"))
+                self.assertLess(text.index("Schema version 2"), text.index("Scope import and updates"))
+                schema2 = text.split("Schema version 2", 1)[1].split("Scope import and updates", 1)[0]
+                for field in CRITERIA_FIELDS:
+                    self.assertIn(f"``{field}``", schema2)
+                for token in ("``criteria``", "``fingerprints``", "``applied_by``", "``replaced_by``",
+                              "``withdrawn``", "rewording", "change of meaning", "never renumbered",
+                              "which item fixes the index date", "validate-answers answers.yaml --fingerprints",
+                              "never computed by hand", "free text changed since itemisation",
+                              "scaffold release that accepts schema 2 is a prerequisite", "sha256:"):
+                    self.assertIn(token, schema2)
+                self.assertIn("``criteria`` and ``fingerprints``", text.split("Scope import and updates", 1)[1])
 
 
 class IntakeEvalFixtures(unittest.TestCase):
