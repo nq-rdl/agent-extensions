@@ -12,15 +12,15 @@
 #                                       carries whatever the SQL did; analyse checks the SQL later
 #   location lines → the prior lines in the prior baseline equal the new lines in the current SQL
 #                    (a remap is fine; the line count must not change): sql-unchanged / lines-unchanged
-#   criteria_status rows (scope only) → criteria-unchanged: state, reason and flag equal the prior row for the
-#                    same criterion (see below); the SQL is not consulted
+#   criteria_status rows (scope only) → criteria-unchanged: state, reason, flag and upstream equal the prior row for
+#                    the same criterion (see below); the SQL is not consulted
 # A carried item copies the prior item's confirmed_by, confirmed_at and confirmed_revision, sets
 # carried_from_revision to the prior revision and carried_basis to the basis (the evidence).
 #
 # criteria_status rows (scope only, spec 017) carry by `criterion` with basis criteria-unchanged: the
-# previous published scope has a row for the same criterion whose state, reason and flag are equal
-# (an absent reason or flag equals an absent one). A row states a target state, not SQL lines, so no
-# SQL evidence applies. The set fields are the assumption ones minus status (confirmed_by, confirmed_at,
+# previous published scope has a row for the same criterion whose state, reason, flag and upstream are equal
+# (an absent reason, flag or upstream equals an absent one, so gaining or dropping an upstream is a
+# change, as at publish, R21). A row states a target state, not SQL lines, so no SQL evidence applies. The set fields are the assumption ones minus status (confirmed_by, confirmed_at,
 # confirmed_revision, carried_from_revision, carried_basis) plus the prior row's upstream when present;
 # a new criterion or a changed row does not qualify and goes to the walk list for fresh confirmation.
 # Output rows use kind "criteria_status" and id = the criterion.
@@ -44,7 +44,7 @@ def carry_criteria_rows($ctx):
       | {kind: "criteria_status", id: $i.criterion}
         + (if $p == null then {why: "no previous published scope to carry from"}
            elif $m == null then {why: "no row for \($i.criterion) in criteria_status at revision \($pr)"}
-           else (["state", "reason", "flag"] | map(select($m[.] != $i[.])) | .[0]) as $f
+           else (["state", "reason", "flag", "upstream"] | map(select($m[.] != $i[.])) | .[0]) as $f
              | if $f != null then {why: "\($f) differs from revision \($pr)"}
                else {basis: "criteria-unchanged"} end
            end)

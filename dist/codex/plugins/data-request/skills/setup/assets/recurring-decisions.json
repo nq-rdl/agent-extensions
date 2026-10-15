@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "updated": "2026-09-29",
+  "updated": "2026-10-15",
   "tracking_issue": "https://github.com/nq-rdl/query-builder/issues/172",
   "decisions": [
     {
@@ -23,6 +23,37 @@
           "role": "Data Engineer",
           "at": "2026-09-29",
           "source": "https://github.com/nq-rdl/agent-extensions/issues/436"
+        }
+      },
+      "library_issue": null,
+      "related_issues": [],
+      "retired_by": null
+    },
+    {
+      "id": "broad-first-pass",
+      "title": "House default: first pass keeps exclusions unapplied",
+      "kind": "assumption",
+      "status": "open",
+      "proposal": {
+        "text": "Exclusion criteria are not applied on the first pass, to keep the cohort broad.",
+        "rationale": "The RDL house default was confirmed by Data Engineer JoshKgh on 2026-10-15 (nq-rdl/data-analysis-scaffold#25, https://github.com/nq-rdl/data-analysis-scaffold/issues/25#issuecomment-6183536330). It supports spec 017 criteria tracking. A request can override it per criterion."
+      },
+      "match": [
+        ["first pass"],
+        ["broad"],
+        ["exclusion", "exclusions"]
+      ],
+      "evidence": [
+        "https://github.com/nq-rdl/data-analysis-scaffold/issues/25#issuecomment-6183536330"
+      ],
+      "house_default": {
+        "confirmed_by": "JoshKgh",
+        "confirmed_at": "2026-10-15",
+        "decided": {
+          "by": "JoshKgh",
+          "role": "Data Engineer",
+          "at": "2026-10-15",
+          "source": "https://github.com/nq-rdl/data-analysis-scaffold/issues/25#issuecomment-6183536330"
         }
       },
       "library_issue": null,

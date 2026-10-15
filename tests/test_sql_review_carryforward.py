@@ -404,7 +404,7 @@ class CarryForwardHelper(Base):
 class CriteriaCarry(Base):
     """Spec 017 (R7): `criteria_status` rows carry by `criterion` with basis criteria-unchanged.
 
-    A row is unchanged when state, reason and flag equal the prior revision's row for the same
+    A row is unchanged when state, reason, flag and upstream equal the prior revision's row for the same
     criterion; anything else is walked. Publish proves a carried claim from the same definition.
     """
 
@@ -502,6 +502,27 @@ class CriteriaCarry(Base):
                 r.update(state="delivered")
                 r.pop("reason", None)
         self.publish_scope(2, fresh)
+
+    def test_a_gained_changed_or_dropped_upstream_is_walked_not_carried(self):
+        # R22: upstream is part of the unchanged comparison, as at publish (R21).
+        other = {"source": "recurring-decision", "id": "other"}
+        changes = {"D1": {"upstream": {"source": "recurring-decision", "id": "broad-first-pass"}},  # gained
+                   "E3": {"upstream": other},                                                       # changed
+                   "I1": None}                                                                      # not changed
+        draft = [{k: v for k, v in dict(r, **(changes.get(r["criterion"]) or {})).items()
+                  if not k.startswith("confirmed")} for r in self.v1]
+        out = self.carryforward("scope", self.scope(2, draft))
+        walked = {w["id"]: w for w in out["walk"]}
+        self.assertEqual(set(walked), {"D1", "E3"})
+        for w in walked.values():
+            self.assertEqual(w["kind"], "criteria_status")
+            self.assertIn("upstream differs from revision 1", w["why"])
+        self.assertEqual({c["id"] for c in out["carry"]}, {"N1", "I1", "E4", "D2"})
+        # dropped: the prior E3 row had an upstream and the draft omits it
+        draft = [{k: v for k, v in r.items() if k != "upstream" and not k.startswith("confirmed")} for r in self.v1]
+        out = self.carryforward("scope", self.scope(2, draft))
+        self.assertEqual([(w["id"], w["why"]) for w in out["walk"]], [("E3", "upstream differs from revision 1")])
+        self.assertNotIn("E3", {c["id"] for c in out["carry"]})
 
     def add_sidecar_criterion(self, id_, kind):
         """An intake re-run adds a criterion after revision 1 was published."""

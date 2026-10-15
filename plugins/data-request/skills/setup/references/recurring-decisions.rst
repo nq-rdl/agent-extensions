@@ -33,9 +33,10 @@ library issue that would retire it. Each entry has these fields:
   list of the same kind (assumptions or limitations); ``--any-kind`` checks both.
 * ``evidence``: links to the library issue rows or a recorded house-default ruling.
   This repository is public, so the list never names an enquiry. Per-enquiry evidence
-  stays in the private library issue. A ``house_default`` also records the string
-  ``facility_code``, original ``confirmed_by`` / ``confirmed_at`` and independent
-  ``decided: {by, role, at, source}``. It is not generic permission to skip confirmation.
+  stays in the private library issue. A ``house_default`` also records the original
+  ``confirmed_by`` / ``confirmed_at`` and independent ``decided: {by, role, at, source}``.
+  Only ``tuh-facility`` also records the string ``facility_code``; the list helper requires
+  it there and nowhere else. It is not generic permission to skip confirmation.
 * ``library_issue`` (URL or null), ``related_issues``, and ``retired_by`` (``{unit, version}``
   when retired).
 
@@ -74,6 +75,31 @@ the marker or house confirmation for changed wording, code or rationale: that is
 request-specific decision with normal confirmation. A source mapping gap is evidence
 work, not a question about the already decided default. Formal SQL review keeps its
 normal implementation/confirmation gates: a generated header alone confirms nothing.
+
+Recorded house default: first pass
+----------------------------------
+
+``broad-first-pass`` is the second recorded house default: on a first pass, exclusion
+criteria are not applied, to keep the cohort broad. It states a rule about criteria, not a
+fact about the cohort, so it carries no ``facility_code`` and bootstrap does not offer it
+as an ``A-`` assumption. Its ``house_default`` preserves JoshKgh's recorded decision on
+nq-rdl/data-analysis-scaffold#25 (the ``decided.source`` comment link).
+
+House-default import therefore covers ``broad-first-pass``. Bootstrap applies it to the
+exclusion criteria of the intake sidecar that the request does not override. Each becomes
+a ``criteria_status`` row with state ``not-applied``, the listed ``proposal.text`` as its
+``reason`` and ``upstream: {source: "recurring-decision", id: "broad-first-pass"}``. Do
+not write an assumption or a limitation for it. Inclusion, entry-event and data-element
+criteria are not touched.
+
+A request that applies an exclusion, or an analyst who overrides it for one criterion,
+keeps the normal row for that criterion and no ``upstream``. Gaining, dropping or changing
+the ``upstream`` of a row needs a fresh confirmation, so the carry helper walks such a row.
+A decision without a ``house_default`` is not imported: bootstrap asks per request.
+
+The rule against inventing stands. Never invent a confirmer, timestamp or confirmation for
+``broad-first-pass`` or any other listed proposal; copy ``confirmed_by``, ``confirmed_at``
+and ``decided`` only from the entry's ``house_default``.
 
 Detect (bootstrap and analyse)
 ------------------------------
