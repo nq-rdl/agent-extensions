@@ -12,7 +12,9 @@ the confirmed scope and the `.sqlreview` reviews. These tests pin:
 * the worked example evaluates the named review items after an applicability check, with a
   fictional enquiry number;
 * the helper `release.sh`: `evidence` (does each review apply to the release tag), `check`
-  (the release record's invariants) and `render` (the paste-ready body);
+  (the release record's invariants), `render` (the paste-ready body) and `criteria` (the
+  "Criteria in this release" table of spec 017: previous tag, change values, held reasons and the
+  legacy line);
 * the guard validates a written release record;
 * the `release-*` eval cases, graded in Python always and in Node when it is on PATH.
 
@@ -741,6 +743,511 @@ class Guard(unittest.TestCase):
         decision, reason = self.decide("Write", "releases/v1.0.0/release.md", "# body")
         self.assertEqual(decision, "deny")
         self.assertIn("release.sh render", reason)
+
+
+# --- helper: criteria table (spec 017, US3) -------------------------------------------------
+
+CRIT_JQ = {
+    "canonical": SETUP / "scripts" / "release-criteria.jq",
+    "claude": REPO / "plugins/data-request/skills/setup/scripts/release-criteria.jq",
+    "codex": REPO / "dist/codex/plugins/data-request/skills/setup/scripts/release-criteria.jq",
+}
+SECRET = "SECRET"
+STAMP = {"confirmed_by": "analyst-login", "confirmed_role": "analyst", "confirmed_at": "2026-10-13T01:00:00Z"}
+FP_FIELDS = ("cohort_entry_event", "inclusion_criteria", "exclusion_criteria", "requested_data_elements")
+FINGERPRINTS = {k: "sha256:" + format(n, "x") * 64 for n, k in enumerate(FP_FIELDS, 1)}
+FLAG_NOTE = "Flagged: `patients.excl_prior_repair` = 1"
+
+
+def criterion(id_, kind, text, **over):
+    d = {"id": id_, "kind": kind, "text": text, **STAMP}
+    d.update(over)
+    return d
+
+
+def withdrawn(reason="Narrowed " + SECRET, replaced_by=None):
+    d = {"reason": reason, "at": "2026-10-14"}
+    if replaced_by:
+        d["replaced_by"] = replaced_by
+    return d
+
+
+# Listed out of order on purpose: the table orders by kind, then id number (E10 after E2).
+CRITERIA_V1 = [
+    criterion("D3", "data_element", "Smoking status"),
+    criterion("E10", "exclusion", "Type 2 diabetes"),
+    criterion("E2", "exclusion", "Previous AAA repair"),
+    criterion("E5", "exclusion", "Transferred in " + SECRET, withdrawn=withdrawn()),
+    criterion("E1", "exclusion", "Deceased patients"),
+    criterion("I2", "inclusion", "Consented to linkage", applied_by="researcher"),
+    criterion("I1", "inclusion", "Adults with AAA diagnosis at TUH | ward A", applied_by="rdl"),
+    criterion("N1", "entry_event", "First AAA admission"),
+]
+
+
+def status_row(cid, state, revision=1, **over):
+    d = {"criterion": cid, "state": state, "confirmed_by": "eng-login",
+         "confirmed_at": "2026-10-13T02:00:00Z", "confirmed_revision": revision}
+    d.update(over)
+    return d
+
+
+STATUS_V1 = [
+    status_row("N1", "applied"), status_row("I1", "applied"), status_row("I2", "researcher-applies"),
+    status_row("E1", "applied"),
+    status_row("E2", "not-applied", reason="First pass: cohort kept broad"),
+    status_row("E10", "partially-applied", reason="diagnosis codes only; medications not used"),
+    status_row("D3", "not-delivered", reason="no structured source"),
+]
+
+
+def criteria_v2():
+    """0.2.0: E1 withdrawn and replaced by E4, D3 withdrawn, I1 reworded, E2 now flagged."""
+    out = []
+    for c in CRITERIA_V1:
+        c = dict(c)
+        if c["id"] == "E1":
+            c["withdrawn"] = withdrawn(replaced_by="E4")
+        elif c["id"] == "D3":
+            c["withdrawn"] = withdrawn()
+        elif c["id"] == "I1":
+            c["text"] = "Adults with an AAA diagnosis at TUH | ward A"
+        out.append(c)
+    return out + [criterion("E4", "exclusion", "Died before the index admission")]
+
+
+STATUS_V2 = [
+    status_row("N1", "applied", 2), status_row("I1", "applied", 2), status_row("I2", "researcher-applies", 2),
+    status_row("E2", "flagged", 2, flag={"output": "patients", "column": "excl_prior_repair"}),
+    status_row("E4", "applied", 2),
+    status_row("E10", "partially-applied", 2, reason="diagnosis codes only; medications not used"),
+]
+
+
+def decided(criteria, decision="accepted"):
+    """The criteria object with every row decided by the analyst."""
+    criteria = json.loads(json.dumps(criteria))
+    for r in criteria["rows"]:
+        r.update(decision=decision, final_note=r["proposed_note"] if decision == "accepted" else None,
+                 decided_by="analyst-login", decided_at="2026-10-15T01:00:00Z")
+    return criteria
+
+
+def render_record(doc):
+    with tempfile.TemporaryDirectory() as tmp:
+        f = Path(tmp) / "release.json"
+        f.write_text(json.dumps(doc))
+        return run(RELEASE, ["render", str(f)], tmp)
+
+
+class CriteriaProject(Project):
+    """Project plus the analyst's schema 2 sidecar and the owning scope of SLUG; `out` holds files
+    that must stay outside the repository (the fingerprints file)."""
+
+    def __init__(self, tmp, out, assertion):
+        super().__init__(tmp)
+        self.out = Path(out)
+        self.assertion = assertion
+        self.fp = self.out / "fingerprints.json"
+        self.fp.write_text(json.dumps(FINGERPRINTS))
+
+    def sidecar(self, criteria, schema=2):
+        doc = {"schemaVersion": schema, "approval_number": "THHSAQUIRE-9042", "decisions": [],
+               "open_questions": []}
+        if schema == 2:
+            doc.update(criteria=criteria, fingerprints=FINGERPRINTS)
+        self.write("answers.intake.json", json.dumps(doc, indent=2))
+
+    def scope(self, status, slug=SLUG, revision=1):
+        doc = {"schemaVersion": 1, "kind": "scope", "slug": slug, "sql_path": SQL_PATH,
+               "title": "Falls", "revision": revision, "recorded_at": "2026-09-28T00:00:00Z",
+               "recorded_by": "engineer-login", "git_commit": None, "intent": "Falls presentations.",
+               "inputs": [{"name": "ed.encounter", "description": "one row per encounter"}],
+               "outputs": [{"name": "encounter_id", "description": "encounter"}],
+               "assumptions": [], "limitations": [], "open_questions": []}
+        if status is not None:
+            doc["criteria_status"] = status
+        self.write(f".sqlreview/reviews/{slug}/scope.json", json.dumps(doc, indent=2))
+
+    def record(self, tag, criteria=None, raw=None):
+        doc = raw if raw is not None else record(tag=tag, criteria=criteria)
+        self.write(f".sqlreview/releases/{tag}/release.json", json.dumps(doc, indent=2))
+
+    def criteria(self, *args):
+        return run(RELEASE, ["criteria", *args], self.root)
+
+    def table(self, tag, flags=None, code=0):
+        r = self.criteria(tag, *(("--fingerprints", str(self.fp)) if flags is None else flags))
+        self.assertion.assertEqual(r.returncode, code, r.stdout + r.stderr)
+        return json.loads(r.stdout)
+
+
+@unittest.skipUnless(shutil.which("jq") and shutil.which("git"), "release.sh needs jq and git")
+class CriteriaTable(unittest.TestCase):
+    """T047: `release.sh criteria <tag>` builds the record's `criteria` object."""
+
+    def setUp(self):
+        self.tmp = tempfile.TemporaryDirectory()
+        self.addCleanup(self.tmp.cleanup)
+        self.out = tempfile.TemporaryDirectory()
+        self.addCleanup(self.out.cleanup)
+        self.p = CriteriaProject(self.tmp.name, self.out.name, self)
+        self.p.sidecar(CRITERIA_V1)
+        self.p.scope(STATUS_V1)
+        self.p.commit("criteria")
+        self.p.tag("0.1.0")
+
+    def release_020(self):
+        """Record 0.1.0, add decoy records, move to the v2 sidecar and scope, tag 0.2.0."""
+        first = decided(self.p.table("0.1.0"))
+        self.p.record("0.1.0", first)
+        # Decoys: an older stable release, a pre-release, a later release and a non-version name.
+        self.p.record("0.0.9", raw={"criteria": None})
+        self.p.record("0.1.5-rc1", raw={"criteria": None})
+        self.p.record("0.3.0", raw={"criteria": None})
+        self.p.record("hotfix", raw={"criteria": None})
+        self.p.sidecar(criteria_v2())
+        self.p.scope(STATUS_V2, revision=2)
+        self.p.commit("criteria v2")
+        self.p.tag("0.2.0")
+        return self.p.table("0.2.0")
+
+    def by_id(self, table):
+        return {r["id"]: r for r in table["rows"]}
+
+    def test_first_release_has_no_previous_tag(self):
+        t = self.p.table("0.1.0")
+        self.assertIsNone(t["previous_tag"])
+        self.assertEqual(t["status"], "complete")
+        self.assertEqual(t["held_reasons"], [])
+        self.assertEqual(t["scope"], {"slug": SLUG, "revision": 1})
+        self.assertEqual([r["id"] for r in t["rows"]], ["N1", "I1", "I2", "E1", "E2", "E5", "E10", "D3"])
+        self.assertEqual({r["change"] for r in t["rows"]}, {"—"})
+        rows = self.by_id(t)
+        texts = {c["id"]: c["text"] for c in CRITERIA_V1}
+        for r in t["rows"]:
+            self.assertEqual(r["text"], texts[r["id"]], "text is copied verbatim")
+            self.assertEqual((r["decision"], r["final_note"]), ("pending", None))
+        self.assertEqual(rows["N1"]["proposed_note"], "Applied")
+        self.assertEqual(rows["I2"]["proposed_note"], "Researcher applies")
+        self.assertEqual(rows["E2"]["proposed_note"], "Not applied: First pass: cohort kept broad")
+        self.assertEqual(rows["E10"]["proposed_note"], "Partially applied: diagnosis codes only; medications not used")
+        self.assertEqual(rows["D3"]["proposed_note"], "Not delivered: no structured source")
+        self.assertEqual((rows["E5"]["state"], rows["E5"]["proposed_note"]), ("withdrawn", "Withdrawn by researcher"))
+
+    def test_previous_tag_and_change_values(self):
+        t = self.release_020()
+        self.assertEqual(t["previous_tag"], "0.1.0", "greatest earlier stable tag with a record")
+        self.assertEqual(t["status"], "complete", t)
+        rows = self.by_id(t)
+        self.assertEqual([r["id"] for r in t["rows"]], ["N1", "I1", "I2", "E1", "E2", "E4", "E10", "D3"],
+                         "E5 was withdrawn before 0.1.0 and is not repeated")
+        self.assertEqual(rows["N1"]["change"], "unchanged")
+        self.assertEqual(rows["I1"]["change"], "text-reworded")
+        self.assertEqual(rows["I1"]["text"], "Adults with an AAA diagnosis at TUH | ward A")
+        self.assertEqual((rows["I2"]["change"], rows["I2"]["proposed_note"]), ("unchanged", "Researcher applies"))
+        self.assertEqual((rows["E1"]["change"], rows["E1"]["replaced_by"]), ("replaced", "E4"))
+        self.assertEqual(rows["E1"]["proposed_note"], "Withdrawn by researcher")
+        self.assertEqual((rows["E2"]["change"], rows["E2"]["previous_state"]), ("changed", "not-applied"))
+        self.assertEqual((rows["E2"]["state"], rows["E2"]["proposed_note"]), ("flagged", FLAG_NOTE))
+        self.assertEqual(rows["E4"]["change"], "new")
+        self.assertEqual(rows["E10"]["change"], "unchanged")
+        self.assertEqual(rows["D3"]["change"], "withdrawn")
+        self.assertNotIn("replaced_by", rows["D3"])
+        self.assertNotIn(SECRET, json.dumps([r.get("proposed_note") for r in t["rows"]]))
+
+    def test_previous_tag_ignores_prerelease_later_and_lower_releases(self):
+        self.release_020()
+        # A v-prefixed stable release between them is the newer previous; 0.3.0 stays ignored.
+        self.p.record("v0.1.2", raw={"criteria": None})
+        self.p.commit("v0.1.2 record")
+        self.p.tag("0.2.1")
+        self.assertEqual(self.p.table("0.2.1")["previous_tag"], "v0.1.2")
+        # Numeric, not lexical: 0.10.0 sorts above 0.9.0.
+        self.p.record("0.9.0", raw={"criteria": None})
+        self.p.record("0.10.0", raw={"criteria": None})
+        self.p.commit("more records")
+        self.p.tag("1.0.0")
+        self.assertEqual(self.p.table("1.0.0")["previous_tag"], "0.10.0")
+        # Records committed after a tag are not at that tag.
+        self.assertEqual(self.p.table("0.2.0")["previous_tag"], "0.1.0")
+
+    def test_previous_release_without_a_table_compares_nothing(self):
+        self.p.record("0.0.9", raw={"criteria": None})
+        self.p.commit("legacy record")
+        self.p.tag("0.1.1")
+        t = self.p.table("0.1.1")
+        self.assertEqual(t["previous_tag"], "0.0.9")
+        self.assertEqual({r["change"] for r in t["rows"]}, {"—"})
+
+    def test_analyst_decisions_are_kept_while_the_note_is_unchanged(self):
+        first = decided(self.p.table("0.1.0"))
+        self.p.record("0.1.0", first)
+        t = self.p.table("0.1.0")
+        self.assertEqual({r["decision"] for r in t["rows"]}, {"accepted"})
+
+    def held(self, tag, reasons, flags=None):
+        t = self.p.table(tag, flags, code=10)
+        self.assertEqual(t["status"], "held")
+        self.assertEqual(t["held_reasons"], reasons)
+        self.assertNotIn(SECRET, json.dumps(t["held_reasons"]))
+        # Held means the approved record fails check and the body shows only the reasons.
+        code, out = violations(record(criteria=t))
+        self.assertEqual(code, 4, out)
+        self.assertIn("approved: criteria table held", out)
+        draft = record(status="draft", criteria=t)
+        self.assertEqual(violations(draft)[0], 0, violations(draft)[1])
+        r = render_record(draft)
+        self.assertEqual(r.returncode, 0, r.stdout + r.stderr)
+        body = r.stdout
+        self.assertIn("Criteria table held: " + ", ".join(reasons) + "\n", body)
+        self.assertNotIn("## Criteria in this release", body)
+        for r in t["rows"]:
+            self.assertNotIn(r["text"], body, "a held table renders no values")
+        return t
+
+    def test_held_fingerprints_unchecked_without_a_flag(self):
+        self.held("0.1.0", ["fingerprints-unchecked"], [])
+
+    def test_held_answers_invalid(self):
+        self.held("0.1.0", ["answers-invalid"], ["--answers-invalid"])
+
+    def test_held_fingerprint_mismatch(self):
+        other = dict(FINGERPRINTS, inclusion_criteria="sha256:" + "f" * 64,
+                     requested_data_elements="sha256:" + "e" * 64)
+        f = Path(self.out.name) / "other.json"
+        f.write_text(json.dumps(other))
+        self.held("0.1.0", ["fingerprint-mismatch:inclusion_criteria",
+                            "fingerprint-mismatch:requested_data_elements"], ["--fingerprints", str(f)])
+
+    def test_held_state_missing(self):
+        status = [r for r in STATUS_V1 if r["criterion"] not in ("E2", "D3")]
+        # A state the kind does not allow is no usable state either.
+        status = [status_row("N1", "flagged", flag={"output": "o", "column": "c"}) if r["criterion"] == "N1" else r
+                  for r in status]
+        self.p.scope(status)
+        self.p.commit("scope without E2")
+        self.p.tag("0.1.1")
+        t = self.held("0.1.1", ["state-missing:N1", "state-missing:E2", "state-missing:D3"])
+        self.assertIsNone(self.by_id(t)["E2"]["state"])
+
+    def test_held_owning_scope_ambiguous(self):
+        self.p.scope(STATUS_V1, slug="sql__v1__other")
+        self.p.commit("second owner")
+        self.p.tag("0.1.1")
+        t = self.held("0.1.1", ["owning-scope-ambiguous"])
+        self.assertIsNone(t["scope"])
+
+    def test_held_review_stale(self):
+        self.p.write(SQL_PATH, SQL_V2)
+        self.p.commit("sql changed after the review")
+        self.p.tag("0.1.1")
+        self.held("0.1.1", ["review-stale"])
+
+    def test_held_note_rejected(self):
+        first = decided(self.p.table("0.1.0"))
+        e2 = next(r for r in first["rows"] if r["id"] == "E2")
+        e2.update(decision="rejected", final_note=None)
+        self.p.record("0.1.0", first)
+        t = self.held("0.1.0", ["note-rejected:E2"])
+        self.assertEqual(self.by_id(t)["E2"]["decision"], "rejected")
+
+    def test_reasons_are_listed_together_in_contract_order(self):
+        self.p.write(SQL_PATH, SQL_V2)
+        self.p.scope([r for r in STATUS_V1 if r["criterion"] != "E2"])
+        self.p.commit("stale and missing")
+        self.p.tag("0.1.1")
+        self.held("0.1.1", ["review-stale", "state-missing:E2", "answers-invalid"], ["--answers-invalid"])
+
+    def test_legacy_repository_is_not_itemised(self):
+        cases = {"no sidecar": lambda: (self.p.root / "answers.intake.json").unlink(),
+                 "schema 1": lambda: self.p.sidecar(None, schema=1),
+                 "no owning scope": lambda: self.p.scope(None)}
+        for n, (name, change) in enumerate(cases.items()):
+            with self.subTest(name):
+                self.p.sidecar(CRITERIA_V1)
+                self.p.scope(STATUS_V1)
+                change()
+                self.p.commit(name)
+                self.p.tag(f"0.1.{n + 1}")
+                r = self.p.criteria(f"0.1.{n + 1}", "--fingerprints", str(self.p.fp))
+                self.assertEqual((r.returncode, r.stdout.strip()), (0, "null"), r.stderr)
+
+    def test_usage_and_errors(self):
+        self.assertEqual(self.p.criteria("0.1.0", "--answers-invalid", "--fingerprints", str(self.p.fp)).returncode, 1)
+        self.assertEqual(self.p.criteria().returncode, 1)
+        self.assertEqual(self.p.criteria("9.9.9").returncode, 2)
+        bad = Path(self.out.name) / "bad.json"
+        bad.write_text(json.dumps({"inclusion_criteria": SECRET}))
+        r = self.p.criteria("0.1.0", "--fingerprints", str(bad))
+        self.assertEqual(r.returncode, 2)
+        self.assertNotIn(SECRET, r.stdout + r.stderr)
+
+    def test_read_only(self):
+        self.p.table("0.1.0")
+        self.assertEqual(git(self.p.root, "status", "--porcelain"), "")
+
+    def test_packaged_module_is_the_canonical_bytes(self):
+        for tree in ("claude", "codex"):
+            with self.subTest(tree=tree):
+                self.assertEqual(CRIT_JQ[tree].read_bytes(), CRIT_JQ["canonical"].read_bytes())
+
+
+def crit_table(previous_tag="0.1.0"):
+    """An approved, complete criteria object in the shape `release.sh criteria` writes."""
+    def r(id_, kind, text, state, note, change, **over):
+        d = {"id": id_, "kind": kind, "text": text, "state": state, "proposed_note": note,
+             "final_note": note, "decision": "accepted", "change": change,
+             "decided_by": "analyst-login", "decided_at": "2026-10-15T01:00:00Z"}
+        d.update(over)
+        return d
+    return {"previous_tag": previous_tag, "scope": {"slug": SLUG, "revision": 2}, "status": "complete",
+            "held_reasons": [], "rows": [
+                r("N1", "entry_event", "First AAA admission", "applied", "Applied", "unchanged"),
+                r("I1", "inclusion", "Adults with an AAA diagnosis at TUH | ward A", "applied", "Applied",
+                  "text-reworded"),
+                r("I2", "inclusion", "Consented to linkage", "researcher-applies", "Researcher applies", "unchanged"),
+                r("E1", "exclusion", "Deceased patients", "withdrawn", "Withdrawn by researcher", "replaced",
+                  replaced_by="E4"),
+                r("E2", "exclusion", "Previous AAA repair", "flagged", FLAG_NOTE, "changed",
+                  previous_state="not-applied"),
+                r("E4", "exclusion", "Died before the index admission", "applied", "Applied", "new",
+                  decision="reworded", final_note="Applied in full"),
+                r("E10", "exclusion", "Type 2 diabetes", "partially-applied",
+                  "Partially applied: diagnosis codes only; medications not used", "unchanged"),
+                r("D3", "data_element", "Smoking status", "withdrawn", "Withdrawn by researcher", "withdrawn"),
+            ]}
+
+
+@unittest.skipUnless(shutil.which("jq"), "release.sh needs jq")
+class CriteriaCheck(unittest.TestCase):
+    """T051: check validates the criteria object and gates approval on it."""
+
+    def assertViolation(self, doc, fragment):
+        code, out = violations(doc)
+        self.assertEqual(code, 4, out)
+        self.assertIn(fragment, out)
+
+    def test_complete_table_and_legacy_records_pass(self):
+        for doc in (record(criteria=crit_table()), record(criteria=None), record()):
+            self.assertEqual(violations(doc)[0], 0, violations(doc)[1])
+
+    def test_pending_row_fails_approval(self):
+        t = crit_table()
+        t["rows"][1].update(decision="pending", final_note=None)
+        del t["rows"][1]["decided_by"], t["rows"][1]["decided_at"]
+        self.assertViolation(record(criteria=t), "approved: criteria I1 is pending")
+        self.assertEqual(violations(record(status="draft", criteria=t))[0], 0)
+
+    def test_shape(self):
+        def broken(mutate):
+            t = crit_table()
+            mutate(t)
+            return record(status="draft", criteria=t)
+        self.assertViolation(broken(lambda t: t.update(status="done")), "criteria: status must be complete or held")
+        self.assertViolation(broken(lambda t: t.update(rows=list(reversed(t["rows"])))),
+                             "criteria: rows must be in criteria order")
+        self.assertViolation(broken(lambda t: t["rows"][4].pop("previous_state")),
+                             "criteria E2: a changed row needs previous_state")
+        self.assertViolation(broken(lambda t: t["rows"][3].pop("replaced_by")),
+                             "criteria E1: a replaced row needs replaced_by")
+        self.assertViolation(broken(lambda t: t["rows"][0].update(change="moved")), "criteria N1: change must be")
+        self.assertViolation(broken(lambda t: t["rows"][0].update(kind="inclusion")),
+                             "criteria: every row needs a criterion id matching its kind")
+        self.assertViolation(broken(lambda t: t["rows"][0].update(state="delivered")),
+                             "criteria N1: state is not allowed for its kind")
+        self.assertViolation(broken(lambda t: t["rows"][0].update(final_note="Different")),
+                             "criteria N1: an accepted note keeps the proposed note as final")
+        self.assertViolation(broken(lambda t: t["rows"].append(dict(t["rows"][-1]))), "criteria: duplicate row D3")
+        self.assertViolation(broken(lambda t: t.update(previous_tag=None)),
+                             "criteria: a first release has no change but —")
+        self.assertViolation(broken(lambda t: t.update(status="held")), "criteria: a held table needs held_reasons")
+        self.assertViolation(broken(lambda t: t.update(held_reasons=["because " + SECRET])),
+                             "criteria: unknown held reason")
+        self.assertNotIn(SECRET, violations(broken(lambda t: t.update(held_reasons=[SECRET])))[1])
+
+    def test_rejected_note_must_hold_the_table(self):
+        t = crit_table()
+        t["rows"][4].update(decision="rejected", final_note=None)
+        self.assertViolation(record(status="draft", criteria=t), "criteria E2: a rejected note holds the table")
+        t.update(status="held", held_reasons=["note-rejected:E2"])
+        self.assertEqual(violations(record(status="draft", criteria=t))[0], 0)
+        self.assertViolation(record(criteria=t), "approved: criteria table held: note-rejected:E2")
+
+
+@unittest.skipUnless(shutil.which("jq"), "release.sh needs jq")
+class CriteriaRender(unittest.TestCase):
+    """T051: the "Criteria in this release" section of the release body."""
+
+    def body(self, doc):
+        r = render_record(doc)
+        self.assertEqual(r.returncode, 0, r.stdout + r.stderr)
+        return r.stdout
+
+    def test_table_before_limitations(self):
+        out = self.body(record(criteria=crit_table()))
+        self.assertLess(out.index("## Extraction Summary"), out.index("## Criteria in this release"))
+        self.assertLess(out.index("## Criteria in this release"),
+                        out.index("## Extraction Assumptions / Important limitations"))
+        table = section(out, "## Criteria in this release")
+        expected = "\n".join([
+            "## Criteria in this release", "",
+            "| ID | Researcher's request | This release | Change since 0.1.0 |",
+            "|---|---|---|---|",
+            "| N1 | First AAA admission | Applied | — |",
+            "| I1 | Adults with an AAA diagnosis at TUH &#124; ward A | Applied | Reworded |",
+            "| I2 | Consented to linkage | Researcher applies | — |",
+            "| E1 | Deceased patients | Withdrawn by researcher | Replaced by E4 |",
+            "| E2 | Previous AAA repair | " + FLAG_NOTE + " | Changed (was not applied) |",
+            "| E4 | Died before the index admission | Applied in full | New |",
+            "| E10 | Type 2 diabetes | Partially applied: diagnosis codes only; medications not used | — |",
+            "| D3 | Smoking status | Withdrawn by researcher | Withdrawn by researcher |",
+        ])
+        self.assertEqual(table.strip(), expected)
+        self.assertNotIn("not itemised", out)
+
+    def test_first_release_header(self):
+        t = crit_table(previous_tag=None)
+        for r in t["rows"]:
+            r["change"] = "—"
+            r.pop("previous_state", None)
+            r.pop("replaced_by", None)
+        out = self.body(record(criteria=t))
+        self.assertIn("| ID | Researcher's request | This release | Change |\n", out)
+        self.assertIn("| E1 | Deceased patients | Withdrawn by researcher | — |", out)
+
+    def test_draft_shows_pending_notes(self):
+        t = crit_table()
+        t["rows"][0].update(decision="pending", final_note=None)
+        out = self.body(record(status="draft", criteria=t))
+        self.assertIn("| N1 | First AAA admission | [pending] Applied | — |", out)
+
+    def test_legacy_record_gets_one_line(self):
+        for doc in (record(), record(criteria=None)):
+            out = self.body(doc)
+            self.assertEqual(out.count("Criteria are not itemised for this request."), 1)
+            self.assertNotIn("## Criteria in this release", out)
+            self.assertLess(out.index("Criteria are not itemised for this request.\n"),
+                            out.index("## Extraction Assumptions / Important limitations"))
+            # The rest of the body is unchanged.
+            self.assertIn("- Age is the patient's age on the day they arrived.", out)
+
+    def test_criteria_claims_are_not_repeated_in_limitations(self):
+        doc = record(criteria=crit_table())
+        doc["claims"].append(claim("C4", "assumptions", "Previous repairs are flagged, not removed.",
+                                   sources=[{"kind": "scope", "slug": SLUG, "item": "E2", "revision": 2}]))
+        self.assertEqual(violations(doc)[0], 0, violations(doc)[1])
+        out = self.body(doc)
+        self.assertNotIn("Previous repairs are flagged", out)
+        self.assertIn("- Age is the patient's age on the day they arrived.",
+                      section(out, "## Extraction Assumptions / Important limitations"))
+
+    def test_only_criteria_claims_do_not_satisfy_approval(self):
+        doc = record(criteria=crit_table())
+        doc["claims"][1]["sources"] = [{"kind": "scope", "slug": SLUG, "item": "E2", "revision": 2}]
+        code, out = violations(doc)
+        self.assertEqual(code, 4, out)
+        self.assertIn("approved: no kept claim in assumptions", out)
 
 
 # --- eval cases -----------------------------------------------------------------------------

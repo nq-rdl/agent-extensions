@@ -27,6 +27,7 @@ for leaf in setup bootstrap analyse explain guardrails map draft validate fix li
 done
 for f in scripts/sqlreview.sh scripts/sqlreview-lib.sh scripts/sqlreview-check.jq scripts/sqlreview-slug.jq scripts/sqlreview-identity.jq scripts/sqlreview-render.jq \
          scripts/sqlreview-criteria.jq scripts/sqlreview-criteria-check.jq scripts/sqlreview-intake.jq \
+         scripts/release.sh scripts/release-criteria.jq \
          assets/sqlreview/config.json assets/sqlreview/templates/scope.md assets/sqlreview/templates/review.md references/definitions.rst; do
   [ -f "plugins/data-request/skills/setup/$f" ] && pass "C: setup/$f shipped" || bad "C: setup/$f missing from plugin"
 done

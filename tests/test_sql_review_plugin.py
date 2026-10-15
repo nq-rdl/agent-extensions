@@ -89,7 +89,7 @@ class Skills(unittest.TestCase):
                     "assets/sqlreview/templates/review.md", "scripts/sqlreview.sh", "scripts/sqlreview-lib.sh",
                     "scripts/sqlreview-check.jq", "scripts/sqlreview-slug.jq", "scripts/sqlreview-identity.jq",
                     "scripts/sqlreview-criteria.jq", "scripts/sqlreview-criteria-check.jq",
-                    "scripts/sqlreview-intake.jq"):
+                    "scripts/sqlreview-intake.jq", "scripts/release.sh", "scripts/release-criteria.jq"):
             with self.subTest(rel):
                 self.assertTrue((SKILLS["setup"] / rel).is_file())
                 self.assertTrue((PLUGIN / "skills" / "setup" / rel).is_file(), "plugin copy missing — run sync-plugins.sh")
