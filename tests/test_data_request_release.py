@@ -1197,6 +1197,14 @@ class CriteriaCheck(unittest.TestCase):
         self.assertIn("criteria: every row needs a criterion id matching its kind", out)
         self.assertNotIn(SECRET, out)
 
+    def test_pending_row_with_a_malformed_id_is_not_echoed_on_approval(self):
+        t = crit_table()
+        t["rows"].append(dict(t["rows"][0], id="Mrs " + SECRET, decision="pending", final_note=None))
+        code, out = violations(record(criteria=t))
+        self.assertEqual(code, 4, out)
+        self.assertIn("criteria: every row needs a criterion id matching its kind", out)
+        self.assertNotIn(SECRET, out)
+
     def test_rejected_note_must_be_named_in_held_reasons(self):
         t = crit_table()
         t["rows"][4].update(decision="rejected", final_note=None)

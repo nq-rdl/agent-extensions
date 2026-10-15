@@ -215,7 +215,7 @@ def rc_errors:
              else "criteria: note-rejected:\($i) names no rejected row" end end),
         (if $record_status != "approved" then empty
          elif $held then "approved: criteria table held: \($reasons | if type == "array" then map(select(rc_reason_ok)) | join(", ") else "" end)"
-         else ($rows[] | objects | select(.decision == "pending") | "approved: criteria \(.id) is pending") end)
+         else ($rows[] | objects | select(.decision == "pending" and (.id | rc_id)) | "approved: criteria \(.id) is pending") end)
     end;
 
 # --- render ------------------------------------------------------------------------------------
