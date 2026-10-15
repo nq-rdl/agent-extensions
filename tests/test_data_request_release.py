@@ -813,7 +813,9 @@ def criteria_v2():
         elif c["id"] == "I1":
             c["text"] = "Adults with an AAA diagnosis at TUH | ward A"
         out.append(c)
-    return out + [criterion("E4", "exclusion", "Died before the index admission")]
+    # E6 was added and withdrawn between the two releases: it was never in a table.
+    return out + [criterion("E4", "exclusion", "Died before the index admission"),
+                  criterion("E6", "exclusion", "Added then withdrawn", withdrawn=withdrawn())]
 
 
 STATUS_V2 = [
@@ -956,6 +958,11 @@ class CriteriaTable(unittest.TestCase):
         self.assertNotIn("replaced_by", rows["D3"])
         self.assertNotIn(SECRET, json.dumps([r.get("proposed_note") for r in t["rows"]]))
 
+    def test_criterion_withdrawn_between_releases_is_not_listed(self):
+        rows = self.by_id(self.release_020())
+        self.assertNotIn("E6", rows, "never in a previous table, so not reported")
+        self.assertIn("E1", rows)
+
     def test_previous_tag_ignores_prerelease_later_and_lower_releases(self):
         self.release_020()
         # A v-prefixed stable release between them is the newer previous; 0.3.0 stays ignored.
@@ -979,6 +986,16 @@ class CriteriaTable(unittest.TestCase):
         t = self.p.table("0.1.1")
         self.assertEqual(t["previous_tag"], "0.0.9")
         self.assertEqual({r["change"] for r in t["rows"]}, {"—"})
+
+    def test_a_changed_note_resets_the_decision(self):
+        first = decided(self.p.table("0.1.0"))
+        e2 = next(r for r in first["rows"] if r["id"] == "E2")
+        e2.update(proposed_note="Not applied: an older reason", final_note="Not applied: an older reason")
+        self.p.record("0.1.0", first)
+        rows = self.by_id(self.p.table("0.1.0"))
+        self.assertEqual((rows["E2"]["decision"], rows["E2"]["final_note"]), ("pending", None))
+        self.assertNotIn("decided_by", rows["E2"])
+        self.assertEqual(rows["E10"]["decision"], "accepted", "unchanged notes keep their decision")
 
     def test_analyst_decisions_are_kept_while_the_note_is_unchanged(self):
         first = decided(self.p.table("0.1.0"))
@@ -1166,6 +1183,27 @@ class CriteriaCheck(unittest.TestCase):
                              "criteria: unknown held reason")
         self.assertNotIn(SECRET, violations(broken(lambda t: t.update(held_reasons=[SECRET])))[1])
 
+    def test_malformed_values_are_never_echoed(self):
+        t = crit_table()
+        t.update(status="held", held_reasons=["note-rejected:Patient " + SECRET + " 1234"])
+        code, out = violations(record(status="draft", criteria=t))
+        self.assertEqual(code, 4, out)
+        self.assertIn("criteria: unknown held reason", out)
+        self.assertNotIn(SECRET, out)
+        t = crit_table()
+        t["rows"] += [dict(t["rows"][0], id="Mrs " + SECRET), dict(t["rows"][0], id="Mrs " + SECRET)]
+        code, out = violations(record(status="draft", criteria=t))
+        self.assertEqual(code, 4, out)
+        self.assertIn("criteria: every row needs a criterion id matching its kind", out)
+        self.assertNotIn(SECRET, out)
+
+    def test_rejected_note_must_be_named_in_held_reasons(self):
+        t = crit_table()
+        t["rows"][4].update(decision="rejected", final_note=None)
+        t.update(status="held", held_reasons=["fingerprints-unchecked"])
+        self.assertViolation(record(status="draft", criteria=t),
+                             "criteria E2: a rejected note holds the table with note-rejected:E2")
+
     def test_rejected_note_must_hold_the_table(self):
         t = crit_table()
         t["rows"][4].update(decision="rejected", final_note=None)
@@ -1231,6 +1269,17 @@ class CriteriaRender(unittest.TestCase):
                             out.index("## Extraction Assumptions / Important limitations"))
             # The rest of the body is unchanged.
             self.assertIn("- Age is the patient's age on the day they arrived.", out)
+
+    def test_legacy_record_keeps_a_claim_citing_a_criterion_like_item(self):
+        doc = record()
+        doc["claims"].append(claim("C4", "assumptions", "Encounters are deduplicated.",
+                                   sources=[{"kind": "scope", "slug": SLUG, "item": "E2", "revision": 2}]))
+        out = self.body(doc)
+        self.assertIn("- Encounters are deduplicated.",
+                      section(out, "## Extraction Assumptions / Important limitations"))
+        # And it counts towards approval, as before.
+        doc["claims"][1].update(decision="rejected", final=None)
+        self.assertEqual(violations(doc)[0], 0, violations(doc)[1])
 
     def test_criteria_claims_are_not_repeated_in_limitations(self):
         doc = record(criteria=crit_table())

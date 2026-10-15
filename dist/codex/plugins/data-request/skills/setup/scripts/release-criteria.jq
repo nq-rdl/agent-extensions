@@ -20,7 +20,8 @@
 # A claim is criterion-sourced when any of its sources is a scope source whose `item` is a
 # criterion id (^[NIED][1-9][0-9]*$, the key of the scope's criteria_status row). Such claims are
 # never rendered under "Extraction Assumptions / Important limitations" (FR-018): the table carries
-# them (rc_criterion_claim).
+# them (rc_criterion_claim). Only a record with a criteria object hides them; a legacy record keeps
+# every claim.
 include "sqlreview-criteria";
 
 def rc_str: type == "string" and test("\\S");
@@ -92,6 +93,7 @@ def rc_build($intake; $scopes; $stale; $previous; $current; $fp; $mode):
       | [ $crit[] | . as $c | ($pby[$c.id] // null) as $p
           | if $c.withdrawn != null then
               if $pby == null then {state: "withdrawn", change: "—"}
+              # Not in the previous table: reported withdrawn earlier, or added and withdrawn between releases.
               elif $p == null or $p.state == "withdrawn" then empty
               elif $c.withdrawn.replaced_by != null then {state: "withdrawn", change: "replaced", replaced_by: $c.withdrawn.replaced_by}
               else {state: "withdrawn", change: "withdrawn"} end
@@ -134,7 +136,7 @@ def rc_build($intake; $scopes; $stale; $previous; $current; $fp; $mode):
 
 # --- check -------------------------------------------------------------------------------------
 
-def rc_row_errors($held):
+def rc_row_errors($held; $reasons):
   (.id // "?") as $id
   | if (crit_id_ok | not) then "criteria: every row needs a criterion id matching its kind"
     else
@@ -161,7 +163,8 @@ def rc_row_errors($held):
        elif (.decision == "rejected" or .decision == "pending") and .final_note != null then
          "criteria \($id): a \(.decision) note has no final note"
        else empty end),
-      (if .decision == "rejected" and ($held | not) then "criteria \($id): a rejected note holds the table" else empty end),
+      (if .decision == "rejected" and (($held | not) or (($reasons | type) == "array" and ($reasons | index(["note-rejected:\($id)"])) == null))
+       then "criteria \($id): a rejected note holds the table with note-rejected:\($id)" else empty end),
       (if (.change as $ch | rc_changes | index([$ch])) == null then
          "criteria \($id): change must be —, unchanged, changed, new, text-reworded, withdrawn or replaced"
        elif .change == "changed" and (.previous_state | rc_str | not) then "criteria \($id): a changed row needs previous_state"
@@ -197,15 +200,17 @@ def rc_errors:
          elif ($held | not) and ($reasons | length) > 0 then "criteria: a complete table has no held_reasons"
          else empty end),
         (if ($c.rows | type) == "array" then empty else "criteria: rows must be an array" end),
-        ($rows[] | if type == "object" then rc_row_errors($held) else "criteria: every row must be an object" end),
-        ($rows | map(objects | .id) | group_by(.)[] | select(length > 1) | "criteria: duplicate row \(.[0])"),
+        ($rows[] | if type == "object" then rc_row_errors($held; $reasons) else "criteria: every row must be an object" end),
+        # Only a well-formed id is named; a malformed one is reported by rc_row_errors without its value.
+        ($rows | map(objects | .id | select(rc_id)) | group_by(.)[] | select(length > 1) | "criteria: duplicate row \(.[0])"),
         (if all($rows[]; type == "object" and crit_id_ok)
-            and ($rows | map(crit_order)) as $keys | $keys != ($keys | sort)
-         then "criteria: rows must be in criteria order" else empty end),
+         then ($rows | map(crit_order)) as $keys
+           | if $keys != ($keys | sort) then "criteria: rows must be in criteria order" else empty end
+         else empty end),
         (if $c.previous_tag == null and any($rows[]; type == "object" and .change != "—")
          then "criteria: a first release has no change but —" else empty end),
         (if ($reasons | type) != "array" then empty
-         else $reasons[] | strings | select(startswith("note-rejected:")) | .[14:] as $i
+         else $reasons[] | select(rc_reason_ok and startswith("note-rejected:")) | .[14:] as $i
            | if any($rows[]; type == "object" and .id == $i and .decision == "rejected") then empty
              else "criteria: note-rejected:\($i) names no rejected row" end end),
         (if $record_status != "approved" then empty

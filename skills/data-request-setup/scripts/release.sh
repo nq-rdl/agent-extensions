@@ -59,8 +59,9 @@ def str: type == "string" and length > 0;
 def arr: if type == "array" then . else [] end;
 def kept: .decision == "accepted" or .decision == "reworded";
 # A claim sourced from a research criterion is in the criteria table, never repeated under
-# "Extraction Assumptions / Important limitations" (FR-018; rc_criterion_claim).
-def limitation_shown: .section != "assumptions" or (rc_criterion_claim | not);
+# "Extraction Assumptions / Important limitations" (FR-018; rc_criterion_claim). $itemised: the
+# record has a criteria object; a legacy record keeps every claim.
+def limitation_shown($itemised): .section != "assumptions" or ($itemised | not) or (rc_criterion_claim | not);
 def src_errors($cid; $kept; $ev):
   if type != "object" then "\($cid): every source must be an object"
   elif .kind == "review" then
@@ -135,8 +136,9 @@ def release_errors:
       (if .status != "approved" then empty else
          (.claims | arr | .[] | objects | select(.decision == "pending") | "approved: \(.id) is pending"),
          (.questions | arr | .[] | objects | select(.resolution == null) | "approved: \(.id) is unresolved"),
-         (("summary", "assumptions") as $s
-          | if any(.claims | arr | .[] | objects; .section == $s and kept and limitation_shown) then empty
+         (((.criteria | type) == "object") as $itemised
+          | ("summary", "assumptions") as $s
+          | if any(.claims | arr | .[] | objects; .section == $s and kept and limitation_shown($itemised)) then empty
             else "approved: no kept claim in \($s)" end)
        end),
       rc_errors
@@ -149,7 +151,8 @@ def claim_line:
   "- \(if .decision == "pending" then "[pending] " + .proposed else .final end)"
   + " <!-- \(.id): \(.sources | map(src_label) | join("; ")) -->";
 def section_lines($s):
-  [.claims[] | select(.section == $s and (kept or .decision == "pending") and limitation_shown) | claim_line]
+  ((.criteria | type) == "object") as $itemised
+  | [.claims[] | select(.section == $s and (kept or .decision == "pending") and limitation_shown($itemised)) | claim_line]
   | if length == 0 then ["_No claims yet._"] else . end | join("\n");
 def render:
   (if .status == "draft"
