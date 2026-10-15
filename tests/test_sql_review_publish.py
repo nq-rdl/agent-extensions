@@ -9,6 +9,7 @@ import subprocess
 import tempfile
 import unittest
 
+from tests.test_sql_review_criteria_status import full_status, sidecar
 from tests.test_sql_review_scripts import REPO, Project, review_doc, scope_doc
 
 
@@ -90,6 +91,43 @@ class Publish(unittest.TestCase):
                 self.assertEqual((self.final / "scope.json").read_bytes(), final_bytes)
                 self.assertTrue(self.draft.is_file())
                 self.assertEqual(list(self.final.glob(".publish.*")), [])
+
+    def test_scope_failing_the_criteria_check_is_refused(self):
+        original = scope_doc("q", "q.sql")
+        self.assertEqual(self.publish(original).returncode, 0)
+        final_bytes = (self.final / "scope.json").read_bytes()
+        incomplete = [r for r in full_status(2) if r["criterion"] != "D2"]
+        cases = [
+            (None, full_status(2), "-\tcriteria_status\tno-itemised-criteria"),
+            (sidecar(), incomplete, "D2\tstate\tmissing"),
+        ]
+        for value, status, finding in cases:
+            with self.subTest(finding=finding):
+                if value is not None:
+                    (self.workspace / "answers.intake.json").write_text(json.dumps(value))
+                result = self.publish(scope_doc("q", "q.sql", revision=2, criteria_status=status))
+                self.assertEqual(result.returncode, 4, result.stdout + result.stderr)
+                self.assertIn(finding, result.stdout.splitlines())
+                self.assertIn("criteria", result.stderr)
+                self.assertEqual((self.final / "scope.json").read_bytes(), final_bytes)
+                self.assertTrue(self.draft.is_file())
+                self.assertEqual(list(self.final.glob(".publish.*")), [])
+
+    def test_scope_passing_the_criteria_check_publishes(self):
+        self.assertEqual(self.publish(scope_doc("q", "q.sql")).returncode, 0)
+        (self.workspace / "answers.intake.json").write_text(json.dumps(sidecar()))
+        doc = scope_doc("q", "q.sql", revision=2, criteria_status=full_status(2))
+        result = self.publish(doc)
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        self.assertEqual(json.loads((self.final / "scope.json").read_text()), doc)
+        self.assertEqual(self.publish(doc).returncode, 0)  # an idempotent retry still passes the check
+        # A second owning scope is refused; a scope without criteria_status is not checked.
+        other = scope_doc("r", "r.sql", criteria_status=full_status())
+        result = self.publish(other, slug="r")
+        self.assertEqual(result.returncode, 4, result.stdout + result.stderr)
+        self.assertIn("-\tcriteria_status\towning-scope-ambiguous", result.stdout.splitlines())
+        self.assertFalse((self.workspace / ".sqlreview/reviews/r/scope.json").exists())
+        self.assertEqual(self.publish(scope_doc("r", "r.sql"), slug="r").returncode, 0)
 
     def test_changed_sql_and_symlink_destinations_are_refused(self):
         self.project.sql("q.sql", "select 1;")
