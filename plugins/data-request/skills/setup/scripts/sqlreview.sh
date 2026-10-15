@@ -732,7 +732,7 @@ cmd_intake() {
   local out
   out="$(jq -se --arg source "$1" --argjson revision "$2" '
     if length == 1 then .[0] else error("expected one intake object") end
-  ' "$1" 2>/dev/null | jq --arg source "$1" --argjson revision "$2" -f "$SR_SCRIPT_DIR/sqlreview-intake.jq" 2>/dev/null)" || sr_die 4 "invalid analyst intake; run validate-answers and correct the sidecar"
+  ' "$1" 2>/dev/null | jq -L "$SR_SCRIPT_DIR" --arg source "$1" --argjson revision "$2" -f "$SR_SCRIPT_DIR/sqlreview-intake.jq" 2>/dev/null)" || sr_die 4 "invalid analyst intake; run validate-answers and correct the sidecar"
   [ -n "$out" ] || sr_die 4 "invalid analyst intake; expected one JSON object"
   if [ $# -eq 3 ]; then
     printf '%s\n' "$out" | jq --slurpfile drafts "$3" --argjson revision "$2" '
