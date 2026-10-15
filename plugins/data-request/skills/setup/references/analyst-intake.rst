@@ -96,7 +96,8 @@ fields, ``criteria`` and ``fingerprints``. ``schemaVersion`` is ``1`` or ``2``;
 ``criteria`` or ``fingerprints`` under schema 1 is invalid. The scaffold release
 that accepts schema 2 is a prerequisite: write ``schemaVersion: 2`` only after
 the installed ``validate-answers`` accepts it, and keep writing schema 1 until it
-does.
+does. Never downgrade an existing schema 2 file: keep it as is and report that
+the validator needs upgrading.
 
 ``criteria`` itemises the four free-text answers in ``answers.yaml``
 (``cohort_entry_event``, ``inclusion_criteria``, ``exclusion_criteria`` and
@@ -115,8 +116,9 @@ wording. Each criterion requires:
 Optional fields are ``decided`` (as for decisions), ``applied_by`` and
 ``withdrawn``. ``applied_by`` is ``rdl`` or ``researcher`` and is allowed only on ``inclusion``
 and ``exclusion``. When the request says who applies the item (for example
-"project team to apply the exclusion criteria"), record it with a ``decided``
-naming the enquiry as its ``source``. Ask the analyst only where the request is
+"project team to apply the exclusion criteria"), record it without asking. Add
+``decided`` only when the enquiry names who decided and when (``by``, ``role``,
+``at`` and ``source``); never infer them. Ask the analyst only where the request is
 unclear, and omit ``applied_by`` when it stays unknown.
 
 ``withdrawn`` is ``{reason, at}`` with a

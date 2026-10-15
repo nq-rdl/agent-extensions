@@ -100,14 +100,15 @@ Itemise the four free-text answers in `answers.yaml` into `criteria`, one entry 
 `cohort_entry_event` (kind `entry_event`), `inclusion_criteria` (`inclusion`),
 `exclusion_criteria` (`exclusion`) and `requested_data_elements` (`data_element`). Ids are
 `N`, `I`, `E` and `D` plus a number counted from 1 within the kind (`E1`, `E2`). Keep the
-researcher's own wording in `text`: split into items, never paraphrase or merge. Leave the
-free text in `answers.yaml` unchanged. Put the numbered list to the analyst per kind, with the
-same options as a decision; an item left open goes to `open_questions` and is not written to
+researcher's own wording in `text`: split into items, never paraphrase or merge. Itemising does not
+edit the free text in `answers.yaml`; filling or correcting it is a separate edit, below. Put the numbered list to the analyst per kind, with
+the same options as a decision; an item left open goes to `open_questions` and is not written to
 `criteria`.
 
 Ask `applied_by` only where the request is unclear about who applies an inclusion or exclusion
-(`rdl` or `researcher`). When the enquiry says so, record it with `decided.source` naming the
-enquiry and do not ask. Never set it on an entry event or data element.
+(`rdl` or `researcher`). When the enquiry says so, record it and do not ask. Add `decided` only
+when the enquiry names who decided and when (`by`, `role`, `at`, `source`); never infer them.
+Never set `applied_by` on an entry event or data element.
 
 When no entry event is stated (for example "all patients with diagnosis X"), do not invent an
 `N1`: ask which item fixes the index date, and record the answer as a `cohort` decision naming
@@ -148,7 +149,7 @@ Field ownership — write a field only where this table allows it:
 | `approval_number`, `governance_type` | Analyst | Asks under governance; writes after confirmation; keeps the sidecar's approval equal |
 | `measurement_granularity` | Analyst | Sets it from the grain answer, never from a default |
 | `short_title`, `project_title`, `project_description`, `delivery_outcomes`, `requestor_name`, `requestor_email` | Analyst | Fills from the enquiry, after confirmation |
-| research text (`inclusion_criteria`, `exclusion_criteria`, `requested_data_elements`, `ehr_sources`) | Analyst | Fills or corrects from answers, after confirmation |
+| research text (`cohort_entry_event`, `inclusion_criteria`, `exclusion_criteria`, `requested_data_elements`, `ehr_sources`) | Analyst | Fills or corrects from answers, after confirmation. Itemising never edits it: a change to the text is a separate, confirmed edit, made before fingerprinting |
 | `license`, `platform`, `include_*`, `use_*`, `framework_ref`, `engineering_reviewers` | Engineer / defaults | Never changes them; shows them before the render |
 
 A `request-template` copy holds a short form without most of these fields: add them. The
@@ -205,8 +206,10 @@ Write `answers.intake.json` as one complete document (`approval_number`, `decisi
 `open_questions`; `open_questions` may be empty). Without confirmed criteria, write
 `schemaVersion: 1`. With them, add `criteria` and `fingerprints` and write `schemaVersion: 2`,
 but only after confirming the installed `validate-answers` accepts schema 2: an older release
-reports `intake.schemaVersion`. If it does not, write schema 1 without `criteria` and tell the
-analyst the scaffold release is needed.
+reports `intake.schemaVersion`. If it does not and no schema 2 sidecar exists, write schema 1 without `criteria` and tell the
+analyst the scaffold release is needed. If a schema 2 sidecar already exists, keep it as is,
+write nothing and stop: report that the validator needs upgrading. Never downgrade a sidecar
+or drop its confirmed criteria.
 
 Fingerprints record the free text the itemisation was made from. After writing `answers.yaml`,
 and before writing the new sidecar, run `validate-answers answers.yaml --fingerprints` (in a
@@ -214,7 +217,8 @@ generated child, `pixi run python scripts/validate_answers.py answers.yaml --fin
 which prints one JSON object, and store the JSON as `fingerprints`. Run it while the sibling sidecar is still the
 last valid one: the command validates the sidecar too, and a schema 2 sidecar with `criteria`
 and no `fingerprints` fails. Never compute a fingerprint by hand. If the command is not
-available, say so and write schema 1.
+available, apply the same rule: write schema 1 only when no schema 2 sidecar exists, otherwise
+keep it as is, stop and report that the validator needs upgrading.
 
 Run the validation above. On failure, fix the named fields and run it again; do not hand over
 an invalid sidecar. A warning that the free text changed since itemisation means a later edit

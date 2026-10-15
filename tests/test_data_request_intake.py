@@ -155,6 +155,12 @@ class IntakeSchema2Contracts(unittest.TestCase):
                               "validate-answers answers.yaml --fingerprints", "store the JSON as `fingerprints`",
                               "Never compute a fingerprint by hand", "`criteria`"):
                     self.assertIn(token, write)
+                for token in ("Add `decided` only when the enquiry names who decided and when",
+                              "never infer them", "Itemising does not edit the free text",
+                              "keep it as is, write nothing and stop", "Never downgrade a sidecar"):
+                    self.assertIn(token, text)
+                row = next(l for l in skill(tree, "intake").read_text().splitlines() if l.startswith("| research text"))
+                self.assertIn("`cohort_entry_event`", row)
                 self.assertIn("confirm nothing", text)
                 self.assertIn("open_questions", text.split("confirm nothing", 1)[1][:200])
 
@@ -172,7 +178,9 @@ class IntakeSchema2Contracts(unittest.TestCase):
                               "``withdrawn``", "rewording", "change of meaning", "never renumbered",
                               "which item fixes the index date", "validate-answers answers.yaml --fingerprints",
                               "never computed by hand", "free text changed since itemisation",
-                              "scaffold release that accepts schema 2 is a prerequisite", "sha256:"):
+                              "scaffold release that accepts schema 2 is a prerequisite", "sha256:",
+                              "Add ``decided`` only when the enquiry names who decided and when",
+                              "Never downgrade an existing schema 2 file"):
                     self.assertIn(token, schema2)
                 self.assertIn("``criteria`` and ``fingerprints``", text.split("Scope import and updates", 1)[1])
 

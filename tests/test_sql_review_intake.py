@@ -56,7 +56,8 @@ def criteria_fault(value, fault):
     elif fault == "id-pattern": c[0]["id"] = "N01"
     elif fault == "id-trailing-newline": c[0]["id"] = "N1\n"
     elif fault == "id-prefix": c[0]["id"] = "I9"
-    elif fault == "id-duplicate": c[3]["id"] = "E1"
+    # D1 becomes a second inclusion I1: nothing references it, so only uniqueness can reject it.
+    elif fault == "id-duplicate": c[4].update(id="I1", kind="inclusion")
     elif fault == "kind": c[0]["kind"] = "SECRET"
     elif fault == "text-blank": c[0]["text"] = "  "
     elif fault == "confirmed-by-email": c[0]["confirmed_by"] = "secret@example.com"
