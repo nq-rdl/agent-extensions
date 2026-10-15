@@ -12,8 +12,18 @@
 #                                       carries whatever the SQL did; analyse checks the SQL later
 #   location lines → the prior lines in the prior baseline equal the new lines in the current SQL
 #                    (a remap is fine; the line count must not change): sql-unchanged / lines-unchanged
+#   criteria_status rows (scope only) → criteria-unchanged: state, reason and flag equal the prior row for the
+#                    same criterion (see below); the SQL is not consulted
 # A carried item copies the prior item's confirmed_by, confirmed_at and confirmed_revision, sets
 # carried_from_revision to the prior revision and carried_basis to the basis (the evidence).
+#
+# criteria_status rows (scope only, spec 017) carry by `criterion` with basis criteria-unchanged: the
+# previous published scope has a row for the same criterion whose state, reason and flag are equal
+# (an absent reason or flag equals an absent one). A row states a target state, not SQL lines, so no
+# SQL evidence applies. The set fields are the assumption ones minus status (confirmed_by, confirmed_at,
+# confirmed_revision, carried_from_revision, carried_basis) plus the prior row's upstream when present;
+# a new criterion or a changed row does not qualify and goes to the walk list for fresh confirmation.
+# Output rows use kind "criteria_status" and id = the criterion.
 #
 # A review item that does not qualify only because the SQL changed under it (location null, or a
 # location added or removed) is marked bulk: its wording is unchanged, so the skill may put all such
@@ -23,14 +33,37 @@
 def cf_sql_lines: if . == null then null elif . == "" then [] else rtrimstr("\n") | split("\n") end;
 def cf_range: type == "array" and length == 2 and all(.[]; type == "number" and . >= 1 and . == floor) and .[0] <= .[1];
 
+# criteria_status rows of a scope draft, in carry_rows' output shape (see the header).
+def carry_criteria_rows($ctx):
+  . as $d
+  | $ctx.prior as $p
+  | ($p.revision // null) as $pr
+  | [ ($d.criteria_status // [] | if type == "array" then .[] else empty end) | select(type == "object") | . as $i
+      | ([($p.criteria_status // [] | if type == "array" then .[] else empty end)
+          | select(type == "object" and .criterion == $i.criterion)][0]) as $m
+      | {kind: "criteria_status", id: $i.criterion}
+        + (if $p == null then {why: "no previous published scope to carry from"}
+           elif $m == null then {why: "no row for \($i.criterion) in criteria_status at revision \($pr)"}
+           else (["state", "reason", "flag"] | map(select($m[.] != $i[.])) | .[0]) as $f
+             | if $f != null then {why: "\($f) differs from revision \($pr)"}
+               else {basis: "criteria-unchanged"} end
+           end)
+      | if has("basis") then
+          . + {set: ({confirmed_by: $m.confirmed_by, confirmed_at: $m.confirmed_at,
+                     confirmed_revision: $m.confirmed_revision, carried_from_revision: $pr, carried_basis: .basis}
+                     + (if $m | has("upstream") then {upstream: $m.upstream} else {} end))}
+        else . + {basis: null, bulk: false} end
+    ];
+
 # Input: a (draft) scope/review document. $ctx:
 #   {kind: "scope"|"review", prior: document|null,
 #    base: string|null (prior baseline SQL, only when it is evidence), cur: string|null (current SQL),
 #    prior_sha: string ("" = SQL absent/unknown at the prior revision), cur_sha: string ("" = SQL absent now),
 #    body_unchanged: boolean (baseline and current SQL differ at most in the leading comment header)}
-# Output: an array with one row per assumption/limitation object:
+# Output: an array with one row per assumption/limitation object (and, for a scope, per criteria_status row):
 #   {kind, id, basis, set} when it qualifies ·
-#   {kind, id, basis: null, bulk, why, text, rationale, location} when it must be asked.
+#   {kind, id, basis: null, bulk, why, text, rationale, location} when it must be asked
+#   (a criteria_status row has just {kind, id, basis: null, bulk: false, why}).
 def carry_rows($ctx):
   . as $d
   | $ctx.prior as $p
@@ -72,24 +105,40 @@ def carry_rows($ctx):
                      + (if $m | has("upstream") then {upstream: $m.upstream} else {} end)
                      + (if $m | has("decided") then {decided: $m.decided} else {} end))}
         else . + {basis: null, bulk: (.bulk // false), text: $i.text, rationale: $i.rationale, location: $i.location} end
-    ];
+    ]
+  + (if $doc == "scope" then carry_criteria_rows($ctx) else [] end);
 
-# Publish's verdict: one violation line per carried item (carried_from_revision set) that does not
-# qualify or does not copy the prior confirmation exactly. carried_basis is optional (documents
+# Publish's verdict: one violation line per carried item (carried_from_revision set; for a criteria_status
+# row, carried_from_revision or carried_basis set) that does not qualify or does not copy the prior confirmation exactly. carried_basis is optional (documents
 # written before #366 lack it) but, when present, must name the basis publish proves.
 # $reconfirm_all refuses every carried item.
 def carry_violations($ctx; $reconfirm_all):
   carry_rows($ctx) as $rows
-  | ("assumptions", "limitations") as $k
-  | (.[$k] // [])[] | select(type == "object" and .carried_from_revision != null) | . as $i
-  | ([$rows[] | select(.kind == $k and .id == $i.id)][0]) as $r
-  | if $reconfirm_all then "\($i.id): --reconfirm-all refuses carried confirmations — re-confirm for this revision"
-    elif $r.basis == null then "\($i.id): cannot carry the confirmation forward: \($r.why) — re-confirm for this revision"
-    elif ($i | {status, confirmed_by, confirmed_at, confirmed_revision, carried_from_revision}) != ($r.set | del(.carried_basis, .upstream, .decided))
-    then "\($i.id): a carried item must copy confirmed_by, confirmed_at and confirmed_revision from revision \($r.set.carried_from_revision) exactly (sqlreview.sh carryforward prints them)"
-    elif ($r.set.upstream.source == "analyst-intake" or $r.set.upstream.source == "house-default")
-         and ($i.upstream != $r.set.upstream or $i.decided != $r.set.decided)
-    then "\($i.id): carried \($r.set.upstream.source) must preserve upstream and decision provenance"
-    elif ($i | has("carried_basis")) and $i.carried_basis != $r.basis
-    then "\($i.id): carried_basis \($i.carried_basis | tojson) does not match the evidence (\($r.basis)); copy the set fields sqlreview.sh carryforward prints"
-    else empty end;
+  | (("assumptions", "limitations") as $k
+     | (.[$k] // [])[] | select(type == "object" and .carried_from_revision != null) | . as $i
+     | ([$rows[] | select(.kind == $k and .id == $i.id)][0]) as $r
+     | if $reconfirm_all then "\($i.id): --reconfirm-all refuses carried confirmations — re-confirm for this revision"
+       elif $r.basis == null then "\($i.id): cannot carry the confirmation forward: \($r.why) — re-confirm for this revision"
+       elif ($i | {status, confirmed_by, confirmed_at, confirmed_revision, carried_from_revision}) != ($r.set | del(.carried_basis, .upstream, .decided))
+       then "\($i.id): a carried item must copy confirmed_by, confirmed_at and confirmed_revision from revision \($r.set.carried_from_revision) exactly (sqlreview.sh carryforward prints them)"
+       elif ($r.set.upstream.source == "analyst-intake" or $r.set.upstream.source == "house-default")
+            and ($i.upstream != $r.set.upstream or $i.decided != $r.set.decided)
+       then "\($i.id): carried \($r.set.upstream.source) must preserve upstream and decision provenance"
+       elif ($i | has("carried_basis")) and $i.carried_basis != $r.basis
+       then "\($i.id): carried_basis \($i.carried_basis | tojson) does not match the evidence (\($r.basis)); copy the set fields sqlreview.sh carryforward prints"
+       else empty end),
+    # A criteria_status row claiming a carry is proven the same way, keyed by criterion.
+    (if ($ctx.kind // .kind) != "scope" then empty
+     else (.criteria_status // [] | if type == "array" then .[] else empty end)
+       | select(type == "object" and (.carried_from_revision != null or .carried_basis != null)) | . as $i
+       | ([$rows[] | select(.kind == "criteria_status" and .id == $i.criterion)][0]) as $r
+       | if $reconfirm_all then "\($i.criterion): --reconfirm-all refuses carried confirmations — re-confirm for this revision"
+         elif $r.basis == null then "\($i.criterion): cannot carry the confirmation forward: \($r.why // "no such criterion row") — re-confirm for this revision"
+         elif ($i | {confirmed_by, confirmed_at, confirmed_revision, carried_from_revision}) != ($r.set | del(.carried_basis, .upstream))
+         then "\($i.criterion): a carried row must copy confirmed_by, confirmed_at and confirmed_revision from revision \($r.set.carried_from_revision) exactly (sqlreview.sh carryforward prints them)"
+         elif ($i.upstream // null) != ($r.set.upstream // null)
+         then "\($i.criterion): a carried row must keep upstream exactly as at revision \($r.set.carried_from_revision)"
+         elif ($i | has("carried_basis")) and $i.carried_basis != $r.basis
+         then "\($i.criterion): carried_basis \($i.carried_basis | tojson) does not match the evidence (\($r.basis)); copy the set fields sqlreview.sh carryforward prints"
+         else empty end
+     end);
