@@ -348,6 +348,30 @@ class CriteriaTableSkill(unittest.TestCase):
                 self.assertIn('re-run `release.sh criteria`', text)
                 self.assertIn("never drops the row", text)
 
+    def test_a_rejection_is_recorded_by_rerunning_criteria_and_embedding_its_object(self):
+        for tree in SKILL:
+            with self.subTest(tree=tree):
+                text = self.step(tree)
+                self.assertIn("write the record with the row `rejected`, then re-run "
+                              "`release.sh criteria` with the same fingerprints file", text)
+                self.assertIn("embed the object it prints", text)
+                self.assertIn("rejected row fails `release.sh check` unless the embedded table is held "
+                              "with `note-rejected:<id>`", text)
+        for tree, path in EXAMPLE.items():
+            with self.subTest(tree=tree, file="example"):
+                text = flat(path.read_text())
+                self.assertIn("re-runs ``release.sh criteria v1.1.0 --fingerprints fp.json`` and embeds the "
+                              "object it prints", text)
+
+    def test_answers_invalid_goes_to_the_engineer_not_the_analyst(self):
+        for tree in SKILL:
+            with self.subTest(tree=tree):
+                text = self.step(tree)
+                self.assertIn("`answers-invalid` means the tag's `answers.yaml` failed validation", text)
+                self.assertIn("the tag cannot change", text)
+                self.assertIn("needs an engineer or intake fix and a new tag", text)
+                self.assertNotIn("the analyst fixes `answers-invalid`", text)
+
     def test_held_table_is_never_presented_as_final(self):
         for tree in SKILL:
             with self.subTest(tree=tree):
@@ -1195,6 +1219,26 @@ class CriteriaTable(unittest.TestCase):
         self.p.record("0.1.0", first)
         t = self.held("0.1.0", ["note-rejected:E2"])
         self.assertEqual(self.by_id(t)["E2"]["decision"], "rejected")
+
+    def test_recording_a_rejection_needs_the_rerun_table_embedded(self):
+        """The sequence the skill gives: reject, write, re-run criteria, embed its object, check."""
+        first = decided(self.p.table("0.1.0"))
+        next(r for r in first["rows"] if r["id"] == "E2").update(decision="rejected", final_note=None)
+        # Embedding the pre-rejection (complete) object fails check, on a draft record too.
+        code, out = violations(record(tag="0.1.0", status="draft", criteria=first))
+        self.assertEqual(code, 4, out)
+        self.assertIn("criteria E2: a rejected note holds the table with note-rejected:E2", out)
+        # Write the decision, re-run criteria with the same fingerprints file, embed what it prints.
+        self.p.record("0.1.0", first)
+        rerun = self.p.table("0.1.0", code=10)
+        self.assertEqual((rerun["status"], rerun["held_reasons"]), ("held", ["note-rejected:E2"]))
+        row = next(r for r in rerun["rows"] if r["id"] == "E2")
+        self.assertEqual((row["decision"], row["final_note"]), ("rejected", None), "decisions carry over")
+        code, out = violations(record(tag="0.1.0", status="draft", criteria=rerun))
+        self.assertEqual(code, 0, out)
+        code, out = violations(record(tag="0.1.0", criteria=rerun))
+        self.assertEqual(code, 4, out)
+        self.assertIn("approved: criteria table held", out)
 
     def test_reasons_are_listed_together_in_contract_order(self):
         self.p.write(SQL_PATH, SQL_V2)

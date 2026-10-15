@@ -193,15 +193,19 @@ tidy it; a changed wording shows as a change in the next release. Fill `decided_
 `release.sh criteria` after the record is written keeps them; a changed note is `pending` again.
 
 A rejection means the stated state is wrong. It sends the state back to the engineer: fix the
-scope, then re-run `release.sh criteria`. Record the row as `rejected` and write the record; re-running
-`release.sh criteria` then reports the table held with `note-rejected:<id>`. The table never drops
-the row.
+scope, then re-run `release.sh criteria`. Record it in order: write the record with the row
+`rejected`, then re-run `release.sh criteria` with the same fingerprints file (exit 10; the
+decisions carry over), embed the object it prints, which names `note-rejected:<id>`, and write
+the record again. A rejected row fails `release.sh check` unless the embedded table is held
+with `note-rejected:<id>`, on a draft record too. The table never drops the row.
 
 **Held.** `release.sh criteria` ends with exit 10 and `status` is `held` for any of these `held_reasons`:
 `review-stale`, `state-missing:<id>`, `fingerprint-mismatch:<field>`, `owning-scope-ambiguous`,
 `note-rejected:<id>`, `answers-invalid` and `fingerprints-unchecked`. A free-text mismatch goes
-back to `/data-request:intake`; the others go to the engineer, except that the analyst fixes
-`answers-invalid` and `fingerprints-unchecked` by re-running the step above. The body then shows
+back to `/data-request:intake`; the others go to the engineer, except `fingerprints-unchecked`,
+which the analyst fixes by re-running the step above. `answers-invalid` means the tag's
+`answers.yaml` failed validation and the tag cannot change, so it needs an engineer or intake fix
+and a new tag. The body then shows
 one line, `Criteria table held: <reasons>`, with no partial table. A held table, or any row whose
 decision is `pending`, fails `release.sh check` only when the record is `approved`: keep the
 record `draft`, and never present a held table as final.

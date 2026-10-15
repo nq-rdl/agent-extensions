@@ -114,9 +114,12 @@ criteria and a second release, ``v1.1.0`` (``v1.0.0`` is its first). The steps:
    what the flag does, and would like the request itself reworded to "Prior abdominal aortic
    aneurysm repair". Only the note can change: the researcher's wording stays "Previous AAA
    repair". The analyst rejects the note instead.
-4. The record is written with E2 ``rejected``. ``release.sh criteria v1.1.0`` now exits 10 and
-   holds the table with ``note-rejected:E2``; the body shows the single line ``Criteria table
-   held: note-rejected:E2``. The record stays ``draft``, because ``release.sh check`` fails a held
+4. The record is written with E2 ``rejected``. The analyst then re-runs ``release.sh criteria
+   v1.1.0 --fingerprints fp.json`` and embeds the object it prints, then writes the record
+   again. The call exits 10 and holds the table with ``note-rejected:E2``, and the decisions
+   carry over; the body shows the single line ``Criteria table held: note-rejected:E2``. Without
+   the re-run, the embedded table would still say ``complete`` and ``release.sh check`` would
+   reject the rejected row. The record stays ``draft``, because ``release.sh check`` fails a held
    table only on an ``approved`` record. The engineer fixes the scope state for E2 and re-runs
    ``release.sh criteria``; the changed note is pending again, and the analyst decides it.
 5. The draft also had a claim "Previous repairs are flagged, not removed", sourced to the scope item
