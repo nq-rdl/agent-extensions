@@ -307,9 +307,10 @@ class SuiteShape(unittest.TestCase):
         # amend-* cases (#356) are covered by test_eval_data_request_amend_graders, field-* cases by
         # test_eval_data_request_field_graders, prerelease-* cases (#390) by
         # test_data_request_prerelease_change and release-* cases (#407) by
-        # test_data_request_release, intake-* cases (#504) by test_data_request_intake; any other directory is ours.
+        # test_data_request_release, intake-* cases (#504) by test_data_request_intake and bootstrap-* cases
+        # (spec 017) by test_data_request_criteria; any other directory is ours.
         cases = {p.name for p in SUITE.iterdir()
-                 if p.is_dir() and not p.name.startswith(("amend-", "field-", "prerelease-", "release-", "handoff-", "intake-"))}
+                 if p.is_dir() and not p.name.startswith(("amend-", "field-", "prerelease-", "release-", "handoff-", "intake-", "bootstrap-"))}
         self.assertEqual(cases, set(CASES))
         for case, spec in CASES.items():
             with self.subTest(case=case):

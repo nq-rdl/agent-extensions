@@ -116,6 +116,14 @@ Reuse valid existing proposals on reruns but recheck scope, output columns and b
 is unchanged. Show this proposal table alongside `review.md`, not as a confirmed probe result.
 Unknown labels/thresholds remain unverified; do not fabricate confirmations to publish a review.
 
+When the scope has `criteria_status`, compare each row with the current SQL in the same read. This
+check runs no SQL either. An `applied` or `partially-applied` row needs logic in the SQL that does what
+the row says, and a `partially-applied` reason must match what the SQL leaves out. Check that
+each `flagged` row's named column exists in the named output, and that each `delivered` row's data element
+is a column of an output. Record each gap as a limitation `L-criterion-<id>` with the SQL lines (or the
+missing place), for the human to confirm like any other limitation. A gap does not change the state row,
+which the engineer confirmed, and the criterion stays out of the assumptions.
+
 The operator needs explicit authorisation to run approved probes before the delivery run.
 Returned counts inform UAT and the data dictionary; surprises go to the analyst, not an automatic
 cohort filter. Before showing counts, apply guardrails `references/release.rst`, **Probe disclosure control**. Apply *After review* below for the separate authorised run and handoff.
