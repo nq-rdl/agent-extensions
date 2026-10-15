@@ -155,6 +155,12 @@ class IntakeSchema2Contracts(unittest.TestCase):
                               "validate-answers answers.yaml --fingerprints", "store the JSON as `fingerprints`",
                               "Never compute a fingerprint by hand", "`criteria`"):
                     self.assertIn(token, write)
+                # A re-run that changes approval_number must not stall on the old sibling sidecar.
+                for token in ("on a copy of `answers.yaml` in a new temporary directory with no sidecar beside it",
+                              'cp answers.yaml "$T/answers.yaml"', "only the answers are validated",
+                              "a changed `approval_number`", "validates the new sidecar"):
+                    self.assertIn(token, write)
+                self.assertNotIn("while the sibling sidecar is still the last valid one", write)
                 for token in ("Add `decided` only when the enquiry names who decided and when",
                               "never infer them", "Itemising does not edit the free text",
                               "keep it as is, write nothing and stop", "Never downgrade a sidecar"):

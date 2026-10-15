@@ -211,15 +211,24 @@ write nothing and stop: report that the validator needs upgrading. Never downgra
 or drop its confirmed criteria.
 
 Fingerprints record the free text the itemisation was made from. After writing `answers.yaml`,
-and before writing the new sidecar, run `validate-answers answers.yaml --fingerprints` (in a
-generated child, `pixi run python scripts/validate_answers.py answers.yaml --fingerprints`),
-which prints one JSON object, and store the JSON as `fingerprints`. Run it while the sibling sidecar is still the
-last valid one: the command validates the sidecar too, and a schema 2 sidecar with `criteria`
-and no `fingerprints` fails. Never compute a fingerprint by hand. If the command is not
-available, apply the same rule: write schema 1 only when no schema 2 sidecar exists, otherwise
-keep it as is, stop and report that the validator needs upgrading.
+and before writing the new sidecar, run `validate-answers answers.yaml --fingerprints` on a copy of `answers.yaml` in a new temporary directory with no sidecar beside it,
+which prints one JSON object, and store the JSON as `fingerprints`:
 
-Run the validation above. On failure, fix the named fields and run it again; do not hand over
+```bash
+T="$(mktemp -d)"; cp answers.yaml "$T/answers.yaml"
+data-analysis-scaffold validate-answers "$T/answers.yaml" --fingerprints
+# in a generated child: pixi run python scripts/validate_answers.py "$T/answers.yaml" --fingerprints
+```
+
+The command validates a sibling sidecar too; the copy has none, so only the answers are validated.
+In place, the old sidecar could fail it (a changed `approval_number` on a re-run, or `criteria`
+without `fingerprints`) and print nothing. Remove the directory afterwards. Never compute a
+fingerprint by hand. If the command is not available, apply the same rule: write schema 1 only
+when no schema 2 sidecar exists, otherwise keep it as is, stop and report that the validator
+needs upgrading.
+
+After writing the sidecar, run `validate-answers answers.yaml` in place, which validates the new sidecar
+with the answers. On failure, fix the named fields and run it again; do not hand over
 an invalid sidecar. A warning that the free text changed since itemisation means a later edit
 to the four answers: re-run this pass.
 
