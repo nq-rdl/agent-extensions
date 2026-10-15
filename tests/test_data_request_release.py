@@ -312,7 +312,14 @@ class CriteriaTableSkill(unittest.TestCase):
                 self.assertIn("--fingerprints", text)
                 self.assertIn('bash "$S/release.sh" criteria "<tag>" --fingerprints', text)
                 self.assertIn("--answers-invalid", text)
-                self.assertIn("non-zero", text)
+                self.assertNotIn("non-zero", text)
+                # Only a validation failure holds the table as answers-invalid (validate-answers contract).
+                for token in ("the child script's exit 3", "the generator CLI's exit 1 after it prints its "
+                              "`✗ <path>: N problem(s)` report", "Any other failure is not a verdict on the answers",
+                              "exit 2", "an older child that rejects `--fingerprints`",
+                              "when it cannot prepare the environment", "Stop and report it",
+                              "do not hold the table as `answers-invalid`"):
+                    self.assertIn(token, text)
                 self.assertIn("`release.sh` runs no Python and never runs the validator", text)
                 self.assertIn("`fingerprints-unchecked`", text)
 
@@ -436,6 +443,8 @@ class CriteriaTableSkill(unittest.TestCase):
                 self.assertIn("Criteria are not itemised for this request.", text)
                 self.assertIn("THHSAQUIRE-99", text)
                 self.assertIn("``Criteria table held: no-owning-scope, state-missing:N1", text)
+                self.assertIn("Had it exited 3", text)
+                self.assertNotIn("non-zero", text)
 
 
 # --- helper: evidence -----------------------------------------------------------------------

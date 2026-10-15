@@ -109,8 +109,9 @@ criteria and a second release, ``v1.1.0`` (``v1.0.0`` is its first). The steps:
 1. Write ``git show v1.1.0:answers.yaml`` (and the tagged ``answers.intake.json`` beside it) to a
    temporary directory, then run ``pixi run python scripts/validate_answers.py <tmp>/answers.yaml
    --fingerprints > fp.json``. The validator exits 0, so run ``release.sh criteria v1.1.0
-   --fingerprints fp.json``. Had it exited non-zero, the call would pass ``--answers-invalid``
-   instead.
+   --fingerprints fp.json``. Had it exited 3, a validation failure, the call would pass
+   ``--answers-invalid`` instead; an operational failure (exit 2, or ``pixi run`` unable to
+   prepare the environment) stops the release.
 2. ``previous_tag`` is ``v1.0.0``, so the last header reads "Change since v1.0.0". The exclusion
    E2, "Previous AAA repair", moved from not applied to flagged: its row reads "Flagged:
    ``patients.excl_prior_repair`` = 1" with the change "Changed (was not applied)". The inclusion

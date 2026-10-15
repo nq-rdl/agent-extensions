@@ -181,8 +181,13 @@ pixi run python scripts/validate_answers.py "$T/answers.yaml" --fingerprints > "
 bash "$S/release.sh" criteria "<tag>" --fingerprints "$T/fp.json"   # exit 0 complete · 10 held · 2 error
 ```
 
-If the validator exits non-zero, pass `--answers-invalid` instead of `--fingerprints`. With neither
-flag the table is held (`fingerprints-unchecked`). Remove the temporary directory afterwards.
+Read the validator's exit status. Only a validation failure means `--answers-invalid` (pass it
+instead of `--fingerprints`): the child script's exit 3, or the generator CLI's exit 1 after it prints its
+`✗ <path>: N problem(s)` report. Any other failure is not a verdict on the answers: the child's
+exit 2 (operational, including an older child that rejects `--fingerprints`), `pixi run`'s exit 1
+when it cannot prepare the environment, or a generator exit 1 without that report. Stop and report
+it; do not hold the table as `answers-invalid`. With neither flag the table is held
+(`fingerprints-unchecked`). Remove the temporary directory afterwards.
 
 **Previous tag.** `previous_tag` is the greatest earlier stable `X.Y.Z` release whose record is in
 the tag's tree: never a prerelease, a later tag or the working tree. The change column compares
