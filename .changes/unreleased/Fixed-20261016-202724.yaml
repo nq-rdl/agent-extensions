@@ -1,3 +1,0 @@
-kind: Fixed
-body: 'codex: run Claude Code hooks in shell form so SessionStart no longer fails with ENOENT on a quoted script path'
-time: 2026-10-16T20:27:24.429597568Z
