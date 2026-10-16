@@ -236,6 +236,15 @@ for plugin_rel in "${plugins[@]}"; do
             ;;
         esac
 
+        # An `args` key (even []) makes Claude Code spawn `command` directly,
+        # without a shell: quotes stay in the path and the spawn fails ENOENT.
+        hook_has_args=$(jq --arg e "$event" --argjson i "$i" --argjson j "$j" \
+          '.hooks[$e][$i].hooks[$j] | has("args")' "$hooks_json")
+        if [ "$hook_has_args" = "true" ] && [[ "$hook_cmd" == *[\"\'[:space:]]* ]]; then
+          error "$hooks_json" \
+            "Event '$event' group[$i] hook[$j]: 'args' selects exec form, so 'command' must be a bare path without quotes or spaces; drop 'args' to use shell form"
+        fi
+
         if [[ "$hook_cmd" == *'${CLAUDE_PLUGIN_ROOT}'* ]]; then
           rel_script="${hook_cmd/\$\{CLAUDE_PLUGIN_ROOT\}/}"
           rel_script="${rel_script#/}"
