@@ -1,0 +1,3 @@
+kind: Added
+body: 'New `cloudflare` plugin: `/cloudflare:web-search` searches the web through Cloudflare Web Search API (beta) via AI Gateway; its helper keeps the API token out of argv and output'
+time: 2026-10-05T12:57:07.000000000Z

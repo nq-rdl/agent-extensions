@@ -1,0 +1,10 @@
+{
+  "name": "cloudflare",
+  "version": "0.38.0",
+  "description": "Cloudflare — live web search through Web Search API and AI Gateway",
+  "author": {
+    "name": "nq-rdl"
+  },
+  "repository": "https://github.com/nq-rdl/agent-extensions",
+  "license": "MIT"
+}

@@ -1,0 +1,34 @@
+schemaVersion: v1
+id: cloudflare
+displayName: Cloudflare
+description: Cloudflare — live web search through Web Search API and AI Gateway
+keywords: [cloudflare, web-search, ai-gateway, workers-ai, search]
+owners:
+  - rdl
+channels:
+  - stable
+skills:
+  - {source: cloudflare-web-search, leaf: web-search}   # → /cloudflare:web-search
+hooks: []
+prompts: []
+mcp: []
+targets:
+  claude:
+    enabled: true
+    pluginName: cloudflare
+    marketplaceName: rdl-agent-extensions
+
+  codex:
+    enabled: true
+    pluginName: cloudflare
+    marketplaceName: rdl-agent-extensions
+    category: Developer Tools
+    components:
+      skills: true
+      mcp: false
+      hooks: false
+      apps: false
+    interface:
+      shortDescription: Cloudflare — live web search through Web Search API
+      defaultPrompt:
+      - Use Cloudflare Web Search to find current sources for my question.

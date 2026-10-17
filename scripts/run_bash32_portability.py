@@ -7,6 +7,11 @@ from pathlib import Path
 
 CASES = (
     "test_adr_scan.Bash32Scan.test_next_list_check_under_bash32",
+    "test_cloudflare_web_search.Bash32.test_request_shape_auth_on_stdin_and_output",
+    "test_cloudflare_web_search.Bash32.test_text_output_and_v4_envelope",
+    "test_cloudflare_web_search.Bash32.test_local_validation_never_calls_the_api",
+    "test_cloudflare_web_search.Bash32.test_missing_or_unsafe_credentials_exit_3",
+    "test_cloudflare_web_search.Bash32.test_api_errors_report_cloudflare_message_and_hints",
     "test_pi_dispatch.Bash32.test_offline_contracts",
     "test_pi_review_rescue.Bash32.test_offline_contracts",
     "test_installed_hooks.Bash32BusyBoxFallback.test_prompt_fallbacks_gate_without_jq_or_python",

@@ -23,6 +23,7 @@ Delegation outlines are optional skill references, not registered agent types.
 | [`obsidian`](#obsidian) | Yes | Yes | Obsidian — Bases databases, the CLI, and Obsidian-flavored Markdown |
 | [`writerside`](#writerside) | Yes | Yes | Writerside — author and build JetBrains Writerside documentation |
 | [`defuddle`](#defuddle) | Yes | Yes | Defuddle — extract clean Markdown from cluttered web pages |
+| [`cloudflare`](#cloudflare) | Yes | Yes | Cloudflare — live web search through Web Search API and AI Gateway |
 | [`gh`](#gh) | Yes | Yes | GitHub workflow — git hooks, changelogs, conventional commits, pull requests, releases, Go CI/CD, and secure GitHub Actions (SHA pinning, OIDC, GitOps delivery) |
 | [`git`](#git) | Yes | Yes | Git PR feedback — review all comments, push fixes to the same PR, and resolve handled threads |
 | [`terraform`](#terraform) | Yes | Yes | Terraform — generate compliant HCL, review IaC for state safety, and author Terratest suites |
@@ -228,6 +229,20 @@ Defuddle — extract clean Markdown from cluttered web pages.
 **Codex skills**
 
 - `$defuddle:extract`
+
+---
+
+## cloudflare
+
+Cloudflare — live web search through Web Search API and AI Gateway.
+
+**Claude Code skills**
+
+- `/cloudflare:web-search`
+
+**Codex skills**
+
+- `$cloudflare:web-search`
 
 ---
 
