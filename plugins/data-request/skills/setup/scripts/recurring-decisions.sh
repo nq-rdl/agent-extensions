@@ -44,14 +44,14 @@ def list_errors:
         (if .status == "open" or .status == "retired" then empty else "list: \($id): status must be open or retired" end),
         (if (.proposal.text | str) and (.proposal.rationale | str) then empty else "list: \($id): proposal needs text and rationale" end),
         (if has("house_default") and ((.house_default | type) != "object" or
-             (.house_default.facility_code | str | not) or
+             (.id == "tuh-facility" and (.house_default.facility_code | str | not)) or
              (.house_default.confirmed_by | (str and (contains("@") | not)) | not) or
              (.house_default.confirmed_at | str | not) or
              (.house_default.decided | type) != "object" or
              ([.house_default.decided.by, .house_default.decided.role,
                .house_default.decided.at, .house_default.decided.source] | all(.[]; str) | not) or
              (.house_default.decided.by | contains("@")))
-         then "list: \($id): house_default needs a string facility code, recorded confirmation and decided origin" else empty end),
+         then "list: \($id): house_default needs \(if .id == "tuh-facility" then "a string facility code, " else "" end)recorded confirmation and decided origin" else empty end),
         (if (.match | type) == "array" and (.match | length) > 0
             and (.match | all(.[]; type == "array" and length > 0 and all(.[]; str)))
          then (if (.match | all(.[][]; . == ascii_downcase)) then empty else "list: \($id): match terms must be lowercase" end)

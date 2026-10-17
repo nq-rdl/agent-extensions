@@ -2,9 +2,10 @@
 # Emits one violation per line; no output means the document is valid. Used by
 # `sqlreview.sh check` and, through it, by the PreToolUse guard hook.
 # Run with `jq -L <this directory>`: path_slug/legacy_path_slug live in sqlreview-slug.jq,
-# identity_violations in sqlreview-identity.jq.
+# identity_violations in sqlreview-identity.jq, the research-criteria vocabulary in sqlreview-criteria.jq.
 include "sqlreview-slug";
 include "sqlreview-identity";
+include "sqlreview-criteria";
 def nonempty: type == "string" and length > 0;
 def integer: type == "number" and . >= 1 and . == floor;
 def line_range: type == "array" and length == 2 and all(.[]; integer) and .[0] <= .[1];
@@ -50,6 +51,51 @@ def items($kind; $rev):
            then "\($id): unknown carried_basis \($cb | tojson)"
            else empty end)
     );
+
+
+# Scope criteria_status (spec 017): the shape of the engineer's one state per research criterion.
+# Kind-independent, because this check runs on every write and cannot see the analyst's sidecar:
+# states allowed by kind, coverage and the researcher-applies basis are `sqlreview.sh criteria`.
+# Findings are "<id>\t<field>\t<rule>" ("-" when no well-formed id); never a value.
+def criteria_status_findings($rev):
+  def ine: type == "string" and test("\\S");
+  def cid: if (.criterion | type) == "string" and (.criterion | test("^[NIED][1-9][0-9]*\\z")) then .criterion else "-" end;
+  if has("criteria_status") | not then empty
+  elif (.criteria_status | type) != "array" then "-\tcriteria_status\tnot-array"
+  else
+    .criteria_status as $rows
+    | ([$rows[] | select(type == "object") | cid | select(. != "-")]
+       | group_by(.)[] | select(length > 1) | "\(.[0])\tcriterion\tduplicate"),
+    ($rows[] |
+      if type != "object" then "-\tcriteria_status\tnot-object" else
+      cid as $id
+      | (if $id == "-" then "-\tcriterion\tinvalid" else empty end),
+        (.state as $s | if ($s | type) != "string" or (crit_all_states | index([$s])) == null then "\($id)\tstate\tunknown"
+         else
+           (if (crit_reason_required | index([$s])) != null and (.reason | ine | not) then "\($id)\treason\trequired" else empty end),
+           (if $s == "flagged" then
+              (.flag | if type == "object" then . else {} end) as $f
+              | (if ($f.output | ine) then empty else "\($id)\tflag.output\trequired" end),
+                (if ($f.column | ine) then empty else "\($id)\tflag.column\trequired" end)
+            else empty end)
+         end),
+        (if has("upstream") and ((.upstream | type) != "object" or (.upstream.source | ine | not) or (.upstream.id | ine | not))
+         then "\($id)\tupstream\tinvalid" else empty end),
+        # Confirmation as for scope assumptions (items above); a carried row's basis is criteria-unchanged.
+        (if (.confirmed_by | nonempty | not) then "\($id)\tconfirmed_by\trequired" else empty end),
+        (if (.confirmed_at | nonempty | not) then "\($id)\tconfirmed_at\trequired" else empty end),
+        (.confirmed_revision as $cr | .carried_from_revision as $cf
+         | if ($cr | integer | not) then "\($id)\tconfirmed_revision\trequired"
+           elif ($rev | integer | not) then empty
+           elif $cr > $rev or ($cr < $rev and $cf == null) then "\($id)\tconfirmed_revision\tstale"
+           elif $cr == $rev then (if $cf != null then "\($id)\tcarried_from_revision\tinvalid" else empty end)
+           elif ($cf | integer | not) or $cf != $rev - 1 or $cf < $cr then "\($id)\tcarried_from_revision\tinvalid"
+           else empty end),
+        (if .carried_basis == null then empty
+         elif .carried_from_revision == null or .carried_basis != "criteria-unchanged" then "\($id)\tcarried_basis\tinvalid"
+         else empty end)
+      end)
+  end;
 
 
 def lift_document($rev):
@@ -133,6 +179,7 @@ else
      else "kind must be \"review\" or \"scope\" or \"lifts\" (got \(.kind // "nothing"))" end),
     (if (.revision | integer | not) then "revision must be an integer >= 1" else empty end),
     (if has("assumptions") and (.assumptions | type) != "array" then "assumptions must be an array" else items("assumptions"; $rev) end),
-    (if has("limitations") and (.limitations | type) != "array" then "limitations must be an array" else items("limitations"; $rev) end)
+    (if has("limitations") and (.limitations | type) != "array" then "limitations must be an array" else items("limitations"; $rev) end),
+    criteria_status_findings($rev)
     )
 end

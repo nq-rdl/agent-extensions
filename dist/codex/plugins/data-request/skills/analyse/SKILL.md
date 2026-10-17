@@ -82,7 +82,7 @@ confirmation or edit the final JSON. Lint cannot grant confirmation. A reworded 
 item no longer matches its scope text, so it is walked.
 
 Some decisions recur in every enquiry (#362). Before you put candidate items to the engineer, run
-`bash "$S/recurring-decisions.sh" match ".sqlreview/reviews/$SLUG/review.draft.json"`. For each other match,
+`bash "$S/recurring-decisions.sh" match ".sqlreview/reviews/$SLUG/review.draft.json"`. For each other match without a `house_default`,
 show the prior enquiries, offer the listed wording and mark the item `upstream`, as
 `${PLUGIN_ROOT}/skills/setup/references/recurring-decisions.rst` says. The engineer still confirms each other item;
 the exact recorded TUH house default is not a fresh facility question. Preserve its upstream origin,
@@ -115,6 +115,14 @@ This check runs **no SQL**: mark proposals **proposed, not executed**, not OBSER
 Reuse valid existing proposals on reruns but recheck scope, output columns and bounds even if SQL
 is unchanged. Show this proposal table alongside `review.md`, not as a confirmed probe result.
 Unknown labels/thresholds remain unverified; do not fabricate confirmations to publish a review.
+
+When the scope has `criteria_status`, compare each row with the current SQL in the same read. This
+check runs no SQL either. An `applied` or `partially-applied` row needs logic in the SQL that does what
+the row says, and a `partially-applied` reason must match what the SQL leaves out. Check that
+each `flagged` row's named column exists in the named output, and that each `delivered` row's data element
+is a column of an output. Record each gap as a limitation `L-criterion-<id>` with the SQL lines (or the
+missing place), for the human to confirm like any other limitation. A gap does not change the state row,
+which the engineer confirmed, and the criterion stays out of the assumptions.
 
 The operator needs explicit authorisation to run approved probes before the delivery run.
 Returned counts inform UAT and the data dictionary; surprises go to the analyst, not an automatic

@@ -21,7 +21,13 @@
 #                                              unlinked decision sources; three columns, exit 10 when any
 #   lint --ste FILE                            also STE wording in intent and item text/rationale, any status: one
 #                                              "<id>\t<field>\t<rule>\t<detail>" line per hit; exit 10 when any
+#   criteria SLUG | criteria DRAFT             a scope's criteria_status against the schema 2 answers.intake.json at
+#                                              the git top-level: states by kind, coverage of non-withdrawn criteria,
+#                                              withdrawn, researcher-applies basis, one owning scope (a DRAFT path stands
+#                                              in for its slug's scope). "<id>\t<field>\t<rule>" per finding, no values;
+#                                              exit 10 when any, 2 operational. No sidecar or schema 1: no-itemised-criteria
 #   publish SLUG scope|review|lifts DRAFT             validate a staged copy, then atomically replace the final JSON
+#                                              (a scope carrying criteria_status must pass criteria first)
 #   publish --reconfirm-all SLUG KIND DRAFT    same, but refuse any carried (carried_from_revision) confirmation
 #   roles ENGINEER ANALYST                     update only the two confirmed role names in config.json
 #   guard string-sql on|off                    set only guard.require_lift_for_string_sql in config.json
@@ -63,7 +69,7 @@
 #                                              (a missing templates/<kind>.md is first installed from the bundled default)
 #
 # Exit codes: 0 ok · 1 usage · 2 error · 3 not initialised · 4 invalid document or notes header · 5 slug conflict ·
-# 6 no baseline · 10 differences found (init --diff / delta).
+# 6 no baseline · 10 differences or findings (init --diff / delta / lint / criteria).
 set -u
 SR_SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd -P)"
 # shellcheck source=sqlreview-lib.sh
@@ -361,6 +367,60 @@ cmd_lint() {
 }
 
 # ---------------------------------------------------------------------------------------------
+# Research criteria (spec 017). check validates the shape of a scope's criteria_status on every
+# write, but cannot see the analyst's sidecar; this checks the rest against answers.intake.json at
+# the git top-level, read through `intake` so the sidecar's own validation applies. Rules live in
+# sqlreview-criteria-check.jq. The argument is a slug (its published scope.json) or a scope draft
+# path (anything with a slash or ending .json), which stands in for its slug's published scope when
+# counting owners. A scope without criteria_status is clean. Findings print as lint's do: one
+# "<id>\t<field>\t<rule>" line each, exit 10; operational failures exit 2.
+cmd_criteria() {
+  [ $# -eq 1 ] || usage
+  case "$1" in ""|-*) usage ;; esac
+  sr_need_jq
+  sr_require_root
+  local doc slug top sidecar intake others=0 f rc out
+  case "$1" in
+    */*|*.json)
+      doc="$(sr_abspath "$1")"
+      [ -f "$doc" ] || sr_die 2 "no such scope draft: $1" ;;
+    *)
+      sr_safe_slug "$1"
+      doc="$SR_REVIEWS/$1/scope.json"
+      sr_no_symlinks "$doc" || exit 2
+      [ -f "$doc" ] || sr_die 2 "no published scope for slug: $1" ;;
+  esac
+  jq -se 'length == 1 and (.[0] | type == "object" and .kind == "scope" and (.slug | type == "string"))' "$doc" >/dev/null 2>&1 \
+    || sr_die 2 "not a scope document: $1"
+  slug="$(jq -r .slug "$doc")"
+  # Refuse an unsafe slug without echoing it (sr_safe_slug would print the document's value).
+  case "$slug" in ""|.|..|*[!A-Za-z0-9_%.-]*) sr_die 2 "unsafe slug in scope document: $1" ;; esac
+  sr_safe_slug "$slug"
+  for f in "$SR_REVIEWS"/*/scope.json; do
+    [ -f "$f" ] || continue
+    [ "$(basename "$(dirname "$f")")" != "$slug" ] || continue
+    sr_no_symlinks "$f" || exit 2
+    jq -e 'type == "object" and has("criteria_status")' "$f" >/dev/null 2>&1; rc=$?
+    case "$rc" in
+      0) others=$((others + 1)) ;;
+      1) ;;
+      *) sr_die 2 "cannot read $(basename "$(dirname "$f")")/scope.json" ;;
+    esac
+  done
+  top="$(git -C "$SR_ROOT" rev-parse --show-toplevel 2>/dev/null)" || top="$SR_ROOT"
+  [ -n "$top" ] || top="$SR_ROOT"
+  sidecar="$top/answers.intake.json"
+  sr_no_symlinks "$sidecar" || exit 2
+  intake="$(cmd_intake "$sidecar" 1 2>/dev/null)" \
+    || sr_die 2 "invalid analyst intake (answers.intake.json); run validate-answers and correct the sidecar"
+  out="$(jq -r -L "$SR_SCRIPT_DIR" --argjson intake "$intake" --argjson others "$others" \
+    -f "$SR_SCRIPT_DIR/sqlreview-criteria-check.jq" "$doc" 2>/dev/null)" || sr_die 2 "criteria check failed to run"
+  [ -n "$out" ] || return 0
+  printf '%s\n' "$out"
+  return 10
+}
+
+# ---------------------------------------------------------------------------------------------
 cmd_roles() (
   [ $# -eq 2 ] || usage
   sr_need_jq
@@ -449,6 +509,16 @@ cmd_publish() (
   cp "$draft" "$tmp" || sr_die 2 "cannot stage draft"
   cmd_check "$tmp" || exit 4
   jq -e --arg s "$slug" --arg k "$kind" '.slug == $s and .kind == $k' "$tmp" >/dev/null || sr_die 4 "document slug/kind must match destination"
+  # A scope that owns research criteria must match the analyst's sidecar before anything is written.
+  if [ "$kind" = scope ] && jq -e 'has("criteria_status")' "$tmp" >/dev/null; then
+    local findings crc
+    findings="$(cmd_criteria "$tmp")"; crc=$?
+    case "$crc" in
+      0) ;;
+      10) printf '%s\n' "$findings"; sr_die 4 "research criteria refused (sqlreview.sh criteria); correct criteria_status, or re-run intake" ;;
+      *) sr_die 2 "research criteria check failed to run" ;;
+    esac
+  fi
   rel="$(jq -r .sql_path "$tmp")"
   sr_safe_sql "$rel"
   local bound_doc
@@ -732,7 +802,7 @@ cmd_intake() {
   local out
   out="$(jq -se --arg source "$1" --argjson revision "$2" '
     if length == 1 then .[0] else error("expected one intake object") end
-  ' "$1" 2>/dev/null | jq --arg source "$1" --argjson revision "$2" -f "$SR_SCRIPT_DIR/sqlreview-intake.jq" 2>/dev/null)" || sr_die 4 "invalid analyst intake; run validate-answers and correct the sidecar"
+  ' "$1" 2>/dev/null | jq -L "$SR_SCRIPT_DIR" --arg source "$1" --argjson revision "$2" -f "$SR_SCRIPT_DIR/sqlreview-intake.jq" 2>/dev/null)" || sr_die 4 "invalid analyst intake; run validate-answers and correct the sidecar"
   [ -n "$out" ] || sr_die 4 "invalid analyst intake; expected one JSON object"
   if [ $# -eq 3 ]; then
     printf '%s\n' "$out" | jq --slurpfile drafts "$3" --argjson revision "$2" '
@@ -1278,7 +1348,7 @@ cmd_render() {
     question_doc="$(cmd_questions "$slug" "$kind")" || return $?
     question_rows="$(printf '%s' "$question_doc" | jq -c .questions)"
   fi
-  vars="$(jq -c --argjson question_rows "$question_rows" --slurpfile cfgs "$cfg" -f "$SR_SCRIPT_DIR/sqlreview-render.jq" "$doc")" || sr_die 2 "render failed for reviews/$slug/$kind.json"
+  vars="$(jq -c -L "$SR_SCRIPT_DIR" --argjson question_rows "$question_rows" --slurpfile cfgs "$cfg" -f "$SR_SCRIPT_DIR/sqlreview-render.jq" "$doc")" || sr_die 2 "render failed for reviews/$slug/$kind.json"
   rendered="$(jq -r -n --rawfile tpl "$tpl" --argjson vars "$vars" \
     'reduce ($vars | keys[]) as $k ($tpl; gsub("\\{\\{\($k)\\}\\}"; $vars[$k]))')" || sr_die 2 "render failed for reviews/$slug/$kind.json"
   if jq -e '(.header_revisions // []) | length > 0' "$doc" >/dev/null; then
@@ -1304,6 +1374,7 @@ case "$cmd" in
   check) cmd_check "$@" ;;
   ledger) . "$SR_SCRIPT_DIR/sqlreview-ledger.sh"; cmd_ledger "$@" ;;
   lint) cmd_lint "$@" ;;
+  criteria) cmd_criteria "$@" ;;
   publish) cmd_publish "$@" ;;
   roles) cmd_roles "$@" ;;
   guard) cmd_guard "$@" ;;

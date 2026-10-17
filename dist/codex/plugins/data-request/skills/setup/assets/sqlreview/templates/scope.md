@@ -20,6 +20,10 @@
 
 {{outputs_list}}
 
+## Criteria
+
+{{criteria}}
+
 ## Assumptions
 
 > {{definition_assumption}}
