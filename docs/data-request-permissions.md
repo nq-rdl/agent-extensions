@@ -37,3 +37,14 @@ through another agent, or disable a check. The agent must not change settings to
 make the action pass. The engineer owns any separate host-configuration review;
 this guidance does not promise that an allow rule overrides an auto-mode
 classifier or another runtime control. No such override was tested here.
+
+## Render-only review evidence
+
+Commit maintained sources, configuration, adapter argv and locked dependencies before
+SQL-bound review. Generated SQL can remain ignored and absent from git. The adapter
+receives `--sql-path` and an absolute temporary `--output`, renders at the selected
+commit and must not connect to a database or execute an extract. Review helpers
+retain hashes and JSON history; historical SQL exists only in private temporary
+directories outside the repository. Missing adapters or historical dependencies
+require reassessment, never reuse of old generated working SQL. The production
+scaffold adapter remains pending under scaffold#290 until separately verified.

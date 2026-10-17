@@ -11,6 +11,7 @@ No model call is made; the behavioural side lives in evals/claude/data-request/.
 import re
 import unittest
 from pathlib import Path
+from unittest.mock import patch
 
 import yaml
 
@@ -131,11 +132,33 @@ class Composition(unittest.TestCase):
             text = path.read_text()
             with self.subTest(path=path.name):
                 # SQL-bound publication/confirmation/mechanics belong to other stages.
-                # #435 deliberately permits only the shared helper's independent ledger calls.
-                self.assertNotRegex(text, r'sqlreview\.sh" (?!ledger\b)')
+                # Independent ledger calls and the exact hand-off source-evidence
+                # gate compose helpers without restating a stage's procedure.
+                allowed = r'ledger\b'
+                if path == CANON / "references" / "handoff.rst":
+                    allowed += "|" + re.escape(
+                        'fingerprint "$(jq -r .sql_path "$path")" >/dev/null || exit $?'
+                    ) + r'(?=\n|\Z)'
+                self.assertNotRegex(text, rf'sqlreview\.sh" (?!(?:{allowed}))')
                 for owned in ("carryforward", "confirmed_revision", "DATEADD",
                               "CREATE TABLE", "scope.draft.json"):
                     self.assertNotIn(owned, text)
+
+    def test_evidence_exception_still_rejects_stage_and_other_fingerprint_calls(self):
+        handoff = CANON / "references" / "handoff.rst"
+        gate = 'bash "$S/sqlreview.sh" fingerprint "$(jq -r .sql_path "$path")" >/dev/null || exit $?'
+        cases = [(handoff, 'bash "$S/sqlreview.sh" ' + command)
+                 for command in ('publish "$SLUG" review draft.json', 'snapshot "$SLUG" q.sql',
+                                 'notes q.sql', 'fingerprint q.sql')]
+        cases += [(CANON / "SKILL.md", gate), (handoff, gate + '; echo continued')]
+        for path, command in cases:
+            with self.subTest(path=path.name, command=command):
+                with patch(__name__ + ".skill_files", return_value=[path]), \
+                     patch.object(Path, "read_text", return_value=command):
+                    result = unittest.TestResult()
+                    Composition("test_does_not_restate_stage_procedures").run(result)
+                self.assertEqual(result.errors, [])
+                self.assertEqual(len(result.failures), 1)
 
     def test_skill_md_is_lean(self):
         self.assertLessEqual(len(SKILL.read_text().splitlines()), 140)

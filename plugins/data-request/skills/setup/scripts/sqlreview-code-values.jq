@@ -24,7 +24,16 @@ def code_value_machine_field($doc; $path; $text):
       ($path | length == 3 and .[0] == "header_revisions" and
         (.[1] | type) == "number" and (.[2] == "sql_sha256" or .[2] == "sql_body_sha256"))) then
     $text | test("^[0-9a-f]{64}$")
-  elif $path == ["git_commit"] then $text | test("^([0-9a-f]{40}|[0-9a-f]{64})$")
+  elif ($path == ["git_commit"] or $path == ["sql_provenance", "commit"] or
+        ($path | length == 3 and .[0] == "header_revisions" and
+          (.[1] | type) == "number" and .[2] == "git_commit") or
+        ($path | length == 4 and .[0] == "header_revisions" and
+          (.[1] | type) == "number" and .[2:] == ["sql_provenance", "commit"])) then
+    $text | test("^([0-9a-f]{40}|[0-9a-f]{64})$")
+  elif ($path == ["sql_provenance", "project_root"] or
+        ($path | length == 4 and .[0] == "header_revisions" and
+          (.[1] | type) == "number" and .[2:] == ["sql_provenance", "project_root"])) then
+    $text == "" or ($text | code_value_path_ok)
   elif $path == ["sql_path"] then $text | code_value_path_ok
   elif $path == ["slug"] then
     ($doc.sql_path | code_value_path_ok) and

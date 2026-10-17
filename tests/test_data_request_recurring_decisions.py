@@ -452,7 +452,9 @@ class MarkerCompatibility(unittest.TestCase):
         self.tmp = tempfile.TemporaryDirectory()
         self.addCleanup(self.tmp.cleanup)
         self.root = Path(self.tmp.name)
-        self.sqlreview("init")
+        from test_sql_review_scripts import Project
+        self.project = Project(self.root)
+        self.project.commit()
 
     def sqlreview(self, *args, expected=0):
         r = run(SQLREVIEW, list(args), self.root)
