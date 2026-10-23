@@ -116,7 +116,7 @@ class Baseline(unittest.TestCase):
 
     def test_compatibility_names_the_v080_floor(self):
         compat = " ".join(frontmatter(SKILL)["compatibility"].split())
-        for token in ("query-builder 0.8.0 is the floor", "supplied cohorts", "identifier-literal gate",
+        for token in ("query-builder 0.8.0 is the floor", "identifier-literal gate", "since 0.7.2",
                       "record_assumption", "record_limitation", "need 0.6.0 or later"):
             with self.subTest(token=token):
                 self.assertIn(token, compat)
@@ -164,7 +164,7 @@ class LegacyOrg(unittest.TestCase):
         text = " ".join(self.text.split())
         self.assertIn("on `nq-rdl/query-builder` below `v0.8.0`, as a **blocker**", text)
         self.assertNotIn("below `v0.6.0`, as a **blocker**", text)
-        for token in ("`SuppliedCohort`/`load_supplied()`", "identifier-literal gate", "check_case_fast()",
+        for token in ("`SuppliedCohort`/`load_supplied()`", "since `v0.7.2`", "identifier-literal gate", "check_case_fast()",
                       "docs/SUPPLIED_COHORTS.md", "blob/v0.8.0/docs/SUPPLIED_COHORTS.md"):
             with self.subTest(token=token):
                 self.assertIn(token, text)
