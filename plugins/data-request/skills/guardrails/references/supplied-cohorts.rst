@@ -77,6 +77,7 @@ Layers of protection
   on any path under ``data/00_raw/``. It is the narrower layer: it covers that directory and the
   ``Read`` tool only, and a shell command is out of its reach by design. The rule above still
   holds for ``Bash``, ``Grep`` and every other route.
+  Codex has no ``Read`` tool and its hook wiring is unchanged, so there the rule rests on this text alone.
 * A scaffold child separately denies ``Read(/data/**)`` and lets the runbook ``pixi run`` tasks
   through. The two are compatible: the child denies more, and the runbook tasks run the loader
   without showing you a value. The runbook is where the researcher's file is saved and a run is

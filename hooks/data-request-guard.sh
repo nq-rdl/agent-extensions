@@ -62,22 +62,23 @@ normalize_path() {
 }
 if [ "$tool" = Read ]; then
   # Researcher-supplied cohort files live under data/00_raw/ (DVC, gitignored) and hold
-  # identifiers. The runner loads them at run time; an agent never reads one. Check the
-  # lexical path and, following symlinks, the physical one, so neither an alias into
-  # data/00_raw nor a ".." detour reaches it. Only the Read tool is covered here.
+  # identifiers. The runner loads them at run time; an agent never reads one. Resolve the
+  # path physically (existing parent via cd -P, so a ".." after a symlinked directory is
+  # followed on disk; then the final component's symlink chain) and also check the lexical
+  # path. A loop or a chain over 20 hops is denied, never allowed. Only the Read tool is covered.
   raw_lexical="$(printf '%s\n' "$abs" | normalize_path)"
-  raw_physical="$raw_lexical"
-  hops=0; link="$raw_lexical"
-  while [ -L "$link" ] && [ "$hops" -lt 20 ]; do
-    target="$(readlink "$link" 2>/dev/null)" || break
-    case "$target" in /*) link="$target" ;; *) link="$(dirname "$link")/$target" ;; esac
-    link="$(printf '%s\n' "$link" | normalize_path)"
+  raw_physical="$abs"; hops=0
+  while :; do
+    parent="$(dirname "$raw_physical")"; suffix="$(basename "$raw_physical")"
+    while [ ! -d "$parent" ] && [ "$parent" != / ]; do suffix="$(basename "$parent")/$suffix"; parent="$(dirname "$parent")"; done
+    if physical_parent="$(cd -P -- "$parent" 2>/dev/null && pwd -P)"; then raw_physical="$physical_parent/$suffix"; else break; fi
+    raw_physical="$(printf '%s\n' "$raw_physical" | normalize_path)"
+    [ -L "$raw_physical" ] || break
     hops=$((hops + 1))
+    [ "$hops" -le 20 ] || decide deny "Read guard could not resolve a symlink chain (loop or over 20 links), so it cannot rule out data/00_raw/. Read the non-symlink path."
+    target="$(readlink "$raw_physical" 2>/dev/null)" || break
+    case "$target" in /*) raw_physical="$target" ;; *) raw_physical="$(dirname "$raw_physical")/$target" ;; esac
   done
-  raw_physical="$link"
-  parent="$(dirname "$raw_physical")"; suffix="$(basename "$raw_physical")"
-  while [ ! -d "$parent" ] && [ "$parent" != / ]; do suffix="$(basename "$parent")/$suffix"; parent="$(dirname "$parent")"; done
-  if physical_parent="$(cd -P -- "$parent" 2>/dev/null && pwd -P)"; then raw_physical="$physical_parent/$suffix"; fi
   for candidate in "$raw_lexical" "$raw_physical"; do
     case "$candidate" in
       */data/00_raw|*/data/00_raw/*)

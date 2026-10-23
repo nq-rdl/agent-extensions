@@ -86,6 +86,24 @@ class ReadGuard(unittest.TestCase):
         link.symlink_to(self.root / "data" / "00_raw")
         self.assertDenied(link / "sample_cohort.csv")
 
+    def test_denies_dotdot_after_a_symlinked_directory(self):
+        (self.root / "data" / "00_raw" / "sub").mkdir()
+        (self.root / "data" / "00_raw" / "a.csv").write_text("x\n")
+        link = self.root / "l"
+        link.symlink_to(self.root / "data" / "00_raw" / "sub")
+        self.assertDenied(link / ".." / "a.csv")
+
+    def test_denies_a_relative_symlink_chain(self):
+        (self.root / "conf" / "one").symlink_to("../data/00_raw/sample_cohort.csv")
+        (self.root / "two").symlink_to("conf/one")
+        self.assertDenied(self.root / "two")
+
+    def test_a_symlink_loop_is_denied_not_allowed(self):
+        (self.root / "loop_a").symlink_to("loop_b")
+        (self.root / "loop_b").symlink_to("loop_a")
+        decision, _ = self.read(self.root / "loop_a")
+        self.assertEqual(decision, "deny")
+
     def test_allows_other_reads(self):
         for path in (self.root / "conf" / "base" / "supplied" / "sample_cohort.template.csv",
                      self.root / "data" / "02_extracts" / "out.csv",
@@ -105,7 +123,7 @@ class ReadGuard(unittest.TestCase):
 
 class Wiring(unittest.TestCase):
     def test_hooks_json_routes_read_to_the_guard(self):
-        for root in (REPO / "hooks" / "data-request", REPO / "plugins" / "data-request" / "hooks"):
+        for root in (REPO / "hooks" / "data-request", REPO / "plugins" / "data-request" / "hooks"):  # Codex has no Read tool
             groups = json.loads((root / "hooks.json").read_text())["hooks"]["PreToolUse"]
             matchers = {g["matcher"]: [h["command"] for h in g["hooks"]] for g in groups}
             with self.subTest(str(root.relative_to(REPO))):
@@ -139,6 +157,13 @@ class SkillContract(unittest.TestCase):
                        "narrower layer", "Read(/data/**)"):
             with self.subTest(phrase):
                 self.assertIn(phrase, text)
+
+    def test_skill_pointers_ship_with_every_copy(self):
+        for tree in ("plugins/data-request/skills", "dist/codex/plugins/data-request/skills"):
+            for leaf in SKILLS:
+                body = " ".join((REPO / tree / leaf / "SKILL.md").read_text().split())
+                with self.subTest(tree=tree, leaf=leaf):
+                    self.assertIn("data/00_raw", body)
 
     def test_reference_ships_with_every_copy(self):
         canonical = (REPO / "skills/data-request-guardrails" / REFERENCE).read_text()
