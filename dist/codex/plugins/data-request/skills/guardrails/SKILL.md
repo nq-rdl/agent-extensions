@@ -6,12 +6,12 @@ description: Apply advisory RDL cohort-SQL guardrails when drafting, changing, m
   spec composition, indexed filters, source timezones, join evidence and researcher
   modelling choices, with pointers to authoritative sources.
 compatibility: RDL cohort SQL; DATEADD and sys catalog examples target SQL Server
-  2022 (16.x). query-builder 0.8.0 is the floor because of its identifier-literal
-  gate (supplied-cohort loader since 0.7.2); record_assumption, record_limitation
-  and isolation_level need query-builder 0.6.0 or later. rdl-service-desk/query-builder
-  is the retired legacy org. Source patterns from issues 313, 325 and 370 to 389 (2026-09-15
-  to 2026-09-28). Composition examples are schematic; verify pinned library APIs,
-  deployed engine and current metadata.
+  2022 (16.x). query-builder 0.8.0 is the floor for its identifier-literal gate (loader
+  since 0.7.2). record_assumption, record_limitation and isolation_level need query-builder
+  0.6.0 or later. rdl-service-desk/query-builder is the retired legacy org. Source
+  patterns from issues 313, 325 and 370 to 389 (2026-09-15 to 2026-09-28). Composition
+  examples are schematic; verify pinned library APIs, deployed engine and current
+  metadata.
 metadata:
   repo: https://github.com/nq-rdl/agent-extensions
 ---
