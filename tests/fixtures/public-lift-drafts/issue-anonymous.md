@@ -29,3 +29,5 @@ Add an at-time address spec. Regression: the synthetic rows above return suburb 
 
 ## Rollout
 Delivered under the old pin; forward release only, no backport.
+
+occurrence 7b20d4e9

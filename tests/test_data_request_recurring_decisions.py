@@ -260,8 +260,8 @@ class Pointers(unittest.TestCase):
     def test_reference_keeps_confirmation_and_deduplication(self):
         text = " ".join(REFERENCE.read_text().split())
         for token in ("Human confirmation is still", "open and closed issues",
-                      "your own earlier comment on the same decision",
-                      "without a public identifier", "one evidence comment per target issue",
+                      "per-occurrence token, not with wording",
+                      "random token", "one evidence comment per target issue",
                       "set that entry's ``library_issue``", "the search in step 2 found nothing",
                       "Never edit the installed plugin copy", "copy ``upstream`` from the prior",
                       "do not authorise hand SQL", "retired_by"):

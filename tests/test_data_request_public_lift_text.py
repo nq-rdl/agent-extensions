@@ -15,6 +15,7 @@ patient data. These tests pin:
 All identifiers in the fixtures are synthetic. No model call is made.
 """
 
+import hashlib
 import re
 import unittest
 from pathlib import Path
@@ -89,6 +90,23 @@ class Fixtures(unittest.TestCase):
             with self.subTest(name):
                 self.assertEqual(leaks((FIXTURES / name).read_text()), set())
 
+    def test_anonymous_drafts_carry_one_random_token_not_a_derived_one(self):
+        for name in ("issue-anonymous.md", "comment-anonymous.md"):
+            text = (FIXTURES / name).read_text()
+            tokens = re.findall(r"^occurrence ([0-9a-f]{8})$", text, re.M)
+            with self.subTest(name):
+                self.assertEqual(len(tokens), 1)
+                for number in ("90210", "8675309"):  # synthetic request numbers
+                    self.assertNotEqual(tokens[0], hashlib.sha256(number.encode()).hexdigest()[:8])
+                    self.assertNotEqual(tokens[0], hashlib.md5(number.encode()).hexdigest()[:8])
+
+    def test_same_wording_in_two_enquiries_differs_only_by_token(self):
+        text = (FIXTURES / "comment-anonymous.md").read_text()
+        second = re.sub(r"occurrence [0-9a-f]{8}", "occurrence 0c5e77b1", text)
+        strip = lambda t: re.sub(r"occurrence [0-9a-f]{8}", "", t)
+        self.assertNotEqual(text, second)
+        self.assertEqual(strip(text), strip(second))  # wording cannot tell them apart; the token can
+
     def test_anonymous_issue_keeps_the_evidence_block_and_a_reproduction(self):
         draft = (FIXTURES / "issue-anonymous.md").read_text()
         for heading in ("Library baseline", "Need and classification", "Pinned capability inspected",
@@ -117,7 +135,9 @@ class Guidance(unittest.TestCase):
                       "anonymous reproduction", "Anonymity is not a decision",
                       "Do not state an assumption or limitation as confirmed in public text",
                       "Private traceability", "The private side points to the public work",
-                      "by its wording", "compare your own earlier text before retrying"):
+                      "by its wording", "proof that this occurrence was already filed",
+                      "per-occurrence line", "never derive it from a request number or a hash of one",
+                      "search for that exact token only"):
             with self.subTest(token):
                 self.assertIn(token, text)
         self.assertNotIn("Enquiry and pin", text)
@@ -125,9 +145,11 @@ class Guidance(unittest.TestCase):
 
     def test_recurring_decisions_keep_dedup_and_retry_without_public_ids(self):
         text = read("/".join(DECISIONS))
-        for token in ("Public evidence", "without a public identifier",
-                      "your own earlier comment on the same decision",
-                      "URL of each public comment or issue you posted",
+        for token in ("Public evidence", "Tell a retry from a new recurrence",
+                      "per-occurrence token, not with wording", "generate a random token",
+                      "Never derive it from a request number", "found by trying them all",
+                      "for that exact token only", "Matching on wording alone is not a duplicate check",
+                      "record the comment URL beside the token",
                       "a library issue is not private merely because it is a library issue",
                       "an anonymous row on the tracking epic",
                       "Anonymous evidence says that the decision recurred",
@@ -136,6 +158,7 @@ class Guidance(unittest.TestCase):
                 self.assertIn(token, text)
         self.assertNotIn("the decision ``id``, the enquiry, the ticket, the item ids", text)
         self.assertNotIn("already cite this enquiry", text)
+        self.assertNotIn("your own earlier comment on the same decision", text)
 
     def test_lift_skill_points_at_the_boundary(self):
         text = read("/".join(LIFT))

@@ -116,12 +116,17 @@ Close out (lift)
 2. Find the target issue for each decision. Use ``library_issue`` if it is set. If it is null,
    search the owning library's open and closed issues for an equivalent unit. If there is
    none, the target is the tracking epic. Several decisions can share one target.
-3. Prevent duplicates without a public identifier. Keep, in the private request record, the URL of
-   each public comment or issue you posted for a decision (the engineer's hand-off lists
-   decision ``id`` and URL). Before you post, check that record, then read the target issue and
-   its comments for your own earlier comment on the same decision with the same anonymous
-   wording. If one exists, link it and add nothing. A comment on another decision does not
-   count. Reading a thread for a recurrence count never needs an enquiry number.
+3. Tell a retry from a new recurrence with a per-occurrence token, not with wording. The same
+   decision recurs in another enquiry with the same anonymous wording, and that is a new row, not a
+   duplicate. Before you post, generate a random token (for example 8 hex digits from the system's
+   random source), store it in the private request record with the decision ``id``, and put it
+   in the public comment as ``occurrence <token>``. Never derive it from a request number, an
+   enquiry id or a hash of one: those numbers are sequential, so a hash is found by trying them
+   all. After the post, record the comment URL beside the token (the engineer's hand-off lists
+   decision ``id``, token and URL). On a retry after an uncertain response, read the target
+   issue and its comments for that exact token only. If it is there, link that comment and add
+   nothing. If it is not, post. Matching on wording alone is not a duplicate check. Reading a
+   thread for a recurrence count never needs an enquiry number.
 4. Put one evidence comment per target issue to the human (**Confirm** / **Reword** /
    **Reject**). It lists every remaining decision for that target: the decision ``id`` and the
    confirmed wording, and the reusable evidence in the anonymous form of *Public evidence*. It never
@@ -130,7 +135,7 @@ Close out (lift)
 5. File a new library issue only when all of these are true: ``library_issue`` is null, the
    search in step 2 found nothing, and the human confirms that the decision needs its own
    library unit. Otherwise use the target from step 2. Link the tracking epic from a new
-   issue. After an uncertain response, search before you retry.
+   issue. After an uncertain response, search for the occurrence token of step 3 before you retry.
 6. Propose a list change, as a pull request that edits the canonical list file, when:
 
    * you filed a new issue in step 5: set that entry's ``library_issue`` to it, so the next

@@ -106,7 +106,7 @@ references and ledger ids out of the title and body; file an anonymous reproduct
 the exact pipeline revision, ledger id and confirmations in the private ledger and hand-off.
 Use a structured GitHub tool or `gh issue create --repo <owner> --body-file <file>`.
 After success record the returned URL and `filed` in the private record; after an uncertain
-response, search for the issue by its wording before retrying. Keep confirmed evidence intact across retries.
+response, search for the issue by its private per-occurrence token before retrying. Keep confirmed evidence intact across retries.
 Publish/render the ledger through the shared helper after each successful filing.
 
 For every delivered-by-hand library candidate, propose a review limitation with

@@ -93,5 +93,8 @@ Before filing or commenting
    text or a code comment counts. Do not rely on a match tool to be complete.
 3. Show the draft to the human with the confirmation above. Then file it.
 4. Search the library's open and closed issues for the reusable need by its wording, not by an
-   identifier, before you create anything. After an uncertain response, search the same way
-   and compare your own earlier text before retrying, so a retry does not duplicate.
+   identifier, before you create anything; a match is an existing unit to reuse or link, not
+   proof that this occurrence was already filed. Put a random per-occurrence line in the draft
+   (``occurrence <8 hex digits>``), keep the token in the private record, and never derive it
+   from a request number or a hash of one. After an uncertain response, search for that exact
+   token only before retrying, so a retry does not duplicate and a new recurrence is not lost.
