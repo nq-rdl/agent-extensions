@@ -203,6 +203,18 @@ pin for per-table `WITH (NOLOCK)` hints (ADR 0004), rather than assuming absence
 [references/performance.rst](references/performance.rst) and the request repo's own
 `docs/READ_ISOLATION.md` where it has one.
 
+## Supplied cohorts: never inline, never read
+
+A researcher-supplied cohort (study IDs, URNs) is loaded by the runner into a `#<table>` temp
+table at run time, from `data/00_raw/` (DVC, gitignored). The reviewed SQL declares its shape
+with `-- @supplied:` and joins to the table; it never holds a value.
+Never copy a cohort value into SQL, comments, specs, review records, issues, pull requests or chat,
+and never read the supplied file, even to check its format; describe it by shape only.
+The plugin guard denies the `Read` tool on `data/00_raw/**`, the narrower layer beside a scaffold
+child's own `Read(/data/**)` deny; the rule also binds `Bash`, `Grep` and every other route.
+Read [references/supplied-cohorts.rst](references/supplied-cohorts.rst) for the load sequence,
+the v0.8.0 literal gate and the test route.
+
 ## Timezone and source system
 
 The seed incident involved **BI-Reporting AEST** and **ieMR/emr UTC**. Treat these as

@@ -56,6 +56,11 @@ intake/scope and each output's actual grain with answers. Reuse one `L-grain-ans
 drift record and offer an answers correction in the same change; preserve expected
 finer outputs. Bare Patient is not an agreed grain or a reason to change released SQL.
 
+**Supplied cohort:** review the `-- @supplied:` declaration and the join, never the file. Do not read
+`data/00_raw/`, and never put a cohort value in the review, scope, an assumption, a limitation, an issue or chat;
+a run may only report the rounded counts allowed by guardrails. A literal `VALUES`, `IN` or `=` list of identifiers
+in the SQL is a defect: send it back to be a supplied cohort. Follow `${PLUGIN_ROOT}/skills/guardrails/references/supplied-cohorts.rst`.
+
 ## Before presenting prose (fresh or update)
 
 **Name the constant, never its value** in scope/review prose, drafts, logic descriptions,

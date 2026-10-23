@@ -93,6 +93,10 @@ Recheck affected evidence/artifacts, not every stage. See [references/ledger.rst
     comment that unblocks it. Read [references/comments.rst](references/comments.rst) for the
     queue and comment formats.
 
+A request that comes with a researcher-supplied cohort is routed by shape only: note the supplier, columns and
+approximate size, and that the runner loads it at run time. Never read `data/00_raw/` and never copy a cohort value
+into a ledger entry, comment or chat. See `${CLAUDE_PLUGIN_ROOT}/skills/guardrails/references/supplied-cohorts.rst`.
+
 ## Co-development
 
 Choose one request from the queue with the human, then route each agreed task:
