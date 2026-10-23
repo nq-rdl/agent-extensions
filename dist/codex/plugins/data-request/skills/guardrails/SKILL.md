@@ -116,7 +116,7 @@ Read the request's pin (`framework_ref`, `pyproject.toml`, lock file) before dra
 still pin it (scaffold v0.1.3 defaulted to its `v0.1.1`, which also lacks `register_result`), and GitHub redirects the old path, so an install can still succeed.
 Below `v0.6.0`, `record_assumption` and `record_limitation` are absent; the supplied-cohort loader (`SuppliedCohort`/`load_supplied()`) exists since `v0.7.2`, and `v0.8.0` is the floor because of its identifier-literal gate. Flag a pin on
 that org, or on `nq-rdl/query-builder` below `v0.8.0`, as a **blocker**: report the pin and the missing APIs, and propose a compatible released re-pin before drafting new SQL.
-v0.8.0's harness gate (`rdl_etl_helpers.harness.literals`, run by `check_case_fast()`) fails a literal `VALUES`, `IN` or `=` list of identifiers, so a cohort of identifiers must be a
+v0.8.0's harness gate (`rdl_etl_helpers.harness.literals`, run by `check_case_fast()`) fails literal `VALUES` rows on `PERSONAL`, `SENSITIVE` or `HEALTH` columns and literal `IN`/`=`/`LIKE`/`CASE` comparisons on identifier columns, so a cohort of identifiers must be a
 supplied cohort loaded at run time: see [docs/SUPPLIED_COHORTS.md](https://github.com/nq-rdl/query-builder/blob/v0.8.0/docs/SUPPLIED_COHORTS.md).
 Scaffold v0.5.0 defaulted to query-builder v0.5.0; inspect a fresh render's actual pin rather than assuming that the current scaffold default has changed. Amending or fixing an already-delivered
 enquiry is exempt: it stays on its delivered pin, with no backport. Agents never re-pin or run `copier update` unasked.
