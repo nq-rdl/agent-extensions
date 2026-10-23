@@ -201,41 +201,35 @@ pin for per-table `WITH (NOLOCK)` hints (ADR 0004), rather than assuming absence
 [references/performance.rst](references/performance.rst) and the request repo's own
 `docs/READ_ISOLATION.md` where it has one.
 
+## Supplied cohorts: never inline, never read
+
+The runner loads a researcher-supplied cohort (study IDs, URNs) from `data/00_raw/` into a `#<table>` at run time; reviewed SQL declares its shape with `-- @supplied:` and joins to it.
+Never copy a cohort value into SQL, comments, specs, review records, issues, pull requests or chat, and never read the supplied file, even to check its format; describe it by shape only.
+The plugin guard denies `Read`, and the path argument of `Grep` and `Glob`, on `data/00_raw/**` (not its `.dvc` pointers or `.gitignore`), the narrower layer beside a scaffold child's own `Read(/data/**)` deny; the rule also binds `Bash` and every other route.
+Read [references/supplied-cohorts.rst](references/supplied-cohorts.rst) for the load sequence, the v0.8.0 literal gate and the test route.
+
 ## Timezone and source system
 
-The seed incident involved **BI-Reporting AEST** and **ieMR/emr UTC**. Treat these as
-source-level clues to verify, not a per-field truth table. Confirm each participating
-field and anchor via its DDL comments and column spec before comparing timestamps.
-Reconcile into the filtered column's timezone by transforming the anchor; avoid
-double conversion when a view or resolver already normalises it. Record the verified
-source and conversion in the task output, rather than copying field facts into this skill.
+The seed incident involved **BI-Reporting AEST** and **ieMR/emr UTC**. Treat these as source-level clues to verify, not a per-field truth table. Confirm each participating
+field and anchor via its DDL comments and column spec before comparing timestamps. Reconcile into the filtered column's timezone by transforming the anchor; avoid double
+conversion when a view or resolver already normalises it. Record the verified source and conversion in the task output, rather than copying field facts into this skill.
 
 ## Join and index patterns
 
-For any spec/resolver that requires a join, make the requirement and its rationale
-discoverable in the resolver's docstring/tests, column-spec metadata and dataops
-DDL/index comments. Inspect those sources for the actual tables and pinned resolver;
-cite which locations and revisions you checked, what each establishes, and any
-missing evidence. When changing a resolver, document and test its join requirement
-and flag missing or stale metadata/comments for the owning repository.
+For any spec/resolver that requires a join, make the requirement and its rationale discoverable in the resolver's docstring/tests, column-spec metadata and dataops DDL/index
+comments. Inspect those sources for the actual tables and pinned resolver; cite which locations and revisions you checked, what each establishes, and any missing evidence.
+When changing a resolver, document and test its join requirement and flag missing or stale metadata/comments for the owning repository.
 
-For person-level clinical-event selection, start with the known RDL pattern
-**`CLINICAL_EVENT → ENCOUNTER → person`**: the seed environment has no person-leading
-index on `CLINICAL_EVENT`. Confirm current key order, encounter/person keys and
-cardinality in DDL/index definitions before choosing the exact join. Do not infer
-that a person identifier's presence makes direct person filtering efficient.
+For person-level clinical-event selection, start with the known RDL pattern **`CLINICAL_EVENT → ENCOUNTER → person`**: the seed environment has no person-leading index on
+`CLINICAL_EVENT`. Confirm current key order, encounter/person keys and cardinality in DDL/index definitions before choosing the exact join. Do not infer that a person
+identifier's presence makes direct person filtering efficient.
 
-Every source needs its own grain check; the pattern above does not transfer. ieMR
-`SCH_APPT` holds one row per role per appointment, and a flat table such as
-BI-Reporting `OPD_Appointments` has no encounter join at all. For HBCIS–ieMR joins
-(the `mart_iemr_hbcis_mapping_*` views and their uniqueness guard) and the
-`CLINICAL_EVENT` `VALID_UNTIL_DT_TM` currency caveat, read
-[references/sources.rst](references/sources.rst).
+Every source needs its own grain check; the pattern above does not transfer. ieMR `SCH_APPT` holds one row per role per appointment, and a flat table such as BI-Reporting
+`OPD_Appointments` has no encounter join at all. For HBCIS–ieMR joins (the `mart_iemr_hbcis_mapping_*` views and their uniqueness guard) and the `CLINICAL_EVENT`
+`VALID_UNTIL_DT_TM` currency caveat, read [references/sources.rst](references/sources.rst).
 
-Check whether multiple encounters/events multiply the intended output grain. Choose
-joins or existence checks from the requested population and verified relationships;
-do not conceal an incorrect join with `DISTINCT`. If current indexes justify a
-different path, explain the evidence rather than treating the seed as timeless.
+Check whether multiple encounters/events multiply the intended output grain. Choose joins or existence checks from the requested population and verified relationships; do not
+conceal an incorrect join with `DISTINCT`. If current indexes justify a different path, explain the evidence rather than treating the seed as timeless.
 
 ## Leave modelling choices to the researcher
 
@@ -275,8 +269,7 @@ treat source limitations as permission to choose a model or promise unavailable 
 
 ## Review hand SQL
 
-Check hand SQL, and any hand-edited generated SQL, against the defect checklist in
-[references/checklist.rst](references/checklist.rst). Each of its seven patterns has a
+Check hand SQL, and any hand-edited generated SQL, against the defect checklist in [references/checklist.rst](references/checklist.rst). Each of its seven patterns has a
 symptom and a fix. Report each finding with its SQL location.
 
 ## Release conventions

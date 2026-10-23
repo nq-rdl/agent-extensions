@@ -1,6 +1,8 @@
 #!/usr/bin/env bash
-# PreToolUse guard (data-request plugin), matcher Write|Edit. Fires only for paths under a
-# .sqlreview/ directory; everything else passes silently. Decisions via permissionDecision JSON:
+# PreToolUse guard (data-request plugin), matchers Write|Edit and Read|Grep|Glob. Those three are denied for paths
+# under data/00_raw/ (researcher-supplied cohort files; *.dvc and .gitignore pass) and pass everywhere else. Write|Edit fire
+# only for paths under a .sqlreview/ directory; everything else passes silently. Decisions via
+# permissionDecision JSON:
 #   reviews/*/review.json, scope.json   Write → content run through `sqlreview.sh check`:
 #                                        every assumption/limitation must carry a complete
 #                                        confirmation record for the current revision, else deny
@@ -51,10 +53,45 @@ decide() { # <allow|deny|ask> <reason>
 }
 
 tool="$(field .tool_name)"
-case "$tool" in Write|Edit) ;; *) exit 0 ;; esac
-path="$(field .tool_input.file_path)"; [ -n "$path" ] || exit 0
+case "$tool" in
+  Write|Edit|Read) path="$(field .tool_input.file_path)" ;;
+  Grep|Glob) path="$(field .tool_input.path)" ;;  # the search root; no path means the cwd, which this guard leaves alone
+  *) exit 0 ;;
+esac
+[ -n "$path" ] || exit 0
 cwd="$(field .cwd)"; [ -n "$cwd" ] || cwd="$(pwd -P)"
 case "$path" in /*) abs="$path" ;; *) abs="$cwd/$path" ;; esac
+normalize_path() {
+  awk -F/ '{ n=0; for (i=1;i<=NF;i++) { if ($i==""||$i==".") continue; if ($i=="..") { if (n>0) n--; continue }; p[++n]=$i }; o=""; for (i=1;i<=n;i++) o=o "/" p[i]; print (o==""?"/":o) }'
+}
+case "$tool" in Read|Grep|Glob)
+  # Researcher-supplied cohort files live under data/00_raw/ (DVC, gitignored) and hold
+  # identifiers. The runner loads them at run time; an agent never reads one. Resolve the
+  # path physically (existing parent via cd -P, so a ".." after a symlinked directory is
+  # followed on disk; then the final component's symlink chain) and also check the lexical
+  # path. A loop or a chain over 20 hops is denied, never allowed. Covers the Read tool and the path argument of Grep and Glob; Bash is the scaffold child's hook.
+  raw_lexical="$(printf '%s\n' "$abs" | normalize_path)"
+  raw_physical="$abs"; hops=0
+  while :; do
+    parent="$(dirname "$raw_physical")"; suffix="$(basename "$raw_physical")"
+    while [ ! -d "$parent" ] && [ "$parent" != / ]; do suffix="$(basename "$parent")/$suffix"; parent="$(dirname "$parent")"; done
+    if physical_parent="$(cd -P -- "$parent" 2>/dev/null && pwd -P)"; then raw_physical="$physical_parent/$suffix"; else break; fi
+    raw_physical="$(printf '%s\n' "$raw_physical" | normalize_path)"
+    [ -L "$raw_physical" ] || break
+    hops=$((hops + 1))
+    [ "$hops" -le 20 ] || decide deny "Read guard could not resolve a symlink chain (loop or over 20 links), so it cannot rule out data/00_raw/. Read the non-symlink path."
+    target="$(readlink "$raw_physical" 2>/dev/null)" || break
+    case "$target" in /*) raw_physical="$target" ;; *) raw_physical="$(dirname "$raw_physical")/$target" ;; esac
+  done
+  for candidate in "$raw_lexical" "$raw_physical"; do
+    case "$candidate" in
+      */data/00_raw/*.dvc|*/data/00_raw/.gitignore) ;;  # DVC pointers and ignore rules hold hashes and rules, not values
+      */data/00_raw|*/data/00_raw/*)
+        decide deny "Reading or searching data/00_raw/ is denied: a researcher-supplied cohort file holds identifiers, and the runner loads it into a temp table at run time. Never read or search it, copy a value from it, or print one. For its shape read conf/base/supplied/<name>.template.csv (header only); for a load problem use the reason codes, row numbers and column names the runner reports (no value appears in them)." ;;
+    esac
+  done
+  exit 0 ;;
+esac
 # Resolve existing parents before lexical cleanup: aliases can lead into .sqlreview,
 # and symlink/.. must follow filesystem semantics. Keep absent suffixes for new files.
 lexical_abs="$abs"
@@ -67,9 +104,6 @@ done
 physical_parent="$(cd -P -- "$parent" 2>/dev/null && pwd -P)" ||
   decide deny "SQL Review guard cannot resolve the destination's existing parent directory."
 abs="$physical_parent/$suffix"
-normalize_path() {
-  awk -F/ '{ n=0; for (i=1;i<=NF;i++) { if ($i==""||$i==".") continue; if ($i=="..") { if (n>0) n--; continue }; p[++n]=$i }; o=""; for (i=1;i<=n;i++) o=o "/" p[i]; print (o==""?"/":o) }'
-}
 # Collapse absent suffixes. Physical protection wins; retain lexical protection
 # too when .sqlreview itself points outside the child.
 abs="$(printf '%s\n' "$abs" | normalize_path)"

@@ -59,6 +59,10 @@ Deliver only the narrowest supported request; offer extras in hand-off, do not b
 **Co-develop:** present alternatives and effects to the owning engineer or analyst, obtain the
 decision, then proceed and flag. Infer mode if absent. Neither mode manufactures confirmation fields.
 
+When the cohort is researcher-supplied, declare its shape with query-builder's `SuppliedCohort` and join to its
+`#` table; the runner loads the file at run time. Never write a cohort value into SQL, comments, specs or
+tests (use `example_rows(n)`), and never read the file under `data/00_raw/`. Follow `${CLAUDE_PLUGIN_ROOT}/skills/guardrails/references/supplied-cohorts.rst`.
+
 Before proposing probes or carrying their evidence into headers, rationale or limitations,
 follow **Probe disclosure control** in
 `${CLAUDE_PLUGIN_ROOT}/skills/guardrails/references/release.rst`.
