@@ -99,9 +99,13 @@ and regression expectations grounded in inspected sources. The owning repo is
 `nq-rdl/query-builder`, for shared composition/spec infrastructure and for
 source-specific resolvers (`resolvers/iemr`, `resolvers/hbcis`). Invoking this skill
 includes filing confirmed library candidates. Do not file on the enquiry repo.
+Library issues and comments are public text: follow **Public by default** in the evidence
+block. Leave the enquiry and approval numbers, request-repository links, request file
+references and ledger ids out of the title and body; file an anonymous reproduction and keep
+the exact pipeline revision, ledger id and confirmations in the private ledger and hand-off.
 Use a structured GitHub tool or `gh issue create --repo <owner> --body-file <file>`.
-After success record the returned URL and `filed`; after an uncertain response,
-search for the issue before retrying. Keep confirmed evidence intact across retries.
+After success record the returned URL and `filed` in the private record; after an uncertain
+response, search for the issue by its wording before retrying. Keep confirmed evidence intact across retries.
 Publish/render the ledger through the shared helper after each successful filing.
 
 For every delivered-by-hand library candidate, propose a review limitation with
@@ -178,7 +182,8 @@ Scope and review items marked `upstream` repeat a listed decision (#362); they a
 List them by decision with `bash "${PLUGIN_ROOT}/skills/setup/scripts/recurring-decisions.sh" marked`
 on the slug's `scope.json` and `review.json`. For each target issue, link it or add one evidence
 comment, or file a new issue, without duplicates and only after the human confirms. Follow
-`${PLUGIN_ROOT}/skills/setup/references/recurring-decisions.rst`, including the list change it proposes.
+`${PLUGIN_ROOT}/skills/setup/references/recurring-decisions.rst`, including the list change it proposes
+and its rule that a public comment carries no enquiry identifier.
 
 ## Report
 
