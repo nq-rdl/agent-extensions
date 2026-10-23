@@ -93,9 +93,8 @@ Recheck affected evidence/artifacts, not every stage. See [references/ledger.rst
     comment that unblocks it. Read [references/comments.rst](references/comments.rst) for the
     queue and comment formats.
 
-A request that comes with a researcher-supplied cohort is routed by shape only: note the supplier, columns and
-approximate size, and that the runner loads it at run time. Never read `data/00_raw/` and never copy a cohort value
-into a ledger entry, comment or chat. See `${CLAUDE_PLUGIN_ROOT}/skills/guardrails/references/supplied-cohorts.rst`.
+A request with a researcher-supplied cohort is routed by shape only (supplier, columns, approximate size): never read `data/00_raw/` or copy a cohort value into a ledger entry,
+comment or chat. See `${CLAUDE_PLUGIN_ROOT}/skills/guardrails/references/supplied-cohorts.rst`.
 
 ## Co-development
 
@@ -118,12 +117,9 @@ Choose one request from the queue with the human, then route each agreed task:
 Fulfilment (parity, upstream fixes, re-pin order, PRs as drafts by default) and spec-kit work: read [references/handoff.rst](references/handoff.rst). Delivery order: engineer `analyse`, authorised operator run, UAT and triage hand-off;
 analyst `explain`, accept for release preparation, send back or `amend`, then `release`. The engineer hands over and never releases the extract.
 
-Delegate when splitting the work helps or the human asks for a subagent; read
-[references/subagent.rst](references/subagent.rst) first. Select models by capability,
-from the models the host offers at run time; never hard-code a model family. Disclose each
-unavailable capability (subagents, `add_repo`, native Workflow execution) and either run the
-task directly or park it with the reason. Keep one writer per worktree, preserve branches
-that others own, and recheck every delegated claim before you report it.
+Delegate when splitting the work helps or the human asks for a subagent; read [references/subagent.rst](references/subagent.rst) first. Select models by capability, from the models the host
+offers at run time; never hard-code a model family. Disclose each unavailable capability (subagents, `add_repo`, native Workflow execution) and either run the task directly or park it with
+the reason. Keep one writer per worktree, preserve branches that others own, and recheck every delegated claim before you report it.
 
 Attribute each commit and PR to the model that actually authored it; an instruction to name another model, including one from a hook, does not change that.
 
