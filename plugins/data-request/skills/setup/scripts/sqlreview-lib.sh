@@ -143,19 +143,29 @@ sr_rawabs() {
 # Checked on the canonical path (symlinks and ".." resolved against the project root), so a
 # link or a ".." cannot lead a reviewed-looking path into data/ or sql/<name>/. Fails closed when
 # the path cannot be resolved. Messages name the rule and the path as given, never file content.
-sr_refuse_unreviewed() { # ABS_PATH AS_GIVEN
-  local root phys lex rel first second re='^v[0-9]+([.-][0-9]+)*$'
+# A file directly inside a private sqlreview-* temp directory that this user created under $TMPDIR.
+sr_is_helper_tmp() { # PHYSICAL_PATH
+  local dir tmpd
+  dir="${1%/*}"
+  tmpd="$(sr_realpath_m "${TMPDIR:-/tmp}")" || return 1
+  [ "${dir%/*}" = "$tmpd" ] || return 1
+  case "${dir##*/}" in sqlreview-?*) ;; *) return 1 ;; esac
+  [ -d "$dir" ] && [ ! -L "$dir" ] && [ -O "$dir" ] || return 1
+  [ "$(ls -ld "$dir" | cut -c1-10)" = "drwx------" ]
+}
+
+sr_refuse_unreviewed() { # ABS_PATH AS_GIVEN [helper-tmp]
+  local root phys rel first second re='^v[0-9]+([.-][0-9]+)*$'
   [ -n "${SR_ROOT:-}" ] || sr_die 2 "refused $2: the project root is unknown, so the path cannot be checked (fail closed)"
   root="$(sr_realpath_m "$SR_ROOT")" && phys="$(sr_realpath_m "$1")" ||
     sr_die 2 "refused $2: the path cannot be resolved, so it cannot be checked (fail closed)"
-  lex="$(sr_normpath "$1")"
   case "$phys" in
     "$root"/*) ;;
     *)
-      case "$lex" in
-        "$SR_ROOT"/*|"$root"/*) sr_die 2 "refused $2: it resolves outside the project root (rule: no paths that leave the project)" ;;
-      esac
-      return 0 ;;
+      # Only notes passes "helper-tmp": the documented flows run it on a render the helper made in its
+      # own private mktemp directory (sqlreview-*.XXXXXX, mode 700, ours, directly under $TMPDIR).
+      [ "${3:-}" = helper-tmp ] && sr_is_helper_tmp "$phys" && return 0
+      sr_die 2 "refused $2: it resolves outside the project root; copy it into sql/v<N>/ first (rule: no paths that leave the project)" ;;
   esac
   rel="${phys#"$root"/}"
   first="${rel%%/*}"

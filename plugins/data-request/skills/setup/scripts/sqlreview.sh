@@ -65,7 +65,7 @@
 #
 # SQL paths (slug, fingerprint, snapshot, move's new path, notes, and the sql_path of drafts and records) and the
 # intake sidecar are refused when their canonical path is under data/ or under sql/ outside a reviewed
-# sql/v<N>/ directory (v[0-9]+([.-][0-9]+)*), or cannot be resolved: exit 2, naming the rule (#516).
+# sql/v<N>/ directory (v[0-9]+([.-][0-9]+)*), or outside the project root, or cannot be resolved: exit 2, naming the rule (#516).
 # Exit codes: 0 ok · 1 usage · 2 error · 3 not initialised · 4 invalid document or notes header · 5 slug conflict ·
 # 6 no baseline · 10 differences found (init --diff / delta).
 set -u
@@ -1160,7 +1160,7 @@ cmd_notes() {
   sr_need_jq
   # notes reads the file as given (no relpath step), so apply the reviewed-tree rule here (#516).
   SR_ROOT="${SR_ROOT:-$(sr_init_root)}"
-  sr_refuse_unreviewed "$(sr_rawabs "$sql")" "$sql" || exit 2
+  sr_refuse_unreviewed "$(sr_rawabs "$sql")" "$sql" helper-tmp || exit 2
   [ -f "$sql" ] && [ -r "$sql" ] || sr_die 2 "no such readable file: $sql"
   if [ -n "$against" ]; then
     [ -f "$against" ] && [ -r "$against" ] || sr_die 2 "no such readable file: $against"

@@ -166,7 +166,10 @@ SQL paths are supplied explicitly to bootstrap/analyse. Only reviewed request SQ
 `sql_path` of any draft or record refuse every path under `data/` and every path under `sql/` outside such a directory
 (pipeline SQL in `sql/<name>/` can hold researcher-supplied cohort values). The path is resolved
 first (`..` and symlinks, from the project root), so a link from `sql/v1/` into `data/` is
-refused. A path that cannot be resolved is refused too. The command exits 2, naming the rule and
+refused. A path that cannot be resolved, or that resolves outside the project root, is refused too; copy a file
+from outside the project root into `sql/v<N>/` first. Only `notes` also accepts the helper's own
+private `sqlreview-*` temp render (mode 700, directly under `$TMPDIR`) that the analyse, bootstrap and
+explain recipes pass it. The command exits 2, naming the rule and
 the path, never file content; nothing is written. Do not work around it: review a version-directory
 copy that holds no values. `move OLD NEW` still accepts a refused OLD path (it is only the record's key,
 never read), so an existing record can be moved into a reviewed directory. To customise report sections, edit the

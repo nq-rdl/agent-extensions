@@ -246,7 +246,8 @@ class Sources(unittest.TestCase):
                             location={"lines": [8, 8]}, status="candidate", confirmed_by=None,
                             confirmed_at=None, confirmed_revision=None)], limitations=[])
         draft = self.p.write_json("sql__v1__request", "review.draft.json", doc)
-        with tempfile.TemporaryDirectory() as tmp:
+        # Mirrors the documented flow: a render in the helper's private sqlreview-* temp directory.
+        with tempfile.TemporaryDirectory(prefix="sqlreview-notes.") as tmp:
             output = Path(tmp) / "notes.sql"
             output.write_text(SQL)
             r = run(["notes", str(output), "--against", str(draft), "--confirmed-by", "engineer-login"], self.p.root)

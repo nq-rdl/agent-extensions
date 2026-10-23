@@ -111,6 +111,31 @@ class PathGuard(unittest.TestCase):
         self.assertEqual(r.stdout.strip().split("\t"), ["moved", slug, "sql__v2.1__q", "sql/v2.1/q.sql"])
         self.assertNotIn(MARKER, r.stdout + r.stderr)
 
+    def test_paths_outside_the_project_root_refused(self):
+        other = Path(self._tmp.name).parent / (Path(self._tmp.name).name + "-other")
+        (other / "data/00_raw").mkdir(parents=True)
+        (other / "data/00_raw/x.csv").write_text(f"id,value\n1,{MARKER}\n")
+        self.addCleanup(lambda: __import__("shutil").rmtree(other, ignore_errors=True))
+        os.symlink(other / "data/00_raw/x.csv", self.root / "sql/v1/out.csv")
+        rule = "outside the project root"
+        rel = f"../{other.name}/data/00_raw/x.csv"
+        self.each_command(rel, rule)
+        self.each_command(str(other / "data/00_raw/x.csv"), rule)
+        self.each_command("sql/v1/out.csv", rule)
+
+    def test_notes_accepts_only_a_private_helper_temp_render(self):
+        with tempfile.TemporaryDirectory(prefix="sqlreview-notes.") as tmp:
+            (Path(tmp) / "current.sql").write_text(SQL_V1)
+            self.assertEqual(run(["notes", str(Path(tmp) / "current.sql")], self.root).returncode, 0)
+            self.assertEqual(run(["slug", str(Path(tmp) / "current.sql")], self.root).returncode, 2)
+        with tempfile.TemporaryDirectory(prefix="other.") as tmp:
+            (Path(tmp) / "current.sql").write_text(SQL_V1)
+            self.assertEqual(run(["notes", str(Path(tmp) / "current.sql")], self.root).returncode, 2)
+        with tempfile.TemporaryDirectory(prefix="sqlreview-notes.") as tmp:
+            os.chmod(tmp, 0o755)
+            (Path(tmp) / "current.sql").write_text(SQL_V1)
+            self.assertEqual(run(["notes", str(Path(tmp) / "current.sql")], self.root).returncode, 2)
+
     def test_unresolvable_path_fails_closed(self):
         self.each_command("sql/v1/loop/q.sql", "cannot be resolved")
 
