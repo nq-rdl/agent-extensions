@@ -75,10 +75,15 @@ sr_require_root() {
   sr_no_symlinks "$SR_REVIEWS" || exit 2
 }
 
-# Path relative to $SR_ROOT (dies when the path is outside the project).
+# Path relative to $SR_ROOT (dies when the path is outside the project). The reviewed-tree rule
+# applies unless the second argument is "nopolicy": move names a record's old path only to find it.
 sr_relpath() {
   local abs
   case "$1" in /*) abs="$(sr_normpath "$1")" ;; *) abs="$(sr_normpath "$SR_ROOT/$1")" ;; esac
+  # Checked on the path as given, not the folded one: "link/.." means different things to the two.
+  if [ "${2:-}" != nopolicy ]; then
+    case "$1" in /*) sr_refuse_unreviewed "$1" "$1" || return 2 ;; *) sr_refuse_unreviewed "$SR_ROOT/$1" "$1" || return 2 ;; esac
+  fi
   sr_no_symlinks "$abs" || return 2
   case "$abs" in
     "$SR_ROOT"/*) printf '%s\n' "${abs#"$SR_ROOT"/}" ;;
@@ -98,9 +103,92 @@ sr_safe_slug() {
   case "$1" in ""|.|..|*[!A-Za-z0-9_%.-]*) sr_die 2 "unsafe slug: $1" ;; esac
   sr_no_symlinks "$SR_REVIEWS/$1" || exit 2
 }
-sr_safe_sql() {
+# Physical form of an absolute path: every symlink resolved, "." and ".." applied after resolution
+# (like realpath -m, which macOS lacks). The path may be missing; its missing tail is kept as
+# written. Returns 1 when it cannot be resolved (loop, unreadable link), so callers fail closed.
+sr_realpath_m() {
+  local rest="$1" cur="" hops=0 part cand target
+  case "$rest" in /*) rest="${rest#/}" ;; *) return 1 ;; esac
+  while [ -n "$rest" ]; do
+    case "$rest" in */*) part="${rest%%/*}"; rest="${rest#*/}" ;; *) part="$rest"; rest="" ;; esac
+    case "$part" in
+      ""|.) continue ;;
+      ..) cur="${cur%/*}"; continue ;;
+    esac
+    cand="$cur/$part"
+    if [ -L "$cand" ]; then
+      hops=$((hops + 1)); [ "$hops" -le 40 ] || return 1
+      target="$(readlink "$cand")" && [ -n "$target" ] || return 1
+      case "$target" in
+        /*) cur=""; rest="${target#/}${rest:+/$rest}" ;;
+        *) rest="$target${rest:+/$rest}" ;;
+      esac
+    else
+      cur="$cand"
+    fi
+  done
+  printf '%s\n' "${cur:-/}"
+}
+
+# Absolute form of a path as the OS will open it: relative to the cwd, "." and ".." left for
+# sr_realpath_m to apply after symlink resolution (sr_abspath would fold ".." lexically first, so
+# sql/v1/link/../x.csv would be checked as sql/v1/x.csv while the kernel opens link's parent).
+sr_rawabs() {
+  case "$1" in /*) printf '%s\n' "$1" ;; *) printf '%s/%s\n' "$(pwd -P)" "$1" ;; esac
+}
+
+# Which files may be read into .sqlreview/ (#516). Researcher-supplied values live under data/ and
+# in pipeline SQL under sql/<name>/, so only a reviewed sql/v<N>/ tree (the scaffold's rule:
+# v[0-9]+([.-][0-9]+)*) may be copied, hashed or parsed into the committed review records.
+# Checked on the canonical path (symlinks and ".." resolved against the project root), so a
+# link or a ".." cannot lead a reviewed-looking path into data/ or sql/<name>/. Fails closed when
+# the path cannot be resolved. Messages name the rule and the path as given, never file content.
+# A file directly inside a private sqlreview-* temp directory that this user created under $TMPDIR.
+sr_is_helper_tmp() { # PHYSICAL_PATH
+  local dir tmpd
+  dir="${1%/*}"
+  tmpd="$(sr_realpath_m "${TMPDIR:-/tmp}")" || return 1
+  [ "${dir%/*}" = "$tmpd" ] || return 1
+  case "${dir##*/}" in sqlreview-?*) ;; *) return 1 ;; esac
+  [ -d "$dir" ] && [ ! -L "$dir" ] && [ -O "$dir" ] || return 1
+  [ "$(ls -ld "$dir" | cut -c1-10)" = "drwx------" ]
+}
+
+sr_refuse_unreviewed() { # ABS_PATH AS_GIVEN [helper-tmp]
+  local root phys rel first second re='^v[0-9]+([.-][0-9]+)*$'
+  [ -n "${SR_ROOT:-}" ] || sr_die 2 "refused $2: the project root is unknown, so the path cannot be checked (fail closed)"
+  root="$(sr_realpath_m "$SR_ROOT")" && phys="$(sr_realpath_m "$1")" ||
+    sr_die 2 "refused $2: the path cannot be resolved, so it cannot be checked (fail closed)"
+  case "$phys" in
+    "$root"/*) ;;
+    *)
+      # Only notes passes "helper-tmp": the documented flows run it on a render the helper made in its
+      # own private mktemp directory (sqlreview-*.XXXXXX, mode 700, ours, directly under $TMPDIR).
+      [ "${3:-}" = helper-tmp ] && sr_is_helper_tmp "$phys" && return 0
+      sr_die 2 "refused $2: it resolves outside the project root; copy it into sql/v<N>/ first (rule: no paths that leave the project)" ;;
+  esac
+  rel="${phys#"$root"/}"
+  first="${rel%%/*}"
+  case "$rel" in */*) second="${rel#*/}"; second="${second%%/*}" ;; *) second="" ;; esac
+  first="$(printf '%s' "$first" | tr '[:upper:]' '[:lower:]')"
+  case "$first" in
+    data)
+      sr_die 2 "refused $2: data/ holds researcher-supplied values and is never read into $SR_DIR/ (rule: no data/ paths)" ;;
+    sql)
+      [[ "$second" =~ $re ]] ||
+        sr_die 2 "refused $2: only a reviewed version directory sql/v<N>/ may be read into $SR_DIR/; pipeline SQL under sql/<name>/ may hold cohort values (rule: sql/ paths must be inside sql/v[0-9]+([.-][0-9]+)*/)" ;;
+  esac
+}
+
+# Structural checks on a stored or derived project-relative path (no policy; see sr_safe_sql).
+sr_safe_path() {
   case "$1" in ""|/*|*/../*|../*|*/..|..|./*|*/./*|*/.|*//*|*/) sr_die 2 "unsafe sql_path: $1" ;; esac
   sr_no_symlinks "$SR_ROOT/$1" || exit 2
+}
+# A SQL path about to be read into .sqlreview/: the reviewed-tree rule first, then the structural checks.
+sr_safe_sql() {
+  case "$1" in /*) sr_refuse_unreviewed "$1" "$1" ;; *) sr_refuse_unreviewed "$SR_ROOT/$1" "$1" ;; esac || exit 2
+  sr_safe_path "$1"
 }
 # Both encodings of a path, readable then legacy, one per line. The definitions live in
 # sqlreview-slug.jq, shared with check's slug/sql_path binding rule (#353).
@@ -255,7 +343,7 @@ sr_state() ( # <slug> -> state, sql_path, revision
     bash "$SR_SCRIPT_DIR/sqlreview.sh" questions "$1" >/dev/null 2>&1 || { printf 'invalid\t\t\n'; return 0; }
   fi
   sql="$(jq -r '.sql_path // ""' "$doc")"
-  sr_safe_sql "$sql"
+  sr_safe_path "$sql"
   rev="$(jq -r '.revision // ""' "$doc")"
   if [ "$kind" = lifts ]; then state=lifts
   elif [ -f "$d/rebind-required" ]; then state=stale

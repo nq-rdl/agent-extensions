@@ -111,7 +111,7 @@ class CommittedHandoffEvidence(unittest.TestCase):
             root = Path(tmp)
             project = Project(root)
             (root / "sql").mkdir()
-            (root / ".gitignore").write_text("sql/request.sql\n")
+            (root / ".gitignore").write_text("sql/v1/request.sql\n")
             (root / "payload").write_text("SELECT 1;\n")
             (root / "render.sh").write_text(ADAPTER)
             config = root / ".sqlreview/config.json"
@@ -119,17 +119,17 @@ class CommittedHandoffEvidence(unittest.TestCase):
             doc["sql_render"] = {"command": ["bash", "render.sh"]}
             config.write_text(json.dumps(doc))
             (root / "sql/provenance.json").write_text(json.dumps({"schema": 1, "requests": {
-                "sql/request.sql": {"source": "builder"}}}))
+                "sql/v1/request.sql": {"source": "builder"}}}))
             project.commit()
-            fp = json.loads(helper_run(["fingerprint", "sql/request.sql"], root).stdout)
-            draft = project.write_json("sql__request", "review.draft.json", review_doc(
-                "sql__request", **fp, logic=[], open_questions=[]))
-            result = helper_run(["publish", "sql__request", "review", str(draft)], root)
+            fp = json.loads(helper_run(["fingerprint", "sql/v1/request.sql"], root).stdout)
+            draft = project.write_json("sql__v1__request", "review.draft.json", review_doc(
+                "sql__v1__request", **fp, logic=[], open_questions=[]))
+            result = helper_run(["publish", "sql__v1__request", "review", str(draft)], root)
             self.assertEqual(result.returncode, 0, result.stderr)
             draft.unlink()
             checked = project.commit("checked review")
             env = {k: v for k, v in os.environ.items() if not k.startswith("GIT_")}
-            env.update(SLUG="sql__request", PR_HEAD=checked, RUN_COMMIT=checked,
+            env.update(SLUG="sql__v1__request", PR_HEAD=checked, RUN_COMMIT=checked,
                        S=str(REPO / "skills/data-request-setup/scripts"))
             review = draft.with_name("review.json")
             original = review.read_bytes()
@@ -154,7 +154,7 @@ class CommittedHandoffEvidence(unittest.TestCase):
             other.write_bytes(original)
             execute(4)  # The checked commit must contain the actual reviewed record.
             other.unlink()
-            env["SLUG"] = "sql__request"
+            env["SLUG"] = "sql__v1__request"
             corrupt = json.loads(original)
             corrupt["sql_sha256"] = "0" * 64
             review.write_text(json.dumps(corrupt))

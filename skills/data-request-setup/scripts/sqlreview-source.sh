@@ -17,7 +17,7 @@ sr_source_context() {
     "$SR_SOURCE_TOP"/*) SR_SOURCE_PREFIX="${SR_ROOT#"$SR_SOURCE_TOP"/}" ;;
     *) sr_source_error "unsafe project-root prefix"; return 2 ;;
   esac
-  [ -z "$SR_SOURCE_PREFIX" ] || sr_safe_sql "$SR_SOURCE_PREFIX"
+  [ -z "$SR_SOURCE_PREFIX" ] || sr_safe_path "$SR_SOURCE_PREFIX"
   local grafts
   grafts="$(git -C "$SR_SOURCE_TOP" rev-parse --git-path info/grafts)" || return 2
   case "$grafts" in /*) ;; *) grafts="$SR_SOURCE_TOP/$grafts" ;; esac

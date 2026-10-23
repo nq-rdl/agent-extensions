@@ -10,8 +10,8 @@
 #                                              move that migrates a legacy-encoded slug); exit 3 when not initialised
 #                                              missing bundled templates: JSON missing_templates, else one stderr line
 #   slug PATH                                  slug for a project path; exit 5 on a conflicting binding. Readable:
-#                                              sql/cohort_pipeline/x.sql -> sql__cohort_pipeline__x; an existing
-#                                              legacy-encoded reviews/sql__cohort%5Fpipeline__x/ is kept
+#                                              sql/v1/cohort_pipeline/x.sql -> sql__v1__cohort_pipeline__x; an existing
+#                                              legacy-encoded reviews/sql__v1__cohort%5Fpipeline__x/ is kept
 #   check FILE | check --stdin                 validate a review/scope JSON; exit 4 with one violation per line
 #   ledger [--session] get TICKET [--against REVISIONS]  load one triage entry; optional selective recheck
 #   ledger [--session] set TICKET ENTRY         validate, lock and atomically save .sqlreview/ledger.json
@@ -63,6 +63,9 @@
 #   render SLUG scope|review|lifts                   JSON + templates/<kind>.md -> reviews/SLUG/<kind>.md
 #                                              (a missing templates/<kind>.md is first installed from the bundled default)
 #
+# SQL paths (slug, fingerprint, snapshot, move's new path, notes, and the sql_path of drafts and records) and the
+# intake sidecar are refused when their canonical path is under data/ or under sql/ outside a reviewed
+# sql/v<N>/ directory (v[0-9]+([.-][0-9]+)*), or outside the project root, or cannot be resolved: exit 2, naming the rule (#516).
 # Exit codes: 0 ok · 1 usage · 2 error · 3 not initialised · 4 invalid document or notes header · 5 slug conflict ·
 # 6 no baseline · 10 differences found (init --diff / delta).
 set -u
@@ -814,6 +817,9 @@ cmd_intake() {
   [ $# -eq 2 ] || [ $# -eq 3 ] || usage
   sr_need_jq
   case "$2" in ''|*[!0-9]*|0) sr_die 1 "revision must be an integer >= 1" ;; esac
+  # The sidecar's content is copied into review drafts, so it follows the reviewed-tree rule too (#516).
+  SR_ROOT="${SR_ROOT:-$(sr_init_root)}"
+  sr_refuse_unreviewed "$(sr_rawabs "$1")" "$1" || exit 2
   if [ ! -e "$1" ]; then
     if [ $# -eq 3 ]; then cat "$3"; return $?; fi
     printf '%s\n' '{"present":false,"assumptions":[],"analyst_questions":[]}'
@@ -1152,6 +1158,9 @@ cmd_notes() {
   done
   [ -n "$sql" ] || usage
   sr_need_jq
+  # notes reads the file as given (no relpath step), so apply the reviewed-tree rule here (#516).
+  SR_ROOT="${SR_ROOT:-$(sr_init_root)}"
+  sr_refuse_unreviewed "$(sr_rawabs "$sql")" "$sql" helper-tmp || exit 2
   [ -f "$sql" ] && [ -r "$sql" ] || sr_die 2 "no such readable file: $sql"
   if [ -n "$against" ]; then
     [ -f "$against" ] && [ -r "$against" ] || sr_die 2 "no such readable file: $against"
@@ -1332,8 +1341,10 @@ cmd_move() {
     newrel="$(sr_relpath "$3")" || exit $?
   else
     [ $# -eq 2 ] || usage
-    oldrel="$(sr_relpath "$1")" || exit $?; newrel="$(sr_relpath "$2")" || exit $?
-    sr_safe_sql "$oldrel"
+    # The old path is only the key of an existing record, never read, so a record bound to a
+    # path the guard now refuses can still be moved into a reviewed sql/v<N>/ directory (#516).
+    oldrel="$(sr_relpath "$1" nopolicy)" || exit $?; newrel="$(sr_relpath "$2")" || exit $?
+    sr_safe_path "$oldrel"
     oldslug="$(sr_slug "$oldrel")"
   fi
   sr_safe_sql "$newrel"

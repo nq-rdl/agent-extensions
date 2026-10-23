@@ -67,12 +67,12 @@ class SourceWorkflows(unittest.TestCase):
         reference = (REPO / "skills/data-request-analyse/references/source-notes.rst").read_text()
         block = re.search(r"\.\. code-block:: bash\n\n((?:    .*\n|\n)+)", reference)
         self.assertIsNotNone(block)
-        recipe = textwrap.dedent(block.group(1)).replace("<sql path>", "sql/request.sql")
+        recipe = textwrap.dedent(block.group(1)).replace("<sql path>", "sql/v1/request.sql")
         with tempfile.TemporaryDirectory() as tmp:
             project = Project(tmp)
             root = project.root
             (root / "sql").mkdir()
-            (root / ".gitignore").write_text("sql/request.sql\n")
+            (root / ".gitignore").write_text("sql/v1/request.sql\n")
             (root / "payload").write_text(HEADER + BODY)
             (root / "render.sh").write_text(ADAPTER)
             config = root / ".sqlreview/config.json"
@@ -80,14 +80,14 @@ class SourceWorkflows(unittest.TestCase):
             settings["sql_render"] = {"command": ["bash", "render.sh"]}
             config.write_text(json.dumps(settings))
             (root / "sql/provenance.json").write_text(json.dumps({"schema": 1, "requests": {
-                "sql/request.sql": {"source": "builder"}}}))
+                "sql/v1/request.sql": {"source": "builder"}}}))
             project.commit()
-            fp = json.loads(run(["fingerprint", "sql/request.sql"], root).stdout)
-            draft = project.write_json("sql__request", "review.draft.json", review_doc(
-                "sql__request", **fp, logic=[], open_questions=[]))
-            published = run(["publish", "sql__request", "review", str(draft)], root)
+            fp = json.loads(run(["fingerprint", "sql/v1/request.sql"], root).stdout)
+            draft = project.write_json("sql__v1__request", "review.draft.json", review_doc(
+                "sql__v1__request", **fp, logic=[], open_questions=[]))
+            published = run(["publish", "sql__v1__request", "review", str(draft)], root)
             self.assertEqual(published.returncode, 0, published.stderr)
-            env = dict(os.environ, S=str(REPO / "skills/data-request-setup/scripts"), SLUG="sql__request")
+            env = dict(os.environ, S=str(REPO / "skills/data-request-setup/scripts"), SLUG="sql__v1__request")
             before = set(Path("/tmp").glob("sqlreview-notes.*"))
 
             def execute(expected):
@@ -95,7 +95,7 @@ class SourceWorkflows(unittest.TestCase):
                                         capture_output=True, text=True, timeout=60)
                 self.assertEqual(result.returncode, expected, result.stdout + result.stderr)
                 self.assertEqual(set(Path("/tmp").glob("sqlreview-notes.*")), before)
-                self.assertFalse((root / "sql/request.sql").exists())
+                self.assertFalse((root / "sql/v1/request.sql").exists())
                 self.assertEqual(list((root / ".sqlreview").rglob("*.sql")), [])
                 return result
 
