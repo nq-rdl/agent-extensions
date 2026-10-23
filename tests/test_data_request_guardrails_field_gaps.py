@@ -114,12 +114,14 @@ class Baseline(unittest.TestCase):
                     self.assertNotIn("query-builder-plugins", text)
                 self.assertNotIn("qb_plugins", text)
 
-    def test_compatibility_names_the_v060_api_floor(self):
-        compat = frontmatter(SKILL)["compatibility"]
-        for token in ("query-builder 0.6.0", "record_assumption", "record_limitation"):
+    def test_compatibility_names_the_v080_floor(self):
+        compat = " ".join(frontmatter(SKILL)["compatibility"].split())
+        for token in ("query-builder 0.8.0 is the floor", "supplied cohorts", "identifier-literal gate",
+                      "record_assumption", "record_limitation", "need 0.6.0 or later"):
             with self.subTest(token=token):
                 self.assertIn(token, compat)
         self.assertNotIn("0.4.0", compat)
+        self.assertNotIn("need query-builder 0.6.0 or later", compat)
 
     def test_compose_section_states_baseline_and_compliant_pypika(self):
         text = section(body(SKILL), "Compose library units in requests")
@@ -157,6 +159,24 @@ class LegacyOrg(unittest.TestCase):
         # register_result exists at v0.4.1 and v0.5.0; only the analysis-notes API is new in v0.6.0.
         self.assertRegex(self.text, r"Below `v0\.6\.0`, `record_assumption` and `record_limitation` are absent")
         self.assertRegex(self.text, r"`v0\.1\.1`[^.]*lacks `register_result`")
+
+    def test_pin_below_v080_is_a_blocker_and_points_at_supplied_cohorts(self):
+        text = " ".join(self.text.split())
+        self.assertIn("on `nq-rdl/query-builder` below `v0.8.0`, as a **blocker**", text)
+        self.assertNotIn("below `v0.6.0`, as a **blocker**", text)
+        for token in ("`SuppliedCohort`/`load_supplied()`", "identifier-literal gate", "check_case_fast()",
+                      "docs/SUPPLIED_COHORTS.md", "blob/v0.8.0/docs/SUPPLIED_COHORTS.md"):
+            with self.subTest(token=token):
+                self.assertIn(token, text)
+
+    def test_pin_below_v080_is_a_blocker_and_points_at_supplied_cohorts(self):
+        text = " ".join(self.text.split())
+        self.assertIn("on `nq-rdl/query-builder` below `v0.8.0`, as a **blocker**", text)
+        self.assertNotIn("below `v0.6.0`, as a **blocker**", text)
+        for token in ("`SuppliedCohort`/`load_supplied()`", "identifier-literal gate", "check_case_fast()",
+                      "docs/SUPPLIED_COHORTS.md", "blob/v0.8.0/docs/SUPPLIED_COHORTS.md"):
+            with self.subTest(token=token):
+                self.assertIn(token, text)
 
     def test_scaffold_default_and_delivered_enquiries(self):
         self.assertIn("Scaffold v0.5.0 defaulted to query-builder v0.5.0", self.text)

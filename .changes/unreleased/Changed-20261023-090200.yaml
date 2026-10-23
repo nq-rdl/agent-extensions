@@ -1,0 +1,3 @@
+kind: Changed
+body: 'data-request: guardrails treat a query-builder pin below v0.8.0 as a blocker and point to docs/SUPPLIED_COHORTS.md'
+time: 2026-10-23T09:02:00.000000000Z

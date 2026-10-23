@@ -9,7 +9,7 @@ argument-hint: '[request, SQL path or resolver]'
 user-invocable: true
 compatibility: >-
   RDL cohort SQL; DATEADD and sys catalog examples target SQL Server 2022 (16.x).
-  record_assumption, record_limitation and isolation_level need query-builder 0.6.0 or later.
+  query-builder 0.8.0 is the floor (supplied cohorts, identifier-literal gate); record_assumption, record_limitation and isolation_level need 0.6.0 or later.
   rdl-service-desk/query-builder is the retired legacy org.
   Source patterns from issues 313, 325 and 370 to 389 (2026-09-15 to 2026-09-28).
   Composition examples are schematic; verify pinned library APIs, deployed engine
@@ -109,17 +109,14 @@ current tags and source paths (`clinical/specifications.py`, `clinical/resolver.
 Re-check the pinned implementations and tests before adapting examples; the latest
 release does not establish availability in an older pin.
 
-Read the request's pin (`framework_ref`, `pyproject.toml`, lock file) before drafting.
-`rdl-service-desk/query-builder` is the retired legacy org. Older scaffold renders
-still pin it (scaffold v0.1.3 defaulted to its `v0.1.1`, which also lacks
-`register_result`), and GitHub redirects the old path, so an install can still succeed.
-Below `v0.6.0`, `record_assumption` and `record_limitation` are absent. Flag a pin on
-that org, or on `nq-rdl/query-builder` below `v0.6.0`, as a **blocker**: report the pin
-and the missing APIs, and propose a compatible released re-pin before drafting new SQL.
-Scaffold v0.5.0 defaulted to query-builder v0.5.0; inspect a fresh render's actual pin
-rather than assuming that the current scaffold default has changed. Amending or fixing an already-delivered
-enquiry is exempt: it stays on its delivered pin, with no backport. Agents never
-re-pin or run `copier update` unasked.
+Read the request's pin (`framework_ref`, `pyproject.toml`, lock file) before drafting. `rdl-service-desk/query-builder` is the retired legacy org. Older scaffold renders
+still pin it (scaffold v0.1.3 defaulted to its `v0.1.1`, which also lacks `register_result`), and GitHub redirects the old path, so an install can still succeed.
+Below `v0.6.0`, `record_assumption` and `record_limitation` are absent; below `v0.8.0` there is no `SuppliedCohort`/`load_supplied()` and no identifier-literal gate. Flag a pin on
+that org, or on `nq-rdl/query-builder` below `v0.8.0`, as a **blocker**: report the pin and the missing APIs, and propose a compatible released re-pin before drafting new SQL.
+v0.8.0's harness gate (`rdl_etl_helpers.harness.literals`, run by `check_case_fast()`) fails a literal `VALUES`, `IN` or `=` list of identifiers, so a cohort of identifiers must be a
+supplied cohort loaded at run time: see [docs/SUPPLIED_COHORTS.md](https://github.com/nq-rdl/query-builder/blob/v0.8.0/docs/SUPPLIED_COHORTS.md).
+Scaffold v0.5.0 defaulted to query-builder v0.5.0; inspect a fresh render's actual pin rather than assuming that the current scaffold default has changed. Amending or fixing an already-delivered
+enquiry is exempt: it stays on its delivered pin, with no backport. Agents never re-pin or run `copier update` unasked.
 
 Confirm the applicable rules in the current `.specify/memory/constitution.md`:
 
