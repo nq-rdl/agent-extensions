@@ -3,8 +3,8 @@
 A researcher-supplied cohort is loaded by the runner at run time and its values never reach Git.
 These tests pin:
 
-* the data-request guard denies the Read tool on any path under data/00_raw/, by relative path,
-  `..` detour and symlink, and lets every other Read through;
+* the data-request guard denies Read, and the path argument of Grep and Glob, under data/00_raw/ (by
+  relative path, `..` detour and symlink), lets *.dvc and .gitignore there and everything else through;
 * the guard still ignores tools other than Read, Write and Edit;
 * hooks.json wires the guard to Read as well as Write|Edit;
 * the guardrails, draft, map, analyse, explain, intake and triage skills carry the guidance, and the
@@ -50,7 +50,8 @@ class ReadGuard(unittest.TestCase):
         (self.root / "conf" / "base" / "supplied" / "sample_cohort.template.csv").write_text("study_id\n")
 
     def read(self, path, tool="Read"):
-        return decide({"tool_name": tool, "cwd": str(self.root), "tool_input": {"file_path": str(path)}})
+        key = "file_path" if tool in ("Read", "Write", "Edit") else "path"
+        return decide({"tool_name": tool, "cwd": str(self.root), "tool_input": {key: str(path)}})
 
     def assertDenied(self, path):
         decision, reason = self.read(path)
@@ -69,9 +70,8 @@ class ReadGuard(unittest.TestCase):
     def test_denies_a_file_that_does_not_exist_yet(self):
         self.assertDenied(self.root / "data" / "00_raw" / "next_instalment.csv")
 
-    def test_denies_the_directory_and_a_dvc_pointer(self):
+    def test_denies_the_directory(self):
         self.assertDenied(self.root / "data" / "00_raw")
-        self.assertDenied(self.root / "data" / "00_raw" / "sample_cohort.csv.dvc")
 
     def test_denies_a_dotdot_detour(self):
         self.assertDenied(self.root / "data" / "02_extracts" / ".." / "00_raw" / "sample_cohort.csv")
@@ -113,9 +113,40 @@ class ReadGuard(unittest.TestCase):
                 self.assertEqual(self.read(path), ("allow", ""))
 
     def test_other_tools_are_untouched(self):
-        for tool in ("Glob", "Bash"):
+        decision, _ = decide({"tool_name": "Bash", "cwd": str(self.root),
+                              "tool_input": {"command": "cat data/00_raw/sample_cohort.csv"}})
+        self.assertEqual(decision, "allow")  # Bash is the scaffold child's hook, not this guard
+
+    def test_grep_and_glob_paths_are_denied(self):
+        for tool in ("Grep", "Glob"):
+            for target in (self.root / "data" / "00_raw", self.root / "data" / "00_raw" / "sample_cohort.csv"):
+                with self.subTest(tool=tool, target=target.name):
+                    self.assertEqual(self.read(target, tool)[0], "deny")
+
+    def test_grep_and_glob_elsewhere_or_without_a_path_pass(self):
+        for tool in ("Grep", "Glob"):
             with self.subTest(tool):
-                self.assertEqual(self.read(self.root / "data" / "00_raw" / "sample_cohort.csv", tool), ("allow", ""))
+                self.assertEqual(self.read(self.root / "conf", tool), ("allow", ""))
+                self.assertEqual(decide({"tool_name": tool, "cwd": str(self.root), "tool_input": {"pattern": "x"}}),
+                                 ("allow", ""))
+
+    def test_dvc_pointers_and_gitignore_pass(self):
+        raw = self.root / "data" / "00_raw"
+        for name in ("sample_cohort.csv.dvc", ".gitignore", "sub/other.csv.dvc"):
+            for tool in ("Read", "Grep"):
+                with self.subTest(name=name, tool=tool):
+                    self.assertEqual(self.read(raw / name, tool), ("allow", ""))
+
+    def test_a_dvc_named_alias_of_the_csv_is_still_denied(self):
+        (self.root / "data" / "00_raw" / "alias.csv.dvc").symlink_to("sample_cohort.csv")
+        self.assertDenied(self.root / "data" / "00_raw" / "alias.csv.dvc")
+        (self.root / "conf" / "pointer.dvc").symlink_to(self.root / "data" / "00_raw" / "sample_cohort.csv")
+        self.assertDenied(self.root / "conf" / "pointer.dvc")
+
+    def test_csv_and_lookalike_names_are_still_denied(self):
+        for name in ("sample_cohort.csv", "x.dvc.csv", "dvc", "notes.gitignore"):
+            with self.subTest(name):
+                self.assertDenied(self.root / "data" / "00_raw" / name)
 
     def test_write_to_the_directory_is_not_this_guards_concern(self):
         self.assertEqual(self.read(self.root / "data" / "00_raw" / "x.csv", "Write"), ("allow", ""))
@@ -129,7 +160,7 @@ class Wiring(unittest.TestCase):
             with self.subTest(str(root.relative_to(REPO))):
                 guard = '"${CLAUDE_PLUGIN_ROOT}/hooks/data-request-guard.sh"'
                 self.assertEqual(matchers.get("Write|Edit"), [guard])
-                self.assertEqual(matchers.get("Read"), [guard])
+                self.assertEqual(matchers.get("Read|Grep|Glob"), [guard])
 
 
 class SkillContract(unittest.TestCase):

@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
-# PreToolUse guard (data-request plugin), matchers Write|Edit and Read. Read is denied for paths
-# under data/00_raw/ (researcher-supplied cohort files) and passes everywhere else. Write|Edit fire
+# PreToolUse guard (data-request plugin), matchers Write|Edit and Read|Grep|Glob. Those three are denied for paths
+# under data/00_raw/ (researcher-supplied cohort files; *.dvc and .gitignore pass) and pass everywhere else. Write|Edit fire
 # only for paths under a .sqlreview/ directory; everything else passes silently. Decisions via
 # permissionDecision JSON:
 #   reviews/*/review.json, scope.json   Write → content run through `sqlreview.sh check`:
@@ -53,19 +53,23 @@ decide() { # <allow|deny|ask> <reason>
 }
 
 tool="$(field .tool_name)"
-case "$tool" in Write|Edit|Read) ;; *) exit 0 ;; esac
-path="$(field .tool_input.file_path)"; [ -n "$path" ] || exit 0
+case "$tool" in
+  Write|Edit|Read) path="$(field .tool_input.file_path)" ;;
+  Grep|Glob) path="$(field .tool_input.path)" ;;  # the search root; no path means the cwd, which this guard leaves alone
+  *) exit 0 ;;
+esac
+[ -n "$path" ] || exit 0
 cwd="$(field .cwd)"; [ -n "$cwd" ] || cwd="$(pwd -P)"
 case "$path" in /*) abs="$path" ;; *) abs="$cwd/$path" ;; esac
 normalize_path() {
   awk -F/ '{ n=0; for (i=1;i<=NF;i++) { if ($i==""||$i==".") continue; if ($i=="..") { if (n>0) n--; continue }; p[++n]=$i }; o=""; for (i=1;i<=n;i++) o=o "/" p[i]; print (o==""?"/":o) }'
 }
-if [ "$tool" = Read ]; then
+case "$tool" in Read|Grep|Glob)
   # Researcher-supplied cohort files live under data/00_raw/ (DVC, gitignored) and hold
   # identifiers. The runner loads them at run time; an agent never reads one. Resolve the
   # path physically (existing parent via cd -P, so a ".." after a symlinked directory is
   # followed on disk; then the final component's symlink chain) and also check the lexical
-  # path. A loop or a chain over 20 hops is denied, never allowed. Only the Read tool is covered.
+  # path. A loop or a chain over 20 hops is denied, never allowed. Covers the Read tool and the path argument of Grep and Glob; Bash is the scaffold child's hook.
   raw_lexical="$(printf '%s\n' "$abs" | normalize_path)"
   raw_physical="$abs"; hops=0
   while :; do
@@ -81,12 +85,13 @@ if [ "$tool" = Read ]; then
   done
   for candidate in "$raw_lexical" "$raw_physical"; do
     case "$candidate" in
+      */data/00_raw/*.dvc|*/data/00_raw/.gitignore) ;;  # DVC pointers and ignore rules hold hashes and rules, not values
       */data/00_raw|*/data/00_raw/*)
-        decide deny "Reading data/00_raw/ is denied: a researcher-supplied cohort file holds identifiers, and the runner loads it into a temp table at run time. Never read it, copy a value from it, or print one. For its shape read conf/base/supplied/<name>.template.csv (header only); for a load problem use the reason codes, row numbers and column names the runner reports (no value appears in them)." ;;
+        decide deny "Reading or searching data/00_raw/ is denied: a researcher-supplied cohort file holds identifiers, and the runner loads it into a temp table at run time. Never read or search it, copy a value from it, or print one. For its shape read conf/base/supplied/<name>.template.csv (header only); for a load problem use the reason codes, row numbers and column names the runner reports (no value appears in them)." ;;
     esac
   done
-  exit 0
-fi
+  exit 0 ;;
+esac
 # Resolve existing parents before lexical cleanup: aliases can lead into .sqlreview,
 # and symlink/.. must follow filesystem semantics. Keep absent suffixes for new files.
 lexical_abs="$abs"

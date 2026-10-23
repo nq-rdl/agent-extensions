@@ -1,3 +1,3 @@
 kind: Added
-body: 'data-request: guard denies agent Read of data/00_raw/ so researcher-supplied cohort files stay unread (refs #516)'
+body: 'data-request: guard denies agent Read, Grep and Glob of data/00_raw/ but allows its .dvc pointers (refs #516)'
 time: 2026-10-23T09:00:01.000000000Z

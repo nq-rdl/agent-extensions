@@ -181,7 +181,7 @@ support and joins to it; name the file and its `.dvc` pointer in the hand-off.
 The runner loads the file into a `#<table>` temp table at run time, so the SQL never holds a value.
 Keep every value out of the sidecar, `answers.yaml`, the hand-off, issues and chat: if the requester
 pastes identifiers into the thread, do not repeat them. Never read anything under `data/00_raw/`; the
-plugin guard denies the `Read` tool there, beside a scaffold child's own `Read(/data/**)` deny. See
+plugin guard denies `Read`, `Grep` and `Glob` there (not `.dvc` pointers), beside a scaffold child's own `Read(/data/**)` deny. See
 `${CLAUDE_PLUGIN_ROOT}/skills/guardrails/references/supplied-cohorts.rst`.
 
 ## Write and validate

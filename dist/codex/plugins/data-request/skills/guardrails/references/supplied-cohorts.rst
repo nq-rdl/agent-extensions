@@ -73,10 +73,12 @@ one.
 Layers of protection
 --------------------
 
-* The data-request plugin's guard (``hooks/data-request-guard.sh``) denies the agent ``Read`` tool
-  on any path under ``data/00_raw/``. It is the narrower layer: it covers that directory and the
-  ``Read`` tool only, and a shell command is out of its reach by design. The rule above still
-  holds for ``Bash``, ``Grep`` and every other route.
+* The data-request plugin's guard (``hooks/data-request-guard.sh``) denies the agent ``Read`` tool,
+  and the ``path`` argument of ``Grep`` and ``Glob``, on any path under ``data/00_raw/``. DVC
+  pointers (``*.dvc``) and ``.gitignore`` there pass: they hold hashes and rules, not values. It is
+  the narrower layer: it covers that directory and those three tools only, and a shell command is out
+  of its reach by design (the scaffold child's own hook covers ``Bash``). A ``Grep`` rooted above
+  the directory is not caught. The rule above still holds for ``Bash`` and every other route.
   Codex has no ``Read`` tool and its hook wiring is unchanged, so there the rule rests on this text alone.
 * A scaffold child separately denies ``Read(/data/**)`` and lets the runbook ``pixi run`` tasks
   through. The two are compatible: the child denies more, and the runbook tasks run the loader
