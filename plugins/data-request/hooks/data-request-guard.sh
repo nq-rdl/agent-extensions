@@ -115,6 +115,8 @@ case "$abs" in
 esac
 
 case "$rel" in
+  reviews/*/source.sql|reviews/*/scope.source.sql|reviews/*/history/*.sql)
+    decide deny "$rel is a legacy SQL snapshot path. Store hashes and committed source provenance in the review JSON; use sqlreview.sh materialize for temporary SQL outside the repository." ;;
   ledger.json)
     decide deny "Triage ledger entries require validated atomic publication. Use sqlreview.sh ledger set <ticket> <entry.json>; direct Write/Edit of .sqlreview/ledger.json can corrupt other tickets." ;;
   config.json)

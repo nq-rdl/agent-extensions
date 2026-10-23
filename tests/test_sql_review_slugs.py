@@ -140,8 +140,15 @@ class LegacyEncodedReview(unittest.TestCase):
         self.addCleanup(self.tmp.cleanup)
         self.p = Project(self.tmp.name)
         self.p.sql(PATH, SQL_V1)
-        self.p.write_json(LEGACY, "scope.json", scope_doc(LEGACY, PATH))
-        self.p.write_json(LEGACY, "review.json", review_doc(LEGACY, PATH))
+        self.p.commit()
+        fp = json.loads(run(["fingerprint", PATH], self.p.root).stdout)
+        self.p.write_json(LEGACY, "scope.json", scope_doc(LEGACY, **fp))
+        self.p.write_json(LEGACY, "review.json", review_doc(LEGACY, **fp))
+        # Existing legacy copies survive path-only moves; no workflow creates them.
+        d = self.reviews() / LEGACY
+        (d / "source.sql").write_text(SQL_V1)
+        (d / "history").mkdir()
+        (d / "history/1.sql").write_text(SQL_V1)
         self.cmd("snapshot", LEGACY, PATH)
         self.cmd("render", LEGACY, "review")
 
@@ -163,12 +170,15 @@ class LegacyEncodedReview(unittest.TestCase):
         self.cmd("delta", LEGACY)
         # publish a second revision under the legacy slug, snapshot it, then detect a change.
         self.p.sql(PATH, SQL_V2)
-        doc = review_doc(LEGACY, PATH, revision=2, sql_sha256=hashlib.sha256(SQL_V2.encode()).hexdigest())
+        self.p.commit("changed maintained source")
+        fp = json.loads(run(["fingerprint", PATH], self.p.root).stdout)
+        doc = review_doc(LEGACY, revision=2, **fp)
         draft = self.p.write_json(LEGACY, "review.draft.json", doc)
         self.cmd("publish", LEGACY, "review", str(draft))
         self.cmd("snapshot", LEGACY, PATH)
         self.cmd("delta", LEGACY)
         self.p.sql(PATH, SQL_V1)
+        self.p.commit("restored maintained source")
         self.cmd("delta", LEGACY, expected=10)
         self.assertFalse((self.reviews() / READABLE).exists())
 
@@ -212,7 +222,9 @@ class LegacyEncodedReview(unittest.TestCase):
     def test_verbose_status_flags_migratable_legacy_slugs(self):
         command = f"sqlreview.sh move '{PATH}' '{PATH}'"
         self.p.sql("reports/monthly.sql", SQL_V1)
-        self.p.write_json("reports__monthly", "review.json", review_doc())
+        self.p.commit("additional maintained source")
+        fp = json.loads(run(["fingerprint", "reports/monthly.sql"], self.p.root).stdout)
+        self.p.write_json("reports__monthly", "review.json", review_doc(**fp))
         text = self.cmd("status", "--verbose").stdout
         legacy_row = next(l for l in text.splitlines() if l.startswith(LEGACY + "\t"))
         self.assertTrue(legacy_row.endswith(f"\tmigrate={command}"), legacy_row)

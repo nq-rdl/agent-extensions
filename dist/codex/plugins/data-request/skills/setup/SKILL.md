@@ -9,7 +9,7 @@ description: 'Initialise project scope and review records for the Data Request w
   $data-request:bootstrap, :analyse or :explain, or whenever one of them reports "not
   initialised".'
 compatibility: .sqlreview schema 2 (schema 1 remains readable) (docs/specs/2026-09-15-sql-review-plugin-design.md);
-  bash 3.2+, jq >= 1.6, git optional. macOS and Linux.
+  bash 3.2+, jq >= 1.6, git required for SQL-bound records. macOS and Linux.
 metadata:
   repo: https://github.com/nq-rdl/agent-extensions
 ---
@@ -64,7 +64,8 @@ and the other stages all resolve the same `.sqlreview/` by walking up from the c
 
 Then confirm before writing (the host user-question tool, skipped only with `--yes`): the target path and
 the file list — `config.json`, `templates/scope.md`, `templates/review.md`, `templates/lifts.md`,
-`reviews/.gitkeep` (an empty placeholder, so git keeps `reviews/` in a committed `.sqlreview/`).
+`reviews/.gitkeep` and `.gitignore`. Fresh ignores prevent SQL copies with
+`/reviews/**/source.sql`, `/reviews/**/scope.source.sql` and `/reviews/**/history/*.sql`.
 
 ```bash
 bash "$S/sqlreview.sh" init                # copies the bundled default; never touches existing files
@@ -126,7 +127,7 @@ bash "$S/sqlreview.sh" render "<slug>" scope    # or review, for each affected r
 
 Inspect any report customisations before rerendering and preserve them with the
 user's chosen template edits. Verify no `/sql-review:` or `/sql-code:` invocations remain in the
-active templates and reports. Do not rewrite JSON, snapshots or history; report
+active templates and reports. Do not rewrite JSON or history; report
 missing source JSON or any retained old invocations as incomplete migration.
 
 ## 3. Verify and hand over
@@ -152,6 +153,13 @@ validates a stored ledger. `ledger --session get|set` uses durable local user st
 without initialising or writing a child. `$data-request:triage` owns its schema and resume
 instructions. Roles in config remain display labels, never ledger owner/decider handles.
 
+Read [committed SQL source and rendering](references/sql-provenance.rst) before SQL-bound work.
+Commit maintained hand-written SQL, or the adapter, builder/cohort/spec, config and pins before
+fingerprinting. Generated SQL needs the render-only adapter from scaffold#290; production
+integration is pending until that adapter is verified. Never hash an old generated working file.
+Historical commits/dependencies and the full recorded SHA must be reproducible before carry,
+diff, explain or release evidence; unavailable history requires reassessment.
+
 SQL paths are supplied explicitly to bootstrap/analyse. To customise report sections, edit the
 project templates; SQL glob filtering and section flags are not configuration options.
 
@@ -166,7 +174,8 @@ strings. Closing alone requires no carry-forward or new scope/review revision.
 (exact body bytes after conservative leading comments). `header-only` and `scoped-header-only`
 remain body-bound; `publish` records helper-owned full header hashes and timestamps in
 `header_revisions`, and `render` notes them even with customised templates. Keep original
-snapshots. Legacy records use their full hash or an authenticated snapshot for header comparison.
+confirmation provenance and JSON history. Legacy records require an authenticated historical render
+matching their original full SHA; missing evidence requires reassessment, never an assumed match.
 Hints, executable/nested comments, `@extract:` markers and code after a block close remain in
 the body; malformed headers have no body hash. Any body edit, including whitespace or comments,
 unbinds the record. Body equality never confirms changed assumptions, rationale or decisions.
@@ -188,18 +197,20 @@ Read-only rows preserve date-only `decided.at` and show the separate observed so
 time; they never fill `confirmed_*`. Same-day sources are eligible from that displayed time;
 precise UTC ISO cutoffs reject later sources. Analyse asks ONE answered Carry over all
 question listing items and governed locations, then records `carried_basis: header-decision`.
-Publish re-proves source bytes and all subsequent relevant path revisions plus working SQL.
+Publish re-proves committed source bytes and all subsequent relevant path revisions.
+Generated header-decision carry is refused until its maintained-source/rendered-header history
+is proved; use ordinary item confirmation. Other authenticated carry bases remain available.
 Shallow/missing history, repeated/relocated ranges, body-prefix changes and relevant merge/
 rename ambiguity are walked; unrelated PR merges with identical SQL path blobs are allowed.
 Git attribution is not human authentication. Retain independent origins; no answer means
 no publication. Later carryforward keeps `decided` and uses its normal confirmation fields.
 
-`remap SLUG [DRAFT]` uses `diff -U 0` against an authenticated same-kind snapshot to update only
+`remap SLUG [DRAFT]` uses `diff -U 0` against authenticated same-kind historical and current renders to update only
 unchanged `location.lines` and `logic[].lines` in a draft. It reports `{document, prior_revision,
 remapped, walk}`; changed or ambiguous ranges remain untouched for reassessment. Default:
 `review.draft.json` when a review exists, otherwise `scope.draft.json`; absent default drafts are
 seeded from the published record, existing drafts are preserved. An explicit draft must be a
 JSON file directly inside that slug's directory, never `scope.json`, `review.json` or `lifts.json`.
-It is retry-safe and atomic on failure. Missing baseline exits 6; corrupt evidence exits 2;
+It is retry-safe and atomic on failure. Unavailable or corrupt historical evidence exits 6; operational failures exit 2;
 invalid draft ranges/binding exit 4. It never publishes, confirms, increments revisions, refreshes
-fingerprints or advances snapshots. See analyse/bootstrap's update paths before carryforward.
+fingerprints or advances published records. See analyse/bootstrap's update paths before carryforward.

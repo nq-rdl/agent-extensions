@@ -8,8 +8,8 @@ Observed in September 2026.
 Fulfilment
 ----------
 
-* Request pipelines compose library units, and committed SQL is generated from
-  them with parity coverage.
+* Request pipelines compose committed library sources and reproduce generated SQL
+  through a render-only adapter with parity coverage.
 * Reusable correctness fixes belong upstream in the library, captured through
   ``/data-request:lift``.
 * Re-pin a child only after the library change it needs is available; then
@@ -63,36 +63,40 @@ prepares and publishes the release. Never direct the engineer to release.
    current head commit (read the run for that SHA, not an older one), and its
    SQL review status is ``current``. Match the review to the SQL that actually ran,
    using the recorded run commit and SQL fingerprint, not just the PR's current SQL.
-   ``release.sh evidence`` reads review records and snapshots from the working tree,
+   ``release.sh evidence`` reads review JSON from the working tree and authenticates
+   committed source renders,
    not the PR. Fetch the checked PR head SHA from GitHub and its commit locally; never
    substitute local ``HEAD``. For every review used in the evidence, set ``SLUG`` to
-   its slug and ``PR_HEAD`` to that checked SHA, then run from the request project root:
+   its slug, ``PR_HEAD`` to that checked SHA and ``RUN_COMMIT`` to the recorded run SHA.
+   Set ``S`` to the installed setup scripts, then run from the request project root:
 
    .. code-block:: bash
 
-     for name in review.json source.sql; do
-       path=".sqlreview/reviews/$SLUG/$name"
-       tmp="$(mktemp)" || exit 2
-       if ! git show "$PR_HEAD:./$path" > "$tmp" 2>/dev/null || ! cmp -s "$tmp" "$path"; then
-         rm -f "$tmp"
-         printf 'Stop: %s is absent or differs at checked PR head %s\n' "$path" "$PR_HEAD" >&2
-         exit 4
-       fi
+     path=".sqlreview/reviews/$SLUG/review.json"
+     tmp="$(mktemp /tmp/sqlreview-handoff.XXXXXX)" || exit 2
+     if ! git show "$PR_HEAD:./$path" > "$tmp" 2>/dev/null || ! cmp -s "$tmp" "$path"; then
        rm -f "$tmp"
-     done
+       printf 'Stop: %s is absent or differs at checked PR head %s\n' "$path" "$PR_HEAD" >&2
+       exit 4
+     fi
+     rm -f "$tmp"
+     # Fresh HEAD reconstruction refuses dirty maintained sources. S is installed setup/scripts.
+     bash "$S/sqlreview.sh" fingerprint "$(jq -r .sql_path "$path")" >/dev/null || exit $?
+     bash "$S/release.sh" evidence "$PR_HEAD" || exit $?
+     bash "$S/release.sh" evidence "$RUN_COMMIT" || exit $?
 
    Missing or differing records stop the hand-off, including uncommitted, untracked
    or locally committed but unpushed reviews. Retain any differing review draft and
    stop for the engineer to complete its unpublished work. Run
    ``bash "$S/release.sh" evidence "<run commit>"`` with ``S`` set to the installed
    setup scripts only after these checks pass. Any ``changed``, ``missing-at-ref``,
-   ``unreviewed`` or invalid review, a missing snapshot, or unproven run provenance
+   ``unreviewed`` or invalid review, unavailable/corrupt historical source evidence, or unproven run provenance
    stops the hand-off. A header-only
    result needs proof that only the leading comments differ. Compare the run manifest
    and maintained pipeline too: a matching committed file alone does not prove it ran.
    Confirm DVC pointers and their corresponding objects are pushed, and that UAT sections
    1 to 3 are recorded for this run. Missing evidence is a failed gate, never a passed check.
-   ``current`` only means the SQL bytes match the reviewed snapshot: also confirm that
+   ``current`` only means the reconstructed SQL bytes match the authenticated reviewed source: also confirm that
    ``/data-request:analyse`` re-ran
    (with ``--reconfirm-all``) after any pre-release logic change. Name every
    open delivery gate, including known governance restrictions. Flag approval-sensitive

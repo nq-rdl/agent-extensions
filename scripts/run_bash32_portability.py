@@ -6,6 +6,7 @@ import unittest
 from pathlib import Path
 
 CASES = (
+    "test_sql_review_sources_bash32.Bash32Sources.test_adapter_historical_publish_and_carry",
     "test_adr_scan.Bash32Scan.test_next_list_check_under_bash32",
     "test_pi_dispatch.Bash32.test_offline_contracts",
     "test_pi_review_rescue.Bash32.test_offline_contracts",

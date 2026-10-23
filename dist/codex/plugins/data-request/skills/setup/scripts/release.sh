@@ -173,7 +173,7 @@ cmd_render() {
 }
 
 # One review directory -> one JSON row on stdout.
-rl_review_row() { # <slug> <commit>
+rl_review_row() ( # <slug> <commit>
   local slug="$1" commit="$2" d="$SR_REVIEWS/$1" doc kind sql reviewed at="" body_at="" applies tmp gc inref="null" binding
   doc="$(sr_doc_for "$slug")" || return 1
   kind="$(jq -r '.kind // ""' "$doc")"
@@ -185,21 +185,35 @@ rl_review_row() { # <slug> <commit>
   sql="$(jq -r '.sql_path' "$doc")"
   sr_safe_sql "$sql"
   reviewed="$(jq -r '.sql_sha256 // ""' "$doc")"
-  tmp="$(mktemp)" || sr_die 2 "mktemp failed"
-  # ./ makes the path relative to SR_ROOT, which need not be the repository top level.
-  if git -C "$SR_ROOT" cat-file -e "$commit:./$sql" 2>/dev/null &&
-     git -C "$SR_ROOT" show "$commit:./$sql" > "$tmp" 2>/dev/null; then
-    at="$(sr_sha256 "$tmp")"
-  fi
-  if [ "$kind" = scope ]; then applies="unreviewed"
-  elif [ -z "$at" ]; then applies="missing-at-ref"
+  local rc
+  tmp="$(sr_source_workspace)" || return 2
+  trap 'rm -rf "$tmp"' EXIT
+  trap 'exit 2' HUP INT TERM
+  applies=unavailable
+  if [ "$kind" = scope ]; then applies=unreviewed
   else
-    sr_no_symlinks "$d/source.sql" || exit 2
-    sr_binding "$doc" "$tmp" "$d/source.sql"; binding=$?
-    case "$binding" in 0) applies="current" ;; 10) applies="header-only" ;; *) applies="changed" ;; esac
+    sr_source_auth "$doc" "$tmp/recorded.sql"; rc=$?
+    case "$rc" in 0) ;; 6) ;; *) return 2 ;; esac
   fi
-  [ -z "$at" ] || body_at="$(sr_body_sha256 "$tmp" || true)"
-  rm -f "$tmp"
+  if [ "$kind" = scope ] || [ "$rc" = 0 ]; then
+    sr_source_path_absent "$commit" "$sql"; rc=$?
+    case "$rc" in
+      0) [ "$kind" = scope ] || applies=missing-at-ref ;;
+      1)
+        sr_source_render "$commit" "$sql" "$tmp/release.sql"; rc=$?
+        case "$rc" in
+          0)
+            at="$(sr_sha256 "$tmp/release.sql")" || return 2
+            body_at="$(sr_body_sha256 "$tmp/release.sql")" || return 2
+            if [ "$kind" != scope ]; then
+              sr_binding "$doc" "$tmp/release.sql" "$tmp/recorded.sql"; binding=$?
+              case "$binding" in 0) applies=current ;; 10) applies=header-only ;; *) applies=changed ;; esac
+            fi ;;
+          6) ;; *) return 2 ;;
+        esac ;;
+      *) return 2 ;;
+    esac
+  fi
   gc="$(jq -r '.git_commit // "" | strings' "$doc")"
   case "$gc" in
     ""|*[!0-9a-f]*) ;;
@@ -223,7 +237,7 @@ rl_review_row() { # <slug> <commit>
      assumptions: (.assumptions | items), limitations: (.limitations | items),
      questions: $question_doc.questions,
      open_questions: [$question_doc.questions[] | select(.status == "open") | .text]}' "$doc"
-}
+)
 
 cmd_evidence() {
   [ $# -ge 1 ] || usage

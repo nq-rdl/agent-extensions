@@ -13,6 +13,8 @@ class ScopeFraming(unittest.TestCase):
         self.addCleanup(self.tmp.cleanup)
         self.p = Project(self.tmp.name)
         self.sql = self.p.sql("q.sql", SQL_V1)
+        self.p.commit()
+        self.fp = json.loads(run(["fingerprint", "q.sql"], self.p.root).stdout)
         self.draft = self.p.review_dir("q") / "scope.draft.json"
 
     def publish(self, doc):
@@ -32,20 +34,22 @@ class ScopeFraming(unittest.TestCase):
         self.assertIn("scope sql_sha256 must be null or a SHA256", r.stdout)
 
     def test_publish_refuses_a_scope_framed_against_older_sql(self):
-        framed = self.sha()
+        framed = dict(self.fp)
         self.sql.write_text(SQL_V2)  # edited mid-interview
-        r = self.publish(scope_doc("q", "q.sql", sql_sha256=framed))
+        self.p.commit("changed source during interview")
+        r = self.publish(scope_doc("q", **framed))
         self.assertEqual(r.returncode, 2)
         self.assertIn("re-put intent, inputs, outputs", r.stderr)
         self.assertFalse((self.p.root / ".sqlreview/reviews/q/scope.json").exists())
-        self.assertEqual(self.publish(scope_doc("q", "q.sql", sql_sha256=self.sha())).returncode, 0)
+        self.assertEqual(self.publish(scope_doc("q", **json.loads(run(["fingerprint", "q.sql"], self.p.root).stdout))).returncode, 0)
 
     def test_publish_refuses_a_scope_sha_when_sql_is_gone(self):
-        framed = self.sha()
+        framed = dict(self.fp)
         self.sql.unlink()
-        r = self.publish(scope_doc("q", "q.sql", sql_sha256=framed))
+        self.p.commit("removed source")
+        r = self.publish(scope_doc("q", **framed))
         self.assertEqual(r.returncode, 2)
-        self.assertIn("SQL is missing", r.stderr)
+        self.assertIn("committed SQL source unavailable", r.stderr)
 
 
 class Lint(unittest.TestCase):
