@@ -117,11 +117,10 @@ class Baseline(unittest.TestCase):
     def test_compatibility_names_the_v080_floor(self):
         compat = " ".join(frontmatter(SKILL)["compatibility"].split())
         for token in ("query-builder 0.8.0 is the floor", "identifier-literal gate", "since 0.7.2",
-                      "record_assumption", "record_limitation", "need 0.6.0 or later"):
+                      "record_assumption", "record_limitation", "need query-builder 0.6.0 or later"):
             with self.subTest(token=token):
                 self.assertIn(token, compat)
         self.assertNotIn("0.4.0", compat)
-        self.assertNotIn("need query-builder 0.6.0 or later", compat)
 
     def test_compose_section_states_baseline_and_compliant_pypika(self):
         text = section(body(SKILL), "Compose library units in requests")
