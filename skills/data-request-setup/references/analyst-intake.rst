@@ -3,9 +3,14 @@ Analyst answers intake
 
 The engineer runs setup. The analyst fills ``answers.yaml`` from the enquiry
 and records research decisions in sibling ``answers.intake.json`` in that same
-pass. The engineer then runs bootstrap and draft. This is not a new stage or
-skill. The analyst's handoff names the branch and any questions still requiring
-the requester. Research gaps discovered later return to that analyst.
+pass. The engineer then runs bootstrap and draft. This is not a new stage: the
+**Data Analyst** runs ``/data-request:intake`` to interview them through that
+pass, and the **Data Engineer** runs ``/data-request:bootstrap`` to interview the
+engineer on the technical scope. Intake needs no ``.sqlreview/``, so it can run
+before setup. On a ``request-template`` copy, intake also renders the scaffold with
+copier once the analyst approves. The analyst's handoff names the branch and any questions still requiring
+the requester. Research gaps discovered later return to that analyst, who
+records the answers with an intake re-run.
 For code discovery during this pass, use ``/data-request:lookup`` and cite its record
 in the ``rationale`` of a ``topic: codes`` decision. Cite the record, not its counts:
 ``answers.intake.json`` is handover tier.

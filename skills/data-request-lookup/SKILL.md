@@ -23,8 +23,8 @@ metadata:
 
 Use during the analyst's answers-filling pass before the engineer's
 `/data-request:bootstrap`, or when `/data-request:map` needs code evidence.
-There is no separate intake skill: read
-`${CLAUDE_PLUGIN_ROOT}/skills/setup/references/analyst-intake.rst` for that pass.
+`/data-request:intake` guides that pass and calls this skill for code discovery; read
+`${CLAUDE_PLUGIN_ROOT}/skills/setup/references/analyst-intake.rst` for its record.
 The analyst owns clinical inclusion, exclusions and code-set edges; the engineer
 owns source and implementation questions. A lookup hit is not clinical approval.
 

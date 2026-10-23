@@ -22,9 +22,13 @@ Here $ARGUMENTS means the user’s supplied skill arguments. Codex does not popu
 # Data Request — bootstrap (Data Engineer)
 
 The **Data Engineer** runs this stage after setup and the Data Analyst's
-`answers.yaml` filling pass. The analyst records research decisions in the optional
-`answers.intake.json` sidecar in that same pass. There is no separate intake skill.
-The engineer owns technical sources, keys, timezones, joins and validity rules.
+`answers.yaml` filling pass. In that same pass the analyst runs `$data-request:intake`,
+which interviews them and records research decisions in the optional
+`answers.intake.json` sidecar. This skill is the engineer's interview, not the analyst's.
+The engineer owns technical sources, grain mechanics, keys, timezones, joins and validity rules.
+**Role guard:** never record a research decision (cohort, codes, outcomes, outputs, governance,
+the clinical grain unit) as an engineer confirmation. Write it as an `Analyst question:` item
+and route it back to the analyst, who can answer it in a `$data-request:intake` re-run.
 
 For RDL cohort SQL, read `${PLUGIN_ROOT}/skills/guardrails/SKILL.md` before
 scoping or reviewing. Apply **Engineer decisions: proceed and flag** in its
@@ -60,7 +64,8 @@ retain existing IDs and closed rows, append missing scope questions, and close a
 answered question only with the analyst's answer and provenance. Absence from a
 sidecar is not closure evidence; never refresh shared history by deleting rows or
 reintroduce embedded arrays. Any research question missed by intake also gets the
-`Analyst question:` prefix and goes back to the analyst, who consults the requester. Missing intake permits legacy technical scoping; it gives
+`Analyst question:` prefix and goes back to the analyst, who consults the requester
+and records the answer with `$data-request:intake`. Missing intake permits legacy technical scoping; it gives
 no analyst confirmation. Do not resolve a research gap by treating an engineer's
 technical choice as the analyst's answer.
 
