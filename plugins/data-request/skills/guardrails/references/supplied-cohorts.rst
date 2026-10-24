@@ -75,7 +75,8 @@ Layers of protection
 
 * The data-request plugin's guard (``hooks/data-request-guard.sh``) denies the agent ``Read`` tool,
   and the ``path`` argument of ``Grep`` and ``Glob``, on any path under ``data/00_raw/``. DVC
-  pointers (``*.dvc``) and ``.gitignore`` there pass: they hold hashes and rules, not values. It is
+  pointers (``*.dvc``) and ``.gitignore`` pass for ``Read`` only when they are small regular files (not links or
+  directories) that look like what the name says: they hold hashes and rules, not values. It is
   the narrower layer: it covers that directory and those three tools only, and a shell command is out
   of its reach by design (the scaffold child's own hook covers ``Bash``). A ``Grep`` rooted above
   the directory is not caught. The rule above still holds for ``Bash`` and every other route.

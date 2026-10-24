@@ -83,11 +83,30 @@ case "$tool" in Read|Grep|Glob)
     target="$(readlink "$raw_physical" 2>/dev/null)" || break
     case "$target" in /*) raw_physical="$target" ;; *) raw_physical="$(dirname "$raw_physical")/$target" ;; esac
   done
+  raw_denied="Reading or searching data/00_raw/ is denied: a researcher-supplied cohort file holds identifiers, and the runner loads it into a temp table at run time. Never read or search it, copy a value from it, or print one. For its shape read conf/base/supplied/<name>.template.csv (header only); for a load problem use the reason codes, row numbers and column names the runner reports (no value appears in them). Only a genuine small DVC pointer (*.dvc) or .gitignore file can be Read."
   for candidate in "$raw_lexical" "$raw_physical"; do
     case "$candidate" in
-      */data/00_raw/*.dvc|*/data/00_raw/.gitignore) ;;  # DVC pointers and ignore rules hold hashes and rules, not values
+      */data/00_raw/*.dvc|*/data/00_raw/.gitignore)
+        # DVC pointers and ignore rules hold hashes and rules, not values, so a Read of a genuine
+        # one passes. The name alone proves nothing: it must be a regular, non-symlink, small file
+        # whose content looks like what it claims. Grep and Glob never pass by suffix.
+        ok=false
+        if [ "$tool" = Read ] && [ -f "$raw_physical" ] && [ ! -L "$abs" ] && [ ! -L "$raw_lexical" ] &&
+           [ "$(basename "$raw_lexical")" = "$(basename "$raw_physical")" ]; then
+          size="$(wc -c < "$raw_physical" 2>/dev/null | tr -d ' ')"
+          if [ -n "$size" ] && [ "$size" -le 65536 ]; then
+            case "$raw_physical" in
+              */.gitignore) ok=true ;;
+              *) if grep -Eq '^outs:[[:space:]]*$' "$raw_physical" &&
+                    grep -Eq '^[[:space:]-]*path:' "$raw_physical" &&
+                    grep -Eq '^[[:space:]-]*(md5|hash|etag):' "$raw_physical" &&
+                    ! grep -Evq '^([[:space:]]*(#.*)?|[A-Za-z_0-9]+:[[:space:]]*[^[:space:]]*|[[:space:]-]+[A-Za-z_0-9]+:[[:space:]]*[^[:space:]].*|[[:space:]]+[A-Za-z_0-9]+:[[:space:]]*)$' "$raw_physical"; then ok=true; fi ;;
+            esac
+          fi
+        fi
+        [ "$ok" = true ] || decide deny "$raw_denied" ;;
       */data/00_raw|*/data/00_raw/*)
-        decide deny "Reading or searching data/00_raw/ is denied: a researcher-supplied cohort file holds identifiers, and the runner loads it into a temp table at run time. Never read or search it, copy a value from it, or print one. For its shape read conf/base/supplied/<name>.template.csv (header only); for a load problem use the reason codes, row numbers and column names the runner reports (no value appears in them)." ;;
+        decide deny "$raw_denied" ;;
     esac
   done
   exit 0 ;;

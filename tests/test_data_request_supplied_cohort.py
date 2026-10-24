@@ -130,16 +130,53 @@ class ReadGuard(unittest.TestCase):
                 self.assertEqual(decide({"tool_name": tool, "cwd": str(self.root), "tool_input": {"pattern": "x"}}),
                                  ("allow", ""))
 
-    def test_dvc_pointers_and_gitignore_pass(self):
+    POINTER = "outs:\n- md5: d41d8cd98f00b204e9800998ecf8427e\n  size: 10\n  hash: md5\n  path: sample_cohort.csv\n"
+
+    def test_a_genuine_dvc_pointer_and_gitignore_pass_for_read(self):
         raw = self.root / "data" / "00_raw"
-        for name in ("sample_cohort.csv.dvc", ".gitignore", "sub/other.csv.dvc"):
-            for tool in ("Read", "Grep"):
-                with self.subTest(name=name, tool=tool):
-                    self.assertEqual(self.read(raw / name, tool), ("allow", ""))
+        (raw / "sample_cohort.csv.dvc").write_text(self.POINTER)
+        (raw / ".gitignore").write_text("/sample_cohort.csv\n")
+        for name in ("sample_cohort.csv.dvc", ".gitignore"):
+            with self.subTest(name):
+                self.assertEqual(self.read(raw / name), ("allow", ""))
+
+    def test_grep_and_glob_never_pass_by_suffix(self):
+        raw = self.root / "data" / "00_raw"
+        (raw / "sample_cohort.csv.dvc").write_text(self.POINTER)
+        (raw / ".gitignore").write_text("/sample_cohort.csv\n")
+        for tool in ("Grep", "Glob"):
+            for name in ("sample_cohort.csv.dvc", ".gitignore"):
+                with self.subTest(tool=tool, name=name):
+                    self.assertEqual(self.read(raw / name, tool)[0], "deny")
+
+    def test_a_dvc_named_file_holding_csv_text_is_denied(self):
+        (self.root / "data" / "00_raw" / "participants.dvc").write_text("study_id\nZZTEST-001\n")
+        self.assertDenied(self.root / "data" / "00_raw" / "participants.dvc")
+
+    def test_a_dvc_named_file_that_mixes_pointer_lines_and_rows_is_denied(self):
+        (self.root / "data" / "00_raw" / "mixed.dvc").write_text(self.POINTER + "ZZTEST-001,ZZTEST-002\n")
+        self.assertDenied(self.root / "data" / "00_raw" / "mixed.dvc")
+
+    def test_an_oversized_dvc_file_is_denied(self):
+        (self.root / "data" / "00_raw" / "big.dvc").write_text(self.POINTER + "# " + "x" * 70000 + "\n")
+        self.assertDenied(self.root / "data" / "00_raw" / "big.dvc")
+
+    def test_a_missing_dvc_file_is_denied(self):
+        self.assertDenied(self.root / "data" / "00_raw" / "absent.dvc")
+
+    def test_a_directory_named_dvc_is_denied_for_read_and_grep(self):
+        (self.root / "data" / "00_raw" / "cohort.dvc").mkdir()
+        (self.root / "data" / "00_raw" / "cohort.dvc" / "rows.csv").write_text("x\n")
+        for tool in ("Read", "Grep"):
+            with self.subTest(tool):
+                self.assertEqual(self.read(self.root / "data" / "00_raw" / "cohort.dvc", tool)[0], "deny")
 
     def test_a_dvc_named_alias_of_the_csv_is_still_denied(self):
         (self.root / "data" / "00_raw" / "alias.csv.dvc").symlink_to("sample_cohort.csv")
         self.assertDenied(self.root / "data" / "00_raw" / "alias.csv.dvc")
+        (self.root / "data" / "00_raw" / "real.dvc").write_text(self.POINTER)
+        (self.root / "data" / "00_raw" / "x.dvc").symlink_to("real.dvc")  # even a link to a real pointer
+        self.assertDenied(self.root / "data" / "00_raw" / "x.dvc")
         (self.root / "conf" / "pointer.dvc").symlink_to(self.root / "data" / "00_raw" / "sample_cohort.csv")
         self.assertDenied(self.root / "conf" / "pointer.dvc")
 
