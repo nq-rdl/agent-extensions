@@ -26,7 +26,7 @@ class Publish(unittest.TestCase):
         shutil.copytree(REPO / "skills/data-request-setup/scripts",
                         self.cache / "skills/setup/scripts", dirs_exist_ok=True)
         self.script = self.cache / "skills/setup/scripts/sqlreview.sh"
-        self.draft = root / "confirmed draft.json"
+        self.draft = self.workspace / ".sqlreview/reviews/confirmed draft.json"
         self.final = self.workspace / ".sqlreview/reviews/q"
 
     def run_helper(self, *args):

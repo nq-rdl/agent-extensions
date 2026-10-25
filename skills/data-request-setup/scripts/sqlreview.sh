@@ -1311,6 +1311,8 @@ _header_decisions() ( # SQL DRAFT intended-human-confirmer parsed-notes
           done ;;
       esac
       if git -C "$root" show "$commit:$source_rel" > "$tmp/sql" 2>/dev/null; then
+        # Our own render of a committed blob: mark it so the inner notes accepts it outside the project.
+        sr_sha256 "$tmp/sql" > "$tmp/sql.sqlreview-render" || row_safe=false
         bash "$SR_SCRIPT_DIR/sqlreview.sh" notes "$tmp/sql" > "$tmp/notes" 2>/dev/null || { printf 'null\n' > "$tmp/notes"; row_safe=false; }
         start="$(sr_body_start "$tmp/sql")" || { start=0; row_safe=false; }
       else

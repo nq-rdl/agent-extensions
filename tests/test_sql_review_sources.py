@@ -176,7 +176,8 @@ class Sources(unittest.TestCase):
             self.assertEqual(output.read_bytes(), b"SELECT 1;\nSELECT 3;\n")
             self.assertEqual(alias.read_bytes(), original)
             self.assertNotEqual(alias.stat().st_ino, output.stat().st_ino)
-            self.assertEqual(list(Path(tmp).iterdir()), [output])
+            # The helper's render marker is the only other file; no staging leftovers.
+            self.assertEqual(sorted(Path(tmp).iterdir()), sorted([output, Path(str(output) + ".sqlreview-render")]))
 
     def test_materialize_failed_output_publication_preserves_existing_alias(self):
         self.publish_generated()
