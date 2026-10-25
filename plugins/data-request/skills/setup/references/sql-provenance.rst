@@ -33,8 +33,10 @@ loop, say) or that resolves outside the project is refused; copy a file from out
 the project root into ``sql/v<N>/`` first. Only ``notes`` also accepts a render the helper itself wrote
 (``sr_source_render``, ``materialize``), marked by a ``FILE.sqlreview-render`` SHA-256
 file, which is what the analyse, bootstrap and explain recipes pass it. A file with
-more than one hard link is refused, since a link may lead to ``data/``. The optional
-drafts argument of ``intake`` and the draft file of ``publish`` follow the same rules. The command exits 2
+more than one hard link is refused, since a link may lead to ``data/``. Every file argument
+(``check``, ``lint``, ``ledger``, ``carryover``, ``carryforward``, ``remap``, ``publish``,
+``publish-questions``, ``intake``, ``notes --against/--questions``, and the files given to
+``release.sh`` and ``recurring-decisions.sh``) follows the same rules. The command exits 2
 with a message that names the rule and the path as given, never file content,
 and writes nothing under ``.sqlreview/``.
 

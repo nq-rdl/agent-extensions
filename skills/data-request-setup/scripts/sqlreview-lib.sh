@@ -190,6 +190,19 @@ sr_refuse_unreviewed() { # ABS_PATH AS_GIVEN [helper-render]
   fi
 }
 
+# THE entry point for any user-supplied path whose content a command reads, copies, hashes into a
+# record or prints (#516): the full policy (data/, unreviewed sql/, outside the project root unless
+# a helper-marked render is allowed, symlink target, hard-link count), exiting 2 when refused.
+# Every subcommand's file arguments go through here, either as sr_guard_input at the dispatch
+# (tests/test_sql_review_path_guard.py walks the dispatch tables and fails on an unlisted
+# command) or via the read/copy wrappers below.
+sr_guard_input() { # PATH [helper-render]
+  [ -n "${SR_ROOT:-}" ] || SR_ROOT="$(sr_find_root 2>/dev/null || sr_init_root)"
+  sr_refuse_unreviewed "$(sr_rawabs "$1")" "$1" "${2:-}" || exit 2
+}
+sr_read_guarded() { sr_guard_input "$1" "${2:-}"; cat "$1"; } # PATH [helper-render]
+sr_copy_guarded() { sr_guard_input "$1"; cp "$1" "$2"; }       # SRC DEST
+
 # Structural checks on a stored or derived project-relative path (no policy; see sr_safe_sql).
 sr_safe_path() {
   case "$1" in ""|/*|*/../*|../*|*/..|..|./*|*/./*|*/.|*//*|*/) sr_die 2 "unsafe sql_path: $1" ;; esac

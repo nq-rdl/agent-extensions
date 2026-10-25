@@ -1449,9 +1449,31 @@ Header revision history: metadata changed without changing its corresponding SQL
   printf 'rendered\t%s\n' "${out#"$SR_ROOT"/}"
 }
 
+# The file arguments each subcommand reads, all through sr_guard_input (#516). Commands whose
+# only inputs are slugs and project-relative SQL paths (resolved by sr_relpath/sr_safe_sql) need no
+# entry; tests/test_sql_review_path_guard.py lists every command and fails on a missing one.
+_sr_guard_command_inputs() { # COMMAND ARGS...
+  local c="$1" a prev="" last=""; shift
+  case "$c" in
+    check) [ $# -lt 1 ] || [ "$1" = --stdin ] || sr_guard_input "$1" ;;
+    lint) for a in "$@"; do last="$a"; done; [ -z "$last" ] || sr_guard_input "$last" ;;
+    carryover|remap|publish-questions) [ $# -lt 2 ] || sr_guard_input "$2" ;;
+    carryforward) [ $# -lt 3 ] || sr_guard_input "$3" ;;
+    notes) for a in "$@"; do case "$prev" in --against|--questions) sr_guard_input "$a" ;; esac; prev="$a"; done ;;
+    ledger)
+      [ "${1:-}" != --session ] || shift
+      case "${1:-}" in
+        check) [ $# -lt 2 ] || sr_guard_input "$2" ;;
+        set) [ $# -lt 3 ] || sr_guard_input "$3" ;;
+        get) [ "${3:-}" != --against ] || [ $# -lt 4 ] || sr_guard_input "$4" ;;
+      esac ;;
+  esac
+}
+
 # ---------------------------------------------------------------------------------------------
 [ $# -ge 1 ] || usage
 cmd="$1"; shift
+_sr_guard_command_inputs "$cmd" "$@"
 case "$cmd" in
   init) cmd_init "$@" ;;
   status) cmd_status "$@" ;;

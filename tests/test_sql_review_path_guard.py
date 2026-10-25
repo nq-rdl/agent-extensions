@@ -197,6 +197,97 @@ class PathGuard(unittest.TestCase):
         self.assertFalse((draft.parent / "review.json").exists())
 
 
+SCRIPTS = SCRIPT.parent
+D = "data/secret.json"
+SLUG = "sql__v1__q"
+# Every subcommand and the arguments that hand it a refused data/ file. NOINPUT marks commands
+# whose only inputs are slugs and project SQL paths, or that only write a path; the walk below
+# fails when a dispatch entry is in neither table, so a new subcommand needs a decision here.
+SQLREVIEW_INPUTS = {
+    "check": [[D]],
+    "lint": [[D], ["--ste", D]],
+    "carryover": [[SLUG, D]],
+    "carryforward": [[SLUG, "scope", D]],
+    "remap": [[SLUG, D]],
+    "publish": [[SLUG, "review", D]],
+    "publish-questions": [[SLUG, D]],
+    "intake": [["sql/v1/missing.json", "1", D], [D, "1"]],
+    "notes": [[D], ["sql/v1/q.sql", "--against", D], ["sql/v1/q.sql", "--questions", D]],
+    "ledger": [["check", D], ["set", "nq-rdl/x#1", D], ["get", "nq-rdl/x#1", "--against", D],
+               ["--session", "check", D]],
+    "slug": [[D]],
+    "fingerprint": [[D]],
+    "snapshot": [[SLUG, D]],
+    "move": [["sql/v1/q.sql", D]],
+}
+SQLREVIEW_NOINPUT = {"init", "status", "roles", "guard", "lifts-stale", "materialize", "delta", "impact",
+                     "questions", "migrate-questions", "render"}
+RELEASE_INPUTS = {"check": [[D]], "render": [[D]]}
+RELEASE_NOINPUT = {"evidence"}
+RECURRING_INPUTS = {"match": [[D], ["--any-kind", D]], "marked": [[D], ["sql/v1/q.sql", D]]}
+RECURRING_NOINPUT = {"list"}
+
+
+def dispatched(script, pattern):
+    """Command names in a script's final dispatch `case`."""
+    import re
+    text = (SCRIPTS / script).read_text()
+    tail = text[text.rindex('case "$cmd" in'):]
+    return {m.group(1) for m in re.finditer(pattern, tail, re.M)}
+
+
+class EveryEntryPoint(unittest.TestCase):
+    """Issue 516 root cause: one unguarded entry point at a time kept being found, so walk them all."""
+
+    def setUp(self):
+        self._tmp = tempfile.TemporaryDirectory()
+        self.addCleanup(self._tmp.cleanup)
+        self.p = Project(self._tmp.name)
+        self.root = self.p.root
+        self.p.sql("data/secret.json", json.dumps({"x": MARKER}))
+        self.p.sql("sql/v1/q.sql", SQL_V1)
+        self.p.review_dir(SLUG)
+        self.p.commit()
+
+    def assert_refused(self, script, command, args):
+        before = tree(self.root)
+        r = subprocess.run(["bash", str(SCRIPTS / script), command, *args], cwd=self.root,
+                           capture_output=True, text=True, timeout=60,
+                           env={k: v for k, v in os.environ.items() if not k.startswith("SQLREVIEW_")})
+        label = (script, command, args)
+        self.assertEqual(r.returncode, 2, (label, r.stdout, r.stderr))
+        self.assertIn("refused", r.stderr, label)
+        self.assertIn(RULE_DATA, r.stderr, label)
+        self.assertNotIn(MARKER, r.stdout + r.stderr, label)
+        self.assertEqual(r.stdout, "", label)
+        self.assertEqual(tree(self.root), before, label)
+
+    def walk(self, script, pattern, inputs, noinput):
+        commands = dispatched(script, pattern) - {"help"}
+        self.assertEqual(commands - set(inputs) - noinput, set(),
+                         f"{script}: new subcommand without a guard decision in this test")
+        self.assertEqual((set(inputs) | noinput) - commands, set(), f"{script}: stale entry")
+        self.assertEqual(set(inputs) & noinput, set())
+        for command, variants in inputs.items():
+            for args in variants:
+                with self.subTest(script=script, command=command, args=args):
+                    self.assert_refused(script, command, args)
+
+    def test_sqlreview(self):
+        self.walk("sqlreview.sh", r"^  ([a-z][a-z-]*)\) .*cmd_", SQLREVIEW_INPUTS, SQLREVIEW_NOINPUT)
+
+    def test_release(self):
+        self.walk("release.sh", r"^  ([a-z][a-z-]*)\) cmd_", RELEASE_INPUTS, RELEASE_NOINPUT)
+
+    def test_recurring_decisions(self):
+        self.walk("recurring-decisions.sh", r"^  ([a-z][a-z-]*)\) cmd_", RECURRING_INPUTS, RECURRING_NOINPUT)
+
+    def test_publish_questions_copies_nothing_from_data(self):
+        self.p.write_json(SLUG, "scope.json", scope_doc(SLUG, "sql/v1/q.sql"))
+        self.assert_refused("sqlreview.sh", "publish-questions", [SLUG, D])
+        self.assertFalse((self.root / ".sqlreview/reviews" / SLUG / "questions.json").exists())
+
+
 class ReviewedTreePasses(unittest.TestCase):
     def test_reviewed_version_directories_pass(self):
         with tempfile.TemporaryDirectory() as tmp:
