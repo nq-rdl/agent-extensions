@@ -594,24 +594,24 @@ class Sources(unittest.TestCase):
         self.assertEqual(json.loads(r.stdout)["sql_sha256"], hashlib.sha256(payload).hexdigest())
         self.assertFalse((self.p.root / "injection").exists())
 
-    def test_fingerprint_tracked_newline_path_preserves_literal_bytes(self):
-        rel = "sql/v1/line\nbreak\\name.sql"
+    def test_fingerprint_tracked_special_character_path_preserves_literal_bytes(self):
+        rel = "sql/v1/line break\\name.sql"
         path = self.p.sql(rel, "SELECT 1;\n")
         self.p.commit("newline tracked path")
-        r = run(["fingerprint", "sql/v1/./discard/../line\nbreak\\name.sql"], self.p.root)
+        r = run(["fingerprint", "sql/v1/./discard/../line break\\name.sql"], self.p.root)
         self.assertEqual(r.returncode, 0, r.stderr)
         fp = json.loads(r.stdout)
         self.assertEqual(fp["sql_path"], rel)
         self.assertEqual(fp["sql_sha256"], hashlib.sha256(path.read_bytes()).hexdigest())
         slug = run(["slug", rel], self.p.root)
         self.assertEqual(slug.returncode, 0, slug.stderr)
-        self.assertEqual(slug.stdout.strip(), "sql__v1__line%0Abreak%5Cname")
+        self.assertEqual(slug.stdout.strip(), "sql__v1__line%20break%5Cname")
         doc = review_doc(slug.stdout.strip(), **fp, logic=[], assumptions=[], limitations=[], open_questions=[])
         draft = self.p.write_json(slug.stdout.strip(), "review.draft.json", doc)
         self.assertEqual(run(["check", str(draft)], self.p.root).returncode, 0)
 
-    def test_fingerprint_generated_newline_path_and_argv(self):
-        rel = "sql/v1/line\nbreak\\name.sql"
+    def test_fingerprint_generated_special_character_path_and_argv(self):
+        rel = "sql/v1/line break\\name.sql"
         literal = "literal \"quoted\"\n$(touch injection)\\end"
         payload = b"SELECT 1;\r\n"
         self.generated(payload)

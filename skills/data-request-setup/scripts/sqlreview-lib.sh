@@ -118,7 +118,10 @@ sr_realpath_m() {
     cand="$cur/$part"
     if [ -L "$cand" ]; then
       hops=$((hops + 1)); [ "$hops" -le 40 ] || return 1
-      target="$(readlink "$cand")" && [ -n "$target" ] || return 1
+      # Sentinel keeps a trailing newline in the link text; a control character fails closed.
+      target="$(readlink "$cand"; printf x)" || return 1
+      target="${target%x}"; target="${target%$'\n'}"
+      case "$target" in ""|*[[:cntrl:]]*) return 1 ;; esac
       case "$target" in
         /*) cur=""; rest="${target#/}${rest:+/$rest}" ;;
         *) rest="$target${rest:+/$rest}" ;;
@@ -134,7 +137,11 @@ sr_realpath_m() {
 # sr_realpath_m to apply after symlink resolution (sr_abspath would fold ".." lexically first, so
 # sql/v1/link/../x.csv would be checked as sql/v1/x.csv while the kernel opens link's parent).
 sr_rawabs() {
-  case "$1" in /*) printf '%s\n' "$1" ;; *) printf '%s/%s\n' "$(pwd -P)" "$1" ;; esac
+  local d
+  case "$1" in
+    /*) printf '%s\n' "$1" ;;
+    *) d="$(pwd -P; printf x)"; d="${d%x}"; printf '%s/%s\n' "${d%$'\n'}" "$1" ;;
+  esac
 }
 
 # Which files may be read into .sqlreview/ (#516). Researcher-supplied values live under data/ and
@@ -162,6 +169,12 @@ sr_helper_render_marker() { # FILE
 
 sr_refuse_unreviewed() { # ABS_PATH AS_GIVEN [helper-render]
   local root phys rel links first second re='^v[0-9]+([.-][0-9]+)*$'
+  # First, before any canonicalisation: command substitution strips trailing newlines, so a name
+  # such as "alias.sql<LF>" would be checked as a different path from the one opened. Refuse
+  # newline, CR, tab and every other control character outright (fail closed).
+  case "$1$2${SR_ROOT:-}" in
+    *[[:cntrl:]]*) sr_die 2 "refused path: it contains a control character such as a newline, carriage return or tab (rule: no control characters in paths)" ;;
+  esac
   [ -n "${SR_ROOT:-}" ] || sr_die 2 "refused $2: the project root is unknown, so the path cannot be checked (fail closed)"
   root="$(sr_realpath_m "$SR_ROOT")" && phys="$(sr_realpath_m "$1")" ||
     sr_die 2 "refused $2: the path cannot be resolved, so it cannot be checked (fail closed)"

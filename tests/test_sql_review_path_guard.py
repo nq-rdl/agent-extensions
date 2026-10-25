@@ -168,6 +168,34 @@ class PathGuard(unittest.TestCase):
         self.assertNotIn(MARKER, r.stdout + r.stderr)
         self.assertEqual(tree(self.root), before)
 
+    def test_control_characters_in_a_path_are_refused(self):
+        # Command substitution strips a trailing newline, so "alias.sql<LF>" would be checked as
+        # "alias.sql" while the shell opens the other file. Refuse the character, not just the leak.
+        os.symlink("../../data/secret.json", self.root / "sql/v1/alias.sql\n")
+        self.p.sql("data/secret.json", json.dumps({"x": MARKER}))
+        self.p.write_json("sql__v1__q", "scope.json", scope_doc("sql__v1__q", "sql/v1/q.sql"))
+        names = {"trailing newline": "sql/v1/alias.sql\n", "embedded newline": "sql/v1/al\nias.sql",
+                 "carriage return": "sql/v1/alias.sql\r", "tab": "sql/v1/al\tias.sql"}
+        for label, name in names.items():
+            self.p.sql(name, SQL_V1) if "alias.sql\n" != name else None
+            for command, args in (("notes", [name]), ("publish-questions", ["sql__v1__q", name]),
+                                  ("fingerprint", [name]), ("check", [name])):
+                with self.subTest(label=label, command=command):
+                    before = tree(self.root)
+                    r = run([command, *args], self.root)
+                    self.assertEqual(r.returncode, 2, (r.stdout, r.stderr))
+                    self.assertIn("control character", r.stderr)
+                    self.assertNotIn(MARKER, r.stdout + r.stderr)
+                    self.assertEqual(r.stdout, "")
+                    self.assertEqual(tree(self.root), before)
+
+    def test_symlink_target_with_a_newline_fails_closed(self):
+        os.symlink("../../data/secret.json\n", self.root / "sql/v1/tgt.sql")
+        self.p.sql("data/secret.json", json.dumps({"x": MARKER}))
+        r = run(["notes", "sql/v1/tgt.sql"], self.root)
+        self.assertEqual(r.returncode, 2, r.stderr)
+        self.assertNotIn(MARKER, r.stdout + r.stderr)
+
     def test_unresolvable_path_fails_closed(self):
         self.each_command("sql/v1/loop/q.sql", "cannot be resolved")
 

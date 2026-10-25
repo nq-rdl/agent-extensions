@@ -53,10 +53,10 @@ cd "$PROJECT"
 S="$FIXTURE/setup/scripts"
 # Config argv contains spaces, quotes, a newline and a literal backslash.
 # The adapter checks exact argv and SQL paths under the pinned shell too.
-newline_path="$(printf 'sql/v1/line\nbreak.sql')"
+newline_path="$(printf 'sql/v1/line break.sql')"
 bash "$S/sqlreview.sh" fingerprint "$newline_path" > "$FIXTURE/newline.json"
 jq -e --arg p "$newline_path" '.sql_path==$p and .sql_provenance.mode=="rendered"' "$FIXTURE/newline.json"
-tracked_path="$(printf 'sql/v1/tracked\nname.sql')"
+tracked_path="$(printf 'sql/v1/tracked name.sql')"
 bash "$S/sqlreview.sh" fingerprint "$tracked_path" > "$FIXTURE/tracked.json"
 jq -e --arg p "$tracked_path" '.sql_path==$p and .sql_provenance.mode=="tracked"' "$FIXTURE/tracked.json"
 bash "$S/sqlreview.sh" fingerprint sql/v1/request.sql > "$FIXTURE/fingerprint.json"
@@ -105,8 +105,7 @@ def fixture(directory):
 set -eu
 [ "$1" = 'literal argument
 "quoted"\end' ] && [ "$2" = --sql-path ]
-case "$3" in sql/v1/request.sql|'sql/v1/line
-break.sql') ;; *) exit 2;; esac
+case "$3" in sql/v1/request.sql|'sql/v1/line break.sql') ;; *) exit 2;; esac
 [ "$4" = --output ]
 case "$5" in /*) ;; *) exit 2;; esac
 cat payload > "$5"
@@ -116,9 +115,9 @@ cat payload > "$5"
     d["sql_render"] = {"command": ["bash", "render.sh", 'literal argument\n"quoted"\\end']}
     config.write_text(json.dumps(d))
     (project / "sql/provenance.json").write_text(json.dumps({"schema": 1, "requests": {
-        "sql/v1/request.sql": {"source": "builder"}, "sql/v1/line\nbreak.sql": {"source": "builder"},
-        "sql/v1/tracked\nname.sql": {"source": "hand-written"}}}))
-    (project / "sql/v1/tracked\nname.sql").write_text("SELECT 7;\n")
+        "sql/v1/request.sql": {"source": "builder"}, "sql/v1/line break.sql": {"source": "builder"},
+        "sql/v1/tracked name.sql": {"source": "hand-written"}}}))
+    (project / "sql/v1/tracked name.sql").write_text("SELECT 7;\n")
     p.commit()
     p.review_dir("sql__v1__request")
     (tmp / "base.json").write_text(json.dumps(review_doc("sql__v1__request", "sql/v1/request.sql",
