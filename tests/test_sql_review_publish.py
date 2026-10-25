@@ -26,7 +26,7 @@ class Publish(unittest.TestCase):
         shutil.copytree(REPO / "skills/data-request-setup/scripts",
                         self.cache / "skills/setup/scripts", dirs_exist_ok=True)
         self.script = self.cache / "skills/setup/scripts/sqlreview.sh"
-        self.draft = root / "confirmed draft.json"
+        self.draft = self.workspace / ".sqlreview/reviews/confirmed draft.json"
         self.final = self.workspace / ".sqlreview/reviews/q"
 
     def run_helper(self, *args):
@@ -40,7 +40,7 @@ class Publish(unittest.TestCase):
 
     def generated(self, payload="SELECT 1;\n"):
         (self.workspace / "sql").mkdir(exist_ok=True)
-        (self.workspace / ".gitignore").write_text("sql/request.sql\n")
+        (self.workspace / ".gitignore").write_text("sql/v1/request.sql\n")
         (self.workspace / "payload").write_text(payload)
         (self.workspace / "render.sh").write_text('set -eu\ncat payload > "$4"\n')
         config = self.workspace / ".sqlreview/config.json"
@@ -48,16 +48,16 @@ class Publish(unittest.TestCase):
         cfg["sql_render"] = {"command": ["bash", "render.sh"]}
         config.write_text(json.dumps(cfg))
         (self.workspace / "sql/provenance.json").write_text(json.dumps({
-            "schema": 1, "requests": {"sql/request.sql": {"source": "builder"}}}))
+            "schema": 1, "requests": {"sql/v1/request.sql": {"source": "builder"}}}))
         self.project.commit()
-        self.final = self.workspace / ".sqlreview/reviews/sql__request"
-        result = self.run_helper("fingerprint", "sql/request.sql")
+        self.final = self.workspace / ".sqlreview/reviews/sql__v1__request"
+        result = self.run_helper("fingerprint", "sql/v1/request.sql")
         self.assertEqual(result.returncode, 0, result.stderr)
         return json.loads(result.stdout)
 
     def generated_doc(self, fp, kind="review", revision=1):
         return (review_doc if kind == "review" else scope_doc)(
-            "sql__request", revision=revision, **fp)
+            "sql__v1__request", revision=revision, **fp)
 
     def assert_no_sql_records(self):
         self.assertFalse(list((self.workspace / ".sqlreview").rglob("*.sql")))
@@ -68,19 +68,19 @@ class Publish(unittest.TestCase):
     def test_rendered_publication_without_snapshots(self):
         fp = self.generated()
         for kind in ("scope", "review"):
-            result = self.publish(self.generated_doc(fp, kind), "sql__request")
+            result = self.publish(self.generated_doc(fp, kind), "sql__v1__request")
             self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
             saved = json.loads((self.final / f"{kind}.json").read_text())
             self.assertEqual(saved["sql_provenance"], fp["sql_provenance"])
-        self.assertFalse((self.workspace / "sql/request.sql").exists())
+        self.assertFalse((self.workspace / "sql/v1/request.sql").exists())
         self.assert_no_sql_records()
 
     def test_revision_history_retains_hash_and_commit(self):
         fp = self.generated()
         for kind in ("scope", "review"):
-            self.assertEqual(self.publish(self.generated_doc(fp, kind), "sql__request").returncode, 0)
+            self.assertEqual(self.publish(self.generated_doc(fp, kind), "sql__v1__request").returncode, 0)
             before = (self.final / f"{kind}.json").read_bytes()
-            result = self.publish(self.generated_doc(fp, kind, 2), "sql__request")
+            result = self.publish(self.generated_doc(fp, kind, 2), "sql__v1__request")
             self.assertEqual(result.returncode, 0, result.stderr)
             history = self.final / f"history/{kind}/1.json"
             self.assertEqual(history.read_bytes(), before)
@@ -91,32 +91,32 @@ class Publish(unittest.TestCase):
 
     def test_history_conflict_preserves_final(self):
         fp = self.generated()
-        self.assertEqual(self.publish(self.generated_doc(fp), "sql__request").returncode, 0)
+        self.assertEqual(self.publish(self.generated_doc(fp), "sql__v1__request").returncode, 0)
         before = (self.final / "review.json").read_bytes()
         history = self.final / "history/review/1.json"
         history.parent.mkdir(parents=True)
         history.write_text("conflict")
-        result = self.publish(self.generated_doc(fp, revision=2), "sql__request")
+        result = self.publish(self.generated_doc(fp, revision=2), "sql__v1__request")
         self.assertEqual(result.returncode, 2, result.stderr)
         self.assertEqual((self.final / "review.json").read_bytes(), before)
         self.assertEqual(history.read_text(), "conflict")
 
     def test_failed_publication_preserves_history(self):
         fp = self.generated()
-        self.assertEqual(self.publish(self.generated_doc(fp), "sql__request").returncode, 0)
+        self.assertEqual(self.publish(self.generated_doc(fp), "sql__v1__request").returncode, 0)
         before = (self.final / "review.json").read_bytes()
         doc = self.generated_doc(fp, revision=2)
         doc["assumptions"][0]["status"] = "pending"
-        self.assertNotEqual(self.publish(doc, "sql__request").returncode, 0)
+        self.assertNotEqual(self.publish(doc, "sql__v1__request").returncode, 0)
         self.assertEqual((self.final / "review.json").read_bytes(), before)
         self.assertFalse((self.final / "history/review/1.json").exists())
 
     def test_snapshot_is_idempotent_verification(self):
         fp = self.generated()
-        self.assertEqual(self.publish(self.generated_doc(fp), "sql__request").returncode, 0)
+        self.assertEqual(self.publish(self.generated_doc(fp), "sql__v1__request").returncode, 0)
         before = {p: p.read_bytes() for p in self.final.rglob("*") if p.is_file()}
         for _ in range(2):
-            result = self.run_helper("snapshot", "sql__request", "sql/request.sql")
+            result = self.run_helper("snapshot", "sql__v1__request", "sql/v1/request.sql")
             self.assertEqual(result.returncode, 0, result.stderr)
         after = {p: p.read_bytes() for p in self.final.rglob("*") if p.is_file()}
         self.assertEqual(before, after)
@@ -127,17 +127,17 @@ class Publish(unittest.TestCase):
         # Claim an unavailable commit while retaining the correct current full/body hashes.
         doc = self.generated_doc(dict(fp, git_commit="f" * 40,
                                       sql_provenance={**fp["sql_provenance"], "commit": "f" * 40}))
-        result = self.publish(doc, "sql__request")
+        result = self.publish(doc, "sql__v1__request")
         self.assertEqual(result.returncode, 6, result.stderr)
         self.assertFalse((self.final / "review.json").exists())
 
     def test_header_revision_preserves_original_and_records_current_commit(self):
         fp = self.generated("-- old header\nSELECT 1;\n")
         doc = self.generated_doc(fp)
-        self.assertEqual(self.publish(doc, "sql__request").returncode, 0)
+        self.assertEqual(self.publish(doc, "sql__v1__request").returncode, 0)
         (self.workspace / "payload").write_text("-- new header\nSELECT 1;\n")
         current = self.project.commit("header")
-        result = self.publish(doc, "sql__request")
+        result = self.publish(doc, "sql__v1__request")
         self.assertEqual(result.returncode, 0, result.stderr)
         saved = json.loads((self.final / "review.json").read_text())
         self.assertEqual(saved["sql_sha256"], fp["sql_sha256"])
@@ -150,7 +150,7 @@ class Publish(unittest.TestCase):
     def test_corrupt_original_hash_cannot_use_matching_body(self):
         fp = self.generated("-- header\nSELECT 1;\n")
         doc = self.generated_doc(dict(fp, sql_sha256="0" * 64))
-        result = self.publish(doc, "sql__request")
+        result = self.publish(doc, "sql__v1__request")
         self.assertEqual(result.returncode, 6, result.stderr)
         self.assertFalse((self.final / "review.json").exists())
 
@@ -158,9 +158,9 @@ class Publish(unittest.TestCase):
         fp = self.generated()
         (self.workspace / "payload").write_text("SELECT 2;\n")
         doc = self.generated_doc(fp)
-        self.assertEqual(self.publish(doc, "sql__request").returncode, 2)
+        self.assertEqual(self.publish(doc, "sql__v1__request").returncode, 2)
         self.project.commit("body change")
-        result = self.publish(doc, "sql__request")
+        result = self.publish(doc, "sql__v1__request")
         self.assertEqual(result.returncode, 2, result.stderr)
         self.assertFalse((self.final / "review.json").exists())
 
@@ -170,22 +170,22 @@ class Publish(unittest.TestCase):
         del doc["sql_provenance"]
         for dirty in (None, False):
             doc["git_dirty"] = dirty
-            result = self.publish(doc, "sql__request")
+            result = self.publish(doc, "sql__v1__request")
             self.assertEqual(result.returncode, 0, result.stderr)
             (self.final / "review.json").unlink()
         del doc["git_dirty"]
-        self.assertEqual(self.publish(doc, "sql__request").returncode, 0)
+        self.assertEqual(self.publish(doc, "sql__v1__request").returncode, 0)
         (self.final / "review.json").unlink()
         for commit, dirty in ((None, False), (fp["git_commit"], True),
                               (fp["git_commit"], "false")):
             doc.update(git_commit=commit, git_dirty=dirty)
-            result = self.publish(doc, "sql__request")
+            result = self.publish(doc, "sql__v1__request")
             self.assertEqual(result.returncode, 6, result.stderr)
             self.assertFalse((self.final / "review.json").exists())
 
     def test_failed_final_replace_rolls_back_new_history(self):
         fp = self.generated()
-        self.assertEqual(self.publish(self.generated_doc(fp), "sql__request").returncode, 0)
+        self.assertEqual(self.publish(self.generated_doc(fp), "sql__v1__request").returncode, 0)
         before = (self.final / "review.json").read_bytes()
         with tempfile.TemporaryDirectory() as binpath:
             shim = Path(binpath) / "mv"
@@ -193,7 +193,7 @@ class Publish(unittest.TestCase):
             shim.chmod(0o755)
             self.draft.write_text(json.dumps(self.generated_doc(fp, revision=2)))
             env = dict(os.environ, PATH=binpath + os.pathsep + os.environ["PATH"])
-            result = subprocess.run(["bash", str(self.script), "publish", "sql__request", "review", str(self.draft)],
+            result = subprocess.run(["bash", str(self.script), "publish", "sql__v1__request", "review", str(self.draft)],
                                     cwd=self.workspace, env=env, capture_output=True, text=True)
         self.assertEqual(result.returncode, 2, result.stderr)
         self.assertEqual((self.final / "review.json").read_bytes(), before)
@@ -203,7 +203,7 @@ class Publish(unittest.TestCase):
 
     def test_publication_interrupted_before_replace_preserves_final_and_history(self):
         fp = self.generated()
-        self.assertEqual(self.publish(self.generated_doc(fp), "sql__request").returncode, 0)
+        self.assertEqual(self.publish(self.generated_doc(fp), "sql__v1__request").returncode, 0)
         before = (self.final / "review.json").read_bytes()
         with tempfile.TemporaryDirectory() as binpath:
             shim = Path(binpath) / "mv"
@@ -211,7 +211,7 @@ class Publish(unittest.TestCase):
             shim.chmod(0o755)
             self.draft.write_text(json.dumps(self.generated_doc(fp, revision=2)))
             env = dict(os.environ, PATH=binpath + os.pathsep + os.environ["PATH"])
-            result = subprocess.run(["bash", str(self.script), "publish", "sql__request", "review", str(self.draft)],
+            result = subprocess.run(["bash", str(self.script), "publish", "sql__v1__request", "review", str(self.draft)],
                                     cwd=self.workspace, env=env, capture_output=True, text=True)
         self.assertNotEqual(result.returncode, 0, result.stderr)
         self.assertEqual((self.final / "review.json").read_bytes(), before)
@@ -221,7 +221,7 @@ class Publish(unittest.TestCase):
 
     def test_signal_after_final_replace_keeps_matching_revision_history(self):
         fp = self.generated()
-        self.assertEqual(self.publish(self.generated_doc(fp), "sql__request").returncode, 0)
+        self.assertEqual(self.publish(self.generated_doc(fp), "sql__v1__request").returncode, 0)
         before = (self.final / "review.json").read_bytes()
         with tempfile.TemporaryDirectory() as binpath:
             shim = Path(binpath) / "mv"
@@ -229,7 +229,7 @@ class Publish(unittest.TestCase):
             shim.chmod(0o755)
             self.draft.write_text(json.dumps(self.generated_doc(fp, revision=2)))
             env = dict(os.environ, PATH=binpath + os.pathsep + os.environ["PATH"])
-            subprocess.run(["bash", str(self.script), "publish", "sql__request", "review", str(self.draft)],
+            subprocess.run(["bash", str(self.script), "publish", "sql__v1__request", "review", str(self.draft)],
                            cwd=self.workspace, env=env, capture_output=True, text=True)
         self.assertEqual(json.loads((self.final / "review.json").read_text())["revision"], 2)
         history = self.final / "history/review/1.json"
@@ -254,13 +254,13 @@ class Publish(unittest.TestCase):
         adapter.write_text('set -eu\ncat payload > "$4"\n' +
                            f'if [ -f "{control}" ]; then printf "SELECT 2;\\n" > "{self.workspace / "payload"}"; fi\n')
         self.project.commit("adapter")
-        result = self.run_helper("fingerprint", "sql/request.sql")
+        result = self.run_helper("fingerprint", "sql/v1/request.sql")
         self.assertEqual(result.returncode, 0, result.stderr)
         fp = json.loads(result.stdout)
-        self.assertEqual(self.publish(self.generated_doc(fp), "sql__request").returncode, 0)
+        self.assertEqual(self.publish(self.generated_doc(fp), "sql__v1__request").returncode, 0)
         before = (self.final / "review.json").read_bytes()
         control.touch()
-        result = self.run_helper("snapshot", "sql__request", "sql/request.sql")
+        result = self.run_helper("snapshot", "sql__v1__request", "sql/v1/request.sql")
         self.assertEqual(result.returncode, 2, result.stderr)
         self.assertEqual((self.final / "review.json").read_bytes(), before)
         self.assert_no_sql_records()
@@ -268,7 +268,7 @@ class Publish(unittest.TestCase):
     def test_recorded_render_copy_failure_is_operational_for_publish_and_snapshot(self):
         fp = self.generated()
         doc = self.generated_doc(fp)
-        self.assertEqual(self.publish(doc, "sql__request").returncode, 0)
+        self.assertEqual(self.publish(doc, "sql__v1__request").returncode, 0)
         before = (self.final / "review.json").read_bytes()
         self.draft.write_text(json.dumps(doc))
         with tempfile.TemporaryDirectory() as binpath:
@@ -276,8 +276,8 @@ class Publish(unittest.TestCase):
             shim.write_text(f'#!/bin/sh\ncase "$2" in */recorded.sql) exit 1;; esac\nexec {shutil.which("cp")} "$@"\n')
             shim.chmod(0o755)
             env = dict(os.environ, PATH=binpath + os.pathsep + os.environ["PATH"])
-            for args in (("publish", "sql__request", "review", str(self.draft)),
-                         ("snapshot", "sql__request", "sql/request.sql")):
+            for args in (("publish", "sql__v1__request", "review", str(self.draft)),
+                         ("snapshot", "sql__v1__request", "sql/v1/request.sql")):
                 with self.subTest(command=args[0]):
                     result = subprocess.run(["bash", str(self.script), *args],
                                             cwd=self.workspace, env=env, capture_output=True, text=True)
@@ -294,7 +294,7 @@ class Publish(unittest.TestCase):
             self.skipTest("/dev/shm and project share a filesystem")
         fp = self.generated()
         doc = self.generated_doc(fp)
-        self.assertEqual(self.publish(doc, "sql__request").returncode, 0)
+        self.assertEqual(self.publish(doc, "sql__v1__request").returncode, 0)
         before = (self.final / "review.json").read_bytes()
         self.draft.write_text(json.dumps(self.generated_doc(fp, revision=2)))
         with tempfile.TemporaryDirectory(dir="/dev/shm") as external, tempfile.TemporaryDirectory() as binpath:
@@ -304,7 +304,7 @@ class Publish(unittest.TestCase):
                             f'exec {shutil.which("mv")} "$@"\n')
             shim.chmod(0o755)
             env = dict(os.environ, PATH=binpath + os.pathsep + os.environ["PATH"], TMPDIR=external)
-            result = subprocess.run(["bash", str(self.script), "publish", "sql__request", "review", str(self.draft)],
+            result = subprocess.run(["bash", str(self.script), "publish", "sql__v1__request", "review", str(self.draft)],
                                     cwd=self.workspace, env=env, capture_output=True, text=True)
         self.assertEqual(result.returncode, 0, result.stderr)
         self.assertEqual((self.final / "history/review/1.json").read_bytes(), before)

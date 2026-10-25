@@ -12,6 +12,34 @@ pins first. Uncommitted source changes are refused; review records under
 ``.sqlreview/reviews/``, templates, ledger and the store ignore file are exempt.
 Ignored generated outputs do not change the source identity.
 
+Accepted paths
+--------------
+
+Only reviewed request SQL under ``sql/v<N>/`` is read into ``.sqlreview/``. The
+directory name must match ``v[0-9]+([.-][0-9]+)*`` (``sql/v1/``, ``sql/v2.1/``,
+``sql/v3-1/``), the scaffold's rule. ``slug``, ``fingerprint``, ``snapshot``,
+``notes`` and ``intake``, the new path of ``move``, and the ``sql_path`` of a draft
+or record, refuse any path under ``data/`` and any path under ``sql/`` outside such a
+directory, such as ``sql/<name>/`` pipeline SQL, because those files can hold
+researcher-supplied values that must never reach Git. Other paths inside the project are
+unaffected. ``move OLD NEW`` accepts a refused OLD path, which is only the key of
+an existing record and is never read, so records bound to such a path can move
+into a reviewed directory.
+
+The path is canonicalised before the check: ``..`` and symlinks are resolved
+relative to the project root, so ``sql/v1/../pipeline_a/q.sql`` and a link from
+``sql/v1/`` into ``data/`` are refused. A path that cannot be resolved (a symlink
+loop, say) or that resolves outside the project is refused; copy a file from outside
+the project root into ``sql/v<N>/`` first. Only ``notes`` also accepts a render the helper itself wrote
+(``sr_source_render``, ``materialize``), marked by a ``FILE.sqlreview-render`` SHA-256
+file, which is what the analyse, bootstrap and explain recipes pass it. A file with
+more than one hard link is refused, since a link may lead to ``data/``. Every file argument
+(``check``, ``lint``, ``ledger``, ``carryover``, ``carryforward``, ``remap``, ``publish``,
+``publish-questions``, ``intake``, ``notes --against/--questions``, and the files given to
+``release.sh`` and ``recurring-decisions.sh``) follows the same rules. The command exits 2
+with a message that names the rule and the path as given, never file content,
+and writes nothing under ``.sqlreview/``.
+
 Project adapter
 ---------------
 

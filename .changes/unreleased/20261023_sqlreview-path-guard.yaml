@@ -1,0 +1,3 @@
+kind: Security
+body: Refuse sqlreview paths under data/ or outside a reviewed sql/v<N>/ directory, resolving symlinks and .. first (#516)
+time: 2026-10-23T00:00:00Z

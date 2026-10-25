@@ -53,36 +53,36 @@ cd "$PROJECT"
 S="$FIXTURE/setup/scripts"
 # Config argv contains spaces, quotes, a newline and a literal backslash.
 # The adapter checks exact argv and SQL paths under the pinned shell too.
-newline_path="$(printf 'sql/line\nbreak.sql')"
+newline_path="$(printf 'sql/v1/line break.sql')"
 bash "$S/sqlreview.sh" fingerprint "$newline_path" > "$FIXTURE/newline.json"
 jq -e --arg p "$newline_path" '.sql_path==$p and .sql_provenance.mode=="rendered"' "$FIXTURE/newline.json"
-tracked_path="$(printf 'sql/tracked\nname.sql')"
+tracked_path="$(printf 'sql/v1/tracked name.sql')"
 bash "$S/sqlreview.sh" fingerprint "$tracked_path" > "$FIXTURE/tracked.json"
 jq -e --arg p "$tracked_path" '.sql_path==$p and .sql_provenance.mode=="tracked"' "$FIXTURE/tracked.json"
-bash "$S/sqlreview.sh" fingerprint sql/request.sql > "$FIXTURE/fingerprint.json"
-jq -s '.[0] * .[1]' "$FIXTURE/base.json" "$FIXTURE/fingerprint.json" > .sqlreview/reviews/sql__request/review.draft.json
-bash "$S/sqlreview.sh" publish sql__request review .sqlreview/reviews/sql__request/review.draft.json
-bash "$S/sqlreview.sh" snapshot sql__request sql/request.sql
-test ! -e sql/request.sql
+bash "$S/sqlreview.sh" fingerprint sql/v1/request.sql > "$FIXTURE/fingerprint.json"
+jq -s '.[0] * .[1]' "$FIXTURE/base.json" "$FIXTURE/fingerprint.json" > .sqlreview/reviews/sql__v1__request/review.draft.json
+bash "$S/sqlreview.sh" publish sql__v1__request review .sqlreview/reviews/sql__v1__request/review.draft.json
+bash "$S/sqlreview.sh" snapshot sql__v1__request sql/v1/request.sql
+test ! -e sql/v1/request.sql
 printf 'SET NOCOUNT ON;\nSELECT 2;\nSELECT 3;\n' > payload
 git add payload
 git -c commit.gpgsign=false commit -qm 'builder shift'
-bash "$S/sqlreview.sh" fingerprint sql/request.sql > "$FIXTURE/fingerprint.json"
-jq -s '.[0] * .[1] | .revision=2' .sqlreview/reviews/sql__request/review.json "$FIXTURE/fingerprint.json" > .sqlreview/reviews/sql__request/review.draft.json
-bash "$S/sqlreview.sh" remap sql__request .sqlreview/reviews/sql__request/review.draft.json
-bash "$S/sqlreview.sh" carryforward sql__request review .sqlreview/reviews/sql__request/review.draft.json > "$FIXTURE/carry.json"
+bash "$S/sqlreview.sh" fingerprint sql/v1/request.sql > "$FIXTURE/fingerprint.json"
+jq -s '.[0] * .[1] | .revision=2' .sqlreview/reviews/sql__v1__request/review.json "$FIXTURE/fingerprint.json" > .sqlreview/reviews/sql__v1__request/review.draft.json
+bash "$S/sqlreview.sh" remap sql__v1__request .sqlreview/reviews/sql__v1__request/review.draft.json
+bash "$S/sqlreview.sh" carryforward sql__v1__request review .sqlreview/reviews/sql__v1__request/review.draft.json > "$FIXTURE/carry.json"
 jq -e '.carry[0].basis=="lines-unchanged" and .carry[0].set.confirmed_revision==1' "$FIXTURE/carry.json"
-jq --slurpfile carry "$FIXTURE/carry.json" '.assumptions[0] += $carry[0].carry[0].set' .sqlreview/reviews/sql__request/review.draft.json > "$FIXTURE/draft.json"
-cp "$FIXTURE/draft.json" .sqlreview/reviews/sql__request/review.draft.json
-bash "$S/sqlreview.sh" publish sql__request review .sqlreview/reviews/sql__request/review.draft.json
-jq -e '.revision==1' .sqlreview/reviews/sql__request/history/review/1.json
+jq --slurpfile carry "$FIXTURE/carry.json" '.assumptions[0] += $carry[0].carry[0].set' .sqlreview/reviews/sql__v1__request/review.draft.json > "$FIXTURE/draft.json"
+cp "$FIXTURE/draft.json" .sqlreview/reviews/sql__v1__request/review.draft.json
+bash "$S/sqlreview.sh" publish sql__v1__request review .sqlreview/reviews/sql__v1__request/review.draft.json
+jq -e '.revision==1' .sqlreview/reviews/sql__v1__request/history/review/1.json
 T="$(mktemp -d /tmp/sqlreview-fixture.XXXXXX)"
 trap 'rm -rf "$T"' EXIT
-bash "$S/sqlreview.sh" materialize sql__request review 1 "$T/old.sql"
+bash "$S/sqlreview.sh" materialize sql__v1__request review 1 "$T/old.sql"
 printf 'SELECT 1;\nSELECT 3;\n' > "$T/expected.sql"
 cmp "$T/old.sql" "$T/expected.sql"
 set +e
-bash "$S/sqlreview.sh" materialize sql__request review 9 "$T/missing.sql"
+bash "$S/sqlreview.sh" materialize sql__v1__request review 9 "$T/missing.sql"
 rc=$?
 set -e
 test "$rc" = 6
@@ -98,15 +98,14 @@ def fixture(directory):
     project = tmp / "project"
     project.mkdir()
     p = Project(project)
-    (project / "sql").mkdir()
-    (project / ".gitignore").write_text("sql/request.sql\n")
+    (project / "sql/v1").mkdir(parents=True)
+    (project / ".gitignore").write_text("sql/v1/request.sql\n")
     (project / "payload").write_text("SELECT 1;\nSELECT 3;\n")
     (project / "render.sh").write_text(r'''#!/usr/bin/env bash
 set -eu
 [ "$1" = 'literal argument
 "quoted"\end' ] && [ "$2" = --sql-path ]
-case "$3" in sql/request.sql|'sql/line
-break.sql') ;; *) exit 2;; esac
+case "$3" in sql/v1/request.sql|'sql/v1/line break.sql') ;; *) exit 2;; esac
 [ "$4" = --output ]
 case "$5" in /*) ;; *) exit 2;; esac
 cat payload > "$5"
@@ -116,12 +115,12 @@ cat payload > "$5"
     d["sql_render"] = {"command": ["bash", "render.sh", 'literal argument\n"quoted"\\end']}
     config.write_text(json.dumps(d))
     (project / "sql/provenance.json").write_text(json.dumps({"schema": 1, "requests": {
-        "sql/request.sql": {"source": "builder"}, "sql/line\nbreak.sql": {"source": "builder"},
-        "sql/tracked\nname.sql": {"source": "hand-written"}}}))
-    (project / "sql/tracked\nname.sql").write_text("SELECT 7;\n")
+        "sql/v1/request.sql": {"source": "builder"}, "sql/v1/line break.sql": {"source": "builder"},
+        "sql/v1/tracked name.sql": {"source": "hand-written"}}}))
+    (project / "sql/v1/tracked name.sql").write_text("SELECT 7;\n")
     p.commit()
-    p.review_dir("sql__request")
-    (tmp / "base.json").write_text(json.dumps(review_doc("sql__request", "sql/request.sql",
+    p.review_dir("sql__v1__request")
+    (tmp / "base.json").write_text(json.dumps(review_doc("sql__v1__request", "sql/v1/request.sql",
         assumptions=[item("A1", "Retain this range", location={"lines": [2, 2]})],
         limitations=[], logic=[], open_questions=[])))
     return project
@@ -135,7 +134,7 @@ class HostSources(unittest.TestCase):
                 env={**os.environ, "PROJECT": str(project), "FIXTURE": tmp}, timeout=120)
             self.assertEqual(r.returncode, 0, r.stdout + r.stderr)
             self.assertIn("source-contract-ok", r.stdout)
-            history = project / ".sqlreview/reviews/sql__request/history"
+            history = project / ".sqlreview/reviews/sql__v1__request/history"
             self.assertEqual(history.stat().st_uid, os.getuid())
             self.assertEqual(history.stat().st_gid, os.getgid())
             self.assertEqual(stat.S_IMODE(history.stat().st_mode), 0o700)
@@ -160,7 +159,7 @@ class Bash32Sources(unittest.TestCase):
             r = run_container(tmp, "/w", command, user=f"{os.getuid()}:{os.getgid()}")
             self.assertEqual(r.returncode, 0, r.stdout + r.stderr)
             self.assertIn("source-contract-ok", r.stdout)
-            history = project / ".sqlreview/reviews/sql__request/history"
+            history = project / ".sqlreview/reviews/sql__v1__request/history"
             self.assertEqual(history.stat().st_uid, os.getuid())
             self.assertEqual(history.stat().st_gid, os.getgid())
             self.assertEqual(stat.S_IMODE(history.stat().st_mode), 0o700)
@@ -282,7 +281,7 @@ class HostGitFixture(unittest.TestCase):
                                            env=env, text=True, capture_output=True)
             self.assertEqual(trusted_clone.returncode, 0, trusted_clone.stdout + trusted_clone.stderr)
             r = subprocess.run(["bash", str(Path(tmp) / "setup/scripts/sqlreview.sh"),
-                                "fingerprint", "sql/request.sql"], cwd=project,
+                                "fingerprint", "sql/v1/request.sql"], cwd=project,
                                env=env, text=True, capture_output=True)
             self.assertEqual(r.returncode, 0, r.stdout + r.stderr)
             self.assertEqual(json.loads(r.stdout)["sql_provenance"]["mode"], "rendered")

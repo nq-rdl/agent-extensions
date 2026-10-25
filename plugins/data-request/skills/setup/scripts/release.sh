@@ -272,6 +272,11 @@ cmd_evidence() {
 cmd="${1:-}"
 [ -n "$cmd" ] || usage
 shift
+# File arguments go through the shared guard (#516): no data/, no unreviewed sql/, nothing outside the project.
+case "$cmd" in
+  check) [ $# -lt 1 ] || [ "$1" = --stdin ] || sr_guard_input "$1" ;;
+  render) [ $# -lt 1 ] || sr_guard_input "$1" ;;
+esac
 case "$cmd" in
   evidence) cmd_evidence "$@" ;;
   check) cmd_check "$@" ;;

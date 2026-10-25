@@ -172,7 +172,8 @@ class Questions(unittest.TestCase):
                 with self.subTest(path=path):
                     r = run(["publish-questions", "q", path], self.p.root)
                     self.assertEqual(r.returncode, 2, r.stdout + r.stderr)
-                    self.assertIn("symlink", r.stderr)
+                    # Refused before any copy: by the path guard (the link leads outside the project) or the symlink rule.
+                    self.assertRegex(r.stderr, "symlink|refused")
                     self.assertEqual(self.bytes(), before)
         (self.p.root / "safe").mkdir()
         self.assertEqual(run(["publish-questions", "q", "safe/../questions.draft.json"], self.p.root).returncode, 0)
