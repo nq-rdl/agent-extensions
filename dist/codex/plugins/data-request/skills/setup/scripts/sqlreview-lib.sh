@@ -143,28 +143,33 @@ sr_rawabs() {
 # Checked on the canonical path (symlinks and ".." resolved against the project root), so a
 # link or a ".." cannot lead a reviewed-looking path into data/ or sql/<name>/. Fails closed when
 # the path cannot be resolved. Messages name the rule and the path as given, never file content.
-# A file directly inside a private sqlreview-* temp directory that this user created under $TMPDIR.
-sr_is_helper_tmp() { # PHYSICAL_PATH
-  local dir tmpd
-  dir="${1%/*}"
-  tmpd="$(sr_realpath_m "${TMPDIR:-/tmp}")" || return 1
-  [ "${dir%/*}" = "$tmpd" ] || return 1
-  case "${dir##*/}" in sqlreview-?*) ;; *) return 1 ;; esac
-  [ -d "$dir" ] && [ ! -L "$dir" ] && [ -O "$dir" ] || return 1
-  [ "$(ls -ld "$dir" | cut -c1-10)" = "drwx------" ]
+# Hard-link count of a file, portably (GNU stat -c, BSD stat -f). Fails when it cannot be read.
+sr_nlink() { # FILE
+  local n
+  n="$(stat -c %h "$1" 2>/dev/null)" || n="$(stat -f %l "$1" 2>/dev/null)" || return 1
+  case "$n" in ""|*[!0-9]*) return 1 ;; esac
+  printf '%s\n' "$n"
 }
 
-sr_refuse_unreviewed() { # ABS_PATH AS_GIVEN [helper-tmp]
-  local root phys rel first second re='^v[0-9]+([.-][0-9]+)*$'
+# A render the helper itself wrote (sr_source_render, materialize) carries FILE.sqlreview-render
+# with the file's SHA-256. notes accepts an outside-project file only with a matching marker, so a
+# directory or file made by hand under any name is refused. Not a defence against a hostile
+# same-user process, which could write the marker too.
+sr_helper_render_marker() { # FILE
+  [ -f "$1" ] && [ ! -L "$1" ] && [ -f "$1.sqlreview-render" ] && [ ! -L "$1.sqlreview-render" ] || return 1
+  [ "$(cat "$1.sqlreview-render" 2>/dev/null)" = "$(sr_sha256 "$1" 2>/dev/null)" ]
+}
+
+sr_refuse_unreviewed() { # ABS_PATH AS_GIVEN [helper-render]
+  local root phys rel links first second re='^v[0-9]+([.-][0-9]+)*$'
   [ -n "${SR_ROOT:-}" ] || sr_die 2 "refused $2: the project root is unknown, so the path cannot be checked (fail closed)"
   root="$(sr_realpath_m "$SR_ROOT")" && phys="$(sr_realpath_m "$1")" ||
     sr_die 2 "refused $2: the path cannot be resolved, so it cannot be checked (fail closed)"
   case "$phys" in
     "$root"/*) ;;
     *)
-      # Only notes passes "helper-tmp": the documented flows run it on a render the helper made in its
-      # own private mktemp directory (sqlreview-*.XXXXXX, mode 700, ours, directly under $TMPDIR).
-      [ "${3:-}" = helper-tmp ] && sr_is_helper_tmp "$phys" && return 0
+      # Only notes passes "helper-render": the documented flows run it on a render the helper wrote.
+      [ "${3:-}" = helper-render ] && sr_helper_render_marker "$phys" && return 0
       sr_die 2 "refused $2: it resolves outside the project root; copy it into sql/v<N>/ first (rule: no paths that leave the project)" ;;
   esac
   rel="${phys#"$root"/}"
@@ -178,6 +183,11 @@ sr_refuse_unreviewed() { # ABS_PATH AS_GIVEN [helper-tmp]
       [[ "$second" =~ $re ]] ||
         sr_die 2 "refused $2: only a reviewed version directory sql/v<N>/ may be read into $SR_DIR/; pipeline SQL under sql/<name>/ may hold cohort values (rule: sql/ paths must be inside sql/v[0-9]+([.-][0-9]+)*/)" ;;
   esac
+  # A hard link shares the inode of a file the path rules never see (a data/ file linked into sql/v1/).
+  if [ -f "$phys" ]; then
+    links="$(sr_nlink "$phys")" || sr_die 2 "refused $2: its hard-link count cannot be read, so it cannot be checked (fail closed)"
+    [ "$links" -le 1 ] || sr_die 2 "refused $2: the file has $links hard links, and one may be under data/ (rule: no hard-linked files)"
+  fi
 }
 
 # Structural checks on a stored or derived project-relative path (no policy; see sr_safe_sql).

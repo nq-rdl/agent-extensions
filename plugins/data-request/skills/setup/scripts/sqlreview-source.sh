@@ -181,6 +181,7 @@ sr_source_render() { # REF SQL_PATH OUTPUT; sets SR_SOURCE_{COMMIT,MODE,PREFIX}
       [ "$sha" = "$expected" ] || { sr_source_unavailable "manifest hash mismatch with fresh render"; exit 6; }
     fi
     cp "$tmp/render.sql" "$output" || { sr_source_error "cannot write caller output"; exit 2; }
+    sr_sha256 "$output" > "$output.sqlreview-render" || { sr_source_error "cannot mark caller output"; exit 2; }
   )
 }
 

@@ -246,10 +246,11 @@ class Sources(unittest.TestCase):
                             location={"lines": [8, 8]}, status="candidate", confirmed_by=None,
                             confirmed_at=None, confirmed_revision=None)], limitations=[])
         draft = self.p.write_json("sql__v1__request", "review.draft.json", doc)
-        # Mirrors the documented flow: a render in the helper's private sqlreview-* temp directory.
+        # Mirrors the documented flow: a render the helper wrote, which carries its marker.
         with tempfile.TemporaryDirectory(prefix="sqlreview-notes.") as tmp:
             output = Path(tmp) / "notes.sql"
             output.write_text(SQL)
+            Path(str(output) + ".sqlreview-render").write_text(hashlib.sha256(SQL.encode()).hexdigest() + "\n")
             r = run(["notes", str(output), "--against", str(draft), "--confirmed-by", "engineer-login"], self.p.root)
             self.assertEqual(r.returncode, 0, r.stdout + r.stderr)
             result = json.loads(r.stdout)

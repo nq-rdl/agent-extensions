@@ -7,14 +7,15 @@ an unresolvable path fails closed, and the message names the rule, never file co
 """
 import json
 import os
+import subprocess
 import tempfile
 import unittest
 from pathlib import Path
 
 try:  # `unittest discover -s tests` puts tests/ on sys.path; `-m unittest tests.x` does not
-    from test_sql_review_scripts import SQL_V1, Project, item, review_doc, run
+    from test_sql_review_scripts import SCRIPT, SQL_V1, Project, item, review_doc, run, scope_doc
 except ModuleNotFoundError:
-    from tests.test_sql_review_scripts import SQL_V1, Project, item, review_doc, run
+    from tests.test_sql_review_scripts import SCRIPT, SQL_V1, Project, item, review_doc, run, scope_doc
 
 MARKER = "ZZTEST-90210-ROW"  # stands in for a researcher-supplied value; must never be echoed
 RULE_DATA = "no data/ paths"
@@ -123,18 +124,49 @@ class PathGuard(unittest.TestCase):
         self.each_command(str(other / "data/00_raw/x.csv"), rule)
         self.each_command("sql/v1/out.csv", rule)
 
-    def test_notes_accepts_only_a_private_helper_temp_render(self):
+    def test_notes_accepts_only_a_helper_marked_render(self):
+        import hashlib
         with tempfile.TemporaryDirectory(prefix="sqlreview-notes.") as tmp:
-            (Path(tmp) / "current.sql").write_text(SQL_V1)
-            self.assertEqual(run(["notes", str(Path(tmp) / "current.sql")], self.root).returncode, 0)
-            self.assertEqual(run(["slug", str(Path(tmp) / "current.sql")], self.root).returncode, 2)
-        with tempfile.TemporaryDirectory(prefix="other.") as tmp:
-            (Path(tmp) / "current.sql").write_text(SQL_V1)
-            self.assertEqual(run(["notes", str(Path(tmp) / "current.sql")], self.root).returncode, 2)
-        with tempfile.TemporaryDirectory(prefix="sqlreview-notes.") as tmp:
-            os.chmod(tmp, 0o755)
-            (Path(tmp) / "current.sql").write_text(SQL_V1)
-            self.assertEqual(run(["notes", str(Path(tmp) / "current.sql")], self.root).returncode, 2)
+            f = Path(tmp) / "current.sql"
+            f.write_text(SQL_V1)
+            # A forged directory with the helper's name and mode, but no marker: refused.
+            self.assertEqual(run(["notes", str(f)], self.root).returncode, 2)
+            marker = Path(str(f) + ".sqlreview-render")
+            marker.write_text("0" * 64 + "\n")
+            self.assertEqual(run(["notes", str(f)], self.root).returncode, 2)
+            marker.write_text(hashlib.sha256(SQL_V1.encode()).hexdigest() + "\n")
+            self.assertEqual(run(["notes", str(f)], self.root).returncode, 0)
+            self.assertEqual(run(["slug", str(f)], self.root).returncode, 2)
+            f.write_text(SQL_V1 + "-- edited after marking\n")
+            self.assertEqual(run(["notes", str(f)], self.root).returncode, 2)
+
+    def test_hard_link_from_data_is_refused(self):
+        os.link(self.root / "data/00_raw/x.csv", self.root / "sql/v1/hl.csv")
+        self.each_command("sql/v1/hl.csv", "hard links")
+
+    def test_intake_drafts_argument_is_guarded(self):
+        self.p.sql("data/secret.sql", f"-- {MARKER}\n")
+        for drafts in ("data/secret.sql", "sql/pipeline_a/q.sql", "../outside.json"):
+            r = run(["intake", "sql/v1/missing.json", "1", drafts], self.root)
+            self.assertEqual(r.returncode, 2, (drafts, r.stderr))
+            self.assertIn("refused", r.stderr)
+            self.assertNotIn(MARKER, r.stdout + r.stderr)
+            self.assertEqual(r.stdout, "")
+        os.symlink("../../data/secret.sql", self.root / "sql/v1/drafts.json")
+        r = run(["intake", "sql/v1/missing.json", "1", "sql/v1/drafts.json"], self.root)
+        self.assertEqual(r.returncode, 2, r.stderr)
+        self.assertNotIn(MARKER, r.stdout + r.stderr)
+
+    def test_publish_refuses_a_draft_file_under_data(self):
+        slug = "sql__v1__q"
+        self.p.sql("data/scope.json", json.dumps(scope_doc(slug, "sql/v1/q.sql")))
+        self.p.review_dir(slug)
+        before = tree(self.root)
+        r = run(["publish", slug, "scope", "data/scope.json"], self.root)
+        self.assertEqual(r.returncode, 2, r.stderr)
+        self.assertIn(RULE_DATA, r.stderr)
+        self.assertNotIn(MARKER, r.stdout + r.stderr)
+        self.assertEqual(tree(self.root), before)
 
     def test_unresolvable_path_fails_closed(self):
         self.each_command("sql/v1/loop/q.sql", "cannot be resolved")
@@ -183,6 +215,19 @@ class ReviewedTreePasses(unittest.TestCase):
                     self.assertIn('"present": false', r.stdout)
                     r = run(["slug", rel], p.root)
                     self.assertEqual(r.returncode, 0, r.stderr)
+
+    def test_helper_render_writes_the_marker_notes_accepts(self):
+        with tempfile.TemporaryDirectory() as proj, tempfile.TemporaryDirectory() as tmp:
+            p = Project(proj)
+            p.sql("sql/v1/q.sql", SQL_V1)
+            p.commit("v1")
+            out = Path(tmp) / "current.sql"
+            script = (f'. "{SCRIPT.parent}/sqlreview-lib.sh"; SR_ROOT="{p.root}"; sr_source_clean || exit $?; '
+                      f'sr_source_render HEAD sql/v1/q.sql "{out}" || exit $?')
+            r = subprocess.run(["bash", "-c", script], cwd=p.root, capture_output=True, text=True)
+            self.assertEqual(r.returncode, 0, r.stderr)
+            self.assertTrue(Path(str(out) + ".sqlreview-render").is_file())
+            self.assertEqual(run(["notes", str(out)], p.root).returncode, 0)
 
     def test_paths_outside_data_and_sql_are_unaffected(self):
         with tempfile.TemporaryDirectory() as tmp:

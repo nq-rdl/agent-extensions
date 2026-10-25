@@ -30,9 +30,11 @@ The path is canonicalised before the check: ``..`` and symlinks are resolved
 relative to the project root, so ``sql/v1/../pipeline_a/q.sql`` and a link from
 ``sql/v1/`` into ``data/`` are refused. A path that cannot be resolved (a symlink
 loop, say) or that resolves outside the project is refused; copy a file from outside
-the project root into ``sql/v<N>/`` first. Only ``notes`` also accepts the helper's own private
-``sqlreview-*`` temp render (mode 700, directly under ``$TMPDIR``) that the analyse,
-bootstrap and explain recipes pass it. The command exits 2
+the project root into ``sql/v<N>/`` first. Only ``notes`` also accepts a render the helper itself wrote
+(``sr_source_render``, ``materialize``), marked by a ``FILE.sqlreview-render`` SHA-256
+file, which is what the analyse, bootstrap and explain recipes pass it. A file with
+more than one hard link is refused, since a link may lead to ``data/``. The optional
+drafts argument of ``intake`` and the draft file of ``publish`` follow the same rules. The command exits 2
 with a message that names the rule and the path as given, never file content,
 and writes nothing under ``.sqlreview/``.
 

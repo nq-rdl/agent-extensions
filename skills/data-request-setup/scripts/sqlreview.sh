@@ -447,6 +447,8 @@ cmd_publish() (
   dest="$SR_REVIEWS/$slug/$kind.json"
   sr_no_symlinks "$dest" || exit 2
   [ ! -d "$dest" ] || sr_die 2 "publish destination is a directory"
+  # The draft's own path is read into .sqlreview/ too, not only the sql_path inside it.
+  sr_refuse_unreviewed "$(sr_rawabs "$draft")" "$draft" || exit 2
   sr_no_symlinks "$(sr_abspath "$draft")" || exit 2
   [ -f "$draft" ] || sr_die 2 "no such draft: $draft"
   mkdir -p "$SR_REVIEWS/$slug" || sr_die 2 "cannot create review directory"
@@ -665,6 +667,7 @@ cmd_materialize() (
   [ ! -e "$output" ] || [ -f "$output" ] || sr_die 2 "output is not a regular file"
   mv "$staged" "$output" || sr_die 2 "cannot publish authenticated output"
   staged=""
+  sr_sha256 "$output" > "$output.sqlreview-render" || sr_die 2 "cannot mark authenticated output"
 )
 
 cmd_snapshot() (
@@ -820,6 +823,8 @@ cmd_intake() {
   # The sidecar's content is copied into review drafts, so it follows the reviewed-tree rule too (#516).
   SR_ROOT="${SR_ROOT:-$(sr_init_root)}"
   sr_refuse_unreviewed "$(sr_rawabs "$1")" "$1" || exit 2
+  # The optional drafts file is read in both branches below, so it gets the same guard.
+  [ $# -lt 3 ] || sr_refuse_unreviewed "$(sr_rawabs "$3")" "$3" || exit 2
   if [ ! -e "$1" ]; then
     if [ $# -eq 3 ]; then cat "$3"; return $?; fi
     printf '%s\n' '{"present":false,"assumptions":[],"analyst_questions":[]}'
@@ -1160,7 +1165,7 @@ cmd_notes() {
   sr_need_jq
   # notes reads the file as given (no relpath step), so apply the reviewed-tree rule here (#516).
   SR_ROOT="${SR_ROOT:-$(sr_init_root)}"
-  sr_refuse_unreviewed "$(sr_rawabs "$sql")" "$sql" helper-tmp || exit 2
+  sr_refuse_unreviewed "$(sr_rawabs "$sql")" "$sql" helper-render || exit 2
   [ -f "$sql" ] && [ -r "$sql" ] || sr_die 2 "no such readable file: $sql"
   if [ -n "$against" ]; then
     [ -f "$against" ] && [ -r "$against" ] || sr_die 2 "no such readable file: $against"
