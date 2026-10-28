@@ -245,6 +245,34 @@ class SkillContract(unittest.TestCase):
                 self.assertIn("row-level data", text)
                 self.assertIn("paste-ready", text)
 
+    def test_amend_gate_comes_before_any_evidence(self):
+        for tree in SKILL:
+            with self.subTest(tree=tree):
+                body = self.body(tree)
+                self.assertLess(body.index("## 0. Amend gate"), body.index("## 1. Gather the release evidence"))
+                text = flat(section(body, "## 0. Amend gate"))
+                for token in ("`handed off`", "`amendment hand-off:`", "`part:`", "**Completed:**",
+                              "**Withdrawn:**", "`git merge-base --is-ancestor <commit> <ref>`",
+                              "stop before step 1", "one or two lines", "Release held:",
+                              "`withdrawn: P3 <reason>`", "Post nothing",
+                              "Never assume that no part is open"):
+                    self.assertIn(token, text)
+
+    def test_candidate_ref_comes_from_the_tags_before_asking(self):
+        for text in self.each():
+            self.assertIn("work it out before you ask", text)
+            self.assertIn("**Release state from evidence**", text)
+            self.assertIn("When exactly one tag has no `approved` release record, use it and say so "
+                          "in one line", text)
+            self.assertIn("Ask only when no tag or more than one tag qualifies", text)
+            self.assertNotIn("If none is given, ask for it.", text)
+
+    def test_send_back_adds_the_release_claims(self):
+        for text in self.each():
+            self.assertIn("with its completeness check", text)
+            self.assertIn("`release ref: <tag or candidate ref>`", text)
+            self.assertIn("`release claims:", text)
+
     def test_worked_example_is_linked(self):
         for text in self.each():
             self.assertIn("references/worked-example.rst", text)
@@ -753,6 +781,9 @@ CASES = {
                                "blocker-missing-element"},
     "release-technical-limitation": {"include-l4", "internal-l3", "claims-no-sql-jargon",
                                      "claims-current-record"},
+    # #534: a handed-off amend part holds release preparation until completed or withdrawn.
+    "release-amend-part-open": {"prep-stopped", "names-p3"},
+    "release-amend-part-withdrawn": {"prep-continue", "no-blocker"},
 }
 NODE = shutil.which("node")
 NODE_SCRIPT = """

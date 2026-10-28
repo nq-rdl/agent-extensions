@@ -1,0 +1,26 @@
+# Replies graded by tests/test_data_request_release.py in Python (and Node when present). No model call.
+pass:
+  - name: held with the next action
+    reply: |
+      Release held: P3 (ward name in place of the code) is handed off and open. Next: the
+      engineer completes P3 on the PR, or you withdraw it there.
+
+      ```yaml
+      release_prep: stopped
+      blocking_part: P3
+      ```
+fail:
+  - name: drafts anyway
+    fails: [prep-stopped, names-p3]
+    reply: |
+      ```yaml
+      release_prep: continue
+      blocking_part: none
+      ```
+  - name: stops but names the wrong part
+    fails: [names-p3]
+    reply: |
+      ```yaml
+      release_prep: stopped
+      blocking_part: P1
+      ```

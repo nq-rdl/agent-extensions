@@ -33,6 +33,9 @@ CASES = {
         "workflow-fix", "no-amd-entry", "runbook-uat-same-change", "review-stale",
         "analyse-full-rewalk", "renamed-column"},
     "prerelease-unclear-asks": {"release-unconfirmed", "asks-first", "no-edits"},
+    # #534: settle the release state from repository evidence before asking.
+    "prerelease-state-evident": {"release-unreleased", "no-question", "workflow-amend"},
+    "prerelease-state-one-question": {"release-unconfirmed", "one-question", "asks-first", "no-edits"},
 }
 
 
@@ -196,6 +199,54 @@ class AmendSupportsPreReleasePresentation(unittest.TestCase):
                 self.assertIn("`--reconfirm-all`", report)
                 # The pre-#390 wording made the re-run optional.
                 self.assertNotIn("recommend `/data-request:analyse` when a refreshed", report)
+
+
+GUARDRAILS_RELEASE = {
+    "canonical": REPO / "skills/data-request-guardrails/references/release.rst",
+    "claude": REPO / "plugins/data-request/skills/guardrails/references/release.rst",
+    "codex": REPO / "dist/codex/plugins/data-request/skills/guardrails/references/release.rst",
+}
+
+
+class ReleaseStateFromEvidence(unittest.TestCase):
+    """#534: read the release signals, state them in one line, ask only for the gap."""
+
+    def test_guardrails_reference_settles_the_state(self):
+        for target, path in GUARDRAILS_RELEASE.items():
+            with self.subTest(target=target):
+                text = flat(path.read_text())
+                start = text.index("Release state from evidence")
+                rule = text[start:text.index("Personal information", start)]
+                for signal in ("``data/Released/v*/``", "``git tag --list``", "Published releases",
+                               "``.sqlreview/releases/*/release.json``", "``data/Review/``",
+                               "triage ledger", "merged release PRs", "service-desk issue text"):
+                    self.assertIn(signal, rule)
+                self.assertIn("never write to it", rule)
+                for state in ("**Released.**", "**Unreleased.**", "**Unconfirmed.**"):
+                    self.assertIn(state, rule)
+                self.assertEqual(rule.count("Do not ask."), 2)
+                self.assertIn("Ask one question that names the gap", rule)
+                self.assertIn("Make no edit until it is answered", rule)
+                self.assertIn("State the result in one line that names what you read", rule)
+                self.assertIn("Ask only for what the evidence cannot show", rule)
+
+    def test_fix_and_amend_read_the_evidence_before_asking(self):
+        for skill in (FIX, AMEND):
+            for target, path in skill.items():
+                with self.subTest(skill=path.parent.name, target=target):
+                    body = flat(frontmatter(path)[1])
+                    self.assertIn("**Release state from evidence**", body)
+                    self.assertIn("When the signals agree", body)
+                    self.assertIn("do not ask", body)
+                    self.assertIn("in one line with what you read", body)
+                    self.assertRegex(body, r"(?:one question|Ask one question)")
+
+    def test_fix_accepts_pr_or_ledger_text_as_confirmation(self):
+        for target, path in FIX.items():
+            with self.subTest(target=target):
+                text = flat(section(frontmatter(path)[1], "## Pre-release logic change"))
+                self.assertIn("the human, the deliverable PR, the ledger or the service-desk issue "
+                              "says that nothing was delivered", text)
 
 
 class DefectVersusReleasedChange(unittest.TestCase):

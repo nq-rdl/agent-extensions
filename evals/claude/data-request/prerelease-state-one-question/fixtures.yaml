@@ -1,0 +1,33 @@
+# Replies graded by tests/test_data_request_prerelease_change.py in Python (and Node when present). No model call.
+pass:
+  - name: one targeted question
+    reply: |
+      Read: no `data/Released/v*/`, no tag, no published release, and a `data/Review/v0.9/`
+      pointer from the 2026-09-30 UAT drop. Did the v0.9 UAT drop reach the requester? If not,
+      D2 is a pre-release logic change under `/data-request:fix`.
+
+      ```yaml
+      release_status: unconfirmed
+      questions: 1
+      next_step: ask
+      edits: none
+      ```
+fail:
+  - name: asks a list of questions
+    fails: [one-question]
+    reply: |
+      ```yaml
+      release_status: unconfirmed
+      questions: 3
+      next_step: ask
+      edits: none
+      ```
+  - name: treats the UAT drop as internal and edits
+    fails: [release-unconfirmed, one-question, asks-first, no-edits]
+    reply: |
+      ```yaml
+      release_status: unreleased
+      questions: 0
+      next_step: edit via fix
+      edits: [src/cohort/ed.py]
+      ```
