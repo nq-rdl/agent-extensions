@@ -125,6 +125,42 @@ class Content(unittest.TestCase):
                 self.assertRegex(sentence, r"(?i)\b(never|not|refus\w*|no)\b")
 
 
+    def test_a_combined_request_is_split_per_part(self):
+        # #533: one engineer-required part no longer stops the analyst-safe parts.
+        self.assertNotIn("stops the whole request", self.body)
+        self.assertIn("### Split a combined request", self.body)
+        split = self.body.split("### Split a combined request", 1)[1].split("## 2.", 1)[0]
+        self.assertRegex(split, r"P1: <the change[^>]*>\nclassification: <analyst-safe \| engineer-required>")
+        self.assertRegex(split, r"(?i)ambiguous is engineer-required")
+        self.assertIn("Do not guess", split)
+        self.assertRegex(split, r"(?i)never change rows or meaning")
+        self.assertRegex(split, r"(?i)one part does not stop the others")
+
+    def test_engineer_parts_share_one_hand_off_on_the_deliverable_pr(self):
+        handoff = self.body.split("## 2.", 1)[1].split("## 3.", 1)[0]
+        for token in ("single hand-off comment", "deliverable PR", "Communication channel",
+                      "amendment hand-off:", "already done by the analyst:", "part:",
+                      "open question:", "route:"):
+            with self.subTest(token=token):
+                self.assertIn(token, handoff)
+        self.assertLess(handoff.index("amendment hand-off:"), handoff.index("\npart: <P3>"))
+
+    def test_split_evidence_and_resume_are_readable_by_the_next_run(self):
+        for token in ("`done` or `handed off`", "Do not add an entry for a handed-off part",
+                      "done:", "handed off:", "open decision:", "open delivery gate",
+                      "## Resume a split request", "Do not post the hand-off again"):
+            with self.subTest(token=token):
+                self.assertIn(token, self.body)
+        resume = self.body.split("## Resume a split request", 1)[1]
+        self.assertRegex(resume, r"(?i)do not redo it")
+        self.assertRegex(resume, r"(?i)sent back as analyst-safe")
+
+    def test_no_interim_workbook_route(self):
+        # The no-database-run route from #533 is an open design choice, not built here.
+        self.assertNotIn("build_workbook", self.body)
+        self.assertIn("Do not run a live extract", self.body)
+
+
 class Routing(unittest.TestCase):
     def test_fix_points_change_requests_to_amend(self):
         body = frontmatter(REPO / "skills/data-request-fix/SKILL.md")[1]

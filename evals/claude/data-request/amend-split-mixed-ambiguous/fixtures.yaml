@@ -1,0 +1,51 @@
+# Replies graded by tests/test_eval_data_request_amend_graders.py in Python and Node. No model call.
+pass:
+  - name: ambiguous part handed off with its question
+    reply: |
+      P1: call the MRN column URN
+      classification: analyst-safe
+
+      P2: show SexCd as words (Male, Female) in place of the code
+      classification: engineer-required
+
+      P2 is ambiguous: the excerpt does not show whether a surfaced lookup exists, so I do not
+      guess. If the words need a join or a new mapping, the value changes source.
+
+      amendment hand-off: 1 of 2 parts need the data engineer
+      already done by the analyst: P1 rename in src/cohort/falls.py
+
+      part: P2
+      classification: engineer-required
+      requested change: show SexCd as words
+      open question: does the export already map SexCd to words, and is that mapping reviewed?
+      affected files: src/cohort/falls.py; the export code
+
+      done: P1
+      handed off: P2 (draft, not posted)
+      open decision: the engineer answers the open question on P2
+fail:
+  - name: guessed the lookup exists
+    fails: [ambiguous-engineer, open-question, summary]
+    reply: |
+      P1: call the MRN column URN
+      classification: analyst-safe
+
+      P2: show SexCd as words
+      classification: analyst-safe
+
+      The export probably has a lookup, so map 1 to Male and 2 to Female there.
+  - name: question left out
+    fails: [open-question]
+    reply: |
+      P1: call the MRN column URN
+      classification: analyst-safe
+
+      P2: show SexCd as words
+      classification: engineer-required
+
+      part: P2
+      requested change: show SexCd as words
+      open question: none
+      done: P1
+      handed off: P2
+      open decision: none
