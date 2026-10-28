@@ -122,7 +122,7 @@ prepares and publishes the release. Never direct the engineer to release.
    decisions for analyst review. The data analyst checks the delivered elements against
    the approval before release. An unchecked approval does not by itself prevent review;
    a known restriction remains a release gate. When the run-evidence or PR gate fails,
-   report which part failed and stop. Re-read the PR head before steps 2 to 4; if it
+   report which part failed and stop. Re-read the PR head before steps 2 and 3; if it
    changed, recheck the gate on the new SHA. Without ``gh``, reading CI runs can need
    the GitHub MCP Actions toolset; if it is not enabled, say so.
 2. **Assign** the PR to the reviewer the human names. Read ``roles.analyst`` from
