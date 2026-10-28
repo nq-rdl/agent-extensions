@@ -406,7 +406,8 @@ extract to the Data Analyst. The engineer never releases the extract. The analys
 
 Read `${CLAUDE_PLUGIN_ROOT}/skills/triage/references/handoff.rst`, *Hand-off to review*.
 Use that existing procedure after the operator run and UAT, including its run-evidence gate,
-child-issue comment, reviewer assignment and board moves. A rendered review alone does not
+reviewer assignment, hand-off comment on the deliverable PR and board moves listed for the human.
+Its *Communication channel* section applies: no hand-off on the child issue, no service-desk write. A rendered review alone does not
 complete the hand-off. Require the request runbook's **Delivery** section to point to this
 same triage hand-off and name the analyst's next step; flag a missing section for the engineer.
 Do not run the extract or write to GitHub without the procedure's explicit authorisation.
