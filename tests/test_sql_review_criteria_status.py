@@ -26,7 +26,7 @@ except ModuleNotFoundError:
     from tests.test_sql_review_scripts import REPO, Project, review_doc, run, scope_doc
 
 FINDING = re.compile(r"^[^\t\n]+\t[^\t\n]+\t[^\t\n]+$")
-SECRET = "SECRET"
+LEAK_CANARY = "LEAK-CANARY"
 STAMP = {"confirmed_by": "analyst-login", "confirmed_role": "analyst", "confirmed_at": "2026-10-13T01:00:00Z"}
 FINGERPRINT_FIELDS = ("cohort_entry_event", "inclusion_criteria", "exclusion_criteria", "requested_data_elements")
 TREES = ("skills/data-request-setup", "plugins/data-request/skills/setup",
@@ -38,11 +38,11 @@ def sidecar(schema=2):
     value = {"schemaVersion": schema, "approval_number": "THHSAQUIRE-042", "decisions": [], "open_questions": []}
     if schema == 2:
         value["criteria"] = [
-            {"id": "N1", "kind": "entry_event", "text": "First AAA admission " + SECRET, **STAMP},
+            {"id": "N1", "kind": "entry_event", "text": "First AAA admission " + LEAK_CANARY, **STAMP},
             {"id": "I1", "kind": "inclusion", "text": "Aged 65 and over", "applied_by": "rdl", **STAMP},
             {"id": "E1", "kind": "exclusion", "text": "Deceased patients", **STAMP,
              "withdrawn": {"reason": "Narrowed", "at": "2026-10-20", "replaced_by": "E4"}},
-            {"id": "E3", "kind": "exclusion", "text": "Prior repair " + SECRET, **STAMP},
+            {"id": "E3", "kind": "exclusion", "text": "Prior repair " + LEAK_CANARY, **STAMP},
             {"id": "E4", "kind": "exclusion", "text": "Died before the index admission", **STAMP},
             {"id": "D1", "kind": "data_element", "text": "Admission date", **STAMP},
             {"id": "D2", "kind": "data_element", "text": "Discharge date", **STAMP},
@@ -87,7 +87,7 @@ class Base(unittest.TestCase):
         lines = result.stdout.splitlines()
         for line in lines:
             self.assertRegex(line, FINDING)
-        self.assertNotIn(SECRET, result.stdout + result.stderr)
+        self.assertNotIn(LEAK_CANARY, result.stdout + result.stderr)
         for line in expected:
             self.assertIn(line, lines, result.stdout)
 
@@ -113,17 +113,17 @@ class ShapeCheck(Base):
         self.assertEqual(self.check_status([]).returncode, 0)
 
     def test_stdin_check_applies_the_same_rules(self):
-        result = run(["check", "--stdin"], self.root, stdin=json.dumps(scope_with([row("N1", SECRET)])))
+        result = run(["check", "--stdin"], self.root, stdin=json.dumps(scope_with([row("N1", LEAK_CANARY)])))
         self.assert_findings(result, ["N1\tstate\tunknown"], 4)
 
     def test_non_array_is_rejected(self):
-        for value in ({SECRET: 1}, SECRET, 7, None, True):
+        for value in ({LEAK_CANARY: 1}, LEAK_CANARY, 7, None, True):
             with self.subTest(value=value):
                 self.assert_findings(self.check_status(value), ["-\tcriteria_status\tnot-array"], 4)
 
     def test_rows_must_be_objects_with_a_well_formed_criterion(self):
-        self.assert_findings(self.check_status([SECRET]), ["-\tcriteria_status\tnot-object"], 4)
-        for bad in (SECRET, "N0", "X1", "n1", "N1\n", 7, None):
+        self.assert_findings(self.check_status([LEAK_CANARY]), ["-\tcriteria_status\tnot-object"], 4)
+        for bad in (LEAK_CANARY, "N0", "X1", "n1", "N1\n", 7, None):
             with self.subTest(criterion=bad):
                 self.assert_findings(self.check_status([row(bad, "applied")]), ["-\tcriterion\tinvalid"], 4)
         missing = row("N1", "applied")
@@ -136,7 +136,7 @@ class ShapeCheck(Base):
         self.assertEqual(result.stdout.count("N1\tcriterion\tduplicate"), 1)
 
     def test_unknown_state_is_rejected_without_its_value(self):
-        for state in (SECRET, "", None, 3, "Applied"):
+        for state in (LEAK_CANARY, "", None, 3, "Applied"):
             with self.subTest(state=state):
                 self.assert_findings(self.check_status([row("E3", state)]), ["E3\tstate\tunknown"], 4)
         missing = row("E3", "applied")
@@ -150,14 +150,14 @@ class ShapeCheck(Base):
                     r = row("E3", state) if reason is None else row("E3", state, reason=reason)
                     self.assert_findings(self.check_status([r]), ["E3\treason\trequired"], 4)
             with self.subTest(state=state, reason="given"):
-                self.assertEqual(self.check_status([row("E3", state, reason=SECRET)]).returncode, 0)
+                self.assertEqual(self.check_status([row("E3", state, reason=LEAK_CANARY)]).returncode, 0)
 
     def test_flagged_needs_output_and_column(self):
         cases = [
             (None, ["E4\tflag.output\trequired", "E4\tflag.column\trequired"]),
-            (SECRET, ["E4\tflag.output\trequired", "E4\tflag.column\trequired"]),
+            (LEAK_CANARY, ["E4\tflag.output\trequired", "E4\tflag.column\trequired"]),
             ({}, ["E4\tflag.output\trequired", "E4\tflag.column\trequired"]),
-            ({"output": "patients " + SECRET}, ["E4\tflag.column\trequired"]),
+            ({"output": "patients " + LEAK_CANARY}, ["E4\tflag.column\trequired"]),
             ({"column": "c", "output": ""}, ["E4\tflag.output\trequired"]),
             ({"output": "patients", "column": 7}, ["E4\tflag.column\trequired"]),
         ]
@@ -188,14 +188,14 @@ class ShapeCheck(Base):
         self.assert_findings(self.check_status([future], revision=2), ["D1\tconfirmed_revision\tstale"], 4)
         carried = row("D1", "delivered", revision=1, carried_from_revision=1, carried_basis="criteria-unchanged")
         self.assertEqual(self.check_status([carried], revision=2).returncode, 0)
-        for over in ({"carried_from_revision": 3}, {"carried_from_revision": SECRET}):
+        for over in ({"carried_from_revision": 3}, {"carried_from_revision": LEAK_CANARY}):
             with self.subTest(over=over):
                 bad = dict(carried, **over)
                 self.assert_findings(self.check_status([bad], revision=2), ["D1\tcarried_from_revision\tinvalid"], 4)
         fresh_with_carry = row("D1", "delivered", revision=2, carried_from_revision=1)
         self.assert_findings(self.check_status([fresh_with_carry], revision=2),
                              ["D1\tcarried_from_revision\tinvalid"], 4)
-        for basis in (SECRET, "sql-unchanged"):
+        for basis in (LEAK_CANARY, "sql-unchanged"):
             with self.subTest(basis=basis):
                 bad = dict(carried, carried_basis=basis)
                 self.assert_findings(self.check_status([bad], revision=2), ["D1\tcarried_basis\tinvalid"], 4)
@@ -203,14 +203,14 @@ class ShapeCheck(Base):
         self.assert_findings(self.check_status([fresh_with_basis], revision=2), ["D1\tcarried_basis\tinvalid"], 4)
 
     def test_upstream_when_present_names_its_source_and_id(self):
-        for upstream in (SECRET, {}, {"source": "recurring-decision"}, {"source": "", "id": "broad-first-pass"}):
+        for upstream in (LEAK_CANARY, {}, {"source": "recurring-decision"}, {"source": "", "id": "broad-first-pass"}):
             with self.subTest(upstream=upstream):
                 r = row("E3", "not-applied", reason="r", upstream=upstream)
                 self.assert_findings(self.check_status([r]), ["E3\tupstream\tinvalid"], 4)
 
     def test_findings_print_only_ids_fields_and_rules(self):
-        status = [row("E3", "not-applied", confirmed_by="", flag=SECRET),
-                  row("E4", "flagged", flag={"output": SECRET}), row("D1", SECRET)]
+        status = [row("E3", "not-applied", confirmed_by="", flag=LEAK_CANARY),
+                  row("E4", "flagged", flag={"output": LEAK_CANARY}), row("D1", LEAK_CANARY)]
         result = self.check_status(status)
         self.assert_findings(result, ["E3\treason\trequired", "E3\tconfirmed_by\trequired",
                                       "E4\tflag.column\trequired", "D1\tstate\tunknown"], 4)
@@ -387,23 +387,23 @@ class CriteriaCoverage(Base):
 
     def test_operational_errors_exit_2_without_values(self):
         self.publish_scope(full_status())
-        self.write_sidecar({"schemaVersion": 2, "approval_number": SECRET, "criteria": SECRET})
+        self.write_sidecar({"schemaVersion": 2, "approval_number": LEAK_CANARY, "criteria": LEAK_CANARY})
         result = self.criteria()
         self.assertEqual(result.returncode, 2, result.stdout + result.stderr)
         self.assertEqual(result.stdout, "")
-        self.assertNotIn(SECRET, result.stderr)
+        self.assertNotIn(LEAK_CANARY, result.stderr)
         self.write_sidecar(sidecar())
         for target in ("nope", "../q", str(self.root / "missing.json")):
             with self.subTest(target=target):
                 self.assertEqual(self.criteria(target).returncode, 2)
         bad = self.root / "bad draft.json"
-        for content in (SECRET, json.dumps(scope_with(full_status(), slug="../" + SECRET)),
+        for content in (LEAK_CANARY, json.dumps(scope_with(full_status(), slug="../" + LEAK_CANARY)),
                         json.dumps(dict(scope_with(full_status()), kind="review"))):
             with self.subTest(content=content[:40]):
                 bad.write_text(content)
                 result = self.criteria(str(bad))
                 self.assertEqual(result.returncode, 2, result.stdout + result.stderr)
-                self.assertNotIn(SECRET, result.stdout + result.stderr)
+                self.assertNotIn(LEAK_CANARY, result.stdout + result.stderr)
         self.assertEqual(run(["criteria"], self.root).returncode, 1)
         self.assertEqual(run(["criteria", "q", "r"], self.root).returncode, 1)
 

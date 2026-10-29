@@ -926,7 +926,7 @@ CRIT_JQ = {
     "claude": REPO / "plugins/data-request/skills/setup/scripts/release-criteria.jq",
     "codex": REPO / "dist/codex/plugins/data-request/skills/setup/scripts/release-criteria.jq",
 }
-SECRET = "SECRET"
+LEAK_CANARY = "LEAK-CANARY"
 STAMP = {"confirmed_by": "analyst-login", "confirmed_role": "analyst", "confirmed_at": "2026-10-13T01:00:00Z"}
 FP_FIELDS = ("cohort_entry_event", "inclusion_criteria", "exclusion_criteria", "requested_data_elements")
 FINGERPRINTS = {k: "sha256:" + format(n, "x") * 64 for n, k in enumerate(FP_FIELDS, 1)}
@@ -939,7 +939,7 @@ def criterion(id_, kind, text, **over):
     return d
 
 
-def withdrawn(reason="Narrowed " + SECRET, replaced_by=None):
+def withdrawn(reason="Narrowed " + LEAK_CANARY, replaced_by=None):
     d = {"reason": reason, "at": "2026-10-14"}
     if replaced_by:
         d["replaced_by"] = replaced_by
@@ -951,7 +951,7 @@ CRITERIA_V1 = [
     criterion("D3", "data_element", "Smoking status"),
     criterion("E10", "exclusion", "Type 2 diabetes"),
     criterion("E2", "exclusion", "Previous AAA repair"),
-    criterion("E5", "exclusion", "Transferred in " + SECRET, withdrawn=withdrawn()),
+    criterion("E5", "exclusion", "Transferred in " + LEAK_CANARY, withdrawn=withdrawn()),
     criterion("E1", "exclusion", "Deceased patients"),
     criterion("I2", "inclusion", "Consented to linkage", applied_by="researcher"),
     criterion("I1", "inclusion", "Adults with AAA diagnosis at TUH | ward A", applied_by="rdl"),
@@ -1130,7 +1130,7 @@ class CriteriaTable(unittest.TestCase):
         self.assertEqual(rows["E10"]["change"], "unchanged")
         self.assertEqual(rows["D3"]["change"], "withdrawn")
         self.assertNotIn("replaced_by", rows["D3"])
-        self.assertNotIn(SECRET, json.dumps([r.get("proposed_note") for r in t["rows"]]))
+        self.assertNotIn(LEAK_CANARY, json.dumps([r.get("proposed_note") for r in t["rows"]]))
 
     def test_criterion_withdrawn_between_releases_is_not_listed(self):
         rows = self.by_id(self.release_020())
@@ -1181,7 +1181,7 @@ class CriteriaTable(unittest.TestCase):
         t = self.p.table(tag, flags, code=10)
         self.assertEqual(t["status"], "held")
         self.assertEqual(t["held_reasons"], reasons)
-        self.assertNotIn(SECRET, json.dumps(t["held_reasons"]))
+        self.assertNotIn(LEAK_CANARY, json.dumps(t["held_reasons"]))
         # Held means the approved record fails check and the body shows only the reasons.
         code, out = violations(record(criteria=t))
         self.assertEqual(code, 4, out)
@@ -1308,7 +1308,7 @@ class CriteriaTable(unittest.TestCase):
                 self.assertEqual(r.returncode, 4, r.stdout + r.stderr)
                 self.assertIn("approved: criteria are itemised at 0.1.0; embed the release.sh criteria table",
                               r.stdout)
-                self.assertNotIn(SECRET, r.stdout + r.stderr)
+                self.assertNotIn(LEAK_CANARY, r.stdout + r.stderr)
                 doc["status"] = "draft"
                 r = run(RELEASE, ["check", "--stdin"], self.p.root, stdin=json.dumps(doc))
                 self.assertEqual(r.returncode, 0, r.stdout + r.stderr)
@@ -1347,10 +1347,10 @@ class CriteriaTable(unittest.TestCase):
         self.assertEqual(self.p.criteria().returncode, 1)
         self.assertEqual(self.p.criteria("9.9.9").returncode, 2)
         bad = Path(self.out.name) / "bad.json"
-        bad.write_text(json.dumps({"inclusion_criteria": SECRET}))
+        bad.write_text(json.dumps({"inclusion_criteria": LEAK_CANARY}))
         r = self.p.criteria("0.1.0", "--fingerprints", str(bad))
         self.assertEqual(r.returncode, 2)
-        self.assertNotIn(SECRET, r.stdout + r.stderr)
+        self.assertNotIn(LEAK_CANARY, r.stdout + r.stderr)
 
     def test_read_only(self):
         self.p.table("0.1.0")
@@ -1431,31 +1431,31 @@ class CriteriaCheck(unittest.TestCase):
         self.assertViolation(broken(lambda t: t.update(previous_tag=None)),
                              "criteria: a first release has no change but —")
         self.assertViolation(broken(lambda t: t.update(status="held")), "criteria: a held table needs held_reasons")
-        self.assertViolation(broken(lambda t: t.update(held_reasons=["because " + SECRET])),
+        self.assertViolation(broken(lambda t: t.update(held_reasons=["because " + LEAK_CANARY])),
                              "criteria: unknown held reason")
-        self.assertNotIn(SECRET, violations(broken(lambda t: t.update(held_reasons=[SECRET])))[1])
+        self.assertNotIn(LEAK_CANARY, violations(broken(lambda t: t.update(held_reasons=[LEAK_CANARY])))[1])
 
     def test_malformed_values_are_never_echoed(self):
         t = crit_table()
-        t.update(status="held", held_reasons=["note-rejected:Patient " + SECRET + " 1234"])
+        t.update(status="held", held_reasons=["note-rejected:Patient " + LEAK_CANARY + " 1234"])
         code, out = violations(record(status="draft", criteria=t))
         self.assertEqual(code, 4, out)
         self.assertIn("criteria: unknown held reason", out)
-        self.assertNotIn(SECRET, out)
+        self.assertNotIn(LEAK_CANARY, out)
         t = crit_table()
-        t["rows"] += [dict(t["rows"][0], id="Mrs " + SECRET), dict(t["rows"][0], id="Mrs " + SECRET)]
+        t["rows"] += [dict(t["rows"][0], id="Mrs " + LEAK_CANARY), dict(t["rows"][0], id="Mrs " + LEAK_CANARY)]
         code, out = violations(record(status="draft", criteria=t))
         self.assertEqual(code, 4, out)
         self.assertIn("criteria: every row needs a criterion id matching its kind", out)
-        self.assertNotIn(SECRET, out)
+        self.assertNotIn(LEAK_CANARY, out)
 
     def test_pending_row_with_a_malformed_id_is_not_echoed_on_approval(self):
         t = crit_table()
-        t["rows"].append(dict(t["rows"][0], id="Mrs " + SECRET, decision="pending", final_note=None))
+        t["rows"].append(dict(t["rows"][0], id="Mrs " + LEAK_CANARY, decision="pending", final_note=None))
         code, out = violations(record(criteria=t))
         self.assertEqual(code, 4, out)
         self.assertIn("criteria: every row needs a criterion id matching its kind", out)
-        self.assertNotIn(SECRET, out)
+        self.assertNotIn(LEAK_CANARY, out)
 
     def test_rejected_note_must_be_named_in_held_reasons(self):
         t = crit_table()
