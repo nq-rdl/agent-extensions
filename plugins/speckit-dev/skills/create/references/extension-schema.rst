@@ -1,4 +1,4 @@
-<!-- Source: https://raw.githubusercontent.com/github/spec-kit/main/extensions/EXTENSION-DEVELOPMENT-GUIDE.md and src/specify_cli/extensions/__init__.py (ExtensionManifest._validate) — fetched 2026-07-04. Canonical truth; re-check the live page for drift before authoring a manifest. -->
+<!-- Source: https://raw.githubusercontent.com/github/spec-kit/main/docs/extensions/developing.md and src/specify_cli/extensions/__init__.py (ExtensionManifest._validate) — fetched 2026-07-04. Canonical truth; re-check the live page for drift before authoring a manifest. -->
 
 spec-kit extension.yml — Schema & Validation
 ============================================
