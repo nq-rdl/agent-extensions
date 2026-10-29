@@ -80,6 +80,10 @@ as optional surrogates; the requester or engineer decides. Record the limitation
 that ethnicity is not held. Check the pinned library for surrogate units; a missing
 unit is a lift candidate. Guardrails holds the convention.
 
+**Supplied cohort:** map it by shape (name, columns, types, key, join target) and propose a `SuppliedCohort`
+declaration; the runner loads the file into a `#` table. Never read `data/00_raw/` or copy a value
+into the mapping, a comment or chat. Follow `${CLAUDE_PLUGIN_ROOT}/skills/guardrails/references/supplied-cohorts.rst`.
+
 ## Lookup evidence for codes
 
 When a mapping needs a discovered code, use `/data-request:lookup` and cite the
