@@ -53,6 +53,9 @@ phase it hooks). If empty, ask for: the extension **id** (kebab), one-line
 6. **Validate** with `/speckit-dev:validate` before installing.
 7. **Test locally**: `specify extension add --dev ./<dir>` in a spec-kit project,
    then `specify extension list` and invoke the command.
+   For per-agent command references (`__SPECKIT_COMMAND_<NAME>__`) and test steps, see the
+   [last agent-neutral development guide](https://raw.githubusercontent.com/github/spec-kit/3f4c5766ad5921cb52833e0a66ebc653b037a010/extensions/EXTENSION-DEVELOPMENT-GUIDE.md). It is pinned because upstream now documents
+   Copilot skills only.
 
 ## Manifest schema — the load-bearing rules (source-verified)
 

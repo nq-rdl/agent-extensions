@@ -16,6 +16,10 @@ Primary
 - Development Guide (manifest schema, validation rules, minimal example,
   .extensionignore):
   https://raw.githubusercontent.com/github/spec-kit/main/docs/extensions/developing.md
+- Development Guide, last agent-neutral version (command-body references rendered
+  per agent, per-agent test steps). Pinned to a commit because upstream now documents
+  Copilot skills only:
+  https://raw.githubusercontent.com/github/spec-kit/3f4c5766ad5921cb52833e0a66ebc653b037a010/extensions/EXTENSION-DEVELOPMENT-GUIDE.md
 - Official scaffold (mirror this):
   https://github.com/github/spec-kit/tree/main/extensions/template
 - API reference (Python classes, hook events):
