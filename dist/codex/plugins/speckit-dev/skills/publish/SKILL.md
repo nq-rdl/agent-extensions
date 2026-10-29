@@ -20,7 +20,7 @@ When supporting references invoke a catalog skill as /subject:facet, use $subjec
 
 > **Verify-canonical guard.** Publishing/catalog facts re-read at spec-kit v1.0.12
 > (catalog schema_version 1.0, 2026-09-29). Confirm against `references/publishing.rst` and the
-> live [publishing guide](https://raw.githubusercontent.com/github/spec-kit/main/extensions/EXTENSION-PUBLISHING-GUIDE.md).
+> live [publishing guide](https://raw.githubusercontent.com/github/spec-kit/main/docs/extensions/publishing.md).
 
 ## Where to publish?
 

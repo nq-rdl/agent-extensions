@@ -15,7 +15,7 @@ Primary
   https://github.github.io/spec-kit/reference/extensions.html
 - Development Guide (manifest schema, validation rules, minimal example,
   .extensionignore):
-  https://raw.githubusercontent.com/github/spec-kit/main/extensions/EXTENSION-DEVELOPMENT-GUIDE.md
+  https://raw.githubusercontent.com/github/spec-kit/main/docs/extensions/developing.md
 - Official scaffold (mirror this):
   https://github.com/github/spec-kit/tree/main/extensions/template
 - API reference (Python classes, hook events):
