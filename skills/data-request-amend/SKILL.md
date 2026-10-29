@@ -72,7 +72,9 @@ State the result on its own line with the amendment record's values:
 ## 2. Engineer-required: stop and hand off
 
 Make no edit: not to the source, the SQL, the record or the extract. Return this hand-off,
-filled in and ready to paste to the data engineer, and stop:
+filled in and ready to paste on the deliverable PR for the data engineer, and stop. Post nothing
+on the child issue or service-desk. See *Communication channel* in
+`${CLAUDE_PLUGIN_ROOT}/skills/triage/references/handoff.rst`:
 
 ```text
 classification: engineer-required

@@ -5,6 +5,28 @@ Read this in co-development before fulfilment work, when a request's library
 work goes to spec-kit, and when a request's deliverable PR is ready for review.
 Observed in September 2026.
 
+Communication channel
+---------------------
+
+The data-request skills cite this section. It applies in every mode.
+
+* **The deliverable PR is the channel.** Write each hand-off, send-back, analyst
+  question, flagged decision, engineer reply and status update on the deliverable
+  PR. Address it to the person. A question about a review line can be a review
+  comment on that line.
+* **The service-desk request issue is read-only for agents.** Read it for the
+  request text, the approval and the enquiry number. Never comment on it, label it,
+  edit it or move its card. General authorisation, such as "yes, do that", does not
+  change this. The human makes every service-desk change.
+* **The child tracking issue gets no hand-off.** You can suggest a one-line link to
+  the PR. Post that link only when the human asks for it.
+* **Board moves stay with the human.** List each card to move, its board and its
+  target state. Do not move cards.
+
+Keep these states separate in each PR comment: progress, a request for human
+confirmation, an operator run, analyst acceptance and publication. A progress note
+does not ask for confirmation. Analyst acceptance does not publish the release.
+
 Fulfilment
 ----------
 
@@ -100,14 +122,14 @@ prepares and publishes the release. Never direct the engineer to release.
    decisions for analyst review. The data analyst checks the delivered elements against
    the approval before release. An unchecked approval does not by itself prevent review;
    a known restriction remains a release gate. When the run-evidence or PR gate fails,
-   report which part failed and stop. Re-read the PR head before steps 2 to 4; if it
+   report which part failed and stop. Re-read the PR head before steps 2 and 3; if it
    changed, recheck the gate on the new SHA. Without ``gh``, reading CI runs can need
    the GitHub MCP Actions toolset; if it is not enabled, say so.
 2. **Assign** the PR to the reviewer the human names. Read ``roles.analyst`` from
    ``.sqlreview/config.json`` for the receiving role, not a person's login; if missing,
    ask for the role and reviewer. Never guess a reviewer. Re-resolve the child
    repository through the API before this write.
-3. **Comment** on the child repository's tracking issue: the PR link, what is
+3. **Comment** on the deliverable PR, addressed to the reviewer: what is
    handed over, run commit and head SHA, review slugs/revisions and SQL fingerprints,
    counts-only QA, links to the run manifest, DVC pointers and UAT evidence, open questions,
    flagged decisions, known governance restrictions and the limitations the requester
@@ -116,15 +138,16 @@ prepares and publishes the release. Never direct the engineer to release.
    preserve original decision provenance, separate from later confirmation.
    List agent-applied technical defaults separately, never as human decisions.
    Include offered extras (not built), not additional unrequested extracts.
-   Keep row-level data, identifiers and small cell counts out. The child
-   issue is the hand-off destination; a PR comment alone is incomplete. Draft it for the
-   human, or post it when the human authorises that post.
-4. **Move** both the child issue and the service-desk request issue to
-   **In-Review** on the Service Desk Request Tracking project board.
-5. **Record** the hand-off in the ledger: PR, head SHA, reviewer, board state and
-   date.
+   Keep row-level data, identifiers and small cell counts out. This PR comment is the
+   hand-off. Do not post it on the child issue or the service-desk issue. Draft it for
+   the human, or post it when the human authorises that post.
+4. **Move** (human only): list the child tracking issue card and the service-desk
+   request issue card, each to **In-Review** on the Service Desk Request Tracking
+   project board. The human moves them. Make no write to service-desk.
+5. **Record** the hand-off in the ledger: PR, head SHA, reviewer, board state as the
+   human reports it (``pending`` until then) and date.
 
-Each write in steps 2 to 4 needs the human's explicit instruction, as any write
-to service-desk does. In triage-only mode, post nothing: return the paste-ready
-comment, the reviewer to assign, and the list of board moves (issue, board and
-target state) for the human.
+Steps 2 and 3 each need the human's explicit instruction. Step 4 is never an agent
+write, whatever the instruction. In triage-only mode, post nothing: return the
+paste-ready PR comment, the reviewer to assign, and the list of board moves (card,
+board and target state) for the human.

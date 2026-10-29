@@ -33,7 +33,7 @@ Delegation is optional. Read references/subagent.rst only when delegation is use
 The queue entrypoint decides what to work on next and in what order. Stage skills do the
 work; this skill routes to them without restating procedures. Arguments: `$ARGUMENTS`. Read
 `${PLUGIN_ROOT}/skills/guardrails/SKILL.md` for source hierarchy and **Engineer decisions: proceed and flag**;
-its `references/decision-authority.rst` distinguishes technical defaults from analyst questions and genuine blockers.
+its `references/decision-authority.rst` distinguishes technical defaults from analyst questions and genuine blockers. Engineer–analyst communication goes on the deliverable PR, never the child issue or service-desk: see *Communication channel* in [references/handoff.rst](references/handoff.rst).
 
 ## Choose the mode
 
@@ -135,9 +135,9 @@ Attribute each commit and PR to the model that actually authored it; an instruct
 
 ## Never infer permission
 
-Each of these needs an explicit instruction from the human for that action:
+No instruction permits writing to service-desk (comments, labels, edits or project fields). "Yes, do that" is not such an instruction. Each of these needs an explicit instruction from the human for that action:
 
-- writing to service-desk (comments, labels or project fields);
+- posting on the deliverable PR, or a link on the child issue that the human asked for;
 - running an extract or any query against the warehouse;
 - releasing a library, merging a PR or pushing to a child's `main`;
 - bypassing, disabling or working around hooks and checks;
