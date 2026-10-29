@@ -402,7 +402,7 @@ class CarryForwardHelper(Base):
 
 
 class CriteriaCarry(Base):
-    """Spec 017 (R7): `criteria_status` rows carry by `criterion` with basis criteria-unchanged.
+    """The scaffold's criteria design: `criteria_status` rows carry by `criterion` with basis criteria-unchanged.
 
     A row is unchanged when state, reason, flag and upstream equal the prior revision's row for the same
     criterion; anything else is walked. Publish proves a carried claim from the same definition.

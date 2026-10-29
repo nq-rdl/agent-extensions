@@ -1,4 +1,4 @@
-# Research-criteria coverage for one scope (spec 017): the rules that need the analyst's sidecar,
+# Research-criteria coverage for one scope (the scaffold's criteria design): the rules that need the analyst's sidecar,
 # so `sqlreview.sh criteria` runs them and the guard hook's shape check (sqlreview-check.jq) cannot.
 # Input: the scope document. Arguments:
 #   $intake  `sqlreview.sh intake` output for answers.intake.json at the repository root; it has a

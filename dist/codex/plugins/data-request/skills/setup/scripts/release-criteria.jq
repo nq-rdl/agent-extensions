@@ -1,4 +1,4 @@
-# The release body's "Criteria in this release" table (spec 017, contracts/release-criteria-table.md).
+# The release body's "Criteria in this release" table (the scaffold's criteria design).
 # A def-only module for release.sh: `criteria` builds the record's `criteria` object, `check`
 # validates it (rc_errors) and `render` places its section (rc_section) before "Extraction
 # Assumptions / Important limitations". Load it with `jq -L <this directory>`; it includes the

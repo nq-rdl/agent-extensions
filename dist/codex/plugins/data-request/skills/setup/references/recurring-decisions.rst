@@ -82,8 +82,8 @@ Recorded house default: first pass
 ``broad-first-pass`` is the second recorded house default: on a first pass, exclusion
 criteria are not applied, to keep the cohort broad. It states a rule about criteria, not a
 fact about the cohort, so it carries no ``facility_code`` and bootstrap does not offer it
-as an ``A-`` assumption. Its ``house_default`` preserves JoshKgh's recorded decision on
-nq-rdl/data-analysis-scaffold#25 (the ``decided.source`` comment link).
+as an ``A-`` assumption. Its ``house_default`` preserves JoshKgh's recorded decision. The
+``decided.source`` link points to the public record of it.
 
 House-default import therefore covers ``broad-first-pass``. Bootstrap applies it to the
 exclusion criteria of the intake sidecar that the request does not override. Each becomes

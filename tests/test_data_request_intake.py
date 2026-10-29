@@ -129,7 +129,7 @@ class IntakeContracts(unittest.TestCase):
 
 
 class IntakeSchema2Contracts(unittest.TestCase):
-    """Spec 017: the interview itemises criteria and writes sidecar schema 2 (tokens, not behaviour)."""
+    """The scaffold's criteria design: the interview itemises criteria and writes sidecar schema 2 (tokens, not behaviour)."""
 
     def test_skill_itemises_criteria_into_schema_2(self):
         for tree in TREES:

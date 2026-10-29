@@ -48,7 +48,7 @@ SEED = {"death-date-raw", "mortality-undercount", "iemr-event-dates", "output-ae
 # Deliberate cross-matches between proposals of the same kind: one prior item (A17 in #172)
 # counts under the death-date, output-time-zone and raw-dated-events rows.
 DELIBERATE_OVERLAPS = {("death-date-raw", "output-aest"), ("death-date-raw", "raw-dated-events")}
-# The maintainer's recorded decision for the broad-first-pass house default (spec 017, research R8).
+# The maintainer's recorded decision for the broad-first-pass house default (the scaffold's criteria design).
 BROAD_SOURCE = "https://github.com/nq-rdl/data-analysis-scaffold/issues/25#issuecomment-6183536330"
 # Fictional ids use a leading 9 (ENQ9001, ...-9901); anything else looks like a real enquiry.
 REAL_ID = re.compile(r"\b(?:ENQ(?!9)\d{3,}|[A-Z]{4,}-(?!9)\d{3,})\b")
@@ -450,7 +450,7 @@ class Helper(unittest.TestCase):
 
 
 class HouseDefaultRequirements(Helper):
-    """Spec 017 (R8): `facility_code` is required only on `tuh-facility`, other fields on every house default."""
+    """The scaffold's criteria design: `facility_code` is required only on `tuh-facility`, other fields on every house default."""
 
     BROAD = {"confirmed_by": "JoshKgh", "confirmed_at": "2026-10-15",
              "decided": {"by": "JoshKgh", "role": "Data Engineer", "at": "2026-10-15", "source": BROAD_SOURCE}}

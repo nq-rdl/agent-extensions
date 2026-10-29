@@ -53,7 +53,7 @@ def items($kind; $rev):
     );
 
 
-# Scope criteria_status (spec 017): the shape of the engineer's one state per research criterion.
+# Scope criteria_status (the scaffold's criteria design): the shape of the engineer's one state per research criterion.
 # Kind-independent, because this check runs on every write and cannot see the analyst's sidecar:
 # states allowed by kind, coverage and the researcher-applies basis are `sqlreview.sh criteria`.
 # Findings are "<id>\t<field>\t<rule>" ("-" when no well-formed id); never a value.

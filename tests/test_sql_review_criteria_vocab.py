@@ -1,4 +1,4 @@
-"""Tests for the shared research-criteria jq vocabulary (spec 017, unit D).
+"""Tests for the shared research-criteria jq vocabulary (the scaffold's criteria design).
 
 skills/data-request-setup/scripts/sqlreview-criteria.jq is a def-only jq module included by the
 intake, check, coverage, scope-renderer and release scripts via `jq -L <scripts dir>` and

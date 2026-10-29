@@ -17,7 +17,7 @@
 # A carried item copies the prior item's confirmed_by, confirmed_at and confirmed_revision, sets
 # carried_from_revision to the prior revision and carried_basis to the basis (the evidence).
 #
-# criteria_status rows (scope only, spec 017) carry by `criterion` with basis criteria-unchanged: the
+# criteria_status rows (scope only, the scaffold's criteria design) carry by `criterion` with basis criteria-unchanged: the
 # previous published scope has a row for the same criterion whose state, reason, flag and upstream are equal
 # (an absent reason, flag or upstream equals an absent one, so gaining or dropping an upstream is a
 # change, as at publish, R21). A row states a target state, not SQL lines, so no SQL evidence applies. The set fields are the assumption ones minus status (confirmed_by, confirmed_at,

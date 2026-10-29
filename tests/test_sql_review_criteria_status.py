@@ -1,4 +1,4 @@
-"""Scope `criteria_status` (spec 017, unit F1): the engineer's one confirmed state per research criterion.
+"""Scope `criteria_status` (the scaffold's criteria design): the engineer's one confirmed state per research criterion.
 
 Two checks, split because the guard hook cannot see the analyst's sidecar (research R6):
 
@@ -10,7 +10,6 @@ Two checks, split because the guard hook cannot see the analyst's sidecar (resea
   and at most one owning scope per repository.
 
 Every finding is `<id>\t<field>\t<rule>` and never carries a value.
-Contract: data-analysis-scaffold specs/017-criteria-prose-to-structure/contracts/scope-criteria-status.md.
 """
 
 import copy

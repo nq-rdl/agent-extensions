@@ -367,7 +367,7 @@ cmd_lint() {
 }
 
 # ---------------------------------------------------------------------------------------------
-# Research criteria (spec 017). check validates the shape of a scope's criteria_status on every
+# Research criteria (the scaffold's criteria design). check validates the shape of a scope's criteria_status on every
 # write, but cannot see the analyst's sidecar; this checks the rest against answers.intake.json at
 # the git top-level, read through `intake` so the sidecar's own validation applies. Rules live in
 # sqlreview-criteria-check.jq. The argument is a slug (its published scope.json) or a scope draft

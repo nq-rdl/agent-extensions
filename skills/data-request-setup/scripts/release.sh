@@ -28,7 +28,7 @@
 #                            "Criteria table held: <reasons>" for a held table, "Criteria are not
 #                            itemised for this request." for a record without a criteria object
 #   criteria TAG [--fingerprints FILE | --answers-invalid]
-#                            the record's `criteria` object (spec 017; release-criteria.jq) from
+#                            the record's `criteria` object (the scaffold's criteria design, release-criteria.jq) from
 #                            answers.intake.json and the one scope carrying criteria_status at TAG,
 #                            the previous release's record (the greatest earlier stable X.Y.Z whose
 #                            .sqlreview/releases/<tag>/release.json is in TAG's tree) and this tag's

@@ -308,7 +308,7 @@ class SuiteShape(unittest.TestCase):
         # test_eval_data_request_field_graders, prerelease-* cases (#390) by
         # test_data_request_prerelease_change and release-* cases (#407) by
         # test_data_request_release, intake-* cases (#504) by test_data_request_intake and bootstrap-* cases
-        # (spec 017) by test_data_request_criteria; any other directory is ours.
+        # (the scaffold's criteria design) by test_data_request_criteria; any other directory is ours.
         cases = {p.name for p in SUITE.iterdir()
                  if p.is_dir() and not p.name.startswith(("amend-", "field-", "prerelease-", "release-", "handoff-", "intake-", "bootstrap-"))}
         self.assertEqual(cases, set(CASES))

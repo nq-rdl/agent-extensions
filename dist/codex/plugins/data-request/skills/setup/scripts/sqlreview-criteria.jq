@@ -1,4 +1,4 @@
-# Research-criteria vocabulary (spec 017): the one definition of criterion kinds, id shape, states
+# Research-criteria vocabulary (the scaffold's criteria design): the one definition of criterion kinds, id shape, states
 # per kind and display order, so the intake, check, coverage, scope-renderer and release scripts
 # cannot drift. A def-only module: no top-level program.
 #

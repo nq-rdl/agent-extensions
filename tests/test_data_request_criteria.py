@@ -1,4 +1,4 @@
-"""Spec 017 (US2): bootstrap records a state per research criterion, analyse checks the SQL for it.
+"""The scaffold's criteria design: bootstrap records a state per research criterion, analyse checks the SQL for it.
 
 Token checks over the three skill trees (canonical, Claude, Codex) and the fixtures of the
 bootstrap-criteria-states eval. No model call is made; the behavioural side is the eval.

@@ -121,7 +121,7 @@ class StatusReportsMissingTemplates(unittest.TestCase):
 
 
 class RenderScopeCriteria(unittest.TestCase):
-    """Spec 017 (T031): the bundled scope.md renders `criteria_status` as an ID/State/Note table."""
+    """The scaffold's criteria design: the bundled scope.md renders `criteria_status` as an ID/State/Note table."""
 
     SLUG = "reports__monthly"
     HEADER = "| ID | State | Note |\n|---|---|---|\n"

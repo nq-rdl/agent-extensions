@@ -13,7 +13,7 @@ the confirmed scope and the `.sqlreview` reviews. These tests pin:
   fictional enquiry number;
 * the helper `release.sh`: `evidence` (does each review apply to the release tag), `check`
   (the release record's invariants), `render` (the paste-ready body) and `criteria` (the
-  "Criteria in this release" table of spec 017: previous tag, change values, held reasons and the
+  "Criteria in this release" table of the scaffold's criteria design: previous tag, change values, held reasons and the
   legacy line);
 * the guard validates a written release record;
 * the `release-*` eval cases, graded in Python always and in Node when it is on PATH.
@@ -274,7 +274,7 @@ class WorkedExample(unittest.TestCase):
 
 
 class CriteriaTableSkill(unittest.TestCase):
-    """Spec 017 (US3): the skill's criteria-table step, in every tree."""
+    """The scaffold's criteria design: the skill's criteria-table step, in every tree."""
 
     HEADING = "## 6. Criteria in this release"
 
@@ -919,7 +919,7 @@ class Guard(unittest.TestCase):
         self.assertIn("release.sh render", reason)
 
 
-# --- helper: criteria table (spec 017, US3) -------------------------------------------------
+# --- helper: criteria table (the scaffold's criteria design) ---------------------------------
 
 CRIT_JQ = {
     "canonical": SETUP / "scripts" / "release-criteria.jq",
