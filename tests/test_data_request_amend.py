@@ -29,6 +29,10 @@ BOUNDARY_TABLE_ROWS = (
 )
 
 
+def flat(text: str) -> str:
+    return " ".join(text.split())
+
+
 def frontmatter(path: Path) -> tuple[dict, str]:
     text = path.read_text()
     _, meta, body = text.split("---\n", 2)
@@ -123,6 +127,75 @@ class Content(unittest.TestCase):
         for sentence in edits:
             with self.subTest(sentence=sentence):
                 self.assertRegex(sentence, r"(?i)\b(never|not|refus\w*|no)\b")
+
+
+    def test_a_combined_request_is_split_per_part(self):
+        # #533: one engineer-required part no longer stops the analyst-safe parts.
+        self.assertNotIn("stops the whole request", self.body)
+        self.assertIn("### Split a combined request", self.body)
+        split = self.body.split("### Split a combined request", 1)[1].split("## 2.", 1)[0]
+        self.assertRegex(split, r"P1: <the change[^>]*>\nclassification: <analyst-safe \| engineer-required>")
+        self.assertRegex(split, r"(?i)ambiguous is engineer-required")
+        self.assertIn("Do not guess", split)
+        self.assertRegex(split, r"(?i)never change rows or meaning")
+        self.assertRegex(split, r"(?i)one part does not stop the others")
+
+    def test_engineer_parts_share_one_hand_off_on_the_deliverable_pr(self):
+        handoff = self.body.split("## 2.", 1)[1].split("## 3.", 1)[0]
+        for token in ("single hand-off comment", "deliverable PR", "Communication channel",
+                      "amendment hand-off:", "already done by the analyst:", "part:",
+                      "open question:", "route:"):
+            with self.subTest(token=token):
+                self.assertIn(token, handoff)
+        self.assertLess(handoff.index("amendment hand-off:"), handoff.index("\npart: <P3>"))
+
+    def test_split_evidence_and_resume_are_readable_by_the_next_run(self):
+        for token in ("`done`, `handed off` or `withdrawn`", "Do not add an entry for a handed-off part",
+                      "done:", "handed off:", "open decision:", "open delivery gate",
+                      "## Resume a split request", "Do not post the hand-off again"):
+            with self.subTest(token=token):
+                self.assertIn(token, self.body)
+        resume = self.body.split("## Resume a split request", 1)[1]
+        self.assertRegex(resume, r"(?i)do not redo it")
+        self.assertRegex(resume, r"(?i)sent back as analyst-safe")
+
+    def test_only_two_strict_forms_close_a_handed_off_part(self):
+        # A comment that only names the part, such as "P3 is still in progress", leaves it open.
+        close = self.body.split("### Close a handed-off part", 1)[1].split("## 3.", 1)[0]
+        self.assertIn("```text\nwithdrawn: P<n> <reason>\ndone: P<n> <commit>\n```", close)
+        self.assertIn("Only two comment forms on the deliverable PR close a handed-off part", close)
+        self.assertIn("The reason is required", close)
+        self.assertIn("A `withdrawn:` line with no\n  reason does not close the part", close)
+        self.assertIn("The commit must be in the release\n  ref", close)
+        self.assertIn("Any other comment that names the part leaves it open", close)
+        self.assertIn("P3 is still in progress", close)
+        self.assertIn("Post it only when the analyst authorises", close)
+        self.assertLess(self.body.index("route: </data-request:fix"),
+                        self.body.index("### Close a handed-off part"))
+
+    def test_hand_off_keys_are_unchanged(self):
+        handoff = self.body.split("```text\namendment hand-off:", 1)[1].split("```", 1)[0]
+        keys = re.findall(r"^([a-z][a-z -]*):", "amendment hand-off:" + handoff, re.M)
+        self.assertEqual(keys, ["amendment hand-off", "enquiry", "already done by the analyst", "part",
+                                "classification", "requested change", "boundary rule",
+                                "open question", "affected files", "governance", "route"])
+
+    def test_record_and_resume_share_the_three_states(self):
+        self.assertIn("`done`, `handed off` or `withdrawn`", self.body)
+        self.assertIn("A withdrawn part also gets the reason and the `withdrawn:` comment URL", self.body)
+        self.assertIn("Do not add an entry for a handed-off part or a withdrawn part", self.body)
+        self.assertIn('withdrawn: <each withdrawn part: P number and reason, or "none">', self.body)
+        resume = flat(self.body.split("## Resume a split request", 1)[1])
+        self.assertIn("a `done: P<n> <commit>` comment closes it", resume)
+        self.assertIn("a `withdrawn: P<n> <reason>` comment closes it", resume)
+        self.assertIn("It no longer blocks the release", resume)
+        self.assertIn("it stays handed off, whatever other comments name it", resume)
+        self.assertIn("`withdrawn` for a `withdrawn:` comment", resume)
+
+    def test_no_interim_workbook_route(self):
+        # The no-database-run route from #533 is an open design choice, not built here.
+        self.assertNotIn("build_workbook", self.body)
+        self.assertIn("Do not run a live extract", self.body)
 
 
 class Routing(unittest.TestCase):

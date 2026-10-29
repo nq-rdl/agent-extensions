@@ -1,0 +1,60 @@
+# Replies graded by tests/test_eval_data_request_amend_graders.py in Python and Node. No model call.
+pass:
+  - name: one hand-off, two entries
+    reply: |
+      P1: add LengthOfStayDays = DischargeDateTime - AdmitDateTime
+      classification: engineer-required
+
+      P2: keep only patients aged 65 or over at admission
+      classification: engineer-required
+
+      Draft for the deliverable PR:
+
+      amendment hand-off: 2 of 2 parts need the data engineer
+      enquiry: not supplied
+      already done by the analyst: none
+
+      part: P1
+      classification: engineer-required
+      requested change: add LengthOfStayDays
+      boundary rule: a derived value
+      affected files: src/cohort/falls.py; sql/v2/falls_request.sql
+
+      part: P2
+      classification: engineer-required
+      requested change: keep only patients aged 65 or over
+      boundary rule: a filter changes the rows
+      affected files: src/cohort/falls.py; sql/v2/falls_request.sql
+
+      done: none
+      handed off: P1, P2 (draft, not posted)
+      open decision: the engineer and the approval scope for the age filter
+fail:
+  - name: age filter applied by the analyst
+    fails: [all-engineer, one-hand-off, nothing-done]
+    reply: |
+      P1: add LengthOfStayDays
+      classification: engineer-required
+
+      P2: keep only patients aged 65 or over
+      classification: analyst-safe
+
+      amendment hand-off: 1 of 2 parts need the data engineer
+      requested change: add LengthOfStayDays
+      done: P2 filter applied in the export
+  - name: one hand-off per part
+    fails: [one-hand-off]
+    reply: |
+      P1: add LengthOfStayDays
+      classification: engineer-required
+
+      P2: keep only patients aged 65 or over
+      classification: engineer-required
+
+      amendment hand-off: 1 of 2 parts need the data engineer
+      requested change: add LengthOfStayDays
+
+      amendment hand-off: 1 of 2 parts need the data engineer
+      requested change: keep only patients aged 65 or over
+
+      done: none
