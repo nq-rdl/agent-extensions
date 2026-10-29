@@ -1,0 +1,40 @@
+# Replies graded by tests/test_data_request_prerelease_change.py in Python (and Node when present). No model call.
+pass:
+  - name: states the evidence and continues
+    reply: |
+      Not released: no `data/Released/v*/`, no tag, no `data/Review/` pointer, and the PR and
+      service-desk issue both say nothing was handed over. The rename is analyst-safe, so it goes
+      through amend with the operator-run extract as the baseline.
+
+      ```yaml
+      release_status: unreleased
+      questions: 0
+      next_step: edit via amend
+      ```
+fail:
+  - name: asks anyway
+    fails: [release-unreleased, no-question, workflow-amend]
+    reply: |
+      Absent tags do not prove anything. Did the extract reach the researcher?
+
+      ```yaml
+      release_status: unconfirmed
+      questions: 1
+      next_step: ask
+      ```
+  - name: right state but still asks to confirm
+    fails: [no-question]
+    reply: |
+      ```yaml
+      release_status: unreleased
+      questions: 1
+      next_step: edit via amend
+      ```
+  - name: rename sent to fix
+    fails: [workflow-amend]
+    reply: |
+      ```yaml
+      release_status: unreleased
+      questions: 0
+      next_step: edit via fix
+      ```

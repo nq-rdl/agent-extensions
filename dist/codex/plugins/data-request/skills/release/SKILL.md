@@ -34,8 +34,10 @@ Order: the Data Engineer completes `analyse`, the authorised operator run, UAT a
 hand-off; the Data Analyst runs `explain`, accepts for release preparation, sends back or
 amends presentation, then drafts here and publishes. Never direct the engineer to release.
 If the analyst chooses **Send back** here, use the paste-ready *Analyst outcome* note in
-`${PLUGIN_ROOT}/skills/explain/SKILL.md`: logic changes or defects to `fix`, presentation
-changes to `amend` before or after release. Keep unresolved claims `pending` and the current
+`${PLUGIN_ROOT}/skills/explain/SKILL.md`, with its completeness check: logic changes or defects to `fix`, presentation
+changes to `amend` before or after release. Add two lines after `outcome:`: `release ref: <tag
+or candidate ref>`, and `release claims: <claim and question ids, with the conflicting sources
+for each>`. The engineer then has the claim, its sources and the expected result in one comment. Keep unresolved claims `pending` and the current
 candidate record `draft`; do not overwrite a previously approved release record, post the
 note or clear a gate. The note belongs on the deliverable PR, never the child issue or
 service-desk. See *Communication channel* in `${PLUGIN_ROOT}/skills/triage/references/handoff.rst`. Refreshed review and operator-run/UAT evidence precede another hand-off.
@@ -45,12 +47,44 @@ a storage fact or conversion. Worked example:
 [references/worked-example.rst](references/worked-example.rst).
 
 Arguments: `$ARGUMENTS` — the release tag or candidate ref (for example `v1.0.0`). If none is
-given, ask for it.
+given, work it out before you ask. Read the release tags (`git tag --list 'v*'`), published
+releases and their notes, `.sqlreview/releases/*/release.json`, the ledger and merged release
+PRs. Guardrails `references/release.rst`, **Release state from evidence**, lists these signals.
+When exactly one tag has no `approved` release record, use it and say so in one line. For
+example: "Candidate v1.1.0: v1.0.0 has an approved record, v1.1.0 has none." Ask only when no
+tag or more than one tag qualifies, and list the candidates in the question.
 
 ```bash
 S="${PLUGIN_ROOT}/skills/setup/scripts"
 bash "$S/sqlreview.sh" status --json   # exit 3 → stop: not initialised, run $data-request:setup first
 ```
+
+## 0. Amend gate
+
+Do this before any other step. A part that `$data-request:amend` handed off blocks the release
+until a strict comment on the deliverable PR closes it. Find the deliverable PR in the ledger,
+or use the PR URL the analyst gives. Read its description and comments, read-only, and the
+ledger. Find each amend status line (`P<n>` with `done`, `handed off` or `withdrawn`) and each
+`amendment hand-off:` comment with its `part:` entries. Only a later comment on the same PR
+whose first line has one of two forms closes a handed-off part:
+
+- **Completed:** `done: P<n> <commit>`, from the engineer. The commit must be in the release
+  ref (`git merge-base --is-ancestor <commit> <ref>`). If the check fails or cannot run, the
+  part stays open.
+- **Withdrawn:** `withdrawn: P<n> <reason>`, from the analyst. A `withdrawn:` line with no
+  reason leaves the part open.
+
+Any other comment that names the part leaves it open, for example "P3 is still in progress".
+For each handed-off part, say in one line which comment you read and what it decided. For
+example: "P3: read `done: P3 4e5f6a7`, and 4e5f6a7 is in v1.1.0, so P3 is closed."
+
+If a handed-off part is still open, stop before step 1. Say it in one or two lines. For
+example: "Release held: P3 (ward name in place of the code) is handed off and open. Next: the
+engineer comments `done: P3 <commit>` on the PR, or you withdraw it there." Offer to draft the
+withdrawal comment for the analyst, `withdrawn: P3 <reason>`, with the analyst's own reason.
+Do not draft it without a reason. Post nothing. If you cannot read the PR, say so and stop.
+Never assume that no part is open. When no part was handed off, or every handed-off part is
+closed, say so in one line and continue.
 
 ## 1. Gather the release evidence
 

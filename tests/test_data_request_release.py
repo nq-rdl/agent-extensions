@@ -245,6 +245,52 @@ class SkillContract(unittest.TestCase):
                 self.assertIn("row-level data", text)
                 self.assertIn("paste-ready", text)
 
+    def test_amend_gate_comes_before_any_evidence(self):
+        for tree in SKILL:
+            with self.subTest(tree=tree):
+                body = self.body(tree)
+                self.assertLess(body.index("## 0. Amend gate"), body.index("## 1. Gather the release evidence"))
+                text = flat(section(body, "## 0. Amend gate"))
+                for token in ("`handed off`", "`amendment hand-off:`", "`part:`", "**Completed:**",
+                              "**Withdrawn:**", "`git merge-base --is-ancestor <commit> <ref>`",
+                              "stop before step 1", "one or two lines", "Release held:",
+                              "`withdrawn: P3 <reason>`", "Post nothing",
+                              "Never assume that no part is open"):
+                    self.assertIn(token, text)
+
+    def test_amend_gate_accepts_only_the_two_strict_forms(self):
+        # A comment that only names the part, such as "P3 is still in progress", leaves it open.
+        for tree in SKILL:
+            with self.subTest(tree=tree):
+                text = flat(section(self.body(tree), "## 0. Amend gate"))
+                for token in ("`done`, `handed off` or `withdrawn`",
+                              "whose first line has one of two forms closes a handed-off part",
+                              "**Completed:** `done: P<n> <commit>`, from the engineer",
+                              "If the check fails or cannot run, the part stays open",
+                              "**Withdrawn:** `withdrawn: P<n> <reason>`, from the analyst",
+                              "A `withdrawn:` line with no reason leaves the part open",
+                              "Any other comment that names the part leaves it open",
+                              '"P3 is still in progress"',
+                              "say in one line which comment you read",
+                              "with the analyst's own reason", "Do not draft it without a reason"):
+                    self.assertIn(token, text)
+                self.assertNotIn("the engineer says the part is done", text)
+
+    def test_candidate_ref_comes_from_the_tags_before_asking(self):
+        for text in self.each():
+            self.assertIn("work it out before you ask", text)
+            self.assertIn("**Release state from evidence**", text)
+            self.assertIn("When exactly one tag has no `approved` release record, use it and say so "
+                          "in one line", text)
+            self.assertIn("Ask only when no tag or more than one tag qualifies", text)
+            self.assertNotIn("If none is given, ask for it.", text)
+
+    def test_send_back_adds_the_release_claims(self):
+        for text in self.each():
+            self.assertIn("with its completeness check", text)
+            self.assertIn("`release ref: <tag or candidate ref>`", text)
+            self.assertIn("`release claims:", text)
+
     def test_worked_example_is_linked(self):
         for text in self.each():
             self.assertIn("references/worked-example.rst", text)
@@ -753,6 +799,14 @@ CASES = {
                                "blocker-missing-element"},
     "release-technical-limitation": {"include-l4", "internal-l3", "claims-no-sql-jargon",
                                      "claims-current-record"},
+    # #534: a handed-off amend part holds release preparation until completed or withdrawn.
+    "release-amend-part-open": {"prep-stopped", "names-p3"},
+    "release-amend-part-withdrawn": {"prep-continue", "no-blocker"},
+    # Only `done: P<n> <commit>` in the release ref or `withdrawn: P<n> <reason>` close a part.
+    "release-amend-part-in-progress": {"prep-stopped", "names-p3", "not-closed"},
+    "release-amend-withdrawn-no-reason": {"prep-stopped", "names-p3", "not-closed"},
+    "release-amend-done-outside-ref": {"prep-stopped", "names-p3", "not-closed"},
+    "release-amend-part-done": {"prep-continue", "no-blocker", "closed-by-done"},
 }
 NODE = shutil.which("node")
 NODE_SCRIPT = """

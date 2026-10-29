@@ -1,8 +1,8 @@
 Release conventions
 ===================
 
-Read this before delivery, and when a request asks for dates, validation listings,
-study identifiers, aggregate counts or clinician names. Evidence: two related
+Read this before delivery, when a skill must settle the release state, and when a request
+asks for dates, validation listings, study identifiers, aggregate counts or clinician names. Evidence: two related
 enquiries whose builder had to decide each point from first principles (issue #389),
 and the governance ruling below (issue #413). Known approval restrictions and the
 requester's confirmed scope override these conventions. Record each choice you make
@@ -35,6 +35,38 @@ complete during the build.
   If a runtime action is denied, report it and stop; never retry in another form
   or route through another agent to evade the denial. Only the engineer may
   change host permission settings, not the agent.
+
+Release state from evidence
+---------------------------
+
+``/data-request:fix``, ``/data-request:amend`` and ``/data-request:release`` work out the
+release state from repository evidence before they ask (issue #534). Read these signals.
+All reads are read-only:
+
+* ``data/Released/v*/`` versions and release tags (``git tag --list``).
+* Published releases and their notes, and ``.sqlreview/releases/*/release.json``.
+* ``data/Review/`` pointers.
+* The triage ledger and merged release PRs.
+* The deliverable PR and the service-desk issue text. Agents read service-desk but never write to it.
+
+Settle the state from those signals:
+
+* **Released.** A released version, a release tag, a published release or a ledger
+  delivery entry settles it. Do not ask.
+* **Unreleased.** No released version, tag, published release or ledger delivery exists.
+  No ``data/Review/`` pointer exists, or the text says that its data stayed inside RDL.
+  The human, the deliverable PR, the ledger or the service-desk issue says that nothing
+  reached the requester. Do not ask.
+* **Unconfirmed.** The signals conflict, or no text says that nothing reached the
+  requester. Ask one question that names the gap. Make no edit until it is answered.
+
+A ``data/Review/`` pointer is a release candidate, not a release. When its data could have
+reached the requester, the one question is whether it did.
+
+State the result in one line that names what you read. For example: "Not released: no
+``data/Released/v*/``, no tag, no ``data/Review/`` pointer, and the PR says not handed
+over." When you ask, give the same line first, then the one question. Ask only for what
+the evidence cannot show.
 
 Personal information
 --------------------

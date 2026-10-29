@@ -19,6 +19,7 @@ CASES = {
     "handoff-prerelease-presentation": {"workflow", "classification", "baseline", "record", "row_keys", "review"},
     "handoff-analyst-send-back": {"outcome", "logic_route", "presentation_route", "release", "posted"},
     "handoff-pr-channel": {"destination", "child_issue", "service_desk", "board"},
+    "handoff-send-back-complete": {"outcome", "route", "follow_up", "resolved"},
 }
 
 
@@ -106,6 +107,17 @@ class HandoffContracts(unittest.TestCase):
             self.assertIn(token, explain)
         self.assertIn("Send back", text("release"))
         self.assertIn("Data Analyst", text("release"))
+
+    def test_send_back_carries_what_the_engineer_needs(self):
+        # #534: the engineer's reply to a send-back is the change, not a request for detail.
+        explain = text("explain")
+        for token in ("deliverable PR:", "review: <slug> revision <n>",
+                      "already resolved by the analyst:", "affected files:", "waiting on:",
+                      "The note must let the engineer act without a reply that asks for more detail",
+                      "finish the analyst's share", "is concrete", "Offer to draft that question",
+                      "Never leave a gap for the engineer to ask about later"):
+            self.assertIn(token, explain)
+        self.assertNotIn("mark undecided meaning explicitly", explain)
 
     def test_order_is_visible_at_each_delivery_entrypoint(self):
         for leaf in ("analyse", "explain", "amend", "fix", "release", "triage"):

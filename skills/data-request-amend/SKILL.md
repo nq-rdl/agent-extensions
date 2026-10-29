@@ -39,14 +39,17 @@ contradicts what was agreed (a wrong value, type or format), it is a defect: use
 
 This skill covers presentation changes before or after release. An extract is released when
 a version exists under `data/Released/v*/`, a release tag exists or any version reached the requester (a `data/Review/` drop that reached
-them counts). Before the first release, use the operator-run extract as the baseline,
-with its run commit, SQL fingerprint and DVC pointer. Confirm that nothing reached the
-requester; absent release files or tags do not prove that. If no operator-run baseline
+them counts). Settle the state from repository evidence first, as guardrails
+`references/release.rst`, **Release state from evidence**, describes. Absent release files or
+tags alone do not prove that nothing reached the requester. When the signals agree, do not
+ask. State the result in one line with what you read, then continue.
+Before the first release, use the operator-run extract as the baseline,
+with its run commit, SQL fingerprint and DVC pointer. If no operator-run baseline
 exists, classify only and report validation pending; do not edit or claim a checked amendment.
 A logic change before the first release goes
 to `/data-request:fix` (*Pre-release logic change*), which allows it with the same runbook, UAT
 and review rules. If you cannot tell whether the extract is released, ask, and make no edit
-until answered.
+until answered. Ask one question that names the gap the evidence leaves.
 
 The engineer completes `analyse`, the authorised operator run, UAT and the triage hand-off.
 The analyst runs `explain`, then accepts, sends back or amends presentation here. After any
@@ -247,7 +250,8 @@ open decision: <the decision that blocks the next step, and who makes it, or "no
 
 A handed-off part is an open delivery gate. Do not start `/data-request:release` until the
 engineer completes each handed-off part, or the analyst withdraws it on the deliverable PR. Only
-the two forms in *Close a handed-off part* (step 2) close a part. The
+the two forms in *Close a handed-off part* (step 2) close a part. `/data-request:release`
+enforces this gate in its step 0 (*Amend gate*). The
 done parts already make the review stale. One full re-walk after the engineer's change can
 cover all parts.
 
