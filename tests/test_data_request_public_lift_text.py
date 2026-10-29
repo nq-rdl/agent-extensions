@@ -34,11 +34,11 @@ COPIES = {
     LIFT: (CLAUDE / "lift/SKILL.md", CODEX / "lift/SKILL.md"),
 }
 
-PUBLIC_LIBRARIES = ("query-builder", "agent-extensions", "data-analysis-scaffold")
+ALLOWED_LIBRARY_REPOS = ("query-builder", "agent-extensions", "data-analysis-scaffold")
 LEAKS = {
     "enquiry-or-approval-number": re.compile(r"\bTHHS[A-Z]+-\d+\b|\bENQ\d{3,}\b|\b\d{4,}_request\b"),
     "non-library-link": re.compile(
-        r"https?://github\.com/(?!nq-rdl/(?:%s)\b)\S+|https?://\S*service-desk\S*" % "|".join(PUBLIC_LIBRARIES)),
+        r"https?://github\.com/(?!nq-rdl/(?:%s)\b)\S+|https?://\S*service-desk\S*" % "|".join(ALLOWED_LIBRARY_REPOS)),
     "request-file-reference": re.compile(
         r"\bsql/v\d+/|_request\.sql\b|\.sqlreview/|\banswers\.yaml\b|\bcohort/request\.json\b"
         r"|\bdata/0\d_|\bconf/base/"),
@@ -80,7 +80,7 @@ class Fixtures(unittest.TestCase):
 
     def test_library_links_are_not_flagged(self):
         for text in ("https://github.com/nq-rdl/query-builder/blob/v0.7.0/resolvers/iemr/resolver.py",
-                     "https://github.com/nq-rdl/query-builder/issues/172",
+                     "https://github.com/nq-rdl/query-builder/issues/1",
                      "https://github.com/nq-rdl/agent-extensions/issues/527"):
             with self.subTest(text):
                 self.assertEqual(leaks(text), set())

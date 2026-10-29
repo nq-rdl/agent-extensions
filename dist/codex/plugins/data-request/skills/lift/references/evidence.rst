@@ -26,8 +26,7 @@ A public issue describes the reusable need. It never contains:
   confirmed it;
 * the researcher's study, project or cohort name, or a count small enough to identify a person.
 
-Links to the owning library at a released tag or commit, and to the public ``nq-rdl``
-repositories that hold the library and these skills, are fine.
+Links to the owning library at a released tag or commit, and to this skills repository, are fine.
 
 Evidence block
 --------------
@@ -91,7 +90,7 @@ Before filing or commenting
    against **Public by default** above, as a person would read it cold.
 2. Remove or generalise each hit. A hit in a quoted snippet, a stack trace, a link
    text or a code comment counts. Do not rely on a match tool to be complete.
-3. Show the draft to the human with the confirmation above. Then file it.
+3. Show the draft to the human and ask Confirm, Reword or Reject. File it only after Confirm.
 4. Search the library's open and closed issues for the reusable need by its wording, not by an
    identifier, before you create anything; a match is an existing unit to reuse or link, not
    proof that this occurrence was already filed. Put a random per-occurrence line in the draft
