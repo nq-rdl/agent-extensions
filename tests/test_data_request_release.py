@@ -258,6 +258,24 @@ class SkillContract(unittest.TestCase):
                               "Never assume that no part is open"):
                     self.assertIn(token, text)
 
+    def test_amend_gate_accepts_only_the_two_strict_forms(self):
+        # A comment that only names the part, such as "P3 is still in progress", leaves it open.
+        for tree in SKILL:
+            with self.subTest(tree=tree):
+                text = flat(section(self.body(tree), "## 0. Amend gate"))
+                for token in ("`done`, `handed off` or `withdrawn`",
+                              "whose first line has one of two forms closes a handed-off part",
+                              "**Completed:** `done: P<n> <commit>`, from the engineer",
+                              "If the check fails or cannot run, the part stays open",
+                              "**Withdrawn:** `withdrawn: P<n> <reason>`, from the analyst",
+                              "A `withdrawn:` line with no reason leaves the part open",
+                              "Any other comment that names the part leaves it open",
+                              '"P3 is still in progress"',
+                              "say in one line which comment you read",
+                              "with the analyst's own reason", "Do not draft it without a reason"):
+                    self.assertIn(token, text)
+                self.assertNotIn("the engineer says the part is done", text)
+
     def test_candidate_ref_comes_from_the_tags_before_asking(self):
         for text in self.each():
             self.assertIn("work it out before you ask", text)
@@ -784,6 +802,11 @@ CASES = {
     # #534: a handed-off amend part holds release preparation until completed or withdrawn.
     "release-amend-part-open": {"prep-stopped", "names-p3"},
     "release-amend-part-withdrawn": {"prep-continue", "no-blocker"},
+    # Only `done: P<n> <commit>` in the release ref or `withdrawn: P<n> <reason>` close a part.
+    "release-amend-part-in-progress": {"prep-stopped", "names-p3", "not-closed"},
+    "release-amend-withdrawn-no-reason": {"prep-stopped", "names-p3", "not-closed"},
+    "release-amend-done-outside-ref": {"prep-stopped", "names-p3", "not-closed"},
+    "release-amend-part-done": {"prep-continue", "no-blocker", "closed-by-done"},
 }
 NODE = shutil.which("node")
 NODE_SCRIPT = """

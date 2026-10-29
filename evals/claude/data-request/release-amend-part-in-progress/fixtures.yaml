@@ -1,0 +1,37 @@
+# Replies graded by tests/test_data_request_release.py in Python (and Node when present). No model call.
+pass:
+  - name: held, names the comment read
+    reply: |
+      Release held: P3 read "P3 is still in progress". That is not a `done:` or
+      `withdrawn:` line, so P3 stays open.
+
+      ```yaml
+      release_prep: stopped
+      blocking_part: P3
+      p3_closed_by: none
+      ```
+fail:
+  - name: treats the comment as a close
+    fails: [prep-stopped, names-p3, not-closed]
+    reply: |
+      ```yaml
+      release_prep: continue
+      blocking_part: none
+      p3_closed_by: done
+      ```
+  - name: stops but calls P3 closed
+    fails: [not-closed]
+    reply: |
+      ```yaml
+      release_prep: stopped
+      blocking_part: P3
+      p3_closed_by: done
+      ```
+  - name: stops but names the wrong part
+    fails: [names-p3]
+    reply: |
+      ```yaml
+      release_prep: stopped
+      blocking_part: P1
+      p3_closed_by: none
+      ```

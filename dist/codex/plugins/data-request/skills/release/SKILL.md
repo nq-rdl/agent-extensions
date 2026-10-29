@@ -62,22 +62,29 @@ bash "$S/sqlreview.sh" status --json   # exit 3 → stop: not initialised, run $
 ## 0. Amend gate
 
 Do this before any other step. A part that `$data-request:amend` handed off blocks the release
-until the engineer completes it, or the analyst withdraws it on the deliverable PR. Find the
-deliverable PR in the ledger, or use the PR URL the analyst gives. Read its description and
-comments, read-only, and the ledger. Find each amend status line (`P<n>` with `done` or
-`handed off`) and each `amendment hand-off:` comment with its `part:` entries. A handed-off part is closed only by a later comment on the same PR that names its
-`P` number:
+until a strict comment on the deliverable PR closes it. Find the deliverable PR in the ledger,
+or use the PR URL the analyst gives. Read its description and comments, read-only, and the
+ledger. Find each amend status line (`P<n>` with `done`, `handed off` or `withdrawn`) and each
+`amendment hand-off:` comment with its `part:` entries. Only a later comment on the same PR
+whose first line has one of two forms closes a handed-off part:
 
-- **Completed:** the engineer says the part is done and names the commit. The commit must be
-  in the release ref (`git merge-base --is-ancestor <commit> <ref>`).
-- **Withdrawn:** the analyst withdraws the part.
+- **Completed:** `done: P<n> <commit>`, from the engineer. The commit must be in the release
+  ref (`git merge-base --is-ancestor <commit> <ref>`). If the check fails or cannot run, the
+  part stays open.
+- **Withdrawn:** `withdrawn: P<n> <reason>`, from the analyst. A `withdrawn:` line with no
+  reason leaves the part open.
+
+Any other comment that names the part leaves it open, for example "P3 is still in progress".
+For each handed-off part, say in one line which comment you read and what it decided. For
+example: "P3: read `done: P3 4e5f6a7`, and 4e5f6a7 is in v1.1.0, so P3 is closed."
 
 If a handed-off part is still open, stop before step 1. Say it in one or two lines. For
 example: "Release held: P3 (ward name in place of the code) is handed off and open. Next: the
-engineer completes P3 on the PR, or you withdraw it there." Offer to draft the withdrawal
-comment for the analyst, `withdrawn: P3 <reason>`. Post nothing. If you cannot read the PR,
-say so and stop. Never assume that no part is open. When no part was handed off, or every
-handed-off part is closed, say so in one line and continue.
+engineer comments `done: P3 <commit>` on the PR, or you withdraw it there." Offer to draft the
+withdrawal comment for the analyst, `withdrawn: P3 <reason>`, with the analyst's own reason.
+Do not draft it without a reason. Post nothing. If you cannot read the PR, say so and stop.
+Never assume that no part is open. When no part was handed off, or every handed-off part is
+closed, say so in one line and continue.
 
 ## 1. Gather the release evidence
 
