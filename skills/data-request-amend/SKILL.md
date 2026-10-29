@@ -122,6 +122,25 @@ route: </data-request:fix before the first release | engineer amendment with a n
 Never relabel a change to fit analyst-safe. The engineer records each handed-off part with a
 named reviewer.
 
+### Close a handed-off part
+
+Only two comment forms on the deliverable PR close a handed-off part. Each is one line that
+starts the comment:
+
+```text
+withdrawn: P<n> <reason>
+done: P<n> <commit>
+```
+
+- **`withdrawn:`** The analyst writes it. The reason is required. A `withdrawn:` line with no
+  reason does not close the part.
+- **`done:`** The engineer writes it when the change is merged. The commit must be in the release
+  ref. `/data-request:release` checks this before it continues.
+
+Any other comment that names the part leaves it open, for example "P3 is still in progress".
+Offer to draft the `withdrawn:` line for the analyst. Post it only when the analyst authorises
+that post.
+
 ## 3. Governance scope: a separate check
 
 Technical safety does not settle scope. Whether the approval covers a change is decided under
@@ -170,7 +189,8 @@ Before the first release, record the requested change, reason, classification, r
 baseline pointer and validation in the PR or existing review ledger. Do not add an `AMD-` entry
 to `specs/amendments.md`: that record governs released extracts. Keep the baseline immutable.
 For a split request, record each part on its own line with its `P` number and a status:
-`done` or `handed off`. A handed-off part also gets the hand-off comment URL, or "draft, not posted".
+`done`, `handed off` or `withdrawn`. A handed-off part also gets the hand-off comment URL, or
+"draft, not posted". A withdrawn part also gets the reason and the `withdrawn:` comment URL.
 
 For a released extract, add one entry per amendment, with its classification, to the child's
 amendment record. In a data-analysis-scaffold child this is `specs/amendments.md`
@@ -181,7 +201,7 @@ email address or a patient identifier. If the repository has no record, say so a
 same fields in the pull request description.
 
 For a split request on a released extract, add an entry only for each part that you completed.
-Do not add an entry for a handed-off part. The engineer adds it with the
+Do not add an entry for a handed-off part or a withdrawn part. The engineer adds it with the
 `engineer-required` classification and a named reviewer, which the guard reads.
 
 ## 6. Validate
@@ -224,12 +244,14 @@ For a split request, end with this short summary for the analyst:
 ```text
 done: <each completed part: P number, change, checks passed or pending, or "none">
 handed off: <each handed-off part: P number, change, hand-off comment URL or "draft", or "none">
+withdrawn: <each withdrawn part: P number and reason, or "none">
 open decision: <the decision that blocks the next step, and who makes it, or "none">
 ```
 
 A handed-off part is an open delivery gate. Do not start `/data-request:release` until the
-engineer completes each handed-off part, or the analyst withdraws it on the deliverable PR.
-`/data-request:release` enforces this gate in its step 0 (*Amend gate*). The
+engineer completes each handed-off part, or the analyst withdraws it on the deliverable PR. Only
+the two forms in *Close a handed-off part* (step 2) close a part. `/data-request:release`
+enforces this gate in its step 0 (*Amend gate*). The
 done parts already make the review stale. One full re-walk after the engineer's change can
 cover all parts.
 
@@ -240,14 +262,16 @@ PR and the record from step 5. Do not split the request again from the start.
 
 - **Done part:** do not redo it. Confirm that its record entry and its regenerated SQL are still
   there. If either is missing, report it as a blocker.
-- **Handed-off part, done by the engineer:** report it as done by the engineer. Do not check
-  or change it here.
+- **Handed-off part, done by the engineer:** a `done: P<n> <commit>` comment closes it. Report
+  it as done by the engineer, with the commit. Do not check or change it here.
 - **Handed-off part, sent back as analyst-safe:** the engineer may answer the open question and
   call the part analyst-safe. Then complete it through steps 3 to 6 and cite the reply. A silence
   or a "probably fine" is not an answer.
-- **Handed-off part, withdrawn by the analyst on the PR:** report it as withdrawn. It no longer
-  blocks the release. Do not complete it here.
-- **Any other handed-off part:** it stays handed off. Do not post the hand-off again. If the
-  comment is missing, draft it again for the human.
+- **Handed-off part, withdrawn by the analyst:** a `withdrawn: P<n> <reason>` comment closes
+  it. Report it as withdrawn, with the reason. It no longer blocks the release. Do not complete
+  it here.
+- **Any other handed-off part:** it stays handed off, whatever other comments name it.
+  Do not post the hand-off again. If the comment is missing, draft it again for the human.
 
-Update the record line of each part whose status changed.
+Update the record line of each part whose status changed: `done` for a `done:` comment, and
+`withdrawn` for a `withdrawn:` comment.
