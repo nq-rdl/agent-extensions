@@ -3,14 +3,16 @@ name: intake
 license: CC-BY-4.0
 description: Interview the Data Analyst on the research decisions of a data request
   — cohort and age limits, code-set edges, outcomes and windows, identifiers and presentation,
-  governance and the grain — then fill answers.yaml, write answers.intake.json (schema
-  1) and, on approval, render the data-analysis-scaffold over a request-template repo
-  with copier. Needs no .sqlreview/. Re-running walks through what changed. Use before
-  the engineer's $data-request:bootstrap, whenever an analyst fills or revises answers.yaml.
-compatibility: answers.intake.json schemaVersion 1, validated by data-analysis-scaffold
+  governance and the grain — then itemise the research criteria, fill answers.yaml,
+  write answers.intake.json (schema 2) and, on approval, render the data-analysis-scaffold
+  over a request-template repo with copier. Needs no .sqlreview/. Re-running walks
+  through what changed. Use before the engineer's $data-request:bootstrap, whenever
+  an analyst fills or revises answers.yaml.
+compatibility: answers.intake.json schemaVersion 1 or 2, validated by data-analysis-scaffold
   validate-answers or a generated child's scripts/validate_answers.py (sidecar checks
-  from scaffold v0.5.1). Render step verified with copier 9.18.2, scaffold v0.5.1
-  and request-template 47b702d; needs copier >= 9.15 and GitHub access to nq-rdl/data-analysis-scaffold.
+  from scaffold v0.5.1; schema 2 and validate-answers --fingerprints need a scaffold
+  release that accepts schema 2). Render step verified with copier 9.18.2, scaffold
+  v0.5.1 and request-template 47b702d; needs copier >= 9.15 and GitHub access to nq-rdl/data-analysis-scaffold.
   Python 3 with PyYAML.
 metadata:
   repo: https://github.com/nq-rdl/agent-extensions
@@ -95,6 +97,26 @@ in its new words. **Leave open** becomes an `open_questions` entry phrased for t
 with the proposed reading noted. Batch the open questions so the analyst can send them to the
 requester in one message.
 
+### Itemise the criteria
+
+Itemise the four free-text answers in `answers.yaml` into `criteria`, one entry per item:
+`cohort_entry_event` (kind `entry_event`), `inclusion_criteria` (`inclusion`),
+`exclusion_criteria` (`exclusion`) and `requested_data_elements` (`data_element`). Ids are
+`N`, `I`, `E` and `D` plus a number counted from 1 within the kind (`E1`, `E2`). Keep the
+researcher's own wording in `text`: split into items, never paraphrase or merge. Itemising does not
+edit the free text in `answers.yaml`; filling or correcting it is a separate edit, below. Put the numbered list to the analyst per kind, with
+the same options as a decision; an item left open goes to `open_questions` and is not written to
+`criteria`.
+
+Ask `applied_by` only where the request is unclear about who applies an inclusion or exclusion
+(`rdl` or `researcher`). When the enquiry says so, record it and do not ask. Add `decided` only
+when the enquiry names who decided and when (`by`, `role`, `at`, `source`); never infer them.
+Never set `applied_by` on an entry event or data element.
+
+When no entry event is stated (for example "all patients with diagnosis X"), do not invent an
+`N1`: ask which item fixes the index date, and record the answer as a `cohort` decision naming
+that item's `id`, or as an open question when the analyst cannot answer.
+
 Stay out of the engineer's lane. Do not ask about source tables, joins, keys, timezones,
 validity rules or SQL. If the analyst volunteers one, keep it for the hand-off note; do not
 record it as a decision. Prior SQL or delivery can support a proposal, but only the analyst's
@@ -111,7 +133,8 @@ answer confirms it.
 - No identifiable patient data, and no lookup counts, in either file.
 
 With no human to answer (a non-interactive run), confirm nothing: every proposal goes to
-`open_questions`. A partial intake is valid; an invented confirmation is not.
+`open_questions`, itemised criteria included (write no `criteria` entry for one). A partial
+intake is valid; an invented confirmation is not.
 
 ## Fill `answers.yaml` in the same pass
 
@@ -129,7 +152,7 @@ Field ownership — write a field only where this table allows it:
 | `approval_number`, `governance_type` | Analyst | Asks under governance; writes after confirmation; keeps the sidecar's approval equal |
 | `measurement_granularity` | Analyst | Sets it from the grain answer, never from a default |
 | `short_title`, `project_title`, `project_description`, `delivery_outcomes`, `requestor_name`, `requestor_email` | Analyst | Fills from the enquiry, after confirmation |
-| research text (`inclusion_criteria`, `exclusion_criteria`, `requested_data_elements`, `ehr_sources`) | Analyst | Fills or corrects from answers, after confirmation |
+| research text (`cohort_entry_event`, `inclusion_criteria`, `exclusion_criteria`, `requested_data_elements`, `ehr_sources`) | Analyst | Fills or corrects from answers, after confirmation. Itemising never edits it: a change to the text is a separate, confirmed edit, made before fingerprinting |
 | `license`, `platform`, `include_*`, `use_*`, `framework_ref`, `engineering_reviewers` | Engineer / defaults | Never changes them; shows them before the render |
 
 A `request-template` copy holds a short form without most of these fields: add them. The
@@ -182,9 +205,36 @@ support and joins to it; name the file and its `.dvc` pointer in the hand-off.
 
 ## Write and validate
 
-Write `answers.intake.json` as one complete document (`schemaVersion: 1`, `approval_number`,
-`decisions`, `open_questions`; `open_questions` may be empty). Run the validation above. On
-failure, fix the named fields and run it again; do not hand over an invalid sidecar.
+Write `answers.intake.json` as one complete document (`approval_number`, `decisions`,
+`open_questions`; `open_questions` may be empty). Without confirmed criteria, write
+`schemaVersion: 1`. With them, add `criteria` and `fingerprints` and write `schemaVersion: 2`,
+but only after confirming the installed `validate-answers` accepts schema 2: an older release
+reports `intake.schemaVersion`. If it does not and no schema 2 sidecar exists, write schema 1 without `criteria` and tell the
+analyst the scaffold release is needed. If a schema 2 sidecar already exists, keep it as is,
+write nothing and stop: report that the validator needs upgrading. Never downgrade a sidecar
+or drop its confirmed criteria.
+
+Fingerprints record the free text the itemisation was made from. After writing `answers.yaml`,
+and before writing the new sidecar, run `validate-answers answers.yaml --fingerprints` on a copy of `answers.yaml` in a new temporary directory with no sidecar beside it,
+which prints one JSON object, and store the JSON as `fingerprints`:
+
+```bash
+T="$(mktemp -d)"; cp answers.yaml "$T/answers.yaml"
+data-analysis-scaffold validate-answers "$T/answers.yaml" --fingerprints
+# in a generated child: pixi run python scripts/validate_answers.py "$T/answers.yaml" --fingerprints
+```
+
+The command validates a sibling sidecar too; the copy has none, so only the answers are validated.
+In place, the old sidecar could fail it (a changed `approval_number` on a re-run, or `criteria`
+without `fingerprints`) and print nothing. Remove the directory afterwards. Never compute a
+fingerprint by hand. If the command is not available, apply the same rule: write schema 1 only
+when no schema 2 sidecar exists, otherwise keep it as is, stop and report that the validator
+needs upgrading.
+
+After writing the sidecar, run `validate-answers answers.yaml` in place, which validates the new sidecar
+with the answers. On failure, fix the named fields and run it again; do not hand over
+an invalid sidecar. A warning that the free text changed since itemisation means a later edit
+to the four answers: re-run this pass.
 
 ## Re-run: walk what changed
 
@@ -192,19 +242,28 @@ When `answers.intake.json` exists (or `--update`):
 
 1. Run the validation and read the sidecar. Read `git log -p -- answers.intake.json
    answers.yaml` when tracked, and the current enquiry, to find what moved since the last pass.
-2. Keep an unchanged decision verbatim: its `confirmed_by`, `confirmed_at` and `decided`
-   stay as recorded. Do not re-stamp it.
+2. Keep an unchanged decision or criterion verbatim: its `confirmed_by`, `confirmed_at` and
+   `decided` stay as recorded. Do not re-stamp it.
 3. Walk only decisions that the new evidence touches (confirm / reword / remove) and new
    topics. A reworded decision gets the analyst's new confirmation. A knock-on edit to
    another decision (a finer output's wording that the new answer contradicts) is a
    proposal too: put it to the analyst. Until they answer, keep that decision verbatim and
    name the conflict in the hand-off; never re-stamp it with this run's time. Keep its `id` when the
    decision is the same one in new words; use a new `id` for a different decision.
-4. Move an open question into `decisions` only with the analyst's answer. Remove a question
+4. Criteria: compare the four free-text answers with the live criteria (those without
+   `withdrawn`). Never renumber, and never reuse an `id`: a new item takes the next number of its
+   kind, counting withdrawn ones. For each wording change, ask the analyst to classify it; do
+   not guess. A rewording (same meaning) keeps the `id`, with the new `text` and a fresh
+   confirmation. A change of meaning withdraws the old criterion (a `reason`, a date and
+   `replaced_by` naming the new `id`) and adds the new one. An item the researcher dropped is
+   withdrawn without `replaced_by`. Keep withdrawn entries. Until the analyst answers, keep the
+   criterion verbatim and name it in the hand-off. Then refresh `fingerprints` as above.
+5. Move an open question into `decisions` only with the analyst's answer. Remove a question
    only when it is answered or the analyst withdraws it — say which.
-5. If `.sqlreview/reviews/*/scope.json` holds `A-intake-<id>` items, the engineer has already
+6. If `.sqlreview/reviews/*/scope.json` holds `A-intake-<id>` items, the engineer has already
    imported the intake. Name each changed or removed `id` in the hand-off: bootstrap routes
-   them as changed analyst decisions on its next run.
+   them as changed analyst decisions on its next run. Name each reworded, withdrawn or new
+   criterion `id` too.
 
 ## Hand over
 
@@ -214,6 +273,8 @@ Show the analyst a short note for the engineer:
   result (which validator ran, and whether it covered the sidecar);
 - for a supplied cohort, the file's `.dvc` pointer path, or that it is still to come;
 - the decisions by topic, the grain (`one row per <unit>`) and finer outputs;
+- the criteria by kind (ids only), any withdrawn or reworded since the last pass, and whether
+  `fingerprints` were recorded;
 - the open questions that wait on the requester;
 - any technical notes the analyst volunteered;
 - next: the engineer runs `$data-request:setup` (if `.sqlreview/` is absent), then

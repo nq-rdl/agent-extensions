@@ -1,0 +1,285 @@
+pass:
+- name: correct answer
+  reply: 'Proposals go to open questions.
+
+
+    ```yaml
+
+    inclusion_ids: I1,I2,I3
+
+    new_wording: verbatim
+
+    kept_id: E2
+
+    new_id: E3
+
+    dropped: withdrawn
+
+    ```
+
+    '
+- name: spaces, comments and quotes
+  reply: '```yaml
+
+    inclusion_ids: I1, I2, I3
+
+    new_wording: "verbatim"  # as written
+
+    kept_id: ''E2''
+
+    new_id: E3
+
+    dropped: withdrawn
+
+    ```
+
+    '
+fail:
+- name: wrong inclusion_ids
+  reply: '```yaml
+
+    inclusion_ids: I1,I2,I4
+
+    new_wording: verbatim
+
+    kept_id: E2
+
+    new_id: E3
+
+    dropped: withdrawn
+
+    ```
+
+    '
+  fails:
+  - inclusion_ids
+- name: duplicate conflicting inclusion_ids
+  reply: '```yaml
+
+    inclusion_ids: I1,I2,I3
+
+    new_wording: verbatim
+
+    kept_id: E2
+
+    new_id: E3
+
+    dropped: withdrawn
+
+    inclusion_ids: I1,I2,I4
+
+    ```
+
+    '
+  fails:
+  - inclusion_ids
+- name: wrong new_wording
+  reply: '```yaml
+
+    inclusion_ids: I1,I2,I3
+
+    new_wording: paraphrased
+
+    kept_id: E2
+
+    new_id: E3
+
+    dropped: withdrawn
+
+    ```
+
+    '
+  fails:
+  - new_wording
+- name: duplicate conflicting new_wording
+  reply: '```yaml
+
+    inclusion_ids: I1,I2,I3
+
+    new_wording: verbatim
+
+    kept_id: E2
+
+    new_id: E3
+
+    dropped: withdrawn
+
+    new_wording: paraphrased
+
+    ```
+
+    '
+  fails:
+  - new_wording
+- name: wrong kept_id
+  reply: '```yaml
+
+    inclusion_ids: I1,I2,I3
+
+    new_wording: verbatim
+
+    kept_id: E1
+
+    new_id: E3
+
+    dropped: withdrawn
+
+    ```
+
+    '
+  fails:
+  - kept_id
+- name: duplicate conflicting kept_id
+  reply: '```yaml
+
+    inclusion_ids: I1,I2,I3
+
+    new_wording: verbatim
+
+    kept_id: E2
+
+    new_id: E3
+
+    dropped: withdrawn
+
+    kept_id: E1
+
+    ```
+
+    '
+  fails:
+  - kept_id
+- name: wrong new_id
+  reply: '```yaml
+
+    inclusion_ids: I1,I2,I3
+
+    new_wording: verbatim
+
+    kept_id: E2
+
+    new_id: E2
+
+    dropped: withdrawn
+
+    ```
+
+    '
+  fails:
+  - new_id
+- name: duplicate conflicting new_id
+  reply: '```yaml
+
+    inclusion_ids: I1,I2,I3
+
+    new_wording: verbatim
+
+    kept_id: E2
+
+    new_id: E3
+
+    dropped: withdrawn
+
+    new_id: E2
+
+    ```
+
+    '
+  fails:
+  - new_id
+- name: wrong dropped
+  reply: '```yaml
+
+    inclusion_ids: I1,I2,I3
+
+    new_wording: verbatim
+
+    kept_id: E2
+
+    new_id: E3
+
+    dropped: deleted
+
+    ```
+
+    '
+  fails:
+  - dropped
+- name: duplicate conflicting dropped
+  reply: '```yaml
+
+    inclusion_ids: I1,I2,I3
+
+    new_wording: verbatim
+
+    kept_id: E2
+
+    new_id: E3
+
+    dropped: withdrawn
+
+    dropped: deleted
+
+    ```
+
+    '
+  fails:
+  - dropped
+- name: renumbered after the drop
+  reply: '```yaml
+
+    inclusion_ids: I1,I2,I3
+
+    new_wording: verbatim
+
+    kept_id: E1
+
+    new_id: E2
+
+    dropped: withdrawn
+
+    ```
+
+    '
+  fails:
+  - kept_id
+  - new_id
+- name: empty answer
+  reply: ''
+  fails: &id001
+  - inclusion_ids
+  - new_wording
+  - kept_id
+  - new_id
+  - dropped
+- name: earlier correct block cannot override final answer
+  reply: '```yaml
+
+    inclusion_ids: I1,I2,I3
+
+    new_wording: verbatim
+
+    kept_id: E2
+
+    new_id: E3
+
+    dropped: withdrawn
+
+    ```
+
+    ```yaml
+
+    inclusion_ids: I1,I2,I4
+
+    new_wording: paraphrased
+
+    kept_id: E1
+
+    new_id: E2
+
+    dropped: deleted
+
+    ```
+
+    '
+  fails: *id001

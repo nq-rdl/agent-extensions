@@ -4,7 +4,8 @@ import tempfile
 import unittest
 
 from test_data_request_lifts import ledger
-from test_sql_review_scripts import ASSETS, Project, run
+from test_sql_review_criteria_status import row
+from test_sql_review_scripts import ASSETS, Project, run, scope_doc
 
 FIX = "sqlreview.sh init --apply templates/lifts.md"
 
@@ -117,6 +118,91 @@ class StatusReportsMissingTemplates(unittest.TestCase):
     def test_customised_template_is_not_reported(self):
         self.tpl.write_text("mine\n")
         self.assertEqual(json.loads(self.status("--json").stdout)["missing_templates"], [])
+
+
+class RenderScopeCriteria(unittest.TestCase):
+    """The scaffold's criteria design: the bundled scope.md renders `criteria_status` as an ID/State/Note table."""
+
+    SLUG = "reports__monthly"
+    HEADER = "| ID | State | Note |\n|---|---|---|\n"
+
+    def setUp(self):
+        self.tmp = tempfile.TemporaryDirectory()
+        self.addCleanup(self.tmp.cleanup)
+        self.p = Project(self.tmp.name)
+        self.tpl = self.p.root / ".sqlreview" / "templates" / "scope.md"
+
+    def render(self, **over):
+        self.p.write_json(self.SLUG, "scope.json", scope_doc(**over))
+        r = run(["render", self.SLUG, "scope"], self.p.root)
+        self.assertEqual(r.returncode, 0, r.stdout + r.stderr)
+        return r, (self.p.review_dir(self.SLUG) / "scope.md").read_text()
+
+    def test_bundled_template_has_a_criteria_section_after_outputs(self):
+        text = (ASSETS / "templates" / "scope.md").read_text()
+        self.assertIn("## Criteria\n\n{{criteria}}\n", text)
+        self.assertLess(text.index("{{outputs_list}}"), text.index("## Criteria"))
+        self.assertLess(text.index("{{criteria}}"), text.index("## Assumptions"))
+
+    def test_renders_a_table_ordered_by_kind_then_numeric_id(self):
+        status = [
+            row("D2", "not-delivered", reason="Not held in the source"),
+            row("E10", "applied"),
+            row("E4", "flagged", flag={"output": "patients", "column": "excl_prior_repair"}),
+            row("I1", "applied"),
+            row("E2", "not-applied", reason="First pass: cohort kept broad"),
+            row("N1", "applied"),
+            row("D1", "delivered"),
+        ]
+        r, md = self.render(criteria_status=status)
+        self.assertEqual(r.stderr, "")
+        expected = self.HEADER + "\n".join([
+            "| N1 | applied |  |",
+            "| I1 | applied |  |",
+            "| E2 | not-applied | First pass: cohort kept broad |",
+            "| E4 | flagged | `patients.excl_prior_repair` |",
+            "| E10 | applied |  |",
+            "| D1 | delivered |  |",
+            "| D2 | not-delivered | Not held in the source |",
+        ])
+        self.assertIn("## Outputs\n\n- **month**", md)
+        self.assertIn("## Criteria\n\n" + expected + "\n\n## Assumptions", md)
+        self.assertNotIn("{{", md)
+
+    def test_cell_content_is_escaped(self):
+        status = [
+            row("I1", "not-applied", reason="a | b\nsecond line"),
+            row("E1", "flagged", flag={"output": "pat|ients", "column": "col\nx"}),
+        ]
+        _, md = self.render(criteria_status=status)
+        self.assertIn("| I1 | not-applied | a &#124; b<br>second line |", md)
+        self.assertIn("| E1 | flagged | `pat&#124;ients.col<br>x` |", md)
+
+    def test_scope_without_criteria_status_renders_none_recorded(self):
+        for over in ({}, {"criteria_status": []}):
+            r, md = self.render(**over)
+            self.assertEqual(r.stderr, "")
+            self.assertIn("## Criteria\n\n_none recorded_\n\n## Assumptions", md)
+            self.assertNotIn("{{", md)
+            self.assertNotIn("| ID | State |", md)
+
+    def test_older_installed_template_still_renders(self):
+        bundled = (ASSETS / "templates" / "scope.md").read_text()
+        older = bundled.replace("## Criteria\n\n{{criteria}}\n\n", "")
+        self.assertNotEqual(older, bundled)
+        self.tpl.write_text(older)
+        r, md = self.render(criteria_status=[row("N1", "applied")])
+        self.assertEqual(r.stderr, "")
+        self.assertNotIn("Criteria", md)
+        self.assertNotIn("| N1 |", md)
+        self.assertIn("Only completed stays are in scope", md)
+
+    def test_older_template_only_gets_the_existing_unknown_placeholder_warning(self):
+        older = (ASSETS / "templates" / "scope.md").read_text().replace("## Criteria\n\n{{criteria}}\n\n", "")
+        self.tpl.write_text(older + "\n{{not_a_thing}}\n")
+        r, md = self.render(criteria_status=[row("N1", "applied")])
+        self.assertEqual(r.stderr.strip(), "sqlreview: unknown placeholder(s) left in place: {{not_a_thing}}")
+        self.assertIn("{{not_a_thing}}", md)
 
 
 if __name__ == "__main__":

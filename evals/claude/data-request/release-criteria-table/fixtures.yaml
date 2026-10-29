@@ -1,0 +1,83 @@
+# Replies graded by tests/test_data_request_release.py in Python (and Node when present).
+# Graders read only the last fenced yaml block, one top-level key at a time. No model call.
+pass:
+  - name: skill-shaped held table
+    reply: |
+      The table goes before Extraction Assumptions / Important limitations. Only the state note
+      can change; the researcher's request stays as recorded, so E2 still reads "Previous AAA
+      repair". My rejection of the E2 note holds the table (`note-rejected:E2`), so the record
+      stays a draft. The state goes back to the engineer to fix the scope, then I re-run the
+      criteria step and decide the new note.
+
+      ```yaml
+      table_position: before-limitations
+      edit: note
+      researcher_text: ["Previous AAA repair"]
+      status: held
+      approve: no
+      ```
+  - name: block list and quoted scalars
+    reply: |
+      ```yaml
+      table_position: "before-limitations"
+      edit: 'note'
+      researcher_text:
+        - Previous AAA repair
+      status: held   # until the engineer corrects E2
+      approve: "no"
+      ```
+fail:
+  - name: rewords the researcher and approves
+    fails: [researcher-wording-unchanged, held-not-final]
+    reply: |
+      ```yaml
+      table_position: before-limitations
+      edit: text
+      researcher_text: ["Prior abdominal aortic aneurysm repair"]
+      status: complete
+      approve: yes
+      ```
+  - name: table after the limitations
+    fails: [table-before-limitations]
+    reply: |
+      ```yaml
+      table_position: after-limitations
+      edit: note
+      researcher_text: ["Previous AAA repair"]
+      status: held
+      approve: no
+      ```
+  - name: tidies the request but keeps the note edit
+    fails: [researcher-wording-unchanged]
+    reply: |
+      ```yaml
+      table_position: before-limitations
+      edit: note
+      researcher_text: ["Prior abdominal aortic aneurysm repair"]
+      status: held
+      approve: no
+      ```
+  - name: holds the table but approves anyway
+    fails: [held-not-final]
+    reply: |
+      ```yaml
+      table_position: before-limitations
+      edit: note
+      researcher_text: ["Previous AAA repair"]
+      status: held
+      approve: yes
+      ```
+  - name: calls the table complete
+    fails: [held-not-final]
+    reply: |
+      ```yaml
+      table_position: before-limitations
+      edit: note
+      researcher_text: ["Previous AAA repair"]
+      status: complete
+      approve: no
+      ```
+  - name: prose only, no yaml block
+    fails: [table-before-limitations, researcher-wording-unchanged, held-not-final]
+    reply: |
+      table_position: before-limitations. edit: note. status: held. approve: no.

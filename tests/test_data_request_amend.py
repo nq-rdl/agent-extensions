@@ -100,7 +100,7 @@ class Content(unittest.TestCase):
 
     def test_records_the_amendment_with_its_classification(self):
         self.assertIn("specs/amendments.md", self.body)
-        self.assertIn("data-analysis-scaffold/issues/234", self.body)
+        self.assertNotIn("data-analysis-scaffold/issues", self.body)
 
     def test_validation_gates(self):
         for gate in ("sql_gate", "spec-validate", "final projection", "row count", "key set",

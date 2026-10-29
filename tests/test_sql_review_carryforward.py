@@ -16,6 +16,11 @@ try:  # `unittest discover -s tests` puts tests/ on sys.path; `-m unittest tests
 except ModuleNotFoundError:
     from tests.test_sql_review_scripts import SQL_V1, Project, item, review_doc, run, scope_doc
 
+try:
+    from test_sql_review_criteria_status import full_status, row, sidecar
+except ModuleNotFoundError:
+    from tests.test_sql_review_criteria_status import full_status, row, sidecar
+
 # SQL_V1, numbered:
 #   1 WITH stays AS (            4 )                          7 GROUP BY month;
 #   2   SELECT * FROM adm.stays  5 SELECT month, COUNT(*) AS n
@@ -394,6 +399,232 @@ class CarryForwardHelper(Base):
         self.assertEqual(run(["carryforward", "q", "lifts", str(self.draft)], self.p.root).returncode, 1)
         self.assertEqual(run(["carryforward", "q", "review", str(self.d / "nope.json")], self.p.root).returncode, 2)
         self.assertEqual(run(["carryforward", "../x", "review", str(self.draft)], self.p.root).returncode, 2)
+
+
+class CriteriaCarry(Base):
+    """The scaffold's criteria design: `criteria_status` rows carry by `criterion` with basis criteria-unchanged.
+
+    A row is unchanged when state, reason, flag and upstream equal the prior revision's row for the same
+    criterion; anything else is walked. Publish proves a carried claim from the same definition.
+    """
+
+    BASIS = "criteria-unchanged"
+
+    def setUp(self):
+        super().setUp()
+        (self.p.root / "answers.intake.json").write_text(json.dumps(sidecar()))
+        self.v1 = full_status(1)
+        self.publish_scope(1, self.v1)
+
+    def scope(self, revision, status):
+        return scope_doc("q", "q.sql", revision=revision, sql_sha256=sha(SQL_V1), assumptions=[], criteria_status=status)
+
+    def publish_scope(self, revision, status, expected=0):
+        doc = self.scope(revision, status)
+        self.draft.write_text(json.dumps(doc))
+        r = run(["publish", "q", "scope", str(self.draft)], self.p.root)
+        self.assertEqual(r.returncode, expected, r.stdout + r.stderr)
+        if expected == 0:
+            (self.d / "scope.source.sql").write_text(SQL_V1)
+        return r
+
+    def prior(self, criterion):
+        return next(r for r in self.v1 if r["criterion"] == criterion)
+
+    def carried_row(self, criterion, revision=2, **over):
+        d = dict(self.prior(criterion), carried_from_revision=revision - 1, carried_basis=self.BASIS)
+        d.update(over)
+        return d
+
+    def fresh_row(self, criterion, revision=2, **over):
+        d = {k: v for k, v in self.prior(criterion).items() if k not in ("carried_from_revision", "carried_basis")}
+        d.update(confirmed_revision=revision, confirmed_at="2026-10-14T00:00:00Z")
+        d.update(over)
+        return d
+
+    def rev2(self, **replace):
+        """Revision 2 of every criterion carried, with `replace` mapping criterion -> row."""
+        return [replace.get(r["criterion"], self.carried_row(r["criterion"])) for r in self.v1]
+
+    def refused_claim(self, status, *needles):
+        r = self.publish_scope(2, status, expected=4)
+        for n in needles:
+            self.assertIn(n, r.stdout + r.stderr)
+        self.assertEqual(json.loads((self.d / "scope.json").read_text())["revision"], 1)
+        return r
+
+    def test_unchanged_rows_carry_with_their_original_confirmation(self):
+        out = self.carryforward("scope", self.scope(2, [{k: v for k, v in r.items() if not k.startswith("confirmed")}
+                                                          for r in self.v1]))
+        self.assertEqual(out["prior_revision"], 1)
+        self.assertEqual({(c["kind"], c["id"], c["basis"]) for c in out["carry"]},
+                         {("criteria_status", r["criterion"], self.BASIS) for r in self.v1})
+        self.assertEqual(out["walk"], [])
+        by = {c["id"]: c["set"] for c in out["carry"]}
+        self.assertEqual(by["D1"], {"confirmed_by": "eng-login", "confirmed_at": "2026-10-13T02:00:00Z",
+                                    "confirmed_revision": 1, "carried_from_revision": 1, "carried_basis": self.BASIS})
+        # upstream rides along when the prior row has it
+        self.assertEqual(by["E3"]["upstream"], {"source": "recurring-decision", "id": "broad-first-pass"})
+        self.assertNotIn("status", by["D1"])
+        # Applying the printed set fields publishes, and the original confirmation survives.
+        self.publish_scope(2, [dict(r, **by[r["criterion"]]) for r in self.v1])
+        published = json.loads((self.d / "scope.json").read_text())["criteria_status"]
+        self.assertEqual([r["carried_from_revision"] for r in published], [1] * len(self.v1))
+        self.assertEqual({r["confirmed_revision"] for r in published}, {1})
+        self.assertEqual({r["carried_basis"] for r in published}, {self.BASIS})
+
+    def test_changed_state_reason_or_flag_is_walked_and_needs_fresh_confirmation(self):
+        changes = {
+            "I1": {"state": "not-applied", "reason": "Narrowed by the analyst"},                    # state
+            "E3": {"reason": "Different reason"},                                                   # reason
+            "E4": {"flag": {"output": "patients", "column": "excl_other"}},                         # flag
+            "D2": {"reason": None},                                                                 # reason removed
+        }
+        draft = [{k: v for k, v in dict(r, **changes.get(r["criterion"], {})).items()
+                  if v is not None and not k.startswith("confirmed")} for r in self.v1]
+        out = self.carryforward("scope", self.scope(2, draft))
+        walked = {w["id"]: w for w in out["walk"]}
+        self.assertEqual(set(walked), set(changes))
+        for w in walked.values():
+            self.assertEqual(w["kind"], "criteria_status")
+            self.assertIn("differs from revision 1", w["why"])
+        self.assertIn("state", walked["I1"]["why"])
+        self.assertIn("reason", walked["E3"]["why"])
+        self.assertIn("flag", walked["E4"]["why"])
+        self.assertEqual({c["id"] for c in out["carry"]}, {"N1", "D1"})
+        self.assertEqual(out["bulk"], [])
+        # Fresh confirmation at the new revision publishes; claiming a carry for a changed row does not.
+        fresh = [self.fresh_row(r["criterion"], **changes[r["criterion"]]) if r["criterion"] in changes
+                 else self.carried_row(r["criterion"]) for r in self.v1]
+        fresh = [{k: v for k, v in r.items() if v is not None} for r in fresh]
+        for r in fresh:
+            if r["criterion"] == "D2":
+                r.update(state="delivered")
+                r.pop("reason", None)
+        self.publish_scope(2, fresh)
+
+    def test_a_gained_changed_or_dropped_upstream_is_walked_not_carried(self):
+        # R22: upstream is part of the unchanged comparison, as at publish (R21).
+        other = {"source": "recurring-decision", "id": "other"}
+        changes = {"D1": {"upstream": {"source": "recurring-decision", "id": "broad-first-pass"}},  # gained
+                   "E3": {"upstream": other},                                                       # changed
+                   "I1": None}                                                                      # not changed
+        draft = [{k: v for k, v in dict(r, **(changes.get(r["criterion"]) or {})).items()
+                  if not k.startswith("confirmed")} for r in self.v1]
+        out = self.carryforward("scope", self.scope(2, draft))
+        walked = {w["id"]: w for w in out["walk"]}
+        self.assertEqual(set(walked), {"D1", "E3"})
+        for w in walked.values():
+            self.assertEqual(w["kind"], "criteria_status")
+            self.assertIn("upstream differs from revision 1", w["why"])
+        self.assertEqual({c["id"] for c in out["carry"]}, {"N1", "I1", "E4", "D2"})
+        # dropped: the prior E3 row had an upstream and the draft omits it
+        draft = [{k: v for k, v in r.items() if k != "upstream" and not k.startswith("confirmed")} for r in self.v1]
+        out = self.carryforward("scope", self.scope(2, draft))
+        self.assertEqual([(w["id"], w["why"]) for w in out["walk"]], [("E3", "upstream differs from revision 1")])
+        self.assertNotIn("E3", {c["id"] for c in out["carry"]})
+
+    def add_sidecar_criterion(self, id_, kind):
+        """An intake re-run adds a criterion after revision 1 was published."""
+        path = self.p.root / "answers.intake.json"
+        value = json.loads(path.read_text())
+        stamp = {k: value["criteria"][0][k] for k in ("confirmed_by", "confirmed_role", "confirmed_at")}
+        value["criteria"].append({"id": id_, "kind": kind, "text": "Added later", **stamp})
+        path.write_text(json.dumps(value))
+
+    def test_a_new_criterion_is_walked(self):
+        self.add_sidecar_criterion("D3", "data_element")
+        draft = [{k: v for k, v in r.items() if not k.startswith("confirmed")} for r in self.v1[:-1]]
+        draft.append({"criterion": "D3", "state": "delivered"})
+        out = self.carryforward("scope", self.scope(2, draft))
+        self.assertEqual([(w["kind"], w["id"]) for w in out["walk"]], [("criteria_status", "D3")])
+        self.assertIn("D3", out["walk"][0]["why"])
+        self.assertEqual({c["id"] for c in out["carry"]}, {r["criterion"] for r in self.v1[:-1]})
+        # D3 is new, so it needs a fresh confirmation at revision 2; the other rows carry
+        self.publish_scope(2, [self.carried_row(r["criterion"]) for r in self.v1]
+                           + [row("D3", "delivered", 2, confirmed_at="2026-10-14T00:00:00Z")])
+
+    def test_absent_reason_and_flag_equal_absent(self):
+        self.assertNotIn("reason", self.prior("D1"))
+        self.assertNotIn("flag", self.prior("D1"))
+        out = self.carryforward("scope", self.scope(2, [{"criterion": "D1", "state": "delivered"}]))
+        self.assertEqual([(c["id"], c["basis"]) for c in out["carry"]], [("D1", self.BASIS)])
+        # a reason or flag appearing where the prior had none is a change
+        out = self.carryforward("scope", self.scope(2, [{"criterion": "D1", "state": "delivered", "reason": "Note"}]))
+        self.assertEqual(out["carry"], [])
+        self.assertIn("reason", out["walk"][0]["why"])
+
+    def test_no_prior_scope_walks_every_criterion(self):
+        (self.d / "scope.json").unlink()
+        out = self.carryforward("scope", self.scope(1, [{"criterion": "N1", "state": "applied"}]))
+        self.assertIsNone(out["prior_revision"])
+        self.assertEqual(out["carry"], [])
+        self.assertEqual([(w["kind"], w["id"]) for w in out["walk"]], [("criteria_status", "N1")])
+
+    def test_publish_carries_unchanged_rows_and_chains_the_original_confirmation(self):
+        self.publish_scope(2, self.rev2(I1=self.fresh_row("I1")))
+        published = {r["criterion"]: r for r in json.loads((self.d / "scope.json").read_text())["criteria_status"]}
+        self.assertEqual(published["N1"]["carried_basis"], self.BASIS)
+        self.assertNotIn("carried_from_revision", published["I1"])
+        # revision 3 carries N1 from revision 2, which itself carried revision 1's confirmation
+        rev3 = [dict(r, carried_from_revision=2, carried_basis=self.BASIS) for r in published.values()]
+        self.publish_scope(3, rev3)
+        # claiming a confirmation at revision 2 for N1 (never confirmed there) is refused
+        r = self.publish_scope(4, [dict(r, carried_from_revision=3, confirmed_revision=2) if r["criterion"] == "N1"
+                                   else dict(r, carried_from_revision=3) for r in rev3], expected=4)
+        self.assertIn("N1", r.stdout)
+
+    def test_publish_refuses_a_false_carry_claim_where_the_row_changed(self):
+        for field, value in (("state", "not-applied"), ("reason", "Changed reason"),
+                             ("flag", {"output": "patients", "column": "excl_other"})):
+            with self.subTest(field=field):
+                criterion = {"state": "I1", "reason": "E3", "flag": "E4"}[field]
+                over = {field: value}
+                if field == "state":
+                    over["reason"] = "Narrowed"
+                r = self.refused_claim(self.rev2(**{criterion: self.carried_row(criterion, **over)}), criterion,
+                                       "cannot carry the confirmation forward", f"{field} differs from revision 1",
+                                       "re-confirm for this revision")
+                self.assertNotIn("Changed reason", r.stdout + r.stderr)
+
+    def test_publish_refuses_a_carry_claim_for_a_criterion_with_no_prior_row(self):
+        self.add_sidecar_criterion("D3", "data_element")
+        status = self.rev2() + [dict(row("D3", "delivered", 1), carried_from_revision=1, carried_basis=self.BASIS)]
+        self.refused_claim(status, "D3", "cannot carry the confirmation forward", "no row for D3")
+
+    def test_publish_refuses_carried_confirmation_fields_that_differ_from_the_prior_row(self):
+        # (confirmed_revision cannot differ at revision 2 and still pass `check`; the chain test covers it)
+        for field, value in (("confirmed_by", "someone-else"), ("confirmed_at", "2026-10-20T00:00:00Z")):
+            with self.subTest(field=field):
+                self.refused_claim(self.rev2(D1=self.carried_row("D1", **{field: value})), "D1",
+                                   "must copy confirmed_by, confirmed_at and confirmed_revision")
+
+    def test_publish_refuses_a_carried_row_whose_upstream_differs(self):
+        self.refused_claim(self.rev2(E3=self.carried_row("E3", upstream={"source": "recurring-decision", "id": "other"})),
+                           "E3", "upstream")
+        dropped = {k: v for k, v in self.carried_row("E3").items() if k != "upstream"}
+        self.refused_claim(self.rev2(E3=dropped), "E3", "upstream")
+        self.refused_claim(self.rev2(D1=self.carried_row("D1", upstream={"source": "recurring-decision", "id": "x"})),
+                           "D1", "upstream")
+
+    def test_publish_refuses_a_basis_the_evidence_does_not_support(self):
+        # "intent-unchanged" is not a criteria basis; check rejects it before publish proves anything
+        r = self.publish_scope(2, self.rev2(D1=self.carried_row("D1", carried_basis="intent-unchanged")), expected=4)
+        self.assertIn("D1", r.stdout)
+        self.assertIn("carried_basis", r.stdout)
+
+    def test_publish_refuses_a_carry_claim_without_a_prior_scope(self):
+        (self.d / "scope.json").unlink()
+        self.draft.write_text(json.dumps(self.scope(1, [dict(row("N1", "applied", 1), carried_from_revision=0)])))
+        r = run(["publish", "q", "scope", str(self.draft)], self.p.root)
+        self.assertEqual(r.returncode, 4, r.stdout)
+        self.assertFalse((self.d / "scope.json").exists())
+
+    def test_reconfirm_all_refuses_carried_criteria_rows(self):
+        self.draft.write_text(json.dumps(self.scope(2, self.rev2())))
+        r = run(["publish", "--reconfirm-all", "q", "scope", str(self.draft)], self.p.root)
+        self.assertEqual(r.returncode, 4, r.stdout + r.stderr)
+        self.assertIn("--reconfirm-all", r.stdout)
 
 
 class Guard(unittest.TestCase):
