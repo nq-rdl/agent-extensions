@@ -7,8 +7,9 @@ the agent too: you work from the cohort's *shape*, and the runner handles its *v
 
 Sources, at query-builder ``v0.8.0``: ``docs/SUPPLIED_COHORTS.md``, the docstring of
 ``rdl_etl_helpers.harness.literals`` and the docstring of ``pypika_queries.identifier_columns``.
-Read them in the pinned library rather than relying on this summary; a request on an older pin
-has no supplied-cohort support (``SuppliedCohort`` and ``load_supplied()`` are in v0.8.0).
+Read them in the pinned library rather than relying on this summary; ``SuppliedCohort`` and
+``load_supplied()`` exist since v0.7.2. The identifier-comparison gate is new in v0.8.0. A pin below v0.7.2
+has no supplied-cohort support.
 
 How the cohort is loaded
 ------------------------
@@ -44,7 +45,7 @@ a partial list, a hash of a value and a count small enough to identify a person.
   the SQL text and are deprecated for supplied data.
 * v0.8.0's harness gate (``assert_no_sensitive_literals()``, run by ``check_case_fast()``) fails a
   literal ``VALUES`` list on a ``PERSONAL``, ``SENSITIVE`` or ``HEALTH`` column. It also fails a
-  literal ``IN``/``=``/``<>``/``LIKE`` on an *identifier column* (see
+  literal ``IN``/``=``/``<>``/``LIKE``/simple ``CASE`` on an *identifier column* (see
   ``pypika_queries.identifier_columns.is_identifier_column()``) when a value has five or more
   digits, or is not one plain literal. On a column it cannot resolve it fails a value of up to
   three letters then seven or more digits. A coded column (``PERSON.SEX_CD``) passes, so a short
@@ -74,12 +75,16 @@ Layers of protection
 --------------------
 
 * The data-request plugin's guard (``hooks/data-request-guard.sh``) denies the agent ``Read`` tool,
-  and the ``path`` argument of ``Grep`` and ``Glob``, on any path under ``data/00_raw/``. DVC
+  and the ``path`` argument of ``Grep`` and ``Glob``, on any path under ``data/00_raw/``. It also denies a
+  ``Grep`` ``glob`` or ``Glob`` ``pattern`` that names ``00_raw``, with or without a ``path`` (for example
+  ``path`` ``data`` with ``glob`` ``00_raw/**``, or ``pattern`` ``data/00_raw/**``). Matching ignores case, because
+  a case-insensitive volume reaches the real file through ``data/00_RAW``. DVC
   pointers (``*.dvc``) and ``.gitignore`` pass for ``Read`` only when they are small regular files (not links or
   directories) that look like what the name says: they hold hashes and rules, not values. It is
   the narrower layer: it covers that directory and those three tools only, and a shell command is out
-  of its reach by design (the scaffold child's own hook covers ``Bash``). A ``Grep`` rooted above
-  the directory is not caught. The rule above still holds for ``Bash`` and every other route.
+  of its reach by design (the scaffold child's own hook covers ``Bash``). A ``Grep`` or ``Glob``
+  rooted above the directory with no filter that names ``00_raw`` is not blocked by the plugin. It relies on
+  the child's own ``Read(/data/**)`` deny. The rule above still holds for ``Bash`` and every other route.
   Codex has no ``Read`` tool and its hook wiring is unchanged, so there the rule rests on this text alone.
 * A scaffold child separately denies ``Read(/data/**)`` and lets the runbook ``pixi run`` tasks
   through. The two are compatible: the child denies more, and the runbook tasks run the loader

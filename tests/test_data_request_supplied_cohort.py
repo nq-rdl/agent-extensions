@@ -130,6 +130,33 @@ class ReadGuard(unittest.TestCase):
                 self.assertEqual(decide({"tool_name": tool, "cwd": str(self.root), "tool_input": {"pattern": "x"}}),
                                  ("allow", ""))
 
+    def search(self, tool, **tool_input):
+        return decide({"tool_name": tool, "cwd": str(self.root), "tool_input": tool_input})
+
+    def test_grep_path_data_with_a_glob_naming_00_raw_is_denied(self):
+        self.assertEqual(self.search("Grep", pattern="x", path="data", glob="00_raw/**")[0], "deny")
+
+    def test_grep_without_a_path_and_a_glob_naming_the_directory_is_denied(self):
+        self.assertEqual(self.search("Grep", pattern="x", glob="data/00_raw/*")[0], "deny")
+
+    def test_glob_without_a_path_and_a_pattern_naming_the_directory_is_denied(self):
+        self.assertEqual(self.search("Glob", pattern="data/00_raw/**")[0], "deny")
+
+    def test_glob_path_data_with_a_pattern_naming_00_raw_is_denied(self):
+        self.assertEqual(self.search("Glob", path="data", pattern="00_raw/*")[0], "deny")
+
+    def test_a_case_variant_of_the_directory_is_denied(self):
+        self.assertEqual(self.read(self.root / "data" / "00_RAW" / "x", "Grep")[0], "deny")
+        self.assertEqual(self.read(self.root / "data" / "00_RAW" / "sample_cohort.csv")[0], "deny")
+        self.assertEqual(self.search("Glob", pattern="data/00_RAW/x")[0], "deny")
+        self.assertEqual(self.search("Grep", pattern="x", glob="Data/00_Raw/*")[0], "deny")
+
+    def test_a_search_rooted_above_the_directory_with_no_filter_still_passes(self):
+        # The documented gap: the child's own Read(/data/**) deny covers it.
+        for tool in ("Grep", "Glob"):
+            with self.subTest(tool):
+                self.assertEqual(self.search(tool, pattern="x", path="."), ("allow", ""))
+
     POINTER = "outs:\n- md5: d41d8cd98f00b204e9800998ecf8427e\n  size: 10\n  hash: md5\n  path: sample_cohort.csv\n"
 
     def test_a_genuine_dvc_pointer_and_gitignore_pass_for_read(self):

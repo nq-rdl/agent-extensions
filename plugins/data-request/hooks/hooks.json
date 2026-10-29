@@ -1,5 +1,5 @@
 {
-  "description": "Data Request review records: a SessionStart preflight that reports whether the project is initialised (.sqlreview/) and which reviews are stale, and a PreToolUse guard that only lets review/scope JSON be written when every assumption and limitation carries a complete human-confirmation record, keeps rendered markdown and config edits on the sanctioned path, and denies agent Read of data/00_raw/ (researcher-supplied cohort files).",
+  "description": "Data Request review records: a SessionStart preflight that reports whether the project is initialised (.sqlreview/) and which reviews are stale, and a PreToolUse guard that only lets review/scope JSON be written when every assumption and limitation carries a complete human-confirmation record, keeps rendered markdown and config edits on the sanctioned path, and denies agent Read, Grep and Glob of data/00_raw/ (researcher-supplied cohort files).",
   "hooks": {
     "SessionStart": [
       {

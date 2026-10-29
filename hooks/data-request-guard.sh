@@ -58,6 +58,12 @@ case "$tool" in
   Grep|Glob) path="$(field .tool_input.path)" ;;  # the search root; no path means the cwd, which this guard leaves alone
   *) exit 0 ;;
 esac
+raw_denied="Reading or searching data/00_raw/ is denied: a researcher-supplied cohort file holds identifiers, and the runner loads it into a temp table at run time. Never read or search it, copy a value from it, or print one. For its shape read conf/base/supplied/<name>.template.csv (header only); for a load problem use the reason codes, row numbers and column names the runner reports (no value appears in them). Only a genuine small DVC pointer (*.dvc) or .gitignore file can be Read."
+lc() { printf '%s' "$1" | tr '[:upper:]' '[:lower:]'; }
+# A Grep glob or Glob pattern that names 00_raw reaches the directory even when path is absent or above it.
+# Case-insensitive, since a case-insensitive volume resolves data/00_RAW to the real directory.
+case "$tool" in Grep) filter="$(field .tool_input.glob)" ;; Glob) filter="$(field .tool_input.pattern)" ;; *) filter="" ;; esac
+case "$(lc "$filter")" in *00_raw*) decide deny "$raw_denied" ;; esac
 [ -n "$path" ] || exit 0
 cwd="$(field .cwd)"; [ -n "$cwd" ] || cwd="$(pwd -P)"
 case "$path" in /*) abs="$path" ;; *) abs="$cwd/$path" ;; esac
@@ -83,9 +89,8 @@ case "$tool" in Read|Grep|Glob)
     target="$(readlink "$raw_physical" 2>/dev/null)" || break
     case "$target" in /*) raw_physical="$target" ;; *) raw_physical="$(dirname "$raw_physical")/$target" ;; esac
   done
-  raw_denied="Reading or searching data/00_raw/ is denied: a researcher-supplied cohort file holds identifiers, and the runner loads it into a temp table at run time. Never read or search it, copy a value from it, or print one. For its shape read conf/base/supplied/<name>.template.csv (header only); for a load problem use the reason codes, row numbers and column names the runner reports (no value appears in them). Only a genuine small DVC pointer (*.dvc) or .gitignore file can be Read."
   for candidate in "$raw_lexical" "$raw_physical"; do
-    case "$candidate" in
+    case "$(lc "$candidate")" in
       */data/00_raw/*.dvc|*/data/00_raw/.gitignore)
         # DVC pointers and ignore rules hold hashes and rules, not values, so a Read of a genuine
         # one passes. The name alone proves nothing: it must be a regular, non-symlink, small file
