@@ -48,8 +48,8 @@ SEED = {"death-date-raw", "mortality-undercount", "iemr-event-dates", "output-ae
 # Deliberate cross-matches between proposals of the same kind: one prior item (A17 in #172)
 # counts under the death-date, output-time-zone and raw-dated-events rows.
 DELIBERATE_OVERLAPS = {("death-date-raw", "output-aest"), ("death-date-raw", "raw-dated-events")}
-# The maintainer's recorded decision for the broad-first-pass house default (the scaffold's criteria design).
-BROAD_SOURCE = "https://github.com/nq-rdl/data-analysis-scaffold/issues/25#issuecomment-6183536330"
+# JoshKgh's recorded decision for the broad-first-pass house default, a public comment on #515.
+BROAD_SOURCE = "https://github.com/nq-rdl/agent-extensions/pull/515#issuecomment-6487817741"
 # Fictional ids use a leading 9 (ENQ9001, ...-9901); anything else looks like a real enquiry.
 REAL_ID = re.compile(r"\b(?:ENQ(?!9)\d{3,}|[A-Z]{4,}-(?!9)\d{3,})\b")
 
@@ -468,8 +468,9 @@ class HouseDefaultRequirements(Helper):
         self.assertEqual(d["title"], "House default: first pass keeps exclusions unapplied")
         self.assertEqual(d["proposal"]["text"],
                          "Exclusion criteria are not applied on the first pass, to keep the cohort broad.")
-        self.assertIn("nq-rdl/data-analysis-scaffold#25", d["proposal"]["rationale"])
-        self.assertIn("spec 017", d["proposal"]["rationale"])
+        self.assertIn(BROAD_SOURCE, d["proposal"]["rationale"])
+        self.assertIn("JoshKgh", d["proposal"]["rationale"])
+        self.assertNotIn("data-analysis-scaffold", d["proposal"]["rationale"])
         self.assertEqual(d["evidence"], [BROAD_SOURCE])
         h = d["house_default"]
         self.assertEqual(h, self.BROAD)

@@ -36,7 +36,7 @@
       "status": "open",
       "proposal": {
         "text": "Exclusion criteria are not applied on the first pass, to keep the cohort broad.",
-        "rationale": "The RDL house default was confirmed by Data Engineer JoshKgh on 2026-10-15 (nq-rdl/data-analysis-scaffold#25, https://github.com/nq-rdl/data-analysis-scaffold/issues/25#issuecomment-6183536330). It supports spec 017 criteria tracking. A request can override it per criterion."
+        "rationale": "The Data Engineer JoshKgh confirmed this RDL house default on 2026-10-15 (https://github.com/nq-rdl/agent-extensions/pull/515#issuecomment-6487817741). It keeps the first-pass cohort broad while each research criterion is tracked. A request can override it for each criterion."
       },
       "match": [
         ["first pass"],
@@ -44,7 +44,7 @@
         ["exclusion", "exclusions"]
       ],
       "evidence": [
-        "https://github.com/nq-rdl/data-analysis-scaffold/issues/25#issuecomment-6183536330"
+        "https://github.com/nq-rdl/agent-extensions/pull/515#issuecomment-6487817741"
       ],
       "house_default": {
         "confirmed_by": "JoshKgh",
@@ -53,7 +53,7 @@
           "by": "JoshKgh",
           "role": "Data Engineer",
           "at": "2026-10-15",
-          "source": "https://github.com/nq-rdl/data-analysis-scaffold/issues/25#issuecomment-6183536330"
+          "source": "https://github.com/nq-rdl/agent-extensions/pull/515#issuecomment-6487817741"
         }
       },
       "library_issue": null,
