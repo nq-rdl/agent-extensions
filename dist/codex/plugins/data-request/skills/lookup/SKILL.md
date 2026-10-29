@@ -7,9 +7,9 @@ description: Help a Data Analyst discover source codes for an order field, clini
   to run, then write a private lookup record for mapping. Never runs a database query
   or chooses the clinical code set for the analyst. Use when an analyst needs a source
   code and has no confirmed code list.
-compatibility: RDL request repositories; query-builder lookup depends on nq-rdl/query-builder#231
-  (open and unmerged when authored). No released command version is assumed; verify
-  the installed pin, help and private lookup documentation before use.
+compatibility: RDL request repositories; query-builder lookup depends on a query-builder
+  issue (open and unmerged when authored). No released command version is assumed;
+  verify the installed pin, help and private lookup documentation before use.
 metadata:
   repo: https://github.com/nq-rdl/agent-extensions
 ---
@@ -38,7 +38,7 @@ store allowed by the disclosure section below; never copy them into this catalog
 ## Verify the private reference first
 
 The command and lookup documentation depend on
-[query-builder #231](https://github.com/nq-rdl/query-builder/issues/231).
+a query-builder issue.
 That issue is a proposal, not proof of an installed capability. Its private home
 is the query-builder code-lookup design that the issue links.
 Read that design and its research; verify against the installed dependency pin,
@@ -47,7 +47,7 @@ Record exact source paths and revisions; draft docs do not establish released su
 
 Use the private docs for the table chains and all storage/read rules. The private
 supporting sources are `rdl-ide-settings/snippets/SQL/`, the child-repository
-lookup probes located through private query-builder #231 and its code-lookup design,
+lookup probes located through the private query-builder issue and its code-lookup design,
 the merged query-builder research on code lookups, and the dataops
 catalogue YAML/DDL. Historical snippets and probes are evidence to reconcile,
 not authority to copy SQL blindly.

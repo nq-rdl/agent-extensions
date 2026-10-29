@@ -45,9 +45,9 @@ class LookupContract(unittest.TestCase):
                                "rdl-ide-settings/snippets/SQL/", "code-lookup design", "dataops",
                                "analyst-intake.rst", "data-request:intake"):
                     self.assertIn(phrase, text)
-                self.assertIn("https://github.com/nq-rdl/query-builder/issues/231", text)
                 self.assertIn("Read each very large table only through a temp table of keys", text)
-                for private in ("query-builder#198", "specs/020", "spec 020", "spec 017", "R12/R13"):
+                for private in ("query-builder#198", "query-builder#231", "query-builder #231",
+                                "nq-rdl/query-builder/issues/231", "specs/020", "spec 020", "spec 017", "R12/R13"):
                     self.assertNotIn(private, text)
                 self.assertNotIn("https://github.com/nq-rdl/agent-extensions/issues/469", text)
                 self.assertIn("State no local rule", text)

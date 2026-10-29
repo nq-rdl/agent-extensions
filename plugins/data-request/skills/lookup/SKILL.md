@@ -10,7 +10,7 @@ description: >-
 argument-hint: '<lookup question or private lookup record>'
 user-invocable: true
 compatibility: >-
-  RDL request repositories; query-builder lookup depends on nq-rdl/query-builder#231
+  RDL request repositories; query-builder lookup depends on a query-builder issue
   (open and unmerged when authored). No released command version is assumed;
   verify the installed pin, help and private lookup documentation before use.
 allowed-tools: Bash, Write, Read, Glob, Grep, AskUserQuestion
@@ -36,7 +36,7 @@ store allowed by the disclosure section below; never copy them into this catalog
 ## Verify the private reference first
 
 The command and lookup documentation depend on
-[query-builder #231](https://github.com/nq-rdl/query-builder/issues/231).
+a query-builder issue.
 That issue is a proposal, not proof of an installed capability. Its private home
 is the query-builder code-lookup design that the issue links.
 Read that design and its research; verify against the installed dependency pin,
@@ -45,7 +45,7 @@ Record exact source paths and revisions; draft docs do not establish released su
 
 Use the private docs for the table chains and all storage/read rules. The private
 supporting sources are `rdl-ide-settings/snippets/SQL/`, the child-repository
-lookup probes located through private query-builder #231 and its code-lookup design,
+lookup probes located through the private query-builder issue and its code-lookup design,
 the merged query-builder research on code lookups, and the dataops
 catalogue YAML/DDL. Historical snippets and probes are evidence to reconcile,
 not authority to copy SQL blindly.
