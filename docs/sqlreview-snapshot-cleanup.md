@@ -14,7 +14,7 @@ the repository, branch/base commit, store paths, snapshot count, check output,
 operator, and eventual PR/verification status in the rollout tracking record.
 Run only against the intended git working-tree root. Use an exclusive working
 tree without a concurrent review publication, cleanup, or filesystem edit.
-Review unrelated changes before starting; retain any pre-existing dirty state
+Review unrelated changes before starting. Retain any pre-existing dirty state
 in the handoff. The utility does not require a clean working tree and does not
 infer that a dirty or null commit is valid evidence.
 
@@ -39,7 +39,7 @@ the operator's handoff before applying. Both check and apply validate every JSON
 file in `.sqlreview/`, the audit index if present, and review-store paths.
 Malformed/multiple JSON documents, symlinks, nonregular files, unsafe audit paths
 and conflicting saved hashes stop cleanup before any child-file mutation.
-Resolve these inputs explicitly and rerun check; do not bypass the checks.
+Resolve these inputs explicitly and rerun check. Do not bypass the checks.
 
 ```bash
 bash "$MAINTAINER/scripts/migrate_sqlreview_snapshots.sh" --root "$CHILD"
@@ -82,7 +82,7 @@ git -C "$CHILD" diff -- .sqlreview docs/maintenance/sqlreview-snapshot-hashes.js
 ```
 
 A new untracked index does not appear in `git diff` until the maintainer stages
-it; inspect the file directly first. If there were no SQL candidates and no
+it. Inspect the file directly first. If there were no SQL candidates and no
 existing index, no index is created. Review JSON should have no diff. Compare
 unstaged changes against the recorded starting state as well as the PR base.
 The JSON records' original commit/hash/confirmation values are deliberately
@@ -91,11 +91,11 @@ guess commits, or refresh confirmations as part of cleanup.
 
 If cleanup is interrupted after hash persistence, all hashes remain available
 although some SQL copies may remain. Rerun check and apply in the same exclusive
-working tree. Existing entries are verified against remaining SQL bytes;
-a conflicting hash refuses cleanup rather than overwriting evidence. Already
+working tree. Existing entries are verified against remaining SQL bytes.
+A conflicting hash refuses cleanup rather than overwriting evidence. Already
 removed snapshots keep their audit entries. Successful reruns produce no further
 changes. A failure during deletion can therefore leave a partial cleanup with a
-complete index; inspect the error and rerun after resolving its cause. Atomic
+complete index. Inspect the error and rerun after resolving its cause. Atomic
 replacement protects against process interruption, not a promise of durability
 through storage hardware failure.
 
@@ -110,12 +110,12 @@ The maintainer stages the named deletions, ignore additions and passive audit
 index through the child's usual PR process after inspection. Include the
 inventory/check evidence and confirm the preserved JSON/report/question/lift
 bytes in the PR. Verify that no unrelated files changed and rerun check/apply to
-confirm idempotence. Retain deleted SQL in existing git history; do not rewrite
+confirm idempotence. Retain deleted SQL in existing git history. Do not rewrite
 history as part of this rollout.
 
 Mark an individual child migrated only when its reviewed PR and hash-preservation
 checks are verified. Runtime completion, delivery of this utility and completion
 of each child's cleanup are separate tracking items. A future scaffold
-`copier update` may call this cleanup contract; that wiring is outside this
+`copier update` may call this cleanup contract. That wiring is outside this
 utility's delivery. After cleanup, review helpers read old SQL with `git show` at
 each record's `git_commit`, so the child keeps its request SQL committed.

@@ -57,8 +57,8 @@ Exit 6: git cannot supply the reviewed SQL at its recorded commit with its recor
 a full analyse rebuild.
 Exit 10: the review no longer describes the file. Ask (AskUserQuestion): **Ask the engineer
 to run /data-request:analyse --update first (Recommended)** / **Explain the reviewed revision** — the
-second explains the reviewed SQL from git, and every step is labelled as describing that revision,
-not the current file. Write it to a temporary file outside the repository and delete it after:
+second explains the reviewed SQL from git. Label every step as describing that revision, not the
+current file. Write it to a temporary file outside the repository and delete it after:
 
 ```bash
 T="$(mktemp -d /tmp/sqlreview-explain.XXXXXX)" || exit 2
@@ -112,7 +112,7 @@ rm -rf "$T"
    — what changed in the assumptions and limitations and why.
 
 If `materialize` exits 6 for either revision, say the historical delta is unavailable and offer a
-full walkthrough; never substitute `delta` against the current SQL. The helper accepts only positive
+full walkthrough. Never substitute `delta` against the current SQL. The helper accepts only positive
 revision numbers.
 
 Offer to continue with the full walkthrough or stop.

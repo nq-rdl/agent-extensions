@@ -212,9 +212,9 @@ requires reassessment.
    imported upstream items first; changed or removed decisions go to the analyst
    for a recorded answer before dependent work proceeds. Then find which existing items keep
    their confirmation (#348): draft the next revision with each unchanged item's `id`, `text` and
-   `rationale` verbatim and its old `location` lines. When the scope's SQL is readable from git
-   with its recorded SHA, compute unchanged ranges first; missing/corrupt evidence means a manual reassessment,
-   not a guessed offset:
+   `rationale` verbatim and its old `location` lines. When git supplies the scope's SQL
+   with its recorded SHA, compute unchanged ranges first. Missing or corrupt evidence means a manual
+   reassessment, not a guessed offset:
 
    ```bash
    bash "$S/sqlreview.sh" remap "$SLUG" ".sqlreview/reviews/$SLUG/scope.draft.json"
@@ -280,10 +280,10 @@ not exist yet, set `sql_sha256` to null.
 Before publishing, commit any SQL edits and re-run `fingerprint`. A changed full hash with the same
 non-null body hash is a header revision: inspect and reconcile the notes without reconfirming
 unchanged items. If the body hash differs or is null, run
-`git diff "<draft git_commit>" HEAD -- "<sql path>"` and, with the hunks in view, re-put intent,
-inputs and outputs (new or dropped columns, changed joins, conversions), plus every item whose
-`location` lines overlap a hunk or whose text or rationale names a changed column, table, filter or
-conversion. Then refresh all `fingerprint` fields. Publish refuses a changed body or SQL that git
+`git diff "<draft git_commit>" HEAD -- "<sql path>"`. With the hunks in view, re-put intent, inputs
+and outputs: new or dropped columns, changed joins and conversions. Also re-put every item whose
+`location` lines overlap a hunk. Re-put every item whose text or rationale names a changed column,
+table, filter or conversion. Then refresh all `fingerprint` fields. Publish refuses a changed body or SQL that git
 cannot supply. The full hash remains the evidence for the original framing.
 
 Also self-check the confirmed wording before publish:
