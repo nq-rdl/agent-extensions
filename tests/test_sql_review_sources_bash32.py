@@ -1,4 +1,4 @@
-"""Real committed adapters under host Bash and the strict Bash 3.2 fixture."""
+"""Committed SQL read from git under host Bash and the strict Bash 3.2 fixture."""
 import json
 import os
 import platform
@@ -13,59 +13,29 @@ from unittest.mock import patch
 from test_sql_review_scripts import Project, review_doc, item, REPO
 from bash32_fixture import container_runtime, static_jq, run_container
 
-# Diagnose only Git's synthetic fixture checkout, before any adapter/SQL execution.
-# Mirror sr_source_isolated's environment and the clone/checkout argv exactly.
-GIT_PREFLIGHT = r'''
-set -euo pipefail
-probe="$(mktemp -d /tmp/sqlreview-git-probe.XXXXXX)"
-trap 'rm -rf "$probe"' EXIT
-mkdir "$probe/home" "$probe/runtime" "$probe/config" "$probe/cache" "$probe/data" "$probe/state"
-head="$(git -C "$PROJECT" rev-parse --verify HEAD)"
-fixture_git_isolated() {
-  env -i PATH="$PATH" HOME="$probe/home" TMPDIR="$probe/runtime" \
-    XDG_CONFIG_HOME="$probe/config" XDG_CACHE_HOME="$probe/cache" \
-    XDG_DATA_HOME="$probe/data" XDG_STATE_HOME="$probe/state" \
-    LC_ALL=C LANG=C TZ=UTC GIT_CONFIG_NOSYSTEM=1 GIT_CONFIG_GLOBAL=/dev/null "$@"
-}
-if fixture_git_isolated git -c core.hooksPath=/dev/null clone --quiet --shared --no-checkout "$PROJECT" "$probe/tree" > "$probe/git.log" 2>&1; then
-  :
-else
-  rc=$?
-  printf 'fixture Git clone failed (exit %s)\n' "$rc" >&2
-  cat "$probe/git.log" >&2
-  exit "$rc"
-fi
-if fixture_git_isolated git -C "$probe/tree" -c core.hooksPath=/dev/null -c core.autocrlf=false checkout --quiet --detach "$head" >> "$probe/git.log" 2>&1; then
-  :
-else
-  rc=$?
-  printf 'fixture Git checkout failed (exit %s)\n' "$rc" >&2
-  cat "$probe/git.log" >&2
-  exit "$rc"
-fi
-rm -rf "$probe"
-trap - EXIT
-'''
-
-SCENARIO = r'''
+SCENARIO = r"""
 set -euo pipefail
 cd "$PROJECT"
 S="$FIXTURE/setup/scripts"
-# Config argv contains spaces, quotes, a newline and a literal backslash.
-# The adapter checks exact argv and SQL paths under the pinned shell too.
+# Builder SQL is committed; provenance.json does not select another route under the pinned shell.
 newline_path="$(printf 'sql/line\nbreak.sql')"
 bash "$S/sqlreview.sh" fingerprint "$newline_path" > "$FIXTURE/newline.json"
-jq -e --arg p "$newline_path" '.sql_path==$p and .sql_provenance.mode=="rendered"' "$FIXTURE/newline.json"
-tracked_path="$(printf 'sql/tracked\nname.sql')"
-bash "$S/sqlreview.sh" fingerprint "$tracked_path" > "$FIXTURE/tracked.json"
-jq -e --arg p "$tracked_path" '.sql_path==$p and .sql_provenance.mode=="tracked"' "$FIXTURE/tracked.json"
+jq -e --arg p "$newline_path" '.sql_path==$p and .git_dirty==false and (has("sql_provenance") | not)' "$FIXTURE/newline.json"
 bash "$S/sqlreview.sh" fingerprint sql/request.sql > "$FIXTURE/fingerprint.json"
 jq -s '.[0] * .[1]' "$FIXTURE/base.json" "$FIXTURE/fingerprint.json" > .sqlreview/reviews/sql__request/review.draft.json
 bash "$S/sqlreview.sh" publish sql__request review .sqlreview/reviews/sql__request/review.draft.json
 bash "$S/sqlreview.sh" snapshot sql__request sql/request.sql
-test ! -e sql/request.sql
-printf 'SET NOCOUNT ON;\nSELECT 2;\nSELECT 3;\n' > payload
-git add payload
+bash "$S/sqlreview.sh" status --json | jq -e '.reviews[0].state=="current"'
+printf 'SET NOCOUNT ON;\nSELECT 2;\nSELECT 3;\n' > sql/request.sql
+# An uncommitted edit is stale for status and a diff for delta, never a refusal.
+bash "$S/sqlreview.sh" status --json | jq -e '.reviews[0].state=="stale"'
+set +e
+bash "$S/sqlreview.sh" delta sql__request > "$FIXTURE/delta.txt"
+rc=$?
+set -e
+test "$rc" = 10
+grep -q '^+SET NOCOUNT ON;' "$FIXTURE/delta.txt"
+git add sql/request.sql
 git -c commit.gpgsign=false commit -qm 'builder shift'
 bash "$S/sqlreview.sh" fingerprint sql/request.sql > "$FIXTURE/fingerprint.json"
 jq -s '.[0] * .[1] | .revision=2' .sqlreview/reviews/sql__request/review.json "$FIXTURE/fingerprint.json" > .sqlreview/reviews/sql__request/review.draft.json
@@ -89,7 +59,7 @@ test "$rc" = 6
 test ! -e "$T/missing.sql"
 test -z "$(find .sqlreview -name '*.sql' -print)"
 printf 'source-contract-ok\n'
-'''
+"""
 
 
 def fixture(directory):
@@ -99,26 +69,10 @@ def fixture(directory):
     project.mkdir()
     p = Project(project)
     (project / "sql").mkdir()
-    (project / ".gitignore").write_text("sql/request.sql\n")
-    (project / "payload").write_text("SELECT 1;\nSELECT 3;\n")
-    (project / "render.sh").write_text(r'''#!/usr/bin/env bash
-set -eu
-[ "$1" = 'literal argument
-"quoted"\end' ] && [ "$2" = --sql-path ]
-case "$3" in sql/request.sql|'sql/line
-break.sql') ;; *) exit 2;; esac
-[ "$4" = --output ]
-case "$5" in /*) ;; *) exit 2;; esac
-cat payload > "$5"
-''')
-    config = project / ".sqlreview/config.json"
-    d = json.loads(config.read_text())
-    d["sql_render"] = {"command": ["bash", "render.sh", 'literal argument\n"quoted"\\end']}
-    config.write_text(json.dumps(d))
+    (project / "sql/request.sql").write_text("SELECT 1;\nSELECT 3;\n")
+    (project / "sql/line\nbreak.sql").write_text("SELECT 7;\n")
     (project / "sql/provenance.json").write_text(json.dumps({"schema": 1, "requests": {
-        "sql/request.sql": {"source": "builder"}, "sql/line\nbreak.sql": {"source": "builder"},
-        "sql/tracked\nname.sql": {"source": "hand-written"}}}))
-    (project / "sql/tracked\nname.sql").write_text("SELECT 7;\n")
+        "sql/request.sql": {"source": "builder"}, "sql/line\nbreak.sql": {"source": "cohort"}}}))
     p.commit()
     p.review_dir("sql__request")
     (tmp / "base.json").write_text(json.dumps(review_doc("sql__request", "sql/request.sql",
@@ -127,18 +81,22 @@ cat payload > "$5"
     return project
 
 
+def assert_private_history(case, project):
+    history = project / ".sqlreview/reviews/sql__request/history"
+    case.assertEqual(history.stat().st_uid, os.getuid())
+    case.assertEqual(history.stat().st_gid, os.getgid())
+    case.assertEqual(stat.S_IMODE(history.stat().st_mode), 0o700)
+
+
 class HostSources(unittest.TestCase):
-    def test_adapter_historical_publish_and_carry(self):
+    def test_committed_publish_diff_and_carry(self):
         with tempfile.TemporaryDirectory() as tmp:
             project = fixture(tmp)
             r = subprocess.run(["bash", "-c", SCENARIO], text=True, capture_output=True,
                 env={**os.environ, "PROJECT": str(project), "FIXTURE": tmp}, timeout=120)
             self.assertEqual(r.returncode, 0, r.stdout + r.stderr)
             self.assertIn("source-contract-ok", r.stdout)
-            history = project / ".sqlreview/reviews/sql__request/history"
-            self.assertEqual(history.stat().st_uid, os.getuid())
-            self.assertEqual(history.stat().st_gid, os.getgid())
-            self.assertEqual(stat.S_IMODE(history.stat().st_mode), 0o700)
+            assert_private_history(self, project)
         self.assertFalse(Path(tmp).exists())
 
 
@@ -147,7 +105,7 @@ class Bash32Sources(unittest.TestCase):
         if not container_runtime() or not static_jq():
             self.skipTest("needs pinned Bash 3.2 image and verified jq; see docs/bash32-portability.md")
 
-    def test_adapter_historical_publish_and_carry(self):
+    def test_committed_publish_diff_and_carry(self):
         from bash32_fixture import copy_host_git
         with tempfile.TemporaryDirectory() as tmp:
             project = fixture(tmp)
@@ -156,100 +114,15 @@ class Bash32Sources(unittest.TestCase):
             copy_host_git(Path(tmp), "/w")
             # Preserve private 0700 review history while keeping bind-mount output
             # owned by the host caller, who must remove the disposable fixture.
-            command = 'export PATH=/w/bin:/w:$PATH PROJECT=/w/project FIXTURE=/w HOME=/w XDG_CONFIG_HOME=/w/config; ' + GIT_PREFLIGHT + SCENARIO
+            command = 'export PATH=/w/bin:/w:$PATH PROJECT=/w/project FIXTURE=/w HOME=/w XDG_CONFIG_HOME=/w/config; ' + SCENARIO
             r = run_container(tmp, "/w", command, user=f"{os.getuid()}:{os.getgid()}")
             self.assertEqual(r.returncode, 0, r.stdout + r.stderr)
             self.assertIn("source-contract-ok", r.stdout)
-            history = project / ".sqlreview/reviews/sql__request/history"
-            self.assertEqual(history.stat().st_uid, os.getuid())
-            self.assertEqual(history.stat().st_gid, os.getgid())
-            self.assertEqual(stat.S_IMODE(history.stat().st_mode), 0o700)
+            assert_private_history(self, project)
         self.assertFalse(Path(tmp).exists())
 
 
 class HostGitFixture(unittest.TestCase):
-    def test_copied_git_transport_clone_and_fetch_without_host_helpers(self):
-        if platform.system() != "Linux" or platform.machine() not in ("x86_64", "amd64"):
-            self.skipTest("host Git transport fixture requires Linux amd64")
-        from bash32_fixture import copy_host_git
-        with tempfile.TemporaryDirectory() as tmp:
-            root = Path(tmp)
-            project = fixture(tmp)
-            copy_host_git(root, tmp)
-            for name in ("empty-exec-path", "home", "runtime", "config", "cache", "data", "state"):
-                (root / name).mkdir()
-            # A complete replacement environment and empty exec-path prevent installed
-            # git-upload-pack/pack helpers from masking missing fixture dependencies.
-            env = {"PATH": str(root / "bin"), "HOME": str(root / "home"),
-                   "TMPDIR": str(root / "runtime"), "XDG_CONFIG_HOME": str(root / "config"),
-                   "XDG_CACHE_HOME": str(root / "cache"), "XDG_DATA_HOME": str(root / "data"),
-                   "XDG_STATE_HOME": str(root / "state"), "LC_ALL": "C", "LANG": "C", "TZ": "UTC",
-                   "GIT_CONFIG_NOSYSTEM": "1", "GIT_CONFIG_GLOBAL": "/dev/null",
-                   "GIT_EXEC_PATH": str(root / "empty-exec-path"), "GIT_TRACE": str(root / "git.trace")}
-            copied_git = str(root / "bin/git")
-            exec_path = subprocess.run([copied_git, "--exec-path"], env=env, text=True, capture_output=True, check=True)
-            self.assertEqual(exec_path.stdout.strip(), str(root / "empty-exec-path"))
-            clone = root / "clone"
-            cloned = subprocess.run([copied_git, "-c", "core.hooksPath=/dev/null", "clone", "--no-local",
-                                     "--no-checkout", str(project), str(clone)],
-                                    env=env, text=True, capture_output=True)
-            self.assertEqual(cloned.returncode, 0, cloned.stdout + cloned.stderr)
-            self.assertTrue(list((clone / ".git/objects/pack").glob("*.pack")))
-            checkout = subprocess.run([copied_git, "-C", str(clone), "-c", "core.hooksPath=/dev/null",
-                                       "checkout", "--detach", "HEAD"], env=env, text=True, capture_output=True)
-            self.assertEqual(checkout.returncode, 0, checkout.stdout + checkout.stderr)
-            self.assertEqual((clone / "payload").read_bytes(), b"SELECT 1;\nSELECT 3;\n")
-            (project / "payload").write_text("SELECT 99;\n")
-            subprocess.run(["git", "-C", str(project), "add", "payload"], check=True)
-            subprocess.run(["git", "-C", str(project), "-c", "commit.gpgsign=false", "commit", "-qm", "transport update"], check=True)
-            fetched = subprocess.run([copied_git, "-C", str(clone), "fetch", "origin"],
-                                     env=env, text=True, capture_output=True)
-            self.assertEqual(fetched.returncode, 0, fetched.stdout + fetched.stderr)
-            updated = subprocess.run([copied_git, "-C", str(clone), "checkout", "--detach", "FETCH_HEAD"],
-                                     env=env, text=True, capture_output=True)
-            self.assertEqual(updated.returncode, 0, updated.stdout + updated.stderr)
-            self.assertEqual((clone / "payload").read_bytes(), b"SELECT 99;\n")
-            trace = (root / "git.trace").read_text()
-            for subprocess_name in ("upload-pack", "pack-objects", "index-pack"):
-                self.assertIn(subprocess_name, trace)
-
-    def test_isolated_git_preflight_exposes_corrupt_checkout_error_without_sql(self):
-        if platform.system() != "Linux" or platform.machine() not in ("x86_64", "amd64"):
-            self.skipTest("host Git preflight requires Linux amd64")
-        from bash32_fixture import copy_host_git
-        with tempfile.TemporaryDirectory() as tmp:
-            project = fixture(tmp)
-            copy_host_git(Path(tmp), tmp)
-            env = {**os.environ, "PROJECT": str(project),
-                   "PATH": str(Path(tmp) / "bin") + os.pathsep + os.environ["PATH"]}
-            success = subprocess.run(["bash", "-c", GIT_PREFLIGHT], env=env, text=True, capture_output=True)
-            self.assertEqual(success.returncode, 0, success.stdout + success.stderr)
-            tree = subprocess.run(["git", "-C", str(project), "rev-parse", "HEAD^{tree}"],
-                                  text=True, capture_output=True, check=True).stdout.strip()
-            (project / ".git/objects" / tree[:2] / tree[2:]).unlink()
-            failed = subprocess.run(["bash", "-c", GIT_PREFLIGHT], env=env, text=True, capture_output=True)
-            self.assertNotEqual(failed.returncode, 0)
-            self.assertIn("fixture Git checkout failed", failed.stderr)
-            self.assertIn("fatal:", failed.stderr)
-            self.assertNotIn("SELECT", failed.stdout + failed.stderr)
-
-    def test_fixture_ownership_trust_resets_inherited_safe_directories(self):
-        if platform.system() != "Linux" or platform.machine() not in ("x86_64", "amd64"):
-            self.skipTest("host Git copy ownership test requires Linux amd64")
-        with tempfile.TemporaryDirectory() as tmp:
-            inherited = Path(tmp) / "gitconfig"
-            inherited.write_text('[safe]\n\tdirectory = *\n')
-            configurations = (
-                {"GIT_CONFIG_COUNT": "1", "GIT_CONFIG_KEY_0": "safe.directory", "GIT_CONFIG_VALUE_0": "*"},
-                {"GIT_CONFIG_PARAMETERS": "'safe.directory'='*'"},
-                {"GIT_CONFIG_GLOBAL": str(inherited)},
-                {"SUDO_UID": str(os.getuid())},
-            )
-            for inherited_env in configurations:
-                with self.subTest(configuration=next(iter(inherited_env))), patch.dict(os.environ, inherited_env):
-                    # Exercise actual copied Git, refusal, clone and fingerprint in each environment.
-                    self.test_fixture_ownership_trust_is_exact_and_allows_fingerprint()
-
     def test_fixture_ownership_trust_is_exact_and_allows_fingerprint(self):
         if platform.system() != "Linux" or platform.machine() not in ("x86_64", "amd64"):
             self.skipTest("host Git copy ownership test requires Linux amd64")
@@ -267,25 +140,11 @@ class HostGitFixture(unittest.TestCase):
                                      env=env, text=True, capture_output=True)
             self.assertEqual(refused.returncode, 128, refused.stdout + refused.stderr)
             self.assertIn("dubious ownership", refused.stderr)
-            cloned = subprocess.run([str(Path(tmp) / "bin/git"), "clone", "--shared", "--no-checkout",
-                                     str(project), str(Path(tmp) / "clone")],
-                                    env=env, text=True, capture_output=True)
-            self.assertEqual(cloned.returncode, 0, cloned.stdout + cloned.stderr)
-            # The hook also marks the newly created destination unowned. It stays
-            # refused unless that one disposable path is explicitly trusted.
-            checkout = [str(Path(tmp) / "bin/git"), "-C", str(Path(tmp) / "clone")]
-            refused_clone = subprocess.run(checkout + ["checkout", "--detach", "HEAD"],
-                                           env=env, text=True, capture_output=True)
-            self.assertEqual(refused_clone.returncode, 128, refused_clone.stdout + refused_clone.stderr)
-            trusted_clone = subprocess.run(checkout + ["-c", "safe.directory=" + str(Path(tmp) / "clone"),
-                                                       "checkout", "--detach", "HEAD"],
-                                           env=env, text=True, capture_output=True)
-            self.assertEqual(trusted_clone.returncode, 0, trusted_clone.stdout + trusted_clone.stderr)
             r = subprocess.run(["bash", str(Path(tmp) / "setup/scripts/sqlreview.sh"),
                                 "fingerprint", "sql/request.sql"], cwd=project,
                                env=env, text=True, capture_output=True)
             self.assertEqual(r.returncode, 0, r.stdout + r.stderr)
-            self.assertEqual(json.loads(r.stdout)["sql_provenance"]["mode"], "rendered")
+            self.assertIs(json.loads(r.stdout)["git_dirty"], False)
 
     def test_real_git_copy_is_self_contained(self):
         if platform.system() != "Linux" or platform.machine() not in ("x86_64", "amd64"):
@@ -329,7 +188,7 @@ class SourceContainerOwnership(unittest.TestCase):
                  patch("test_sql_review_sources_bash32.run_container") as launch:
                 launch.side_effect = host_scenario
                 result = unittest.TestResult()
-                Bash32Sources("test_adapter_historical_publish_and_carry").run(result)
+                Bash32Sources("test_committed_publish_diff_and_carry").run(result)
             self.assertTrue(result.wasSuccessful(), result.errors + result.failures)
             self.assertEqual(launch.call_args.kwargs.get("user"), f"{os.getuid()}:{os.getgid()}")
 

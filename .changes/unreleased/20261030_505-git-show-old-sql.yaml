@@ -1,0 +1,3 @@
+kind: Fixed
+body: Diff, carry, remap, explain and release read old SQL with git show and check the recorded SHA first (#505)
+time: 2026-10-30T00:00:02Z

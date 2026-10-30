@@ -66,18 +66,12 @@ class HeaderCarry(unittest.TestCase):
         self.assertEqual(out["header_carry_over"], [])
         self.assertEqual([i["id"] for i in out["header_walk"]], ["A1"])
 
-    def test_manifest_only_generated_interval_requires_ordinary_confirmation(self):
+    def test_builder_manifest_does_not_change_committed_header_eligibility(self):
         manifest = self.p.root / "sql/provenance.json"
         manifest.parent.mkdir()
-        for mode, at in (("builder", "2026-09-25T10:00:00Z"), ("hand-written", "2026-09-26T10:00:00Z")):
-            manifest.write_text(json.dumps({"schema": 1, "requests": {"q.sql": {"source": mode}}}))
-            self.commit(at)
-        self.walked()
-
-    def test_rendered_record_never_supplies_fresh_tracked_header_eligibility(self):
-        commit = subprocess.check_output(["git", "rev-parse", "HEAD"], cwd=self.p.root, text=True).strip()
-        self.doc["sql_provenance"] = {"commit": commit, "mode": "rendered", "project_root": ""}
-        self.walked()
+        manifest.write_text(json.dumps({"schema": 1, "requests": {"q.sql": {"source": "builder"}}}))
+        self.commit("2026-09-25T10:00:00Z")
+        self.eligible()
 
     def test_same_day_named_decision_is_candidate_without_confirmation(self):
         self.eligible()

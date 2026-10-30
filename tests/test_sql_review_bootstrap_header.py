@@ -316,9 +316,7 @@ class BootstrapContract(unittest.TestCase):
                                "both identities", "provisional", "Do not close", "semantic"):
                     self.assertIn(phrase, body)
                 self.assertRegex(body, r"[/\$]data-request:fix")
-                self.assertNotIn('if [ -f "<sql path>" ]', body)
-                self.assertIn('sr_source_render HEAD "$SQL_PATH" "$T/current.sql"', body)
-                self.assertIn("SQL-bound draft", body)
+                self.assertIn('if [ -f "<sql path>" ]', body)
                 self.assertIn("malformed", body)
                 self.assertIn("no warning", body)
 

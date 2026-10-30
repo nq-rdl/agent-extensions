@@ -117,5 +117,5 @@ Mark an individual child migrated only when its reviewed PR and hash-preservatio
 checks are verified. Runtime completion, delivery of this utility and completion
 of each child's cleanup are separate tracking items. A future scaffold
 `copier update` may call this cleanup contract; that wiring is outside this
-utility's delivery. Production committed-source adapter integration remains
-tracked separately in scaffold#290.
+utility's delivery. After cleanup, review helpers read old SQL with `git show` at
+each record's `git_commit`, so the child keeps its request SQL committed.

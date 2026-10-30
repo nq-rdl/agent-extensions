@@ -253,9 +253,7 @@ class NotesContract(unittest.TestCase):
 
     def test_analyse_seeds_candidates_and_still_requires_confirmation(self):
         body = self.skill("analyse")
-        self.assertIn('references/source-notes.rst', body)
-        recipe = (REPO / "skills/data-request-analyse/references/source-notes.rst").read_text()
-        self.assertIn('sqlreview.sh" notes "$T/current.sql"', recipe)
+        self.assertIn('sqlreview.sh" notes', body)
         self.assertIn('"status": "candidate"', body)
         self.assertIn("mismatch", body)
         self.assertRegex(body, r"(?i)header items are candidates")

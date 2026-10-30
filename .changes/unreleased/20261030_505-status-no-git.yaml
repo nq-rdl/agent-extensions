@@ -1,0 +1,3 @@
+kind: Fixed
+body: sqlreview.sh status compares recorded hashes without git, so uncommitted edits show as stale and never block it
+time: 2026-10-30T00:00:03Z

@@ -38,7 +38,7 @@ SLUG="$(bash "$S/sqlreview.sh" slug "<sql path>")"  # or the slug given
 
 No `reviews/$SLUG/review.json` → stop: there is nothing reviewed to explain; the engineer runs
 `/data-request:analyse <sql path>` first. Read `review.json`, `review.md`, `scope.json` if present,
-and its authenticated recorded render. Read `definitions` from `.sqlreview/config.json` and use that wording verbatim when
+and the SQL. Read `definitions` from `.sqlreview/config.json` and use that wording verbatim when
 the analyst asks what an assumption or limitation is.
 
 Load `bash "$S/sqlreview.sh" questions "$SLUG" review` on every resume, even when the
@@ -50,35 +50,23 @@ change this store during a walkthrough; send reconciliation to the owning engine
 ## Staleness first — always
 
 ```bash
-bash "$S/sqlreview.sh" delta "$SLUG"      # 0 current · 10 the SQL changed since it was reviewed · 6 no baseline
+bash "$S/sqlreview.sh" delta "$SLUG"      # 0 current · 10 the SQL changed since it was reviewed · 6 reviewed SQL not in git
 ```
 
-Exit 2: stop and resolve the operational/source failure with the engineer.
-Exit 6: historical evidence is unavailable or corrupt; stop for full analyse reassessment.
-Exit 10: ask **Ask the engineer to run /data-request:analyse --update first (Recommended)** /
-**Explain the recorded revision**. The second option describes the recorded revision at every
-step and cannot authorize acceptance of current SQL. Generated SQL need not be tracked.
-
-Before reading SQL, materialize the exact recorded revision outside the repository:
+Exit 2: stop and resolve the missing/moved SQL with the engineer before any walkthrough.
+Exit 6: git cannot supply the reviewed SQL at its recorded commit with its recorded SHA. Stop for
+a full analyse rebuild.
+Exit 10: the review no longer describes the file. Ask (AskUserQuestion): **Ask the engineer
+to run /data-request:analyse --update first (Recommended)** / **Explain the reviewed revision** — the
+second explains the reviewed SQL from git, and every step is labelled as describing that revision,
+not the current file. Write it to a temporary file outside the repository and delete it after:
 
 ```bash
-bash -s -- "$S" "$SLUG" <<'SH'
-set -e
-S="$1"; SLUG="$2"
-REVISION="$(jq -r '.revision' ".sqlreview/reviews/$SLUG/review.json")"
 T="$(mktemp -d /tmp/sqlreview-explain.XXXXXX)" || exit 2
-trap 'rm -rf "$T"' EXIT
-trap 'exit 130' INT
-trap 'exit 143' TERM HUP
+REVISION="$(jq -r '.revision' ".sqlreview/reviews/$SLUG/review.json")"
 bash "$S/sqlreview.sh" materialize "$SLUG" review "$REVISION" "$T/reviewed.sql" || exit $?
-nl -ba "$T/reviewed.sql"
-bash "$S/sqlreview.sh" notes "$T/reviewed.sql" --against ".sqlreview/reviews/$SLUG/review.json" || exit $?
-SH
+# read "$T/reviewed.sql" for the walkthrough, then: rm -rf "$T"
 ```
-
-Use this numbered recorded SQL output throughout the walkthrough. The shell deletes its
-private directory when finished. Re-run this self-contained command if lines are needed again.
-Exit 6 requires reassessment; never substitute current SQL for an unavailable recorded render.
 
 ## Load the durable hand-off
 
@@ -107,21 +95,16 @@ If `reviews/$SLUG/explain.json` exists and its `sql_sha256` or `review_revision`
 now, walk the change first:
 
 ```bash
-bash -s -- "$S" "$SLUG" <<'SH'
-set -e
-S="$1"; SLUG="$2"
+T="$(mktemp -d /tmp/sqlreview-explain.XXXXXX)" || exit 2
 REVISION="$(jq -r '.revision' ".sqlreview/reviews/$SLUG/review.json")"
 PREVIOUS="$(jq -r '.review_revision' ".sqlreview/reviews/$SLUG/explain.json")"
-# Each invocation owns its own external directory and cleanup.
-T="$(mktemp -d /tmp/sqlreview-explain.XXXXXX)" || exit 2
-trap 'rm -rf "$T"' EXIT
-trap 'exit 130' INT
-trap 'exit 143' TERM HUP
-bash "$S/sqlreview.sh" materialize "$SLUG" review "$REVISION" "$T/reviewed.sql" || exit $?
-bash "$S/sqlreview.sh" materialize "$SLUG" review "$PREVIOUS" "$T/previous.sql" || exit $?
-git diff --no-index -- "$T/previous.sql" "$T/reviewed.sql"  # exit 1 means changes
-SH
+bash "$S/sqlreview.sh" materialize "$SLUG" review "$PREVIOUS" "$T/previous.sql" &&
+  bash "$S/sqlreview.sh" materialize "$SLUG" review "$REVISION" "$T/reviewed.sql" &&
+  git diff --no-index -- "$T/previous.sql" "$T/reviewed.sql"   # exit 1 means changes
+rm -rf "$T"
 ```
+
+`materialize` reads each revision's SQL with `git show` at its recorded commit and checks its SHA.
 
 1. Explain each hunk in the analyst's terms; pause after each.
 2. Then the indirect consequences (#128 §2.1): trace identifiers in those hunks and check the
@@ -129,10 +112,9 @@ SH
 3. Then the review items whose `confirmed_revision` is newer than `explain.json.review_revision`
    — what changed in the assumptions and limitations and why.
 
-If either authenticated historical render is unavailable, say the historical delta is unavailable
-and offer a full walkthrough of an authenticated selected revision, or reassessment when that
-revision cannot be reproduced. Never substitute `delta` against current SQL. The helper validates
-positive revisions and reads `history/review/<revision>.json` or the matching published record.
+If `materialize` exits 6 for either revision, say the historical delta is unavailable and offer a
+full walkthrough; never substitute `delta` against the current SQL. The helper accepts only positive
+revision numbers.
 
 Offer to continue with the full walkthrough or stop.
 
@@ -146,9 +128,9 @@ In review order, one step per turn, pausing each time with AskUserQuestion — o
 3. **Each logic step** — Read and show the SQL lines it covers; then the assumptions and
    limitations whose `location` falls in those lines, **by id** (`A1`, `L2`), with the decision,
    its rationale and who confirmed it — this is the cross-reference (#128 §1.2). If the SQL
-   explained opens with a query-builder analysis-notes header, use the notes emitted by
-   the materialization command before its temporary file was deleted, and name the review
-   id each header item matches. A header item with `match: null` is
+   explained opens with a query-builder analysis-notes header, run
+   `bash "$S/sqlreview.sh" notes "<that SQL>" --against ".sqlreview/reviews/$SLUG/review.json"`
+   once and name the review id each header item matches. A header item with `match: null` is
    unreviewed: say so and note it for the engineer; the confirmed review is the authority.
 4. **Outputs** — each column; then items with no `location` (global ones).
 5. **Open questions** — what is still with the requester.
@@ -162,7 +144,7 @@ change the SQL or the review; if the analyst disagrees with an item, note it for
 Write `reviews/$SLUG/explain.json` (state marker only — not a report):
 
 ```json
-{"sql_sha256": "<SHA of the recorded render actually explained>", "review_revision": <review.json revision>,
+{"sql_sha256": "<SHA of the SQL actually explained>", "review_revision": <review.json revision>,
  "at": "<UTC ISO>", "by": "<analyst>", "completed": true, "last_step": "outputs"}
 ```
 
@@ -177,7 +159,7 @@ A completed explanation is not acceptance of the extract. Only after the durable
 has been loaded and rechecked, show run QA, open questions, flagged decisions and known approval
 restrictions from it. Ask the analyst for
 **Accept for release preparation** / **Send back** / **Presentation amendment**. Do not
-offer acceptance of stale SQL, an explained historical revision, missing run/UAT evidence or an
+offer acceptance of stale SQL, an explained earlier revision, missing run/UAT evidence or an
 unresolved release gate. Leave acceptance pending when the analyst stops.
 
 Acceptance permits `/data-request:release <candidate ref>` to draft the researcher-facing

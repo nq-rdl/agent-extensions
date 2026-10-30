@@ -27,9 +27,9 @@
 #   guard string-sql on|off                    set only guard.require_lift_for_string_sql in config.json
 #   lifts-stale SLUG --tag TAG                  read-only JSON nudges for units newly present at a stable library tag
 #                                              uses authenticated gh GETs; unavailable evidence is unknown, never absent
-#   fingerprint SQL                            fresh clean-HEAD render: hashes, commit, git_dirty:false, sql_provenance
-#   materialize SLUG scope|review REVISION OUTPUT  authenticate exact revision into an external file; caller deletes it
-#   snapshot SLUG SQL                          verify final review against committed renders; no SQL writes
+#   fingerprint SQL                            committed SQL at a clean HEAD: hashes, git_commit, git_dirty:false
+#   materialize SLUG scope|review REVISION OUTPUT  git show + SHA check of that revision into an external file; caller deletes it
+#   snapshot SLUG SQL                          verify the final review against the committed SQL; no SQL writes
 #   delta SLUG [scope|review]                  body binding + full hashes; exit 0 full/header-only, 10 body change, 6 no baseline
 #   carryover SLUG DRAFT                       review draft items matching confirmed, still-valid scope items (JSON)
 #   intake FILE REVISION [DRAFT]              read analyst answers sidecar; optional collision-safe scope draft merge
@@ -128,11 +128,16 @@ cmd_init() {
     # reader of reviews/ iterates slug directories only.
     mkdir -p "$target/reviews" || sr_die 2 "cannot create reviews"
     [ -e "$target/reviews/.gitkeep" ] || : > "$target/reviews/.gitkeep" || sr_die 2 "cannot create reviews/.gitkeep"
+    # Review records hold hashes and commits only (#505). The ignore keeps legacy SQL copies out of git.
+    sr_no_symlinks "$target/.gitignore" || exit 2
+    [ -e "$target/.gitignore" ] ||
+      printf '%s\n' '/reviews/**/source.sql' '/reviews/**/scope.source.sql' '/reviews/**/history/*.sql' \
+        > "$target/.gitignore" || sr_die 2 "cannot create .gitignore"
     if [ "$json" = 1 ]; then
-      jq -n --arg root "$root" --arg files "$files" '{root: $root, created: true, files: ($files | split("\n") + ["reviews/.gitkeep"])}'
+      jq -n --arg root "$root" --arg files "$files" '{root: $root, created: true, files: ($files | split("\n") + ["reviews/.gitkeep", ".gitignore"])}'
     else
       printf 'created\t%s\n' "$target"
-      for f in $files reviews/.gitkeep; do printf 'file\t%s\n' "$f"; done
+      for f in $files reviews/.gitkeep .gitignore; do printf 'file\t%s\n' "$f"; done
     fi
     return 0
   fi
@@ -162,7 +167,7 @@ cmd_init() {
 
 # ---------------------------------------------------------------------------------------------
 cmd_status() {
-  local json=0 verbose=0 d slug state reason migrate schema lifts rows="[]" f missing="" state_row
+  local json=0 verbose=0 d slug state reason migrate schema lifts rows="[]" f missing=""
   while [ $# -gt 0 ]; do
     case "$1" in --json) json=1 ;; --verbose) verbose=1 ;; *) usage ;; esac
     shift
@@ -183,9 +188,8 @@ cmd_status() {
     for d in "$SR_REVIEWS"/*/; do
       [ -d "$d" ] || continue
       slug="$(basename "$d")"
-      state_row="$(sr_state "$slug")" || exit 2
       IFS="$(printf '\t')" read -r state SR_SQL_PATH SR_REVISION <<EOF
-$state_row
+$(sr_state "$slug")
 EOF
       lifts="{}"
       if [ -f "$d/lifts.json" ]; then
@@ -481,13 +485,13 @@ cmd_publish() (
     printf '%s\n' "$inherited" > "$tmp"
   fi
   if [ "$kind" = review ] || { [ "$kind" = scope ] && jq -e '.sql_sha256 | type == "string"' "$tmp" >/dev/null; }; then
-    local binding current_mode current_prefix
+    local binding
     sr_source_clean || exit 2
-    # Reconstruct and authenticate the original full bytes before considering a body match,
+    # Read and authenticate the recorded bytes from git before considering a body match,
     # even when HEAD's full hash is identical. Legacy records use the same authentication.
     sr_source_auth "$tmp" "$work/recorded.sql" || exit $?
-    sr_source_render HEAD "$rel" "$work/current.sql" || exit 2
-    head="$SR_SOURCE_COMMIT"; current_mode="$SR_SOURCE_MODE"; current_prefix="$SR_SOURCE_PREFIX"
+    sr_source_show HEAD "$rel" "$work/current.sql" || exit 2
+    head="$SR_SOURCE_COMMIT"
     current_sql="$work/current.sql"
     sr_binding "$tmp" "$current_sql" "$work/recorded.sql"; binding=$?
     case "$binding" in
@@ -495,12 +499,11 @@ cmd_publish() (
       10)
         local amended
         amended="$(jq --arg sha "$(sr_sha256 "$current_sql")" --arg at "$(sr_now)" --arg body "$(sr_body_sha256 "$current_sql")" \
-          --arg commit "$head" --arg mode "$current_mode" --arg prefix "$current_prefix" '
+          --arg commit "$head" '
           .header_revisions = ((.header_revisions // []) +
             (if any((.header_revisions // [])[]; .sql_sha256 == $sha and .git_commit == $commit) then []
              else [{sql_sha256: $sha, sql_body_sha256: $body, revision: .revision, at: $at,
-               git_commit: $commit, git_dirty: false,
-               sql_provenance: {mode: $mode, project_root: $prefix, commit: $commit}}] end))' "$tmp")" || sr_die 2 "cannot record header revision"
+               git_commit: $commit, git_dirty: false}] end))' "$tmp")" || sr_die 2 "cannot record header revision"
         printf '%s\n' "$amended" > "$tmp"
         ;;
       *) sr_die 2 "SQL changed since fingerprint; reassess before publishing; re-put intent, inputs, outputs and affected items, then refresh sql_sha256" ;;
@@ -569,7 +572,7 @@ cmd_publish() (
     history_tmp="$(mktemp "$(dirname "$history")/.history.XXXXXX")" || sr_die 2 "cannot stage $kind history"
     cp "$dest" "$history_tmp" || sr_die 2 "cannot stage $kind history"
   fi
-  # Refuse stale work after rendering and validation, before any history/final mutation.
+  # Refuse stale work after validation, before any history/final mutation.
   [ "$(sr_sha256 "$draft")" = "$original_draft" ] || sr_die 2 "draft changed during publication"
   sr_no_symlinks "$dest" || exit 2
   if [ -n "$original_dest" ]; then
@@ -616,13 +619,11 @@ cmd_fingerprint() (
   trap 'rm -rf "$tmp"' EXIT
   trap 'exit 130' INT
   trap 'exit 143' TERM HUP
-  sr_source_render HEAD "$rel" "$tmp/render.sql" || exit 2
-  sha="$(sr_sha256 "$tmp/render.sql")"
-  body="$(sr_body_sha256 "$tmp/render.sql" || true)"
+  sr_source_show HEAD "$rel" "$tmp/committed.sql" || exit 2
+  sha="$(sr_sha256 "$tmp/committed.sql")"
+  body="$(sr_body_sha256 "$tmp/committed.sql" || true)"
   jq -n --arg p "$rel" --arg sha "$sha" --arg body "$body" --arg c "$SR_SOURCE_COMMIT" \
-    --arg mode "$SR_SOURCE_MODE" --arg prefix "$SR_SOURCE_PREFIX" \
-    '{sql_path: $p, sql_sha256: $sha, sql_body_sha256: (if $body == "" then null else $body end), git_commit: $c, git_dirty: false,
-      sql_provenance: {mode: $mode, project_root: $prefix, commit: $c}}'
+    '{sql_path: $p, sql_sha256: $sha, sql_body_sha256: (if $body == "" then null else $body end), git_commit: $c, git_dirty: false}'
 )
 
 # ---------------------------------------------------------------------------------------------
@@ -657,7 +658,7 @@ cmd_materialize() (
   # that inode with an in-repository file. Stage a fresh sibling and rename it.
   umask 077
   staged="$(mktemp "$(dirname "$output")/.sqlreview-materialize.XXXXXX")" || sr_die 2 "cannot stage authenticated output"
-  cp "$work/recorded.sql" "$staged" || sr_die 2 "cannot copy authenticated render to output"
+  cp "$work/recorded.sql" "$staged" || sr_die 2 "cannot copy authenticated SQL to output"
   sr_no_symlinks "$output" || exit 2
   [ ! -e "$output" ] || [ -f "$output" ] || sr_die 2 "output is not a regular file"
   mv "$staged" "$output" || sr_die 2 "cannot publish authenticated output"
@@ -685,7 +686,7 @@ cmd_snapshot() (
   original="$(sr_sha256 "$doc")"
   cp "$doc" "$work/review.json" || sr_die 2 "cannot stage review verification"
   sr_source_auth "$work/review.json" "$work/recorded.sql" || exit $?
-  sr_source_render HEAD "$rel" "$work/current.sql" || exit 2
+  sr_source_show HEAD "$rel" "$work/current.sql" || exit 2
   head="$SR_SOURCE_COMMIT"
   sr_binding "$work/review.json" "$work/current.sql" "$work/recorded.sql"; binding=$?
   sr_no_symlinks "$doc" || exit 2
@@ -718,10 +719,9 @@ _delta_prepare() {
   SR_SQL_PATH="$(jq -r '.sql_path // ""' "$doc")"
   sr_safe_sql "$SR_SQL_PATH"
   SR_BASE="$work/base.sql"
-  SR_CUR="$work/current.sql"
+  SR_CUR="$SR_ROOT/$SR_SQL_PATH"
+  [ -f "$SR_CUR" ] || sr_die 2 "the reviewed SQL no longer exists: $SR_SQL_PATH (moved? see: sqlreview.sh move)"
   sr_source_auth "$doc" "$SR_BASE" || exit $?
-  sr_source_clean || exit 2
-  sr_source_render HEAD "$SR_SQL_PATH" "$SR_CUR" || exit 2
   local binding
   sr_binding "$doc" "$SR_CUR" "$SR_BASE"; binding=$?
   [ "$binding" = 10 ] && { printf 'header-only revision; SQL body unchanged\n'; return 0; }
@@ -906,12 +906,12 @@ cmd_carryover() (
 
 # ---------------------------------------------------------------------------------------------
 # Evidence for carrying scope/review confirmations forward (#348), shared by publish and
-# carryforward. The previous published <kind>.json is the prior revision; its immutable source
-# is reconstructed and authenticated against the full recorded SHA before any comparison.
+# carryforward. The previous published <kind>.json is the prior revision; its SQL is read from
+# git at the recorded commit and authenticated against the full recorded SHA before any comparison.
 # Sets CF_KIND, CF_PRIOR, CF_BASE, CF_CUR (a path or /dev/null), CF_HAVE_BASE, CF_HAVE_CUR, CF_PRIOR_SHA,
 # CF_CUR_SHA and CF_BODY_SAME (baseline and current SQL differ at most in the leading comment header, #366).
 _carry_context() { # <slug> <scope|review> <sql_path>
-  local d="$SR_REVIEWS/$1" absent=1
+  local d="$SR_REVIEWS/$1"
   CF_KIND="$2" CF_PRIOR=/dev/null CF_BASE=/dev/null CF_CUR=/dev/null
   CF_HAVE_BASE=false CF_HAVE_CUR=false CF_PRIOR_SHA="" CF_CUR_SHA=""
   CF_BODY_SAME=false CF_PRIOR_ABSENT=false CF_CUR_ABSENT=false
@@ -928,21 +928,11 @@ _carry_context() { # <slug> <scope|review> <sql_path>
       CF_HAVE_BASE=true
     fi
   fi
-  sr_source_clean || exit 2
-  # Only a scope explicitly framed before SQL may treat a committed undeclared path
-  # as absent. Missing historical evidence above always fails authentication.
-  if [ "$CF_PRIOR_ABSENT" = true ] || { [ "$CF_KIND" = scope ] && [ "$CF_PRIOR" = /dev/null ]; }; then
-    sr_source_path_absent HEAD "$3"; absent=$?
-  fi
-  [ "$absent" -le 1 ] || exit 2
-  if [ "$absent" = 0 ]; then
-    CF_CUR_ABSENT=true
-  else
-    CF_CUR="$work/carry-current.sql"
-    sr_source_render HEAD "$3" "$CF_CUR" || exit 2
-    CF_HAVE_CUR=true
+  # Current SQL is the working file. publish has already refused uncommitted changes.
+  if [ -f "$SR_ROOT/$3" ]; then
+    CF_CUR="$SR_ROOT/$3"; CF_HAVE_CUR=true
     CF_CUR_SHA="$(sr_sha256 "$CF_CUR")" || exit 2
-  fi
+  else CF_CUR_ABSENT=true; fi
   if [ "$CF_HAVE_BASE" = true ] && [ "$CF_HAVE_CUR" = true ] && sr_body_same "$CF_BASE" "$CF_CUR"; then CF_BODY_SAME=true; fi
 }
 
@@ -1023,16 +1013,16 @@ cmd_remap() (
   sql="$(jq -r .sql_path "$prior")"
   sr_safe_sql "$sql"
   [ ! -f "$SR_REVIEWS/$slug/rebind-required" ] || sr_die 6 "SQL path moved; reassess before remapping"
+  [ -f "$SR_ROOT/$sql" ] || sr_die 2 "no such SQL: $sql"
   jq -e --arg s "$slug" --arg k "$kind" --arg p "$sql" '
     .slug == $s and .kind == $k and .sql_path == $p' "$input" >/dev/null || sr_die 4 "draft slug/kind/sql_path must match published source"
   work="$(sr_source_workspace)" || exit 2
   trap 'rm -rf "$work"; [ -z "${staged:-}" ] || rm -f "$staged"' EXIT
   trap 'exit 2' HUP INT TERM
-  cp "$input" "$work/draft.json" && cp "$prior" "$work/prior.json" || sr_die 2 "cannot stage remap inputs"
+  cp "$input" "$work/draft.json" && cp "$prior" "$work/prior.json" &&
+    cp "$SR_ROOT/$sql" "$work/current.sql" || sr_die 2 "cannot stage remap inputs"
   sr_source_auth "$work/prior.json" "$work/base.sql" || exit $?
-  sr_source_clean || exit 2
-  sr_source_render HEAD "$sql" "$work/current.sql" || exit 2
-  local head="$SR_SOURCE_COMMIT" staged=""
+  local staged=""
   jq -e -L "$SR_SCRIPT_DIR" 'include "sqlreview-remap"; remap_valid' "$work/draft.json" >/dev/null || sr_die 4 "invalid draft ranges"
   LC_ALL=C diff -U 0 "$work/base.sql" "$work/current.sql" > "$work/diff"
   code=$?
@@ -1045,18 +1035,16 @@ cmd_remap() (
       include "sqlreview-remap"; remap_result' "$work/draft.json" > "$work/result.json" || sr_die 2 "cannot compute line map"
   jq '.draft' "$work/result.json" > "$work/remapped.json" || sr_die 2 "cannot stage remapped draft"
   # Refuse concurrent edits rather than overwriting work or publishing a map for stale SQL.
-  cmp -s "$prior" "$work/prior.json" && cmp -s "$input" "$work/draft.json" &&
-    [ "$(git -C "$SR_ROOT" rev-parse HEAD)" = "$head" ] || sr_die 2 "remap inputs changed; retry"
-  sr_source_clean || sr_die 2 "remap inputs changed; retry"
+  cmp -s "$prior" "$work/prior.json" && cmp -s "$SR_ROOT/$sql" "$work/current.sql" &&
+    cmp -s "$input" "$work/draft.json" || sr_die 2 "remap inputs changed; retry"
   sr_no_symlinks "$draft" || exit 2
   if [ "$had_draft" = false ] && [ -e "$draft" ]; then sr_die 2 "draft appeared during remap; retry"; fi
   if ! cmp -s "$draft" "$work/remapped.json"; then
     # JSON-only sibling staging keeps the final rename on the destination filesystem.
     staged="$(mktemp "$SR_REVIEWS/$slug/.remap-json.XXXXXX")" || sr_die 2 "mktemp failed"
     cp "$work/remapped.json" "$staged" || sr_die 2 "cannot stage remapped draft"
-    cmp -s "$prior" "$work/prior.json" && cmp -s "$input" "$work/draft.json" &&
-      [ "$(git -C "$SR_ROOT" rev-parse HEAD)" = "$head" ] || sr_die 2 "remap inputs changed; retry"
-    sr_source_clean || sr_die 2 "remap inputs changed; retry"
+    cmp -s "$prior" "$work/prior.json" && cmp -s "$SR_ROOT/$sql" "$work/current.sql" &&
+      cmp -s "$input" "$work/draft.json" || sr_die 2 "remap inputs changed; retry"
     sr_no_symlinks "$draft" || exit 2
     if [ "$had_draft" = false ] && [ -e "$draft" ]; then sr_die 2 "draft appeared during remap; retry"; fi
     mv "$staged" "$draft" || sr_die 2 "cannot replace draft"
@@ -1229,7 +1217,7 @@ _scope_notes() { # scope-draft optional-question-draft parsed-notes
 # fail closed; unrelated PR merges with identical path blobs do not invalidate evidence.
 _header_decisions() ( # SQL DRAFT intended-human-confirmer parsed-notes
   local sql="$1" draft="$2" actor="$3" parsed="$4" root rel tmp commit epoch parents start safe=true row_safe path_sha=""
-  local project source_rel source_sql generated=false manifest entry
+  local project source_rel source_sql
   # Replacement refs/grafts are not evidence of the original object ancestry.
   export GIT_NO_REPLACE_OBJECTS=1
   project="$(sr_find_root)" || project=""
@@ -1240,7 +1228,7 @@ _header_decisions() ( # SQL DRAFT intended-human-confirmer parsed-notes
   trap 'rm -rf "$tmp"' EXIT
   trap 'exit 2' HUP INT TERM
   : > "$tmp/rows" || return 2
-  # Publication supplies temporary authenticated bytes. Resolve their maintained
+  # Publication supplies temporary authenticated bytes. Resolve their committed
   # path from the draft's project, rather than treating the temporary file as source.
   if [ -n "$project" ]; then
     rel="$(jq -r '.sql_path' "$draft")"
@@ -1252,21 +1240,7 @@ _header_decisions() ( # SQL DRAFT intended-human-confirmer parsed-notes
     [ -n "$project" ] || rel="$source_rel"
     case "$(cd "$tmp" && pwd -P)" in "$root"|"$root"/*) sr_die 2 "temporary header evidence must be outside the git tree" ;; esac
     path_sha="$(sr_sha256 "$sql")"
-    if jq -e '.sql_provenance.mode == "rendered"' "$draft" >/dev/null; then generated=true; safe=false; fi
-    manifest=""
-    # The provenance manifest belongs at the project SQL directory, not beside
-    # arbitrary nested SQL paths. A declared generated source has no complete
-    # committed rendered-header history yet, so fresh decisions require a walk.
-    if [ -n "$project" ]; then
-      manifest="${project#"$root"}"
-      manifest="${manifest#/}"
-      manifest="${manifest:+$manifest/}sql/provenance.json"
-      if git -C "$root" show "HEAD:$manifest" > "$tmp/manifest" 2>/dev/null; then
-        entry="$(jq -r --arg p "$rel" '.requests[$p].source // ""' "$tmp/manifest")" || safe=false
-        case "$entry" in builder|cohort|spec) generated=true; safe=false ;; hand-written) ;; *) safe=false ;; esac
-      fi
-    fi
-    git -C "$root" log --full-history --topo-order --reverse --format='%H %ct %P' HEAD -- ":(literal)$source_rel" ${manifest:+":(literal)$manifest"} > "$tmp/history" 2>/dev/null || safe=false
+    git -C "$root" log --full-history --topo-order --reverse --format='%H %ct %P' HEAD -- ":(literal)$source_rel" > "$tmp/history" 2>/dev/null || safe=false
     [ "$(git -C "$root" rev-parse --is-shallow-repository 2>/dev/null)" = false ] || safe=false
     local grafts blob parent parent_blob changes
     grafts="$(git -C "$root" rev-parse --git-path info/grafts)"
@@ -1276,15 +1250,6 @@ _header_decisions() ( # SQL DRAFT intended-human-confirmer parsed-notes
     while read -r commit epoch parents; do
       [ -n "$commit" ] || continue
       row_safe=true
-      if [ -n "$manifest" ]; then
-        git -C "$root" ls-tree -r "$commit" -- "$manifest" > "$tmp/manifest-tree" 2>/dev/null || safe=false
-        if [ -s "$tmp/manifest-tree" ]; then
-          if git -C "$root" show "$commit:$manifest" > "$tmp/manifest" 2>/dev/null; then
-            entry="$(jq -r --arg p "$rel" '.requests[$p].source // ""' "$tmp/manifest")" || row_safe=false
-            case "$entry" in hand-written) ;; *) row_safe=false ;; esac
-          else safe=false; fi
-        fi
-      fi
       # Git simplification must not hide an alternate-parent edit or a path move.
       changes="$(git -C "$root" diff-tree --root --no-commit-id -r -M -m "$commit" 2>/dev/null)" || row_safe=false
       if printf '%s\n' "$changes" | awk -F '\t' -v path="$source_rel" '$1 ~ / R[0-9]+$/ && ($2 == path || $3 == path) { found=1 } END { exit !found }'; then row_safe=false; fi
@@ -1315,9 +1280,8 @@ _header_decisions() ( # SQL DRAFT intended-human-confirmer parsed-notes
   else root=""; rel=""; safe=false; fi
   start="$(sr_body_start "$sql")" || start=0
   printf '%s\n' "$parsed" | jq -L "$SR_SCRIPT_DIR" --slurpfile draft "$draft" --rawfile sql "$sql" \
-    --argjson generated "$generated" --arg actor "$actor" --arg path "$rel" --arg sha "$path_sha" --argjson safe "$safe" --argjson start "$start" --slurpfile history "$tmp/rows" \
-    'include "sqlreview-header"; header_candidates($draft[0]; $sql; $actor; $path; $sha; $safe; $start; $history)
-      | if $generated then .header_walk |= map(.why = "generated source has no proven committed rendered-header history; confirm ordinarily") else . end'
+    --arg actor "$actor" --arg path "$rel" --arg sha "$path_sha" --argjson safe "$safe" --argjson start "$start" --slurpfile history "$tmp/rows" \
+    'include "sqlreview-header"; header_candidates($draft[0]; $sql; $actor; $path; $sha; $safe; $start; $history)'
 )
 
 # ---------------------------------------------------------------------------------------------

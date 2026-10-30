@@ -146,12 +146,11 @@ validates a stored ledger. `ledger --session get|set` uses durable local user st
 without initialising or writing a child. `/data-request:triage` owns its schema and resume
 instructions. Roles in config remain display labels, never ledger owner/decider handles.
 
-Read [committed SQL source and rendering](references/sql-provenance.rst) before SQL-bound work.
-Commit maintained hand-written SQL, or the adapter, builder/cohort/spec, config and pins before
-fingerprinting. Generated SQL needs the render-only adapter from scaffold#290; production
-integration is pending until that adapter is verified. Never hash an old generated working file.
-Historical commits/dependencies and the full recorded SHA must be reproducible before carry,
-diff, explain or release evidence; unavailable history requires reassessment.
+Read [committed SQL source](references/sql-provenance.rst) before SQL-bound work. Review
+records store the SQL SHA-256 and the git commit only. Commit the request SQL, whatever produced
+it, and its builder, configuration and pins before `fingerprint`. Diff, carry, explain and release
+read old SQL with `git show` at the recorded commit and check its SHA first. Unavailable or
+mismatched SQL requires reassessment.
 
 SQL paths are supplied explicitly to bootstrap/analyse. To customise report sections, edit the
 project templates; SQL glob filtering and section flags are not configuration options.
@@ -167,8 +166,8 @@ strings. Closing alone requires no carry-forward or new scope/review revision.
 (exact body bytes after conservative leading comments). `header-only` and `scoped-header-only`
 remain body-bound; `publish` records helper-owned full header hashes and timestamps in
 `header_revisions`, and `render` notes them even with customised templates. Keep original
-confirmation provenance and JSON history. Legacy records require an authenticated historical render
-matching their original full SHA; missing evidence requires reassessment, never an assumed match.
+confirmation provenance and JSON history. Legacy records need their SQL in git at the recorded
+commit with the original full SHA. Missing evidence requires reassessment, never an assumed match.
 Hints, executable/nested comments, `@extract:` markers and code after a block close remain in
 the body; malformed headers have no body hash. Any body edit, including whitespace or comments,
 unbinds the record. Body equality never confirms changed assumptions, rationale or decisions.
@@ -191,14 +190,12 @@ time; they never fill `confirmed_*`. Same-day sources are eligible from that dis
 precise UTC ISO cutoffs reject later sources. Analyse asks ONE answered Carry over all
 question listing items and governed locations, then records `carried_basis: header-decision`.
 Publish re-proves committed source bytes and all subsequent relevant path revisions.
-Generated header-decision carry is refused until its maintained-source/rendered-header history
-is proved; use ordinary item confirmation. Other authenticated carry bases remain available.
 Shallow/missing history, repeated/relocated ranges, body-prefix changes and relevant merge/
 rename ambiguity are walked; unrelated PR merges with identical SQL path blobs are allowed.
 Git attribution is not human authentication. Retain independent origins; no answer means
 no publication. Later carryforward keeps `decided` and uses its normal confirmation fields.
 
-`remap SLUG [DRAFT]` uses `diff -U 0` against authenticated same-kind historical and current renders to update only
+`remap SLUG [DRAFT]` uses `diff -U 0` from the authenticated same-kind SQL in git to the current SQL to update only
 unchanged `location.lines` and `logic[].lines` in a draft. It reports `{document, prior_revision,
 remapped, walk}`; changed or ambiguous ranges remain untouched for reassessment. Default:
 `review.draft.json` when a review exists, otherwise `scope.draft.json`; absent default drafts are

@@ -39,14 +39,9 @@ class Publish(unittest.TestCase):
         return self.run_helper("publish", slug, kind or doc["kind"], str(self.draft))
 
     def generated(self, payload="SELECT 1;\n"):
+        # Builder SQL is committed like any other request SQL; provenance.json does not change the route.
         (self.workspace / "sql").mkdir(exist_ok=True)
-        (self.workspace / ".gitignore").write_text("sql/request.sql\n")
-        (self.workspace / "payload").write_text(payload)
-        (self.workspace / "render.sh").write_text('set -eu\ncat payload > "$4"\n')
-        config = self.workspace / ".sqlreview/config.json"
-        cfg = json.loads(config.read_text())
-        cfg["sql_render"] = {"command": ["bash", "render.sh"]}
-        config.write_text(json.dumps(cfg))
+        (self.workspace / "sql/request.sql").write_text(payload)
         (self.workspace / "sql/provenance.json").write_text(json.dumps({
             "schema": 1, "requests": {"sql/request.sql": {"source": "builder"}}}))
         self.project.commit()
@@ -65,14 +60,14 @@ class Publish(unittest.TestCase):
         added = git(self.workspace, "diff", "--cached", "--name-only", "--", ".sqlreview").stdout
         self.assertFalse(any(path.endswith(".sql") for path in added.splitlines()), added)
 
-    def test_rendered_publication_without_snapshots(self):
+    def test_builder_publication_without_snapshots(self):
         fp = self.generated()
+        self.assertEqual(set(fp), {"sql_path", "sql_sha256", "sql_body_sha256", "git_commit", "git_dirty"})
         for kind in ("scope", "review"):
             result = self.publish(self.generated_doc(fp, kind), "sql__request")
             self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
             saved = json.loads((self.final / f"{kind}.json").read_text())
-            self.assertEqual(saved["sql_provenance"], fp["sql_provenance"])
-        self.assertFalse((self.workspace / "sql/request.sql").exists())
+            self.assertEqual(saved["git_commit"], fp["git_commit"])
         self.assert_no_sql_records()
 
     def test_revision_history_retains_hash_and_commit(self):
@@ -125,8 +120,7 @@ class Publish(unittest.TestCase):
     def test_recorded_full_hash_authenticates_even_when_current_hash_matches(self):
         fp = self.generated()
         # Claim an unavailable commit while retaining the correct current full/body hashes.
-        doc = self.generated_doc(dict(fp, git_commit="f" * 40,
-                                      sql_provenance={**fp["sql_provenance"], "commit": "f" * 40}))
+        doc = self.generated_doc(dict(fp, git_commit="f" * 40))
         result = self.publish(doc, "sql__request")
         self.assertEqual(result.returncode, 6, result.stderr)
         self.assertFalse((self.final / "review.json").exists())
@@ -135,7 +129,7 @@ class Publish(unittest.TestCase):
         fp = self.generated("-- old header\nSELECT 1;\n")
         doc = self.generated_doc(fp)
         self.assertEqual(self.publish(doc, "sql__request").returncode, 0)
-        (self.workspace / "payload").write_text("-- new header\nSELECT 1;\n")
+        (self.workspace / "sql/request.sql").write_text("-- new header\nSELECT 1;\n")
         current = self.project.commit("header")
         result = self.publish(doc, "sql__request")
         self.assertEqual(result.returncode, 0, result.stderr)
@@ -144,7 +138,6 @@ class Publish(unittest.TestCase):
         self.assertEqual(saved["git_commit"], fp["git_commit"])
         self.assertEqual(saved["assumptions"], doc["assumptions"])
         self.assertEqual(saved["header_revisions"][-1]["git_commit"], current)
-        self.assertEqual(saved["header_revisions"][-1]["sql_provenance"]["commit"], current)
         self.assert_no_sql_records()
 
     def test_corrupt_original_hash_cannot_use_matching_body(self):
@@ -156,7 +149,7 @@ class Publish(unittest.TestCase):
 
     def test_source_changes_between_fingerprint_and_publish_are_refused(self):
         fp = self.generated()
-        (self.workspace / "payload").write_text("SELECT 2;\n")
+        (self.workspace / "sql/request.sql").write_text("SELECT 2;\n")
         doc = self.generated_doc(fp)
         self.assertEqual(self.publish(doc, "sql__request").returncode, 2)
         self.project.commit("body change")
@@ -167,7 +160,6 @@ class Publish(unittest.TestCase):
     def test_legacy_records_require_clean_reproducible_commit(self):
         fp = self.generated()
         doc = self.generated_doc(fp)
-        del doc["sql_provenance"]
         for dirty in (None, False):
             doc["git_dirty"] = dirty
             result = self.publish(doc, "sql__request")
@@ -237,56 +229,16 @@ class Publish(unittest.TestCase):
         self.assertEqual(history.read_bytes(), before)
         self.assert_no_sql_records()
 
-    def test_helper_owned_header_provenance_schema_refuses_inconsistent_commit(self):
+    def test_snapshot_refuses_uncommitted_sql(self):
         fp = self.generated()
-        doc = self.generated_doc(fp)
-        doc["header_revisions"] = [{"sql_sha256": fp["sql_sha256"], "at": "2026-10-08",
-                                   "git_commit": fp["git_commit"], "git_dirty": False,
-                                   "sql_provenance": {**fp["sql_provenance"], "commit": "a" * 40}}]
-        self.draft.write_text(json.dumps(doc))
-        result = self.run_helper("check", str(self.draft))
-        self.assertEqual(result.returncode, 4, result.stderr)
-
-    def test_snapshot_refuses_source_mutation_during_render(self):
-        self.generated()
-        control = Path(self.temp.name) / "source mutation enabled"
-        adapter = self.workspace / "render.sh"
-        adapter.write_text('set -eu\ncat payload > "$4"\n' +
-                           f'if [ -f "{control}" ]; then printf "SELECT 2;\\n" > "{self.workspace / "payload"}"; fi\n')
-        self.project.commit("adapter")
-        result = self.run_helper("fingerprint", "sql/request.sql")
-        self.assertEqual(result.returncode, 0, result.stderr)
-        fp = json.loads(result.stdout)
         self.assertEqual(self.publish(self.generated_doc(fp), "sql__request").returncode, 0)
         before = (self.final / "review.json").read_bytes()
-        control.touch()
+        (self.workspace / "sql/request.sql").write_text("SELECT 2;\n")
         result = self.run_helper("snapshot", "sql__request", "sql/request.sql")
         self.assertEqual(result.returncode, 2, result.stderr)
+        self.assertIn("uncommitted source changes", result.stderr)
         self.assertEqual((self.final / "review.json").read_bytes(), before)
         self.assert_no_sql_records()
-
-    def test_recorded_render_copy_failure_is_operational_for_publish_and_snapshot(self):
-        fp = self.generated()
-        doc = self.generated_doc(fp)
-        self.assertEqual(self.publish(doc, "sql__request").returncode, 0)
-        before = (self.final / "review.json").read_bytes()
-        self.draft.write_text(json.dumps(doc))
-        with tempfile.TemporaryDirectory() as binpath:
-            shim = Path(binpath) / "cp"
-            shim.write_text(f'#!/bin/sh\ncase "$2" in */recorded.sql) exit 1;; esac\nexec {shutil.which("cp")} "$@"\n')
-            shim.chmod(0o755)
-            env = dict(os.environ, PATH=binpath + os.pathsep + os.environ["PATH"])
-            for args in (("publish", "sql__request", "review", str(self.draft)),
-                         ("snapshot", "sql__request", "sql/request.sql")):
-                with self.subTest(command=args[0]):
-                    result = subprocess.run(["bash", str(self.script), *args],
-                                            cwd=self.workspace, env=env, capture_output=True, text=True)
-                    self.assertEqual(result.returncode, 2, result.stderr)
-                    self.assertIn("cannot write caller output", result.stderr)
-                    self.assertNotIn("reassess", result.stderr)
-                    self.assertEqual((self.final / "review.json").read_bytes(), before)
-        self.assert_no_sql_records()
-
     def test_history_rename_is_local_with_cross_filesystem_tmpdir(self):
         if not Path("/dev/shm").is_dir() or not os.access("/dev/shm", os.W_OK):
             self.skipTest("separate-filesystem temporary directory unavailable")

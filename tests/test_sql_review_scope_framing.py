@@ -49,7 +49,7 @@ class ScopeFraming(unittest.TestCase):
         self.p.commit("removed source")
         r = self.publish(scope_doc("q", **framed))
         self.assertEqual(r.returncode, 2)
-        self.assertIn("committed SQL source unavailable", r.stderr)
+        self.assertIn("not committed", r.stderr)
 
 
 class Lint(unittest.TestCase):

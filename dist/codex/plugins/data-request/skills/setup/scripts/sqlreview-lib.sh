@@ -240,59 +240,54 @@ sr_doc_for() { # <slug> -> path
   else return 1; fi
 }
 
-# State uses authenticated committed sources, never generated working output or snapshots.
-# no-baseline means unavailable historical provenance; operational errors propagate as 2.
-sr_state() ( # <slug> -> state, sql_path, revision
+# State of one review directory, from the recorded hashes and the SQL on disk. It never runs
+# git: old SQL is read only where a diff, carry or release check needs it. Prints
+# "<state>\t<sql_path>\t<revision>" so a caller can `IFS=$'\t' read -r state sql rev`.
+#   scoped       scope.json only
+#   missing      the SQL file is gone
+#   no-baseline  review.json without a clean recorded git_commit, so old SQL cannot be read
+#   stale        the SQL differs from the recorded sql_sha256
+#   current      identical
+sr_state() { # <slug>
   sr_safe_slug "$1"
-  local d="$SR_REVIEWS/$1" doc sql rev state work bound rc kind head
+  local d="$SR_REVIEWS/$1" doc sql rev state kind authentic bound
   doc="$(sr_doc_for "$1")" || {
     if [ -f "$d/review.draft.json" ] || [ -f "$d/scope.draft.json" ]; then printf 'draft\t\t\n'; else printf 'invalid\t\t\n'; fi
     return 0
   }
   cmd_check "$doc" >/dev/null || { printf 'invalid\t\t\n'; return 0; }
-  kind="$(jq -r .kind "$doc")"
+  # One read of the document; every field is non-empty once cmd_check passed.
+  IFS=$'\t' read -r kind sql rev authentic <<EOF
+$(jq -r '[.kind, .sql_path, (.revision | tostring),
+  ((.git_commit | type == "string" and test("^[0-9a-f]{40}$|^[0-9a-f]{64}$")) and
+   (.git_dirty == null or .git_dirty == false) | tostring)] | join("\t")' "$doc")
+EOF
   if [ "$kind" != lifts ]; then
     bash "$SR_SCRIPT_DIR/sqlreview.sh" questions "$1" >/dev/null 2>&1 || { printf 'invalid\t\t\n'; return 0; }
   fi
-  sql="$(jq -r '.sql_path // ""' "$doc")"
   sr_safe_sql "$sql"
-  rev="$(jq -r '.revision // ""' "$doc")"
-  if [ "$kind" = lifts ]; then state=lifts
-  elif [ -f "$d/rebind-required" ]; then state=stale
-  elif [ "$kind" = scope ] && jq -e '.sql_sha256 == null' "$doc" >/dev/null; then state=scoped
-  else
-    work="$(sr_source_workspace)" || return 2
-    trap 'rm -rf "$work"' EXIT
-    trap 'exit 2' HUP INT TERM
-    sr_source_auth "$doc" "$work/recorded.sql"; rc=$?
-    case "$rc" in
-      6) state=no-baseline ;;
-      0)
-        sr_source_clean || return 2
-        head="$(git -C "$SR_ROOT" rev-parse --verify HEAD)" || return 2
-        sr_source_path_absent "$head" "$sql"; rc=$?
-        case "$rc" in
-          0) state=missing ;;
-          1)
-            sr_source_render "$head" "$sql" "$work/current.sql" || return 2
-            sr_binding "$doc" "$work/current.sql" "$work/recorded.sql"; bound=$?
-            case "$bound" in
-              0) if [ "$kind" = scope ]; then state=scoped; else state=current; fi ;;
-              10) if [ "$kind" = scope ]; then state=scoped-header-only; else state=header-only; fi ;;
-              *) state=stale ;;
-            esac
-            ;;
-          *) return 2 ;;
-        esac
-        sr_source_clean || return 2
-        [ "$(git -C "$SR_ROOT" rev-parse --verify HEAD)" = "$head" ] || {
-          sr_source_error "source commit changed during state check; retry"; return 2;
-        } ;;
-      *) return 2 ;;
-    esac
-  fi
+  case "$kind" in
+    scope)
+      state="scoped"
+      if jq -e '.sql_sha256 != null' "$doc" >/dev/null; then
+        if [ ! -f "$SR_ROOT/$sql" ]; then state="missing"
+        else
+          sr_binding "$doc" "$SR_ROOT/$sql" /dev/null; bound=$?
+          case "$bound" in 0) ;; 10) state="scoped-header-only" ;; *) state="stale" ;; esac
+        fi
+      fi ;;
+    lifts) state="lifts" ;;
+    *)
+      if [ ! -f "$SR_ROOT/$sql" ]; then state="missing"
+      elif [ "$authentic" != true ]; then state="no-baseline"
+      elif [ -f "$d/rebind-required" ]; then state="stale"
+      else
+        sr_binding "$doc" "$SR_ROOT/$sql" /dev/null; bound=$?
+        case "$bound" in 0) state="current" ;; 10) state="header-only" ;; *) state="stale" ;; esac
+      fi ;;
+  esac
   printf '%s\t%s\t%s\n' "$state" "$sql" "$rev"
-)
+}
 
 # Why a review is invalid or missing, on one line (empty otherwise). Kept apart from sr_state:
 # tab-separated reads collapse empty fields, and invalid rows have no sql_path or revision.
@@ -318,10 +313,10 @@ sr_state_reason() { # <slug> <state>
         why="$why; the slug is not derived from any current path — rebind with: sqlreview.sh move --slug $slug <sql path>" ;;
       esac ;;
     no-baseline)
-      why="recorded SQL source cannot be authenticated — reassess with /data-request:analyse --update" ;;
+      why="the review records no clean git_commit, so its SQL cannot be read from git — reassess with /data-request:analyse --update" ;;
     missing)
       sql="$(jq -r '.sql_path // ""' "$(sr_doc_for "$slug")" 2>/dev/null)"
-      why="committed SQL source missing: $sql — if it moved, run: sqlreview.sh move '$sql' <new path>" ;;
+      why="sql_path target missing: $sql — if it moved, run: sqlreview.sh move '$sql' <new path>" ;;
   esac
   printf '%s\n' "$why"
 }
@@ -336,36 +331,4 @@ sr_source_workspace() (
     rm -rf "$work"; sr_source_error "temporary inputs must be outside the git tree"; exit 2 ;;
   esac
   printf '%s\n' "$work"
-)
-
-# Authenticated absence means HEAD has neither a maintained source nor a declared
-# generated path. This is only used for a scope whose recorded hash is null.
-sr_source_path_absent() (
-  local commit manifest path entry status work row name manifest_present=false
-  sr_source_context || return 2
-  commit="$(git -C "$SR_SOURCE_TOP" rev-parse --verify "$1^{commit}")" || return 2
-  path="${SR_SOURCE_PREFIX:+$SR_SOURCE_PREFIX/}$2"
-  manifest="${SR_SOURCE_PREFIX:+$SR_SOURCE_PREFIX/}sql/provenance.json"
-  work="$(sr_source_workspace)" || return 2
-  trap 'rm -rf "$work"' EXIT
-  trap 'exit 2' HUP INT TERM
-  # A failed path lookup cannot distinguish absent paths from unreadable objects.
-  # Enumerate the complete tree successfully before interpreting a missing entry;
-  # -t includes directories, and NUL records preserve every literal filename.
-  git -C "$SR_SOURCE_TOP" ls-tree -r -t -z --full-tree "$commit" > "$work/tree" || {
-    sr_source_error "cannot inspect committed source tree; SQL absence unavailable"; return 2;
-  }
-  while IFS= read -r -d '' row; do
-    name="${row#*$'\t'}"
-    [ "$name" != "$path" ] || return 1
-    [ "$name" != "$manifest" ] || manifest_present=true
-  done < "$work/tree"
-  if [ "$manifest_present" = true ]; then
-    entry="$(git -C "$SR_SOURCE_TOP" show "$commit:$manifest")" || return 2
-    printf '%s' "$entry" | jq -e --arg p "$2" '.schema == 1 and (.requests | type == "object") and (.requests | has($p) | not)' >/dev/null || {
-      status=$?
-      case "$status" in 1|4|5) return 1 ;; *) return 2 ;; esac
-    }
-  fi
-  return 0
 )

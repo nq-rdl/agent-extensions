@@ -75,12 +75,13 @@ and upstream jq checksum, update the fixture constants and provenance here,
 then rerun the strict gate and its runner regression tests.
 
 
-SQL-source cases use a real disposable Git repository and a committed render-only
-adapter with a spaced argv argument. They cover fingerprint, publication,
-historical materialization, JSON revision history and carry after shifted lines,
-with no generated SQL in any Git tree or under the review store. The fixture
-copies a Linux amd64 host Git binary and its glibc loader/libraries into the
-disposable mount; unsupported hosts or unavailable dependencies cannot pass the
-strict gate. This Git dependency is not pinned and is not the portability target.
-Bash 3.2, BusyBox and static jq retain the pins above. No in-container package
-install or network access is added. The same scenario runs under host Bash.
+The SQL-source case uses a real disposable Git repository with committed
+builder SQL and a newline in one SQL path. It covers fingerprint, publication,
+status, delta on an uncommitted edit, remap and carry after shifted lines, JSON
+revision history and `materialize` from `git show`. No SQL is written under the
+review store. The fixture copies a Linux amd64 host Git binary and its glibc
+loader and libraries into the disposable mount. Unsupported hosts or missing
+dependencies cannot pass the strict gate. This Git dependency is not pinned and
+is not the portability target. Bash 3.2, BusyBox and static jq keep the pins
+above. No in-container package install or network access is added. The same
+scenario runs under host Bash.

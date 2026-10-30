@@ -330,18 +330,22 @@ class SnapshotDelta(unittest.TestCase):
             self.assertIn("+WITH completed AS", r.stdout)
             self.assertIn("baseline_sha256=", r.stdout)
 
-    def test_committed_baseline_refuses_dirty_untracked_and_no_git_sources(self):
+    def test_read_only_commands_ignore_dirty_tree_and_fingerprint_refuses_it(self):
         with tempfile.TemporaryDirectory() as tmp:
             p = Project(tmp)
             self._reviewed(p)
             f = p.root / "reports/monthly.sql"
             f.write_text(SQL_V2)
-            self.assertEqual(run(["delta", "reports__monthly"], p.root).returncode, 2)
+            # An uncommitted edit is a working-tree change to diff, never a refusal.
+            self.assertEqual(run(["delta", "reports__monthly"], p.root).returncode, 10)
+            self.assertIn("stale", run(["status"], p.root).stdout)
+            self.assertEqual(run(["fingerprint", "reports/monthly.sql"], p.root).returncode, 2)
             git(p.root, "checkout", "--", "reports/monthly.sql")
             self.assertEqual(run(["delta", "reports__monthly"], p.root).returncode, 0)
             p.sql("untracked.sql", SQL_V1)
             self.assertEqual(run(["fingerprint", "untracked.sql"], p.root).returncode, 2)
-            self.assertEqual(run(["delta", "reports__monthly"], p.root).returncode, 2)
+            self.assertEqual(run(["delta", "reports__monthly"], p.root).returncode, 0)
+            self.assertIn("current", run(["status"], p.root).stdout)
         with tempfile.TemporaryDirectory() as tmp:
             p = Project(tmp, git_repo=False)
             p.sql("q.sql", SQL_V1)

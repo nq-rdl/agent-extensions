@@ -87,7 +87,9 @@ class BodyBinding(unittest.TestCase):
         (self.d / "review.json").write_text(json.dumps(corrupted))
         self.sql.write_text(NEW)
         self.p.commit("header")
-        self.assertIn("no-baseline", run(["status"], self.p.root).stdout)
+        # status compares recorded hashes only; reading SQL from git exposes the corrupt full hash.
+        self.assertIn("header-only", run(["status"], self.p.root).stdout)
+        self.assertEqual(run(["delta", "q"], self.p.root).returncode, 6)
         self.assertNotEqual(self.publish(corrupted).returncode, 0)
         self.assertNotEqual(run(["snapshot", "q", "q.sql"], self.p.root).returncode, 0)
 
@@ -172,7 +174,6 @@ class ScopeBodyState(unittest.TestCase):
                 doc = scope_doc("q", **fp)
                 if legacy:
                     del doc["sql_body_sha256"]
-                    del doc["sql_provenance"]
                 published = p.write_json("q", "scope.json", doc)
                 sql.write_text(NEW)
                 p.commit("header")
@@ -215,7 +216,8 @@ class ScopeBodyState(unittest.TestCase):
             corrupt = json.loads(scope.read_text())
             corrupt["sql_sha256"] = "0" * 64
             scope.write_text(json.dumps(corrupt))
-            self.assertIn("no-baseline", run(["status"], p.root).stdout)
+            self.assertIn("scoped-header-only", run(["status"], p.root).stdout)
+            self.assertEqual(run(["delta", "q", "scope"], p.root).returncode, 6)
 
     def test_scope_baseline_symlink_is_not_binding_evidence(self):
         with tempfile.TemporaryDirectory() as tmp:
