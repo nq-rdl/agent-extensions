@@ -203,7 +203,7 @@ class Status(unittest.TestCase):
             })
             self.assertEqual(j["schemaVersion"], 2)
             text = run(["status"], p.root).stdout
-            self.assertRegex(text, r"(?m)^reports__weekly\tstale\treports/weekly.sql\t1\tlifts=\{\}$")
+            self.assertRegex(text, r"(?m)^reports__weekly\tstale\treports/weekly.sql\t1\tlifts=\{\}\tnext=/data-request:analyse reports/weekly.sql --update$")
 
 
 class Slug(unittest.TestCase):

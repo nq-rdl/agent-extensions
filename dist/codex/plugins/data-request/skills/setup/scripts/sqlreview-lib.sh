@@ -312,3 +312,77 @@ sr_state_reason() { # <slug> <state>
   esac
   printf '%s\n' "$why"
 }
+
+# The next command for one review directory, on one line (#514). Derived only from records that
+# already exist: the state, scope.json and its scope.source.sql binding, the root answers.intake.json
+# and explain.json. A bound scope whose SQL body moved on, or whose imported analyst decisions no
+# longer match the sidecar, names bootstrap as the rescope step. Cheap: a few jq and hash calls,
+# because status runs from a SessionStart hook with a 5-second timeout.
+sr_next() { # <slug> <state> <sql_path>
+  local d="$SR_REVIEWS/$1" state="$2" sql="$3" scope srev="" bound="" intake="" why="" follow="" ex
+  case "$state" in
+    draft)
+      if [ -f "$d/scope.draft.json" ]; then printf 'resume /data-request:bootstrap to finish the scope draft\n'
+      else printf 'resume /data-request:analyse to finish the review draft\n'; fi
+      return 0 ;;
+    invalid) printf 'run sqlreview.sh status --verbose to see why, then repair the documents\n'; return 0 ;;
+    lifts) printf '/data-request:lift to close out the lift ledger\n'; return 0 ;;
+    missing) printf "sqlreview.sh move '%s' <new path> if the SQL moved\n" "$sql"; return 0 ;;
+  esac
+  scope="$d/scope.json"
+  if [ -f "$scope" ]; then
+    local sidecar="$SR_ROOT/answers.intake.json" prog='
+      def mine: [.assumptions[]? | select(.upstream.source? == "analyst-intake")
+                 | {id, text, rationale, confirmed_by, confirmed_at, decided}] | sort_by(.id);
+      def theirs: [.decisions[] | {id: ("A-intake-" + .id), text, rationale, confirmed_by, confirmed_at, decided}] | sort_by(.id);
+      $s[0] as $doc
+      | [($doc.revision // "-" | tostring),
+         (if ($doc.sql_sha256 | type) == "string" then "y" else "n" end),
+         (if $i == null then "n" else (try (if ($doc | mine) == ($i[0] | theirs) then "n" else "y" end) catch "n") end)]
+      | join("\t")'
+    IFS="$(printf '\t')" read -r srev bound intake <<EOF2
+$( { [ -f "$sidecar" ] && jq -rn --slurpfile s "$scope" --slurpfile i "$sidecar" "$prog" 2>/dev/null; } ||
+   jq -rn --slurpfile s "$scope" --argjson i null "$prog" 2>/dev/null )
+EOF2
+    case "$srev" in ''|*[!0-9]*) srev="" ;; esac
+  fi
+  if [ -n "$srev" ]; then
+    # The scope document's own staleness is the state itself. Under a review, test the scope
+    # binding directly: analyse alone never refreshes scope.json.
+    if [ "$state" = stale ] && [ ! -f "$d/review.json" ]; then why="The SQL"
+    elif [ -f "$d/review.json" ] && [ "$bound" = y ] && [ -f "$SR_ROOT/$sql" ]; then
+      sr_binding "$scope" "$SR_ROOT/$sql" "$d/scope.source.sql" >/dev/null 2>&1
+      [ $? -eq 1 ] && why="The SQL"
+    fi
+    if [ "$intake" = y ]; then why="${why:+$why and the analyst intake}"; why="${why:-The analyst intake}"; fi
+    if [ -n "$why" ]; then
+      if [ -f "$d/review.json" ]; then follow="/data-request:analyse $sql --update"
+      elif [ -f "$SR_ROOT/$sql" ]; then follow="/data-request:analyse $sql"
+      else follow="/data-request:draft to write $sql"; fi
+      printf '%s changed after scope revision %s: run /data-request:bootstrap %s to publish scope revision %s, then %s\n' \
+        "$why" "$srev" "$sql" "$((srev + 1))" "$follow"
+      return 0
+    fi
+  fi
+  case "$state" in
+    scoped)
+      if [ -f "$SR_ROOT/$sql" ]; then printf '/data-request:analyse %s to review the SQL\n' "$sql"
+      else printf '/data-request:draft to write %s, then /data-request:analyse %s\n' "$sql" "$sql"; fi ;;
+    scoped-header-only) printf '/data-request:bootstrap %s to record the header revision of the scope\n' "$sql" ;;
+    stale|no-baseline) printf '/data-request:analyse %s --update\n' "$sql" ;;
+    header-only) printf '/data-request:analyse %s to record the header revision of the review\n' "$sql" ;;
+    current)
+      ex=""
+      if [ -f "$d/explain.json" ] && [ ! -L "$d/explain.json" ]; then
+        ex="$(jq -rn --slurpfile e "$d/explain.json" --slurpfile r "$d/review.json" '
+          if ($e[0].sql_sha256 == $r[0].sql_sha256 and $e[0].review_revision == $r[0].revision)
+          then (if $e[0].completed == true then "done" else "partial" end) else "" end' 2>/dev/null)"
+      fi
+      case "$ex" in
+        done) printf '/data-request:release <candidate ref> after the analyst accepts the explained SQL\n' ;;
+        partial) printf '/data-request:explain %s to resume the walkthrough\n' "$sql" ;;
+        *) printf '/data-request:explain %s to walk the analyst through the review\n' "$sql" ;;
+      esac ;;
+    *) printf '\n' ;;
+  esac
+}

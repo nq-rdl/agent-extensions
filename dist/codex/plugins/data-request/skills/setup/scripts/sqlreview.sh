@@ -6,8 +6,9 @@
 #
 #   init [--diff] [--apply PATH...] [--json]   create .sqlreview/ from the bundled default (plus an empty
 #                                              reviews/.gitkeep so git keeps reviews/); never overwrites
-#   status [--json] [--verbose]                reviews and their state (--verbose: why invalid/missing, and the
-#                                              move that migrates a legacy-encoded slug); exit 3 when not initialised
+#   status [--json] [--verbose]                reviews, their state and the next command (bootstrap first when the
+#                                              SQL or intake changed after the scope; --verbose: why invalid/missing,
+#                                              and the move that migrates a legacy-encoded slug); exit 3 when not initialised
 #                                              missing bundled templates: JSON missing_templates, else one stderr line
 #   slug PATH                                  slug for a project path; exit 5 on a conflicting binding. Readable:
 #                                              sql/cohort_pipeline/x.sql -> sql__cohort_pipeline__x; an existing
@@ -161,7 +162,7 @@ cmd_init() {
 
 # ---------------------------------------------------------------------------------------------
 cmd_status() {
-  local json=0 verbose=0 d slug state reason migrate schema lifts rows="[]" f missing=""
+  local json=0 verbose=0 d slug state reason migrate next schema lifts rows="[]" f missing=""
   while [ $# -gt 0 ]; do
     case "$1" in --json) json=1 ;; --verbose) verbose=1 ;; *) usage ;; esac
     shift
@@ -192,6 +193,7 @@ EOF
         else lifts='{"invalid":true}'; fi
       fi
       reason="" migrate=""
+      next="$(sr_next "$slug" "$state" "$SR_SQL_PATH")"
       [ "$verbose" = 1 ] && reason="$(sr_state_reason "$slug" "$state")"
       # A legacy-encoded slug (#353) of the path it records can be migrated to the readable one.
       if [ "$verbose" = 1 ] && [ -n "$SR_SQL_PATH" ] &&
@@ -200,12 +202,14 @@ EOF
       fi
       if [ "$json" = 1 ]; then
         rows="$(printf '%s' "$rows" | jq -c --arg slug "$slug" --arg state "$state" --arg sql "$SR_SQL_PATH" --arg rev "$SR_REVISION" --argjson lifts "$lifts" \
-          --arg reason "$reason" --arg migrate "$migrate" --argjson verbose "$verbose" \
-          '. + [{slug: $slug, state: $state, sql_path: $sql, revision: ($rev | tonumber? // null), lifts: $lifts}
+          --arg reason "$reason" --arg migrate "$migrate" --argjson verbose "$verbose" --arg next "$next" \
+          '. + [{slug: $slug, state: $state, sql_path: $sql, revision: ($rev | tonumber? // null), lifts: $lifts,
+                 next: (if $next == "" then null else $next end)}
                 + (if $verbose == 1 then {reason: (if $reason == "" then null else $reason end),
                                           migrate: (if $migrate == "" then null else $migrate end)} else {} end)]')"
       else
         printf '%s\t%s\t%s\t%s\tlifts=%s' "$slug" "$state" "$SR_SQL_PATH" "$SR_REVISION" "$lifts"
+        [ -z "$next" ] || printf '\tnext=%s' "$next"
         [ -z "$reason" ] || printf '\treason=%s' "$reason"
         [ -z "$migrate" ] || printf '\tmigrate=%s' "$migrate"
         printf '\n'
