@@ -6,6 +6,9 @@
 SR_DIR=".sqlreview"
 # Where the jq programs live (sqlreview.sh sets it before sourcing this file).
 : "${SR_SCRIPT_DIR:=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd -P)}"
+# Field separators for `IFS=... read`, set once: $(printf) in a loop costs a fork per review.
+SR_TAB="$(printf '\t')"
+SR_US="$(printf '\037')"
 SR_SETUP_HINT="Run /data-request:setup to initialise the project (creates $SR_DIR/ with config.json and templates/)."
 
 sr_die() { # <exit-code> <message>
@@ -84,12 +87,17 @@ sr_relpath() {
   esac
 }
 
-# Reject symlink components, including missing targets' existing ancestors.
+# Reject symlink components, including missing targets' existing ancestors. Walks up with
+# parameter expansion, not dirname: status calls this many times per review, inside a 5-second hook.
 sr_no_symlinks() {
   local p="$1"
-  while [ "$p" != / ]; do
+  while [ "$p" != / ] && [ "$p" != . ]; do
     [ ! -L "$p" ] || { printf 'sqlreview: symlink path refused: %s\n' "$p" >&2; return 2; }
-    p="$(dirname "$p")"
+    # dirname: drop trailing slashes, then the last component ("a" -> ".", "/a" -> "/").
+    while :; do case "$p" in ?*/) p="${p%/}" ;; *) break ;; esac; done
+    case "$p" in */*) p="${p%/*}" ;; *) p=. ;; esac
+    while :; do case "$p" in ?*/) p="${p%/}" ;; *) break ;; esac; done
+    p="${p:-/}"
   done
 }
 sr_safe_slug() {
@@ -122,13 +130,15 @@ sr_slug() {
   fi
 }
 
-sr_sha256() ( # <file> -> hex digest
-  set -o pipefail
-  # Hash stdin so filename escaping (e.g. backslashes) cannot prefix the digest.
-  if command -v sha256sum >/dev/null 2>&1; then sha256sum < "$1" | cut -d' ' -f1
-  elif command -v shasum >/dev/null 2>&1; then shasum -a 256 < "$1" | cut -d' ' -f1
+sr_sha256() { # <file> -> hex digest
+  # Hash stdin so filename escaping (e.g. backslashes) cannot prefix the digest. A brace body and
+  # ${h%% *}, not a subshell and cut: status hashes several files per review.
+  local h
+  if command -v sha256sum >/dev/null 2>&1; then h="$(sha256sum < "$1")" || return $?
+  elif command -v shasum >/dev/null 2>&1; then h="$(shasum -a 256 < "$1")" || return $?
   else sr_die 2 "neither sha256sum nor shasum is available"; fi
-)
+  printf '%s\n' "${h%% *}"
+}
 
 # Where the SQL body starts, after the leading comment header (#366): the first line number that
 # is not a blank line, a full-line `--` comment or part of a leading /* */ block. The body is then
@@ -184,14 +194,13 @@ sr_body_start() { # <file> -> line number (N+1 when the whole file is header)
     }' "$1"
 }
 # SHA256 of the SQL body (tail from sr_body_start). Prints nothing and returns 1 on any failure
-# (unterminated header, awk/tail/mktemp error): callers compare only two non-empty digests.
+# (unterminated header, awk/tail/hash error): callers compare only two non-empty digests.
 sr_body_sha256() { # <file> -> hex digest
-  local n tmp sha
+  local n sha
   n="$(sr_body_start "$1")" || return 1
   case "$n" in ""|*[!0-9]*) return 1 ;; esac
-  tmp="$(mktemp)" || return 1
-  if ! tail -n +"$n" "$1" > "$tmp"; then rm -f "$tmp"; return 1; fi
-  sha="$( (sr_sha256 "$tmp") 2>/dev/null )"; rm -f "$tmp"
+  # A pipe, not a temporary file: status hashes several bodies per review.
+  sha="$( (set -o pipefail; tail -n +"$n" "$1" | sr_sha256 /dev/stdin) 2>/dev/null )" || return 1
   case "$sha" in [0-9a-f]*) printf '%s\n' "$sha" ;; *) return 1 ;; esac
 }
 # True when both files' bodies are known and equal (a failure on either side counts as a change).
@@ -205,8 +214,9 @@ sr_body_same() { # <file> <file>
 sr_binding() { # <document> <current SQL> <optional baseline>; 0 full, 10 header-only, 1 changed
   local doc="$1" cur="$2" base="$3" full body current
   sr_no_symlinks "$base" || return 1
-  full="$(jq -r '.sql_sha256 // ""' "$doc")"
-  body="$(jq -r '.sql_body_sha256 // ""' "$doc")"
+  IFS="$SR_US" read -r full body <<EOF
+$(jq -r '[(.sql_sha256 // "" | tostring), (.sql_body_sha256 // "" | tostring)] | join("\u001f")' "$doc")
+EOF
   if [ -f "$base" ]; then
     [ "$(sr_sha256 "$base")" = "$full" ] || return 1
     if [ -n "$body" ]; then [ "$(sr_body_sha256 "$base")" = "$body" ] || return 1; fi
@@ -245,23 +255,27 @@ sr_doc_for() { # <slug> -> path
 #   current      identical
 sr_state() { # <slug>
   sr_safe_slug "$1"
-  local d="$SR_REVIEWS/$1" doc sql rev state
+  local d="$SR_REVIEWS/$1" doc sql rev state kind sha
   doc="$(sr_doc_for "$1")" || {
     if [ -f "$d/review.draft.json" ] || [ -f "$d/scope.draft.json" ]; then printf 'draft\t\t\n'; else printf 'invalid\t\t\n'; fi
     return 0
   }
   sr_no_symlinks "$d/source.sql" || exit 2
   cmd_check "$doc" >/dev/null || { printf 'invalid\t\t\n'; return 0; }
-  if [ "$(jq -r .kind "$doc")" != lifts ]; then
-    bash "$SR_SCRIPT_DIR/sqlreview.sh" questions "$1" >/dev/null 2>&1 || { printf 'invalid\t\t\n'; return 0; }
+  # One jq call for four fields. \037 is not IFS whitespace, so an empty field stays in place.
+  IFS="$SR_US" read -r kind sql rev sha <<EOF
+$(jq -r '[(.kind | tostring), (.sql_path // "" | tostring), (.revision // "" | tostring), (.sql_sha256 != null | tostring)] | join("\u001f")' "$doc" 2>/dev/null)
+EOF
+  if [ "$kind" != lifts ]; then
+    # The question store must load, as `sqlreview.sh questions` loads it. In a subshell, not a child
+    # bash, which would read sqlreview.sh again per review. Its review filter keeps every question.
+    ( _q_context "$1" ) >/dev/null 2>&1 || { printf 'invalid\t\t\n'; return 0; }
   fi
-  sql="$(jq -r '.sql_path // ""' "$doc" 2>/dev/null)"
   sr_safe_sql "$sql"
-  rev="$(jq -r '.revision // ""' "$doc" 2>/dev/null)"
   case "$doc" in
     */scope.json)
       state="scoped"
-      if jq -e '.sql_sha256 != null' "$doc" >/dev/null; then
+      if [ "$sha" = true ]; then
         if [ ! -f "$SR_ROOT/$sql" ]; then state="missing"
         else
           local bound
@@ -340,7 +354,7 @@ sr_next() { # <slug> <state> <sql_path>
          (if ($doc.sql_sha256 | type) == "string" then "y" else "n" end),
          (if $i == null then "n" else (try (if ($doc | mine) == ($i[0] | theirs) then "n" else "y" end) catch "n") end)]
       | join("\t")'
-    IFS="$(printf '\t')" read -r srev bound intake <<EOF2
+    IFS="$SR_TAB" read -r srev bound intake <<EOF2
 $( { [ -f "$sidecar" ] && jq -rn --slurpfile s "$scope" --slurpfile i "$sidecar" "$prog" 2>/dev/null; } ||
    jq -rn --slurpfile s "$scope" --argjson i null "$prog" 2>/dev/null )
 EOF2
