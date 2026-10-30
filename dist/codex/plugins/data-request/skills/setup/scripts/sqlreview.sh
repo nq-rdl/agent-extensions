@@ -169,6 +169,11 @@ cmd_status() {
   done
   sr_need_jq
   sr_require_root
+  SR_CHECKED="
+"
+  SR_CHECK_TMP="$(mktemp)" || sr_die 2 "mktemp failed"
+  trap 'rm -f "$SR_CHECK_TMP"' EXIT
+  trap 'exit 2' HUP INT TERM
   schema="$(jq -r '.schemaVersion // "?"' "$SR_ROOT/$SR_DIR/config.json" 2>/dev/null || echo '?')"
   # Bundled templates the project lacks (e.g. lifts.md in a project initialised before lifts, #349).
   for f in "$SR_ASSETS"/templates/*.md; do
@@ -182,8 +187,8 @@ cmd_status() {
   if [ -d "$SR_REVIEWS" ]; then
     for d in "$SR_REVIEWS"/*/; do
       [ -d "$d" ] || continue
-      slug="$(basename "$d")"
-      IFS="$(printf '\t')" read -r state SR_SQL_PATH SR_REVISION <<EOF
+      slug="${d%/}"; slug="${slug##*/}"
+      IFS="$SR_TAB" read -r state SR_SQL_PATH SR_REVISION <<EOF
 $(sr_state "$slug")
 EOF
       lifts="{}"
@@ -258,24 +263,33 @@ cmd_slug() {
 cmd_check() {
   [ $# -eq 1 ] || usage
   sr_need_jq
-  local src="$1" tmp out rc
-  tmp="$(mktemp)" || sr_die 2 "mktemp failed"
+  local src="$1" tmp out rc kind
+  # status checks each document once per run, though sr_state and the question store both ask (SR_CHECKED).
+  case "${SR_CHECKED-}" in *"
+$src
+"*) printf 'ok\n'; return 0 ;; esac
+  # status passes one temporary file (SR_CHECK_TMP) for all its checks, and removes it itself.
+  tmp="${SR_CHECK_TMP:-$(mktemp)}" || sr_die 2 "mktemp failed"
 
   if [ "$src" = "--stdin" ]; then cat > "$tmp"; else
-    [ -f "$src" ] || { rm -f "$tmp"; sr_die 2 "no such file: $src"; }
+    [ -f "$src" ] || { [ -n "${SR_CHECK_TMP-}" ] || rm -f "$tmp"; sr_die 2 "no such file: $src"; }
     cat "$src" > "$tmp"
   fi
-  if ! jq -se 'length == 1 and (.[0] | type == "object")' "$tmp" >/dev/null 2>&1; then
-    rm -f "$tmp"; printf 'invalid JSON: the document does not parse\n'; return 4
+  # One jq call both parses the document and reads its kind.
+  kind="$(jq -sr 'if length == 1 and (.[0] | type == "object") then .[0].kind == "questions" else empty end' "$tmp" 2>/dev/null)"
+  if [ -z "$kind" ]; then
+    [ -n "${SR_CHECK_TMP-}" ] || rm -f "$tmp"; printf 'invalid JSON: the document does not parse\n'; return 4
   fi
-  if jq -e '.kind == "questions"' "$tmp" >/dev/null; then
+  if [ "$kind" = true ]; then
     out="$(jq -r -L "$SR_SCRIPT_DIR" 'include "sqlreview-questions"; question_errors' "$tmp" 2>&1)"; rc=$?
   else
     out="$(jq -r -L "$SR_SCRIPT_DIR" -f "$SR_SCRIPT_DIR/sqlreview-check.jq" "$tmp" 2>&1)"; rc=$?
   fi
-  rm -f "$tmp"
+  [ -n "${SR_CHECK_TMP-}" ] || rm -f "$tmp"
   if [ "$rc" -ne 0 ]; then printf 'check failed to run: %s\n' "$out"; return 4; fi
   if [ -n "$out" ]; then printf '%s\n' "$out"; return 4; fi
+  [ -z "${SR_CHECKED+x}" ] || [ "$src" = --stdin ] || SR_CHECKED="$SR_CHECKED$src
+"
   printf 'ok\n'
   return 0
 }
