@@ -1,8 +1,9 @@
 #!/usr/bin/env bash
 # SessionStart hook (data-request plugin): one declarative line of context about the session's
 # project — whether .sqlreview/ is initialised and which reviews are stale or missing — so the
-# model knows which /data-request:* stage applies before it is asked. Runs `sqlreview.sh status
-# --json` from the event's cwd. Advisory only: any failure (no helper, no cwd, no jq) is a silent
+# model knows which /data-request:* stage applies before it is asked. Each review that needs
+# action adds one line with its next command from status (bootstrap first when the scope is out
+# of date, #514). Runs `sqlreview.sh status --json` from the event's cwd. Advisory only: any failure (no helper, no cwd, no jq) is a silent
 # no-op, and an uninitialised project only gets a hint when it actually contains SQL files.
 set -u
 input="$(cat 2>/dev/null)" || exit 0
@@ -54,7 +55,11 @@ elif [ "$rc" -eq 0 ] && [ -n "$status" ]; then
              (.counts.stale // 0 | select(. > 0) | "\(.) stale (\(names("stale")))"),
              (.counts["no-baseline"] // 0 | select(. > 0) | "\(.) without a baseline (\(names("no-baseline")))"),
              (.counts.missing // 0 | select(. > 0) | "\(.) whose SQL is missing (\(names("missing")))") ] | join(", "))
-        + ". Stale or baseline-less reviews need /data-request:analyse --update before /data-request:explain; a missing SQL file is rebound with sqlreview.sh move."
+        + "."
+        # One line per review that needs action (#514). A current review only shows when its scope
+        # must be updated first, so a quiet project stays one line.
+        + ([ $r.reviews[] | select(.next != null and (.state != "current" or (.next | contains("/data-request:bootstrap"))))
+             | "\n- next for \(.slug) (\(.state)): \(.next)" ] | join(""))
       end' 2>/dev/null)"
 fi
 [ -n "$ctx" ] || exit 0

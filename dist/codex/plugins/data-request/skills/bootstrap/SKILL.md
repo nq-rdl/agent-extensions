@@ -5,8 +5,9 @@ description: 'Scope a piece of SQL work with the Data Engineer before the SQL is
   an interview that produces .sqlreview/reviews/<slug>/scope.json and the rendered
   scope.md (intent, inputs, outputs, assumptions, open questions), preserving recorded
   upstream confirmations. Re-running on an existing scope walks through what changed.
-  Use at the start of the Data Request scoping workflow, after $data-request:setup
-  and before $data-request:analyse.'
+  It is also the step that updates a scope after the SQL or the analyst intake changes,
+  before analyse runs again. Use at the start of the Data Request scoping workflow,
+  after $data-request:setup and before $data-request:analyse.'
 compatibility: .sqlreview schema 2 (schema 1 remains readable) (docs/specs/2026-09-15-sql-review-plugin-design.md);
   bash 3.2+, jq >= 1.6, git optional.
 metadata:
