@@ -6,7 +6,8 @@
 #   evidence REF [SLUG...]   does each .sqlreview review apply to the release at REF? JSON
 #                            {ref, commit, reviews: [{slug, kind, sql_path, revision, applies,
 #                            sql_sha256_reviewed, sql_sha256_at_ref, reviewed_commit,
-#                            reviewed_commit_in_ref, assumptions, limitations, open_questions}]}.
+#                            reviewed_commit_in_ref, other_paths_changed_since_review, assumptions,
+#                            limitations, open_questions}]}.
 #                            The reviews are read from the working tree (the newest record); the SQL
 #                            is read from REF, never the working tree. applies:
 #                              current         the SQL at REF is the reviewed SQL
@@ -14,9 +15,14 @@
 #                              changed         the SQL at REF differs: the review is stale for REF
 #                              missing-at-ref  REF has no file at sql_path: the review may describe a draft
 #                              unreviewed      scope only, no review
+#                              unavailable     the reviewed SQL cannot be read from git at the
+#                                              review's git_commit, or its SHA differs: reassess
 #                              invalid         the record fails sqlreview.sh check
 #                            reviewed_commit_in_ref: whether the review's git_commit is an ancestor of
 #                            REF (null when the review has none or git cannot tell).
+#                            other_paths_changed_since_review: committed paths outside sql_path and
+#                            .sqlreview/ that differ between git_commit and REF (null when unknown).
+#                            SQL can be unchanged while code, pins or exports change (#521).
 #   check FILE | check --stdin
 #                            validate a release record (.sqlreview/releases/<tag>/release.json):
 #                            one violation per line, exit 4; "ok" otherwise
@@ -173,8 +179,8 @@ cmd_render() {
 }
 
 # One review directory -> one JSON row on stdout.
-rl_review_row() { # <slug> <commit>
-  local slug="$1" commit="$2" d="$SR_REVIEWS/$1" doc kind sql reviewed at="" body_at="" applies tmp gc inref="null" binding
+rl_review_row() ( # <slug> <commit>
+  local slug="$1" commit="$2" d="$SR_REVIEWS/$1" doc kind sql reviewed at="" body_at="" applies tmp gc inref="null" binding others="null"
   doc="$(sr_doc_for "$slug")" || return 1
   kind="$(jq -r '.kind // ""' "$doc")"
   if ! bash "$SR_SCRIPT_DIR/sqlreview.sh" check "$doc" >/dev/null 2>&1; then
@@ -185,26 +191,40 @@ rl_review_row() { # <slug> <commit>
   sql="$(jq -r '.sql_path' "$doc")"
   sr_safe_sql "$sql"
   reviewed="$(jq -r '.sql_sha256 // ""' "$doc")"
-  tmp="$(mktemp)" || sr_die 2 "mktemp failed"
-  # ./ makes the path relative to SR_ROOT, which need not be the repository top level.
-  if git -C "$SR_ROOT" cat-file -e "$commit:./$sql" 2>/dev/null &&
-     git -C "$SR_ROOT" show "$commit:./$sql" > "$tmp" 2>/dev/null; then
-    at="$(sr_sha256 "$tmp")"
-  fi
-  if [ "$kind" = scope ]; then applies="unreviewed"
-  elif [ -z "$at" ]; then applies="missing-at-ref"
+  local rc
+  tmp="$(sr_source_workspace)" || return 2
+  trap 'rm -rf "$tmp"' EXIT
+  trap 'exit 2' HUP INT TERM
+  applies=unavailable
+  if [ "$kind" = scope ]; then applies=unreviewed
   else
-    sr_no_symlinks "$d/source.sql" || exit 2
-    sr_binding "$doc" "$tmp" "$d/source.sql"; binding=$?
-    case "$binding" in 0) applies="current" ;; 10) applies="header-only" ;; *) applies="changed" ;; esac
+    sr_source_auth "$doc" "$tmp/recorded.sql"; rc=$?
+    case "$rc" in 0) ;; 6) ;; *) return 2 ;; esac
   fi
-  [ -z "$at" ] || body_at="$(sr_body_sha256 "$tmp" || true)"
-  rm -f "$tmp"
+  if [ "$kind" = scope ] || [ "$rc" = 0 ]; then
+    sr_source_show "$commit" "$sql" "$tmp/release.sql" 2>/dev/null; rc=$?
+    case "$rc" in
+      0)
+        at="$(sr_sha256 "$tmp/release.sql")" || return 2
+        body_at="$(sr_body_sha256 "$tmp/release.sql")" || return 2
+        if [ "$kind" != scope ]; then
+          sr_binding "$doc" "$tmp/release.sql" "$tmp/recorded.sql"; binding=$?
+          case "$binding" in 0) applies=current ;; 10) applies=header-only ;; *) applies=changed ;; esac
+        fi ;;
+      6) [ "$kind" = scope ] || applies=missing-at-ref ;;
+      *) return 2 ;;
+    esac
+  fi
   gc="$(jq -r '.git_commit // "" | strings' "$doc")"
   case "$gc" in
     ""|*[!0-9a-f]*) ;;
     *) if git -C "$SR_ROOT" merge-base --is-ancestor "$gc" "$commit" 2>/dev/null; then inref=true
-       elif [ $? -eq 1 ]; then inref=false; fi ;;
+       elif [ $? -eq 1 ]; then inref=false; fi
+       # SQL can stay identical while code, pins or exports change (#521). List them; never judge them.
+       if git -C "$SR_ROOT" diff --name-only -z "$gc" "$commit" -- . ":(exclude).sqlreview" ":(exclude)$sql" \
+         > "$tmp/others" 2>/dev/null; then
+         others="$(tr '\0' '\n' < "$tmp/others" | jq -Rsc 'split("\n") | map(select(length > 0))')" || return 2
+       fi ;;
   esac
   local question_doc question_rc
   question_doc="$(bash "$SR_SCRIPT_DIR/sqlreview.sh" questions "$slug" "$kind")" || {
@@ -214,16 +234,16 @@ rl_review_row() { # <slug> <commit>
       '{slug: $slug, kind: $kind, sql_path: null, revision: null, applies: "invalid"}'
     return 0
   }
-  jq -c --argjson question_doc "$question_doc" --arg slug "$slug" --arg applies "$applies" --arg at "$at" --arg body_at "$body_at" --argjson inref "$inref" '
+  jq -c --argjson question_doc "$question_doc" --arg slug "$slug" --arg applies "$applies" --arg at "$at" --arg body_at "$body_at" --argjson inref "$inref" --argjson others "$others" '
     def items: [(. // [])[] | {id, text, rationale, confirmed_revision}];
     {slug: $slug, kind, sql_path, revision, applies: $applies,
      sql_sha256_reviewed: .sql_sha256, sql_sha256_at_ref: (if $at == "" then null else $at end),
      sql_body_sha256_reviewed: (.sql_body_sha256 // null), sql_body_sha256_at_ref: (if $body_at == "" then null else $body_at end),
-     reviewed_commit: .git_commit, reviewed_commit_in_ref: $inref,
+     reviewed_commit: .git_commit, reviewed_commit_in_ref: $inref, other_paths_changed_since_review: $others,
      assumptions: (.assumptions | items), limitations: (.limitations | items),
      questions: $question_doc.questions,
      open_questions: [$question_doc.questions[] | select(.status == "open") | .text]}' "$doc"
-}
+)
 
 cmd_evidence() {
   [ $# -ge 1 ] || usage

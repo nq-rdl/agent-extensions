@@ -100,7 +100,7 @@ class HandoffContracts(unittest.TestCase):
 class CommittedHandoffEvidence(unittest.TestCase):
     """Execute the documented gate against a checked PR SHA, not merely local HEAD."""
 
-    def test_review_and_snapshot_must_match_checked_head(self):
+    def test_review_must_match_checked_head(self):
         handoff = (REPO / "skills/data-request-triage/references/handoff.rst").read_text()
         block = re.search(r"\.\. code-block:: bash\n\n((?:     .*\n|\n)+)", handoff)
         self.assertIsNotNone(block, "hand-off needs an executable committed-evidence gate")
@@ -120,9 +120,7 @@ class CommittedHandoffEvidence(unittest.TestCase):
             directory = root / ".sqlreview/reviews/q"
             directory.mkdir(parents=True)
             review = directory / "review.json"
-            snapshot = directory / "source.sql"
             review.write_text('{"revision": 1}\n')
-            snapshot.write_text("select 1;\n")
             git("add", ".sqlreview")
             git("commit", "-qm", "checked review")
             env["PR_HEAD"] = git("rev-parse", "HEAD")
@@ -139,15 +137,11 @@ class CommittedHandoffEvidence(unittest.TestCase):
             git("commit", "-qm", "local unpublished review")
             run(4)  # clean local HEAD is not the checked PR head
             review.write_text('{"revision": 1}\n')
-            snapshot.write_text("select 2;\n")
-            run(4)  # matching review alone is insufficient
-            snapshot.write_text("select 1;\n")
             run(0)
             env["SLUG"] = "untracked"
             new = root / ".sqlreview/reviews/untracked"
             new.mkdir()
             (new / "review.json").write_text(review.read_text())
-            (new / "source.sql").write_text(snapshot.read_text())
             run(4)  # evidence absent from the checked commit
 
 

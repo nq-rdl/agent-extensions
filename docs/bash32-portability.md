@@ -73,3 +73,15 @@ Replace `podman` with `docker` for Docker. No image tag fallback or in-fixture
 package install is allowed. To refresh pins, verify the official image manifest
 and upstream jq checksum, update the fixture constants and provenance here,
 then rerun the strict gate and its runner regression tests.
+
+
+The SQL-source case uses a real disposable Git repository with committed
+builder SQL and a newline in one SQL path. It covers fingerprint, publication,
+status, delta on an uncommitted edit, remap and carry after shifted lines, JSON
+revision history and `materialize` from `git show`. No SQL is written under the
+review store. The fixture copies a Linux amd64 host Git binary and its glibc
+loader and libraries into the disposable mount. Unsupported hosts or missing
+dependencies cannot pass the strict gate. This Git dependency is not pinned and
+is not the portability target. Bash 3.2, BusyBox and static jq keep the pins
+above. No in-container package install or network access is added. The same
+scenario runs under host Bash.

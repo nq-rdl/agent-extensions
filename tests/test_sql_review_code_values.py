@@ -73,6 +73,21 @@ class CodeValues(unittest.TestCase):
         doc["extension"] = {"header_revisions": copy.deepcopy(doc["header_revisions"])}
         self.assertEqual(len(self.code_rows(doc, "--ste")), 3)
 
+    def test_header_revision_commit_is_not_prose(self):
+        commit = "b123456789b" + "b" * 29
+        doc = review_doc(git_commit=commit,
+                         header_revisions=[{"sql_sha256": "a" * 64,
+                                            "at": "2026-10-08T00:00:00Z", "revision": 1,
+                                            "git_commit": commit, "git_dirty": False}])
+        for flags in ((), ("--ste",)):
+            result = self.lint(doc, *flags)
+            self.assertEqual((result.returncode, result.stdout), (0, ""))
+        doc["header_revisions"][0]["git_commit"] = "Use " + DIGITS
+        self.assertEqual(len(self.code_rows(doc, "--ste")), 1)
+        doc = review_doc(git_commit=commit)
+        doc["extension"] = {"git_commit": commit}
+        self.assertEqual(len(self.code_rows(doc, "--ste")), 1)
+
     def test_metadata_exemptions_are_validated_and_location_specific(self):
         for over in ({"sql_sha256": "not a hash " + DIGITS},
                      {"sql_body_sha256": "not a hash " + DIGITS},

@@ -8,7 +8,7 @@ description: 'Scope a piece of SQL work with the Data Engineer before the SQL is
   Use at the start of the Data Request scoping workflow, after $data-request:setup
   and before $data-request:analyse.'
 compatibility: .sqlreview schema 2 (schema 1 remains readable) (docs/specs/2026-09-15-sql-review-plugin-design.md);
-  bash 3.2+, jq >= 1.6, git optional.
+  bash 3.2+, jq >= 1.6, git required for SQL-bound scopes.
 metadata:
   repo: https://github.com/nq-rdl/agent-extensions
 ---
@@ -190,21 +190,21 @@ silently. Recheck these answers on updates, including when SQL first becomes ava
 
 If `.sqlreview/reviews/$SLUG/scope.json` exists (or `--update`):
 
-For `scoped-header-only` status, inspect the header diff against the authenticated
-`scope.source.sql` and reconcile its notes with the confirmed scope. If only header wording
+For `scoped-header-only` status, inspect the header diff from `delta "$SLUG" scope`
+and reconcile its notes with the confirmed scope. If only header wording
 changed, run the pre-publish header check below with the current shared questions, then
 republish the existing `scope.json` and render it to record a header revision without
 repeating unchanged confirmations or incrementing the semantic revision. Changed item text,
-rationale or framing still follows the update path below. `stale` includes a body change or
-corrupt baseline and requires reassessment.
+rationale or framing still follows the update path below. `stale` is a body change and
+requires reassessment.
 
 1. First inspect locally how the scope itself moved: `git log -p --follow -- .sqlreview/reviews/$SLUG/scope.json`
    when it is tracked (skip silently otherwise). Also inspect `git diff -- <scope path>` and
    `git diff --cached -- <scope path>` for unstaged and staged scope edits.
-2. If the SQL now exists, use `git diff --no-index -- ".sqlreview/reviews/$SLUG/scope.source.sql" "<sql path>"`
-   to inspect changes since the previous bootstrap (exit 1 means changes). Show only the linted
-   explanations, not raw scope/SQL diffs. If the baseline is absent,
-   explicitly say a historical delta is unavailable and do a full reassessment. Read the SQL and compare it with the scope's intent, inputs and outputs —
+2. If the SQL now exists, run `bash "$S/sqlreview.sh" delta "$SLUG" scope` to inspect changes
+   since the previous bootstrap. It reads the scope's SQL with `git show` at its recorded commit
+   (exit 10 means body changes). Show only the linted explanations, not raw scope/SQL diffs. On
+   exit 6, explicitly say a historical delta is unavailable and do a full reassessment. Read the SQL and compare it with the scope's intent, inputs and outputs —
    name each place the SQL does something the scope did not foresee.
 3. Before re-putting intent, inputs and outputs, stage and lint their proposed wording using
    the pre-presentation check above. **Re-put technical implementation of intent, inputs and outputs** to the engineer;
@@ -212,9 +212,9 @@ corrupt baseline and requires reassessment.
    imported upstream items first; changed or removed decisions go to the analyst
    for a recorded answer before dependent work proceeds. Then find which existing items keep
    their confirmation (#348): draft the next revision with each unchanged item's `id`, `text` and
-   `rationale` verbatim and its old `location` lines. When an authenticated `scope.source.sql`
-   exists, compute unchanged ranges first; missing/corrupt baseline means a manual reassessment,
-   not a guessed offset:
+   `rationale` verbatim and its old `location` lines. When git supplies the scope's SQL
+   with its recorded SHA, compute unchanged ranges first. Missing or corrupt evidence means a manual
+   reassessment, not a guessed offset:
 
    ```bash
    bash "$S/sqlreview.sh" remap "$SLUG" ".sqlreview/reviews/$SLUG/scope.draft.json"
@@ -227,7 +227,7 @@ corrupt baseline and requires reassessment.
    ranges (changed, split by an insertion, or ambiguous repeated text) stay untouched; reassess
    their current lines with the human before carryforward. It preserves new/manual ranges and
    is safe to retry. The explicit draft must be directly inside this slug's review directory,
-   not a published JSON or SQL snapshot.
+   not a published JSON.
 
    Copy each `carry` item's `set` fields onto it verbatim; it keeps the confirmation a human gave
    at `confirmed_revision` and is not asked again. Re-run the pre-presentation lint before each `walk` batch,
@@ -272,18 +272,19 @@ engineer stops, leave the draft and write nothing final — say so.
 
 ## SQL that changes during the interview
 
-When the SQL exists, the framing is confirmed *against its bytes*. On confirming intent, inputs
-and outputs, record `fingerprint`'s `sql_sha256` and `sql_body_sha256` in the draft and copy the SQL to
-`.sqlreview/reviews/$SLUG/scope.draft.sql` (guard-exempt working baseline). When the SQL does not
-exist yet, set `sql_sha256` to null.
+When the SQL exists, the framing is confirmed *against its committed bytes*. Commit the SQL first.
+On confirming intent, inputs and outputs, record `fingerprint`'s `sql_sha256`, `sql_body_sha256`,
+`git_commit` and `git_dirty` in the draft. Do not copy SQL under `.sqlreview/`. When the SQL does
+not exist yet, set `sql_sha256` to null.
 
-Before publishing, re-run `fingerprint`. A changed full hash with the same non-null body hash
-is a header revision: inspect and reconcile the notes without reconfirming unchanged items.
-If the body hash differs, is null, or a legacy full hash differs without an authenticated baseline, run `git diff --no-index -- ".sqlreview/reviews/$SLUG/scope.draft.sql" "<sql path>"`
-and, with the hunks in view, re-put intent, inputs and outputs (new or dropped columns, changed
-joins, conversions), plus every item whose `location` lines overlap a hunk or whose text or
-rationale names a changed column, table, filter or conversion. Then refresh `sql_sha256` and
-`scope.draft.sql`. Publish refuses a changed body or corrupt baseline; the full hash remains provenance for the original framing.
+Before publishing, commit any SQL edits and re-run `fingerprint`. A changed full hash with the same
+non-null body hash is a header revision: inspect and reconcile the notes without reconfirming
+unchanged items. If the body hash differs or is null, run
+`git diff "<draft git_commit>" HEAD -- "<sql path>"`. With the hunks in view, re-put intent, inputs
+and outputs: new or dropped columns, changed joins and conversions. Also re-put every item whose
+`location` lines overlap a hunk. Re-put every item whose text or rationale names a changed column,
+table, filter or conversion. Then refresh all `fingerprint` fields. Publish refuses a changed body or SQL that git
+cannot supply. The full hash remains the evidence for the original framing.
 
 Also self-check the confirmed wording before publish:
 
@@ -313,8 +314,8 @@ Write the complete confirmed document to
 {
   "schemaVersion": 2, "kind": "scope", "slug": "<SLUG>", "sql_path": "<intended sql path>",
   "title": "…", "revision": 1, "recorded_at": "<UTC ISO>", "recorded_by": "<user>",
-  "git_commit": "<git rev-parse HEAD or null>", "sql_sha256": "<fingerprint SHA the framing was confirmed against, or null>",
-  "sql_body_sha256": "<fingerprint body SHA, or null>",
+  "git_commit": "<fingerprint git_commit, or null>", "sql_sha256": "<fingerprint SHA the framing was confirmed against, or null>",
+  "sql_body_sha256": "<fingerprint body SHA, or null>", "git_dirty": false,
   "intent": "…",
   "inputs":  [{"name": "schema.table", "description": "one row per …"}],
   "outputs": [{"name": "column", "description": "…"}],
@@ -383,21 +384,16 @@ bash "$S/sqlreview.sh" publish-questions "$SLUG" ".sqlreview/reviews/$SLUG/quest
 ```
 
 Publish validates a staged copy, including confirmations and the next revision, before atomically
-replacing `scope.json`. It re-proves every carried item against the previous `scope.json` and
-`scope.source.sql`; on refusal (the SQL moved on since `carryforward`), re-run it and walk what it
-lists. Never copy or patch the draft directly into the final path.
-After publish succeeds, if SQL exists and the full fingerprint still matches, copy its reviewed bytes to
-`.sqlreview/reviews/$SLUG/scope.source.sql` (separate from analyse’s `source.sql`) and check the
-copy's SHA equals `sql_sha256`; if the copy fails, remove any old scope baseline and report that
-the next bootstrap needs a full reassessment. For a header-only update, retain the authenticated
-original scope baseline; do not overwrite it with new header bytes. If the original baseline is
-unavailable, recover its full-hash-matching bytes or perform a fresh reassessment.
-Preserve the previous revision and increment it on updates.
-
+replacing `scope.json`. It re-proves every carried item against the previous `scope.json` and its
+SQL, read with `git show` at the recorded commit and checked against `sql_sha256`. On refusal (the
+SQL moved on since `carryforward`), re-run it and walk what it lists. Never copy or patch the draft
+directly into the final path. Publish keeps the previous revision at `history/scope/<revision>.json`.
+A header-only update keeps the original full SHA, commit and confirmations, and records the new
+header in `header_revisions`. Preserve the previous revision and increment it on updates.
 
 ```bash
 bash "$S/sqlreview.sh" render "$SLUG" scope || exit $?  # → reviews/<slug>/scope.md (never hand-write it)
-rm -f ".sqlreview/reviews/$SLUG/scope.draft.json" ".sqlreview/reviews/$SLUG/scope.draft.sql"
+rm -f ".sqlreview/reviews/$SLUG/scope.draft.json"
 ```
 
 

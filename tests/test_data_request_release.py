@@ -320,7 +320,6 @@ class Project:
     def review(self, sql, slug=SLUG, sql_path=SQL_PATH):
         d = self.root / ".sqlreview/reviews" / slug
         d.mkdir(parents=True, exist_ok=True)
-        (d / "source.sql").write_text(sql)
         doc = {"schemaVersion": 2, "kind": "review", "slug": slug, "sql_path": sql_path,
                "title": "Falls", "revision": 2, "recorded_at": "2026-09-28T00:00:00Z",
                "recorded_by": "engineer-login",
@@ -422,7 +421,7 @@ class Evidence(unittest.TestCase):
         self.assertEqual(r.returncode, 0, r.stderr)
         self.assertEqual(self.only(r)[1]["applies"], "header-only")
 
-    def test_body_evidence_keeps_full_hash_and_refuses_corrupt_snapshot(self):
+    def test_body_evidence_keeps_full_hash_and_authenticates_recorded_source(self):
         path = self.p.root / ".sqlreview/reviews" / SLUG / "review.json"
         doc = json.loads(path.read_text())
         body = hashlib.sha256(SQL_V1.split("*/\n", 1)[1].encode()).hexdigest()
@@ -437,8 +436,11 @@ class Evidence(unittest.TestCase):
         self.assertEqual(row["sql_body_sha256_reviewed"], body)
         self.assertEqual(row["sql_body_sha256_at_ref"], body)
         self.assertNotEqual(row["sql_sha256_reviewed"], row["sql_sha256_at_ref"])
-        self.p.write(f".sqlreview/reviews/{SLUG}/source.sql", SQL_HEADER)
-        self.assertEqual(self.only(self.p.evidence("v1.0.0"))[1]["applies"], "changed")
+        doc["sql_sha256"] = "0" * 64
+        path.write_text(json.dumps(doc))
+        result = self.p.evidence("v1.0.0")
+        self.assertEqual(result.returncode, 10, result.stderr)
+        self.assertEqual(self.only(result)[1]["applies"], "unavailable")
 
     def test_review_of_draft_sql_absent_from_the_release(self):
         # SQL-only review on a branch; the release is cut from a pipeline without that file.

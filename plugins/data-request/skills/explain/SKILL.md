@@ -49,15 +49,23 @@ change this store during a walkthrough; send reconciliation to the owning engine
 ## Staleness first — always
 
 ```bash
-bash "$S/sqlreview.sh" delta "$SLUG"      # 0 current · 10 the SQL changed since it was reviewed · 6 no baseline
+bash "$S/sqlreview.sh" delta "$SLUG"      # 0 current · 10 the SQL changed since it was reviewed · 6 reviewed SQL not in git
 ```
 
 Exit 2: stop and resolve the missing/moved SQL with the engineer before any walkthrough.
-Exit 6: stop for a full analyse rebuild; do not offer a missing snapshot.
+Exit 6: git cannot supply the reviewed SQL at its recorded commit with its recorded SHA. Stop for
+a full analyse rebuild.
 Exit 10: the review no longer describes the file. Ask (AskUserQuestion): **Ask the engineer
-to run /data-request:analyse --update first (Recommended)** / **Explain the reviewed snapshot** — the
-second explains `reviews/$SLUG/source.sql`, and every step is labelled as describing the
-snapshot, not the current file.
+to run /data-request:analyse --update first (Recommended)** / **Explain the reviewed revision** — the
+second explains the reviewed SQL from git. Label every step as describing that revision, not the
+current file. Write it to a temporary file outside the repository and delete it after:
+
+```bash
+T="$(mktemp -d /tmp/sqlreview-explain.XXXXXX)" || exit 2
+REVISION="$(jq -r '.revision' ".sqlreview/reviews/$SLUG/review.json")"
+bash "$S/sqlreview.sh" materialize "$SLUG" review "$REVISION" "$T/reviewed.sql" || exit $?
+# read "$T/reviewed.sql" for the walkthrough, then: rm -rf "$T"
+```
 
 ## Load the durable hand-off
 
@@ -73,7 +81,7 @@ and SQL fingerprint with the review being explained. Read the linked run manifes
 QA, DVC provenance and UAT sections 1 to 3 for that run, plus open questions, flagged decisions,
 requester limitations and known approval restrictions. Read
 `${CLAUDE_PLUGIN_ROOT}/skills/triage/references/handoff.rst`, *Hand-off to review*, and recheck
-its gate, including the committed-review/snapshot check and `release.sh evidence` at the run
+its gate, including the committed-review/source-evidence check and `release.sh evidence` at the run
 commit. Recheck any referenced release gates against their current evidence before outcomes.
 
 If the record, linked evidence or tools are missing, or any identity/revision differs, name
@@ -86,9 +94,16 @@ If `reviews/$SLUG/explain.json` exists and its `sql_sha256` or `review_revision`
 now, walk the change first:
 
 ```bash
-git diff --no-index -- ".sqlreview/reviews/$SLUG/history/<previous review_revision>.sql" \
-  ".sqlreview/reviews/$SLUG/history/<current review_revision>.sql"   # exit 1 means changes
+T="$(mktemp -d /tmp/sqlreview-explain.XXXXXX)" || exit 2
+REVISION="$(jq -r '.revision' ".sqlreview/reviews/$SLUG/review.json")"
+PREVIOUS="$(jq -r '.review_revision' ".sqlreview/reviews/$SLUG/explain.json")"
+bash "$S/sqlreview.sh" materialize "$SLUG" review "$PREVIOUS" "$T/previous.sql" &&
+  bash "$S/sqlreview.sh" materialize "$SLUG" review "$REVISION" "$T/reviewed.sql" &&
+  git diff --no-index -- "$T/previous.sql" "$T/reviewed.sql"   # exit 1 means changes
+rm -rf "$T"
 ```
+
+`materialize` reads each revision's SQL with `git show` at its recorded commit and checks its SHA.
 
 1. Explain each hunk in the analyst's terms; pause after each.
 2. Then the indirect consequences (#128 §2.1): trace identifiers in those hunks and check the
@@ -96,9 +111,9 @@ git diff --no-index -- ".sqlreview/reviews/$SLUG/history/<previous review_revisi
 3. Then the review items whose `confirmed_revision` is newer than `explain.json.review_revision`
    — what changed in the assumptions and limitations and why.
 
-If either historical snapshot is absent, say the historical delta is unavailable and offer a full
-walkthrough; never substitute `delta` against the current baseline. Validate revision values as
-positive integers before constructing history paths.
+If `materialize` exits 6 for either revision, say the historical delta is unavailable and offer a
+full walkthrough. Never substitute `delta` against the current SQL. The helper accepts only positive
+revision numbers.
 
 Offer to continue with the full walkthrough or stop.
 
@@ -128,7 +143,7 @@ change the SQL or the review; if the analyst disagrees with an item, note it for
 Write `reviews/$SLUG/explain.json` (state marker only — not a report):
 
 ```json
-{"sql_sha256": "<SHA of the snapshot actually explained>", "review_revision": <review.json revision>,
+{"sql_sha256": "<SHA of the SQL actually explained>", "review_revision": <review.json revision>,
  "at": "<UTC ISO>", "by": "<analyst>", "completed": true, "last_step": "outputs"}
 ```
 
@@ -143,7 +158,7 @@ A completed explanation is not acceptance of the extract. Only after the durable
 has been loaded and rechecked, show run QA, open questions, flagged decisions and known approval
 restrictions from it. Ask the analyst for
 **Accept for release preparation** / **Send back** / **Presentation amendment**. Do not
-offer acceptance of stale SQL, an explained snapshot, missing run/UAT evidence or an
+offer acceptance of stale SQL, an explained earlier revision, missing run/UAT evidence or an
 unresolved release gate. Leave acceptance pending when the analyst stops.
 
 Acceptance permits `/data-request:release <candidate ref>` to draft the researcher-facing
