@@ -4,7 +4,8 @@ description: >-
   Scope a piece of SQL work with the Data Engineer before the SQL is written: an interview that
   produces .sqlreview/reviews/<slug>/scope.json and the rendered scope.md (intent, inputs,
   outputs, assumptions, open questions), preserving recorded upstream confirmations. Re-running
-  on an existing scope walks through what changed. Use at the start of the Data Request scoping workflow,
+  on an existing scope walks through what changed. It is also the step that updates a scope after
+  the SQL or the analyst intake changes, before analyse runs again. Use at the start of the Data Request scoping workflow,
   after /data-request:setup and before /data-request:analyse.
 argument-hint: '<intended sql path> [--update]'
 user-invocable: true
