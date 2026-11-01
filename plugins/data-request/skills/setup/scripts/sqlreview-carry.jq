@@ -58,7 +58,8 @@ def carry_criteria_rows($ctx):
 # Input: a (draft) scope/review document. $ctx:
 #   {kind: "scope"|"review", prior: document|null,
 #    base: string|null (prior baseline SQL, only when it is evidence), cur: string|null (current SQL),
-#    prior_sha: string ("" = SQL absent/unknown at the prior revision), cur_sha: string ("" = SQL absent now),
+#    prior_sha: string, cur_sha: string ("" means no authenticated SQL hash),
+#    prior_absent: boolean, cur_absent: boolean (explicit scope-before-SQL and committed absence),
 #    body_unchanged: boolean (baseline and current SQL differ at most in the leading comment header)}
 # Output: an array with one row per assumption/limitation object (and, for a scope, per criteria_status row):
 #   {kind, id, basis, set} when it qualifies ·
@@ -69,7 +70,7 @@ def carry_rows($ctx):
   | $ctx.prior as $p
   | ($ctx.kind // $d.kind) as $doc
   | ($ctx.prior_sha != "" and $ctx.cur_sha != "" and $ctx.prior_sha == $ctx.cur_sha) as $unchanged
-  | ($ctx.prior_sha == "" and $ctx.cur_sha == "") as $absent
+  | (($ctx.prior_absent // false) and ($ctx.cur_absent // false)) as $absent
   | ($unchanged or ($ctx.body_unchanged // false)) as $body
   | ($ctx.cur | cf_sql_lines) as $c
   | (if $ctx.base != null then ($ctx.base | cf_sql_lines) elif $unchanged then $c else null end) as $b
