@@ -434,12 +434,11 @@ class CriteriaCarry(Base):
         return scope_doc("q", "q.sql", revision=revision, sql_sha256=sha(SQL_V1), assumptions=[], criteria_status=status)
 
     def publish_scope(self, revision, status, expected=0):
-        doc = self.scope(revision, status)
+        # Hash-only reviews (#505): publish reads committed sources, and nothing writes scope.source.sql.
+        doc = dict(self.scope(revision, status), git_commit=committed(self.p))
         self.draft.write_text(json.dumps(doc))
         r = run(["publish", "q", "scope", str(self.draft)], self.p.root)
         self.assertEqual(r.returncode, expected, r.stdout + r.stderr)
-        if expected == 0:
-            (self.d / "scope.source.sql").write_text(SQL_V1)
         return r
 
     def prior(self, criterion):
@@ -635,7 +634,7 @@ class CriteriaCarry(Base):
         self.assertFalse((self.d / "scope.json").exists())
 
     def test_reconfirm_all_refuses_carried_criteria_rows(self):
-        self.draft.write_text(json.dumps(self.scope(2, self.rev2())))
+        self.draft.write_text(json.dumps(dict(self.scope(2, self.rev2()), git_commit=committed(self.p))))
         r = run(["publish", "--reconfirm-all", "q", "scope", str(self.draft)], self.p.root)
         self.assertEqual(r.returncode, 4, r.stdout + r.stderr)
         self.assertIn("--reconfirm-all", r.stdout)

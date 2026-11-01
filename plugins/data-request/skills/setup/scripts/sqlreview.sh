@@ -611,7 +611,8 @@ cmd_publish() (
     jq -e --argjson previous "$previous" '.revision == ($previous + 1)' "$tmp" >/dev/null || sr_die 4 "revision must follow the existing document (first revision is 1)"
     local needs_carry=false
     if [ "$kind" != lifts ]; then
-      needs_carry="$(jq -r 'any((.assumptions[], .limitations[]); .carried_from_revision != null)' "$tmp")" || sr_die 2 "cannot inspect carried confirmations"
+      # criteria_status rows carry too (#515), so a carried row there also needs the proof.
+      needs_carry="$(jq -r 'any((.assumptions[], .limitations[], (.criteria_status | arrays | .[])); .carried_from_revision != null)' "$tmp")" || sr_die 2 "cannot inspect carried confirmations"
     fi
     if [ "$needs_carry" = true ]; then
       # A carried confirmation must be proved from the prior revision and its SQL.
