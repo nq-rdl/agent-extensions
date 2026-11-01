@@ -108,10 +108,10 @@ Reuse an already answered intake/scope exception; do not ask it again or interse
 Continue independent work while the dependent facility scope remains unresolved.
 
 Some decisions recur in every enquiry (#362). Before you put candidate items to the engineer, run
-`bash "$S/recurring-decisions.sh" match ".sqlreview/reviews/$SLUG/scope.draft.json"`. For each other match,
+`bash "$S/recurring-decisions.sh" match ".sqlreview/reviews/$SLUG/scope.draft.json"`. For each other match without a `house_default`,
 show the prior enquiries, offer the listed wording and mark the item `upstream`, as
 `${CLAUDE_PLUGIN_ROOT}/skills/setup/references/recurring-decisions.rst` says. The engineer still confirms each other item;
-the exact recorded TUH house default is imported, not put in a new confirmation batch.
+the exact recorded TUH house default is imported, not put in a new confirmation batch, and `broad-first-pass` is imported as criteria rows (see *Criteria states* below).
 Rows from `carryforward` include recorded `upstream` and `decided` fields: preserve them.
 
 ## Decision origin (#434)
@@ -183,6 +183,71 @@ Record that gap in intent or a confirmed limitation, not as an agreed population
 An engineer's confirmation of the static SQL finding is not an analyst research answer.
 Continue independent work under the shared authority rule; do not widen or narrow a cohort
 silently. Recheck these answers on updates, including when SQL first becomes available.
+
+## Criteria states
+
+When `sqlreview.sh intake` returns `criteria` (a schema 2 sidecar), the scope says what the SQL does
+with each one. Record one `criteria_status` row per live criterion and none for a withdrawn id.
+The kind sets the allowed states:
+
+- `entry_event` (`N`): `applied` or `not-doable`. Several live entry events are alternatives that fix
+  one index date, not separate cohorts.
+- `inclusion` and `exclusion` (`I`, `E`): `applied`, `partially-applied`, `flagged`, `not-applied`,
+  `researcher-applies` or `not-doable`.
+- `data_element` (`D`): `delivered`, `not-delivered` or `not-doable`.
+
+A row is `{criterion, state, reason?, flag?, upstream?, confirmed_by, confirmed_at, confirmed_revision}`.
+Put the rows to the engineer in batches like candidate assumptions, options **Confirm (Recommended)** /
+**Reword** / **Reject**, each showing the criterion's wording, the proposed state and its reason. The
+engineer confirms what the SQL does or will do. The analyst's wording stays as intake recorded it.
+
+- A `reason` is required for `partially-applied`, `not-applied`, `not-delivered` and `not-doable`. For
+  `partially-applied` it names the part that is not applied.
+- `flagged` names the delivered output and column that carry the flag, as
+  `flag: {"output": "<output>", "column": "<column>"}`. The column must be one the SQL delivers.
+- `researcher-applies` needs `applied_by: researcher` on that criterion in the sidecar. Without it,
+  record `not-applied` for this iteration, with a reason that names the open analyst question on who
+  applies it. Put one `Analyst question:` for the analyst to answer through `/data-request:intake`,
+  which sets `applied_by`. The scope can publish meanwhile. Once the sidecar has `applied_by: researcher`,
+  a later revision may record `researcher-applies`, confirmed afresh. An engineer's confirmation is not
+  that answer.
+- A derived data element the researcher computes (a length of stay from delivered admission and
+  discharge datetimes) is `not-delivered`. Its reason names the delivered inputs.
+
+Criteria hold only what the researcher asked for. A row filter RDL adds on its own initiative (test
+patients, an invalid URN, cancelled admissions) is not a criterion. Record it as an engineer-confirmed
+assumption, reported under "Extraction Assumptions / Important limitations". Do not repeat a criterion
+in that section.
+
+**House default:** `broad-first-pass` applies without asking, like `tuh-facility`, when the request is
+on its first pass (no earlier delivery exists for it). When it is not, the default is not applied and
+exclusions get ordinary engineer-confirmed rows. Read it with `recurring-decisions.sh list`. Give
+each exclusion that the request does not override a row with state `not-applied`, `reason` the
+decision's `proposal.text` and `upstream: {"source": "recurring-decision", "id": "broad-first-pass"}`.
+Copy `confirmed_by` and `confirmed_at` from its `house_default`, set `confirmed_revision` to the import
+revision, and put no `decided` on the row. Invent no other confirmer. Write no assumption or limitation
+for it, and leave inclusions, entry events and data elements alone. A request that applies an
+exclusion, or an engineer who overrides the default for one criterion, gets the normal row with no
+`upstream`, confirmed afresh. See `${CLAUDE_PLUGIN_ROOT}/skills/setup/references/recurring-decisions.rst`.
+
+After the first delivery the default no longer holds, yet carry-forward keeps its rows, and their
+reason would still say first pass. On the first update after a delivery, walk every row whose `upstream` is `broad-first-pass`
+with the engineer, who re-confirms it: `not-applied` with the engineer's own reason, or the state
+the SQL now gives it. Either way, drop the `upstream`: a fresh confirmation, with no `decided`. The scope
+never carries a first-pass reason into a later release.
+
+Only one scope per repository carries `criteria_status`: the one that owns the request's criteria.
+Another scope in the repository leaves it out. Before publish, check the draft:
+
+```bash
+bash "$S/sqlreview.sh" criteria ".sqlreview/reviews/$SLUG/scope.draft.json"
+# exit 10 → one "<id>\t<field>\t<rule>" per finding, never a value; 2 → operational, stop
+```
+
+Fix each finding and run it again. Publish runs the same check and refuses with exit 4. On the update
+path, `carryforward` lists each unchanged row as `criteria_status` with basis `criteria-unchanged`:
+copy its `set` fields and keep its confirmation. A changed row, a new criterion and a row that gains
+or loses `upstream` are confirmed afresh.
 
 ## Existing scope → update path (#127 §2)
 

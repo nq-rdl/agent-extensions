@@ -88,3 +88,52 @@ Extraction Assumptions / Important limitations section carries A1, A4, L1, L2, L
 the release confirms them. Each claim cites the pipeline at ``v1.0.0`` and, where it helped,
 the review item by id. The analyst accepts, rewords or rejects each claim. The record keeps
 the wording and the sources, and the review itself is unchanged.
+
+The criteria table
+------------------
+
+The release body also has a section ``## Criteria in this release`` before the limitations,
+or one line saying why it has none. The falls repository above holds only a legacy ``.copier-answers.yml`` and has no
+``answers.intake.json``. ``release.sh criteria v1.0.0`` prints ``null``, so the body gets the one
+line ``Criteria are not itemised for this request.`` before the limitations, and nothing else in it
+changes.
+
+Had the analyst itemised the criteria after the engineer published the scope, the tag would carry
+live criteria with no scope recording their states. ``release.sh criteria`` then holds the table,
+``Criteria table held: no-owning-scope, state-missing:N1, …``, never "not itemised", and the
+engineer runs ``/data-request:bootstrap`` to record the states before a new tag.
+
+A second fictional enquiry, THHSAQUIRE-9937, an abdominal aortic aneurysm cohort, has itemised
+criteria and a second release, ``v1.1.0`` (``v1.0.0`` is its first). The steps:
+
+1. Write ``git show v1.1.0:answers.yaml`` (and the tagged ``answers.intake.json`` beside it) to a
+   temporary directory, then run ``pixi run python scripts/validate_answers.py <tmp>/answers.yaml
+   --fingerprints > fp.json``. The validator exits 0, so run ``release.sh criteria v1.1.0
+   --fingerprints fp.json``. Had it exited 3, a validation failure, the call would pass
+   ``--answers-invalid`` instead; an operational failure (exit 2, or ``pixi run`` unable to
+   prepare the environment) stops the release.
+2. ``previous_tag`` is ``v1.0.0``, so the last header reads "Change since v1.0.0". The exclusion
+   E2, "Previous AAA repair", moved from not applied to flagged: its row reads "Flagged:
+   ``patients.excl_prior_repair`` = 1" with the change "Changed (was not applied)". The inclusion
+   I1 is unchanged.
+3. The analyst accepts every proposed note except E2. The analyst thinks the E2 note overstates
+   what the flag does, and would like the request itself reworded to "Prior abdominal aortic
+   aneurysm repair". Only the note can change: the researcher's wording stays "Previous AAA
+   repair". The analyst rejects the note instead.
+4. The record is written with E2 ``rejected``. The analyst then re-runs ``release.sh criteria
+   v1.1.0 --fingerprints fp.json`` and embeds the object it prints, then writes the record
+   again. The call exits 10 and holds the table with ``note-rejected:E2``, and the decisions
+   carry over; the body shows the single line ``Criteria table held: note-rejected:E2``. Without
+   the re-run, the embedded table would still say ``complete`` and ``release.sh check`` would
+   reject the rejected row. The record stays ``draft``, because ``release.sh check`` fails a held
+   table only on an ``approved`` record. The engineer fixes the scope state for E2 and re-runs
+   ``release.sh criteria``; the changed note is pending again, and the analyst decides it.
+5. The draft also had a claim "Previous repairs are flagged, not removed", sourced to the scope item
+   E2. The table already carries E2, so the body leaves the claim out of the limitations. While it
+   is pending it is hidden from the draft but still blocks approval, so the analyst decides it too.
+   The limitations keep the filters RDL added on its own, such as excluding test patients, because
+   the researcher did not ask for them.
+
+Once every row and claim is decided and the table is complete, the record becomes ``approved`` and
+the rendered body lists every criterion before the limitations, with the researcher's wording
+unchanged.

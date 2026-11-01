@@ -19,27 +19,53 @@
 #                            REF (null when the review has none or git cannot tell).
 #   check FILE | check --stdin
 #                            validate a release record (.sqlreview/releases/<tag>/release.json):
-#                            one violation per line, exit 4; "ok" otherwise
+#                            one violation per line, exit 4; "ok" otherwise. Inside the project,
+#                            an approved record without a criteria table fails when the sidecar
+#                            at its commit has a live criterion
 #   render FILE              the paste-ready release body (Markdown) from a valid record; a draft
-#                            shows its pending claims and open questions
+#                            shows its pending claims and open questions. Before the limitations
+#                            comes "## Criteria in this release" (the criteria table), or one line:
+#                            "Criteria table held: <reasons>" for a held table, "Criteria are not
+#                            itemised for this request." for a record without a criteria object
+#   criteria TAG [--fingerprints FILE | --answers-invalid]
+#                            the record's `criteria` object (the scaffold's criteria design, release-criteria.jq) from
+#                            answers.intake.json and the one scope carrying criteria_status at TAG,
+#                            the previous release's record (the greatest earlier stable X.Y.Z whose
+#                            .sqlreview/releases/<tag>/release.json is in TAG's tree) and this tag's
+#                            working-tree record, whose analyst decisions are kept while a row's
+#                            note is unchanged. FILE is validate-answers --fingerprints output for
+#                            answers.yaml at TAG; --answers-invalid says that validation failed;
+#                            with neither the table is held (fingerprints-unchecked). Prints null
+#                            when the criteria are not itemised (no sidecar, a schema 1 sidecar,
+#                            or no live criterion at TAG); live criteria with no scope carrying
+#                            criteria_status hold the table (no-owning-scope). Runs no Python.
+#                            Exit 10 when held.
 #
 # Exit codes: 0 ok · 1 usage · 2 error (unknown ref or slug, no jq or git) · 3 not initialised ·
-# 4 invalid record · 10 at least one review does not apply to REF (evidence).
+# 4 invalid record · 10 at least one review does not apply to REF (evidence), or the criteria
+# table is held (criteria).
 set -u
 SR_SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd -P)"
 # shellcheck source=sqlreview-lib.sh
 . "$SR_SCRIPT_DIR/sqlreview-lib.sh"
+# shellcheck source=sqlreview-lifts.sh
+. "$SR_SCRIPT_DIR/sqlreview-lifts.sh"   # for _sr_release_tag, the stable X.Y.Z rule
 
 usage() {
   awk 'NR > 1 && !/^#/ { exit } NR > 1' "$0" | sed 's/^# \{0,1\}//' >&2
   exit 1
 }
 
-# Shared jq definitions: record validation and rendering.
+# Shared jq definitions: record validation and rendering. The criteria table is release-criteria.jq.
 RL_JQ='include "sqlreview-identity";
+include "release-criteria";
 def str: type == "string" and length > 0;
 def arr: if type == "array" then . else [] end;
 def kept: .decision == "accepted" or .decision == "reworded";
+# A claim sourced from a research criterion is in the criteria table, never repeated under
+# "Extraction Assumptions / Important limitations" (FR-018; rc_criterion_claim). $itemised: the
+# record has a criteria object; a legacy record keeps every claim.
+def limitation_shown($itemised): .section != "assumptions" or ($itemised | not) or (rc_criterion_claim | not);
 def src_errors($cid; $kept; $ev):
   if type != "object" then "\($cid): every source must be an object"
   elif .kind == "review" then
@@ -114,10 +140,12 @@ def release_errors:
       (if .status != "approved" then empty else
          (.claims | arr | .[] | objects | select(.decision == "pending") | "approved: \(.id) is pending"),
          (.questions | arr | .[] | objects | select(.resolution == null) | "approved: \(.id) is unresolved"),
-         (("summary", "assumptions") as $s
-          | if any(.claims | arr | .[] | objects; .section == $s and kept) then empty
+         (((.criteria | type) == "object") as $itemised
+          | ("summary", "assumptions") as $s
+          | if any(.claims | arr | .[] | objects; .section == $s and kept and limitation_shown($itemised)) then empty
             else "approved: no kept claim in \($s)" end)
-       end)
+       end),
+      rc_errors
   end;
 def src_label:
   if .kind == "review" then "review \(.slug) \(.item) r\(.revision)"
@@ -127,23 +155,50 @@ def claim_line:
   "- \(if .decision == "pending" then "[pending] " + .proposed else .final end)"
   + " <!-- \(.id): \(.sources | map(src_label) | join("; ")) -->";
 def section_lines($s):
-  [.claims[] | select(.section == $s and (kept or .decision == "pending")) | claim_line]
+  ((.criteria | type) == "object") as $itemised
+  | [.claims[] | select(.section == $s and (kept or .decision == "pending") and limitation_shown($itemised)) | claim_line]
   | if length == 0 then ["_No claims yet._"] else . end | join("\n");
 def render:
   (if .status == "draft"
    then "> **Draft, not approved.** Resolve the pending claims and open questions below before release.\n\n"
    else "" end)
   + "## Extraction Summary\n\n" + section_lines("summary") + "\n\n"
+  + rc_section
   + "## Extraction Assumptions / Important limitations\n\n" + section_lines("assumptions") + "\n"
   + ([.questions[] | select(.resolution == null) | "- \(.id): \(.text)"]
      | if length == 0 then "" else "\n## Open questions (resolve before release)\n\n" + join("\n") + "\n" end);
 '
 
+# An approved record with no criteria table, at a commit whose answers.intake.json is a schema 2
+# sidecar with a live criterion: `release.sh criteria` gives such a tag a table (held, at worst, as
+# no-owning-scope), so null there would tell the researcher "not itemised" falsely (FR-017). Read
+# only when the record sits in a .sqlreview/ project whose git history holds its commit; elsewhere
+# (a record checked outside its repository) the held table from `criteria` is the gate.
+rl_itemised_without_table() { # <record file>; prints the violation, returns 4 when found
+  local commit tag root
+  commit="$(jq -r 'select(type == "object" and .status == "approved" and .criteria == null) | .commit | strings' "$1" 2>/dev/null)"
+  case "$commit" in ""|*[!0-9a-f]*) return 0 ;; esac
+  command -v git >/dev/null 2>&1 || return 0
+  root="$(sr_find_root)" || return 0
+  commit="$(git -C "$root" rev-parse --verify --quiet "$commit^{commit}" 2>/dev/null)" || return 0
+  git -C "$root" cat-file -e "$commit:answers.intake.json" 2>/dev/null || return 0
+  git -C "$root" show "$commit:answers.intake.json" 2>/dev/null |
+    jq -e '.schemaVersion == 2 and any(.criteria | if type == "array" then .[] else empty end;
+             type == "object" and .withdrawn == null)' >/dev/null 2>&1 || return 0
+  tag="$(jq -r '.tag | strings | select(test("^[A-Za-z0-9][A-Za-z0-9._-]*$"))' "$1" 2>/dev/null)"
+  printf 'approved: criteria are itemised at %s; embed the release.sh criteria table\n' "${tag:-the release commit}"
+  return 4
+}
+
 # Validate a record read from $1 (a file) and print its violations; returns 4 when any.
 rl_check_file() {
-  local out
+  local out more
   out="$(jq -r -L "$SR_SCRIPT_DIR" "$RL_JQ"' release_errors' "$1" 2>/dev/null)" || { printf 'not valid JSON\n'; return 4; }
-  [ -z "$out" ] || { printf '%s\n' "$out"; return 4; }
+  more="$(rl_itemised_without_table "$1")"
+  [ -z "$out" ] && [ -z "$more" ] && return 0
+  [ -z "$out" ] || printf '%s\n' "$out"
+  [ -z "$more" ] || printf '%s\n' "$more"
+  return 4
 }
 
 cmd_check() {
@@ -255,6 +310,120 @@ cmd_evidence() {
   printf '%s' "$rows" | jq -se 'all(.[]; .applies == "current" or .applies == "header-only")' >/dev/null || exit 10
 }
 
+# Greatest stable release below TAG whose record is in TAG's tree (research R9); prints nothing for a
+# first release, or when TAG has no X.Y.Z version (a pre-release TAG compares by its X.Y.Z). Stable is
+# _sr_release_tag's rule; jq sorts the versions numerically, since Bash 3.2 has no sort -V.
+release_previous_tag() { # <tag>  (needs SR_ROOT)
+  local tag="$1" commit path name names=""
+  commit="$(git -C "$SR_ROOT" rev-parse --verify --quiet "$tag^{commit}" 2>/dev/null)" || return 1
+  while IFS= read -r path; do
+    case "$path" in "$SR_DIR"/releases/*/release.json) ;; *) continue ;; esac
+    name="${path#"$SR_DIR"/releases/}"; name="${name%/release.json}"
+    case "$name" in */*) continue ;; esac
+    _sr_release_tag "$name" || continue
+    names="$names$name"$'\n'
+  done <<EOF
+$(git -C "$SR_ROOT" ls-tree -r --name-only "$commit" -- "$SR_DIR/releases" 2>/dev/null)
+EOF
+  printf '%s' "$names" | jq -Rnr --arg tag "$tag" '
+    def ver: capture("^v?(?<a>[0-9]+)\\.(?<b>[0-9]+)\\.(?<c>[0-9]+)") | [.a, .b, .c] | map(tonumber);
+    ([$tag | ver][0]) as $cur
+    | if $cur == null then empty
+      else [inputs | select(length > 0) | {name: ., v: ver} | select(.v < $cur)]
+        | sort_by(.v, .name) | last | .name // empty end'
+}
+
+cmd_criteria() {
+  [ $# -ge 1 ] || usage
+  local tag="$1" mode=unchecked fpfile="" fp=null commit tmp intake path slug doc row rows="" scopes stale=false
+  local prev previous=null current=null f out
+  shift
+  case "$tag" in ""|-*) usage ;; esac
+  while [ $# -gt 0 ]; do
+    case "$1" in
+      --fingerprints) { [ $# -ge 2 ] && [ "$mode" = unchecked ]; } || usage
+        mode=fingerprints; fpfile="$2"; shift 2 ;;
+      --answers-invalid) [ "$mode" = unchecked ] || usage
+        mode=answers-invalid; shift ;;
+      *) usage ;;
+    esac
+  done
+  sr_need_jq
+  command -v git >/dev/null 2>&1 || sr_die 2 "git is required to read the release"
+  sr_require_root
+  commit="$(git -C "$SR_ROOT" rev-parse --verify --quiet "$tag^{commit}" 2>/dev/null)" ||
+    sr_die 2 "unknown ref: $tag (give the release tag)"
+  if [ "$mode" = fingerprints ]; then
+    [ -f "$fpfile" ] || sr_die 2 "no such fingerprints file"
+    fp="$(jq -sce '
+      ["cohort_entry_event", "exclusion_criteria", "inclusion_criteria", "requested_data_elements"] as $k
+      | if length == 1 and (.[0] | type == "object" and keys == $k
+             and all(.[]; type == "string" and test("^sha256:[0-9a-f]{64}\\z")))
+        then .[0] else error("fingerprints") end' "$fpfile" 2>/dev/null)" ||
+      sr_die 2 "invalid fingerprints file: pass the validate-answers --fingerprints output for answers.yaml at $tag"
+  fi
+  # The analyst's sidecar at the tag (the git top level), read through `sqlreview.sh intake` so its
+  # validation applies. No sidecar: the criteria are not itemised.
+  if ! git -C "$SR_ROOT" cat-file -e "$commit:answers.intake.json" 2>/dev/null; then
+    printf 'null\n'
+    return 0
+  fi
+  tmp="$(mktemp)" || sr_die 2 "mktemp failed"
+  if ! git -C "$SR_ROOT" show "$commit:answers.intake.json" > "$tmp" 2>/dev/null; then
+    rm -f "$tmp"; sr_die 2 "cannot read answers.intake.json at $tag"
+  fi
+  if ! intake="$(bash "$SR_SCRIPT_DIR/sqlreview.sh" intake "$tmp" 1 2>/dev/null)"; then
+    rm -f "$tmp"; sr_die 2 "invalid analyst intake (answers.intake.json) at $tag; run validate-answers and correct the sidecar"
+  fi
+  rm -f "$tmp"
+  # Every scope at the tag that carries criteria_status; exactly one may own the criteria (research R6).
+  while IFS= read -r path; do
+    case "$path" in "$SR_DIR"/reviews/*/scope.json) ;; *) continue ;; esac
+    slug="${path#"$SR_DIR"/reviews/}"; slug="${slug%/scope.json}"
+    case "$slug" in */*|.|..|*[!A-Za-z0-9_%.-]*) sr_die 2 "unsafe review directory name at $tag" ;; esac
+    doc="$(git -C "$SR_ROOT" show "$commit:./$path" 2>/dev/null)" || sr_die 2 "cannot read $slug/scope.json at $tag"
+    row="$(printf '%s' "$doc" | jq -c --arg slug "$slug" '
+      select(type == "object" and has("criteria_status")) | {slug: $slug, revision, criteria_status}' 2>/dev/null)" ||
+      sr_die 2 "cannot read $slug/scope.json at $tag"
+    [ -z "$row" ] || rows="$rows$row"$'\n'
+  done <<EOF
+$(git -C "$SR_ROOT" ls-tree -r --name-only "$commit" -- "$SR_DIR/reviews" 2>/dev/null)
+EOF
+  scopes="$(printf '%s' "$rows" | jq -sc '.')" || sr_die 2 "cannot assemble the scopes at $tag"
+  # The owning scope's review must apply to the tag, by release.sh evidence's rule (current or
+  # header-only); a scope with no review in the working tree is stale too.
+  if [ "$(printf '%s' "$scopes" | jq 'length')" = 1 ]; then
+    slug="$(printf '%s' "$scopes" | jq -r '.[0].slug')"
+    sr_safe_slug "$slug"
+    if [ -f "$SR_REVIEWS/$slug/review.json" ] || [ -f "$SR_REVIEWS/$slug/scope.json" ]; then
+      row="$(rl_review_row "$slug" "$commit")" || sr_die 2 "cannot read review $slug"
+      printf '%s' "$row" | jq -e '.applies == "current" or .applies == "header-only"' >/dev/null || stale=true
+    else
+      stale=true
+    fi
+  fi
+  prev="$(release_previous_tag "$tag")" || sr_die 2 "cannot list the release records at $tag"
+  if [ -n "$prev" ]; then
+    previous="$(git -C "$SR_ROOT" show "$commit:./$SR_DIR/releases/$prev/release.json" 2>/dev/null |
+      jq -c --arg tag "$prev" '{tag: $tag, criteria: (.criteria // null)}' 2>/dev/null)" ||
+      sr_die 2 "cannot read the release record of $prev at $tag"
+  fi
+  # This tag's record in the working tree: its analyst decisions survive while a row's note is unchanged.
+  case "$tag" in
+    *..*|*[!A-Za-z0-9._-]*|[!A-Za-z0-9]*) ;;
+    *) f="$SR_ROOT/$SR_DIR/releases/$tag/release.json"
+       sr_no_symlinks "$f" || exit 2
+       if [ -f "$f" ]; then current="$(jq -c '.criteria // null' "$f" 2>/dev/null)" || current=null; fi
+       [ -n "$current" ] || current=null ;;
+  esac
+  out="$(jq -n -L "$SR_SCRIPT_DIR" --argjson intake "$intake" --argjson scopes "$scopes" --argjson stale "$stale" \
+    --argjson previous "$previous" --argjson current "$current" --argjson fp "$fp" --arg mode "$mode" \
+    'include "release-criteria"; rc_build($intake; $scopes; $stale; $previous; $current; $fp; $mode)')" ||
+    sr_die 2 "cannot build the criteria table"
+  printf '%s\n' "$out"
+  printf '%s' "$out" | jq -e '. == null or .status == "complete"' >/dev/null || exit 10
+}
+
 cmd="${1:-}"
 [ -n "$cmd" ] || usage
 shift
@@ -262,5 +431,6 @@ case "$cmd" in
   evidence) cmd_evidence "$@" ;;
   check) cmd_check "$@" ;;
   render) cmd_render "$@" ;;
+  criteria) cmd_criteria "$@" ;;
   *) usage ;;
 esac
