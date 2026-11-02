@@ -42,7 +42,8 @@
 #   delta SLUG [scope|review]                  body binding + full hashes; exit 0 full/header-only, 10 body change, 6 no baseline
 #   carryover SLUG DRAFT                       review draft items matching confirmed, still-valid scope items (JSON)
 #   intake FILE REVISION [DRAFT]              read analyst answers sidecar; optional collision-safe scope draft merge
-#                                              missing FILE is a legacy no-op; invalid intake exits 4; never writes
+#                                              missing FILE is a legacy no-op (with DRAFT it prints nothing);
+#                                              invalid intake exits 4; never writes
 #   carryforward SLUG scope|review DRAFT       draft items whose previous-revision confirmation may be carried (JSON)
 #   remap SLUG [DRAFT]                         atomically remap unchanged location/logic ranges in a draft (JSON report)
 #                                              default: review.draft.json, else scope.draft.json; seed from published JSON
@@ -302,12 +303,13 @@ $src
     [ -n "${SR_CHECK_TMP-}" ] || rm -f "$tmp"; printf 'invalid JSON: the document does not parse\n'; return 4
   fi
   if [ "$kind" = true ]; then
-    out="$(jq -r -L "$SR_SCRIPT_DIR" 'include "sqlreview-questions"; question_errors' "$tmp" 2>&1)"; rc=$?
+    out="$(jq -r -L "$SR_SCRIPT_DIR" 'include "sqlreview-questions"; question_errors' "$tmp" 2>/dev/null)"; rc=$?
   else
-    out="$(jq -r -L "$SR_SCRIPT_DIR" -f "$SR_SCRIPT_DIR/sqlreview-check.jq" "$tmp" 2>&1)"; rc=$?
+    out="$(jq -r -L "$SR_SCRIPT_DIR" -f "$SR_SCRIPT_DIR/sqlreview-check.jq" "$tmp" 2>/dev/null)"; rc=$?
   fi
   [ -n "${SR_CHECK_TMP-}" ] || rm -f "$tmp"
-  if [ "$rc" -ne 0 ]; then printf 'check failed to run: %s\n' "$out"; return 4; fi
+  # jq's own error text can quote a document value, so it never reaches the output (no-echo).
+  if [ "$rc" -ne 0 ]; then printf 'check failed to run\n'; return 4; fi
   if [ -n "$out" ]; then printf '%s\n' "$out"; return 4; fi
   [ -z "${SR_CHECKED+x}" ] || [ "$src" = --stdin ] || SR_CHECKED="$SR_CHECKED$src
 "
@@ -913,7 +915,9 @@ cmd_intake() {
   sr_need_jq
   case "$2" in ''|*[!0-9]*|0) sr_die 1 "revision must be an integer >= 1" ;; esac
   if [ ! -e "$1" ]; then
-    if [ $# -eq 3 ]; then cat "$3"; return $?; fi
+    # A legacy no-op. With DRAFT it prints nothing: the draft stays as it is, and its text is
+    # never echoed (no-echo).
+    [ $# -eq 3 ] && return 0
     printf '%s\n' '{"present":false,"assumptions":[],"analyst_questions":[]}'
     return 0
   fi
@@ -999,7 +1003,9 @@ cmd_carryover() (
        carry_over: [$rows[] | select(.basis == "sql-unchanged" or .basis == "sql-body-unchanged" or .basis == "lines-unchanged")],
        carry_over_intent: [$rows[] | select(.basis == "scope-before-sql" or .basis == "intent-unchanged")],
        walk: [$rows[] | select(.basis == null) | {kind, id, why}
-              + (if has("decided") then {decided} else {} end)]}'
+              + (if has("decided") then {decided} else {} end)]}' 2>/dev/null ||
+    # jq error text can quote a draft value (no-echo), so only a fixed line is printed.
+    sr_die 4 "carryover failed to run: check the draft with sqlreview.sh check"
 )
 
 # ---------------------------------------------------------------------------------------------
@@ -1205,7 +1211,7 @@ _notes_scan() { # <sql file> → records separated by \037: H start end · I kin
           hasd = 1; iend = NR
           next
         }
-        bad(NR, "unexpected line in notes header: " line)
+        bad(NR, "unexpected line in notes header")
       }
       t = line; sub(/^[ \t]+/, "", t)
       if (t == "") next
@@ -1477,9 +1483,9 @@ cmd_render() {
     question_doc="$(cmd_questions "$slug" "$kind")" || return $?
     question_rows="$(printf '%s' "$question_doc" | jq -c .questions)"
   fi
-  vars="$(jq -c -L "$SR_SCRIPT_DIR" --argjson question_rows "$question_rows" --slurpfile cfgs "$cfg" -f "$SR_SCRIPT_DIR/sqlreview-render.jq" "$doc")" || sr_die 2 "render failed for reviews/$slug/$kind.json"
+  vars="$(jq -c -L "$SR_SCRIPT_DIR" --argjson question_rows "$question_rows" --slurpfile cfgs "$cfg" -f "$SR_SCRIPT_DIR/sqlreview-render.jq" "$doc" 2>/dev/null)" || sr_die 2 "render failed for reviews/$slug/$kind.json"
   rendered="$(jq -r -n --rawfile tpl "$tpl" --argjson vars "$vars" \
-    'reduce ($vars | keys[]) as $k ($tpl; gsub("\\{\\{\($k)\\}\\}"; $vars[$k]))')" || sr_die 2 "render failed for reviews/$slug/$kind.json"
+    'reduce ($vars | keys[]) as $k ($tpl; gsub("\\{\\{\($k)\\}\\}"; $vars[$k]))' 2>/dev/null)" || sr_die 2 "render failed for reviews/$slug/$kind.json"
   if jq -e '(.header_revisions // []) | length > 0' "$doc" >/dev/null; then
     rendered="$rendered
 

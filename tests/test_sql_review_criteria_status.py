@@ -221,7 +221,7 @@ class ShapeCheck(Base):
         pending = copy.deepcopy(doc)
         pending["assumptions"][0]["status"] = "pending"
         self.assertEqual(self.check(pending).stdout,
-                         "A1: status is pending — every assumption and limitation must be confirmed by the human "
+                         "A1: status must be confirmed — every assumption and limitation must be confirmed by the human "
                          "before it is written\n")
         self.assertEqual(self.check(review_doc("q", "q.sql")).stdout, "ok\n")
         no_intent = copy.deepcopy(doc)

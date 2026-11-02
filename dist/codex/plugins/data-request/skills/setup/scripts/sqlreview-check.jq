@@ -12,13 +12,16 @@ def line_range: type == "array" and length == 2 and all(.[]; integer) and .[0] <
 def path_ok: nonempty and (startswith("/") | not) and (split("/") | all(.[]; . != "" and . != "." and . != ".."));
 def release_tag: type == "string" and test("^v?(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)$");
 def req($k): if has($k) then empty else "missing key: \($k)" end;
+# No-echo: a violation names the field and the rule, never a value. An id prints only when it is a
+# well-formed identifier, so free text placed in an id field never reaches the output.
+def safe_id: if type == "string" and test("^[A-Za-z0-9][A-Za-z0-9._-]{0,63}\\z") then . else "(invalid id)" end;
 
 def items($kind; $rev):
   (.[$kind] // []) as $arr
-  | ($arr | map(.id // "") | group_by(.) | map(select(length > 1) | .[0]) | .[] | "duplicate id in \($kind): \(.)"),
+  | ($arr | map(.id // "") | group_by(.) | map(select(length > 1) | .[0]) | .[] | "duplicate id in \($kind): \(safe_id)"),
     ($arr[]
       | (if (.id | type) != "string" or .id == "" then "item without id in \($kind)" else empty end),
-        ((.id // "?") | tostring) as $id
+        (.id | safe_id) as $id
       | (if (.text | nonempty | not) then "\($id): empty text" else empty end),
         (if (.rationale | nonempty | not) then "\($id): rationale must be a nonempty string" else empty end),
         (if .location != null and ((.location | type) != "object" or (.location.lines | line_range | not)) then "\($id): location must be null or an object with a line range" else empty end),
@@ -29,17 +32,18 @@ def items($kind; $rev):
               elif (.decided[$key] | test("\\S") | not) then "\($id): decided.\($key) must be a nonempty string"
               else empty end)
           end else empty end),
-        (if .status != "confirmed" then "\($id): status is \(.status // "missing") — every assumption and limitation must be confirmed by the human before it is written" else empty end),
+        (if .status != "confirmed" then "\($id): status must be confirmed — every assumption and limitation must be confirmed by the human before it is written" else empty end),
         (if (.confirmed_by | nonempty | not) then "\($id): confirmed_by is empty" else empty end),
         (if (.confirmed_at | nonempty | not) then "\($id): confirmed_at is empty" else empty end),
         # Fresh: confirmed_revision == revision, no carried_from_revision. Carried (#348): an earlier
         # confirmed_revision with carried_from_revision == revision - 1; publish proves the claim
         # against the previous published document, this stateless check validates only the fields.
         (.confirmed_revision as $cr | .carried_from_revision as $cf
-         | if ($cr | integer | not) or ($rev | integer | not) or $cr > $rev then "\($id): confirmed_revision \($cr // "missing") != revision \($rev // "missing") — re-confirm for this revision"
-           elif $cr == $rev then (if $cf != null then "\($id): carried_from_revision \($cf) on an item confirmed at revision \($rev) — remove it, or re-confirm for this revision" else empty end)
+         | if ($cr | integer | not) or ($rev | integer | not) then "\($id): confirmed_revision must be an integer >= 1 that is not above revision — re-confirm for this revision"
+           elif $cr > $rev then "\($id): confirmed_revision \($cr) != revision \($rev) — re-confirm for this revision"
+           elif $cr == $rev then (if $cf != null then "\($id): carried_from_revision on an item confirmed at revision \($rev) — remove it, or re-confirm for this revision" else empty end)
            elif $cf == null then "\($id): confirmed_revision \($cr) != revision \($rev) — re-confirm for this revision, or carry it forward with carried_from_revision (sqlreview.sh carryforward)"
-           elif ($cf | integer | not) or $cf != $rev - 1 or $cf < $cr then "\($id): carried_from_revision \($cf) must be revision - 1 (\($rev - 1)) and >= confirmed_revision \($cr) — re-confirm for this revision"
+           elif ($cf | integer | not) or $cf != $rev - 1 or $cf < $cr then "\($id): carried_from_revision must be revision - 1 (\($rev - 1)) and >= confirmed_revision \($cr) — re-confirm for this revision"
            else empty end),
         # carried_basis (#366) records why publish accepted a carried item; only carried items have one.
         (.carried_basis as $cb
@@ -48,7 +52,7 @@ def items($kind; $rev):
              if .carried_from_revision != null or .confirmed_revision != $rev then "\($id): header-decision requires a fresh answered confirmation for this revision" else empty end
            elif .carried_from_revision == null then "\($id): carried_basis on an item that is not carried — remove it"
            elif (["sql-unchanged", "sql-absent", "sql-body-unchanged", "intent-unchanged", "lines-unchanged"] | index([$cb])) == null
-           then "\($id): unknown carried_basis \($cb | tojson)"
+           then "\($id): unknown carried_basis"
            else empty end)
     );
 
@@ -102,10 +106,10 @@ def lift_document($rev):
   (if .schemaVersion != 2 then "lifts requires schemaVersion 2" else empty end),
   (if (.recurring | type) != "boolean" then "recurring must be a boolean" else empty end),
   (if (.lifts | type) != "array" then "lifts must be an array" else
-    (.lifts | map(.id) | group_by(.)[] | select(length > 1) | "duplicate lift id: \(.[0])"),
+    (.lifts | map(.id) | group_by(.)[] | select(length > 1) | "duplicate lift id: \(.[0] | safe_id)"),
     (.lifts[] |
       if type != "object" then "lift must be an object" else
-      (.id // "?") as $id |
+      (.id | safe_id) as $id |
       (["id", "revision", "need", "library", "pinned_version", "looked_in", "shortfall", "workaround", "classification", "status", "issue_url", "confirmed_by", "confirmed_at", "confirmed_revision"][] as $k | req($k)),
       (if .library != "nq-rdl/query-builder" and .library != "nq-rdl/query-builder-plugins" then "\($id): unknown library" else empty end),
       (if (.revision | integer | not) then "\($id): entry revision must be an integer >= 1" else empty end),
@@ -176,7 +180,7 @@ else
     (if .kind == "review" then (req("purpose"), req("inputs"), req("outputs"), req("logic"), req("sql_sha256"))
      elif .kind == "scope" then (req("intent"), req("inputs"), req("outputs"), (if has("question_store") then empty else req("open_questions") end))
      elif .kind == "lifts" then lift_document($rev)
-     else "kind must be \"review\" or \"scope\" or \"lifts\" (got \(.kind // "nothing"))" end),
+     else "kind must be \"review\" or \"scope\" or \"lifts\"" end),
     (if (.revision | integer | not) then "revision must be an integer >= 1" else empty end),
     (if has("assumptions") and (.assumptions | type) != "array" then "assumptions must be an array" else items("assumptions"; $rev) end),
     (if has("limitations") and (.limitations | type) != "array" then "limitations must be an array" else items("limitations"; $rev) end),

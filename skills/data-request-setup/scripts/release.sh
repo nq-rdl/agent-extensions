@@ -77,6 +77,10 @@ include "release-criteria";
 def str: type == "string" and length > 0;
 def arr: if type == "array" then . else [] end;
 def kept: .decision == "accepted" or .decision == "reworded";
+# No-echo: a violation names the field and the rule, never a value. An id or slug prints only in
+# its well-formed shape; any other value prints as a placeholder.
+def rl_id($re): if str and test($re) then . else "(invalid id)" end;
+def rl_slug: if str and test("^[A-Za-z0-9_%.-]+$") then . else "(invalid slug)" end;
 # A claim sourced from a research criterion is in the criteria table, never repeated under
 # "Extraction Assumptions / Important limitations" (FR-018; rc_criterion_claim). $itemised: the
 # record has a criteria object; a legacy record keeps every claim.
@@ -87,11 +91,11 @@ def src_errors($cid; $kept; $ev):
     if (.slug | str) and (.item | str) and (.revision | type) == "number" then
       if $kept | not then empty
       else . as $s | ([$ev[] | select(.slug == $s.slug)][0]) as $e
-        | if $e == null then "\($cid): review \(.slug) is not in evidence"
+        | if $e == null then "\($cid): review \(.slug | rl_slug) is not in evidence"
           elif $e.revision != .revision then
-            "\($cid): review \(.slug) revision \(.revision) is not the revision in evidence (\($e.revision))"
+            "\($cid): review \(.slug | rl_slug) revision \(.revision) is not the revision in evidence (\($e.revision))"
           elif $e.applies == "current" or $e.applies == "header-only" then empty
-          else "\($cid): review \(.slug) does not apply to the release (\($e.applies)); cite the release files that support the claim, or raise it as a question" end
+          else "\($cid): review \(.slug | rl_slug) does not apply to the release (\($e.applies)); cite the release files that support the claim, or raise it as a question" end
       end
     else "\($cid): a review source needs slug, item and revision" end
   elif .kind == "scope" then
@@ -101,8 +105,8 @@ def src_errors($cid; $kept; $ev):
     if (.path | str) and (.ref | str) then empty else "\($cid): a file source needs path and ref" end
   else "\($cid): source kind must be review, scope or file" end;
 def claim_errors($ev):
-  (.id // "?") as $id
-  | (if (.id | str) and (.id | test("^C[1-9][0-9]*$")) then empty else "claim id must be C<n>: \($id)" end),
+  (.id | rl_id("^C[1-9][0-9]*$")) as $id
+  | (if (.id | str) and (.id | test("^C[1-9][0-9]*$")) then empty else "claim id must be C<n>" end),
     (if .section == "summary" or .section == "assumptions" then empty
      else "\($id): section must be summary or assumptions" end),
     (if (.proposed | str) then empty else "\($id): proposed wording is empty" end),
@@ -123,8 +127,8 @@ def claim_errors($ev):
      then kept as $k | .sources[] | src_errors($id; $k; $ev)
      else "\($id): sources must be a nonempty array" end);
 def question_errors:
-  (.id // "?") as $id
-  | (if (.id | str) and (.id | test("^Q[1-9][0-9]*$")) then empty else "question id must be Q<n>: \($id)" end),
+  (.id | rl_id("^Q[1-9][0-9]*$")) as $id
+  | (if (.id | str) and (.id | test("^Q[1-9][0-9]*$")) then empty else "question id must be Q<n>" end),
     (if (.text | str) then empty else "\($id): text is empty" end),
     (if (.sources | type) == "array" then empty else "\($id): sources must be an array" end),
     (if .resolution == null then empty
@@ -150,11 +154,11 @@ def release_errors:
       (if (.claims | type) == "array" and (.claims | length) > 0 then empty else "claims must be a nonempty array" end),
       (.claims | arr | .[] | if type == "object" then claim_errors($ev) else "every claim must be an object" end),
       (.questions | arr | .[] | if type == "object" then question_errors else "every question must be an object" end),
-      (.claims | arr | map(objects | .id) | group_by(.)[] | select(length > 1) | "duplicate claim id \(.[0])"),
-      (.questions | arr | map(objects | .id) | group_by(.)[] | select(length > 1) | "duplicate question id \(.[0])"),
+      (.claims | arr | map(objects | .id) | group_by(.)[] | select(length > 1) | "duplicate claim id \(.[0] | rl_id("^C[1-9][0-9]*$"))"),
+      (.questions | arr | map(objects | .id) | group_by(.)[] | select(length > 1) | "duplicate question id \(.[0] | rl_id("^Q[1-9][0-9]*$"))"),
       (if .status != "approved" then empty else
-         (.claims | arr | .[] | objects | select(.decision == "pending") | "approved: \(.id) is pending"),
-         (.questions | arr | .[] | objects | select(.resolution == null) | "approved: \(.id) is unresolved"),
+         (.claims | arr | .[] | objects | select(.decision == "pending") | "approved: \(.id | rl_id("^C[1-9][0-9]*$")) is pending"),
+         (.questions | arr | .[] | objects | select(.resolution == null) | "approved: \(.id | rl_id("^Q[1-9][0-9]*$")) is unresolved"),
          (((.criteria | type) == "object") as $itemised
           | ("summary", "assumptions") as $s
           | if any(.claims | arr | .[] | objects; .section == $s and kept and limitation_shown($itemised)) then empty

@@ -107,7 +107,7 @@ sr_safe_slug() {
   sr_no_symlinks "$SR_REVIEWS/$1" || exit 2
 }
 sr_safe_sql() {
-  case "$1" in ""|/*|*/../*|../*|*/..|..|./*|*/./*|*/.|*//*|*/) sr_die 2 "unsafe sql_path: $1" ;; esac
+  case "$1" in ""|/*|*/../*|../*|*/..|..|./*|*/./*|*/.|*//*|*/) sr_die 2 "unsafe sql_path" ;; esac
   sr_no_symlinks "$SR_ROOT/$1" || exit 2
 }
 # Both encodings of a path, readable then legacy, one per line. The definitions live in
@@ -314,11 +314,13 @@ sr_state_reason() { # <slug> <state>
         violations="$(bash "$SR_SCRIPT_DIR/sqlreview.sh" questions "$slug" 2>&1 >/dev/null | tr '\n' ';' | sed 's/;$//')"
       fi
       why="$(basename "$doc"): $violations"
-      schema="$(jq -r '.schemaVersion // "missing" | tostring' "$doc" 2>/dev/null || echo unreadable)"
+      # No-echo: only a known schema version prints. Any other value prints as its rule.
+      schema="$(jq -r 'if .schemaVersion == 1 or .schemaVersion == 2 then .schemaVersion
+        elif has("schemaVersion") then "invalid" else "missing" end | tostring' "$doc" 2>/dev/null || echo unreadable)"
       why="$why; schemaVersion $schema"
       sql="$(jq -r '.sql_path // "" | strings' "$doc" 2>/dev/null || true)"
       if [ -n "$sql" ]; then
-        case "$sql" in /*|*..*) why="$why; sql_path '$sql' is not project-relative" ;; *)
+        case "$sql" in /*|*..*) why="$why; unsafe sql_path (not project-relative)" ;; *)
           [ -f "$SR_ROOT/$sql" ] || why="$why; sql_path target missing: $sql" ;;
         esac
       fi
