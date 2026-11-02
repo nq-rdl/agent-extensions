@@ -40,6 +40,7 @@
 #   materialize SLUG scope|review REVISION OUTPUT  git show + SHA check of that revision into an external file; caller deletes it
 #   snapshot SLUG SQL                          verify the final review against the committed SQL; no SQL writes
 #   delta SLUG [scope|review]                  body binding + full hashes; exit 0 full/header-only, 10 body change, 6 no baseline
+#                                              (a scope with no SQL binding names the bootstrap bind step)
 #   carryover SLUG DRAFT                       review draft items matching confirmed, still-valid scope items (JSON)
 #   intake FILE REVISION [DRAFT]              read analyst answers sidecar; optional collision-safe scope draft merge
 #                                              missing FILE is a legacy no-op (with DRAFT it prints nothing);
@@ -816,8 +817,14 @@ _delta_prepare() {
     doc="$(sr_doc_for "$slug")" || sr_die 2 "reviews/$slug/ has no review.json or scope.json"
   fi
   cmd_check "$doc" >/dev/null || sr_die 4 "invalid document"
-  SR_SQL_PATH="$(jq -r '.sql_path // ""' "$doc")"
+  local bound
+  IFS="$SR_TAB" read -r SR_SQL_PATH bound <<EOF
+$(jq -r '[(.sql_path // ""), (if .kind == "scope" and .sql_sha256 == null then "unbound" else "bound" end)] | join("\t")' "$doc")
+EOF
   sr_safe_sql "$SR_SQL_PATH"
+  # A scope framed before the SQL existed has no recorded SQL to compare with: name the bind step.
+  [ "$bound" = bound ] ||
+    sr_die 6 "scope $slug has no SQL binding: run /data-request:bootstrap $SR_SQL_PATH once the SQL exists to bind it"
   SR_BASE="$work/base.sql"
   SR_CUR="$SR_ROOT/$SR_SQL_PATH"
   [ -f "$SR_CUR" ] || sr_die 2 "the reviewed SQL no longer exists: $SR_SQL_PATH (moved? see: sqlreview.sh move)"
