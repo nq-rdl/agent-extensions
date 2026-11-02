@@ -117,7 +117,9 @@ the row says, and a `partially-applied` reason must match what the SQL leaves ou
 each `flagged` row's named column exists in the named output, and that each `delivered` row's data element
 is a column of an output. Record each gap as a limitation `L-criterion-<id>` with the SQL lines (or the
 missing place), for the human to confirm like any other limitation. A gap does not change the state row,
-which the engineer confirmed, and the criterion stays out of the assumptions.
+which the engineer confirmed, and the criterion stays out of the assumptions. A row does not carry
+across a SQL body change. If the SQL body changed after the scope was published, send the engineer
+to bootstrap's update path to reconfirm each row.
 
 The operator needs explicit authorisation to run approved probes before the delivery run.
 Returned counts inform UAT and the data dictionary; surprises go to the analyst, not an automatic

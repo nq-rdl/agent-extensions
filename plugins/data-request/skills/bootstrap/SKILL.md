@@ -246,7 +246,9 @@ bash "$S/sqlreview.sh" criteria ".sqlreview/reviews/$SLUG/scope.draft.json"
 Fix each finding and run it again. Publish runs the same check and refuses with exit 4. On the update
 path, `carryforward` lists each unchanged row as `criteria_status` with basis `criteria-unchanged`:
 copy its `set` fields and keep its confirmation. A changed row, a new criterion and a row that gains
-or loses `upstream` are confirmed afresh.
+or loses `upstream` are confirmed afresh. A row carries only when the SQL body is unchanged. After
+any SQL body change, `carryforward` puts every row in `walk`. Ask the engineer to confirm or change
+each state, one row at a time, never in bulk. Publish refuses a row that claims a carry.
 
 ## Existing scope → update path (#127 §2)
 
