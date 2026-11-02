@@ -12,7 +12,7 @@ import unittest
 from pathlib import Path
 
 from test_data_request_recurring_decisions import run
-from test_sql_review_scripts import item, review_doc, scope_doc
+from test_sql_review_scripts import Project, item, review_doc, scope_doc
 
 REPO = Path(__file__).resolve().parent.parent
 TREES = {"canonical": REPO / "skills",
@@ -189,10 +189,13 @@ class FacilityHelperRoundTrips(unittest.TestCase):
         for tree in TREES:
             for kind in ("scope", "review"):
                 with self.subTest(tree=tree, kind=kind), tempfile.TemporaryDirectory() as tmp:
-                    root = Path(tmp)
+                    p = Project(tmp)
+                    root = p.root
                     sql = "SELECT 1;\n"
                     (root / "cohort.sql").write_text(sql)
                     self.helper(tree, tmp, "sqlreview", "init")
+                    p.commit()
+                    fp = json.loads(self.helper(tree, tmp, "sqlreview", "fingerprint", "cohort.sql").stdout)
                     slug = "cohort"
                     store = root / ".sqlreview/reviews" / slug
                     store.mkdir(parents=True, exist_ok=True)
@@ -202,8 +205,7 @@ class FacilityHelperRoundTrips(unittest.TestCase):
                              confirmed_by=h["confirmed_by"], confirmed_at=h["confirmed_at"],
                              decided=h["decided"], upstream={"decision": DECISION, "source": "house-default"})
                     factory = scope_doc if kind == "scope" else review_doc
-                    doc = factory(slug, "cohort.sql", schemaVersion=2, assumptions=[a], limitations=[],
-                                  sql_sha256=hashlib.sha256(sql.encode()).hexdigest(),
+                    doc = factory(slug, **fp, schemaVersion=2, assumptions=[a], limitations=[],
                                   logic=[{"step": 1, "title": "Select", "lines": [1, 1], "description": "Fixture"}])
                     draft = store / f"{kind}.draft.json"
                     draft.write_text(json.dumps(doc))
@@ -238,10 +240,12 @@ class FacilityHelperRoundTrips(unittest.TestCase):
     def test_default_publish_render_and_carry_keep_the_original_record(self):
         for tree in TREES:
             with self.subTest(tree=tree), tempfile.TemporaryDirectory() as tmp:
-                root = Path(tmp)
+                p = Project(tmp)
+                root = p.root
                 d = entry(tree)
                 h = d["house_default"]
                 self.helper(tree, tmp, "sqlreview", "init")
+                p.commit()
                 slug = self.helper(tree, tmp, "sqlreview", "slug", "cohort.sql").stdout.strip()
                 store = root / ".sqlreview/reviews" / slug
                 store.mkdir(parents=True, exist_ok=True)

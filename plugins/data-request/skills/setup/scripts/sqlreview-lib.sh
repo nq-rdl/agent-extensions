@@ -21,18 +21,20 @@ sr_need_jq() {
 # Collapse "." and ".." segments and duplicate slashes in an absolute path, without touching the
 # filesystem (the path may not exist yet — bootstrap names SQL that is still to be written).
 sr_normpath() {
-  printf '%s\n' "$1" | awk -F/ '{
-    n = 0
-    for (i = 1; i <= NF; i++) {
-      if ($i == "" || $i == ".") continue
-      if ($i == "..") { if (n > 0) n--; continue }
-      parts[++n] = $i
-    }
-    out = ""
-    for (i = 1; i <= n; i++) out = out "/" parts[i]
-    if (out == "") out = "/"
-    print out
-  }'
+  # Split only on slashes: line-oriented tools rewrite newline-containing names,
+  # and awk -v would also interpret backslash escapes in the path.
+  local rest="$1" part out=""
+  while :; do
+    part="${rest%%/*}"
+    case "$part" in
+      ""|.) ;;
+      ..) out="${out%/*}" ;;
+      *) out="$out/$part" ;;
+    esac
+    [ "$rest" != "$part" ] || break
+    rest="${rest#*/}"
+  done
+  printf '%s\n' "${out:-/}"
 }
 
 # Absolute, normalised form of a path given on the command line (relative paths resolve
@@ -224,6 +226,8 @@ sr_binding() { # <document> <current SQL> <optional baseline>; 0 full, 10 header
 
 sr_now() { date -u +%Y-%m-%dT%H:%M:%SZ; }
 
+. "$SR_SCRIPT_DIR/sqlreview-source.sh"
+
 # The authoritative document of a review directory: review.json, else scope.json, else nothing.
 sr_doc_for() { # <slug> -> path
   sr_safe_slug "$1"
@@ -236,47 +240,49 @@ sr_doc_for() { # <slug> -> path
   else return 1; fi
 }
 
-# State of one review directory, from bytes on disk (never from git). Prints
+# State of one review directory, from the recorded hashes and the SQL on disk. It never runs
+# git: old SQL is read only where a diff, carry or release check needs it. Prints
 # "<state>\t<sql_path>\t<revision>" so a caller can `IFS=$'\t' read -r state sql rev`.
 #   scoped       scope.json only
 #   missing      the SQL file is gone
-#   no-baseline  review.json but no source.sql snapshot
-#   stale        source.sql differs from the current SQL
+#   no-baseline  review.json without a clean recorded git_commit, so old SQL cannot be read
+#   stale        the SQL differs from the recorded sql_sha256
 #   current      identical
 sr_state() { # <slug>
   sr_safe_slug "$1"
-  local d="$SR_REVIEWS/$1" doc sql rev state
+  local d="$SR_REVIEWS/$1" doc sql rev state kind authentic bound
   doc="$(sr_doc_for "$1")" || {
     if [ -f "$d/review.draft.json" ] || [ -f "$d/scope.draft.json" ]; then printf 'draft\t\t\n'; else printf 'invalid\t\t\n'; fi
     return 0
   }
-  sr_no_symlinks "$d/source.sql" || exit 2
   cmd_check "$doc" >/dev/null || { printf 'invalid\t\t\n'; return 0; }
-  if [ "$(jq -r .kind "$doc")" != lifts ]; then
+  # One read of the document; every field is non-empty once cmd_check passed.
+  IFS=$'\t' read -r kind sql rev authentic <<EOF
+$(jq -r '[.kind, .sql_path, (.revision | tostring),
+  ((.git_commit | type == "string" and test("^[0-9a-f]{40}$|^[0-9a-f]{64}$")) and
+   (.git_dirty == null or .git_dirty == false) | tostring)] | join("\t")' "$doc")
+EOF
+  if [ "$kind" != lifts ]; then
     bash "$SR_SCRIPT_DIR/sqlreview.sh" questions "$1" >/dev/null 2>&1 || { printf 'invalid\t\t\n'; return 0; }
   fi
-  sql="$(jq -r '.sql_path // ""' "$doc" 2>/dev/null)"
   sr_safe_sql "$sql"
-  rev="$(jq -r '.revision // ""' "$doc" 2>/dev/null)"
-  case "$doc" in
-    */scope.json)
+  case "$kind" in
+    scope)
       state="scoped"
       if jq -e '.sql_sha256 != null' "$doc" >/dev/null; then
         if [ ! -f "$SR_ROOT/$sql" ]; then state="missing"
         else
-          local bound
-          sr_binding "$doc" "$SR_ROOT/$sql" "$d/scope.source.sql"; bound=$?
+          sr_binding "$doc" "$SR_ROOT/$sql" /dev/null; bound=$?
           case "$bound" in 0) ;; 10) state="scoped-header-only" ;; *) state="stale" ;; esac
         fi
       fi ;;
-    */lifts.json) state="lifts" ;;
+    lifts) state="lifts" ;;
     *)
       if [ ! -f "$SR_ROOT/$sql" ]; then state="missing"
-      elif [ ! -f "$d/source.sql" ]; then state="no-baseline"
+      elif [ "$authentic" != true ]; then state="no-baseline"
       elif [ -f "$d/rebind-required" ]; then state="stale"
       else
-        local bound
-        sr_binding "$doc" "$SR_ROOT/$sql" "$d/source.sql"; bound=$?
+        sr_binding "$doc" "$SR_ROOT/$sql" /dev/null; bound=$?
         case "$bound" in 0) state="current" ;; 10) state="header-only" ;; *) state="stale" ;; esac
       fi ;;
   esac
@@ -306,9 +312,23 @@ sr_state_reason() { # <slug> <state>
       case "$violations" in *"binding mismatch"*)
         why="$why; the slug is not derived from any current path — rebind with: sqlreview.sh move --slug $slug <sql path>" ;;
       esac ;;
+    no-baseline)
+      why="the review records no clean git_commit, so its SQL cannot be read from git — reassess with /data-request:analyse --update" ;;
     missing)
       sql="$(jq -r '.sql_path // ""' "$(sr_doc_for "$slug")" 2>/dev/null)"
       why="sql_path target missing: $sql — if it moved, run: sqlreview.sh move '$sql' <new path>" ;;
   esac
   printf '%s\n' "$why"
 }
+
+# Private consumer inputs must never live within the repository, even with a local TMPDIR.
+sr_source_workspace() (
+  sr_source_context || exit 2
+  umask 077
+  local work
+  work="$(mktemp -d "${TMPDIR:-/tmp}/sqlreview-inputs.XXXXXX")" || exit 2
+  case "$(cd "$work" && pwd -P)" in "$SR_SOURCE_TOP"|"$SR_SOURCE_TOP"/*)
+    rm -rf "$work"; sr_source_error "temporary inputs must be outside the git tree"; exit 2 ;;
+  esac
+  printf '%s\n' "$work"
+)

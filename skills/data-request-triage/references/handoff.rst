@@ -63,14 +63,14 @@ prepares and publishes the release. Never direct the engineer to release.
    current head commit (read the run for that SHA, not an older one), and its
    SQL review status is ``current``. Match the review to the SQL that actually ran,
    using the recorded run commit and SQL fingerprint, not just the PR's current SQL.
-   ``release.sh evidence`` reads review records and snapshots from the working tree,
-   not the PR. Fetch the checked PR head SHA from GitHub and its commit locally; never
+   ``release.sh evidence`` reads review records from the working tree, not the PR, and
+   the reviewed SQL from git at each record's ``git_commit``. Fetch the checked PR head SHA from GitHub and its commit locally; never
    substitute local ``HEAD``. For every review used in the evidence, set ``SLUG`` to
    its slug and ``PR_HEAD`` to that checked SHA, then run from the request project root:
 
    .. code-block:: bash
 
-     for name in review.json source.sql; do
+     for name in review.json; do
        path=".sqlreview/reviews/$SLUG/$name"
        tmp="$(mktemp)" || exit 2
        if ! git show "$PR_HEAD:./$path" > "$tmp" 2>/dev/null || ! cmp -s "$tmp" "$path"; then
@@ -86,13 +86,13 @@ prepares and publishes the release. Never direct the engineer to release.
    stop for the engineer to complete its unpublished work. Run
    ``bash "$S/release.sh" evidence "<run commit>"`` with ``S`` set to the installed
    setup scripts only after these checks pass. Any ``changed``, ``missing-at-ref``,
-   ``unreviewed`` or invalid review, a missing snapshot, or unproven run provenance
+   ``unreviewed``, ``unavailable`` or invalid review, or unproven run provenance
    stops the hand-off. A header-only
    result needs proof that only the leading comments differ. Compare the run manifest
    and maintained pipeline too: a matching committed file alone does not prove it ran.
    Confirm DVC pointers and their corresponding objects are pushed, and that UAT sections
    1 to 3 are recorded for this run. Missing evidence is a failed gate, never a passed check.
-   ``current`` only means the SQL bytes match the reviewed snapshot: also confirm that
+   ``current`` only means the SQL bytes match the reviewed SQL: also confirm that
    ``/data-request:analyse`` re-ran
    (with ``--reconfirm-all``) after any pre-release logic change. Name every
    open delivery gate, including known governance restrictions. Flag approval-sensitive
