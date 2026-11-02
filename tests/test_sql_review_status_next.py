@@ -43,6 +43,9 @@ class StatusNext(unittest.TestCase):
         self.tmp = tempfile.TemporaryDirectory()
         self.addCleanup(self.tmp.cleanup)
         self.p = Project(self.tmp.name)
+        # A real project commits its .sqlreview/config.json after setup. Fingerprint refuses any
+        # other uncommitted source (#548), and status names it.
+        self.p.commit("setup")
 
     def status(self):
         r = run(["status", "--json"], self.p.root)
@@ -274,6 +277,11 @@ class StatusNext(unittest.TestCase):
         self.assertEqual(self.row()["next"], f"/data-request:explain {SQL} to walk the analyst through the review")
 
     # --- analyst intake ---------------------------------------------------------------------
+    def commit_text(self, path, text):
+        """The analyst commits the changed sidecar, so only the intake change is named."""
+        path.write_text(text)
+        self.p.commit("analyst intake")
+
     def import_intake(self):
         source = self.p.root / "answers.intake.json"
         source.write_text(json.dumps(sidecar()))
@@ -286,7 +294,7 @@ class StatusNext(unittest.TestCase):
         source, imported = self.import_intake()
         self.scope(SQL_V1, assumptions=scope_doc(revision=3)["assumptions"] + imported)
         self.assertEqual(self.row()["next"], f"/data-request:analyse {SQL} to review the SQL")
-        source.write_text(json.dumps(sidecar("Include adults aged 16 and over.")))
+        self.commit_text(source, json.dumps(sidecar("Include adults aged 16 and over.")))
         self.assert_rescope(self.row(), "The analyst intake", f"/data-request:analyse {SQL}")
 
     def test_intake_and_sql_changes_are_named_together(self):
@@ -295,14 +303,14 @@ class StatusNext(unittest.TestCase):
         self.scope(SQL_V1, assumptions=scope_doc(revision=3)["assumptions"] + imported)
         self.review()
         self.sql(SQL_V2)
-        source.write_text(json.dumps(sidecar("Include adults aged 16 and over.")))
+        self.commit_text(source, json.dumps(sidecar("Include adults aged 16 and over.")))
         self.assert_rescope(self.row(), "The SQL and the analyst intake", f"/data-request:analyse {SQL} --update")
 
     def test_unreadable_intake_gives_no_signal(self):
         self.sql(SQL_V1)
         source, imported = self.import_intake()
         self.scope(SQL_V1, assumptions=scope_doc(revision=3)["assumptions"] + imported)
-        source.write_text("{not json")
+        self.commit_text(source, "{not json")
         self.assertEqual(self.row()["next"], f"/data-request:analyse {SQL} to review the SQL")
 
     # --- states without a workflow position -------------------------------------------------
@@ -350,6 +358,58 @@ class StatusNext(unittest.TestCase):
         self.assertIn(f"- next for {SLUG} (current): The SQL changed after scope revision 3: "
                       f"run /data-request:bootstrap {SQL} to publish scope revision 4", lines[1])
         self.assertNotIn("other", ctx)
+
+
+
+class StatusSources(unittest.TestCase):
+    """Status names the commit step for the same source set that fingerprint refuses (#548):
+    every uncommitted path but the review records, with one git call per run."""
+
+    setUp, status, sql, row, fingerprint, reviewed, scope, review = (
+        StatusNext.setUp, StatusNext.status, StatusNext.sql, StatusNext.row, StatusNext.fingerprint,
+        StatusNext.reviewed, StatusNext.scope, StatusNext.review)
+
+    def fingerprint_refuses(self):
+        r = run(["fingerprint", SQL], self.p.root)
+        self.assertEqual(r.returncode, 2, r.stdout + r.stderr)
+        self.assertIn("uncommitted source changes", r.stderr)
+
+    def scoped_and_committed(self):
+        self.sql(SQL_V1)
+        self.scope(SQL_V1)
+        self.p.commit("scope")
+
+    def test_an_uncommitted_builder_names_the_commit_before_analyse(self):
+        self.scoped_and_committed()
+        self.p.sql("pipeline/build.py", "QUERY = 'x'\n")       # untracked builder
+        self.assertEqual(self.row()["next"], "commit the uncommitted sources (builders, configuration, pins), "
+                                             f"then /data-request:analyse {SQL} to review the SQL")
+        self.fingerprint_refuses()
+
+    def test_modified_pins_and_configuration_count(self):
+        self.p.sql("pixi.toml", "[workspace]\n")
+        self.scoped_and_committed()
+        for rel in ("pixi.toml", ".sqlreview/config.json"):
+            with self.subTest(rel=rel):
+                path = self.p.root / rel
+                before = path.read_text()
+                path.write_text(before + "\n")
+                self.assertTrue(self.row()["next"].startswith("commit the uncommitted sources"), self.row())
+                self.fingerprint_refuses()
+                path.write_text(before)
+
+    def test_review_records_do_not_count(self):
+        self.scoped_and_committed()
+        self.p.write_json(SLUG, "scope.draft.json", scope_doc(SLUG, SQL, revision=4))
+        (self.p.root / ".sqlreview" / "ledger.json").write_text("{}")
+        self.assertEqual(self.row()["next"], f"/data-request:analyse {SQL} to review the SQL")
+
+    def test_uncommitted_sql_and_other_sources_are_named_together(self):
+        self.scoped_and_committed()
+        self.sql(SQL_V2, commit=False)
+        self.p.sql("pipeline/build.py", "QUERY = 'x'\n")
+        self.assertIn(f"then commit {SQL} and the other uncommitted sources, then /data-request:analyse {SQL}",
+                      self.row()["next"])
 
 
 if __name__ == "__main__":
