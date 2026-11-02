@@ -1,0 +1,675 @@
+### validate-answers --fingerprints (no sidecar)
+$ python3 -I <scaffold-validate-answers.py> answers.yaml --fingerprints
+exit=0
+✓ answers.yaml: valid
+{"cohort_entry_event": "sha256:d8400a6292b96976d8a83cfe7d32f48827233ef8339a61d6e912e234c12eb53a", "inclusion_criteria": "sha256:f545d0e352cc23ba55b8e7f741cbcb99e7108c0aa3795979196c84be9ca083e8", "exclusion_criteria": "sha256:e2bab509a77b0ae50271f9e301930b3f5fb86269681ee6d1b9278377d5b5fd3a", "requested_data_elements": "sha256:cebab349289dc3c94461a77a6842b3358b98b319bb8621230edd1e9f97125c39"}
+
+### status: before setup
+$ sr status
+exit=3
+sqlreview: not initialised: no .sqlreview/ found above <project>. Run /data-request:setup to initialise the project (creates .sqlreview/ with config.json and templates/).
+
+### setup: init
+$ sr init
+exit=0
+created	<project>/.sqlreview
+file	config.json
+file	templates/lifts.md
+file	templates/review.md
+file	templates/scope.md
+file	reviews/.gitkeep
+file	.gitignore
+
+### setup: roles
+$ sr roles eng-login analyst-login
+exit=0
+updated	config.json roles
+
+### intake: validate-answers (schema 2)
+$ python3 -I <scaffold-validate-answers.py> answers.yaml
+exit=0
+✓ answers.yaml: valid
+
+### intake: validate-answers --fingerprints
+$ python3 -I <scaffold-validate-answers.py> answers.yaml --fingerprints
+exit=0
+✓ answers.yaml: valid
+{"cohort_entry_event": "sha256:d8400a6292b96976d8a83cfe7d32f48827233ef8339a61d6e912e234c12eb53a", "inclusion_criteria": "sha256:f545d0e352cc23ba55b8e7f741cbcb99e7108c0aa3795979196c84be9ca083e8", "exclusion_criteria": "sha256:e2bab509a77b0ae50271f9e301930b3f5fb86269681ee6d1b9278377d5b5fd3a", "requested_data_elements": "sha256:cebab349289dc3c94461a77a6842b3358b98b319bb8621230edd1e9f97125c39"}
+
+### status: after setup and intake
+$ sr status
+exit=0
+
+
+### slug
+$ sr slug sql/cohort/request.sql
+exit=0
+sql__cohort__request
+
+### bootstrap: intake merge into draft
+$ sr intake answers.intake.json 1 .sqlreview/reviews/sql__cohort__request/scope.draft.json
+exit=0
+{
+  "schemaVersion": 1,
+  "kind": "scope",
+  "slug": "sql__cohort__request",
+  "sql_path": "sql/cohort/request.sql",
+  "title": "Sample cohort",
+  "revision": 1,
+  "recorded_at": "2026-11-01T02:00:00Z",
+  "recorded_by": "eng-login",
+  "git_commit": null,
+  "sql_sha256": null,
+  "intent": "Patients with a first ZZTEST-E11 admission in 2024.",
+  "inputs": [
+    {
+      "name": "adm.stays",
+      "description": "one row per stay"
+    }
+  ],
+  "outputs": [
+    {
+      "name": "patient_id",
+      "description": "synthetic id"
+    },
+    {
+      "name": "admission_date",
+      "description": "date"
+    },
+    {
+      "name": "discharge_date",
+      "description": "date"
+    }
+  ],
+  "assumptions": [
+    {
+      "id": "A1",
+      "text": "Admission dates are complete",
+      "rationale": "The source fills them.",
+      "location": null,
+      "status": "confirmed",
+      "confirmed_by": "eng-login",
+      "confirmed_at": "2026-11-01T02:00:00Z",
+      "confirmed_revision": 1
+    },
+    {
+      "id": "A-intake-age",
+      "text": "Include adults aged 18 and over.",
+      "rationale": "The requester studies adults.",
+      "location": null,
+      "status": "confirmed",
+      "confirmed_by": "analyst-login",
+      "confirmed_at": "2026-11-01T01:00:00Z",
+      "confirmed_revision": 1,
+      "upstream": {
+        "source": "analyst-intake",
+        "file": "answers.intake.json",
+        "intake_id": "age",
+        "approval_number": "THHSAQUIRE-99187",
+        "role": "analyst",
+        "topic": "cohort"
+      }
+    }
+  ],
+  "limitations": [
+    {
+      "id": "L1",
+      "text": "Excludes private hospitals",
+      "rationale": "Not in the source.",
+      "location": null,
+      "status": "confirmed",
+      "confirmed_by": "eng-login",
+      "confirmed_at": "2026-11-01T02:00:00Z",
+      "confirmed_revision": 1
+    }
+  ],
+  "open_questions": [],
+  "criteria_status": [
+    {
+      "criterion": "N1",
+      "state": "applied",
+      "confirmed_by": "eng-login",
+      "confirmed_at": "2026-11-01T02:00:00Z",
+      "confirmed_revision": 1
+    },
+    {
+      "criterion": "I1",
+      "state": "applied",
+      "confirmed_by": "eng-login",
+      "confirmed_at": "2026-11-01T02:00:00Z",
+      "confirmed_revision": 1
+    },
+    {
+      "criterion": "E1",
+      "state": "applied",
+      "confirmed_by": "eng-login",
+      "confirmed_at": "2026-11-01T02:00:00Z",
+      "confirmed_revision": 1
+    },
+    {
+      "criterion": "D1",
+      "state": "delivered",
+      "confirmed_by": "eng-login",
+      "confirmed_at": "2026-11-01T02:00:00Z",
+      "confirmed_revision": 1
+    },
+    {
+      "criterion": "D2",
+      "state": "delivered",
+      "confirmed_by": "eng-login",
+      "confirmed_at": "2026-11-01T02:00:00Z",
+      "confirmed_revision": 1
+    }
+  ],
+  "intake_questions": []
+}
+
+### bootstrap: criteria DRAFT
+$ sr criteria .sqlreview/reviews/sql__cohort__request/scope.draft.json
+exit=0
+
+
+### bootstrap: lint
+$ sr lint .sqlreview/reviews/sql__cohort__request/scope.draft.json
+exit=0
+
+
+### status: scope draft present
+$ sr status
+exit=0
+sql__cohort__request	draft			lifts={}	next=resume /data-request:bootstrap to finish the scope draft
+
+### bootstrap: publish scope r1
+$ sr publish sql__cohort__request scope .sqlreview/reviews/sql__cohort__request/scope.draft.json
+exit=0
+ok
+published	.sqlreview/reviews/sql__cohort__request/scope.json
+
+### bootstrap: render scope
+$ sr render sql__cohort__request scope
+exit=0
+rendered	.sqlreview/reviews/sql__cohort__request/scope.md
+
+### status: after scope r1
+$ sr status
+exit=0
+sql__cohort__request	scoped	sql/cohort/request.sql	1	lifts={}	next=/data-request:draft to write sql/cohort/request.sql, then /data-request:analyse sql/cohort/request.sql
+
+### status: SQL written, uncommitted
+$ sr status
+exit=0
+sql__cohort__request	scoped	sql/cohort/request.sql	1	lifts={}	next=/data-request:analyse sql/cohort/request.sql to review the SQL
+
+### fingerprint before commit
+$ sr fingerprint sql/cohort/request.sql
+exit=2
+sqlreview: uncommitted source changes; commit SQL, builders, configuration and pins before fingerprinting
+
+### status: SQL committed
+$ sr status
+exit=0
+sql__cohort__request	scoped	sql/cohort/request.sql	1	lifts={}	next=/data-request:analyse sql/cohort/request.sql to review the SQL
+
+### analyse: fingerprint
+$ sr fingerprint sql/cohort/request.sql
+exit=0
+{
+  "sql_path": "sql/cohort/request.sql",
+  "sql_sha256": "80e6b38016fba0009abb498a1fd077d6a6817510341d04808206564e808d8e9b",
+  "sql_body_sha256": "bead33d141b9d9bfd3e42874040ac80845ea3d9c23965d80febc4aac3a7216d5",
+  "git_commit": "59fcd1600d18c4a1bfcc7d15044559c6bbf43742",
+  "git_dirty": false
+}
+
+### analyse: carryover
+$ sr carryover sql__cohort__request .sqlreview/reviews/sql__cohort__request/review.draft.json
+exit=0
+{
+  "scope_revision": 1,
+  "sql_unchanged": false,
+  "sql_body_unchanged": false,
+  "scope_before_sql": true,
+  "carry_over": [],
+  "carry_over_intent": [
+    {
+      "kind": "assumptions",
+      "id": "A1",
+      "text": "Admission dates are complete",
+      "rationale": "The source fills them.",
+      "location": {
+        "lines": [
+          3,
+          5
+        ]
+      },
+      "scope_id": "A1",
+      "basis": "scope-before-sql"
+    },
+    {
+      "kind": "limitations",
+      "id": "L1",
+      "text": "Excludes private hospitals",
+      "rationale": "Not in the source.",
+      "location": null,
+      "scope_id": "L1",
+      "basis": "scope-before-sql"
+    }
+  ],
+  "walk": []
+}
+
+### analyse: publish review r1
+$ sr publish sql__cohort__request review .sqlreview/reviews/sql__cohort__request/review.draft.json
+exit=0
+ok
+published	.sqlreview/reviews/sql__cohort__request/review.json
+
+### analyse: snapshot
+$ sr snapshot sql__cohort__request sql/cohort/request.sql
+exit=0
+verified	sql__cohort__request	80e6b38016fba0009abb498a1fd077d6a6817510341d04808206564e808d8e9b
+
+### analyse: render review
+$ sr render sql__cohort__request review
+exit=0
+rendered	.sqlreview/reviews/sql__cohort__request/review.md
+
+### status: after review r1
+$ sr status
+exit=0
+sql__cohort__request	current	sql/cohort/request.sql	1	lifts={}	next=/data-request:explain sql/cohort/request.sql to walk the analyst through the review
+
+### status: SQL body changed (scope framed before SQL)
+$ sr status
+exit=0
+sql__cohort__request	stale	sql/cohort/request.sql	1	lifts={}	next=/data-request:analyse sql/cohort/request.sql --update
+
+### delta review
+$ sr delta sql__cohort__request review
+exit=10
+baseline_sha256=80e6b38016fba0009abb498a1fd077d6a6817510341d04808206564e808d8e9b current_sha256=0db7d20694aa44799d80d65c73030b0f1d068855e000f9d5a94e6b4aefcd0290 sql_path=sql/cohort/request.sql
+--- reviewed (sql__cohort__request recorded source)
++++ current (sql/cohort/request.sql)
+@@ -7,4 +7,4 @@
+ )
+ SELECT s.patient_id, s.admission_date, s.discharge_date
+ FROM adm.stays s JOIN entry e ON e.patient_id = s.patient_id AND s.admission_date = e.index_date
+-WHERE s.age_at_admission >= 18 AND (s.death_date IS NULL OR s.death_date >= e.index_date);
++WHERE s.age_at_admission >= 16 AND (s.death_date IS NULL OR s.death_date >= e.index_date);
+
+### delta scope
+$ sr delta sql__cohort__request scope
+exit=6
+sqlreview: record lacks clean immutable source evidence; reassess
+
+### rescope: carryforward scope r2
+$ sr carryforward sql__cohort__request scope .sqlreview/reviews/sql__cohort__request/scope.draft.json
+exit=0
+{
+  "document": "scope",
+  "prior_revision": 1,
+  "revision": 2,
+  "sql_unchanged": false,
+  "sql_body_unchanged": false,
+  "carry": [
+    {
+      "kind": "assumptions",
+      "id": "A1",
+      "basis": "intent-unchanged",
+      "set": {
+        "status": "confirmed",
+        "confirmed_by": "eng-login",
+        "confirmed_at": "2026-11-01T02:00:00Z",
+        "confirmed_revision": 1,
+        "carried_from_revision": 1,
+        "carried_basis": "intent-unchanged"
+      }
+    },
+    {
+      "kind": "assumptions",
+      "id": "A-intake-age",
+      "basis": "intent-unchanged",
+      "set": {
+        "status": "confirmed",
+        "confirmed_by": "analyst-login",
+        "confirmed_at": "2026-11-01T01:00:00Z",
+        "confirmed_revision": 1,
+        "carried_from_revision": 1,
+        "carried_basis": "intent-unchanged",
+        "upstream": {
+          "source": "analyst-intake",
+          "file": "answers.intake.json",
+          "intake_id": "age",
+          "approval_number": "THHSAQUIRE-99187",
+          "role": "analyst",
+          "topic": "cohort"
+        }
+      }
+    },
+    {
+      "kind": "limitations",
+      "id": "L1",
+      "basis": "intent-unchanged",
+      "set": {
+        "status": "confirmed",
+        "confirmed_by": "eng-login",
+        "confirmed_at": "2026-11-01T02:00:00Z",
+        "confirmed_revision": 1,
+        "carried_from_revision": 1,
+        "carried_basis": "intent-unchanged"
+      }
+    },
+    {
+      "kind": "criteria_status",
+      "id": "N1",
+      "basis": "criteria-unchanged",
+      "set": {
+        "confirmed_by": "eng-login",
+        "confirmed_at": "2026-11-01T02:00:00Z",
+        "confirmed_revision": 1,
+        "carried_from_revision": 1,
+        "carried_basis": "criteria-unchanged"
+      }
+    },
+    {
+      "kind": "criteria_status",
+      "id": "I1",
+      "basis": "criteria-unchanged",
+      "set": {
+        "confirmed_by": "eng-login",
+        "confirmed_at": "2026-11-01T02:00:00Z",
+        "confirmed_revision": 1,
+        "carried_from_revision": 1,
+        "carried_basis": "criteria-unchanged"
+      }
+    },
+    {
+      "kind": "criteria_status",
+      "id": "E1",
+      "basis": "criteria-unchanged",
+      "set": {
+        "confirmed_by": "eng-login",
+        "confirmed_at": "2026-11-01T02:00:00Z",
+        "confirmed_revision": 1,
+        "carried_from_revision": 1,
+        "carried_basis": "criteria-unchanged"
+      }
+    },
+    {
+      "kind": "criteria_status",
+      "id": "D1",
+      "basis": "criteria-unchanged",
+      "set": {
+        "confirmed_by": "eng-login",
+        "confirmed_at": "2026-11-01T02:00:00Z",
+        "confirmed_revision": 1,
+        "carried_from_revision": 1,
+        "carried_basis": "criteria-unchanged"
+      }
+    },
+    {
+      "kind": "criteria_status",
+      "id": "D2",
+      "basis": "criteria-unchanged",
+      "set": {
+        "confirmed_by": "eng-login",
+        "confirmed_at": "2026-11-01T02:00:00Z",
+        "confirmed_revision": 1,
+        "carried_from_revision": 1,
+        "carried_basis": "criteria-unchanged"
+      }
+    }
+  ],
+  "bulk": [],
+  "walk": []
+}
+
+### rescope: criteria DRAFT
+$ sr criteria .sqlreview/reviews/sql__cohort__request/scope.draft.json
+exit=0
+
+
+### rescope: publish scope r2
+$ sr publish sql__cohort__request scope .sqlreview/reviews/sql__cohort__request/scope.draft.json
+exit=0
+ok
+published	.sqlreview/reviews/sql__cohort__request/scope.json
+
+### status: after scope r2 bound
+$ sr status
+exit=0
+sql__cohort__request	stale	sql/cohort/request.sql	1	lifts={}	next=/data-request:analyse sql/cohort/request.sql --update
+
+### analyse: impact
+$ sr impact sql__cohort__request
+exit=0
+# impact hints — HEURISTIC. Identifiers that appear in the changed lines, traced to unchanged lines
+# that mention them. This suggests where to look; it does not prove anything unaffected. Every
+# assumption and limitation is reassessed on an update regardless of this list.
+e	line 9	FROM adm.stays s JOIN entry e ON e.patient_id = s.patient_id AND s.admission_date = e.index_date
+index_date	line 3	  SELECT patient_id, MIN(admission_date) AS index_date
+index_date	line 9	FROM adm.stays s JOIN entry e ON e.patient_id = s.patient_id AND s.admission_date = e.index_date
+s	line 8	SELECT s.patient_id, s.admission_date, s.discharge_date
+s	line 9	FROM adm.stays s JOIN entry e ON e.patient_id = s.patient_id AND s.admission_date = e.index_date
+
+### analyse: publish review r2
+$ sr publish sql__cohort__request review .sqlreview/reviews/sql__cohort__request/review.draft.json
+exit=0
+ok
+published	.sqlreview/reviews/sql__cohort__request/review.json
+
+### analyse: snapshot r2
+$ sr snapshot sql__cohort__request sql/cohort/request.sql
+exit=0
+verified	sql__cohort__request	0db7d20694aa44799d80d65c73030b0f1d068855e000f9d5a94e6b4aefcd0290
+
+### status: after review r2
+$ sr status
+exit=0
+sql__cohort__request	current	sql/cohort/request.sql	2	lifts={}	next=/data-request:explain sql/cohort/request.sql to walk the analyst through the review
+
+### status: SQL body changed (scope bound)
+$ sr status
+exit=0
+sql__cohort__request	stale	sql/cohort/request.sql	2	lifts={}	next=The SQL changed after scope revision 2: run /data-request:bootstrap sql/cohort/request.sql to publish scope revision 3, then /data-request:analyse sql/cohort/request.sql --update
+
+### preflight hook
+$ bash -c printf '{"hook_event_name":"SessionStart","cwd":"<project>"}' | bash <repo>/hooks/data-request-preflight.sh
+exit=0
+{"hookSpecificOutput":{"hookEventName":"SessionStart","additionalContext":"SQL Review: .sqlreview/ is initialised (schema 2), 1 review: 1 stale (sql__cohort__request).\n- next for sql__cohort__request (stale): The SQL changed after scope revision 2: run /data-request:bootstrap sql/cohort/request.sql to publish scope revision 3, then /data-request:analyse sql/cohort/request.sql --update"}}
+
+### publish scope r3
+$ sr publish sql__cohort__request scope .sqlreview/reviews/sql__cohort__request/scope.draft.json
+exit=0
+ok
+published	.sqlreview/reviews/sql__cohort__request/scope.json
+
+### status: after scope r3
+$ sr status
+exit=0
+sql__cohort__request	stale	sql/cohort/request.sql	2	lifts={}	next=/data-request:analyse sql/cohort/request.sql --update
+
+### publish review r3
+$ sr publish sql__cohort__request review .sqlreview/reviews/sql__cohort__request/review.draft.json
+exit=0
+ok
+published	.sqlreview/reviews/sql__cohort__request/review.json
+
+### snapshot r3
+$ sr snapshot sql__cohort__request sql/cohort/request.sql
+exit=0
+verified	sql__cohort__request	01d29ddaa936d89b185119c7fd6a2fa286462e51966bf9f632d602393d5fea4e
+
+### status: after review r3
+$ sr status
+exit=0
+sql__cohort__request	current	sql/cohort/request.sql	3	lifts={}	next=/data-request:explain sql/cohort/request.sql to walk the analyst through the review
+
+### status: explain partial
+$ sr status
+exit=0
+sql__cohort__request	current	sql/cohort/request.sql	3	lifts={}	next=/data-request:explain sql/cohort/request.sql to resume the walkthrough
+
+### status: explain completed
+$ sr status
+exit=0
+sql__cohort__request	current	sql/cohort/request.sql	3	lifts={}	next=/data-request:release <candidate ref> after the analyst accepts the explained SQL
+
+### release evidence v1.0.0 (before amend)
+$ rl evidence v1.0.0
+exit=0
+{
+  "ref": "v1.0.0",
+  "commit": "96c8ae615925e753a8846b9eb7d7c324a3ce6e9a",
+  "reviews": [
+    {
+      "slug": "sql__cohort__request",
+      "kind": "review",
+      "sql_path": "sql/cohort/request.sql",
+      "revision": 3,
+      "applies": "current",
+      "sql_sha256_reviewed": "01d29ddaa936d89b185119c7fd6a2fa286462e51966bf9f632d602393d5fea4e",
+      "sql_sha256_at_ref": "01d29ddaa936d89b185119c7fd6a2fa286462e51966bf9f632d602393d5fea4e",
+      "sql_body_sha256_reviewed": "440ac1e4beefe2e39200b530ec3bb7647afcc8164a378e156d6cf4c6520b7876",
+      "sql_body_sha256_at_ref": "440ac1e4beefe2e39200b530ec3bb7647afcc8164a378e156d6cf4c6520b7876",
+      "reviewed_commit": "7fb1dbab97c6db7475e1e9e13aec2052e5eec088",
+      "reviewed_commit_in_ref": true,
+      "other_paths_changed_since_review": [],
+      "assumptions": [
+        {
+          "id": "A1",
+          "text": "Admission dates are complete",
+          "rationale": "The source fills them.",
+          "confirmed_revision": 3
+        }
+      ],
+      "limitations": [
+        {
+          "id": "L1",
+          "text": "Excludes private hospitals",
+          "rationale": "Not in the source.",
+          "confirmed_revision": 3
+        }
+      ],
+      "questions": [],
+      "open_questions": []
+    }
+  ]
+}
+
+### status: after P1 (P2 open)
+$ sr status
+exit=0
+sql__cohort__request	stale	sql/cohort/request.sql	3	lifts={}	next=The SQL changed after scope revision 3: run /data-request:bootstrap sql/cohort/request.sql to publish scope revision 4, then /data-request:analyse sql/cohort/request.sql --update
+
+### release evidence with P2 open
+$ bash -c bash <repo>/skills/data-request-setup/scripts/release.sh evidence v1.0.1-rc | jq -c '.reviews[]|{applies,revision}'; echo rc=${PIPESTATUS[0]}
+exit=0
+{"applies":"changed","revision":3}
+rc=10
+
+### publish scope r4
+$ sr publish sql__cohort__request scope .sqlreview/reviews/sql__cohort__request/scope.draft.json
+exit=0
+ok
+published	.sqlreview/reviews/sql__cohort__request/scope.json
+
+### publish review r4
+$ sr publish sql__cohort__request review .sqlreview/reviews/sql__cohort__request/review.draft.json
+exit=0
+ok
+published	.sqlreview/reviews/sql__cohort__request/review.json
+
+### status: after review r4 (P2 open)
+$ sr status
+exit=0
+sql__cohort__request	current	sql/cohort/request.sql	4	lifts={}	next=/data-request:explain sql/cohort/request.sql to walk the analyst through the review
+
+### release evidence v1.0.1, P2 open
+$ bash -c bash <repo>/skills/data-request-setup/scripts/release.sh evidence v1.0.1 | jq -c '.reviews[]|{applies,revision,other_paths_changed_since_review}'; echo rc=${PIPESTATUS[0]}
+exit=0
+{"applies":"current","revision":4,"other_paths_changed_since_review":[]}
+rc=0
+
+### release evidence v1.0.2, P2 withdrawn
+$ bash -c bash <repo>/skills/data-request-setup/scripts/release.sh evidence v1.0.2 | jq -c '.reviews[]|{applies,revision,other_paths_changed_since_review}'; echo rc=${PIPESTATUS[0]}
+exit=0
+{"applies":"current","revision":4,"other_paths_changed_since_review":["specs/amendments.md"]}
+rc=0
+
+### status: after P2 withdrawn
+$ sr status
+exit=0
+sql__cohort__request	current	sql/cohort/request.sql	4	lifts={}	next=/data-request:explain sql/cohort/request.sql to walk the analyst through the review
+
+### release criteria v1.0.2 --fingerprints
+$ rl criteria v1.0.2 --fingerprints <fingerprints.json>
+exit=0
+{
+  "previous_tag": null,
+  "scope": {
+    "slug": "sql__cohort__request",
+    "revision": 4
+  },
+  "status": "complete",
+  "held_reasons": [],
+  "rows": [
+    {
+      "id": "N1",
+      "kind": "entry_event",
+      "text": "First admission with a ZZTEST-E11 code in 2024",
+      "state": "applied",
+      "proposed_note": "Applied",
+      "change": "—",
+      "final_note": null,
+      "decision": "pending"
+    },
+    {
+      "id": "I1",
+      "kind": "inclusion",
+      "text": "Aged 18 and over at the entry event",
+      "state": "applied",
+      "proposed_note": "Applied",
+      "change": "—",
+      "final_note": null,
+      "decision": "pending"
+    },
+    {
+      "id": "E1",
+      "kind": "exclusion",
+      "text": "Died before the entry event",
+      "state": "applied",
+      "proposed_note": "Applied",
+      "change": "—",
+      "final_note": null,
+      "decision": "pending"
+    },
+    {
+      "id": "D1",
+      "kind": "data_element",
+      "text": "Admission date",
+      "state": "delivered",
+      "proposed_note": "Delivered",
+      "change": "—",
+      "final_note": null,
+      "decision": "pending"
+    },
+    {
+      "id": "D2",
+      "kind": "data_element",
+      "text": "Discharge date",
+      "state": "delivered",
+      "proposed_note": "Delivered",
+      "change": "—",
+      "final_note": null,
+      "decision": "pending"
+    }
+  ]
+}
+
+### release criteria v1.0.2 (no fingerprints)
+$ bash -c bash <repo>/skills/data-request-setup/scripts/release.sh criteria v1.0.2 | jq -c '{status,held_reasons}'; echo rc=${PIPESTATUS[0]}
+exit=0
+{"status":"held","held_reasons":["fingerprints-unchecked"]}
+rc=10
+
