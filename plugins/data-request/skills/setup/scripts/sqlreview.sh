@@ -8,7 +8,10 @@
 #                                              reviews/.gitkeep so git keeps reviews/); never overwrites
 #   status [--json] [--verbose]                reviews, their state and the next command (bootstrap first when the
 #                                              SQL or intake changed after the scope, or to bind an unbound scope;
-#                                              a commit before analyse when git lists the SQL as uncommitted; an
+#                                              a commit before analyse when git lists the SQL or another source
+#                                              that fingerprint refuses as uncommitted; an open amendment part
+#                                              (.sqlreview/amendments/*.json, "handed off") gets its own line
+#                                              with its part ids and next action; an
 #                                              empty project names bootstrap; --verbose: why invalid/missing,
 #                                              and the move that migrates a legacy-encoded slug); exit 3 when not initialised
 #                                              missing bundled templates: JSON missing_templates, else one stderr line
@@ -240,13 +243,32 @@ EOF
       fi
     done
   fi
+  # An open amendment part (#534) holds the release: name each record's handed-off part ids and the
+  # next action on one line. One jq read per record and no other process, because status runs
+  # from the SessionStart hook. Part ids print only as P<n>, and a record name only as amend names it.
+  local arec aname aopen aex amend=""
+  for arec in "$SR_ROOT/$SR_DIR"/amendments/*.json; do
+    [ -f "$arec" ] && [ ! -L "$arec" ] || continue
+    aopen="$(jq -r 'if type == "object" and (.parts | type) == "array" then [.parts[] | objects
+      | select(.status == "handed off") | .id | strings | select(test("^P[1-9][0-9]*$"))] | join(" ") else "" end' "$arec" 2>/dev/null)" ||
+      aopen=""
+    [ -n "$aopen" ] || continue
+    aname="${arec##*/}"; aname="${aname%.json}"
+    case "$aname" in ""|-*|*[!a-z0-9-]*) aname="(invalid name)" ;; esac
+    case "$aopen" in *" "*) aex="P<n>" ;; *) aex="$aopen" ;; esac
+    next="the engineer comments done: $aex <commit> or the analyst comments withdrawn: $aex <reason> on the deliverable PR, then /data-request:amend updates $SR_DIR/amendments/$aname.json before release"
+    amend="$amend$aname$SR_TAB$aopen$SR_TAB$next$SR_NL"
+    [ "$json" = 1 ] || printf 'amendment %s\thanded off: %s\tnext=%s\n' "$aname" "$aopen" "$next"
+  done
   # An empty project has one next step: scope the first SQL file.
   next=""
   [ "$seen" = 1 ] || next="/data-request:bootstrap <sql path> to scope the first SQL file"
   if [ "$json" = 0 ] && [ -n "$next" ]; then printf 'no reviews yet\tnext=%s\n' "$next"; fi
   if [ "$json" = 1 ]; then
-    printf '%s' "$rows" | jq --arg root "$SR_ROOT" --arg schema "$schema" --arg missing "$missing" --arg next "$next" \
+    printf '%s' "$rows" | jq --arg root "$SR_ROOT" --arg schema "$schema" --arg missing "$missing" --arg next "$next" --arg amend "$amend" \
       '{root: $root, schemaVersion: ($schema | tonumber? // $schema), reviews: ., next: (if $next == "" then null else $next end),
+        amendments: [$amend | split("\n")[] | select(. != "") | split("\t")
+                     | {record: ".sqlreview/amendments/\(.[0]).json", handed_off: (.[1] | split(" ")), next: .[2]}],
         counts: (group_by(.state) | map({key: .[0].state, value: length}) | from_entries | . + {total: (map(.) | add // 0)}),
         missing_templates: ($missing | split(" ") | map(select(. != ""))),
         missing_templates_fix: (if $missing == "" then null else "sqlreview.sh init --apply " + $missing end)}'

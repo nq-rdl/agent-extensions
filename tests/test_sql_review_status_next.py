@@ -412,5 +412,65 @@ class StatusSources(unittest.TestCase):
                       self.row()["next"])
 
 
+class StatusAmendment(unittest.TestCase):
+    """An open amendment part (#534) gets one status line: its part ids and the next action."""
+
+    setUp, status, sql, row, fingerprint, reviewed, scope, review = (
+        StatusNext.setUp, StatusNext.status, StatusNext.sql, StatusNext.row, StatusNext.fingerprint,
+        StatusNext.reviewed, StatusNext.scope, StatusNext.review)
+
+    REC = "enq9177-falls"
+
+    def record(self, parts, name=None):
+        path = self.p.root / ".sqlreview" / "amendments" / f"{name or self.REC}.json"
+        path.parent.mkdir(exist_ok=True)
+        path.write_text(json.dumps({"schemaVersion": 1, "kind": "amendment", "parts": parts}))
+        return path
+
+    def part(self, pid, status, **fields):
+        return {"id": pid, "status": status, "text": "LEAK-CANARY change", **fields}
+
+    def text(self):
+        r = run(["status"], self.p.root)
+        self.assertEqual(r.returncode, 0, r.stderr)
+        return r.stdout
+
+    def test_a_handed_off_part_is_named_with_its_next_action(self):
+        self.record([self.part("P1", "done", commit="a" * 40), self.part("P2", "handed off")])
+        line = [ln for ln in self.text().splitlines() if ln.startswith("amendment ")]
+        self.assertEqual(line, [f"amendment {self.REC}\thanded off: P2\tnext=the engineer comments done: P2 <commit> "
+                                "or the analyst comments withdrawn: P2 <reason> on the deliverable PR, then "
+                                f"/data-request:amend updates .sqlreview/amendments/{self.REC}.json before release"])
+        j = json.loads(run(["status", "--json"], self.p.root).stdout)
+        self.assertEqual(j["amendments"], [{"record": f".sqlreview/amendments/{self.REC}.json",
+                                            "handed_off": ["P2"], "next": line[0].split("next=", 1)[1]}])
+
+    def test_several_open_parts_use_the_generic_part_form(self):
+        self.record([self.part("P2", "handed off"), self.part("P3", "handed off")])
+        j = json.loads(run(["status", "--json"], self.p.root).stdout)
+        self.assertEqual(j["amendments"][0]["handed_off"], ["P2", "P3"])
+        self.assertIn("done: P<n> <commit>", j["amendments"][0]["next"])
+
+    def test_closed_invalid_and_malformed_records_add_no_line(self):
+        self.record([self.part("P1", "done", commit="a" * 40), self.part("P2", "withdrawn", reason="r")])
+        self.record([self.part("LEAK-CANARY", "handed off")], name="enq9178-falls")
+        (self.p.root / ".sqlreview" / "amendments" / "enq9179-falls.json").write_text("{LEAK-CANARY")
+        text = self.text()
+        self.assertNotIn("amendment ", text)
+        self.assertNotIn("LEAK-C", text)
+        self.assertEqual(json.loads(run(["status", "--json"], self.p.root).stdout)["amendments"], [])
+
+    def test_the_preflight_hook_names_the_open_part(self):
+        self.record([self.part("P2", "handed off")])
+        for with_review in (False, True):
+            with self.subTest(with_review=with_review):
+                if with_review:
+                    self.sql(SQL_V1)
+                    self.review()
+                ctx = decision(run_hook(PREFLIGHT, {"cwd": str(self.p.root)}, env_for()))["additionalContext"]
+                self.assertIn(f"- next for .sqlreview/amendments/{self.REC}.json (handed off: P2): the engineer "
+                              "comments done: P2 <commit>", ctx)
+                self.assertNotIn("LEAK-C", ctx)
+
 if __name__ == "__main__":
     unittest.main()
