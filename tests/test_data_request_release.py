@@ -1040,7 +1040,9 @@ class CriteriaProject(Project):
                "recorded_by": "engineer-login", "git_commit": None, "intent": "Falls presentations.",
                "inputs": [{"name": "ed.encounter", "description": "one row per encounter"}],
                "outputs": [{"name": "encounter_id", "description": "encounter"}],
-               "assumptions": [], "limitations": [], "open_questions": []}
+               "assumptions": [], "limitations": [], "open_questions": [],
+               # the SQL this scope was confirmed against: a later SQL body change holds as scope-stale
+               "sql_sha256": hashlib.sha256((self.root / SQL_PATH).read_bytes()).hexdigest()}
         if status is not None:
             doc["criteria_status"] = status
         self.write(f".sqlreview/reviews/{slug}/scope.json", json.dumps(doc, indent=2))
@@ -1233,7 +1235,7 @@ class CriteriaTable(unittest.TestCase):
         self.p.write(SQL_PATH, SQL_V2)
         self.p.commit("sql changed after the review")
         self.p.tag("0.1.1")
-        self.held("0.1.1", ["review-stale"])
+        self.held("0.1.1", ["review-stale", "scope-stale"])
 
     def test_held_note_rejected(self):
         first = decided(self.p.table("0.1.0"))

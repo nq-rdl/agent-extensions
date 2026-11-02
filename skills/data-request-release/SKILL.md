@@ -206,13 +206,15 @@ the record again. A rejected row fails `release.sh check` unless the embedded ta
 with `note-rejected:<id>`, on a draft record too. The table never drops the row.
 
 **Held.** `release.sh criteria` ends with exit 10 and `status` is `held` for any of these `held_reasons`:
-`no-owning-scope`, `review-stale`, `state-missing:<id>`, `fingerprint-mismatch:<field>`, `owning-scope-ambiguous`,
+`no-owning-scope`, `review-stale`, `scope-stale`, `state-missing:<id>`, `fingerprint-mismatch:<field>`, `owning-scope-ambiguous`,
 `note-rejected:<id>`, `answers-invalid` and `fingerprints-unchecked`. A free-text mismatch goes
 back to `/data-request:intake`; the others go to the engineer, except `fingerprints-unchecked`,
 which the analyst fixes by re-running the step above. `no-owning-scope` means the tag's sidecar itemises live criteria but no scope carries their states (a scope
 published before the analyst itemised): the engineer must run `/data-request:bootstrap` to record criteria states,
 and a new tag follows. It comes with `state-missing:<id>` for each live criterion, whose row shows the
-researcher's request with no state; such a table is never "not itemised". `answers-invalid` means the tag's
+researcher's request with no state; such a table is never "not itemised". `scope-stale` means the SQL body at
+the tag differs from the body the owning scope recorded, so its states may be false. A header-only change
+does not hold. The engineer rescopes with `/data-request:bootstrap`, publishes, and a new tag follows. `answers-invalid` means the tag's
 `answers.yaml` failed validation and the tag cannot change, so it needs an engineer or intake fix
 and a new tag. The body then shows
 one line, `Criteria table held: <reasons>`, with no partial table. A held table, or any row whose

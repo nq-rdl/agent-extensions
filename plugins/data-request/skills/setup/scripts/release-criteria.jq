@@ -39,6 +39,7 @@ def rc_criterion_claim:
 def rc_reason_rank:
   if . == "no-owning-scope" then [0, 0, 0]
   elif . == "review-stale" then [1, 0, 0]
+  elif . == "scope-stale" then [1, 1, 0]
   elif startswith("state-missing:") then [2] + (.[14:] | {id: ., kind: crit_kind_of_id} | crit_order)
   elif startswith("fingerprint-mismatch:") then [3, (.[21:] as $f | rc_fp_fields | index([$f])), 0]
   elif . == "owning-scope-ambiguous" then [4, 0, 0]
@@ -47,9 +48,16 @@ def rc_reason_rank:
   else [7, 0, 0] end;
 def rc_reason_ok:
   type == "string"
-  and (test("^(no-owning-scope|review-stale|owning-scope-ambiguous|answers-invalid|fingerprints-unchecked)\\z")
+  and (test("^(no-owning-scope|review-stale|scope-stale|owning-scope-ambiguous|answers-invalid|fingerprints-unchecked)\\z")
        or test("^(state-missing|note-rejected):[NIED][1-9][0-9]*\\z")
        or (startswith("fingerprint-mismatch:") and (.[21:] as $f | rc_fp_fields | index([$f])) != null));
+
+# scope-stale: the owning scope recorded another SQL body than the SQL at the tag (release.sh
+# rl_scope_current), so its states may not describe that SQL. Applied after rc_build.
+def rc_scope_stale($scope_stale):
+  if type == "object" and $scope_stale and .scope != null
+  then .held_reasons = (.held_reasons + ["scope-stale"] | sort_by(rc_reason_rank)) | .status = "held"
+  else . end;
 
 # --- build -------------------------------------------------------------------------------------
 
@@ -76,7 +84,7 @@ def rc_note:
 #   $scopes    [{slug, revision, criteria_status}] for every scope at the tag carrying criteria_status;
 #              none, while a criterion is live, holds the table (no-owning-scope): the criteria are
 #              itemised but no scope records their states, so "not itemised" would be false (FR-017)
-#   $stale     true when the owning scope's review does not apply to the tag
+#   $stale     true when the owning scope's review does not apply to the tag (scope-stale is rc_scope_stale)
 #   $previous  {tag, criteria} of the previous release (research R9), or null
 #   $current   the `criteria` of this tag's record in the working tree (its analyst decisions), or null
 #   $fp        the fingerprints file (validate-answers --fingerprints), or null

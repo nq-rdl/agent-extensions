@@ -16,10 +16,11 @@ import unittest
 from pathlib import Path
 
 try:  # `unittest discover -s tests` puts tests/ on sys.path; `-m unittest tests.x` does not
-    from test_data_request_release import FINGERPRINTS, RELEASE, SQLREVIEW, STAMP, criterion, git, run, status_row
+    from test_data_request_release import (FINGERPRINTS, RELEASE, SQLREVIEW, criterion, git, record,
+                                           render_record, run, status_row, violations)
 except ModuleNotFoundError:
-    from tests.test_data_request_release import (FINGERPRINTS, RELEASE, SQLREVIEW, STAMP, criterion, git, run,
-                                                 status_row)
+    from tests.test_data_request_release import (FINGERPRINTS, RELEASE, SQLREVIEW, criterion, git, record,
+                                                 render_record, run, status_row, violations)
 
 LEAK_CANARY = "LEAK-CANARY"
 SLUG = "sql__adults"
@@ -49,8 +50,9 @@ def sha(text):
     return hashlib.sha256(text.encode()).hexdigest()
 
 
-@unittest.skipUnless(shutil.which("jq") and shutil.which("git"), "sqlreview.sh needs jq and git")
-class CriteriaBodyChange(unittest.TestCase):
+class Base(unittest.TestCase):
+    """A git project with the analyst's sidecar and revision 1 of the owning scope, at SQL_18."""
+
     def setUp(self):
         self.tmp = tempfile.TemporaryDirectory()
         self.addCleanup(self.tmp.cleanup)
@@ -133,7 +135,15 @@ class CriteriaBodyChange(unittest.TestCase):
         return r
 
     def release_table(self, tag, sql):
-        """Commit with a review current for `sql`, tag, and build the criteria table."""
+        """Commit with a review current for `sql`, tag, and build the complete criteria table."""
+        r = self.release_run(tag, sql)
+        self.assertEqual(r.returncode, 0, r.stdout + r.stderr)
+        table = json.loads(r.stdout)
+        self.assertEqual(table["status"], "complete", table)
+        return {row["id"]: row for row in table["rows"]}
+
+    def release_run(self, tag, sql):
+        """Commit with a review current for `sql`, tag, and run `release.sh criteria`."""
         (self.d / "source.sql").write_text(sql)
         review = {"schemaVersion": 2, "kind": "review", "slug": SLUG, "sql_path": SQL_PATH, "title": "Adults",
                   "revision": 1, "recorded_at": "2026-10-21T00:00:00Z", "recorded_by": "eng-login",
@@ -149,13 +159,11 @@ class CriteriaBodyChange(unittest.TestCase):
         git(self.root, "add", "-A")
         git(self.root, "commit", "-q", "-m", f"release {tag}")
         git(self.root, "tag", tag)
-        r = run(RELEASE, ["criteria", tag, "--fingerprints", str(self.fp)], self.root)
-        self.assertEqual(r.returncode, 0, r.stdout + r.stderr)
-        table = json.loads(r.stdout)
-        self.assertEqual(table["status"], "complete", table)
-        return {row["id"]: row for row in table["rows"]}
+        return run(RELEASE, ["criteria", tag, "--fingerprints", str(self.fp)], self.root)
 
-    # --- cases ------------------------------------------------------------------------------
+
+@unittest.skipUnless(shutil.which("jq") and shutil.which("git"), "sqlreview.sh needs jq and git")
+class CriteriaBodyChange(Base):
     def test_body_change_walks_every_row_and_publish_refuses_a_carry(self):
         self.write_sql(SQL_16)
         draft = [{k: v for k, v in r.items() if not k.startswith("confirmed")} for r in STATUS_V1]
@@ -215,6 +223,68 @@ class CriteriaBodyChange(unittest.TestCase):
         self.assertEqual((rows["I1"]["state"], rows["I1"]["proposed_note"]),
                          ("not-applied", "Not applied: Filter is below 18"))
         self.assertNotEqual(rows["I1"]["proposed_note"], "Applied")
+
+
+@unittest.skipUnless(shutil.which("jq") and shutil.which("git"), "release.sh needs jq and git")
+class ScopeStaleRelease(Base):
+    """`release.sh criteria` holds as scope-stale when the SQL body at the tag differs from the body the owning
+    scope recorded. The scope is never published again here, so only the release check can catch it."""
+
+    def held(self, r):
+        self.assertEqual(r.returncode, 10, r.stdout + r.stderr)
+        table = json.loads(r.stdout)
+        self.assertEqual((table["status"], table["held_reasons"]), ("held", ["scope-stale"]), table)
+        self.assertEqual(table["scope"], {"slug": SLUG, "revision": 1})
+        self.assertIn(f"criteria held: scope {SLUG} is stale (scope-stale)", r.stderr)
+        self.assertIn("rescope with /data-request:bootstrap, then publish", r.stderr)
+        return table
+
+    def test_body_change_after_the_last_scope_publish_holds(self):
+        self.write_sql(SQL_16)
+        table = self.held(self.release_run("0.1.0", SQL_16))
+        i1 = next(row for row in table["rows"] if row["id"] == "I1")
+        self.assertEqual(i1["state"], "applied", "the stale state is shown, and the hold stops its release")
+
+    def test_header_only_change_after_publish_does_not_hold(self):
+        self.write_sql(SQL_18_HEADER)
+        r = self.release_run("0.1.0", SQL_18_HEADER)
+        self.assertEqual(r.returncode, 0, r.stdout + r.stderr)
+        self.assertEqual(json.loads(r.stdout)["held_reasons"], [])
+        self.assertNotIn("scope-stale", r.stderr)
+
+    def test_rescope_and_publish_clears_the_hold_and_shows_the_reconfirmed_states(self):
+        self.write_sql(SQL_16)
+        self.held(self.release_run("0.1.0", SQL_16))
+        self.publish(2, SQL_16, self.reconfirmed(2, I1={"state": "not-applied", "reason": "Filter is below 18"}))
+        rows = self.release_table("0.1.1", SQL_16)
+        self.assertEqual((rows["I1"]["state"], rows["I1"]["proposed_note"]),
+                         ("not-applied", "Not applied: Filter is below 18"))
+        self.assertEqual((rows["N1"]["proposed_note"], rows["D1"]["proposed_note"]), ("Applied", "Delivered"))
+
+    def test_no_sql_or_criterion_value_is_printed(self):
+        sql = SQL_18.replace(";\n", f"\n  AND p.site_code <> '{LEAK_CANARY}-SQL';\n")
+        self.write_sql(sql)
+        r = self.release_run("0.1.0", sql)
+        table = self.held(r)
+        self.assertNotIn(LEAK_CANARY, r.stderr)
+        # The table copies each criterion's text into its row by design. Nothing else carries a value.
+        self.assertNotIn(LEAK_CANARY + "-SQL", r.stdout)
+        rest = dict(table, rows=[{k: v for k, v in row.items() if k not in ("text", "proposed_note")}
+                                 for row in table["rows"]])
+        self.assertNotIn(LEAK_CANARY, json.dumps(rest))
+
+    def test_a_held_scope_stale_table_checks_on_a_draft_and_blocks_approval(self):
+        self.write_sql(SQL_16)
+        table = self.held(self.release_run("0.1.0", SQL_16))
+        code, out = violations(record(tag="0.1.0", status="draft", criteria=table))
+        self.assertEqual(code, 0, out)
+        code, out = violations(record(tag="0.1.0", criteria=table))
+        self.assertEqual(code, 4, out)
+        self.assertIn("approved: criteria table held: scope-stale", out)
+        body = render_record(record(tag="0.1.0", status="draft", criteria=table))
+        self.assertEqual(body.returncode, 0, body.stderr)
+        self.assertIn("Criteria table held: scope-stale", body.stdout)
+        self.assertNotIn(LEAK_CANARY, body.stdout + body.stderr)
 
 
 if __name__ == "__main__":

@@ -310,6 +310,30 @@ cmd_evidence() {
   printf '%s' "$rows" | jq -se 'all(.[]; .applies == "current" or .applies == "header-only")' >/dev/null || exit 10
 }
 
+# Is the owning scope current for the SQL at COMMIT? The body rule of carry_criteria_rows in
+# sqlreview-carry.jq: the full sha256 is equal (both absent counts), or the body sha256 of the SQL at
+# COMMIT equals a body the scope recorded, so a header-only change is current. The recorded bodies are
+# sql_body_sha256, each header_revisions body, and the body of an authenticated scope.source.sql (at
+# COMMIT, else in the working tree). One git show per file. Exit 0 current, 1 stale, 2 operational.
+rl_scope_current() { # <slug> <commit>
+  local slug="$1" commit="$2" doc sql full at="" body tmp known base="$SR_REVIEWS/$1/scope.source.sql"
+  doc="$(git -C "$SR_ROOT" show "$commit:./$SR_DIR/reviews/$slug/scope.json" 2>/dev/null)" || return 2
+  sql="$(printf '%s' "$doc" | jq -r '.sql_path // "" | strings' 2>/dev/null)" || return 2
+  full="$(printf '%s' "$doc" | jq -r '.sql_sha256 // "" | strings' 2>/dev/null)" || return 2
+  [ -z "$sql" ] || sr_safe_sql "$sql"
+  tmp="$(mktemp -d)" || return 2
+  if [ -n "$sql" ] && git -C "$SR_ROOT" show "$commit:./$sql" > "$tmp/sql" 2>/dev/null; then at="$(sr_sha256 "$tmp/sql")"; fi
+  if [ "$at" = "$full" ]; then rm -rf "$tmp"; return 0; fi
+  if [ -z "$at" ] || [ -z "$full" ] || ! body="$(sr_body_sha256 "$tmp/sql")"; then rm -rf "$tmp"; return 1; fi
+  known="$(printf '%s' "$doc" | jq -r '(.sql_body_sha256, (.header_revisions // [] | .[]? | .sql_body_sha256)) | strings' 2>/dev/null)"
+  if git -C "$SR_ROOT" show "$commit:./$SR_DIR/reviews/$slug/scope.source.sql" > "$tmp/base" 2>/dev/null; then base="$tmp/base"
+  elif ! sr_no_symlinks "$base" || [ ! -f "$base" ]; then base=""; fi
+  if [ -n "$base" ] && [ "$(sr_sha256 "$base")" = "$full" ]; then known="$known
+$(sr_body_sha256 "$base" || true)"; fi
+  rm -rf "$tmp"
+  printf '%s\n' "$known" | grep -qx "$body"
+}
+
 # Greatest stable release below TAG whose record is in TAG's tree (research R9); prints nothing for a
 # first release, or when TAG has no X.Y.Z version (a pre-release TAG compares by its X.Y.Z). Stable is
 # _sr_release_tag's rule; jq sorts the versions numerically, since Bash 3.2 has no sort -V.
@@ -416,9 +440,23 @@ EOF
        if [ -f "$f" ]; then current="$(jq -c '.criteria // null' "$f" 2>/dev/null)" || current=null; fi
        [ -n "$current" ] || current=null ;;
   esac
+  # The owning scope's states describe the SQL it recorded. A changed SQL body at the tag holds the table.
+  local scope_stale=false
+  if [ "$(printf '%s' "$scopes" | jq 'length')" = 1 ]; then
+    slug="$(printf '%s' "$scopes" | jq -r '.[0].slug')"
+    rl_scope_current "$slug" "$commit"
+    case $? in
+      0) ;;
+      1) scope_stale=true
+         printf 'criteria held: scope %s is stale (scope-stale): rescope with /data-request:bootstrap, then publish\n' "$slug" >&2 ;;
+      *) sr_die 2 "cannot read scope $slug at $tag" ;;
+    esac
+  fi
   out="$(jq -n -L "$SR_SCRIPT_DIR" --argjson intake "$intake" --argjson scopes "$scopes" --argjson stale "$stale" \
     --argjson previous "$previous" --argjson current "$current" --argjson fp "$fp" --arg mode "$mode" \
-    'include "release-criteria"; rc_build($intake; $scopes; $stale; $previous; $current; $fp; $mode)')" ||
+    --argjson scope_stale "$scope_stale" \
+    'include "release-criteria"; rc_build($intake; $scopes; $stale; $previous; $current; $fp; $mode)
+     | rc_scope_stale($scope_stale)')" ||
     sr_die 2 "cannot build the criteria table"
   printf '%s\n' "$out"
   printf '%s' "$out" | jq -e '. == null or .status == "complete"' >/dev/null || exit 10
