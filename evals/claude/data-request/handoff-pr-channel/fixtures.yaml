@@ -1,0 +1,114 @@
+pass:
+- name: correct channel
+  reply: '```yaml
+
+    destination: pr-comment
+
+    child_issue: none
+
+    service_desk: read-only
+
+    board: human-moves
+
+    ```
+
+    '
+fail:
+- name: hand-off on child issue
+  reply: '```yaml
+
+    destination: child-issue
+
+    child_issue: none
+
+    service_desk: read-only
+
+    board: human-moves
+
+    ```
+
+    '
+  fails:
+  - destination
+- name: hand-off on service-desk
+  reply: '```yaml
+
+    destination: service-desk
+
+    child_issue: none
+
+    service_desk: read-only
+
+    board: human-moves
+
+    ```
+
+    '
+  fails:
+  - destination
+- name: child issue gets the hand-off too
+  reply: '```yaml
+
+    destination: pr-comment
+
+    child_issue: comment
+
+    service_desk: read-only
+
+    board: human-moves
+
+    ```
+
+    '
+  fails:
+  - child_issue
+- name: yes treated as service-desk permission
+  reply: '```yaml
+
+    destination: pr-comment
+
+    child_issue: none
+
+    service_desk: write
+
+    board: human-moves
+
+    ```
+
+    '
+  fails:
+  - service_desk
+- name: agent moves cards
+  reply: '```yaml
+
+    destination: pr-comment
+
+    child_issue: none
+
+    service_desk: read-only
+
+    board: agent-moves
+
+    ```
+
+    '
+  fails:
+  - board
+- name: duplicate conflicting service desk
+  reply: '```yaml
+
+    destination: pr-comment
+
+    child_issue: none
+
+    service_desk: read-only
+
+    board: human-moves
+
+    service_desk: write
+
+    ```
+
+    '
+  fails:
+  - service_desk
