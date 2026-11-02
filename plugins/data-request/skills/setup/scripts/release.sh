@@ -22,6 +22,8 @@
 #                            "done" (with commit), "handed off" or "withdrawn" (with reason).
 #                            A handed-off part, a done commit outside REF or a malformed record
 #                            holds the release (exit 11, ids and fields on stderr).
+#                            An entry of .sqlreview/ledger.json at the amend stage with no record
+#                            file holds too.
 #   check FILE | check --stdin
 #                            validate a release record (.sqlreview/releases/<tag>/release.json):
 #                            one violation per line, exit 4; "ok" otherwise
@@ -253,11 +255,42 @@ else
      else bad("\($at).status") end)
 end'
 
+# The triage ledger shows an amendment when an entry has the amend stage. Emits each recorded
+# amendment record path, or "none" when an amended entry names no record. Paths only, no values.
+RL_AMEND_LEDGER_JQ='def rec: type == "string" and test("^\\.sqlreview/amendments/[a-z0-9][a-z0-9-]*\\.json$");
+if type != "object" or (.entries | type) != "array" then "bad"
+else .entries[] | objects | select(.stage == "amend" or ((.stages_done | arrays | index("amend")) != null))
+  | [.stage_evidence.amend.artifacts | arrays | .[] | objects | .path | select(rec)]
+  | if length == 0 then "none" else .[] | "path\t" + . end
+end'
+
+# One jq read of .sqlreview/ledger.json. Sets $missing to one hold line per amended entry whose
+# record file does not exist. A ledger that is not valid JSON also holds.
+rl_amend_ledger_missing() {
+  local ledger="$SR_ROOT/$SR_DIR/ledger.json" line nl='
+' next='write it from the amendment hand-off comment on the deliverable PR (/data-request:amend step 5)'
+  missing=""
+  [ -e "$ledger" ] || return 0
+  sr_no_symlinks "$ledger" || exit 2
+  while read -r line; do
+    case "$line" in
+      "") ;;
+      bad) missing="$missing${nl}release held: $SR_DIR/ledger.json: field entries is missing or invalid" ;;
+      none) missing="$missing${nl}release held: the ledger shows an amendment but no record: $SR_DIR/amendments/<request>.json is missing. Next: $next" ;;
+      path*) line="${line#path?}"
+        [ -f "$SR_ROOT/$line" ] ||
+          missing="$missing${nl}release held: the ledger shows an amendment but $line is missing. Next: $next" ;;
+    esac
+  done <<EOF
+$(jq -r "$RL_AMEND_LEDGER_JQ" "$ledger" 2>/dev/null || printf 'bad\n')
+EOF
+}
+
 # Hold while any part in .sqlreview/amendments/*.json is handed off, malformed, or done by a
 # commit outside the release. One jq read per document; the messages name part ids, files and
 # fields only. Prints the hold on stderr and returns 11 when held.
 rl_amend_hold() { # <ref> <commit>
-  local ref="$1" commit="$2" f rel kind id field c rows open="" stale="" bad="" nl='
+  local ref="$1" commit="$2" f rel kind id field c rows open="" stale="" bad="" missing="" nl='
 '
   for f in "$SR_ROOT/$SR_DIR"/amendments/*.json; do
     [ -e "$f" ] || continue
@@ -274,11 +307,13 @@ rl_amend_hold() { # <ref> <commit>
 $rows
 EOF
   done
-  [ -n "$open$stale$bad" ] || return 0
+  rl_amend_ledger_missing  # sets missing: amended in the ledger, no record file
+  [ -n "$open$stale$bad$missing" ] || return 0
   [ -z "$open" ] || printf 'release held: amend part handed off and open:%s\n' "$open" >&2
   [ -z "$stale" ] || printf 'release held: amend part done by a commit not in %s:%s\n' "$ref" "$stale" >&2
   [ -z "$bad" ] || printf '%s\n' "${bad#?}" >&2
-  printf '%s\n' "next: the engineer comments done: P<n> <commit> or the analyst comments withdrawn: P<n> <reason> on the deliverable PR, then the record is updated" >&2
+  [ -z "$missing" ] || printf '%s\n' "${missing#?}" >&2
+  [ -z "$open$stale$bad" ] || printf '%s\n' "next: the engineer comments done: P<n> <commit> or the analyst comments withdrawn: P<n> <reason> on the deliverable PR, then the record is updated" >&2
   return 11
 }
 

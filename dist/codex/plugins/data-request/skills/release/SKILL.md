@@ -78,7 +78,8 @@ entries. Only a later comment whose first line has one of two forms closes a han
 
 Any other comment that names the part leaves it open, for example "P3 is still in progress".
 For each handed-off part, say in one line which comment you read and what it decided. A hand-off
-comment with no record is a blocker: write the record with the part `handed off`. If you cannot
+comment with no record is a blocker: write the record with the part `handed off`. The script also
+holds when the ledger shows an `amend` stage and the record file is missing. If you cannot
 read the PR, say so and stop. Never assume that no part is open.
 
 Then run `bash "$S/release.sh" evidence "<ref>"`. Exit 11 means release held: stop before step 1.

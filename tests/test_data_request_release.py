@@ -714,6 +714,64 @@ class AmendGate(unittest.TestCase):
                 self.assertIn(f"release held: {self.RECORD}: field", r.stderr)
                 self.assert_no_leak(r)
 
+    def ledger(self, stages_done=("intake", "amend"), artifacts=None):
+        # The triage ledger's own entry style: the amend stage lists the record as its artifact.
+        amend = {"sources": ["pr"], "artifacts": artifacts if artifacts is not None else []}
+        entry = {"ticket": "rdl-service-desk/service-desk#9177", "enquiry": "ENQ9177", "stage": "release",
+                 "stages_done": list(stages_done), "evidence_revision": {"ticket": "2026-11-01", "pr": "abc1234"},
+                 "stage_evidence": {"intake": {"sources": ["ticket"], "artifacts": []}},
+                 "decisions": [], "blockers": [{"class": "note", "detail": CANARY}], "depends_on": [],
+                 "next_action": f"analyst-handle: release {CANARY}",
+                 "verification": {"status": "unverified", "commands": [], "at": "2026-11-01"}}
+        if "amend" in stages_done:
+            entry["stage_evidence"]["amend"] = amend
+        store = {"schemaVersion": 1, "entries": [entry]}
+        path = self.p.root / ".sqlreview/ledger.json"
+        path.write_text(json.dumps(store))
+        r = run(SQLREVIEW, ["ledger", "check", ".sqlreview/ledger.json"], self.p.root)
+        self.assertEqual(r.returncode, 0, r.stdout + r.stderr)
+
+    def artifact(self):
+        return [{"path": self.RECORD, "sha256": "0" * 64}]
+
+    def test_ledger_amendment_without_record_holds(self):
+        for name, artifacts, path in (("record named", self.artifact(), self.RECORD),
+                                      ("no record named", [], ".sqlreview/amendments/<request>.json")):
+            with self.subTest(name):
+                self.ledger(artifacts=artifacts)
+                r = self.p.evidence("v1.0.0")
+                self.assertEqual(r.returncode, 11, r.stderr)
+                self.assertIn(f"{path} is missing", r.stderr)
+                self.assertIn("amendment hand-off comment on the deliverable PR", r.stderr)
+                self.assertNotIn("comments done:", r.stderr)
+                self.assert_no_leak(r)
+
+    def test_ledger_amendment_with_record_follows_the_record(self):
+        self.ledger(artifacts=self.artifact())
+        self.record([self.part("P1", "done", commit=self.head), self.part("P2", "withdrawn", reason=CANARY)])
+        r = self.p.evidence("v1.0.0")
+        self.assertEqual(r.returncode, 0, r.stderr)
+        self.assert_no_leak(r)
+        self.record([self.part("P1", "done", commit=self.head), self.part("P2", "handed off")])
+        r = self.p.evidence("v1.0.0")
+        self.assertEqual(r.returncode, 11, r.stderr)
+        self.assertIn("open: P2", r.stderr)
+        self.assertNotIn("is missing", r.stderr)
+        self.assert_no_leak(r)
+
+    def test_ledger_without_amendment_and_no_record_passes(self):
+        self.ledger(stages_done=("intake",))
+        r = self.p.evidence("v1.0.0")
+        self.assertEqual(r.returncode, 0, r.stderr)
+        self.assertEqual(r.stderr, "")
+
+    def test_unreadable_ledger_holds(self):
+        (self.p.root / ".sqlreview/ledger.json").write_text(f'{{"entries": "{CANARY}')
+        r = self.p.evidence("v1.0.0")
+        self.assertEqual(r.returncode, 11, r.stderr)
+        self.assertIn("release held: .sqlreview/ledger.json: field entries is missing or invalid", r.stderr)
+        self.assert_no_leak(r)
+
     def test_every_record_is_read(self):
         self.record([self.part("P1", "done", commit=self.head)])
         self.p.write(".sqlreview/amendments/enq9178-falls.json",

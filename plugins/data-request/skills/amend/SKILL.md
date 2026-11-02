@@ -205,7 +205,9 @@ Before or after release, write the part states of each split request to
 ```
 
 A `done` part needs the commit that made the change. A `withdrawn` part needs the reason. Write
-the whole file again for each change. If the repository has no `.sqlreview/`, say so: release
+the whole file again for each change. When you split a request, also set its triage ledger entry once, with `amend` in
+`stages_done` and the record path and SHA-256 as its `amend` artifact (`sqlreview.sh ledger set`).
+Reuse the entry if one exists, and put no part text or values in it. If the repository has no `.sqlreview/`, say so: release
 needs `/data-request:setup` first.
 
 For a released extract, add one entry per amendment, with its classification, to the child's
