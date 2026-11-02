@@ -4,7 +4,8 @@
 # model knows which /data-request:* stage applies before it is asked. Each review that needs
 # action adds one line with its next command from status (bootstrap first when the scope is out
 # of date, #514). Runs `sqlreview.sh status --json` from the event's cwd. Advisory only: any failure (no helper, no cwd, no jq) is a silent
-# no-op, and an uninitialised project only gets a hint when it actually contains SQL files.
+# no-op, and an uninitialised project only gets a hint when it actually contains SQL files. When status
+# runs past its budget (SQLREVIEW_PREFLIGHT_BUDGET seconds, default 4), one line says so.
 set -u
 input="$(cat 2>/dev/null)" || exit 0
 field() {
@@ -30,9 +31,22 @@ for c in "${CLAUDE_PLUGIN_ROOT:-/nonexistent}/skills/setup/scripts/sqlreview.sh"
 done
 [ -n "$helper" ] || exit 0
 
-status="$(cd "$cwd" && bash "$helper" status --json 2>/dev/null)"; rc=$?
+# Claude Code stops this hook after 5 seconds and drops its output without a message. Status takes
+# about 0.15 s per review, so give it a budget and report a timeout instead of going silent.
+budget="${SQLREVIEW_PREFLIGHT_BUDGET:-4}"
+case "$budget" in ''|*[!0-9]*) budget=4 ;; esac
+status="$(cd "$cwd" || exit 1
+  bash "$helper" status --json 2>/dev/null </dev/null & pid=$!
+  # The watchdog stops its own sleep when stopped, so no process outlives the hook.
+  ( sleep "$budget" & s=$!; trap 'kill "$s" 2>/dev/null; exit 0' TERM; wait "$s" && kill -TERM "$pid" ) </dev/null >/dev/null 2>&1 & dog=$!
+  wait "$pid"; rc=$?
+  # A live watchdog means status ended by itself.
+  if kill -0 "$dog" 2>/dev/null; then kill "$dog" 2>/dev/null; exit "$rc"; fi
+  exit 124)"; rc=$?
 ctx=""
-if [ "$rc" -eq 3 ]; then
+if [ "$rc" -eq 124 ]; then
+  ctx="SQL Review: status did not finish in the $budget-second session-start budget, so this summary is not available. Run sqlreview.sh status to see each review and its next command."
+elif [ "$rc" -eq 3 ]; then
   has_sql="$(cd "$cwd" && { git ls-files -- '*.sql' '**/*.sql' 2>/dev/null; find . -name .git -prune -o -type f -name '*.sql' -print 2>/dev/null; } | head -1)"
   [ -n "$has_sql" ] || exit 0
   ctx="SQL Review: this project contains SQL files but has no .sqlreview/ directory. /data-request:setup initialises it (once per project); then /data-request:bootstrap, :analyse and :explain use it."
