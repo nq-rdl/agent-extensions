@@ -30,8 +30,10 @@ Order: the Data Engineer completes `analyse`, the authorised operator run, UAT a
 hand-off; the Data Analyst runs `explain`, accepts for release preparation, sends back or
 amends presentation, then drafts here and publishes. Never direct the engineer to release.
 If the analyst chooses **Send back** here, use the paste-ready *Analyst outcome* note in
-`${CLAUDE_PLUGIN_ROOT}/skills/explain/SKILL.md`: logic changes or defects to `fix`, presentation
-changes to `amend` before or after release. Keep unresolved claims `pending` and the current
+`${CLAUDE_PLUGIN_ROOT}/skills/explain/SKILL.md`, with its completeness check: logic changes or defects to `fix`, presentation
+changes to `amend` before or after release. Add two lines after `outcome:`: `release ref: <tag
+or candidate ref>`, and `release claims: <claim and question ids, with the conflicting sources
+for each>`. The engineer then has the claim, its sources and the expected result in one comment. Keep unresolved claims `pending` and the current
 candidate record `draft`; do not overwrite a previously approved release record, post the
 note or clear a gate. The note belongs on the deliverable PR, never the child issue or
 service-desk. See *Communication channel* in `${CLAUDE_PLUGIN_ROOT}/skills/triage/references/handoff.rst`. Refreshed review and operator-run/UAT evidence precede another hand-off.
@@ -41,12 +43,46 @@ a storage fact or conversion. Worked example:
 [references/worked-example.rst](references/worked-example.rst).
 
 Arguments: `$ARGUMENTS` — the release tag or candidate ref (for example `v1.0.0`). If none is
-given, ask for it.
+given, work it out before you ask. Read the release tags (`git tag --list 'v*'`), published
+releases and their notes, `.sqlreview/releases/*/release.json`, the ledger and merged release
+PRs. Guardrails `references/release.rst`, **Release state from evidence**, lists these signals.
+When exactly one tag has no `approved` release record, use it and say so in one line. For
+example: "Candidate v1.1.0: v1.0.0 has an approved record, v1.1.0 has none." Ask only when no
+tag or more than one tag qualifies, and list the candidates in the question.
 
 ```bash
 S="${CLAUDE_PLUGIN_ROOT}/skills/setup/scripts"
 bash "$S/sqlreview.sh" status --json   # exit 3 → stop: not initialised, run /data-request:setup first
 ```
+
+## 0. Amend gate
+
+Do this before any other step. A part that `/data-request:amend` handed off blocks the release
+until a strict comment on the deliverable PR closes it. `release.sh evidence` enforces this from
+amend's part-state record, `.sqlreview/amendments/<request>.json` (amend step 5). Each part has
+the status `done`, `handed off` or `withdrawn`.
+
+First bring the record up to date. Find the deliverable PR in the ledger, or use the PR URL the
+analyst gives. Read its comments, read-only, for each `amendment hand-off:` comment and its `part:`
+entries. Only a later comment whose first line has one of two forms closes a handed-off part:
+
+- **Completed:** `done: P<n> <commit>`, from the engineer. Set the part to `done` with that commit.
+  The script checks that the commit is in the release ref (`git merge-base --is-ancestor <commit> <ref>`).
+  If the check fails or cannot run, the part stays open.
+- **Withdrawn:** `withdrawn: P<n> <reason>`, from the analyst. Set the part to `withdrawn` with that
+  reason. A `withdrawn:` line with no reason leaves the part open.
+
+Any other comment that names the part leaves it open, for example "P3 is still in progress".
+For each handed-off part, say in one line which comment you read and what it decided. A hand-off
+comment with no record is a blocker: write the record with the part `handed off`. The script also
+holds when the ledger shows an `amend` stage and the record file is missing. If you cannot
+read the PR, say so and stop. Never assume that no part is open.
+
+Then run `bash "$S/release.sh" evidence "<ref>"`. Exit 11 means release held: stop before step 1.
+Give its stderr in one or two lines, for example "Release held: P3 is handed off and open. Next:
+the engineer comments `done: P3 <commit>` on the PR, or you withdraw it there." Offer to draft
+`withdrawn: P3 <reason>` with the analyst's own reason. Do not draft it without a reason. Post
+nothing. Never edit the record to pass the gate without a strict comment.
 
 ## 1. Gather the release evidence
 
@@ -64,7 +100,7 @@ For counts in that evidence, apply guardrails `references/release.rst`, **Probe 
 Then list the reviews and whether each describes the release:
 
 ```bash
-bash "$S/release.sh" evidence "<tag>"   # exit 0 every review applies · 10 at least one does not · 2 unknown ref
+bash "$S/release.sh" evidence "<tag>"   # exit 0 every review applies · 10 at least one does not · 11 amend hold · 2 unknown ref
 ```
 
 For each slug, load `bash "$S/sqlreview.sh" questions "$SLUG" review`: `questions.json`
