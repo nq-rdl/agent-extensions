@@ -7,7 +7,9 @@
 #   init [--diff] [--apply PATH...] [--json]   create .sqlreview/ from the bundled default (plus an empty
 #                                              reviews/.gitkeep so git keeps reviews/); never overwrites
 #   status [--json] [--verbose]                reviews, their state and the next command (bootstrap first when the
-#                                              SQL or intake changed after the scope; --verbose: why invalid/missing,
+#                                              SQL or intake changed after the scope, or to bind an unbound scope;
+#                                              a commit before analyse when git lists the SQL as uncommitted; an
+#                                              empty project names bootstrap; --verbose: why invalid/missing,
 #                                              and the move that migrates a legacy-encoded slug); exit 3 when not initialised
 #                                              missing bundled templates: JSON missing_templates, else one stderr line
 #   slug PATH                                  slug for a project path; exit 5 on a conflicting binding. Readable:
@@ -162,7 +164,7 @@ cmd_init() {
 
 # ---------------------------------------------------------------------------------------------
 cmd_status() {
-  local json=0 verbose=0 d slug state reason migrate next schema lifts rows="[]" f missing=""
+  local json=0 verbose=0 d slug state reason migrate next schema lifts rows="[]" f missing="" seen=0
   while [ $# -gt 0 ]; do
     case "$1" in --json) json=1 ;; --verbose) verbose=1 ;; *) usage ;; esac
     shift
@@ -184,9 +186,12 @@ cmd_status() {
   if [ -n "$missing" ] && [ "$json" = 0 ]; then
     printf 'sqlreview: missing bundled template(s): %s; render installs them automatically, or add them now with: sqlreview.sh init --apply %s\n' "$missing" "$missing" >&2
   fi
+  # One git call per run, not one per review: which SQL is not committed yet (sr_next reads it).
+  sr_load_uncommitted
   if [ -d "$SR_REVIEWS" ]; then
     for d in "$SR_REVIEWS"/*/; do
       [ -d "$d" ] || continue
+      seen=1
       slug="${d%/}"; slug="${slug##*/}"
       IFS="$SR_TAB" read -r state SR_SQL_PATH SR_REVISION <<EOF
 $(sr_state "$slug")
@@ -221,9 +226,13 @@ EOF
       fi
     done
   fi
+  # An empty project has one next step: scope the first SQL file.
+  next=""
+  [ "$seen" = 1 ] || next="/data-request:bootstrap <sql path> to scope the first SQL file"
+  if [ "$json" = 0 ] && [ -n "$next" ]; then printf 'no reviews yet\tnext=%s\n' "$next"; fi
   if [ "$json" = 1 ]; then
-    printf '%s' "$rows" | jq --arg root "$SR_ROOT" --arg schema "$schema" --arg missing "$missing" \
-      '{root: $root, schemaVersion: ($schema | tonumber? // $schema), reviews: .,
+    printf '%s' "$rows" | jq --arg root "$SR_ROOT" --arg schema "$schema" --arg missing "$missing" --arg next "$next" \
+      '{root: $root, schemaVersion: ($schema | tonumber? // $schema), reviews: ., next: (if $next == "" then null else $next end),
         counts: (group_by(.state) | map({key: .[0].state, value: length}) | from_entries | . + {total: (map(.) | add // 0)}),
         missing_templates: ($missing | split(" ") | map(select(. != ""))),
         missing_templates_fix: (if $missing == "" then null else "sqlreview.sh init --apply " + $missing end)}'

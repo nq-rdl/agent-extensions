@@ -327,13 +327,38 @@ sr_state_reason() { # <slug> <state>
   printf '%s\n' "$why"
 }
 
+# SQL paths that git reports as uncommitted (untracked, modified or staged), one per line between
+# newlines. cmd_status sets it once per run with ONE git call, before its loop over the reviews,
+# because analyse's fingerprint refuses uncommitted SQL. Paths are relative to $SR_ROOT. Empty when
+# git or the repository is unavailable: then no review is named as uncommitted.
+SR_NL='
+'
+sr_load_uncommitted() {
+  local line p
+  SR_UNCOMMITTED="$SR_NL"
+  command -v git >/dev/null 2>&1 || return 0
+  while IFS= read -r line; do
+    p="${line#???}"
+    # A quoted path (one with a space) loses its quotes. A path that git escapes does not match.
+    case "$p" in \"*\") p="${p#\"}"; p="${p%\"}" ;; esac
+    [ -z "$p" ] || SR_UNCOMMITTED="$SR_UNCOMMITTED$p$SR_NL"
+  done <<EOF
+$(git --no-optional-locks -C "$SR_ROOT" -c core.quotePath=false -c status.relativePaths=true -c color.status=false \
+    status --short --untracked-files=all --no-renames -- . ":(exclude)$SR_DIR" 2>/dev/null)
+EOF
+}
+sr_uncommitted() { # <sql_path>: true when the run's git status lists it
+  case "${SR_UNCOMMITTED-}" in *"$SR_NL$1$SR_NL"*) return 0 ;; esac
+  return 1
+}
+
 # The next command for one review directory, on one line (#514). Derived only from records that
 # already exist: the state, scope.json and its scope.source.sql binding, the root answers.intake.json
 # and explain.json. A bound scope whose SQL body moved on, or whose imported analyst decisions no
 # longer match the sidecar, names bootstrap as the rescope step. Cheap: a few jq and hash calls,
 # because status runs from a SessionStart hook with a 5-second timeout.
 sr_next() { # <slug> <state> <sql_path>
-  local d="$SR_REVIEWS/$1" state="$2" sql="$3" scope srev="" bound="" intake="" why="" follow="" ex
+  local d="$SR_REVIEWS/$1" state="$2" sql="$3" scope srev="" bound="" intake="" why="" gap="" follow="" ex pre=""
   case "$state" in
     draft)
       if [ -f "$d/scope.draft.json" ]; then printf 'resume /data-request:bootstrap to finish the scope draft\n'
@@ -360,31 +385,38 @@ $( { [ -f "$sidecar" ] && jq -rn --slurpfile s "$scope" --slurpfile i "$sidecar"
 EOF2
     case "$srev" in ''|*[!0-9]*) srev="" ;; esac
   fi
+  # Analyse fingerprints committed SQL only, so uncommitted SQL is committed first.
+  if [ -f "$SR_ROOT/$sql" ] && sr_uncommitted "$sql"; then pre="commit $sql, then "; fi
   if [ -n "$srev" ]; then
     # The scope document's own staleness is the state itself. Under a review, test the scope
-    # binding directly: analyse alone never refreshes scope.json.
+    # binding directly: analyse alone never refreshes scope.json. A scope framed before the SQL
+    # existed has no binding to compare, so a stale review over it also names the rescope.
     if [ "$state" = stale ] && [ ! -f "$d/review.json" ]; then why="The SQL"
     elif [ -f "$d/review.json" ] && [ "$bound" = y ] && [ -f "$SR_ROOT/$sql" ]; then
       sr_binding "$scope" "$SR_ROOT/$sql" "$d/scope.source.sql" >/dev/null 2>&1
       [ $? -eq 1 ] && why="The SQL"
+    elif [ "$state" = stale ] && [ -f "$d/review.json" ] && [ "$bound" = n ]; then
+      why="The SQL"; gap=", which has no SQL binding"
     fi
     if [ "$intake" = y ]; then why="${why:+$why and the analyst intake}"; why="${why:-The analyst intake}"; fi
     if [ -n "$why" ]; then
-      if [ -f "$d/review.json" ]; then follow="/data-request:analyse $sql --update"
-      elif [ -f "$SR_ROOT/$sql" ]; then follow="/data-request:analyse $sql"
+      if [ -f "$d/review.json" ]; then follow="$pre/data-request:analyse $sql --update"
+      elif [ -f "$SR_ROOT/$sql" ]; then follow="$pre/data-request:analyse $sql"
       else follow="/data-request:draft to write $sql"; fi
-      printf '%s changed after scope revision %s: run /data-request:bootstrap %s to publish scope revision %s, then %s\n' \
-        "$why" "$srev" "$sql" "$((srev + 1))" "$follow"
+      printf '%s changed after scope revision %s%s: run /data-request:bootstrap %s to publish scope revision %s, then %s\n' \
+        "$why" "$srev" "$gap" "$sql" "$((srev + 1))" "$follow"
       return 0
     fi
   fi
   case "$state" in
     scoped)
-      if [ -f "$SR_ROOT/$sql" ]; then printf '/data-request:analyse %s to review the SQL\n' "$sql"
-      else printf '/data-request:draft to write %s, then /data-request:analyse %s\n' "$sql" "$sql"; fi ;;
+      if [ ! -f "$SR_ROOT/$sql" ]; then printf '/data-request:draft to write %s, then /data-request:analyse %s\n' "$sql" "$sql"
+      elif [ "$bound" = n ]; then
+        printf '/data-request:bootstrap %s to bind the scope to the SQL, then %s/data-request:analyse %s\n' "$sql" "$pre" "$sql"
+      else printf '%s/data-request:analyse %s to review the SQL\n' "$pre" "$sql"; fi ;;
     scoped-header-only) printf '/data-request:bootstrap %s to record the header revision of the scope\n' "$sql" ;;
-    stale|no-baseline) printf '/data-request:analyse %s --update\n' "$sql" ;;
-    header-only) printf '/data-request:analyse %s to record the header revision of the review\n' "$sql" ;;
+    stale|no-baseline) printf '%s/data-request:analyse %s --update\n' "$pre" "$sql" ;;
+    header-only) printf '%s/data-request:analyse %s to record the header revision of the review\n' "$pre" "$sql" ;;
     current)
       ex=""
       if [ -f "$d/explain.json" ] && [ ! -L "$d/explain.json" ]; then

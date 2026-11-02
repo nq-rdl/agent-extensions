@@ -195,6 +195,8 @@ class Status(unittest.TestCase):
             (p.root / "audits" / "gone.sql").unlink()
             p.sql("reports/nobase.sql", SQL_V1)
             p.write_json("reports__planned", "scope.json", scope_doc("reports__planned", "reports/planned.sql"))
+            git(p.root, "add", "-A")  # committed SQL: analyse fingerprints committed SQL only
+            git(p.root, "commit", "-q", "-m", "sql")
             j = json.loads(run(["status", "--json"], p.root).stdout)
             states = {r["slug"]: r["state"] for r in j["reviews"]}
             self.assertEqual(states, {
