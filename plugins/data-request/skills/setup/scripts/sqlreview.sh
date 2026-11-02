@@ -6,8 +6,11 @@
 #
 #   init [--diff] [--apply PATH...] [--json]   create .sqlreview/ from the bundled default (plus an empty
 #                                              reviews/.gitkeep so git keeps reviews/); never overwrites
-#   status [--json] [--verbose]                reviews and their state (--verbose: why invalid/missing, and the
-#                                              move that migrates a legacy-encoded slug); exit 3 when not initialised
+#   status [--json] [--verbose]                reviews, their state and the next command (bootstrap first when the
+#                                              SQL or intake changed after the scope, or to bind an unbound scope;
+#                                              a commit before analyse when git lists the SQL as uncommitted; an
+#                                              empty project names bootstrap; --verbose: why invalid/missing,
+#                                              and the move that migrates a legacy-encoded slug); exit 3 when not initialised
 #                                              missing bundled templates: JSON missing_templates, else one stderr line
 #   slug PATH                                  slug for a project path; exit 5 on a conflicting binding. Readable:
 #                                              sql/cohort_pipeline/x.sql -> sql__cohort_pipeline__x; an existing
@@ -173,7 +176,7 @@ cmd_init() {
 
 # ---------------------------------------------------------------------------------------------
 cmd_status() {
-  local json=0 verbose=0 d slug state reason migrate schema lifts rows="[]" f missing=""
+  local json=0 verbose=0 d slug state reason migrate next schema lifts rows="[]" f missing="" seen=0
   while [ $# -gt 0 ]; do
     case "$1" in --json) json=1 ;; --verbose) verbose=1 ;; *) usage ;; esac
     shift
@@ -190,9 +193,12 @@ cmd_status() {
   if [ -n "$missing" ] && [ "$json" = 0 ]; then
     printf 'sqlreview: missing bundled template(s): %s; render installs them automatically, or add them now with: sqlreview.sh init --apply %s\n' "$missing" "$missing" >&2
   fi
+  # One git call per run, not one per review: which SQL is not committed yet (sr_next reads it).
+  sr_load_uncommitted
   if [ -d "$SR_REVIEWS" ]; then
     for d in "$SR_REVIEWS"/*/; do
       [ -d "$d" ] || continue
+      seen=1
       slug="$(basename "$d")"
       IFS="$(printf '\t')" read -r state SR_SQL_PATH SR_REVISION <<EOF
 $(sr_state "$slug")
@@ -204,6 +210,7 @@ EOF
         else lifts='{"invalid":true}'; fi
       fi
       reason="" migrate=""
+      next="$(sr_next "$slug" "$state" "$SR_SQL_PATH")"
       [ "$verbose" = 1 ] && reason="$(sr_state_reason "$slug" "$state")"
       # A legacy-encoded slug (#353) of the path it records can be migrated to the readable one.
       if [ "$verbose" = 1 ] && [ -n "$SR_SQL_PATH" ] &&
@@ -212,21 +219,27 @@ EOF
       fi
       if [ "$json" = 1 ]; then
         rows="$(printf '%s' "$rows" | jq -c --arg slug "$slug" --arg state "$state" --arg sql "$SR_SQL_PATH" --arg rev "$SR_REVISION" --argjson lifts "$lifts" \
-          --arg reason "$reason" --arg migrate "$migrate" --argjson verbose "$verbose" \
-          '. + [{slug: $slug, state: $state, sql_path: $sql, revision: ($rev | tonumber? // null), lifts: $lifts}
+          --arg reason "$reason" --arg migrate "$migrate" --argjson verbose "$verbose" --arg next "$next" \
+          '. + [{slug: $slug, state: $state, sql_path: $sql, revision: ($rev | tonumber? // null), lifts: $lifts,
+                 next: (if $next == "" then null else $next end)}
                 + (if $verbose == 1 then {reason: (if $reason == "" then null else $reason end),
                                           migrate: (if $migrate == "" then null else $migrate end)} else {} end)]')"
       else
         printf '%s\t%s\t%s\t%s\tlifts=%s' "$slug" "$state" "$SR_SQL_PATH" "$SR_REVISION" "$lifts"
+        [ -z "$next" ] || printf '\tnext=%s' "$next"
         [ -z "$reason" ] || printf '\treason=%s' "$reason"
         [ -z "$migrate" ] || printf '\tmigrate=%s' "$migrate"
         printf '\n'
       fi
     done
   fi
+  # An empty project has one next step: scope the first SQL file.
+  next=""
+  [ "$seen" = 1 ] || next="/data-request:bootstrap <sql path> to scope the first SQL file"
+  if [ "$json" = 0 ] && [ -n "$next" ]; then printf 'no reviews yet\tnext=%s\n' "$next"; fi
   if [ "$json" = 1 ]; then
-    printf '%s' "$rows" | jq --arg root "$SR_ROOT" --arg schema "$schema" --arg missing "$missing" \
-      '{root: $root, schemaVersion: ($schema | tonumber? // $schema), reviews: .,
+    printf '%s' "$rows" | jq --arg root "$SR_ROOT" --arg schema "$schema" --arg missing "$missing" --arg next "$next" \
+      '{root: $root, schemaVersion: ($schema | tonumber? // $schema), reviews: ., next: (if $next == "" then null else $next end),
         counts: (group_by(.state) | map({key: .[0].state, value: length}) | from_entries | . + {total: (map(.) | add // 0)}),
         missing_templates: ($missing | split(" ") | map(select(. != ""))),
         missing_templates_fix: (if $missing == "" then null else "sqlreview.sh init --apply " + $missing end)}'
