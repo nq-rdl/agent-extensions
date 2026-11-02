@@ -22,7 +22,7 @@ metadata:
 > v1.0.12 source (2026-09-28); flags drift, so `--help` is authoritative. Confirm
 > against `references/cli-and-catalogs.rst` and the live
 > [extensions reference](https://github.github.io/spec-kit/reference/extensions.html)
-> and [user guide](https://raw.githubusercontent.com/github/spec-kit/main/extensions/EXTENSION-USER-GUIDE.md).
+> and [user guide](https://raw.githubusercontent.com/github/spec-kit/main/docs/extensions/overview.md).
 
 ## Install spec-kit
 

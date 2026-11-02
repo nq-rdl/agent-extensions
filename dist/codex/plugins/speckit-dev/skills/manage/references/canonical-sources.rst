@@ -15,10 +15,10 @@ Primary
   https://github.github.io/spec-kit/reference/extensions.html
 - Extension User Guide (install, catalog stack, per-extension config
   layering, full `specify extension` CLI):
-  https://raw.githubusercontent.com/github/spec-kit/main/extensions/EXTENSION-USER-GUIDE.md
+  https://raw.githubusercontent.com/github/spec-kit/main/docs/extensions/overview.md
 - Development Guide (manifest schema, validation rules, minimal example,
   .extensionignore):
-  https://raw.githubusercontent.com/github/spec-kit/main/extensions/EXTENSION-DEVELOPMENT-GUIDE.md
+  https://raw.githubusercontent.com/github/spec-kit/main/docs/extensions/developing.md
 - Official scaffold (mirror this):
   https://github.com/github/spec-kit/tree/main/extensions/template
 - API reference (Python classes, hook events):
