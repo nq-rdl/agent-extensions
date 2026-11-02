@@ -104,7 +104,8 @@ class StatusReportsMissingTemplates(unittest.TestCase):
         self.assertEqual(j["missing_templates"], ["templates/lifts.md"])
         self.assertEqual(j["missing_templates_fix"], FIX)
         text = self.status()
-        self.assertEqual(text.stdout, "")  # stdout stays one tab-separated row per review
+        # stdout stays one tab-separated row per review, or the one next-step row of an empty project
+        self.assertEqual(text.stdout, "no reviews yet\tnext=/data-request:bootstrap <sql path> to scope the first SQL file\n")
         self.assertIn("templates/lifts.md", text.stderr)
         self.assertIn(FIX, text.stderr)
 
