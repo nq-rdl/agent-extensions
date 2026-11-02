@@ -192,6 +192,23 @@ For a split request, record each part on its own line with its `P` number and a 
 `done`, `handed off` or `withdrawn`. A handed-off part also gets the hand-off comment URL, or
 "draft, not posted". A withdrawn part also gets the reason and the `withdrawn:` comment URL.
 
+### The part-state record
+
+Before or after release, write the part states of each split request to
+`.sqlreview/amendments/<request>.json`. Use lower-case letters, digits and hyphens in the name.
+`release.sh evidence` reads this file and holds the release while a part is handed off:
+
+```json
+{"schemaVersion": 1, "kind": "amendment",
+ "parts": [{"id": "P1", "status": "done", "commit": "<commit>"},
+           {"id": "P2", "status": "handed off", "hand_off": "<comment URL or draft, not posted>"},
+           {"id": "P3", "status": "withdrawn", "reason": "<reason>", "comment": "<comment URL>"}]}
+```
+
+A `done` part needs the commit that made the change. A `withdrawn` part needs the reason. Write
+the whole file again for each change. If the repository has no `.sqlreview/`, say so: release
+needs `/data-request:setup` first.
+
 For a released extract, add one entry per amendment, with its classification, to the child's
 amendment record. In a data-analysis-scaffold child this is `specs/amendments.md`
 ([data-analysis-scaffold#234](https://github.com/nq-rdl/data-analysis-scaffold/issues/234)).
@@ -274,4 +291,4 @@ PR and the record from step 5. Do not split the request again from the start.
   Do not post the hand-off again. If the comment is missing, draft it again for the human.
 
 Update the record line of each part whose status changed: `done` for a `done:` comment, and
-`withdrawn` for a `withdrawn:` comment.
+`withdrawn` for a `withdrawn:` comment. Update the part-state record (step 5) in the same way.

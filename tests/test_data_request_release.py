@@ -276,6 +276,19 @@ class SkillContract(unittest.TestCase):
                     self.assertIn(token, text)
                 self.assertNotIn("the engineer says the part is done", text)
 
+    def test_amend_gate_relies_on_the_script_hold(self):
+        # #534: the skill updates amend's record from the strict comments; the script holds.
+        for tree in SKILL:
+            with self.subTest(tree=tree):
+                text = flat(section(self.body(tree), "## 0. Amend gate"))
+                for token in ("`.sqlreview/amendments/<request>.json`", "`release.sh evidence` enforces this",
+                              "Exit 11 means release held: stop before step 1",
+                              "Never edit the record to pass the gate without a strict comment"):
+                    self.assertIn(token, text)
+        amend = flat((REPO / "skills/data-request-amend/SKILL.md").read_text())
+        self.assertIn("`.sqlreview/amendments/<request>.json`", amend)
+        self.assertIn("`release.sh evidence` reads this file and holds the release", amend)
+
     def test_candidate_ref_comes_from_the_tags_before_asking(self):
         for text in self.each():
             self.assertIn("work it out before you ask", text)
@@ -596,6 +609,118 @@ def record(**over):
                         "resolved_by": "analyst-login", "resolved_at": "2026-09-28T01:00:00Z"}]}
     d.update(over)
     return d
+
+
+CANARY = "LEAK-CANARY-9177"
+
+
+@unittest.skipUnless(shutil.which("jq") and shutil.which("git"), "release.sh needs jq and git")
+class AmendGate(unittest.TestCase):
+    """#534: `evidence` reads amend's record and holds (exit 11) while a part is handed off.
+
+    The hold names part ids, the file and the field only: never part text, reasons or values.
+    """
+
+    RECORD = ".sqlreview/amendments/enq9177-falls.json"
+
+    def setUp(self):
+        self.tmp = tempfile.TemporaryDirectory()
+        self.addCleanup(self.tmp.cleanup)
+        self.p = Project(self.tmp.name)
+        self.p.tag("v1.0.0")
+        self.head = git(self.p.root, "rev-parse", "HEAD")
+
+    def record(self, parts, **extra):
+        doc = {"schemaVersion": 1, "kind": "amendment", "enquiry": "THHSRDLENQ-9177", "parts": parts}
+        doc.update(extra)
+        self.p.write(self.RECORD, json.dumps(doc))
+
+    def part(self, id_, status, **fields):
+        return {"id": id_, "status": status, "text": f"{CANARY} change {id_}", **fields}
+
+    def assert_no_leak(self, r):
+        self.assertNotIn(CANARY, r.stdout + r.stderr)
+        self.assertNotIn("THHSRDLENQ-9177", r.stderr)
+
+    def test_handed_off_part_holds_and_names_the_part(self):
+        self.record([self.part("P1", "done", commit=self.head),
+                     self.part("P2", "handed off", hand_off=f"draft, not posted {CANARY}")])
+        r = self.p.evidence("v1.0.0")
+        self.assertEqual(r.returncode, 11, r.stderr)
+        self.assertIn("release held: amend part handed off and open: P2", r.stderr)
+        self.assertNotIn("P1", r.stderr.splitlines()[0])
+        self.assertIn("next:", r.stderr)
+        self.assertLessEqual(len(r.stderr.strip().splitlines()), 2, r.stderr)
+        self.assertEqual(json.loads(r.stdout)["reviews"][0]["applies"], "current")
+        self.assert_no_leak(r)
+
+    def test_every_part_done_passes(self):
+        self.record([self.part("P1", "done", commit=self.head), self.part("P2", "done", commit=self.head[:7])])
+        r = self.p.evidence("v1.0.0")
+        self.assertEqual(r.returncode, 0, r.stderr)
+        self.assertEqual(r.stderr, "")
+
+    def test_withdrawn_part_passes(self):
+        self.record([self.part("P1", "done", commit=self.head),
+                     self.part("P2", "withdrawn", reason=f"{CANARY} requester no longer needs it")])
+        r = self.p.evidence("v1.0.0")
+        self.assertEqual(r.returncode, 0, r.stderr)
+        self.assert_no_leak(r)
+
+    def test_no_record_passes(self):
+        r = self.p.evidence("v1.0.0")
+        self.assertEqual(r.returncode, 0, r.stderr)
+
+    def test_done_commit_outside_the_ref_holds(self):
+        self.p.write("late.txt", "x")
+        self.p.commit("engineer change after the tag")
+        late = git(self.p.root, "rev-parse", "HEAD")
+        self.record([self.part("P3", "done", commit=late)])
+        r = self.p.evidence("v1.0.0")
+        self.assertEqual(r.returncode, 11, r.stderr)
+        self.assertIn("not in v1.0.0: P3", r.stderr)
+        self.assertEqual(self.p.evidence("HEAD").returncode, 0)
+
+    def test_hold_takes_precedence_over_a_stale_review(self):
+        self.p.write(SQL_PATH, SQL_V2)
+        self.p.commit("widen criteria")
+        self.record([self.part("P1", "handed off")])
+        self.assertEqual(self.p.evidence("HEAD").returncode, 11)
+
+    def test_malformed_record_holds_and_names_file_and_field(self):
+        cases = {
+            "status": ([self.part("P1", f"{CANARY} in progress")], "parts[0].status"),
+            "missing status": ([{"id": "P1", "text": CANARY}], "parts[0].status"),
+            "withdrawn, no reason": ([self.part("P1", "withdrawn", reason="  ")], "parts[0].reason"),
+            "done, no commit": ([self.part("P1", "done", commit=CANARY)], "parts[0].commit"),
+            "id": ([self.part(CANARY, "done", commit=self.head)], "parts[0].id"),
+            "duplicate id": ([self.part("P1", "withdrawn", reason="r"), self.part("P1", "handed off")],
+                             "parts[].id (duplicate)"),
+            "no parts": ([], "parts"),
+        }
+        for name, (parts, field) in cases.items():
+            with self.subTest(name):
+                self.record(parts)
+                r = self.p.evidence("v1.0.0")
+                self.assertEqual(r.returncode, 11, r.stderr)
+                self.assertIn(f"release held: {self.RECORD}: field {field} is missing or invalid", r.stderr)
+                self.assert_no_leak(r)
+        for name, text in (("not JSON", f'{{"parts": "{CANARY}'), ("not an object", f'["{CANARY}"]'),
+                           ("schema", json.dumps({"schemaVersion": 2, "parts": [CANARY]}))):
+            with self.subTest(name):
+                self.p.write(self.RECORD, text)
+                r = self.p.evidence("v1.0.0")
+                self.assertEqual(r.returncode, 11, r.stderr)
+                self.assertIn(f"release held: {self.RECORD}: field", r.stderr)
+                self.assert_no_leak(r)
+
+    def test_every_record_is_read(self):
+        self.record([self.part("P1", "done", commit=self.head)])
+        self.p.write(".sqlreview/amendments/enq9178-falls.json",
+                     json.dumps({"schemaVersion": 1, "parts": [self.part("P4", "handed off")]}))
+        r = self.p.evidence("v1.0.0")
+        self.assertEqual(r.returncode, 11, r.stderr)
+        self.assertIn("open: P4", r.stderr)
 
 
 def violations(doc):

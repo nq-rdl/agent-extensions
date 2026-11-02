@@ -57,29 +57,30 @@ bash "$S/sqlreview.sh" status --json   # exit 3 → stop: not initialised, run /
 ## 0. Amend gate
 
 Do this before any other step. A part that `/data-request:amend` handed off blocks the release
-until a strict comment on the deliverable PR closes it. Find the deliverable PR in the ledger,
-or use the PR URL the analyst gives. Read its description and comments, read-only, and the
-ledger. Find each amend status line (`P<n>` with `done`, `handed off` or `withdrawn`) and each
-`amendment hand-off:` comment with its `part:` entries. Only a later comment on the same PR
-whose first line has one of two forms closes a handed-off part:
+until a strict comment on the deliverable PR closes it. `release.sh evidence` enforces this from
+amend's part-state record, `.sqlreview/amendments/<request>.json` (amend step 5). Each part has
+the status `done`, `handed off` or `withdrawn`.
 
-- **Completed:** `done: P<n> <commit>`, from the engineer. The commit must be in the release
-  ref (`git merge-base --is-ancestor <commit> <ref>`). If the check fails or cannot run, the
-  part stays open.
-- **Withdrawn:** `withdrawn: P<n> <reason>`, from the analyst. A `withdrawn:` line with no
-  reason leaves the part open.
+First bring the record up to date. Find the deliverable PR in the ledger, or use the PR URL the
+analyst gives. Read its comments, read-only, for each `amendment hand-off:` comment and its `part:`
+entries. Only a later comment whose first line has one of two forms closes a handed-off part:
+
+- **Completed:** `done: P<n> <commit>`, from the engineer. Set the part to `done` with that commit.
+  The script checks that the commit is in the release ref (`git merge-base --is-ancestor <commit> <ref>`).
+  If the check fails or cannot run, the part stays open.
+- **Withdrawn:** `withdrawn: P<n> <reason>`, from the analyst. Set the part to `withdrawn` with that
+  reason. A `withdrawn:` line with no reason leaves the part open.
 
 Any other comment that names the part leaves it open, for example "P3 is still in progress".
-For each handed-off part, say in one line which comment you read and what it decided. For
-example: "P3: read `done: P3 4e5f6a7`, and 4e5f6a7 is in v1.1.0, so P3 is closed."
+For each handed-off part, say in one line which comment you read and what it decided. A hand-off
+comment with no record is a blocker: write the record with the part `handed off`. If you cannot
+read the PR, say so and stop. Never assume that no part is open.
 
-If a handed-off part is still open, stop before step 1. Say it in one or two lines. For
-example: "Release held: P3 (ward name in place of the code) is handed off and open. Next: the
-engineer comments `done: P3 <commit>` on the PR, or you withdraw it there." Offer to draft the
-withdrawal comment for the analyst, `withdrawn: P3 <reason>`, with the analyst's own reason.
-Do not draft it without a reason. Post nothing. If you cannot read the PR, say so and stop.
-Never assume that no part is open. When no part was handed off, or every handed-off part is
-closed, say so in one line and continue.
+Then run `bash "$S/release.sh" evidence "<ref>"`. Exit 11 means release held: stop before step 1.
+Give its stderr in one or two lines, for example "Release held: P3 is handed off and open. Next:
+the engineer comments `done: P3 <commit>` on the PR, or you withdraw it there." Offer to draft
+`withdrawn: P3 <reason>` with the analyst's own reason. Do not draft it without a reason. Post
+nothing. Never edit the record to pass the gate without a strict comment.
 
 ## 1. Gather the release evidence
 
@@ -97,7 +98,7 @@ For counts in that evidence, apply guardrails `references/release.rst`, **Probe 
 Then list the reviews and whether each describes the release:
 
 ```bash
-bash "$S/release.sh" evidence "<tag>"   # exit 0 every review applies · 10 at least one does not · 2 unknown ref
+bash "$S/release.sh" evidence "<tag>"   # exit 0 every review applies · 10 at least one does not · 11 amend hold · 2 unknown ref
 ```
 
 For each slug, load `bash "$S/sqlreview.sh" questions "$SLUG" review`: `questions.json`
