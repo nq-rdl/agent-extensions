@@ -30,6 +30,12 @@
 #                            holds the release (exit 11, ids and fields on stderr).
 #                            An entry of .sqlreview/ledger.json at the amend stage with no record
 #                            file holds too.
+#   amend-check FILE | amend-check --stdin
+#                            validate an amendment part-state record (.sqlreview/amendments/<request>.json),
+#                            as the guard does on each Write: schemaVersion 1, kind "amendment", parts[]
+#                            with a unique id P<n> and a status done (with commit), handed off or withdrawn
+#                            (with reason and comment). One "<field>: <rule>" line per violation, exit 4;
+#                            "ok" otherwise. Never a value
 #   check FILE | check --stdin
 #                            validate a release record (.sqlreview/releases/<tag>/release.json):
 #                            one violation per line, exit 4; "ok" otherwise. Inside the project,
@@ -584,11 +590,57 @@ EOF
   printf '%s' "$out" | jq -e '. == null or .status == "complete"' >/dev/null || exit 10
 }
 
+# The write-time schema of an amendment part-state record (#534). The evidence hold (RL_AMEND_JQ)
+# reads the same parts. Each finding names a field path and a rule, never a value.
+RL_AMEND_CHECK_JQ='def ne: type == "string" and test("\\S");
+if type != "object" then "(document): must be a JSON object"
+else
+  (if .schemaVersion == 1 then empty else "schemaVersion: must be 1" end),
+  (if .kind == "amendment" then empty else "kind: must be amendment" end),
+  (if (.parts | type) != "array" or (.parts | length) == 0 then "parts: must be a nonempty array"
+   else
+     (if [.parts[] | objects | .id | strings] | group_by(.) | any(length > 1)
+      then "parts[].id: must be unique" else empty end),
+     (.parts | to_entries[] | "parts[\(.key)]" as $at | .value
+      | if type != "object" then "\($at): must be an object"
+        else
+          (if (.id | type) == "string" and (.id | test("^P[1-9][0-9]*$")) then empty else "\($at).id: must be P<n>" end),
+          (if .status == "done" then
+             (if (.commit | type) == "string" and (.commit | test("^[0-9a-f]{7,64}$")) then empty
+              else "\($at).commit: required for a done part (a commit hash)" end)
+           elif .status == "withdrawn" then
+             (if (.reason | ne) then empty else "\($at).reason: required for a withdrawn part" end),
+             (if (.comment | ne) then empty else "\($at).comment: required for a withdrawn part (the withdrawn: comment URL)" end)
+           elif .status == "handed off" then empty
+           else "\($at).status: must be done, handed off or withdrawn" end)
+        end)
+   end)
+end'
+
+cmd_amend_check() {
+  sr_need_jq
+  local f tmp out rc=0
+  case "${1:-}" in
+    --stdin) [ $# -eq 1 ] || usage
+      tmp="$(mktemp)" || sr_die 2 "mktemp failed"
+      cat > "$tmp"; f="$tmp" ;;
+    "") usage ;;
+    *) [ $# -eq 1 ] || usage
+      f="$1"; [ -f "$f" ] || sr_die 2 "no such file: $f" ;;
+  esac
+  # jq error text can quote a value (no-echo): a parse failure prints a fixed line.
+  out="$(jq -r "$RL_AMEND_CHECK_JQ" "$f" 2>/dev/null)" || out="(document): not valid JSON"
+  [ -z "${tmp:-}" ] || rm -f "$tmp"
+  if [ -n "$out" ]; then printf '%s\n' "$out"; rc=4; else printf 'ok\n'; fi
+  return "$rc"
+}
+
 cmd="${1:-}"
 [ -n "$cmd" ] || usage
 shift
 case "$cmd" in
   evidence) cmd_evidence "$@" ;;
+  amend-check) cmd_amend_check "$@" ;;
   check) cmd_check "$@" ;;
   render) cmd_render "$@" ;;
   criteria) cmd_criteria "$@" ;;
