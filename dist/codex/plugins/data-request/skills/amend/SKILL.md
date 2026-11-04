@@ -17,8 +17,6 @@ metadata:
 
 ## Codex execution
 
-Before shell examples, set PLUGIN_ROOT to the absolute installed plugin directory: two parent directories above this SKILL.md’s containing skill directory. Derive it from the loaded file path, never the working directory. This variable is not automatically supplied to ordinary shell tools. Quote it in commands.
-
 Here $ARGUMENTS means the user’s supplied skill arguments. Codex does not populate a shell variable for them. Pass arguments with shell quoting that preserves literal text; never evaluate user text as shell code.
 
 # Data Request — amend
@@ -26,7 +24,7 @@ Here $ARGUMENTS means the user’s supplied skill arguments. Codex does not popu
 The **Data Analyst** runs presentation amendments before or after release.
 Logic or row changes go to the Data Engineer through the existing handoff below.
 
-Arguments: `$ARGUMENTS`. Read `${PLUGIN_ROOT}/skills/guardrails/SKILL.md` and apply
+Arguments: `$ARGUMENTS`. Invoke `$data-request:guardrails` and apply
 the rules relevant to the request. The boundary is query-builder's
 [`docs/ANALYST_AMENDMENTS.md`](https://github.com/nq-rdl/query-builder/blob/main/docs/ANALYST_AMENDMENTS.md).
 Read it, preferring the copy in the repository's pinned query-builder, and classify against
@@ -136,8 +134,7 @@ baseline pointer and validation in the PR or existing review ledger. Do not add 
 to `specs/amendments.md`: that record governs released extracts. Keep the baseline immutable.
 
 For a released extract, add one entry per amendment, with its classification, to the child's
-amendment record. In a data-analysis-scaffold child this is `specs/amendments.md`
-([data-analysis-scaffold#234](https://github.com/nq-rdl/data-analysis-scaffold/issues/234)).
+amendment record. In a data-analysis-scaffold child this is `specs/amendments.md`.
 Follow the record's template and field names, which its guard reads, and use the next `AMD-`
 number. Never edit an entry that is already in a release. Write names or handles, never an
 email address or a patient identifier. If the repository has no record, say so and put the

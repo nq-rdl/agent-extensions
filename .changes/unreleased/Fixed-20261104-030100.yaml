@@ -1,0 +1,3 @@
+kind: Fixed
+body: 'The triage hand-off gate compares review records at the PR head with git cat-file and cmp, without a temporary file'
+time: 2026-11-04T03:01:00.000000000Z

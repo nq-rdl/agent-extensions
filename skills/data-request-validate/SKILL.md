@@ -7,7 +7,7 @@ description: >-
 argument-hint: '<sql path> [scope path] [--autonomous|--co-develop]'
 user-invocable: true
 compatibility: RDL cohort SQL; verify deployed SQL dialect/version and current dataops schema/index metadata.
-allowed-tools: Bash, Read, Glob, Grep, AskUserQuestion
+allowed-tools: Bash, Read, Glob, Grep, AskUserQuestion, Skill
 metadata:
   repo: https://github.com/nq-rdl/agent-extensions
 ---
@@ -17,7 +17,7 @@ metadata:
 The **Data Engineer** runs technical validation. Research questions belong to
 the Data Analyst and retain analyst attribution through the scope handoff.
 
-Read `${CLAUDE_PLUGIN_ROOT}/skills/guardrails/SKILL.md` first. Arguments: `$ARGUMENTS`.
+Invoke `/data-request:guardrails` first. Arguments: `$ARGUMENTS`.
 Read the SQL, request and available scope; validate the actual SQL bytes, not a stale
 review snapshot. This action needs no `.sqlreview/` setup and creates no review record.
 

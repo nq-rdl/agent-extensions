@@ -1,7 +1,7 @@
 """`sqlreview.sh status` names the next command for each state (#514).
 
 The next command comes from existing records only: the state, scope.json and its
-scope.source.sql binding, the root answers.intake.json and explain.json. When a bound scope's
+sql_sha256 binding, the root answers.intake.json and explain.json. When a bound scope's
 SQL body or its imported analyst intake changed after the scope, the next command is
 bootstrap, to publish the next scope revision, then analyse. Analyse fingerprints committed SQL
 only, so uncommitted SQL is named for a commit first. Each fixture that expects a committed state
@@ -59,17 +59,33 @@ class StatusNext(unittest.TestCase):
     def row(self, slug=SLUG):
         return self.status()[slug]
 
+    def fingerprint(self, rel=SQL):
+        """Commit everything first, as a real project would, then fingerprint (#505)."""
+        if git(self.p.root, "status", "--porcelain").stdout.strip():
+            self.p.commit("record state before fingerprint")
+        r = run(["fingerprint", rel], self.p.root)
+        self.assertEqual(r.returncode, 0, r.stderr)
+        fp = json.loads(r.stdout)
+        fp.pop("sql_path")
+        return fp
+
+    def reviewed(self, slug, rel):
+        """A review fingerprinted from committed SQL (#505)."""
+        self.p.write_json(slug, "review.json", review_doc(slug, rel, **self.fingerprint(rel)))
+        r = run(["snapshot", slug, rel], self.p.root)
+        self.assertEqual(r.returncode, 0, r.stderr)
+
     def scope(self, sql_text=None, revision=3, **over):
-        """A scope bound to sql_text (None: framed before the SQL existed)."""
+        """A scope bound to sql_text by sql_sha256 and sql_body_sha256 (None: framed before the SQL existed)."""
         if sql_text is not None:
-            over.setdefault("sql_sha256", sha(sql_text))
-            self.p.review_dir(SLUG).joinpath("scope.source.sql").write_text(sql_text)
+            fp = self.fingerprint()
+            self.assertEqual(fp["sql_sha256"], sha(sql_text))
+            over.setdefault("sql_sha256", fp["sql_sha256"])
+            over.setdefault("sql_body_sha256", fp["sql_body_sha256"])
         self.p.write_json(SLUG, "scope.json", scope_doc(SLUG, SQL, revision=revision, **over))
 
     def review(self):
-        self.p.write_json(SLUG, "review.json", review_doc(SLUG, SQL))
-        r = run(["snapshot", SLUG, SQL], self.p.root)
-        self.assertEqual(r.returncode, 0, r.stderr)
+        self.reviewed(SLUG, SQL)
 
     def assert_rescope(self, row, why, then):
         self.assertEqual(row["next"], f"{why} changed after scope revision 3: run /data-request:bootstrap {SQL} "
@@ -153,7 +169,7 @@ class StatusNext(unittest.TestCase):
     # --- the SQL's working-tree state -------------------------------------------------------
     def test_uncommitted_sql_names_the_commit_before_analyse(self):
         self.sql(SQL_V1, commit=False)  # untracked
-        self.scope(SQL_V1)
+        self.scope(sql_sha256=sha(SQL_V1))  # bound by hash: fingerprint would commit the SQL first
         self.assertEqual(self.row()["next"], f"commit {SQL}, then /data-request:analyse {SQL} to review the SQL")
         git(self.p.root, "add", "--", SQL)  # staged is still not committed
         self.assertEqual(self.row()["next"], f"commit {SQL}, then /data-request:analyse {SQL} to review the SQL")
@@ -178,22 +194,30 @@ class StatusNext(unittest.TestCase):
         r = run(["slug", rel], self.p.root)
         self.assertEqual(r.returncode, 0, r.stderr)
         slug = r.stdout.strip()
-        self.p.write_json(slug, "review.json", review_doc(slug, rel))
-        self.assertEqual(run(["snapshot", slug, rel], self.p.root).returncode, 0)
+        self.reviewed(slug, rel)  # fingerprint commits the SQL first (#505)
         self.sql(SQL_V2, rel=rel, commit=False)
         self.assertEqual(self.row(slug)["next"], f"commit {rel}, then /data-request:analyse {rel} --update")
 
     def test_uncommitted_unbound_and_rescope_lines_name_the_commit(self):
         self.scope()
         self.sql(SQL_V1, commit=False)
-        self.assertEqual(self.row()["next"], f"/data-request:bootstrap {SQL} to bind the scope to the SQL, "
-                                             f"then commit {SQL}, then /data-request:analyse {SQL}")
+        # Bootstrap binds the scope to committed bytes, so the commit comes first (N1).
+        self.assertEqual(self.row()["next"], f"commit {SQL}, then /data-request:bootstrap {SQL} to bind the scope "
+                                             f"to the SQL, then /data-request:analyse {SQL}")
+
+    def test_uncommitted_sql_after_a_rescope_names_the_commit_before_bootstrap(self):
+        self.sql(SQL_V1)
+        self.scope(SQL_V1)
+        self.sql(SQL_V2, commit=False)
+        self.assertEqual(self.row()["next"], f"The SQL changed after scope revision 3: commit {SQL}, then run "
+                                             f"/data-request:bootstrap {SQL} to publish scope revision 4, "
+                                             f"then /data-request:analyse {SQL}")
 
     def test_outside_a_git_repository_names_analyse_alone(self):
         with tempfile.TemporaryDirectory() as tmp:
             self.p = Project(tmp, git_repo=False)
             self.p.sql(SQL, SQL_V1)
-            self.scope(SQL_V1)
+            self.scope(sql_sha256=sha(SQL_V1))  # no git: bound by hash, not by fingerprint
             self.assertEqual(self.row()["next"], f"/data-request:analyse {SQL} to review the SQL")
 
     def test_one_git_call_per_status_run(self):
@@ -326,8 +350,7 @@ class StatusNext(unittest.TestCase):
         self.sql(SQL_V2)
         self.review()
         self.p.sql("other.sql", SQL_V1)
-        self.p.write_json("other", "review.json", review_doc("other", "other.sql"))
-        run(["snapshot", "other", "other.sql"], self.p.root)
+        self.reviewed("other", "other.sql")
         ctx = decision(run_hook(PREFLIGHT, {"cwd": str(self.p.root)}, env_for()))["additionalContext"]
         lines = ctx.splitlines()
         # One summary line, then one line for the review that needs action. The plain current

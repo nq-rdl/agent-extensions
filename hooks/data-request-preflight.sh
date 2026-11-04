@@ -53,7 +53,7 @@ elif [ "$rc" -eq 0 ] && [ -n "$status" ]; then
              (.counts.scoped // 0 | select(. > 0) | "\(.) scoped (bootstrap only)"),
              (.counts["scoped-header-only"] // 0 | select(. > 0) | "\(.) scoped-header-only (\(names("scoped-header-only"))) — /data-request:bootstrap: inspect the header diff and notes, then record the header revision if confirmations remain unchanged"),
              (.counts.stale // 0 | select(. > 0) | "\(.) stale (\(names("stale")))"),
-             (.counts["no-baseline"] // 0 | select(. > 0) | "\(.) without a baseline (\(names("no-baseline")))"),
+             (.counts["no-baseline"] // 0 | select(. > 0) | "\(.) without a clean recorded commit (\(names("no-baseline")))"),
              (.counts.missing // 0 | select(. > 0) | "\(.) whose SQL is missing (\(names("missing")))") ] | join(", "))
         + "."
         # One line per review that needs action (#514). A current review only shows when its scope

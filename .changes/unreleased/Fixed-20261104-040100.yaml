@@ -1,0 +1,3 @@
+kind: Fixed
+body: 'sqlreview.sh snapshot clears the rebind-required marker once a moved review verifies at its new path'
+time: 2026-11-04T04:01:00.000000000Z
