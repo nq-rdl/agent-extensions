@@ -74,7 +74,7 @@ Header to review: ``notes --against --confirmed-by``
 An explicit named engineer attribution must match the intended human handle exactly.
 Show every kind/id, text, rationale, governed location, independent ``decided`` and
 ``evidence.commit`` / ``committed_at`` in ONE question: **Carry over all (Recommended)** /
-**Walk each individually**. No answer or an interrupted question supplies no confirmation.
+**Walk each individually**. An absent answer or an interrupted question is not a confirmation.
 
 A date-only decision keeps that precision. Its first recorded source may be committed
 on the same day; display the observed time and explain that unchanged-content evidence
