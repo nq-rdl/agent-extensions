@@ -1,0 +1,3 @@
+kind: Fixed
+body: 'sqlreview.sh publish and materialize clean up through guarded named functions instead of inline trap strings'
+time: 2026-11-04T01:01:00.000000000Z
