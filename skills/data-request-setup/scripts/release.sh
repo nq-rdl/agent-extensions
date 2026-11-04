@@ -423,10 +423,14 @@ cmd_criteria() {
   if ! git -C "$SR_ROOT" show "$commit:answers.intake.json" > "$tmp" 2>/dev/null; then
     rm -f "$tmp"; sr_die 2 "cannot read answers.intake.json at $tag"
   fi
-  if ! intake="$(bash "$SR_SCRIPT_DIR/sqlreview.sh" intake "$tmp" 1 2>/dev/null)"; then
-    rm -f "$tmp"; sr_die 2 "invalid analyst intake (answers.intake.json) at $tag; run validate-answers and correct the sidecar"
+  # A render of a committed blob, outside the project: mark it so intake accepts it there.
+  if ! sr_sha256 "$tmp" > "$tmp.sqlreview-render"; then
+    rm -f "$tmp" "$tmp.sqlreview-render"; sr_die 2 "cannot mark answers.intake.json at $tag"
   fi
-  rm -f "$tmp"
+  if ! intake="$(bash "$SR_SCRIPT_DIR/sqlreview.sh" intake "$tmp" 1 2>/dev/null)"; then
+    rm -f "$tmp" "$tmp.sqlreview-render"; sr_die 2 "invalid analyst intake (answers.intake.json) at $tag; run validate-answers and correct the sidecar"
+  fi
+  rm -f "$tmp" "$tmp.sqlreview-render"
   # Every scope at the tag that carries criteria_status; exactly one may own the criteria (research R6).
   while IFS= read -r path; do
     case "$path" in "$SR_DIR"/reviews/*/scope.json) ;; *) continue ;; esac
@@ -492,6 +496,11 @@ EOF
 cmd="${1:-}"
 [ -n "$cmd" ] || usage
 shift
+# File arguments go through the shared guard (#516): no data/, no unreviewed sql/, nothing outside the project.
+case "$cmd" in
+  check) [ $# -lt 1 ] || [ "$1" = --stdin ] || sr_guard_input "$1" ;;
+  render) [ $# -lt 1 ] || sr_guard_input "$1" ;;
+esac
 case "$cmd" in
   evidence) cmd_evidence "$@" ;;
   check) cmd_check "$@" ;;

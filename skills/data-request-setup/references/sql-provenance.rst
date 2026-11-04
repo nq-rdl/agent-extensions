@@ -11,6 +11,47 @@ Review records store hashes and a commit, never SQL. ``scope.json`` and
 so git history holds every reviewed revision. This applies to every SQL path,
 whatever ``sql/provenance.json`` says produced it.
 
+Accepted paths
+--------------
+
+Only reviewed request SQL under ``sql/v<N>/`` is read into ``.sqlreview/``. The
+directory name must match ``v[0-9]+([.-][0-9]+)*``. Examples are ``sql/v1/``,
+``sql/v2.1/`` and ``sql/v3-1/``. This is the scaffold rule. The commands ``slug``,
+``fingerprint``, ``snapshot``, ``notes`` and ``intake`` refuse any path under
+``data/`` and any path under ``sql/`` outside such a directory. So do the new path
+of ``move`` and the ``sql_path`` of a draft or record. Pipeline SQL under
+``sql/<name>/`` is refused because it can hold researcher-supplied values that
+must never reach Git. Other paths inside the project are not affected.
+
+``move OLD NEW`` accepts a refused OLD path. That path is only the key of an
+existing record and is never read. A record bound to such a path can therefore
+move into a reviewed directory. ``move`` keeps the pre-move binding in
+``history/``, and ``materialize`` can still rebuild that revision from Git.
+``status`` lists records with a refused path and does not apply the rule.
+
+The path is canonicalised before the check. The helper resolves ``..`` and
+symlinks relative to the project root. The paths ``sql/v1/../pipeline_a/q.sql``
+and a link from ``sql/v1/`` into ``data/`` are both refused. The helper also
+refuses a path that cannot be resolved, such as a symlink loop. It refuses a path
+that resolves outside the project. Copy such a file into ``sql/v<N>/`` first.
+
+The commands ``notes`` and ``intake`` also accept a file that the helper wrote
+itself, such as a render of a committed blob. The helper marks it with a
+``FILE.sqlreview-render`` file that holds the SHA-256 of the file. The analyse,
+bootstrap and explain recipes pass such a render. The
+helper refuses a file with more than one hard link, because a link may lead to
+``data/``. It refuses any path with a control character.
+
+Every file argument follows the same rules. This covers ``check``, ``lint``,
+``ledger``, ``carryover``, ``carryforward``, ``remap``, ``publish``,
+``publish-questions``, ``intake`` and ``notes --against`` and ``--questions``. It
+also covers the files given to ``release.sh`` and ``recurring-decisions.sh``.
+A refused command exits with code 2 and names the rule and the path as given.
+It never prints file content and writes nothing under ``.sqlreview/``.
+
+The rule stops accidental copies by agents and users. It does not stop a hostile
+process of the same user, which can read ``data/`` directly.
+
 Fingerprint
 -----------
 

@@ -85,7 +85,7 @@ cmd_publish_questions() (
   sr_no_symlinks "$draft" || exit 2
   [ -f "$draft" ] || sr_die 2 "no such question draft"
   tmp="$(mktemp "$SR_REVIEWS/$slug/.questions.XXXXXX")" || sr_die 2 "mktemp failed"
-  cp "$draft" "$tmp" || sr_die 2 "cannot stage question draft"
+  sr_copy_guarded "$draft" "$tmp" || sr_die 2 "cannot stage question draft"
   cmd_check "$tmp" || exit 4
   jq -e -L "$SR_SCRIPT_DIR" --slurpfile scope "$Q_SCOPE" --slurpfile review "$Q_REVIEW" '
     include "sqlreview-questions"; legacy_covered($scope[0]; $review[0])' "$tmp" >/dev/null || sr_die 4 "question draft omits untracked legacy questions"
