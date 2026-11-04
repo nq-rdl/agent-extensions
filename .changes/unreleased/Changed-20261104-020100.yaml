@@ -1,0 +1,3 @@
+kind: Changed
+body: 'data-request bootstrap, analyse and draft invoke /data-request:guardrails instead of reading its SKILL.md by path'
+time: 2026-11-04T02:01:00.000000000Z

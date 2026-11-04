@@ -63,7 +63,7 @@ class HouseDefaultContracts(unittest.TestCase):
             for leaf in ("map", "bootstrap", "draft"):
                 with self.subTest(tree=tree, leaf=leaf):
                     rule = text(tree, leaf)
-                    for token in ("House defaults", "tuh-facility", "upstream", "without asking",
+                    for token in ("House defaults", "tuh-facility", "upstream", "without a fresh question",
                                   "one standard assumption", "recurring-decisions.rst"):
                         self.assertIn(token, rule)
 
@@ -94,7 +94,7 @@ class HouseDefaultContracts(unittest.TestCase):
         for tree in TREES:
             with self.subTest(tree=tree):
                 rule = text(tree, "setup", "references/recurring-decisions.rst")
-                for token in ("Recorded house default", "tuh-facility", "without asking",
+                for token in ("Recorded house default", "tuh-facility", "without a fresh question",
                               "confirmed_by", "confirmed_at", "confirmed_revision", "decided",
                               "date-only", "not a new engineer confirmation", "exact listed wording",
                               "changed wording", "Human confirmation is still", "upstream",
