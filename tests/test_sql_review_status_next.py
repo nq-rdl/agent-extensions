@@ -2,7 +2,8 @@
 
 The next command comes from existing records only: the state, scope.json and its
 sql_sha256 binding, the root answers.intake.json and explain.json. When a bound scope's
-SQL body or its imported analyst intake changed after the scope, the next command is
+SQL body, its imported analyst intake or, for the scope that owns them, its research criteria
+changed after the scope, the next command is
 bootstrap, to publish the next scope revision, then analyse. Analyse fingerprints committed SQL
 only, so uncommitted SQL is named for a commit first. Each fixture that expects a committed state
 commits its SQL.
@@ -19,10 +20,14 @@ try:  # `unittest discover -s tests` puts tests/ on sys.path; `-m unittest tests
     from test_sql_review_scripts import SQL_V1, SQL_V2, Project, git, review_doc, run, scope_doc
     from test_sql_review_hooks import PREFLIGHT, decision, env_for, run_hook
     from test_data_request_lifts import ledger
+    from test_sql_review_criteria_status import full_status
+    from test_sql_review_criteria_status import sidecar as criteria_sidecar
 except ModuleNotFoundError:
     from tests.test_sql_review_scripts import SQL_V1, SQL_V2, Project, git, review_doc, run, scope_doc
     from tests.test_sql_review_hooks import PREFLIGHT, decision, env_for, run_hook
     from tests.test_data_request_lifts import ledger
+    from tests.test_sql_review_criteria_status import full_status
+    from tests.test_sql_review_criteria_status import sidecar as criteria_sidecar
 
 SLUG, SQL = "reports__monthly", "reports/monthly.sql"
 HEADER_V1 = "-- original header\n" + SQL_V1
@@ -312,6 +317,68 @@ class StatusNext(unittest.TestCase):
         source, imported = self.import_intake()
         self.scope(SQL_V1, assumptions=scope_doc(revision=3)["assumptions"] + imported)
         source.write_text("{not json")
+        self.assertEqual(self.row()["next"], f"/data-request:analyse {SQL} to review the SQL")
+
+    # --- research criteria (schema 2 intake) ------------------------------------------------
+    # The criteria fixture's sidecar confirms every criterion at 2026-10-13T01:00:00Z.
+    def criteria_scope(self, criteria, status=None, recorded_at="2026-10-14T00:00:00Z", **over):
+        """A bound scope over SQL_V1 that owns the criteria, under a schema 2 sidecar."""
+        value = criteria_sidecar()
+        value["criteria"] = criteria
+        (self.p.root / "answers.intake.json").write_text(json.dumps(value))
+        self.sql(SQL_V1)
+        self.scope(SQL_V1, criteria_status=full_status(3) if status is None else status,
+                   recorded_at=recorded_at, **over)
+
+    def test_unchanged_criteria_name_analyse(self):
+        self.criteria_scope(criteria_sidecar()["criteria"])
+        self.assertEqual(self.row()["state"], "scoped")
+        self.assertEqual(self.row()["next"], f"/data-request:analyse {SQL} to review the SQL")
+
+    def test_added_data_element_names_bootstrap_to_rescope(self):
+        criteria = criteria_sidecar()["criteria"]
+        criteria.append(dict(criteria[-1], id="D3", text="Ward at admission"))
+        self.criteria_scope(criteria)
+        self.assert_rescope(self.row(), "The analyst intake", f"/data-request:analyse {SQL}")
+
+    def test_withdrawn_inclusion_names_bootstrap_to_rescope(self):
+        criteria = criteria_sidecar()["criteria"]
+        criteria[1]["withdrawn"] = {"reason": "The researcher dropped the age limit", "at": "2026-10-20"}
+        self.criteria_scope(criteria)
+        self.assert_rescope(self.row(), "The analyst intake", f"/data-request:analyse {SQL}")
+
+    def test_reworded_criterion_after_the_scope_names_bootstrap(self):
+        criteria = criteria_sidecar()["criteria"]
+        criteria[1].update(text="Aged 70 and over", confirmed_at="2026-10-20T01:00:00Z")
+        self.criteria_scope(criteria)
+        self.assert_rescope(self.row(), "The analyst intake", f"/data-request:analyse {SQL}")
+
+    def test_criteria_change_under_a_current_review_names_bootstrap_first(self):
+        criteria = criteria_sidecar()["criteria"]
+        self.criteria_scope(criteria)
+        self.review()
+        self.assertEqual(self.row()["state"], "current")
+        criteria.append(dict(criteria[-1], id="D3", text="Ward at admission"))
+        value = criteria_sidecar()
+        value["criteria"] = criteria
+        (self.p.root / "answers.intake.json").write_text(json.dumps(value))
+        self.assert_rescope(self.row(), "The analyst intake", f"/data-request:analyse {SQL} --update")
+
+    def test_criteria_confirmed_before_the_scope_or_without_a_utc_stamp_give_no_signal(self):
+        # A row carried from an earlier revision keeps its older confirmation; the scope's own
+        # recorded_at is what the criteria are compared with.
+        self.criteria_scope(criteria_sidecar()["criteria"])
+        for recorded_at in ("2026-10-13T01:00:00Z", "2026-10-13T01:00:00.500Z", "2026-10-13 11:00 +10:00", None):
+            with self.subTest(recorded_at=recorded_at):
+                self.scope(SQL_V1, criteria_status=full_status(3), recorded_at=recorded_at)
+                self.assertEqual(self.row()["next"], f"/data-request:analyse {SQL} to review the SQL")
+
+    def test_a_scope_without_criteria_status_ignores_the_criteria(self):
+        # Only the owning scope carries criteria_status; another scope in the repository leaves it out.
+        criteria = criteria_sidecar()["criteria"]
+        criteria.append(dict(criteria[-1], id="D3", text="Ward at admission"))
+        self.criteria_scope(criteria)
+        self.scope(SQL_V1, recorded_at="2026-10-14T00:00:00Z")
         self.assertEqual(self.row()["next"], f"/data-request:analyse {SQL} to review the SQL")
 
     # --- states without a workflow position -------------------------------------------------

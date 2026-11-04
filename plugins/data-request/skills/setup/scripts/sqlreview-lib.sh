@@ -373,8 +373,9 @@ sr_uncommitted() { # <sql_path>: true when the run's git status lists it
 
 # The next command for one review directory, on one line (#514). Derived only from records that
 # already exist: the state, scope.json and its recorded SQL binding (sql_sha256), the root answers.intake.json
-# and explain.json. A bound scope whose SQL body moved on, or whose imported analyst decisions no
-# longer match the sidecar, names bootstrap as the rescope step. Cheap: a few jq and hash calls,
+# and explain.json. A bound scope whose SQL body moved on, whose imported analyst decisions no
+# longer match the sidecar, or (for the scope that carries criteria_status) whose research criteria
+# moved on, names bootstrap as the rescope step. Cheap: a few jq and hash calls,
 # because status runs from a SessionStart hook with a 5-second timeout.
 sr_next() { # <slug> <state> <sql_path>
   local d="$SR_REVIEWS/$1" state="$2" sql="$3" scope srev="" bound="" intake="" why="" gap="" follow="" ex pre=""
@@ -393,10 +394,21 @@ sr_next() { # <slug> <state> <sql_path>
       def mine: [.assumptions[]? | select(.upstream.source? == "analyst-intake")
                  | {id, text, rationale, confirmed_by, confirmed_at, decided}] | sort_by(.id);
       def theirs: [.decisions[] | {id: ("A-intake-" + .id), text, rationale, confirmed_by, confirmed_at, decided}] | sort_by(.id);
+      # Only the scope that owns the criteria (it carries criteria_status) tracks them. It is behind
+      # when a live criterion has no row, a withdrawn one keeps its row, or a criterion was
+      # re-confirmed (reworded, or applied_by changed) after the scope revision was recorded. The
+      # time test runs only on UTC "Z" stamps, compared to the second, so another format is no signal.
+      def utc: if type == "string" and test("^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}(\\.[0-9]+)?Z$")
+               then .[0:19] else null end;
+      def criteria_moved($doc):
+        ($doc | has("criteria_status")) and ((.criteria | type) == "array")
+        and ([.criteria[] | select(.withdrawn == null)] as $live | ($doc.recorded_at | utc) as $at
+             | ([$live[].id] | sort) != ([$doc.criteria_status[]? | .criterion] | sort)
+               or ($at != null and any($live[]; (.confirmed_at | utc) as $c | $c != null and $c > $at)));
       $s[0] as $doc
       | [($doc.revision // "-" | tostring),
          (if ($doc.sql_sha256 | type) == "string" then "y" else "n" end),
-         (if $i == null then "n" else (try (if ($doc | mine) == ($i[0] | theirs) then "n" else "y" end) catch "n") end)]
+         (if $i == null then "n" else (try (if ($doc | mine) == ($i[0] | theirs) and ($i[0] | criteria_moved($doc) | not) then "n" else "y" end) catch "n") end)]
       | join("\t")'
     IFS="$(printf '\t')" read -r srev bound intake <<EOF2
 $( { [ -f "$sidecar" ] && jq -rn --slurpfile s "$scope" --slurpfile i "$sidecar" "$prog" 2>/dev/null; } ||
