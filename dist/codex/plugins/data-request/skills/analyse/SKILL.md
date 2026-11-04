@@ -175,7 +175,7 @@ fi
 bash "$S/sqlreview.sh" render "$SLUG" review || exit $?
 if jq -e -s 'length == 2 and (.[0] | del(.header_revisions)) == (.[1] | del(.header_revisions))' \
     ".sqlreview/reviews/$SLUG/review.draft.json" ".sqlreview/reviews/$SLUG/review.json" >/dev/null 2>&1; then
-  rm -f ".sqlreview/reviews/$SLUG/review.draft.json"
+  bash "$S/sqlreview.sh" discard-draft "$SLUG" review >/dev/null || exit $?
 fi
 if [ -e ".sqlreview/reviews/$SLUG/review.draft.json" ]; then
   printf 'Stop: review draft contains unpublished work; retain it for completion.\n' >&2
@@ -406,7 +406,7 @@ change before continuing. Write the complete confirmed document to
 bash "$S/sqlreview.sh" publish "$SLUG" review ".sqlreview/reviews/$SLUG/review.draft.json" || exit $?
 bash "$S/sqlreview.sh" snapshot "$SLUG" "<sql path>" || exit $?  # verify only AFTER publish succeeds; writes no SQL
 bash "$S/sqlreview.sh" render "$SLUG" review || exit $?  # → reviews/<slug>/review.md (never hand-write it)
-rm -f ".sqlreview/reviews/$SLUG/review.draft.json"
+bash "$S/sqlreview.sh" discard-draft "$SLUG" review || exit $?
 ```
 
 Show `review.md`. Continue with *After review* below.

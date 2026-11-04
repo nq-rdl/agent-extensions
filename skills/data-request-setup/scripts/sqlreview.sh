@@ -29,6 +29,7 @@
 #   publish SLUG scope|review|lifts DRAFT             validate a staged copy, then atomically replace the final JSON
 #                                              (a scope carrying criteria_status must pass criteria first)
 #   publish --reconfirm-all SLUG KIND DRAFT    same, but refuse any carried (carried_from_revision) confirmation
+#   discard-draft SLUG scope|review|lifts      remove only reviews/SLUG/<kind>.draft.json; absent is a no-op
 #   roles ENGINEER ANALYST                     update only the two confirmed role names in config.json
 #   guard string-sql on|off                    set only guard.require_lift_for_string_sql in config.json
 #   lifts-stale SLUG --tag TAG                  read-only JSON nudges for units newly present at a stable library tag
@@ -495,6 +496,21 @@ _verify_header_decisions() ( # DOC SQL binding reconfirm-all
 )
 
 # ---------------------------------------------------------------------------------------------
+# EXIT cleanup for cmd_publish. It reads that subshell's locals and removes only paths the
+# command created itself: the staged copy, the staged history copy and the private work directory.
+# A history entry added for this publish is rolled back unless the final document is the one
+# this publish wrote.
+sr_publish_cleanup() {
+  if [ "$history_added" = true ] && [ "$committed" = false ]; then
+    if [ ! -f "$dest" ] || [ "$(sr_sha256 "$dest" 2>/dev/null)" != "$proposed_sha" ]; then
+      rm -f -- "$history"
+    fi
+  fi
+  rm -f -- "$tmp"
+  if [ -n "$history_tmp" ]; then rm -f -- "$history_tmp"; fi
+  if [ -n "$work" ]; then rm -rf -- "$work"; fi
+}
+
 cmd_publish() (
   local reconfirm_all=false
   if [ "${1:-}" = "--reconfirm-all" ]; then reconfirm_all=true; shift; fi
@@ -514,7 +530,7 @@ cmd_publish() (
   tmp="$(mktemp "$SR_REVIEWS/$slug/.publish.XXXXXX")" || sr_die 2 "mktemp failed"
   umask 077
   work=""
-  trap 'if [ "$history_added" = true ] && [ "$committed" = false ] && { [ ! -f "$dest" ] || [ "$(sr_sha256 "$dest" 2>/dev/null)" != "$proposed_sha" ]; }; then rm -f "$history"; fi; rm -f "$tmp"; [ -z "$history_tmp" ] || rm -f "$history_tmp"; [ -z "$work" ] || rm -rf "$work"' EXIT
+  trap sr_publish_cleanup EXIT
   work="$(mktemp -d "${TMPDIR:-/tmp}/sqlreview-publish.XXXXXX")" || sr_die 2 "mktemp failed"
   trap 'exit 2' HUP INT TERM
   original_draft="$(sr_sha256 "$draft")"
@@ -701,6 +717,13 @@ cmd_fingerprint() (
 )
 
 # ---------------------------------------------------------------------------------------------
+# EXIT cleanup for cmd_materialize: the private workspace from sr_source_workspace and, when the
+# rename did not happen, the staged output sibling. Neither path comes from the caller.
+sr_materialize_cleanup() {
+  if [ -n "$staged" ]; then rm -f -- "$staged"; fi
+  if [ -n "$work" ]; then rm -rf -- "$work"; fi
+}
+
 cmd_materialize() (
   [ $# -eq 4 ] || usage
   sr_need_jq
@@ -724,7 +747,7 @@ cmd_materialize() (
   jq -e --arg slug "$slug" --arg kind "$kind" --argjson revision "$revision" \
     '.slug == $slug and .kind == $kind and .revision == $revision' "$doc" >/dev/null || sr_die 4 "recorded revision identity differs"
   work="$(sr_source_workspace)" || exit 2
-  trap '[ -z "$staged" ] || rm -f "$staged"; rm -rf "$work"' EXIT
+  trap sr_materialize_cleanup EXIT
   trap 'exit 2' HUP INT TERM
   cp "$doc" "$work/document.json" || exit 2
   sr_source_auth "$work/document.json" "$work/recorded.sql" || exit $?
@@ -737,6 +760,22 @@ cmd_materialize() (
   [ ! -e "$output" ] || [ -f "$output" ] || sr_die 2 "output is not a regular file"
   mv "$staged" "$output" || sr_die 2 "cannot publish authenticated output"
   staged=""
+)
+
+# Remove a draft only at its canonical path, after the same slug and symlink checks as publish,
+# so callers never pass a constructed path to rm.
+cmd_discard_draft() (
+  [ $# -eq 2 ] || usage
+  sr_require_root
+  local slug="$1" kind="$2" draft
+  sr_safe_slug "$slug"
+  case "$kind" in scope|review|lifts) ;; *) usage ;; esac
+  draft="$SR_REVIEWS/$slug/$kind.draft.json"
+  sr_no_symlinks "$draft" || exit 2
+  [ -e "$draft" ] || exit 0
+  [ -f "$draft" ] || sr_die 2 "draft is not a regular file"
+  rm -f -- "$draft" || sr_die 2 "cannot remove draft"
+  printf 'discarded\t%s\n' "${draft#"$SR_ROOT"/}"
 )
 
 cmd_snapshot() (
@@ -1481,6 +1520,7 @@ case "$cmd" in
   lint) cmd_lint "$@" ;;
   criteria) cmd_criteria "$@" ;;
   publish) cmd_publish "$@" ;;
+  discard-draft) cmd_discard_draft "$@" ;;
   roles) cmd_roles "$@" ;;
   guard) cmd_guard "$@" ;;
   lifts-stale) cmd_lifts_stale "$@" ;;

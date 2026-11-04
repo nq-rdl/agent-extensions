@@ -461,7 +461,7 @@ header in `header_revisions`. Preserve the previous revision and increment it on
 
 ```bash
 bash "$S/sqlreview.sh" render "$SLUG" scope || exit $?  # → reviews/<slug>/scope.md (never hand-write it)
-rm -f ".sqlreview/reviews/$SLUG/scope.draft.json"
+bash "$S/sqlreview.sh" discard-draft "$SLUG" scope || exit $?
 ```
 
 

@@ -275,7 +275,8 @@ rl_review_row() ( # <slug> <commit>
     ""|*[!0-9a-f]*) ;;
     *) if git -C "$SR_ROOT" merge-base --is-ancestor "$gc" "$commit" 2>/dev/null; then inref=true
        elif [ $? -eq 1 ]; then inref=false; fi
-       # SQL can stay identical while code, pins or exports change (#521). List them; never judge them.
+       # SQL can stay identical while code, pins or exports change (#521). Report the paths as evidence;
+       # the reviewer decides whether a change matters.
        if git -C "$SR_ROOT" diff --name-only -z "$gc" "$commit" -- . ":(exclude).sqlreview" ":(exclude)$sql" \
          > "$tmp/others" 2>/dev/null; then
          others="$(tr '\0' '\n' < "$tmp/others" | jq -Rsc 'split("\n") | map(select(length > 0))')" || return 2
