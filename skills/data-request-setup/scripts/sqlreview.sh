@@ -502,7 +502,7 @@ cmd_publish() (
   sr_need_jq
   sr_require_root
   local slug="$1" kind="$2" draft="$3" dest tmp rel previous work history="" history_tmp="" history_added=false committed=false
-  local original_dest="" original_draft head="" current_sql="" header_only=false already=false proposed_sha=""
+  local original_dest="" original_draft head="" current_sql="" header_only=false already=false proposed_sha="" check_out=""
   sr_safe_slug "$slug"
   case "$kind" in scope|review|lifts) ;; *) usage ;; esac
   dest="$SR_REVIEWS/$slug/$kind.json"
@@ -519,7 +519,8 @@ cmd_publish() (
   trap 'exit 2' HUP INT TERM
   original_draft="$(sr_sha256 "$draft")"
   cp "$draft" "$tmp" || sr_die 2 "cannot stage draft"
-  cmd_check "$tmp" || exit 4
+  # Hold the check output: its "ok" is printed only when publish succeeds, so a later refusal prints none.
+  check_out="$(cmd_check "$tmp")" || { printf '%s\n' "$check_out"; exit 4; }
   jq -e --arg s "$slug" --arg k "$kind" '.slug == $s and .kind == $k' "$tmp" >/dev/null || sr_die 4 "document slug/kind must match destination"
   # A scope that owns research criteria must match the analyst's sidecar before anything is written.
   if [ "$kind" = scope ] && jq -e 'has("criteria_status")' "$tmp" >/dev/null; then
@@ -656,6 +657,7 @@ cmd_publish() (
     [ "$(git -C "$SR_ROOT" rev-parse --verify HEAD)" = "$head" ] || sr_die 2 "source commit changed during publication"
   fi
   if [ "$already" = true ]; then
+    printf '%s\n' "$check_out"
     printf 'already published\t%s\n' "${dest#"$SR_ROOT"/}"
     exit 0
   fi
@@ -673,6 +675,7 @@ cmd_publish() (
   fi
   mv "$tmp" "$dest" || sr_die 2 "cannot publish document"
   committed=true
+  printf '%s\n' "$check_out"
   printf 'published\t%s\n' "${dest#"$SR_ROOT"/}"
 )
 

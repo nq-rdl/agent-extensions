@@ -230,6 +230,21 @@ class Publish(unittest.TestCase):
         self.assertEqual(history.read_bytes(), before)
         self.assert_no_sql_records()
 
+    def test_refused_publish_with_uncommitted_sources_prints_no_ok(self):
+        fp = self.generated()
+        (self.workspace / "sql/request.sql").write_text("SELECT 2;\n")
+        result = self.publish(self.generated_doc(fp), "sql__request")
+        self.assertEqual(result.returncode, 2, result.stdout + result.stderr)
+        self.assertNotIn("ok", result.stdout.split())
+        self.assertIn("uncommitted source changes", result.stderr)
+        self.assertFalse((self.final / "review.json").exists())
+        # Once committed, the same publish succeeds and still reports the check result.
+        self.project.commit("body change")
+        fp = json.loads(self.run_helper("fingerprint", "sql/request.sql").stdout)
+        result = self.publish(self.generated_doc(fp), "sql__request")
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        self.assertEqual(result.stdout.split()[:1], ["ok"])
+
     def test_snapshot_refuses_uncommitted_sql(self):
         fp = self.generated()
         self.assertEqual(self.publish(self.generated_doc(fp), "sql__request").returncode, 0)
