@@ -23,7 +23,7 @@ Primary
 - Official scaffold (mirror this):
   https://github.com/github/spec-kit/tree/main/extensions/template
 - API reference (Python classes, hook events):
-  https://raw.githubusercontent.com/github/spec-kit/main/extensions/EXTENSION-API-REFERENCE.md
+  https://raw.githubusercontent.com/github/spec-kit/main/docs/extensions/api.md
 
 Context
 -------
