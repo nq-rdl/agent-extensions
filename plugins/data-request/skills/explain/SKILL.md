@@ -46,6 +46,9 @@ projection); stale embedded strings and cached Markdown are not current question
 Show closures by ID, answer and provenance as well as remaining open questions. Do not
 change this store during a walkthrough; send reconciliation to the owning engineer/analyst.
 
+**Supplied cohort:** explain the join to the `#` table by its declared shape and the `-- @supplied:` line.
+Never open the file under `data/00_raw/` or quote a value from it to the analyst. See `${CLAUDE_PLUGIN_ROOT}/skills/guardrails/references/supplied-cohorts.rst`.
+
 ## Staleness first — always
 
 ```bash
