@@ -75,6 +75,13 @@ class HandoffContracts(unittest.TestCase):
                               "flagged decisions", "restrictions", "linked evidence", "ask",
                               "do not offer acceptance", "walkthrough", "Send back"):
                     self.assertIn(token, load)
+                # The tracking issue is checked read-only, next to the child repository and PR check.
+                self.assertIn("child repository and deliverable PR match this request", load)
+                self.assertIn("also confirm that the child tracking issue links to the same deliverable PR "
+                              "and the same request", load)
+                self.assertIn("Never write to that issue", load)
+                self.assertLess(load.index("child repository and deliverable PR match"),
+                                load.index("child tracking issue links to the same"))
                 self.assertLess(body.index("## Load the durable hand-off"), body.index("## Analyst outcome"))
                 outcome = body.split("## Analyst outcome", 1)[1]
                 self.assertIn("loaded and rechecked", outcome)

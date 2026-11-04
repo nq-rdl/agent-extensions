@@ -85,7 +85,9 @@ issue only links to the PR. If the comment is ambiguous or unavailable, ask for 
 Read that comment and its linked evidence with `gh` or available GitHub read tools, not a
 recollection of an earlier session. Make no GitHub writes while you load the hand-off.
 
-Verify the child repository and deliverable PR match this request. Read the
+Verify the child repository and deliverable PR match this request. With a read-only call, also
+confirm that the child tracking issue links to the same deliverable PR and the same request. If
+it does not, name the difference and do not offer acceptance. Never write to that issue. Read the
 current PR head SHA from GitHub and compare the hand-off's head SHA, run commit, review revision
 and SQL fingerprint with the review being explained. Read the linked run manifest, counts-only
 QA, DVC provenance and UAT sections 1 to 3 for that run, plus open questions, flagged decisions,
