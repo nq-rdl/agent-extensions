@@ -1,5 +1,6 @@
 """Import the analyst's answers sidecar without rebadging its confirmations."""
 import copy
+import hashlib
 import json
 import subprocess
 import tempfile
@@ -21,6 +22,88 @@ def intake():
          "decided": {"by": "requester-login", "role": "requester", "at": "2026-09-28T10:00:00Z",
                      "source": "enquiry reply"}}], "open_questions": ["Which TIA subcodes?"]}
 
+
+FINGERPRINT_FIELDS = ("cohort_entry_event", "inclusion_criteria", "exclusion_criteria", "requested_data_elements")
+STAMP = {"confirmed_by": "analyst-login", "confirmed_role": "analyst", "confirmed_at": "2026-10-13T01:00:00Z"}
+
+
+def criteria_intake():
+    """A schema 2 sidecar: every kind, a researcher-applied exclusion and a withdrawn one with its replacement."""
+    value = intake()
+    value["schemaVersion"] = 2
+    value["criteria"] = [
+        {"id": "N1", "kind": "entry_event", "text": "First AAA admission", **STAMP},
+        {"id": "I1", "kind": "inclusion", "text": "Aged 65 and over", "applied_by": "rdl", **STAMP,
+         "decided": {"by": "requester-login", "role": "requester", "at": "2026-10-12", "source": "enquiry reply"}},
+        {"id": "E1", "kind": "exclusion", "text": "Deceased patients", "applied_by": "researcher", **STAMP,
+         "withdrawn": {"reason": "Narrowed to death before index", "at": "2026-10-20", "replaced_by": "E4"}},
+        {"id": "E4", "kind": "exclusion", "text": "Died before the index admission", **STAMP},
+        {"id": "D1", "kind": "data_element", "text": "Admission date", **STAMP},
+    ]
+    value["fingerprints"] = {k: "sha256:" + format(n, "x") * 64 for n, k in enumerate(FINGERPRINT_FIELDS, 1)}
+    return value
+
+
+def criteria_fault(value, fault):
+    """Break one schema 2 rule; the SECRET marker must never reach a diagnostic."""
+    c, w = value["criteria"], value["criteria"][2]["withdrawn"]
+    if fault == "schema1-criteria": value["schemaVersion"] = 1; value.pop("fingerprints")
+    elif fault == "schema1-fingerprints": value["schemaVersion"] = 1; value.pop("criteria")
+    elif fault == "version-3": value["schemaVersion"] = 3
+    elif fault == "criteria-object": value["criteria"] = {"SECRET": 1}
+    elif fault == "criteria-null": value["criteria"] = None
+    elif fault == "entry-not-object": c.append("SECRET")
+    elif fault == "id-pattern": c[0]["id"] = "N01"
+    elif fault == "id-trailing-newline": c[0]["id"] = "N1\n"
+    elif fault == "id-prefix": c[0]["id"] = "I9"
+    # D1 becomes a second inclusion I1: nothing references it, so only uniqueness can reject it.
+    elif fault == "id-duplicate": c[4].update(id="I1", kind="inclusion")
+    elif fault == "kind": c[0]["kind"] = "SECRET"
+    elif fault == "text-blank": c[0]["text"] = "  "
+    elif fault == "confirmed-by-email": c[0]["confirmed_by"] = "secret@example.com"
+    elif fault == "confirmed-role": c[0]["confirmed_role"] = "engineer"
+    elif fault == "confirmed-at": c[0]["confirmed_at"] = "2026-10-13"
+    elif fault == "confirmed-at-day": c[0]["confirmed_at"] = "2026-02-30T01:00:00Z"
+    elif fault == "applied-by-value": c[1]["applied_by"] = "SECRET"
+    elif fault == "applied-by-entry": c[0]["applied_by"] = "rdl"
+    elif fault == "applied-by-data-element": c[4]["applied_by"] = "researcher"
+    elif fault == "decided-source": c[1]["decided"]["source"] = ""
+    elif fault == "decided-at": c[1]["decided"]["at"] = "SECRET"
+    elif fault == "withdrawn-shape": c[2]["withdrawn"] = "SECRET"
+    elif fault == "withdrawn-reason": w["reason"] = " "
+    elif fault == "withdrawn-at": w["at"] = "2026-13-01"
+    elif fault == "replaced-by-missing": w["replaced_by"] = "E9"
+    elif fault == "replaced-by-other-kind": w["replaced_by"] = "I1"
+    elif fault == "replaced-by-self": w["replaced_by"] = "E1"
+    elif fault == "replaced-by-number": w["replaced_by"] = 4
+    elif fault == "fingerprints-missing": value.pop("fingerprints")
+    elif fault == "fingerprints-null": value["fingerprints"] = None
+    elif fault == "fingerprints-array": value["fingerprints"] = ["SECRET"]
+    elif fault == "fingerprints-unknown-key": value["fingerprints"]["SECRET"] = "sha256:" + "a" * 64
+    elif fault == "fingerprints-key-missing": del value["fingerprints"]["inclusion_criteria"]
+    elif fault == "fingerprints-uppercase": value["fingerprints"]["inclusion_criteria"] = "sha256:" + "A" * 64
+    elif fault == "fingerprints-short": value["fingerprints"]["inclusion_criteria"] = "sha256:abc"
+    elif fault == "fingerprints-prefix": value["fingerprints"]["inclusion_criteria"] = "md5:" + "a" * 64
+    elif fault == "fingerprints-trailing-newline": value["fingerprints"]["inclusion_criteria"] = "sha256:" + "a" * 64 + "\n"
+    elif fault == "fingerprints-leading-newline": value["fingerprints"]["inclusion_criteria"] = "x\nsha256:" + "a" * 64
+    elif fault == "id-leading-newline": c[0]["id"] = "x\nN1"
+    elif fault == "fingerprints-number": value["fingerprints"]["inclusion_criteria"] = 7
+    else: raise AssertionError(fault)
+    return value
+
+
+CRITERIA_FAULTS = (
+    "schema1-criteria", "schema1-fingerprints", "version-3", "criteria-object", "criteria-null",
+    "entry-not-object", "id-pattern", "id-trailing-newline", "id-prefix", "id-duplicate", "kind", "text-blank",
+    "confirmed-by-email", "confirmed-role", "confirmed-at", "confirmed-at-day", "applied-by-value",
+    "applied-by-entry", "applied-by-data-element", "decided-source", "decided-at", "withdrawn-shape",
+    "withdrawn-reason", "withdrawn-at", "replaced-by-missing", "replaced-by-other-kind", "replaced-by-self",
+    "replaced-by-number", "fingerprints-missing", "fingerprints-null", "fingerprints-array",
+    "fingerprints-unknown-key", "fingerprints-key-missing", "fingerprints-uppercase", "fingerprints-short",
+    "fingerprints-prefix", "fingerprints-trailing-newline", "fingerprints-leading-newline", "id-leading-newline", "fingerprints-number")
+
+# sha256 of today's `sqlreview.sh intake answers.intake.json 1` stdout for intake(): schema 1 must not change.
+SCHEMA_1_OUTPUT_SHA256 = "1c152e9b43f16d6d9a67222144b30a1062583bcc4ed6b1723c68e9ed1baf2617"
 
 TREES = ("skills/data-request-setup", "plugins/data-request/skills/setup",
          "dist/codex/plugins/data-request/skills/setup")
@@ -190,6 +273,96 @@ class IntakeReviewRegressions(unittest.TestCase):
                 self.assertNotIn(str(p.root), rendered)
                 self.assertNotIn("private workstation", rendered)
                 self.assertEqual(source.read_text(), original)
+
+    def test_schema_2_returns_criteria_and_fingerprints_verbatim(self):
+        value = criteria_intake()
+        for tree in TREES:
+            with self.subTest(tree=tree), tempfile.TemporaryDirectory() as tmp:
+                p = Project(tmp)
+                source = p.root / "answers.intake.json"
+                source.write_text(json.dumps(value))
+                result = json.loads(self.successful(tree, p.root, "intake", str(source), "1"))
+                self.assertEqual(list(result), ["present", "approval_number", "assumptions", "analyst_questions",
+                                                "criteria", "fingerprints"])
+                self.assertIs(result["present"], True)
+                self.assertEqual(result["criteria"], value["criteria"])
+                self.assertEqual(result["fingerprints"], value["fingerprints"])
+                self.assertEqual([c["id"] for c in result["criteria"]], ["N1", "I1", "E1", "E4", "D1"])
+                self.assertEqual(result["criteria"][2]["withdrawn"]["replaced_by"], "E4")
+                self.assertEqual(result["criteria"][1]["applied_by"], "rdl")
+                # The decisions and questions still import exactly as under schema 1.
+                self.assertEqual([a["id"] for a in result["assumptions"]], ["A-intake-age"])
+                self.assertEqual(result["analyst_questions"], ["Analyst question: Which TIA subcodes?"])
+
+    def test_schema_2_without_criteria_is_valid_and_empty(self):
+        for tree in TREES:
+            with self.subTest(tree=tree), tempfile.TemporaryDirectory() as tmp:
+                p = Project(tmp)
+                source = p.root / "answers.intake.json"
+                value = intake()
+                value["schemaVersion"] = 2
+                source.write_text(json.dumps(value))
+                result = json.loads(self.successful(tree, p.root, "intake", str(source), "1"))
+                self.assertEqual((result["criteria"], result["fingerprints"]), ([], None))
+                value["criteria"] = []
+                source.write_text(json.dumps(value))
+                self.assertEqual(json.loads(self.successful(tree, p.root, "intake", str(source), "1"))["criteria"], [])
+                # Fingerprints may stand alone, but must be exact when present.
+                value["fingerprints"] = criteria_intake()["fingerprints"]
+                source.write_text(json.dumps(value))
+                self.assertEqual(json.loads(self.successful(tree, p.root, "intake", str(source), "1"))["fingerprints"],
+                                 value["fingerprints"])
+
+    def test_schema_2_edge_forms_the_validator_accepts(self):
+        value = criteria_intake()
+        value["criteria"][2]["withdrawn"]["replaced_by"] = "E4"
+        value["criteria"][3]["withdrawn"] = {"reason": "Dropped", "at": "2026-10-21T02:03:04Z", "replaced_by": "E1"}
+        value["criteria"].append({"id": "I10", "kind": "inclusion", "text": "Adults", **STAMP,
+                                  "withdrawn": {"reason": "Merged", "at": "2026-10-21"}})
+        for tree in TREES:
+            with self.subTest(tree=tree), tempfile.TemporaryDirectory() as tmp:
+                p = Project(tmp)
+                source = p.root / "answers.intake.json"
+                source.write_text(json.dumps(value))
+                result = json.loads(self.successful(tree, p.root, "intake", str(source), "1"))
+                self.assertEqual(result["criteria"], value["criteria"])
+
+    def test_schema_1_output_is_byte_identical_to_before_schema_2(self):
+        for tree in TREES:
+            with self.subTest(tree=tree), tempfile.TemporaryDirectory() as tmp:
+                p = Project(tmp)
+                source = p.root / "answers.intake.json"
+                source.write_text(json.dumps(intake()))
+                out = self.successful(tree, p.root, "intake", str(source), "1")
+                self.assertEqual(hashlib.sha256(out.encode()).hexdigest(), SCHEMA_1_OUTPUT_SHA256)
+                self.assertNotIn("criteria", out)
+                self.assertNotIn("fingerprints", out)
+
+    def test_invalid_schema_2_exits_4_without_echoing_values(self):
+        for tree in TREES:
+            for fault in CRITERIA_FAULTS:
+                with self.subTest(tree=tree, fault=fault), tempfile.TemporaryDirectory() as tmp:
+                    p = Project(tmp)
+                    source = p.root / "answers.intake.json"
+                    source.write_text(json.dumps(criteria_fault(criteria_intake(), fault)))
+                    result = self.invoke(tree, p.root, "intake", str(source), "1")
+                    self.assertEqual(result.returncode, 4, result.stdout + result.stderr)
+                    self.assertEqual(result.stdout, "")
+                    for secret in ("SECRET", "secret@example.com", "sha256:", "Deceased"):
+                        self.assertNotIn(secret, result.stderr)
+
+    def test_schema_2_merges_into_a_scope_draft_without_criteria_leaking_in(self):
+        for tree in TREES:
+            with self.subTest(tree=tree), tempfile.TemporaryDirectory() as tmp:
+                p = Project(tmp)
+                source = p.root / "answers.intake.json"
+                source.write_text(json.dumps(criteria_intake()))
+                d = scope_doc(sql_sha256=None, approval_number="THHSAQUIRE-042")
+                draft = p.write_json(d["slug"], "scope.draft.json", d)
+                merged = json.loads(self.successful(tree, p.root, "intake", str(source), "1", str(draft)))
+                self.assertNotIn("criteria", merged)
+                self.assertNotIn("fingerprints", merged)
+                self.assertIn("A-intake-age", [a["id"] for a in merged["assumptions"]])
 
 
 class Intake(unittest.TestCase):

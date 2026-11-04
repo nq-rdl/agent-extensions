@@ -133,8 +133,7 @@ baseline pointer and validation in the PR or existing review ledger. Do not add 
 to `specs/amendments.md`: that record governs released extracts. Keep the baseline immutable.
 
 For a released extract, add one entry per amendment, with its classification, to the child's
-amendment record. In a data-analysis-scaffold child this is `specs/amendments.md`
-([data-analysis-scaffold#234](https://github.com/nq-rdl/data-analysis-scaffold/issues/234)).
+amendment record. In a data-analysis-scaffold child this is `specs/amendments.md`.
 Follow the record's template and field names, which its guard reads, and use the next `AMD-`
 number. Never edit an entry that is already in a release. Write names or handles, never an
 email address or a patient identifier. If the repository has no record, say so and put the

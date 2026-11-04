@@ -35,9 +35,11 @@ library issue that would retire it. Treat the epic and every library issue as pu
 * ``evidence``: links to the library issue rows or a recorded house-default ruling.
   This repository is public, so the list never names an enquiry. Per-enquiry evidence
   stays in the private request record; a library issue is not private merely because it is
-  a library issue. A ``house_default`` also records the string
-  ``facility_code``, original ``confirmed_by`` / ``confirmed_at`` and independent
-  ``decided: {by, role, at, source}``. It is not generic permission to skip confirmation.
+  a library issue. A ``house_default`` also records the original ``confirmed_by`` /
+  ``confirmed_at`` and independent ``decided: {by, role, at, source}``. Only ``tuh-facility``
+  also records the string ``facility_code``; the list helper requires it there and nowhere else.
+  A ``house_default`` is the recorded ruling for its own
+  entry only. It never replaces the confirmation of any other item.
 * ``library_issue`` (URL or null), ``related_issues``, and ``retired_by`` (``{unit, version}``
   when retired).
 
@@ -77,19 +79,49 @@ request-specific decision with normal confirmation. A source mapping gap is evid
 work, not a question about the already decided default. Formal SQL review keeps its
 normal implementation/confirmation gates: a generated header alone confirms nothing.
 
+Recorded house default: first pass
+----------------------------------
+
+``broad-first-pass`` is the second recorded house default: on a first pass, exclusion
+criteria are not applied, to keep the cohort broad. It states a rule about criteria, not a
+fact about the cohort, so it carries no ``facility_code`` and bootstrap does not offer it
+as an ``A-`` assumption. Its ``house_default`` preserves JoshKgh's recorded decision. The
+``decided.source`` link points to the public record of it.
+
+House-default import therefore covers ``broad-first-pass``. Bootstrap applies it to the
+exclusion criteria of the intake sidecar that the request does not override. Each becomes
+a ``criteria_status`` row with state ``not-applied``, the listed ``proposal.text`` as its
+``reason`` and ``upstream: {source: "recurring-decision", id: "broad-first-pass"}``. The
+row takes ``confirmed_by`` and ``confirmed_at`` from the entry's ``house_default``, and its
+``confirmed_revision`` is the import revision. It carries no ``decided``: the decider stays on
+the entry, and the row claims no origin of its own. Bootstrap imports the rows without a
+fresh question, as it does for ``tuh-facility``. It tells the engineer which rows it imported, with
+the recorded decider and date, and the engineer may override any row. Do not write an assumption
+or a limitation for it. Inclusion, entry-event and data-element criteria are not touched.
+
+A request that applies an exclusion, or an analyst who overrides it for one criterion,
+keeps the normal row for that criterion and no ``upstream``. Gaining, dropping or changing
+the ``upstream`` of a row needs a fresh confirmation, so the carry helper walks such a row.
+A decision without a ``house_default`` is not imported: bootstrap asks per request.
+
+The rule against inventing stands: never invent a confirmer for the entry or its rows, and
+never invent a timestamp or confirmation for ``broad-first-pass`` or any other listed proposal.
+Copy ``confirmed_by`` and ``confirmed_at`` only from the entry's ``house_default``.
+
 Detect (bootstrap and analyse)
 ------------------------------
 
 1. Before you draft candidate items, run ``list``. Apply the recorded house-default
-   rule above first. For each other open decision that applies to the request's
-   sources and outputs, offer the listed text and rationale as the candidate item.
+   rules above first. For each other open decision without a ``house_default`` that applies
+   to the request's sources and outputs, offer the listed text and rationale as the
+   candidate item. ``broad-first-pass`` is never one of them: it becomes criteria rows.
 2. Before each batch of questions, run ``match`` on the draft. The result is a set of hints.
    Decide each hit yourself. A miss does not prove that no listed decision applies.
-3. For each other match, read the prior enquiries from the ``evidence`` links at run time
-   (``gh issue view <number> --repo <owner/repo> --comments``). Show what they record in the
-   question to the engineer, with the library issue; this is a private session, and any request
-   identifiers in older rows stay there. If you cannot read the links, show
-   them and say that the prior enquiries are not available. Offer the listed wording as the
+3. For each other match without a ``house_default``, read the prior enquiries from the
+   ``evidence`` links at run time (``gh issue view <number> --repo <owner/repo> --comments``).
+   Show what they record in the question to the engineer, with the library issue; this is a
+   private session, and any request identifiers in older rows stay there. If you cannot read
+   the links, show them and say that the prior enquiries are not available. Offer the listed wording as the
    proposal, unless this request needs a different reading. Say that the item is an upstream
    candidate. Do not copy enquiry ids into this list or into a skill.
 4. Mark the item with ``"upstream": {"decision": "<id>"}``. The exact recorded house
