@@ -89,20 +89,27 @@ class Base(unittest.TestCase):
                 "assumptions": [], "limitations": [], "open_questions": [],
                 "sql_sha256": sha(sql), "criteria_status": status}
 
+    def commit(self):
+        """Hash-only reviews (#548): commit the sources and return HEAD for the draft's git_commit."""
+        git(self.root, "add", "-A")
+        if git(self.root, "status", "--porcelain"):
+            git(self.root, "commit", "-q", "-m", "fixture sources")
+        return git(self.root, "rev-parse", "HEAD")
+
+    def draft_doc(self, revision, sql, status):
+        return dict(self.scope(revision, sql, status), git_commit=self.commit())
+
     def publish(self, revision, sql, status, expected=0):
-        self.draft.write_text(json.dumps(self.scope(revision, sql, status)))
+        self.draft.write_text(json.dumps(self.draft_doc(revision, sql, status)))
         r = run(SQLREVIEW, ["publish", SLUG, "scope", str(self.draft)], self.root)
         self.assertEqual(r.returncode, expected, r.stdout + r.stderr)
-        if expected == 0:
-            # bootstrap records the authenticated scope baseline after each publish
-            (self.d / "scope.source.sql").write_text(sql)
         return r
 
     def published(self):
         return json.loads((self.d / "scope.json").read_text())
 
     def carryforward(self, revision, sql, status):
-        self.draft.write_text(json.dumps(self.scope(revision, sql, status)))
+        self.draft.write_text(json.dumps(self.draft_doc(revision, sql, status)))
         r = run(SQLREVIEW, ["carryforward", SLUG, "scope", str(self.draft)], self.root)
         self.assertEqual(r.returncode, 0, r.stdout + r.stderr)
         return json.loads(r.stdout)
@@ -144,10 +151,11 @@ class Base(unittest.TestCase):
 
     def release_run(self, tag, sql):
         """Commit with a review current for `sql`, tag, and run `release.sh criteria`."""
-        (self.d / "source.sql").write_text(sql)
+        self.draft.unlink(missing_ok=True)
+        reviewed = self.commit()
         review = {"schemaVersion": 2, "kind": "review", "slug": SLUG, "sql_path": SQL_PATH, "title": "Adults",
                   "revision": 1, "recorded_at": "2026-10-21T00:00:00Z", "recorded_by": "eng-login",
-                  "sql_sha256": sha(sql), "git_commit": None, "git_dirty": False,
+                  "sql_sha256": sha(sql), "git_commit": reviewed, "git_dirty": False,
                   "purpose": "Adults.", "grain": "one row per patient",
                   "inputs": [{"name": "ed.patients", "description": "one row per patient"}],
                   "outputs": [{"name": "patient_id", "description": "patient"}],
