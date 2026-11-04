@@ -1,0 +1,3 @@
+kind: Added
+body: 'data-request: a no-echo canary test fails when a fixed script path prints a canary value'
+time: 2026-11-02T15:01:00.000000000Z

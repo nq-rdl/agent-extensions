@@ -107,7 +107,7 @@ sr_safe_slug() {
   sr_no_symlinks "$SR_REVIEWS/$1" || exit 2
 }
 sr_safe_sql() {
-  case "$1" in ""|/*|*/../*|../*|*/..|..|./*|*/./*|*/.|*//*|*/) sr_die 2 "unsafe sql_path: $1" ;; esac
+  case "$1" in ""|/*|*/../*|../*|*/..|..|./*|*/./*|*/.|*//*|*/) sr_die 2 "unsafe sql_path" ;; esac
   sr_no_symlinks "$SR_ROOT/$1" || exit 2
 }
 # Both encodings of a path, readable then legacy, one per line. The definitions live in
@@ -313,11 +313,13 @@ sr_state_reason() { # <slug> <state>
         violations="$(bash "$SR_SCRIPT_DIR/sqlreview.sh" questions "$slug" 2>&1 >/dev/null | tr '\n' ';' | sed 's/;$//')"
       fi
       why="$(basename "$doc"): $violations"
-      schema="$(jq -r '.schemaVersion // "missing" | tostring' "$doc" 2>/dev/null || echo unreadable)"
+      # No-echo: only a known schema version prints. Any other value prints as its rule.
+      schema="$(jq -r 'if .schemaVersion == 1 or .schemaVersion == 2 then .schemaVersion
+        elif has("schemaVersion") then "invalid" else "missing" end | tostring' "$doc" 2>/dev/null || echo unreadable)"
       why="$why; schemaVersion $schema"
       sql="$(jq -r '.sql_path // "" | strings' "$doc" 2>/dev/null || true)"
       if [ -n "$sql" ]; then
-        case "$sql" in /*|*..*) why="$why; sql_path '$sql' is not project-relative" ;; *)
+        case "$sql" in /*|*..*) why="$why; unsafe sql_path (not project-relative)" ;; *)
           [ -f "$SR_ROOT/$sql" ] || why="$why; sql_path target missing: $sql" ;;
         esac
       fi
@@ -357,24 +359,30 @@ sr_source_workspace() (
   printf '%s\n' "$work"
 )
 
-# SQL paths that git reports as uncommitted (untracked, modified or staged), one per line between
+# Uncommitted sources that git reports (untracked, modified or staged), one per line between
 # newlines. cmd_status sets it once per run with ONE git call, before its loop over the reviews,
-# because analyse's fingerprint refuses uncommitted SQL. Paths are relative to $SR_ROOT. Empty when
-# git or the repository is unavailable: then no review is named as uncommitted.
+# because analyse's fingerprint refuses them (#548, sr_source_clean). The set is sr_source_clean's:
+# the whole repository, minus the review records under $SR_DIR (reviews/, releases/, templates/,
+# ledger.json and .gitignore). Paths are relative to $SR_ROOT ("../" for a path above it).
+# SR_DIRTY_N counts them. Both are empty when git or the repository is unavailable: then no
+# review is named as uncommitted.
 SR_NL='
 '
 sr_load_uncommitted() {
   local line p
-  SR_UNCOMMITTED="$SR_NL"
+  SR_UNCOMMITTED="$SR_NL" SR_DIRTY_N=0
   command -v git >/dev/null 2>&1 || return 0
   while IFS= read -r line; do
     p="${line#???}"
     # A quoted path (one with a space) loses its quotes. A path that git escapes does not match.
     case "$p" in \"*\") p="${p#\"}"; p="${p%\"}" ;; esac
-    [ -z "$p" ] || SR_UNCOMMITTED="$SR_UNCOMMITTED$p$SR_NL"
+    case "$p" in
+      ""|"$SR_DIR"/reviews/*|"$SR_DIR"/releases/*|"$SR_DIR"/templates/*|"$SR_DIR"/ledger.json|"$SR_DIR"/.gitignore) ;;
+      *) SR_UNCOMMITTED="$SR_UNCOMMITTED$p$SR_NL"; SR_DIRTY_N=$((SR_DIRTY_N + 1)) ;;
+    esac
   done <<EOF
 $(git --no-optional-locks -C "$SR_ROOT" -c core.quotePath=false -c status.relativePaths=true -c color.status=false \
-    status --short --untracked-files=all --no-renames -- . ":(exclude)$SR_DIR" 2>/dev/null)
+    status --short --untracked-files=all --no-renames -- ':/' 2>/dev/null)
 EOF
 }
 sr_uncommitted() { # <sql_path>: true when the run's git status lists it
@@ -415,8 +423,12 @@ $( { [ -f "$sidecar" ] && jq -rn --slurpfile s "$scope" --slurpfile i "$sidecar"
 EOF2
     case "$srev" in ''|*[!0-9]*) srev="" ;; esac
   fi
-  # Analyse fingerprints committed SQL only, so uncommitted SQL is committed first.
-  if [ -f "$SR_ROOT/$sql" ] && sr_uncommitted "$sql"; then pre="commit $sql, then "; fi
+  # Analyse fingerprints committed sources only (sr_source_clean), so they are committed first.
+  if [ -f "$SR_ROOT/$sql" ] && sr_uncommitted "$sql"; then
+    if [ "${SR_DIRTY_N:-0}" -gt 1 ]; then pre="commit $sql and the other uncommitted sources, then "
+    else pre="commit $sql, then "; fi
+  elif [ "${SR_DIRTY_N:-0}" -gt 0 ]; then pre="commit the uncommitted sources (builders, configuration, pins), then "
+  fi
   if [ -n "$srev" ]; then
     # The scope document's own staleness is the state itself. Under a review, test the scope
     # binding directly: analyse alone never refreshes scope.json. A scope framed before the SQL

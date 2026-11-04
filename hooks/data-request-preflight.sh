@@ -3,7 +3,7 @@
 # project — whether .sqlreview/ is initialised and which reviews are stale or missing — so the
 # model knows which /data-request:* stage applies before it is asked. Each review that needs
 # action adds one line with its next command from status (bootstrap first when the scope is out
-# of date, #514). Runs `sqlreview.sh status --json` from the event's cwd. Advisory only: any failure (no helper, no cwd, no jq) is a silent
+# of date, #514), and so does each amendment record with a handed-off part. Runs `sqlreview.sh status --json` from the event's cwd. Advisory only: any failure (no helper, no cwd, no jq) is a silent
 # no-op, and an uninitialised project only gets a hint when it actually contains SQL files. When status
 # runs past its budget (SQLREVIEW_PREFLIGHT_BUDGET seconds, default 4), one line says so.
 set -u
@@ -74,7 +74,9 @@ elif [ "$rc" -eq 0 ] && [ -n "$status" ]; then
         # must be updated first, so a quiet project stays one line.
         + ([ $r.reviews[] | select(.next != null and (.state != "current" or (.next | contains("/data-request:bootstrap"))))
              | "\n- next for \(.slug) (\(.state)): \(.next)" ] | join(""))
-      end' 2>/dev/null)"
+      end
+    # An open amendment part holds the release (#534): one line per record, with or without reviews.
+    + ([ ($r.amendments // [])[] | "\n- next for \(.record) (handed off: \(.handed_off | join(" "))): \(.next)" ] | join(""))' 2>/dev/null)"
 fi
 [ -n "$ctx" ] || exit 0
 jq -nc --arg c "$ctx" '{hookSpecificOutput:{hookEventName:"SessionStart",additionalContext:$c}}'

@@ -30,6 +30,12 @@
 #                            holds the release (exit 11, ids and fields on stderr).
 #                            An entry of .sqlreview/ledger.json at the amend stage with no record
 #                            file holds too.
+#   amend-check FILE | amend-check --stdin
+#                            validate an amendment part-state record (.sqlreview/amendments/<request>.json),
+#                            as the guard does on each Write: schemaVersion 1, kind "amendment", parts[]
+#                            with a unique id P<n> and a status done (with commit), handed off or withdrawn
+#                            (with reason and comment). One "<field>: <rule>" line per violation, exit 4;
+#                            "ok" otherwise. Never a value
 #   check FILE | check --stdin
 #                            validate a release record (.sqlreview/releases/<tag>/release.json):
 #                            one violation per line, exit 4; "ok" otherwise. Inside the project,
@@ -77,6 +83,10 @@ include "release-criteria";
 def str: type == "string" and length > 0;
 def arr: if type == "array" then . else [] end;
 def kept: .decision == "accepted" or .decision == "reworded";
+# No-echo: a violation names the field and the rule, never a value. An id or slug prints only in
+# its well-formed shape; any other value prints as a placeholder.
+def rl_id($re): if str and test($re) then . else "(invalid id)" end;
+def rl_slug: if str and test("^[A-Za-z0-9_%.-]+$") then . else "(invalid slug)" end;
 # A claim sourced from a research criterion is in the criteria table, never repeated under
 # "Extraction Assumptions / Important limitations" (FR-018; rc_criterion_claim). $itemised: the
 # record has a criteria object; a legacy record keeps every claim.
@@ -87,11 +97,11 @@ def src_errors($cid; $kept; $ev):
     if (.slug | str) and (.item | str) and (.revision | type) == "number" then
       if $kept | not then empty
       else . as $s | ([$ev[] | select(.slug == $s.slug)][0]) as $e
-        | if $e == null then "\($cid): review \(.slug) is not in evidence"
+        | if $e == null then "\($cid): review \(.slug | rl_slug) is not in evidence"
           elif $e.revision != .revision then
-            "\($cid): review \(.slug) revision \(.revision) is not the revision in evidence (\($e.revision))"
+            "\($cid): review \(.slug | rl_slug) revision \(.revision) is not the revision in evidence (\($e.revision))"
           elif $e.applies == "current" or $e.applies == "header-only" then empty
-          else "\($cid): review \(.slug) does not apply to the release (\($e.applies)); cite the release files that support the claim, or raise it as a question" end
+          else "\($cid): review \(.slug | rl_slug) does not apply to the release (\($e.applies)); cite the release files that support the claim, or raise it as a question" end
       end
     else "\($cid): a review source needs slug, item and revision" end
   elif .kind == "scope" then
@@ -101,8 +111,8 @@ def src_errors($cid; $kept; $ev):
     if (.path | str) and (.ref | str) then empty else "\($cid): a file source needs path and ref" end
   else "\($cid): source kind must be review, scope or file" end;
 def claim_errors($ev):
-  (.id // "?") as $id
-  | (if (.id | str) and (.id | test("^C[1-9][0-9]*$")) then empty else "claim id must be C<n>: \($id)" end),
+  (.id | rl_id("^C[1-9][0-9]*$")) as $id
+  | (if (.id | str) and (.id | test("^C[1-9][0-9]*$")) then empty else "claim id must be C<n>" end),
     (if .section == "summary" or .section == "assumptions" then empty
      else "\($id): section must be summary or assumptions" end),
     (if (.proposed | str) then empty else "\($id): proposed wording is empty" end),
@@ -123,8 +133,8 @@ def claim_errors($ev):
      then kept as $k | .sources[] | src_errors($id; $k; $ev)
      else "\($id): sources must be a nonempty array" end);
 def question_errors:
-  (.id // "?") as $id
-  | (if (.id | str) and (.id | test("^Q[1-9][0-9]*$")) then empty else "question id must be Q<n>: \($id)" end),
+  (.id | rl_id("^Q[1-9][0-9]*$")) as $id
+  | (if (.id | str) and (.id | test("^Q[1-9][0-9]*$")) then empty else "question id must be Q<n>" end),
     (if (.text | str) then empty else "\($id): text is empty" end),
     (if (.sources | type) == "array" then empty else "\($id): sources must be an array" end),
     (if .resolution == null then empty
@@ -150,11 +160,11 @@ def release_errors:
       (if (.claims | type) == "array" and (.claims | length) > 0 then empty else "claims must be a nonempty array" end),
       (.claims | arr | .[] | if type == "object" then claim_errors($ev) else "every claim must be an object" end),
       (.questions | arr | .[] | if type == "object" then question_errors else "every question must be an object" end),
-      (.claims | arr | map(objects | .id) | group_by(.)[] | select(length > 1) | "duplicate claim id \(.[0])"),
-      (.questions | arr | map(objects | .id) | group_by(.)[] | select(length > 1) | "duplicate question id \(.[0])"),
+      (.claims | arr | map(objects | .id) | group_by(.)[] | select(length > 1) | "duplicate claim id \(.[0] | rl_id("^C[1-9][0-9]*$"))"),
+      (.questions | arr | map(objects | .id) | group_by(.)[] | select(length > 1) | "duplicate question id \(.[0] | rl_id("^Q[1-9][0-9]*$"))"),
       (if .status != "approved" then empty else
-         (.claims | arr | .[] | objects | select(.decision == "pending") | "approved: \(.id) is pending"),
-         (.questions | arr | .[] | objects | select(.resolution == null) | "approved: \(.id) is unresolved"),
+         (.claims | arr | .[] | objects | select(.decision == "pending") | "approved: \(.id | rl_id("^C[1-9][0-9]*$")) is pending"),
+         (.questions | arr | .[] | objects | select(.resolution == null) | "approved: \(.id | rl_id("^Q[1-9][0-9]*$")) is unresolved"),
          (((.criteria | type) == "object") as $itemised
           | ("summary", "assumptions") as $s
           | if any(.claims | arr | .[] | objects; .section == $s and kept and limitation_shown($itemised)) then empty
@@ -590,11 +600,57 @@ EOF
   printf '%s' "$out" | jq -e '. == null or .status == "complete"' >/dev/null || exit 10
 }
 
+# The write-time schema of an amendment part-state record (#534). The evidence hold (RL_AMEND_JQ)
+# reads the same parts. Each finding names a field path and a rule, never a value.
+RL_AMEND_CHECK_JQ='def ne: type == "string" and test("\\S");
+if type != "object" then "(document): must be a JSON object"
+else
+  (if .schemaVersion == 1 then empty else "schemaVersion: must be 1" end),
+  (if .kind == "amendment" then empty else "kind: must be amendment" end),
+  (if (.parts | type) != "array" or (.parts | length) == 0 then "parts: must be a nonempty array"
+   else
+     (if [.parts[] | objects | .id | strings] | group_by(.) | any(length > 1)
+      then "parts[].id: must be unique" else empty end),
+     (.parts | to_entries[] | "parts[\(.key)]" as $at | .value
+      | if type != "object" then "\($at): must be an object"
+        else
+          (if (.id | type) == "string" and (.id | test("^P[1-9][0-9]*$")) then empty else "\($at).id: must be P<n>" end),
+          (if .status == "done" then
+             (if (.commit | type) == "string" and (.commit | test("^[0-9a-f]{7,64}$")) then empty
+              else "\($at).commit: required for a done part (a commit hash)" end)
+           elif .status == "withdrawn" then
+             (if (.reason | ne) then empty else "\($at).reason: required for a withdrawn part" end),
+             (if (.comment | ne) then empty else "\($at).comment: required for a withdrawn part (the withdrawn: comment URL)" end)
+           elif .status == "handed off" then empty
+           else "\($at).status: must be done, handed off or withdrawn" end)
+        end)
+   end)
+end'
+
+cmd_amend_check() {
+  sr_need_jq
+  local f tmp out rc=0
+  case "${1:-}" in
+    --stdin) [ $# -eq 1 ] || usage
+      tmp="$(mktemp)" || sr_die 2 "mktemp failed"
+      cat > "$tmp"; f="$tmp" ;;
+    "") usage ;;
+    *) [ $# -eq 1 ] || usage
+      f="$1"; [ -f "$f" ] || sr_die 2 "no such file: $f" ;;
+  esac
+  # jq error text can quote a value (no-echo): a parse failure prints a fixed line.
+  out="$(jq -r "$RL_AMEND_CHECK_JQ" "$f" 2>/dev/null)" || out="(document): not valid JSON"
+  [ -z "${tmp:-}" ] || rm -f "$tmp"
+  if [ -n "$out" ]; then printf '%s\n' "$out"; rc=4; else printf 'ok\n'; fi
+  return "$rc"
+}
+
 cmd="${1:-}"
 [ -n "$cmd" ] || usage
 shift
 case "$cmd" in
   evidence) cmd_evidence "$@" ;;
+  amend-check) cmd_amend_check "$@" ;;
   check) cmd_check "$@" ;;
   render) cmd_render "$@" ;;
   criteria) cmd_criteria "$@" ;;

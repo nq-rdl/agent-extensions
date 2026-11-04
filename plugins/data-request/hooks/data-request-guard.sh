@@ -15,6 +15,7 @@
 #   releases/*/release.json             Write → content run through `release.sh check`; Edit → deny
 #   releases/*/release.md               deny  (rendered from the record by `release.sh render`)
 #   reviews/*/explain.json              Write → its `by` must be a handle, not an email (#419); Edit → deny
+#   amendments/<request>.json           Write → content run through `release.sh amend-check`; Edit → deny
 #   reviews/*/*.draft.json, source.sql, templates/*   pass
 # This is an invariant check, not proof that a human answered: it makes "forgot to ask" a denied
 # tool call with the offending ids named, and leaves a fabricated confirmation auditable in the
@@ -209,6 +210,17 @@ case "$rel" in
     expected_tag="${rel#releases/}"; expected_tag="${expected_tag%/*}"
     printf '%s' "$content" | jq -e --arg t "$expected_tag" '.tag == $t' >/dev/null ||
       decide deny "The record's tag must match its directory: releases/$expected_tag/."
+    exit 0 ;;
+  amendments/*.json)
+    # The amendment part-state record (#534) holds a release while a part is handed off, so it is
+    # validated whole, like the other review documents. The reason names fields and rules only.
+    [ "$tool" = "Write" ] || decide deny "$rel is an amendment part-state record: it is validated as a whole. Write the complete file instead of an Edit fragment."
+    name="${rel#amendments/}"; name="${name%.json}"
+    case "$name" in ""|-*|*[!a-z0-9-]*) decide deny "An amendment record is .sqlreview/amendments/<request>.json, with lower-case letters, digits and hyphens in the name." ;; esac
+    [ -n "$checker" ] || decide deny "SQL Review guard cannot find sqlreview.sh, so it cannot find release.sh next to it. Reinstall data-request@rdl-agent-extensions before writing $rel."
+    command -v jq >/dev/null 2>&1 || decide deny "Amendment records are validated with jq, which is not installed. Install jq (>= 1.6) before writing $rel."
+    out="$(field .tool_input.content | bash "$(dirname "$checker")/release.sh" amend-check --stdin 2>/dev/null)" ||
+      decide deny "$rel rejected by release.sh amend-check: $(printf '%s' "$out" | tr '\n' ';' | sed 's/;$//'). Write schemaVersion 1, kind amendment and parts with a unique id P<n> and a status done (with commit), handed off or withdrawn (with reason and comment)."
     exit 0 ;;
   *) exit 0 ;;
 esac

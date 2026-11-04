@@ -1254,6 +1254,88 @@ def decided(criteria, decision="accepted"):
     return criteria
 
 
+@unittest.skipUnless(shutil.which("jq"), "the guard needs jq")
+class AmendRecordGuard(unittest.TestCase):
+    """The guard validates writes to .sqlreview/amendments/*.json like the other review documents.
+
+    The schema is #534's: schemaVersion 1, kind amendment, parts[] with a unique id P<n> and a status
+    done (with commit), handed off or withdrawn (with reason and comment). Never a value in the reason.
+    """
+    REL = "amendments/enq9177-falls.json"
+    decide = Guard.decide
+
+    def doc(self, parts=None, **over):
+        d = {"schemaVersion": 1, "kind": "amendment", "parts": parts if parts is not None else [
+            {"id": "P1", "status": "done", "commit": "a" * 40},
+            {"id": "P2", "status": "handed off", "hand_off": "draft, not posted"},
+            {"id": "P3", "status": "withdrawn", "reason": "Not needed " + CANARY,
+             "comment": "https://github.com/example-org/extract-example/pull/9/comment-1"}]}
+        d.update(over)
+        return d
+
+    def denied(self, doc, *rules, rel=None):
+        decision, reason = self.decide("Write", rel or self.REL, doc if isinstance(doc, str) else json.dumps(doc))
+        self.assertEqual(decision, "deny", reason)
+        for rule in rules:
+            self.assertIn(rule, reason)
+        self.assertNotIn("LEAK-C", reason)
+        return reason
+
+    def test_a_valid_record_passes(self):
+        decision, reason = self.decide("Write", self.REL, json.dumps(self.doc()))
+        self.assertEqual(decision, "allow", reason)
+
+    def test_edit_is_denied(self):
+        decision, reason = self.decide("Edit", self.REL)
+        self.assertEqual(decision, "deny")
+        self.assertIn("Write the complete file", reason)
+
+    def test_document_fields(self):
+        self.denied(self.doc(schemaVersion=CANARY), "schemaVersion: must be 1")
+        self.denied(self.doc(kind=CANARY), "kind: must be amendment")
+        self.denied(self.doc(parts=[]), "parts: must be a nonempty array")
+        self.denied(self.doc(parts=CANARY), "parts: must be a nonempty array")
+        self.denied("[]", "(document): must be a JSON object")
+        self.denied('{"x": "' + CANARY + '",,}', "(document): not valid JSON")
+
+    def test_part_rules_name_the_field_and_the_rule(self):
+        parts = [{"id": CANARY, "status": "done", "commit": "a" * 40},
+                 {"id": "P2", "status": "done", "commit": CANARY},
+                 {"id": "P3", "status": "withdrawn", "reason": " ", "comment": ""},
+                 {"id": "P3", "status": CANARY},
+                 CANARY]
+        reason = self.denied(self.doc(parts), "parts[0].id: must be P<n>",
+                             "parts[1].commit: required for a done part",
+                             "parts[2].reason: required for a withdrawn part",
+                             "parts[2].comment: required for a withdrawn part",
+                             "parts[].id: must be unique",
+                             "parts[3].status: must be done, handed off or withdrawn",
+                             "parts[4]: must be an object")
+        self.assertIn("release.sh amend-check", reason)
+
+    def test_the_record_name_is_checked(self):
+        self.denied(self.doc(), "lower-case letters, digits and hyphens", rel="amendments/ENQ 9177.json")
+
+    def test_amend_check_cli(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            f = Path(tmp) / "a.json"
+            f.write_text(json.dumps(self.doc()))
+            r = run(RELEASE, ["amend-check", str(f)], tmp)
+            self.assertEqual((r.returncode, r.stdout), (0, "ok\n"), r.stderr)
+            r = run(RELEASE, ["amend-check", "--stdin"], tmp, stdin=json.dumps(self.doc(kind=CANARY)))
+            self.assertEqual((r.returncode, r.stdout), (4, "kind: must be amendment\n"), r.stderr)
+            self.assertNotIn("LEAK-C", r.stdout + r.stderr)
+
+    def test_every_record_the_amend_skill_shows_passes(self):
+        # The JSON example in the amend skill is a valid record once its placeholders are filled.
+        for tree in (REPO / "skills/data-request-amend", REPO / "plugins/data-request/skills/amend"):
+            text = (tree / "SKILL.md").read_text()
+            block = text.split('```json\n{"schemaVersion": 1, "kind": "amendment"', 1)[1].split("```", 1)[0]
+            example = json.loads('{"schemaVersion": 1, "kind": "amendment"' + block.replace("<commit>", "a" * 7))
+            decision, reason = self.decide("Write", self.REL, json.dumps(example))
+            self.assertEqual(decision, "allow", reason)
+
+
 def render_record(doc):
     with tempfile.TemporaryDirectory() as tmp:
         f = Path(tmp) / "release.json"
