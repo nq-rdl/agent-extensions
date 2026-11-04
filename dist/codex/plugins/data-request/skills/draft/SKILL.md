@@ -41,7 +41,9 @@ required columns from explicit instructions or confirmed scope. Consult column-s
 metadata and dataops DDL comments for every field whose interpretation affects the
 result; use `$data-request:map` for unresolved source/resolver choices. Verify dialect and
 correctness-critical syntax using the canonical docs linked by guardrails.
-Apply guardrails **House defaults** from their recorded confirmation, without a fresh question: use TUH `00200` unless the request
+Apply guardrails **House defaults** from their recorded confirmation, without a fresh question. `tuh-facility` is a recorded human
+ruling that you import and do not decide. Use it only if its `house_default` holds `confirmed_by` and `confirmed_at`, and tell the
+engineer which item you used. The engineer may override it. Use TUH `00200` unless the request
 explicitly changes the cohort's facility set (another facility/HHS/network scope). Reuse one standard assumption from setup's
 `tuh-facility` entry, its `upstream` marker and original confirmation per
 `${PLUGIN_ROOT}/skills/setup/references/recurring-decisions.rst`; do not duplicate an existing scope item.
