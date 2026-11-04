@@ -64,7 +64,7 @@ prepares and publishes the release. Never direct the engineer to release.
    SQL review status is ``current``. Match the review to the SQL that actually ran,
    using the recorded run commit and SQL fingerprint, not just the PR's current SQL.
    ``release.sh evidence`` reads review records from the working tree, not the PR, and
-   the reviewed SQL from git at each record's ``git_commit``. Fetch the checked PR head SHA from GitHub and its commit locally; never
+   the reviewed SQL from git at the ``git_commit`` of each record. Fetch the checked PR head SHA from GitHub and its commit locally; never
    substitute local ``HEAD``. For every review used in the evidence, set ``SLUG`` to
    its slug and ``PR_HEAD`` to that checked SHA, then run from the request project root:
 
