@@ -390,7 +390,15 @@ EOF
   [ -z "$stale" ] || printf 'release held: amend part done by a commit not in %s:%s\n' "$ref" "$stale" >&2
   [ -z "$bad" ] || printf '%s\n' "${bad#?}" >&2
   [ -z "$missing" ] || printf '%s\n' "${missing#?}" >&2
-  [ -z "$open$stale$bad" ] || printf '%s\n' "next: the engineer comments done: P<n> <commit> or the analyst comments withdrawn: P<n> <reason> on the deliverable PR, then the record is updated" >&2
+  # Each next line names the real part id, so the reader can paste it (N2). Part ids are the P<n>
+  # values already checked by RL_AMEND_JQ, so they carry no record text.
+  for id in $open; do
+    printf 'next: the engineer comments done: %s <commit> or the analyst comments withdrawn: %s <reason> on the deliverable PR, then the record is updated\n' "$id" "$id" >&2
+  done
+  for id in $stale; do
+    printf 'next: %s is done by a commit outside %s: release from a ref that holds the commit, or the engineer comments done: %s <commit> with a commit in the ref\n' "$id" "$ref" "$id" >&2
+  done
+  [ -z "$bad" ] || printf '%s\n' "next: correct each record field named above, then run evidence again" >&2
   return 11
 }
 

@@ -827,9 +827,23 @@ class AmendGate(unittest.TestCase):
         self.assertEqual(r.returncode, 11, r.stderr)
         self.assertIn("release held: amend part handed off and open: P2", r.stderr)
         self.assertNotIn("P1", r.stderr.splitlines()[0])
-        self.assertIn("next:", r.stderr)
+        # The next line names the real part id, not a P<n> placeholder (N2).
+        self.assertIn("next: the engineer comments done: P2 <commit> or the analyst comments withdrawn: P2 <reason>",
+                      r.stderr)
+        self.assertNotIn("P<n>", r.stderr)
         self.assertLessEqual(len(r.stderr.strip().splitlines()), 2, r.stderr)
         self.assertEqual(json.loads(r.stdout)["reviews"][0]["applies"], "current")
+        self.assert_no_leak(r)
+
+    def test_each_open_part_gets_its_own_next_line_with_its_id(self):
+        self.record([self.part("P1", "handed off"), self.part("P4", "handed off")])
+        r = self.p.evidence("v1.0.0")
+        self.assertEqual(r.returncode, 11, r.stderr)
+        nexts = [line for line in r.stderr.splitlines() if line.startswith("next:")]
+        self.assertEqual(len(nexts), 2, r.stderr)
+        self.assertIn("done: P1 <commit>", nexts[0])
+        self.assertIn("withdrawn: P4 <reason>", nexts[1])
+        self.assertNotIn("P<n>", r.stderr)
         self.assert_no_leak(r)
 
     def test_every_part_done_passes(self):
