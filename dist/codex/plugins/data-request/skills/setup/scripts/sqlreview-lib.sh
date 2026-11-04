@@ -322,13 +322,25 @@ sr_state_reason() { # <slug> <state>
   printf '%s\n' "$why"
 }
 
+# A private scratch directory under TMPDIR, printed as its physical path. TMPDIR is often
+# reached through a symlink (macOS /var/folders and /tmp), and paths built from this one go
+# through sr_no_symlinks, which must refuse only caller-supplied links, not this one.
+sr_private_tmpdir() { # PREFIX
+  local dir
+  dir="$(mktemp -d "${TMPDIR:-/tmp}/$1.XXXXXX")" || return 1
+  (cd "$dir" && pwd -P) || {
+    rm -rf -- "$dir"
+    return 1
+  }
+}
+
 # Private consumer inputs must never live within the repository, even with a local TMPDIR.
 sr_source_workspace() (
   sr_source_context || exit 2
   umask 077
   local work
-  work="$(mktemp -d "${TMPDIR:-/tmp}/sqlreview-inputs.XXXXXX")" || exit 2
-  case "$(cd "$work" && pwd -P)" in "$SR_SOURCE_TOP"|"$SR_SOURCE_TOP"/*)
+  work="$(sr_private_tmpdir sqlreview-inputs)" || exit 2
+  case "$work" in "$SR_SOURCE_TOP"|"$SR_SOURCE_TOP"/*)
     rm -rf "$work"; sr_source_error "temporary inputs must be outside the git tree"; exit 2 ;;
   esac
   printf '%s\n' "$work"

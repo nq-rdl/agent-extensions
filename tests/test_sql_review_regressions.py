@@ -25,6 +25,42 @@ class ReviewRegressions(unittest.TestCase):
         self.p.write_json('q', 'review.json', review_doc('q', **fp))
         self.assertEqual(run(['snapshot', 'q', 'q.sql'], self.p.root).returncode, 0)
 
+    def test_snapshot_after_reassessment_clears_the_move_marker(self):
+        self.reviewed()
+        self.assertEqual(run(['move', 'q.sql', 'renamed.sql'], self.p.root).returncode, 0)
+        moved = self.d.parent / 'renamed'
+        self.assertTrue((moved / 'rebind-required').is_file())
+        (self.p.root / 'q.sql').rename(self.p.root / 'renamed.sql')
+        # Before reassessment the recorded commit has no SQL at the new path: snapshot fails
+        # and the marker stays.
+        self.p.commit('move sql')
+        self.assertNotEqual(run(['snapshot', 'renamed', 'renamed.sql'], self.p.root).returncode, 0)
+        self.assertTrue((moved / 'rebind-required').is_file())
+        fp = json.loads(run(['fingerprint', 'renamed.sql'], self.p.root).stdout)
+        self.p.write_json('renamed', 'review.json', review_doc('renamed', **fp))
+        self.p.commit('reassessed review')
+        result = run(['snapshot', 'renamed', 'renamed.sql'], self.p.root)
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertFalse((moved / 'rebind-required').exists())
+        rows = json.loads(run(['status', '--json'], self.p.root).stdout)['reviews']
+        self.assertNotEqual({r['slug']: r['state'] for r in rows}['renamed'], 'stale')
+
+    def test_symlinked_tmpdir_is_resolved_for_helper_workspaces(self):
+        self.p.commit()
+        outside = tempfile.TemporaryDirectory()  # outside the project, which is self.tmp
+        self.addCleanup(outside.cleanup)
+        real = Path(outside.name) / 'real-tmp'
+        real.mkdir()
+        link = Path(outside.name) / 'link-tmp'
+        link.symlink_to(real)
+        env = {'TMPDIR': str(link)}
+        fp = run(['fingerprint', 'q.sql'], self.p.root, env=env)
+        self.assertEqual(fp.returncode, 0, fp.stderr)
+        self.p.write_json('q', 'review.json', review_doc('q', **json.loads(fp.stdout)))
+        snap = run(['snapshot', 'q', 'q.sql'], self.p.root, env=env)
+        self.assertEqual(snap.returncode, 0, snap.stderr)
+        self.assertEqual(list(real.iterdir()), [], 'helper workspaces are removed')
+
     def test_unsafe_paths_and_slugs_are_rejected(self):
         for slug in ['', '.', '..', '../../outside', '/tmp/outside']:
             for command in [['snapshot', slug, 'q.sql'], ['render', slug, 'review'], ['delta', slug], ['impact', slug]]:

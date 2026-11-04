@@ -531,7 +531,7 @@ cmd_publish() (
   umask 077
   work=""
   trap sr_publish_cleanup EXIT
-  work="$(mktemp -d "${TMPDIR:-/tmp}/sqlreview-publish.XXXXXX")" || sr_die 2 "mktemp failed"
+  work="$(sr_private_tmpdir sqlreview-publish)" || sr_die 2 "mktemp failed"
   trap 'exit 2' HUP INT TERM
   original_draft="$(sr_sha256 "$draft")"
   cp "$draft" "$tmp" || sr_die 2 "cannot stage draft"
@@ -705,7 +705,7 @@ cmd_fingerprint() (
   sr_safe_sql "$rel"
   sr_source_clean || exit 2
   umask 077
-  tmp="$(mktemp -d "${TMPDIR:-/tmp}/sqlreview-fingerprint.XXXXXX")" || exit 2
+  tmp="$(sr_private_tmpdir sqlreview-fingerprint)" || exit 2
   trap 'rm -rf "$tmp"' EXIT
   trap 'exit 130' INT
   trap 'exit 143' TERM HUP
@@ -793,7 +793,7 @@ cmd_snapshot() (
   [ "$(jq -r .sql_path "$doc")" = "$rel" ] || sr_die 2 "review/path mismatch"
   sr_source_clean || exit 2
   umask 077
-  work="$(mktemp -d "${TMPDIR:-/tmp}/sqlreview-verify.XXXXXX")" || sr_die 2 "mktemp failed"
+  work="$(sr_private_tmpdir sqlreview-verify)" || sr_die 2 "mktemp failed"
   trap 'rm -rf "$work"' EXIT
   trap 'exit 2' HUP INT TERM
   original="$(sr_sha256 "$doc")"
@@ -807,9 +807,17 @@ cmd_snapshot() (
   sr_source_clean || exit 2
   [ "$(git -C "$SR_ROOT" rev-parse --verify HEAD)" = "$head" ] || sr_die 2 "source commit changed during verification"
   case "$binding" in
-    0|10) printf 'verified\t%s\t%s\n' "$slug" "$(jq -r .sql_sha256 "$doc")" ;;
+    0|10) ;;
     *) sr_die 2 "SQL changed since fingerprint; reassess before snapshot verification" ;;
   esac
+  # A review verified at the moved path is the reassessment that move asked for. A review
+  # not yet re-fingerprinted fails authentication above, so it never reaches this point.
+  sr_no_symlinks "$SR_REVIEWS/$slug/rebind-required" || exit 2
+  (
+    cd "$SR_REVIEWS/$slug" || exit 2
+    rm -f -- rebind-required
+  ) || sr_die 2 "cannot clear rebind marker"
+  printf 'verified\t%s\t%s\n' "$slug" "$(jq -r .sql_sha256 "$doc")"
 )
 
 # ---------------------------------------------------------------------------------------------
