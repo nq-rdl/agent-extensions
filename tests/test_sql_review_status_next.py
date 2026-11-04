@@ -482,5 +482,48 @@ class StatusAmendment(unittest.TestCase):
                               "comments done: P2 <commit>", ctx)
                 self.assertNotIn("LEAK-C", ctx)
 
+    def ledger(self, artifacts, stages_done=("intake", "amend")):
+        """The triage ledger shows an amendment (the amend stage), with or without its record path."""
+        entry = {"ticket": "rdl-service-desk/service-desk#9177", "enquiry": "ENQ9177", "stage": "release",
+                 "stages_done": list(stages_done), "evidence_revision": {"ticket": "2026-11-01", "pr": "abc1234"},
+                 "stage_evidence": {"intake": {"sources": ["ticket"], "artifacts": []}},
+                 "decisions": [], "blockers": [], "depends_on": [], "next_action": "analyst-handle: release",
+                 "verification": {"status": "unverified", "commands": [], "at": "2026-11-01"}}
+        if "amend" in stages_done:
+            entry["stage_evidence"]["amend"] = {"sources": ["pr"], "artifacts": artifacts}
+        (self.p.root / ".sqlreview" / "ledger.json").write_text(json.dumps({"schemaVersion": 1, "entries": [entry]}))
+        r = run(["ledger", "check", ".sqlreview/ledger.json"], self.p.root)
+        self.assertEqual(r.returncode, 0, r.stdout + r.stderr)
+
+    MISSING_NEXT = ("write it from the amendment hand-off comment on the deliverable PR "
+                    "(/data-request:amend step 5)")
+
+    def test_a_ledger_amendment_with_no_record_file_is_named(self):
+        # N3: release holds on it, so status and preflight say so before release is tried.
+        for name, artifacts, rec in (("record named", [{"path": f".sqlreview/amendments/{self.REC}.json",
+                                                       "sha256": "0" * 64}], self.REC),
+                                     ("no record named", [], "<request>")):
+            with self.subTest(name):
+                self.ledger(artifacts)
+                lines = [ln for ln in self.text().splitlines() if ln.startswith("amendment ")]
+                self.assertEqual(lines, [f"amendment {rec}\trecord missing\tnext={self.MISSING_NEXT}"])
+                j = json.loads(run(["status", "--json"], self.p.root).stdout)
+                self.assertEqual(j["amendments"], [{"record": f".sqlreview/amendments/{rec}.json", "handed_off": [],
+                                                    "next": self.MISSING_NEXT, "missing": True}])
+                ctx = decision(run_hook(PREFLIGHT, {"cwd": str(self.p.root)}, env_for()))["additionalContext"]
+                self.assertIn(f"- next for .sqlreview/amendments/{rec}.json (record missing): {self.MISSING_NEXT}", ctx)
+
+    def test_a_ledger_amendment_with_its_record_or_without_an_amendment_adds_no_line(self):
+        self.ledger([{"path": f".sqlreview/amendments/{self.REC}.json", "sha256": "0" * 64}])
+        self.record([self.part("P1", "done", commit="a" * 40)])
+        self.assertNotIn("amendment ", self.text())
+        self.ledger([], stages_done=("intake",))
+        self.assertNotIn("amendment ", self.text())
+        (self.p.root / ".sqlreview" / "ledger.json").write_text("{LEAK-CANARY")
+        text = self.text()
+        self.assertNotIn("amendment ", text)
+        self.assertNotIn("LEAK-C", text)
+
+
 if __name__ == "__main__":
     unittest.main()

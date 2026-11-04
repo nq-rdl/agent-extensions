@@ -475,3 +475,15 @@ EOF2
     *) printf '\n' ;;
   esac
 }
+
+# The triage ledger shows an amendment when an entry has the amend stage (#534). This filter prints
+# "bad" for a ledger that does not have the expected shape, "none" for an amended entry that names
+# no record, and "path<TAB><record path>" for each record it names. Paths only, never a value.
+# release.sh holds the release on it and status names it, so both read this one definition.
+SR_AMEND_LEDGER_JQ='def rec: type == "string" and test("^\\.sqlreview/amendments/[a-z0-9][a-z0-9-]*\\.json$");
+if type != "object" or (.entries | type) != "array" then "bad"
+else .entries[] | objects | select(.stage == "amend" or ((.stages_done | arrays | index("amend")) != null))
+  | [.stage_evidence.amend.artifacts | arrays | .[] | objects | .path | select(rec)]
+  | if length == 0 then "none" else .[] | "path\t" + . end
+end'
+SR_AMEND_NEXT='write it from the amendment hand-off comment on the deliverable PR (/data-request:amend step 5)'

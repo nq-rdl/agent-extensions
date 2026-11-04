@@ -11,7 +11,8 @@
 #                                              a commit before analyse when git lists the SQL or another source
 #                                              that fingerprint refuses as uncommitted; an open amendment part
 #                                              (.sqlreview/amendments/*.json, "handed off") gets its own line
-#                                              with its part ids and next action; an
+#                                              with its part ids and next action, and so does an amendment
+#                                              in .sqlreview/ledger.json whose record file is missing; an
 #                                              empty project names bootstrap; --verbose: why invalid/missing,
 #                                              and the move that migrates a legacy-encoded slug); exit 3 when not initialised
 #                                              missing bundled templates: JSON missing_templates, else one stderr line
@@ -261,6 +262,25 @@ EOF
     amend="$amend$aname$SR_TAB$aopen$SR_TAB$next$SR_NL"
     [ "$json" = 1 ] || printf 'amendment %s\thanded off: %s\tnext=%s\n' "$aname" "$aopen" "$next"
   done
+  # The ledger shows an amendment but its record file is missing: release holds on it, so status
+  # names it too (N3). One jq read, and only when a ledger exists. Paths only, never a value.
+  local lline lfile="$SR_ROOT/$SR_DIR/ledger.json"
+  if [ -f "$lfile" ] && [ ! -L "$lfile" ]; then
+    while IFS= read -r lline; do
+      case "$lline" in
+        none) aname="<request>" ;;
+        path*) aname="${lline#path?}"
+          [ -f "$SR_ROOT/$aname" ] && continue
+          aname="${aname#"$SR_DIR"/amendments/}"; aname="${aname%.json}" ;;
+        *) continue ;;
+      esac
+      next="$SR_AMEND_NEXT"
+      amend="$amend$aname${SR_TAB}missing$SR_TAB$next$SR_NL"
+      [ "$json" = 1 ] || printf 'amendment %s\trecord missing\tnext=%s\n' "$aname" "$next"
+    done <<EOF
+$(jq -r "$SR_AMEND_LEDGER_JQ" "$lfile" 2>/dev/null)
+EOF
+  fi
   # An empty project has one next step: scope the first SQL file.
   next=""
   [ "$seen" = 1 ] || next="/data-request:bootstrap <sql path> to scope the first SQL file"
@@ -269,7 +289,8 @@ EOF
     printf '%s' "$rows" | jq --arg root "$SR_ROOT" --arg schema "$schema" --arg missing "$missing" --arg next "$next" --arg amend "$amend" \
       '{root: $root, schemaVersion: ($schema | tonumber? // $schema), reviews: ., next: (if $next == "" then null else $next end),
         amendments: [$amend | split("\n")[] | select(. != "") | split("\t")
-                     | {record: ".sqlreview/amendments/\(.[0]).json", handed_off: (.[1] | split(" ")), next: .[2]}],
+                     | {record: ".sqlreview/amendments/\(.[0]).json", handed_off: (if .[1] == "missing" then [] else .[1] | split(" ") end), next: .[2]}
+                       + (if .[1] == "missing" then {missing: true} else {} end)],
         counts: (group_by(.state) | map({key: .[0].state, value: length}) | from_entries | . + {total: (map(.) | add // 0)}),
         missing_templates: ($missing | split(" ") | map(select(. != ""))),
         missing_templates_fix: (if $missing == "" then null else "sqlreview.sh init --apply " + $missing end)}'

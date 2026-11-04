@@ -342,20 +342,14 @@ else
      else bad("\($at).status") end)
 end'
 
-# The triage ledger shows an amendment when an entry has the amend stage. Emits each recorded
-# amendment record path, or "none" when an amended entry names no record. Paths only, no values.
-RL_AMEND_LEDGER_JQ='def rec: type == "string" and test("^\\.sqlreview/amendments/[a-z0-9][a-z0-9-]*\\.json$");
-if type != "object" or (.entries | type) != "array" then "bad"
-else .entries[] | objects | select(.stage == "amend" or ((.stages_done | arrays | index("amend")) != null))
-  | [.stage_evidence.amend.artifacts | arrays | .[] | objects | .path | select(rec)]
-  | if length == 0 then "none" else .[] | "path\t" + . end
-end'
+# The ledger filter and the next-step text are shared with status: sqlreview-lib.sh.
+RL_AMEND_LEDGER_JQ="$SR_AMEND_LEDGER_JQ"
 
 # One jq read of .sqlreview/ledger.json. Sets $missing to one hold line per amended entry whose
 # record file does not exist. A ledger that is not valid JSON also holds.
 rl_amend_ledger_missing() {
   local ledger="$SR_ROOT/$SR_DIR/ledger.json" line nl='
-' next='write it from the amendment hand-off comment on the deliverable PR (/data-request:amend step 5)'
+' next="$SR_AMEND_NEXT"
   missing=""
   [ -e "$ledger" ] || return 0
   sr_no_symlinks "$ledger" || exit 2
