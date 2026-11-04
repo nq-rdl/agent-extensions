@@ -45,6 +45,47 @@ class ReviewRegressions(unittest.TestCase):
         rows = json.loads(run(['status', '--json'], self.p.root).stdout)['reviews']
         self.assertNotEqual({r['slug']: r['state'] for r in rows}['renamed'], 'stale')
 
+    def test_moved_reviews_keep_every_recorded_revision_readable(self):
+        outside = tempfile.TemporaryDirectory()  # drafts and outputs stay out of the project
+        self.addCleanup(outside.cleanup)
+        out = Path(outside.name)
+
+        def publish(slug, revision, path):
+            fp = json.loads(run(['fingerprint', path], self.p.root).stdout)
+            draft = out / 'draft.json'
+            draft.write_text(json.dumps(review_doc(slug, revision=revision, **fp)))
+            result = run(['publish', slug, 'review', str(draft)], self.p.root)
+            self.assertEqual(result.returncode, 0, result.stderr)
+
+        def moved(old, new, slug):
+            self.assertEqual(run(['move', old, new], self.p.root).returncode, 0)
+            (self.p.root / old).rename(self.p.root / new)
+            self.p.commit(f'move to {new}')
+            # Carry evidence comes from the archived binding before reassessment, too.
+            draft = out / 'carry.json'
+            current = json.loads((self.d.parent / slug / 'review.json').read_text())
+            draft.write_text(json.dumps(dict(current, revision=current['revision'] + 1)))
+            carry = run(['carryforward', slug, 'review', str(draft)], self.p.root)
+            self.assertEqual(carry.returncode, 0, carry.stderr)
+
+        self.p.commit()
+        publish('q', 1, 'q.sql')
+        self.p.sql('q.sql', SQL_V2)
+        self.p.commit('v2')
+        publish('q', 2, 'q.sql')
+        moved('q.sql', 'renamed.sql', 'renamed')
+        publish('renamed', 3, 'renamed.sql')
+        moved('renamed.sql', 'again.sql', 'again')
+        publish('again', 4, 'again.sql')
+        for revision, sql in ((1, SQL_V1), (2, SQL_V2), (3, SQL_V2), (4, SQL_V2)):
+            with self.subTest(revision=revision):
+                target = out / f'{revision}.sql'
+                result = run(['materialize', 'again', 'review', str(revision), str(target)], self.p.root)
+                self.assertEqual(result.returncode, 0, result.stderr)
+                self.assertEqual(target.read_text(), sql)
+        archived = json.loads((self.d.parent / 'again/history/review/2.json').read_text())
+        self.assertEqual((archived['slug'], archived['sql_path']), ('q', 'q.sql'))
+
     def test_symlinked_tmpdir_is_resolved_for_helper_workspaces(self):
         self.p.commit()
         outside = tempfile.TemporaryDirectory()  # outside the project, which is self.tmp

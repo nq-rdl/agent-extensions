@@ -51,7 +51,16 @@ Records and history
 ``history/<kind>/<revision>.json``. A header-only update keeps the original full
 SHA, commit and confirmations. It appends the new header hashes and commit to
 helper-owned ``header_revisions``. ``snapshot`` verifies the published review
-and writes nothing. A scope framed before SQL exists keeps ``sql_sha256: null``.
+and writes nothing, apart from clearing the ``rebind-required`` marker of a moved
+review. A scope framed before SQL exists keeps ``sql_sha256: null``.
+
+``move`` renames the review directory and rewrites ``slug`` and ``sql_path`` in
+the current records. It cannot rewrite their commit, so it first archives each
+current scope and review unchanged as ``history/<kind>/<revision>.json``.
+History entries keep the slug and path they were recorded under, and their
+directory identifies them. ``materialize``, ``delta`` and carry-forward read a
+revision from its history entry when one exists, so every recorded revision
+stays readable from git after any number of moves.
 
 Legacy records with a clean immutable commit and a full hash work unchanged.
 Records with a dirty or null commit report ``no-baseline`` and need

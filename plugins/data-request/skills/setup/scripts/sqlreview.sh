@@ -496,6 +496,17 @@ _verify_header_decisions() ( # DOC SQL binding reconfirm-all
 )
 
 # ---------------------------------------------------------------------------------------------
+# The record whose sql_path and git_commit authenticate DOC's revision. move rewrites the
+# current document's sql_path but cannot rewrite its commit, so it first archives the
+# pre-move binding as history/<kind>/<revision>.json; that archive, when present, is read.
+sr_binding_doc() { # <review dir> <kind> <doc>
+  local revision archive
+  revision="$(jq -r '.revision // "" | tostring' "$3")" || return 2
+  archive="$1/history/$2/$revision.json"
+  sr_no_symlinks "$archive" || return 2
+  if [ -f "$archive" ]; then printf '%s\n' "$archive"; else printf '%s\n' "$3"; fi
+}
+
 # EXIT cleanup for cmd_publish. It reads that subshell's locals and removes only paths the
 # command created itself: the staged copy, the staged history copy and the private work directory.
 # A history entry added for this publish is rolled back unless the final document is the one
@@ -517,7 +528,7 @@ cmd_publish() (
   [ $# -eq 3 ] || usage
   sr_need_jq
   sr_require_root
-  local slug="$1" kind="$2" draft="$3" dest tmp rel previous work history="" history_tmp="" history_added=false committed=false
+  local slug="$1" kind="$2" draft="$3" dest tmp rel previous work history="" history_tmp="" history_src="" history_added=false committed=false
   local original_dest="" original_draft head="" current_sql="" header_only=false already=false proposed_sha="" check_out=""
   sr_safe_slug "$slug"
   case "$kind" in scope|review|lifts) ;; *) usage ;; esac
@@ -655,10 +666,17 @@ cmd_publish() (
   if [ -f "$dest" ] && [ "$header_only" = false ] && [ "$already" = false ]; then
     history="$SR_REVIEWS/$slug/history/$kind/$previous.json"
     sr_no_symlinks "$history" || exit 2
-    [ ! -e "$history" ] || { [ -f "$history" ] && cmp -s "$dest" "$history"; } || sr_die 2 "$kind history conflict"
+    history_src="$dest"
+    if [ -e "$history" ] && ! { [ -f "$history" ] && cmp -s "$dest" "$history"; }; then
+      # move archived this revision with its pre-move slug and sql_path, the path its git_commit
+      # holds. Keep that archive; it may differ from the moved document only in those two fields.
+      [ -f "$history" ] && jq -e -s '(.[0] | del(.sql_path, .slug)) == (.[1] | del(.sql_path, .slug))' "$dest" "$history" \
+        >/dev/null 2>&1 || sr_die 2 "$kind history conflict"
+      history_src="$history"
+    fi
     mkdir -p "$(dirname "$history")" || sr_die 2 "cannot create $kind history"
     history_tmp="$(mktemp "$(dirname "$history")/.history.XXXXXX")" || sr_die 2 "cannot stage $kind history"
-    cp "$dest" "$history_tmp" || sr_die 2 "cannot stage $kind history"
+    cp "$history_src" "$history_tmp" || sr_die 2 "cannot stage $kind history"
   fi
   # Refuse stale work after validation, before any history/final mutation.
   [ "$(sr_sha256 "$draft")" = "$original_draft" ] || sr_die 2 "draft changed during publication"
@@ -739,13 +757,16 @@ cmd_materialize() (
   [ ! -e "$output" ] || [ -f "$output" ] || sr_die 2 "output is not a regular file"
   current="$SR_REVIEWS/$slug/$kind.json"
   sr_no_symlinks "$current" || exit 2
-  if [ -f "$current" ] && [ "$(jq -r '.revision' "$current")" = "$revision" ]; then doc="$current"
-  else doc="$SR_REVIEWS/$slug/history/$kind/$revision.json"; fi
+  # A history entry holds the revision's source binding, including a current revision move archived.
+  doc="$SR_REVIEWS/$slug/history/$kind/$revision.json"
+  sr_no_symlinks "$doc" || exit 2
+  if [ ! -e "$doc" ] && [ -f "$current" ] && [ "$(jq -r '.revision' "$current")" = "$revision" ]; then doc="$current"; fi
   sr_no_symlinks "$doc" || exit 2
   [ -f "$doc" ] || sr_die 6 "recorded $kind revision $revision unavailable"
   cmd_check "$doc" >/dev/null || sr_die 4 "invalid recorded $kind revision"
-  jq -e --arg slug "$slug" --arg kind "$kind" --argjson revision "$revision" \
-    '.slug == $slug and .kind == $kind and .revision == $revision' "$doc" >/dev/null || sr_die 4 "recorded revision identity differs"
+  # A history entry keeps the slug it was recorded under (a later move renames only the directory).
+  jq -e --arg slug "$slug" --arg kind "$kind" --argjson revision "$revision" --arg current "$current" --arg doc "$doc" \
+    '(.slug == $slug or $doc != $current) and .kind == $kind and .revision == $revision' "$doc" >/dev/null || sr_die 4 "recorded revision identity differs"
   work="$(sr_source_workspace)" || exit 2
   trap sr_materialize_cleanup EXIT
   trap 'exit 2' HUP INT TERM
@@ -842,7 +863,7 @@ _delta_prepare() {
   SR_BASE="$work/base.sql"
   SR_CUR="$SR_ROOT/$SR_SQL_PATH"
   [ -f "$SR_CUR" ] || sr_die 2 "the reviewed SQL no longer exists: $SR_SQL_PATH (moved? see: sqlreview.sh move)"
-  sr_source_auth "$doc" "$SR_BASE" || exit $?
+  sr_source_auth "$(sr_binding_doc "$SR_REVIEWS/$1" "$(jq -r .kind "$doc")" "$doc")" "$SR_BASE" || exit $?
   local binding
   sr_binding "$doc" "$SR_CUR" "$SR_BASE"; binding=$?
   [ "$binding" = 10 ] && { printf 'header-only revision; SQL body unchanged\n'; return 0; }
@@ -1045,7 +1066,7 @@ _carry_context() { # <slug> <scope|review> <sql_path>
       CF_PRIOR_ABSENT=true
     else
       CF_BASE="$work/carry-base.sql"
-      sr_source_auth "$CF_PRIOR" "$CF_BASE" || exit $?
+      sr_source_auth "$(sr_binding_doc "$d" "$2" "$CF_PRIOR")" "$CF_BASE" || exit $?
       CF_HAVE_BASE=true
     fi
   fi
@@ -1406,6 +1427,25 @@ _header_decisions() ( # SQL DRAFT intended-human-confirmer parsed-notes
 )
 
 # ---------------------------------------------------------------------------------------------
+# Before move rewrites slug and sql_path, archive the current scope/review document unchanged as
+# history/<kind>/<revision>.json: its git_commit holds the SQL at the old path. History entries
+# are kept as they were recorded; the directory, not the slug inside, now identifies them.
+_move_archive_history() { # <new slug>
+  local d="$SR_REVIEWS/$1" kind doc archive
+  for kind in scope review; do
+    doc="$d/$kind.json"
+    [ -f "$doc" ] || continue
+    jq -e '.git_commit | type == "string"' "$doc" >/dev/null 2>&1 || continue
+    archive="$d/history/$kind/$(jq -r '.revision | tostring' "$doc").json"
+    sr_no_symlinks "$archive" || return 2
+    [ ! -d "$archive" ] || return 2
+    # An earlier move already archived this revision with its original path: keep that one.
+    [ ! -e "$archive" ] || continue
+    mkdir -p "$(dirname "$archive")" || return 2
+    cp "$doc" "$archive" || return 2
+  done
+}
+
 cmd_move() {
   sr_need_jq
   sr_require_root
@@ -1447,6 +1487,7 @@ cmd_move() {
   fi
   [ "$oldslug" = "$newslug" ] || mv "$SR_REVIEWS/$oldslug" "$SR_REVIEWS/$newslug" || sr_die 2 "move failed"
   [ "$rebind" = 0 ] || touch "$SR_REVIEWS/$newslug/rebind-required" || sr_die 2 "cannot mark stale"
+  _move_archive_history "$newslug" || sr_die 2 "cannot archive the pre-move source binding; review needs repair"
   # Renders are rebuilt from the rebound JSON; only these three fixed names in the slug directory go.
   (
     cd "$SR_REVIEWS/$newslug" || exit 2
