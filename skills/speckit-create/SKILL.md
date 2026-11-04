@@ -24,7 +24,7 @@ metadata:
 > **Verify-canonical guard.** spec-kit moves fast (v0.12.0 to v1.0.12 in three
 > months) and predates the model's training cutoff. Before writing any manifest, read
 > `references/extension-schema.rst` AND re-check the live
-> [extensions reference](https://github.github.io/spec-kit/reference/extensions.html)
+> [extensions reference](https://raw.githubusercontent.com/github/spec-kit/main/docs/extensions/cli.md)
 > and [development guide](https://raw.githubusercontent.com/github/spec-kit/main/docs/extensions/developing.md)
 > for drift. Prefer the official `extensions/template/` over recall.
 

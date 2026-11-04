@@ -12,7 +12,7 @@ Primary
 -------
 
 - Extensions reference (rendered):
-  https://github.github.io/spec-kit/reference/extensions.html
+  https://raw.githubusercontent.com/github/spec-kit/main/docs/extensions/cli.md
 - Extension User Guide (install, catalog stack, per-extension config
   layering, full `specify extension` CLI):
   https://raw.githubusercontent.com/github/spec-kit/main/docs/extensions/overview.md

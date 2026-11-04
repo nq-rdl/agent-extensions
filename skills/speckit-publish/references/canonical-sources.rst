@@ -12,7 +12,7 @@ Primary
 -------
 
 - Extensions reference (rendered):
-  https://github.github.io/spec-kit/reference/extensions.html
+  https://raw.githubusercontent.com/github/spec-kit/main/docs/extensions/cli.md
 - Publishing Guide (release/tag flow, catalog-entry schema, distribution
   paths):
   https://raw.githubusercontent.com/github/spec-kit/main/docs/extensions/publishing.md
