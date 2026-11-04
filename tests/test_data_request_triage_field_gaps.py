@@ -357,7 +357,9 @@ class SpecKitDirectMode(unittest.TestCase):
         handoff = [yaml.safe_load(m) for m in re.findall(r'\{"decision": "generativeMode"[^}]*\}',
                                                          (REFS / "handoff.rst").read_text())]
         # The ledger example is one YAML entry; read its decisions as data, not by text shape.
-        example = (REFS / "ledger.rst").read_text().split(".. code-block:: yaml\n", 1)[1]
+        # Anchor on the "Example entry" lead-in so another YAML block elsewhere cannot be picked up.
+        example = (REFS / "ledger.rst").read_text().split("Example entry", 1)[1]
+        example = example.split(".. code-block:: yaml\n", 1)[1]
         example = re.split(r"\n(?=\S)", example.lstrip("\n"), maxsplit=1)[0]
         ledger = [d for d in yaml.safe_load(textwrap.dedent(example))["decisions"]
                   if d.get("decision") == "generativeMode"]

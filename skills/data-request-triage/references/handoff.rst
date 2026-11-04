@@ -36,7 +36,7 @@ hands a ``/speckit.*`` command back to the human.
 
   .. code-block:: json
 
-     {"decision": "generativeMode", "value": "direct", "by": "example-engineer", "at": "2026-11-04T09:30:00Z", "scope": "nq-rdl/query-builder"}
+     {"decision": "generativeMode", "value": "direct", "by": "engineer-handle", "at": "2026-11-04T09:30:00Z", "scope": "nq-rdl/query-builder"}
 
   ``by`` is the GitHub login of the human who authorised it, never an email
   address, and ``at`` is when. Record ``scope`` as the repository

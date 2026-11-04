@@ -82,7 +82,7 @@ Recheck affected evidence/artifacts, not every stage. See [references/ledger.rst
    source system and grain with the engineer before `/data-request:bootstrap`; proceed and flag technical decisions. Bare `Patient` is unconfirmed: propose evidenced grain using guardrails `references/grain.rst`, not the answers default.
    Separate confirmed requirements, engineer decisions and proposals; silence is not approval. Supplied cohorts mean linkage.
    Use explicit codes as written, not a broader library concept. Apply guardrails **House defaults**: TUH `00200` needs no facility question; see [references/checks.rst](references/checks.rst).
-   When the request explicitly changes the cohort's facility set to another facility, the whole HHS or a network-wide cohort, return one `Analyst question:` about the facility set instead of the TUH default. Reuse an exception already answered in intake or a prior scope; do not put the question again or intersect it with TUH.
+   When the request explicitly changes the cohort's facility set to another facility, the whole HHS or a network-wide cohort, return one `Analyst question:` about the facility set instead of the TUH default. Reuse an exception already answered in intake or a prior scope; do not ask it again or intersect it with TUH.
 7. **Recheck every gap claim**, whether yours, a worker's or a register row, against current
    code, tests, releases and dependency topology before you plan or file it. A delivered
    capability is closed; run and report the [read-only stale lift check](references/checks.rst).
