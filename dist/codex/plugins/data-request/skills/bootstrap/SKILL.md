@@ -221,14 +221,18 @@ patients, an invalid URN, cancelled admissions) is not a criterion. Record it as
 assumption, reported under "Extraction Assumptions / Important limitations". Do not repeat a criterion
 in that section.
 
-**House default:** `broad-first-pass` applies without asking, like `tuh-facility`, when the request is
-on its first pass (no earlier delivery exists for it). When it is not, the default is not applied and
-exclusions get ordinary engineer-confirmed rows. Read it with `recurring-decisions.sh list`. Give
-each exclusion that the request does not override a row with state `not-applied`, `reason` the
-decision's `proposal.text` and `upstream: {"source": "recurring-decision", "id": "broad-first-pass"}`.
+**House default:** `broad-first-pass` is a human ruling that is already recorded. You import it and you
+do not decide it. Like `tuh-facility`, it needs no fresh question when the request is on its first
+pass (no earlier delivery exists for it). When it is not, the default is not applied and
+exclusions get ordinary engineer-confirmed rows. Read it with `recurring-decisions.sh list`. Import it
+only when its `house_default` holds `confirmed_by` and `confirmed_at`. If either is missing, treat the
+exclusions as ordinary engineer-confirmed rows. Give each exclusion that the request does not override
+a row with state `not-applied`, `reason` the decision's `proposal.text` and `upstream: {"source": "recurring-decision", "id": "broad-first-pass"}`.
 Copy `confirmed_by` and `confirmed_at` from its `house_default`, set `confirmed_revision` to the import
 revision, and put no `decided` on the row. Invent no other confirmer. Write no assumption or limitation
-for it, and leave inclusions, entry events and data elements alone. A request that applies an
+for it, and leave inclusions, entry events and data elements alone. Tell the engineer which rows
+you imported, with the recorded decider and date from `house_default.decided`. The engineer may override
+any row before publish. A request that applies an
 exclusion, or an engineer who overrides the default for one criterion, gets the normal row with no
 `upstream`, confirmed afresh. See `${PLUGIN_ROOT}/skills/setup/references/recurring-decisions.rst`.
 

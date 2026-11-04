@@ -38,7 +38,8 @@ library issue that would retire it. Treat the epic and every library issue as pu
   a library issue. A ``house_default`` also records the original ``confirmed_by`` /
   ``confirmed_at`` and independent ``decided: {by, role, at, source}``. Only ``tuh-facility``
   also records the string ``facility_code``; the list helper requires it there and nowhere else.
-  It is not generic permission to skip confirmation.
+  A ``house_default`` is the recorded ruling for its own
+  entry only. It never replaces the confirmation of any other item.
 * ``library_issue`` (URL or null), ``related_issues``, and ``retired_by`` (``{unit, version}``
   when retired).
 
@@ -94,8 +95,9 @@ a ``criteria_status`` row with state ``not-applied``, the listed ``proposal.text
 row takes ``confirmed_by`` and ``confirmed_at`` from the entry's ``house_default``, and its
 ``confirmed_revision`` is the import revision. It carries no ``decided``: the decider stays on
 the entry, and the row claims no origin of its own. Bootstrap imports the rows without a
-fresh question, as it does for ``tuh-facility``. Do not write an assumption or a limitation
-for it. Inclusion, entry-event and data-element criteria are not touched.
+fresh question, as it does for ``tuh-facility``. It tells the engineer which rows it imported, with
+the recorded decider and date, and the engineer may override any row. Do not write an assumption
+or a limitation for it. Inclusion, entry-event and data-element criteria are not touched.
 
 A request that applies an exclusion, or an analyst who overrides it for one criterion,
 keeps the normal row for that criterion and no ``upstream``. Gaining, dropping or changing

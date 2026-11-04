@@ -77,7 +77,11 @@ class BootstrapCriteriaStates(unittest.TestCase):
         for tree in TREES:
             with self.subTest(tree=tree):
                 rule = self.criteria(tree)
-                for token in ("`broad-first-pass`", "without asking, like `tuh-facility`", "first pass",
+                for token in ("`broad-first-pass`", "a human ruling that is already recorded", "You import it and you do not decide it",
+                              "it needs no fresh question when the request is on its first pass",
+                              "only when its `house_default` holds `confirmed_by` and `confirmed_at`",
+                              "Tell the engineer which rows you imported",
+                              "The engineer may override any row before publish", "first pass",
                               "each exclusion that the request does not override", "state `not-applied`",
                               "`reason` the decision's `proposal.text`",
                               "\"source\": \"recurring-decision\"", "\"id\": \"broad-first-pass\"",
