@@ -36,7 +36,7 @@ hands a ``/speckit.*`` command back to the human.
 
   .. code-block:: json
 
-     {"decision": "generativeMode", "value": "direct", "by": "<who>", "at": "<ISO time>", "scope": "<owner/name>"}
+     {"decision": "generativeMode", "value": "direct", "by": "example-engineer", "at": "2026-11-04T09:30:00Z", "scope": "nq-rdl/query-builder"}
 
   ``by`` is the GitHub login of the human who authorised it, never an email
   address, and ``at`` is when. Record ``scope`` as the repository
@@ -62,7 +62,7 @@ prepares and publishes the release. Never direct the engineer to release.
 1. **Gate.** Continue only when the PR is out of draft, its CI is green on the
    current head commit (read the run for that SHA, not an older one), and its
    SQL review status is ``current``. Match the review to the SQL that actually ran,
-   using the recorded run commit and SQL fingerprint, not just the PR's current SQL.
+   using the recorded run commit and SQL fingerprint, not just the current SQL in the PR.
    ``release.sh evidence`` reads review records and snapshots from the working tree,
    not the PR. Fetch the checked PR head SHA from GitHub and its commit locally; never
    substitute local ``HEAD``. For every review used in the evidence, set ``SLUG`` to
@@ -72,13 +72,12 @@ prepares and publishes the release. Never direct the engineer to release.
 
      for name in review.json source.sql; do
        path=".sqlreview/reviews/$SLUG/$name"
-       tmp="$(mktemp)" || exit 2
-       if ! git show "$PR_HEAD:./$path" > "$tmp" 2>/dev/null || ! cmp -s "$tmp" "$path"; then
-         rm -f "$tmp"
+       # Compare the committed bytes directly; no temporary copy to clean up.
+       if ! git cat-file -e "$PR_HEAD:./$path" 2>/dev/null ||
+          ! git show "$PR_HEAD:./$path" | cmp -s - "$path"; then
          printf 'Stop: %s is absent or differs at checked PR head %s\n' "$path" "$PR_HEAD" >&2
          exit 4
        fi
-       rm -f "$tmp"
      done
 
    Missing or differing records stop the hand-off, including uncommitted, untracked
