@@ -247,6 +247,65 @@ class SkillContract(unittest.TestCase):
                 self.assertIn("row-level data", text)
                 self.assertIn("paste-ready", text)
 
+    def test_amend_gate_comes_before_any_evidence(self):
+        for tree in SKILL:
+            with self.subTest(tree=tree):
+                body = self.body(tree)
+                self.assertLess(body.index("## 0. Amend gate"), body.index("## 1. Gather the release evidence"))
+                text = flat(section(body, "## 0. Amend gate"))
+                for token in ("`handed off`", "`amendment hand-off:`", "`part:`", "**Completed:**",
+                              "**Withdrawn:**", "`git merge-base --is-ancestor <commit> <ref>`",
+                              "stop before step 1", "one or two lines", "Release held:",
+                              "`withdrawn: P3 <reason>`", "Post nothing",
+                              "Never assume that no part is open"):
+                    self.assertIn(token, text)
+
+    def test_amend_gate_accepts_only_the_two_strict_forms(self):
+        # A comment that only names the part, such as "P3 is still in progress", leaves it open.
+        for tree in SKILL:
+            with self.subTest(tree=tree):
+                text = flat(section(self.body(tree), "## 0. Amend gate"))
+                for token in ("`done`, `handed off` or `withdrawn`",
+                              "whose first line has one of two forms closes a handed-off part",
+                              "**Completed:** `done: P<n> <commit>`, from the engineer",
+                              "If the check fails or cannot run, the part stays open",
+                              "**Withdrawn:** `withdrawn: P<n> <reason>`, from the analyst",
+                              "A `withdrawn:` line with no reason leaves the part open",
+                              "Any other comment that names the part leaves it open",
+                              '"P3 is still in progress"',
+                              "say in one line which comment you read",
+                              "with the analyst's own reason", "Do not draft it without a reason"):
+                    self.assertIn(token, text)
+                self.assertNotIn("the engineer says the part is done", text)
+
+    def test_amend_gate_relies_on_the_script_hold(self):
+        # #534: the skill updates amend's record from the strict comments; the script holds.
+        for tree in SKILL:
+            with self.subTest(tree=tree):
+                text = flat(section(self.body(tree), "## 0. Amend gate"))
+                for token in ("`.sqlreview/amendments/<request>.json`", "`release.sh evidence` enforces this",
+                              "Exit 11 means release held: stop before step 1",
+                              "Never edit the record to pass the gate without a strict comment"):
+                    self.assertIn(token, text)
+        amend = flat((REPO / "skills/data-request-amend/SKILL.md").read_text())
+        self.assertIn("`.sqlreview/amendments/<request>.json`", amend)
+        self.assertIn("`release.sh evidence` reads this file and holds the release", amend)
+
+    def test_candidate_ref_comes_from_the_tags_before_asking(self):
+        for text in self.each():
+            self.assertIn("work it out before you ask", text)
+            self.assertIn("**Release state from evidence**", text)
+            self.assertIn("When exactly one tag has no `approved` release record, use it and say so "
+                          "in one line", text)
+            self.assertIn("Ask only when no tag or more than one tag qualifies", text)
+            self.assertNotIn("If none is given, ask for it.", text)
+
+    def test_send_back_adds_the_release_claims(self):
+        for text in self.each():
+            self.assertIn("with its completeness check", text)
+            self.assertIn("`release ref: <tag or candidate ref>`", text)
+            self.assertIn("`release claims:", text)
+
     def test_worked_example_is_linked(self):
         for text in self.each():
             self.assertIn("references/worked-example.rst", text)
@@ -728,6 +787,176 @@ def record(**over):
                         "resolved_by": "analyst-login", "resolved_at": "2026-09-28T01:00:00Z"}]}
     d.update(over)
     return d
+
+
+CANARY = "LEAK-CANARY-9177"
+
+
+@unittest.skipUnless(shutil.which("jq") and shutil.which("git"), "release.sh needs jq and git")
+class AmendGate(unittest.TestCase):
+    """#534: `evidence` reads amend's record and holds (exit 11) while a part is handed off.
+
+    The hold names part ids, the file and the field only: never part text, reasons or values.
+    """
+
+    RECORD = ".sqlreview/amendments/enq9177-falls.json"
+
+    def setUp(self):
+        self.tmp = tempfile.TemporaryDirectory()
+        self.addCleanup(self.tmp.cleanup)
+        self.p = Project(self.tmp.name)
+        self.p.tag("v1.0.0")
+        self.head = git(self.p.root, "rev-parse", "HEAD")
+
+    def record(self, parts, **extra):
+        doc = {"schemaVersion": 1, "kind": "amendment", "enquiry": "THHSRDLENQ-9177", "parts": parts}
+        doc.update(extra)
+        self.p.write(self.RECORD, json.dumps(doc))
+
+    def part(self, id_, status, **fields):
+        return {"id": id_, "status": status, "text": f"{CANARY} change {id_}", **fields}
+
+    def assert_no_leak(self, r):
+        self.assertNotIn(CANARY, r.stdout + r.stderr)
+        self.assertNotIn("THHSRDLENQ-9177", r.stderr)
+
+    def test_handed_off_part_holds_and_names_the_part(self):
+        self.record([self.part("P1", "done", commit=self.head),
+                     self.part("P2", "handed off", hand_off=f"draft, not posted {CANARY}")])
+        r = self.p.evidence("v1.0.0")
+        self.assertEqual(r.returncode, 11, r.stderr)
+        self.assertIn("release held: amend part handed off and open: P2", r.stderr)
+        self.assertNotIn("P1", r.stderr.splitlines()[0])
+        self.assertIn("next:", r.stderr)
+        self.assertLessEqual(len(r.stderr.strip().splitlines()), 2, r.stderr)
+        self.assertEqual(json.loads(r.stdout)["reviews"][0]["applies"], "current")
+        self.assert_no_leak(r)
+
+    def test_every_part_done_passes(self):
+        self.record([self.part("P1", "done", commit=self.head), self.part("P2", "done", commit=self.head[:7])])
+        r = self.p.evidence("v1.0.0")
+        self.assertEqual(r.returncode, 0, r.stderr)
+        self.assertEqual(r.stderr, "")
+
+    def test_withdrawn_part_passes(self):
+        self.record([self.part("P1", "done", commit=self.head),
+                     self.part("P2", "withdrawn", reason=f"{CANARY} requester no longer needs it")])
+        r = self.p.evidence("v1.0.0")
+        self.assertEqual(r.returncode, 0, r.stderr)
+        self.assert_no_leak(r)
+
+    def test_no_record_passes(self):
+        r = self.p.evidence("v1.0.0")
+        self.assertEqual(r.returncode, 0, r.stderr)
+
+    def test_done_commit_outside_the_ref_holds(self):
+        self.p.write("late.txt", "x")
+        self.p.commit("engineer change after the tag")
+        late = git(self.p.root, "rev-parse", "HEAD")
+        self.record([self.part("P3", "done", commit=late)])
+        r = self.p.evidence("v1.0.0")
+        self.assertEqual(r.returncode, 11, r.stderr)
+        self.assertIn("not in v1.0.0: P3", r.stderr)
+        self.assertEqual(self.p.evidence("HEAD").returncode, 0)
+
+    def test_hold_takes_precedence_over_a_stale_review(self):
+        self.p.write(SQL_PATH, SQL_V2)
+        self.p.commit("widen criteria")
+        self.record([self.part("P1", "handed off")])
+        self.assertEqual(self.p.evidence("HEAD").returncode, 11)
+
+    def test_malformed_record_holds_and_names_file_and_field(self):
+        cases = {
+            "status": ([self.part("P1", f"{CANARY} in progress")], "parts[0].status"),
+            "missing status": ([{"id": "P1", "text": CANARY}], "parts[0].status"),
+            "withdrawn, no reason": ([self.part("P1", "withdrawn", reason="  ")], "parts[0].reason"),
+            "done, no commit": ([self.part("P1", "done", commit=CANARY)], "parts[0].commit"),
+            "id": ([self.part(CANARY, "done", commit=self.head)], "parts[0].id"),
+            "duplicate id": ([self.part("P1", "withdrawn", reason="r"), self.part("P1", "handed off")],
+                             "parts[].id (duplicate)"),
+            "no parts": ([], "parts"),
+        }
+        for name, (parts, field) in cases.items():
+            with self.subTest(name):
+                self.record(parts)
+                r = self.p.evidence("v1.0.0")
+                self.assertEqual(r.returncode, 11, r.stderr)
+                self.assertIn(f"release held: {self.RECORD}: field {field} is missing or invalid", r.stderr)
+                self.assert_no_leak(r)
+        for name, text in (("not JSON", f'{{"parts": "{CANARY}'), ("not an object", f'["{CANARY}"]'),
+                           ("schema", json.dumps({"schemaVersion": 2, "parts": [CANARY]}))):
+            with self.subTest(name):
+                self.p.write(self.RECORD, text)
+                r = self.p.evidence("v1.0.0")
+                self.assertEqual(r.returncode, 11, r.stderr)
+                self.assertIn(f"release held: {self.RECORD}: field", r.stderr)
+                self.assert_no_leak(r)
+
+    def ledger(self, stages_done=("intake", "amend"), artifacts=None):
+        # The triage ledger's own entry style: the amend stage lists the record as its artifact.
+        amend = {"sources": ["pr"], "artifacts": artifacts if artifacts is not None else []}
+        entry = {"ticket": "rdl-service-desk/service-desk#9177", "enquiry": "ENQ9177", "stage": "release",
+                 "stages_done": list(stages_done), "evidence_revision": {"ticket": "2026-11-01", "pr": "abc1234"},
+                 "stage_evidence": {"intake": {"sources": ["ticket"], "artifacts": []}},
+                 "decisions": [], "blockers": [{"class": "note", "detail": CANARY}], "depends_on": [],
+                 "next_action": f"analyst-handle: release {CANARY}",
+                 "verification": {"status": "unverified", "commands": [], "at": "2026-11-01"}}
+        if "amend" in stages_done:
+            entry["stage_evidence"]["amend"] = amend
+        store = {"schemaVersion": 1, "entries": [entry]}
+        path = self.p.root / ".sqlreview/ledger.json"
+        path.write_text(json.dumps(store))
+        r = run(SQLREVIEW, ["ledger", "check", ".sqlreview/ledger.json"], self.p.root)
+        self.assertEqual(r.returncode, 0, r.stdout + r.stderr)
+
+    def artifact(self):
+        return [{"path": self.RECORD, "sha256": "0" * 64}]
+
+    def test_ledger_amendment_without_record_holds(self):
+        for name, artifacts, path in (("record named", self.artifact(), self.RECORD),
+                                      ("no record named", [], ".sqlreview/amendments/<request>.json")):
+            with self.subTest(name):
+                self.ledger(artifacts=artifacts)
+                r = self.p.evidence("v1.0.0")
+                self.assertEqual(r.returncode, 11, r.stderr)
+                self.assertIn(f"{path} is missing", r.stderr)
+                self.assertIn("amendment hand-off comment on the deliverable PR", r.stderr)
+                self.assertNotIn("comments done:", r.stderr)
+                self.assert_no_leak(r)
+
+    def test_ledger_amendment_with_record_follows_the_record(self):
+        self.ledger(artifacts=self.artifact())
+        self.record([self.part("P1", "done", commit=self.head), self.part("P2", "withdrawn", reason=CANARY)])
+        r = self.p.evidence("v1.0.0")
+        self.assertEqual(r.returncode, 0, r.stderr)
+        self.assert_no_leak(r)
+        self.record([self.part("P1", "done", commit=self.head), self.part("P2", "handed off")])
+        r = self.p.evidence("v1.0.0")
+        self.assertEqual(r.returncode, 11, r.stderr)
+        self.assertIn("open: P2", r.stderr)
+        self.assertNotIn("is missing", r.stderr)
+        self.assert_no_leak(r)
+
+    def test_ledger_without_amendment_and_no_record_passes(self):
+        self.ledger(stages_done=("intake",))
+        r = self.p.evidence("v1.0.0")
+        self.assertEqual(r.returncode, 0, r.stderr)
+        self.assertEqual(r.stderr, "")
+
+    def test_unreadable_ledger_holds(self):
+        (self.p.root / ".sqlreview/ledger.json").write_text(f'{{"entries": "{CANARY}')
+        r = self.p.evidence("v1.0.0")
+        self.assertEqual(r.returncode, 11, r.stderr)
+        self.assertIn("release held: .sqlreview/ledger.json: field entries is missing or invalid", r.stderr)
+        self.assert_no_leak(r)
+
+    def test_every_record_is_read(self):
+        self.record([self.part("P1", "done", commit=self.head)])
+        self.p.write(".sqlreview/amendments/enq9178-falls.json",
+                     json.dumps({"schemaVersion": 1, "parts": [self.part("P4", "handed off")]}))
+        r = self.p.evidence("v1.0.0")
+        self.assertEqual(r.returncode, 11, r.stderr)
+        self.assertIn("open: P4", r.stderr)
 
 
 def violations(doc):
@@ -1575,6 +1804,14 @@ CASES = {
                                      "claims-current-record"},
     "release-criteria-table": {"table-before-limitations", "researcher-wording-unchanged",
                                "held-not-final"},
+    # #534: a handed-off amend part holds release preparation until completed or withdrawn.
+    "release-amend-part-open": {"prep-stopped", "names-p3"},
+    "release-amend-part-withdrawn": {"prep-continue", "no-blocker"},
+    # Only `done: P<n> <commit>` in the release ref or `withdrawn: P<n> <reason>` close a part.
+    "release-amend-part-in-progress": {"prep-stopped", "names-p3", "not-closed"},
+    "release-amend-withdrawn-no-reason": {"prep-stopped", "names-p3", "not-closed"},
+    "release-amend-done-outside-ref": {"prep-stopped", "names-p3", "not-closed"},
+    "release-amend-part-done": {"prep-continue", "no-blocker", "closed-by-done"},
 }
 NODE = shutil.which("node")
 NODE_SCRIPT = """

@@ -1,0 +1,70 @@
+# Replies graded by tests/test_data_request_handoff.py in Python (and Node when present). No model call.
+pass:
+  - name: complete note
+    reply: |
+      ```text
+      outcome: send-back
+      deliverable PR: <PR URL> at head 1a2b3c4
+      run commit: 5d6e7f8
+      review: los revision 3, SQL fingerprint from the hand-off
+      already resolved by the analyst: A4 whole 24-hour periods, reconfirmed by the requester on 2026-10-20 (jsmith-example); no governance scope question
+      finding: F1: los_days counts calendar dates
+      affected files: src/cohort/los.py; regenerate sql/los_request.sql; runbook; specs/uat-checklist.md
+      expected result: los_days is the number of whole 24-hour periods between admission and discharge
+      waiting on: nothing
+      classification: logic or defect
+      route: /data-request:fix
+      evidence: review A4 revision 3, SQL lines 40 to 48
+      open gates: none
+      return to review: refresh analyse, operator-run/UAT evidence and triage hand-off
+      ```
+
+      ```yaml
+      outcome: send-back
+      route: fix
+      engineer_follow_up: none
+      posted: 'no'
+      ```
+fail:
+  - name: thin note leaves questions
+    fails: [follow_up, resolved]
+    reply: |
+      ```text
+      outcome: send-back
+      finding: F1: los_days looks wrong
+      expected result: make it right
+      route: /data-request:fix
+      ```
+
+      ```yaml
+      outcome: send-back
+      route: fix
+      engineer_follow_up: which files and what result
+      posted: 'no'
+      ```
+  - name: resolved line says none
+    fails: [resolved]
+    reply: |
+      already resolved by the analyst: none
+      affected files: src/cohort/los.py
+      waiting on: nothing
+
+      ```yaml
+      outcome: send-back
+      route: fix
+      engineer_follow_up: none
+      posted: 'no'
+      ```
+  - name: accepted and routed to amend
+    fails: [outcome, route]
+    reply: |
+      already resolved by the analyst: A4 reconfirmed
+      affected files: src/cohort/los.py
+      waiting on: nothing
+
+      ```yaml
+      outcome: accepted
+      route: amend
+      engineer_follow_up: none
+      posted: 'no'
+      ```

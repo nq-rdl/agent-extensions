@@ -176,6 +176,8 @@ Classify each finding; do not make the change or approve new meaning during expl
 
 For **Send back**, return the paste-ready note in
 [references/send-back-note.rst](references/send-back-note.rst), with one finding block per change.
+Run its completeness check before you present the note. The engineer must be able to act on it
+without a reply that asks for more detail.
 
 Present the note to the analyst; post nothing unless explicitly instructed. When instructed,
 post it on the deliverable PR, addressed to the engineer. Never post it on the child issue or

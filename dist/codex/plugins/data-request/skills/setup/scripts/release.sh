@@ -23,6 +23,13 @@
 #                            other_paths_changed_since_review: committed paths outside sql_path and
 #                            .sqlreview/ that differ between git_commit and REF (null when unknown).
 #                            SQL can be unchanged while code, pins or exports change (#521).
+#                            Amend gate: each .sqlreview/amendments/<request>.json is
+#                            {schemaVersion: 1, parts: [{id: "P<n>", status, ...}]}, status
+#                            "done" (with commit), "handed off" or "withdrawn" (with reason).
+#                            A handed-off part, a done commit outside REF or a malformed record
+#                            holds the release (exit 11, ids and fields on stderr).
+#                            An entry of .sqlreview/ledger.json at the amend stage with no record
+#                            file holds too.
 #   check FILE | check --stdin
 #                            validate a release record (.sqlreview/releases/<tag>/release.json):
 #                            one violation per line, exit 4; "ok" otherwise. Inside the project,
@@ -49,7 +56,9 @@
 #
 # Exit codes: 0 ok · 1 usage · 2 error (unknown ref or slug, no jq or git) · 3 not initialised ·
 # 4 invalid record · 10 at least one review does not apply to REF (evidence), or the criteria
-# table is held (criteria).
+# table is held (criteria) · 11 release held by the amend gate (evidence): a part in
+# .sqlreview/amendments/*.json is handed off, malformed or done by a commit outside REF. The JSON
+# is still printed. 11 takes precedence over 10.
 set -u
 SR_SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd -P)"
 # shellcheck source=sqlreview-lib.sh
@@ -302,6 +311,89 @@ rl_review_row() ( # <slug> <commit>
      open_questions: [$question_doc.questions[] | select(.status == "open") | .text]}' "$doc"
 )
 
+# Amend gate (#534): one TSV line per finding in an amendment record. It emits part ids, field
+# paths and done commits only, never part text, reasons or other record values.
+RL_AMEND_JQ='def bad($f): ["bad", "-", $f] | join("\t");
+if type != "object" then bad("(document)")
+elif .schemaVersion != 1 then bad("schemaVersion")
+elif (.parts | type) != "array" or (.parts | length) == 0 then bad("parts")
+else
+  (if [.parts[] | objects | .id | strings] | group_by(.) | any(length > 1)
+   then bad("parts[].id (duplicate)") else empty end),
+  (.parts | to_entries[] | .key as $i | .value as $p | "parts[\($i)]" as $at
+   | if ($p | type) != "object" then bad($at)
+     elif ($p.id | type) != "string" or ($p.id | test("^P[1-9][0-9]*$") | not) then bad("\($at).id")
+     elif $p.status == "handed off" then ["open", $p.id] | join("\t")
+     elif $p.status == "withdrawn" then
+       (if ($p.reason | type) == "string" and ($p.reason | test("\\S")) then empty else bad("\($at).reason") end)
+     elif $p.status == "done" then
+       (if ($p.commit | type) == "string" and ($p.commit | test("^[0-9a-f]{7,64}$"))
+        then ["done", $p.id, "-", $p.commit] | join("\t") else bad("\($at).commit") end)
+     else bad("\($at).status") end)
+end'
+
+# The triage ledger shows an amendment when an entry has the amend stage. Emits each recorded
+# amendment record path, or "none" when an amended entry names no record. Paths only, no values.
+RL_AMEND_LEDGER_JQ='def rec: type == "string" and test("^\\.sqlreview/amendments/[a-z0-9][a-z0-9-]*\\.json$");
+if type != "object" or (.entries | type) != "array" then "bad"
+else .entries[] | objects | select(.stage == "amend" or ((.stages_done | arrays | index("amend")) != null))
+  | [.stage_evidence.amend.artifacts | arrays | .[] | objects | .path | select(rec)]
+  | if length == 0 then "none" else .[] | "path\t" + . end
+end'
+
+# One jq read of .sqlreview/ledger.json. Sets $missing to one hold line per amended entry whose
+# record file does not exist. A ledger that is not valid JSON also holds.
+rl_amend_ledger_missing() {
+  local ledger="$SR_ROOT/$SR_DIR/ledger.json" line nl='
+' next='write it from the amendment hand-off comment on the deliverable PR (/data-request:amend step 5)'
+  missing=""
+  [ -e "$ledger" ] || return 0
+  sr_no_symlinks "$ledger" || exit 2
+  while read -r line; do
+    case "$line" in
+      "") ;;
+      bad) missing="$missing${nl}release held: $SR_DIR/ledger.json: field entries is missing or invalid" ;;
+      none) missing="$missing${nl}release held: the ledger shows an amendment but no record: $SR_DIR/amendments/<request>.json is missing. Next: $next" ;;
+      path*) line="${line#path?}"
+        [ -f "$SR_ROOT/$line" ] ||
+          missing="$missing${nl}release held: the ledger shows an amendment but $line is missing. Next: $next" ;;
+    esac
+  done <<EOF
+$(jq -r "$RL_AMEND_LEDGER_JQ" "$ledger" 2>/dev/null || printf 'bad\n')
+EOF
+}
+
+# Hold while any part in .sqlreview/amendments/*.json is handed off, malformed, or done by a
+# commit outside the release. One jq read per document; the messages name part ids, files and
+# fields only. Prints the hold on stderr and returns 11 when held.
+rl_amend_hold() { # <ref> <commit>
+  local ref="$1" commit="$2" f rel kind id field c rows open="" stale="" bad="" missing="" nl='
+'
+  for f in "$SR_ROOT/$SR_DIR"/amendments/*.json; do
+    [ -e "$f" ] || continue
+    rel="$SR_DIR/amendments/${f##*/}"
+    sr_no_symlinks "$f" || exit 2
+    rows="$(jq -r "$RL_AMEND_JQ" "$f" 2>/dev/null)" || rows="$(printf 'bad\t-\t(not valid JSON)')"
+    while IFS="$(printf '\t')" read -r kind id field c; do
+      if [ "$kind" = open ]; then open="$open $id"
+      elif [ "$kind" = bad ]; then bad="$bad${nl}release held: $rel: field $field is missing or invalid"
+      elif [ "$kind" = done ]; then
+        git -C "$SR_ROOT" merge-base --is-ancestor "$c" "$commit" 2>/dev/null || stale="$stale $id"
+      fi
+    done <<EOF
+$rows
+EOF
+  done
+  rl_amend_ledger_missing  # sets missing: amended in the ledger, no record file
+  [ -n "$open$stale$bad$missing" ] || return 0
+  [ -z "$open" ] || printf 'release held: amend part handed off and open:%s\n' "$open" >&2
+  [ -z "$stale" ] || printf 'release held: amend part done by a commit not in %s:%s\n' "$ref" "$stale" >&2
+  [ -z "$bad" ] || printf '%s\n' "${bad#?}" >&2
+  [ -z "$missing" ] || printf '%s\n' "${missing#?}" >&2
+  [ -z "$open$stale$bad" ] || printf '%s\n' "next: the engineer comments done: P<n> <commit> or the analyst comments withdrawn: P<n> <reason> on the deliverable PR, then the record is updated" >&2
+  return 11
+}
+
 cmd_evidence() {
   [ $# -ge 1 ] || usage
   sr_need_jq
@@ -329,6 +421,7 @@ cmd_evidence() {
   done
   printf '%s' "$rows" | jq -s --arg ref "$ref" --arg commit "$commit" \
     '{ref: $ref, commit: $commit, reviews: .}' || sr_die 2 "cannot assemble evidence"
+  rl_amend_hold "$ref" "$commit" || exit 11
   printf '%s' "$rows" | jq -se 'all(.[]; .applies == "current" or .applies == "header-only")' >/dev/null || exit 10
 }
 
