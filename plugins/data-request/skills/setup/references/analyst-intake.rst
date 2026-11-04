@@ -57,8 +57,8 @@ inventing confirmation. Prior SQL/delivery and requested elements can support
 an engineer technical proposal, not an analyst research answer. Guardrails'
 ``references/grain.rst`` owns evidence selection and once-only drift handling.
 
-Optional ``decided`` is ``{by, role, at, source}``, separate from confirmation:
-nonempty actor handle, role and evidence source; ``at`` uses the same UTC form
+Optional ``decided`` is an object with ``by``, ``role``, ``at`` and ``source``, separate from
+confirmation: nonempty actor handle, role and evidence source; ``at`` uses the same UTC form
 or a real ``YYYY-MM-DD`` date when the source gives only the day.
 The requester who made a decision can differ from the analyst who confirmed
 the intake. Omit provenance not actually known; never manufacture a dated

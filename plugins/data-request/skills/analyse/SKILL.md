@@ -12,7 +12,7 @@ compatibility: >-
   .sqlreview schema 2 (schema 1 remains readable) (docs/specs/2026-09-15-sql-review-plugin-design.md); bash 3.2+, jq >= 1.6,
   git optional (required only for header-decision eligibility; diffs use the stored snapshot).
   The analysis-notes header read by `notes` needs query-builder 0.6.0 or later.
-allowed-tools: Bash, Read, Glob, Grep, Write, AskUserQuestion
+allowed-tools: Bash, Read, Glob, Grep, Write, AskUserQuestion, Skill
 metadata:
   repo: https://github.com/nq-rdl/agent-extensions
 ---
@@ -26,8 +26,7 @@ prefix its shared question's text `Analyst question:` and send it back through
 the handoff for the analyst to consult the requester. Do not relabel an
 engineer confirmation as an analyst confirmation.
 
-For RDL cohort SQL, read `${CLAUDE_PLUGIN_ROOT}/skills/guardrails/SKILL.md` before
-scoping or reviewing. Consult its dataops/column-spec sources and carry evidence or
+For RDL cohort SQL, invoke `/data-request:guardrails` before scoping or reviewing. Consult its dataops/column-spec sources and carry evidence or
 unverified facts into the discussion; advisory findings do not replace human confirmation.
 
 Arguments: `$ARGUMENTS`.
@@ -197,7 +196,8 @@ steps 3–4 of *Changed SQL* below: draft the next revision, run `carryforward`,
 items implicated by the grain/evidence change even when their SQL lines are unchanged,
 increment the revision and append to `changes[]`. Then follow *Confirm, write, render*,
 including confirmation/carry gates and publish → snapshot → render. Do not change SQL
-or auto-confirm a new or reworded item to make this update possible.
+or record a confirmation the human did not give for a new or reworded item to make this
+update possible.
 
 ### Changed SQL: reassess the review
 

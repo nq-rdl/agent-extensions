@@ -14,7 +14,7 @@ compatibility: >-
   RDL enquiry repos. Boundary: query-builder docs/ANALYST_AMENDMENTS.md (0.6.0).
   Amendment record and guard: data-analysis-scaffold 0.5.0 (specs/amendments.md,
   pixi run amend). Verify the installed versions and the repo's own commands at use time.
-allowed-tools: Bash, Read, Glob, Grep, Write, Edit, AskUserQuestion
+allowed-tools: Bash, Read, Glob, Grep, Write, Edit, AskUserQuestion, Skill
 metadata:
   repo: https://github.com/nq-rdl/agent-extensions
 ---
@@ -24,7 +24,7 @@ metadata:
 The **Data Analyst** runs presentation amendments before or after release.
 Logic or row changes go to the Data Engineer through the existing handoff below.
 
-Arguments: `$ARGUMENTS`. Read `${CLAUDE_PLUGIN_ROOT}/skills/guardrails/SKILL.md` and apply
+Arguments: `$ARGUMENTS`. Invoke `/data-request:guardrails` and apply
 the rules relevant to the request. The boundary is query-builder's
 [`docs/ANALYST_AMENDMENTS.md`](https://github.com/nq-rdl/query-builder/blob/main/docs/ANALYST_AMENDMENTS.md).
 Read it, preferring the copy in the repository's pinned query-builder, and classify against

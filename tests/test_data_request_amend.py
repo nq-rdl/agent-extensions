@@ -109,7 +109,7 @@ class Content(unittest.TestCase):
                 self.assertIn(gate, self.body)
 
     def test_reuses_sibling_actions_by_reference(self):
-        self.assertIn("${CLAUDE_PLUGIN_ROOT}/skills/guardrails/SKILL.md", self.body)
+        self.assertIn("`/data-request:guardrails`", self.body)
         for leaf in ("validate", "fix", "analyse"):
             with self.subTest(leaf=leaf):
                 self.assertIn(f"/data-request:{leaf}", self.body)

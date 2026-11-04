@@ -13,7 +13,7 @@ compatibility: >-
   bash 3.2+, jq >= 1.6, git (reads the release tag). Scaffold paths (specs/amendments.md,
   .copier-answers.yml, runbook, UAT checklist) follow data-analysis-scaffold 0.5.0; verify the
   repository's own layout at use time.
-allowed-tools: Bash, Read, Glob, Grep, Write, AskUserQuestion
+allowed-tools: Bash, Read, Glob, Grep, Write, AskUserQuestion, Skill
 metadata:
   repo: https://github.com/nq-rdl/agent-extensions
 ---
@@ -28,13 +28,13 @@ file, and it never publishes a release, pushes a tag or posts the body.
 Order: the Data Engineer completes `analyse`, the authorised operator run, UAT and the triage
 hand-off; the Data Analyst runs `explain`, accepts for release preparation, sends back or
 amends presentation, then drafts here and publishes. Never direct the engineer to release.
-If the analyst chooses **Send back** here, use the paste-ready *Analyst outcome* note in
-`${CLAUDE_PLUGIN_ROOT}/skills/explain/SKILL.md`: logic changes or defects to `fix`, presentation
+If the analyst chooses **Send back** here, use the paste-ready send-back note in
+`${CLAUDE_PLUGIN_ROOT}/skills/explain/references/send-back-note.rst`: logic changes or defects to `fix`, presentation
 changes to `amend` before or after release. Keep unresolved claims `pending` and the current
 candidate record `draft`; do not overwrite a previously approved release record, post the
 note or clear a gate. Refreshed review and operator-run/UAT evidence precede another hand-off.
 
-For RDL cohort SQL, read `${CLAUDE_PLUGIN_ROOT}/skills/guardrails/SKILL.md` when a claim rests on
+For RDL cohort SQL, invoke `/data-request:guardrails` when a claim rests on
 a storage fact or conversion. Worked example:
 [references/worked-example.rst](references/worked-example.rst).
 

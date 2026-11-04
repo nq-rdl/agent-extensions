@@ -5,9 +5,9 @@ description: 'Initialise project scope and review records for the Data Request w
   create the .sqlreview/ directory with config.json (settings + the shared assumption/limitation
   definitions) and the scope/review report templates, from the bundled default or
   from answers to a few questions. Safe to re-run — an existing setup is diffed file
-  by file and nothing is overwritten without confirmation. Use once per project before
-  $data-request:bootstrap, :analyse or :explain, or whenever one of them reports "not
-  initialised".'
+  by file and nothing is overwritten unless the user confirms it. Use once per project
+  before $data-request:bootstrap, :analyse or :explain, or whenever one of them reports
+  "not initialised".'
 compatibility: .sqlreview schema 2 (schema 1 remains readable) (docs/specs/2026-09-15-sql-review-plugin-design.md);
   bash 3.2+, jq >= 1.6, git optional. macOS and Linux.
 metadata:

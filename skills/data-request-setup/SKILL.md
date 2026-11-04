@@ -5,7 +5,7 @@ description: >-
   Initialise project scope and review records for the Data Request workflow: create the .sqlreview/ directory with
   config.json (settings + the shared assumption/limitation definitions) and the scope/review
   report templates, from the bundled default or from answers to a few questions. Safe to re-run —
-  an existing setup is diffed file by file and nothing is overwritten without confirmation. Use
+  an existing setup is diffed file by file and nothing is overwritten unless the user confirms it. Use
   once per project before /data-request:bootstrap, :analyse or :explain, or whenever one of them
   reports "not initialised".
 argument-hint: '[--default|--custom] [--check] [--yes] (non-interactive: --default --yes)'

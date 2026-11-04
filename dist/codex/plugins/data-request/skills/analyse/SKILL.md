@@ -32,8 +32,7 @@ prefix its shared question's text `Analyst question:` and send it back through
 the handoff for the analyst to consult the requester. Do not relabel an
 engineer confirmation as an analyst confirmation.
 
-For RDL cohort SQL, read `${PLUGIN_ROOT}/skills/guardrails/SKILL.md` before
-scoping or reviewing. Consult its dataops/column-spec sources and carry evidence or
+For RDL cohort SQL, invoke `$data-request:guardrails` before scoping or reviewing. Consult its dataops/column-spec sources and carry evidence or
 unverified facts into the discussion; advisory findings do not replace human confirmation.
 
 Arguments: `$ARGUMENTS`.
@@ -203,7 +202,8 @@ steps 3–4 of *Changed SQL* below: draft the next revision, run `carryforward`,
 items implicated by the grain/evidence change even when their SQL lines are unchanged,
 increment the revision and append to `changes[]`. Then follow *Confirm, write, render*,
 including confirmation/carry gates and publish → snapshot → render. Do not change SQL
-or auto-confirm a new or reworded item to make this update possible.
+or record a confirmation the human did not give for a new or reworded item to make this
+update possible.
 
 ### Changed SQL: reassess the review
 
