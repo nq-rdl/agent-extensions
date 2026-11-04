@@ -201,8 +201,17 @@ class StatusNext(unittest.TestCase):
     def test_uncommitted_unbound_and_rescope_lines_name_the_commit(self):
         self.scope()
         self.sql(SQL_V1, commit=False)
-        self.assertEqual(self.row()["next"], f"/data-request:bootstrap {SQL} to bind the scope to the SQL, "
-                                             f"then commit {SQL}, then /data-request:analyse {SQL}")
+        # Bootstrap binds the scope to committed bytes, so the commit comes first (N1).
+        self.assertEqual(self.row()["next"], f"commit {SQL}, then /data-request:bootstrap {SQL} to bind the scope "
+                                             f"to the SQL, then /data-request:analyse {SQL}")
+
+    def test_uncommitted_sql_after_a_rescope_names_the_commit_before_bootstrap(self):
+        self.sql(SQL_V1)
+        self.scope(SQL_V1)
+        self.sql(SQL_V2, commit=False)
+        self.assertEqual(self.row()["next"], f"The SQL changed after scope revision 3: commit {SQL}, then run "
+                                             f"/data-request:bootstrap {SQL} to publish scope revision 4, "
+                                             f"then /data-request:analyse {SQL}")
 
     def test_outside_a_git_repository_names_analyse_alone(self):
         with tempfile.TemporaryDirectory() as tmp:

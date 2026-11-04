@@ -419,11 +419,12 @@ EOF2
     fi
     if [ "$intake" = y ]; then why="${why:+$why and the analyst intake}"; why="${why:-The analyst intake}"; fi
     if [ -n "$why" ]; then
-      if [ -f "$d/review.json" ]; then follow="$pre/data-request:analyse $sql --update"
-      elif [ -f "$SR_ROOT/$sql" ]; then follow="$pre/data-request:analyse $sql"
+      # Bootstrap binds the scope to committed SQL, so a commit comes before it, not after.
+      if [ -f "$d/review.json" ]; then follow="/data-request:analyse $sql --update"
+      elif [ -f "$SR_ROOT/$sql" ]; then follow="/data-request:analyse $sql"
       else follow="/data-request:draft to write $sql"; fi
-      printf '%s changed after scope revision %s%s: run /data-request:bootstrap %s to publish scope revision %s, then %s\n' \
-        "$why" "$srev" "$gap" "$sql" "$((srev + 1))" "$follow"
+      printf '%s changed after scope revision %s%s: %srun /data-request:bootstrap %s to publish scope revision %s, then %s\n' \
+        "$why" "$srev" "$gap" "$pre" "$sql" "$((srev + 1))" "$follow"
       return 0
     fi
   fi
@@ -431,7 +432,7 @@ EOF2
     scoped)
       if [ ! -f "$SR_ROOT/$sql" ]; then printf '/data-request:draft to write %s, then /data-request:analyse %s\n' "$sql" "$sql"
       elif [ "$bound" = n ]; then
-        printf '/data-request:bootstrap %s to bind the scope to the SQL, then %s/data-request:analyse %s\n' "$sql" "$pre" "$sql"
+        printf '%s/data-request:bootstrap %s to bind the scope to the SQL, then /data-request:analyse %s\n' "$pre" "$sql" "$sql"
       else printf '%s/data-request:analyse %s to review the SQL\n' "$pre" "$sql"; fi ;;
     scoped-header-only) printf '/data-request:bootstrap %s to record the header revision of the scope\n' "$sql" ;;
     stale|no-baseline) printf '%s/data-request:analyse %s --update\n' "$pre" "$sql" ;;
