@@ -9,7 +9,7 @@ user-invocable: true
 compatibility: >-
   RDL cohort SQL; verify target engine/version, dataops schema and query-builder column-spec metadata at use time.
   record_assumption/record_limitation need query-builder 0.6.0 or later.
-allowed-tools: Bash, Write, Read, Glob, Grep, Edit, AskUserQuestion
+allowed-tools: Bash, Write, Read, Glob, Grep, Edit, AskUserQuestion, Skill
 metadata:
   repo: https://github.com/nq-rdl/agent-extensions
 ---
@@ -23,7 +23,7 @@ them to the analyst to consult the requester; engineer technical choices do not
 replace those answers.
 
 Invoke `/data-request:guardrails` first and apply its **Engineer decisions: proceed and flag**
-in `references/decision-authority.rst`. Arguments: `$ARGUMENTS`.
+in `${CLAUDE_PLUGIN_ROOT}/skills/guardrails/references/decision-authority.rst`. Arguments: `$ARGUMENTS`.
 Use the requested SQL path, existing SQL, request and any supplied scope. Drafting
 requires no formal scope/review record. Before writing SQL outside the composition
 API, silently publish a lift candidate under the pipeline path, following

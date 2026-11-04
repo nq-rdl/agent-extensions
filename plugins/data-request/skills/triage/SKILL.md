@@ -13,7 +13,7 @@ compatibility: >-
   Layout observed 2026-09-21 to 2026-09-23: requests are rdl-service-desk/service-desk issues,
   children are rdl-service-desk/<APPROVAL-ID> repositories rendered from data-analysis-scaffold,
   and query-builder-plugins is consolidated into query-builder. Re-check the layout before relying on it.
-allowed-tools: Bash, Read, Glob, Grep, Write, Edit, AskUserQuestion
+allowed-tools: Bash, Read, Glob, Grep, Write, Edit, AskUserQuestion, Skill
 metadata:
   repo: https://github.com/nq-rdl/agent-extensions
 ---
@@ -21,9 +21,9 @@ metadata:
 # Data Request — triage (Data Analyst / Data Engineer)
 
 The queue entrypoint decides what to work on next and in what order. Stage skills do the
-work; this skill routes to them without restating procedures. Arguments: `$ARGUMENTS`. Read
-`${CLAUDE_PLUGIN_ROOT}/skills/guardrails/SKILL.md` for source hierarchy and **Engineer decisions: proceed and flag**;
-its `references/decision-authority.rst` distinguishes technical defaults from analyst questions and genuine blockers.
+work; this skill routes to them without restating procedures. Arguments: `$ARGUMENTS`. Invoke
+`/data-request:guardrails` for source hierarchy and **Engineer decisions: proceed and flag**;
+`${CLAUDE_PLUGIN_ROOT}/skills/guardrails/references/decision-authority.rst` distinguishes technical defaults from analyst questions and genuine blockers.
 
 ## Choose the mode
 

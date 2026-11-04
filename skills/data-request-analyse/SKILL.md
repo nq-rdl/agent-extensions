@@ -13,7 +13,7 @@ compatibility: >-
   .sqlreview schema 2 (schema 1 remains readable) (docs/specs/2026-09-15-sql-review-plugin-design.md); bash 3.2+, jq >= 1.6,
   git optional (required only for header-decision eligibility; diffs use the stored snapshot).
   The analysis-notes header read by `notes` needs query-builder 0.6.0 or later.
-allowed-tools: Bash, Read, Glob, Grep, Write, AskUserQuestion
+allowed-tools: Bash, Read, Glob, Grep, Write, AskUserQuestion, Skill
 metadata:
   repo: https://github.com/nq-rdl/agent-extensions
 ---

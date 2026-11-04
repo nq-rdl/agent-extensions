@@ -17,8 +17,6 @@ metadata:
 
 ## Codex execution
 
-Before shell examples, set PLUGIN_ROOT to the absolute installed plugin directory: two parent directories above this SKILL.md’s containing skill directory. Derive it from the loaded file path, never the working directory. This variable is not automatically supplied to ordinary shell tools. Quote it in commands.
-
 Here $ARGUMENTS means the user’s supplied skill arguments. Codex does not populate a shell variable for them. Pass arguments with shell quoting that preserves literal text; never evaluate user text as shell code.
 
 # Data Request — amend
@@ -26,7 +24,7 @@ Here $ARGUMENTS means the user’s supplied skill arguments. Codex does not popu
 The **Data Analyst** runs presentation amendments before or after release.
 Logic or row changes go to the Data Engineer through the existing handoff below.
 
-Arguments: `$ARGUMENTS`. Read `${PLUGIN_ROOT}/skills/guardrails/SKILL.md` and apply
+Arguments: `$ARGUMENTS`. Invoke `$data-request:guardrails` and apply
 the rules relevant to the request. The boundary is query-builder's
 [`docs/ANALYST_AMENDMENTS.md`](https://github.com/nq-rdl/query-builder/blob/main/docs/ANALYST_AMENDMENTS.md).
 Read it, preferring the copy in the repository's pinned query-builder, and classify against

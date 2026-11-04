@@ -12,7 +12,7 @@ user-invocable: true
 compatibility: >-
   .sqlreview schema 2 (schema 1 remains readable) (docs/specs/2026-09-15-sql-review-plugin-design.md); bash 3.2+, jq >= 1.6,
   git optional.
-allowed-tools: Bash, Read, Glob, Grep, Write, AskUserQuestion
+allowed-tools: Bash, Read, Glob, Grep, Write, AskUserQuestion, Skill
 metadata:
   repo: https://github.com/nq-rdl/agent-extensions
 ---
@@ -28,8 +28,8 @@ The engineer owns technical sources, grain mechanics, keys, timezones, joins and
 the clinical grain unit) as an engineer confirmation. Write it as an `Analyst question:` item
 and route it back to the analyst, who can answer it in a `/data-request:intake` re-run.
 
-For RDL cohort SQL, invoke `/data-request:guardrails` before scoping or reviewing. Apply **Engineer decisions: proceed and flag** in its
-`references/decision-authority.rst`: implement evidenced technical defaults within the agreed task,
+For RDL cohort SQL, invoke `/data-request:guardrails` before scoping or reviewing. Apply **Engineer decisions: proceed and flag** in
+`${CLAUDE_PLUGIN_ROOT}/skills/guardrails/references/decision-authority.rst`: implement evidenced technical defaults within the agreed task,
 flag them for analyst review, and batch only remaining research questions. This does not park the build for analyst approval
 or replace formal engineer confirmation. Deliver requested outputs only; offer extras, do not build them.
 Consult dataops/column-spec evidence; never invent human confirmation.

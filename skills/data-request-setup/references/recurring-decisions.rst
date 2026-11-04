@@ -14,7 +14,8 @@ The list lives in one file: ``assets/recurring-decisions.json`` in this skill (c
 ``skills/data-request-setup/assets/recurring-decisions.json`` in ``nq-rdl/agent-extensions``).
 Do not copy the list into a skill, a project or ``.sqlreview/``; records contain only
 applicable items. Read it through
-the helper beside ``sqlreview.sh`` (``S`` holds the path of the ``scripts`` directory of this skill):
+the helper beside ``sqlreview.sh`` (the shell variable ``S`` holds the path of the ``scripts`` directory of this skill; set it as
+the setup skill shows):
 
 ::
 

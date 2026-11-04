@@ -26,7 +26,7 @@ them to the analyst to consult the requester; engineer technical choices do not
 replace those answers.
 
 Invoke `$data-request:guardrails` first and apply its **Engineer decisions: proceed and flag**
-in `references/decision-authority.rst`. Arguments: `$ARGUMENTS`.
+in `${PLUGIN_ROOT}/skills/guardrails/references/decision-authority.rst`. Arguments: `$ARGUMENTS`.
 Use the requested SQL path, existing SQL, request and any supplied scope. Drafting
 requires no formal scope/review record. Before writing SQL outside the composition
 API, silently publish a lift candidate under the pipeline path, following

@@ -31,9 +31,9 @@ Delegation is optional. Read references/subagent.rst only when delegation is use
 # Data Request — triage (Data Analyst / Data Engineer)
 
 The queue entrypoint decides what to work on next and in what order. Stage skills do the
-work; this skill routes to them without restating procedures. Arguments: `$ARGUMENTS`. Read
-`${PLUGIN_ROOT}/skills/guardrails/SKILL.md` for source hierarchy and **Engineer decisions: proceed and flag**;
-its `references/decision-authority.rst` distinguishes technical defaults from analyst questions and genuine blockers.
+work; this skill routes to them without restating procedures. Arguments: `$ARGUMENTS`. Invoke
+`$data-request:guardrails` for source hierarchy and **Engineer decisions: proceed and flag**;
+`${PLUGIN_ROOT}/skills/guardrails/references/decision-authority.rst` distinguishes technical defaults from analyst questions and genuine blockers.
 
 ## Choose the mode
 
