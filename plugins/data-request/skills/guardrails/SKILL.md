@@ -78,8 +78,8 @@ Before SQL outside the composition API, inspect the actual dependency pin's spec
 resolver and tests. Record a `candidate` in the pipeline's `.sqlreview` lift ledger
 with that pin, inspected paths/revisions, need, shortfall and workaround location.
 Read `${CLAUDE_PLUGIN_ROOT}/skills/setup/references/lifts.rst` for the record and
-publish commands. Capture silently, with no confirmation question mid-draft;
-classification and confirmation belong to `/data-request:lift` at close-out.
+publish commands. Capture the candidate without a confirmation question mid-draft. A candidate is unconfirmed
+evidence, not a decision. Classification and human confirmation belong to `/data-request:lift` at close-out.
 **No published entry means no hand SQL.** A missing source is not proof of a gap.
 The ledger permits a pinned-deadline workaround under this guidance, but does not
 override an explicit repository prohibition. Check the request's dependency pin
