@@ -46,12 +46,16 @@ library issue that would retire it. Treat the epic and every library issue as pu
 Recorded house default
 ----------------------
 
-For ``tuh-facility``, when cohort facility scope is unstated or explicitly TUH, apply
-without asking the engineer or analyst. Read ``list`` and use the exact listed wording
-and rationale as **one item**, with ``upstream: {decision: "tuh-facility", source:
+``tuh-facility`` is a human ruling that is already recorded. You import it and you do not
+decide it. Import it when cohort facility scope is unstated or explicitly TUH, and only if its
+``house_default`` holds ``confirmed_by`` and ``confirmed_at``. If either is missing, do not import
+it. Put one facility-scope question to the engineer instead. Read ``list`` and use the exact
+listed wording and rationale as **one item**, with ``upstream: {decision: "tuh-facility", source:
 "house-default"}``; reuse that item by id through map, bootstrap, draft and review,
 not a separate assumption for each source system or stage. Do not copy the list into
-projects; only the applicable assumption goes into scope/SQL.
+projects; only the applicable assumption goes into scope/SQL. Tell the engineer which item you
+imported, with the recorded decider and date from ``house_default.decided``. The engineer may
+override it before publish. An override gets a normal item and a fresh confirmation.
 
 The ``house_default`` preserves JoshKgh's recorded human confirmation from #436.
 Copy its ``confirmed_by``, ``confirmed_at`` and ``decided`` verbatim. Keep the

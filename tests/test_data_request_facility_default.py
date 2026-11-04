@@ -63,8 +63,9 @@ class HouseDefaultContracts(unittest.TestCase):
             for leaf in ("map", "bootstrap", "draft"):
                 with self.subTest(tree=tree, leaf=leaf):
                     rule = text(tree, leaf)
-                    for token in ("House defaults", "tuh-facility", "upstream", "without asking",
-                                  "one standard assumption", "recurring-decisions.rst"):
+                    for token in ("House defaults", "tuh-facility", "upstream", "confirmed_by",
+                                  "confirmed_at", "may override", "one standard assumption",
+                                  "recurring-decisions.rst"):
                         self.assertIn(token, rule)
 
     def test_alternative_hhs_network_scope_gets_question_instead_of_default(self):
@@ -94,7 +95,8 @@ class HouseDefaultContracts(unittest.TestCase):
         for tree in TREES:
             with self.subTest(tree=tree):
                 rule = text(tree, "setup", "references/recurring-decisions.rst")
-                for token in ("Recorded house default", "tuh-facility", "without asking",
+                for token in ("Recorded house default", "tuh-facility", "human ruling",
+                              "you do not decide it", "may override it before publish",
                               "confirmed_by", "confirmed_at", "confirmed_revision", "decided",
                               "date-only", "not a new engineer confirmation", "exact listed wording",
                               "changed wording", "Human confirmation is still", "upstream",

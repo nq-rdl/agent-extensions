@@ -19,8 +19,10 @@ Return unanswered research choices to the Data Analyst; establish technical
 source, key and join evidence with the engineer.
 
 Invoke `/data-request:guardrails` first and follow its source hierarchy and **House defaults**.
-Apply TUH `00200` without asking when no alternative facility scope is named: reuse
+When no alternative facility scope is named, import the recorded `tuh-facility` ruling for TUH `00200`. You do not decide it.
+Import it only if its `house_default` holds `confirmed_by` and `confirmed_at`. Reuse
 one standard assumption from setup's `tuh-facility` entry with its `upstream` marker.
+Tell the engineer which item you imported, with the recorded decider and date. The engineer may override it.
 Read `${CLAUDE_PLUGIN_ROOT}/skills/setup/references/recurring-decisions.rst` for wording
 and original confirmation; mapping returns the assumption as a proposal/handoff, never initialises a store.
 If the request explicitly changes the cohort's facility set (alternative/HHS/network scope), leave the TUH default out, carry the
