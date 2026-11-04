@@ -193,7 +193,8 @@ sr_body_sha256() { # <file> -> hex digest
   case "$n" in ""|*[!0-9]*) return 1 ;; esac
   tmp="$(mktemp)" || return 1
   if ! tail -n +"$n" "$1" > "$tmp"; then rm -f "$tmp"; return 1; fi
-  sha="$( (sr_sha256 "$tmp") 2>/dev/null )"; rm -f "$tmp"
+  sha="$( (sr_sha256 "$tmp") 2>/dev/null )"
+  rm -f -- "$tmp"
   case "$sha" in [0-9a-f]*) printf '%s\n' "$sha" ;; *) return 1 ;; esac
 }
 # True when both files' bodies are known and equal (a failure on either side counts as a change).

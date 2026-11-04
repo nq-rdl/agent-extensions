@@ -1439,7 +1439,11 @@ cmd_move() {
   fi
   [ "$oldslug" = "$newslug" ] || mv "$SR_REVIEWS/$oldslug" "$SR_REVIEWS/$newslug" || sr_die 2 "move failed"
   [ "$rebind" = 0 ] || touch "$SR_REVIEWS/$newslug/rebind-required" || sr_die 2 "cannot mark stale"
-  rm -f "$SR_REVIEWS/$newslug/review.md" "$SR_REVIEWS/$newslug/scope.md" "$SR_REVIEWS/$newslug/lifts.md" || sr_die 2 "cannot remove stale renders"
+  # Renders are rebuilt from the rebound JSON; only these three fixed names in the slug directory go.
+  (
+    cd "$SR_REVIEWS/$newslug" || exit 2
+    rm -f -- review.md scope.md lifts.md
+  ) || sr_die 2 "cannot remove stale renders"
   for f in review.json scope.json lifts.json questions.json; do
     [ -f "$SR_REVIEWS/$newslug/$f" ] || continue
     tmp="$(mktemp "$SR_REVIEWS/$newslug/.move.XXXXXX")" || sr_die 2 "mktemp failed"

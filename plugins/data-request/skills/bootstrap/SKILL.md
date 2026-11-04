@@ -443,7 +443,8 @@ rules. Known restrictions still apply.
 Re-run comparison after reconciliation. After SQL edits, also re-run fingerprint and the
 SQL-change checks above; changed framing or item wording needs the appropriate reconfirmation.
 Do not publish while a mismatch is unaddressed. If the matches are clean and no header settles
-an open question (including explicitly acknowledged provisional choices), give no warning.
+an open question (including explicitly acknowledged provisional choices),
+there is nothing to report; publish.
 Semantic checking is the agent/source-review obligation, not something `publish` proves.
 
 ```bash

@@ -214,7 +214,8 @@ cmd_check() {
     --stdin) [ $# -eq 1 ] || usage
       tmp="$(mktemp)" || sr_die 2 "mktemp failed"
       cat > "$tmp"
-      rl_check_file "$tmp"; rc=$?; rm -f "$tmp" ;;
+      rl_check_file "$tmp"; rc=$?
+      rm -f -- "$tmp" ;;
     "") usage ;;
     *) [ $# -eq 1 ] || usage
       f="$1"; [ -f "$f" ] || sr_die 2 "no such file: $f"
