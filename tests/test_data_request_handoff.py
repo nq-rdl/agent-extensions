@@ -80,7 +80,10 @@ class HandoffContracts(unittest.TestCase):
                 self.assertNotIn("runs amend after release", opening)
 
     def test_analyst_send_back_is_a_paste_ready_outcome_without_approval(self):
-        explain = text("explain")
+        note = REPO / "skills/data-request-explain/references/send-back-note.rst"
+        explain = text("explain") + " " + " ".join(note.read_text().split())
+        self.assertIn("references/send-back-note.rst", text("explain"))
+        self.assertIn("skills/explain/references/send-back-note.rst", text("release"))
         for token in ("Accept for release preparation", "Send back", "Presentation amendment",
                       "finding:", "expected result:", "route:", "/data-request:fix",
                       "/data-request:amend", "open gates:", "paste-ready", "not acceptance"):

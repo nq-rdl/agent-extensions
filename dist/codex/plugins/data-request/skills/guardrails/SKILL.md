@@ -35,7 +35,7 @@ Read [references/decision-authority.rst](references/decision-authority.rst) for 
 ## House defaults
 
 The cohort is **Townsville University Hospital**, facility string `00200`, unless the request explicitly changes the cohort's facility set to another facility, the whole HHS or a network-wide cohort.
-This house default was confirmed by Data Engineer **JoshKgh** on **2026-09-29** ([#436](https://github.com/nq-rdl/agent-extensions/issues/436)). Apply it without asking; record one upstream-marked assumption, not a new request-specific decision.
+This house default was confirmed by Data Engineer **JoshKgh** on **2026-09-29** ([#436](https://github.com/nq-rdl/agent-extensions/issues/436)). Apply it from that recorded confirmation, without a fresh question; record one upstream-marked assumption, not a new request-specific decision.
 Read [references/sources.rst](references/sources.rst) for HBCIS/ePADT fields, ieMR facility-crosswalk verification and exception routing; setup's recurring-decisions reference owns the wording and recorded confirmation.
 
 ## Confirm sources before using a fact
@@ -80,8 +80,8 @@ Before SQL outside the composition API, inspect the actual dependency pin's spec
 resolver and tests. Record a `candidate` in the pipeline's `.sqlreview` lift ledger
 with that pin, inspected paths/revisions, need, shortfall and workaround location.
 Read `${PLUGIN_ROOT}/skills/setup/references/lifts.rst` for the record and
-publish commands. Capture silently, with no confirmation question mid-draft;
-classification and confirmation belong to `$data-request:lift` at close-out.
+publish commands. Capture it silently; the confirmation question waits for close-out, where
+`$data-request:lift` classifies and confirms it.
 **No published entry means no hand SQL.** A missing source is not proof of a gap.
 The ledger permits a pinned-deadline workaround under this guidance, but does not
 override an explicit repository prohibition. Check the request's dependency pin

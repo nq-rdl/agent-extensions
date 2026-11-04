@@ -146,7 +146,7 @@ Branches, owners and pins
 * List open PRs and branches with their last committer and date. A branch with
   no PR (such as ``enq/9003``) can be someone's work in progress. Name its owner
   and ask; never reuse, rebase or delete it unasked.
-* Read another child's branch without checking it out: ``git show
+* Read another child's branch without a checkout: ``git show
   <ref>:<path>``, ``git ls-tree -r --name-only <ref> -- <dir>``, or a fetch into
   a scratch clone (``git clone --no-checkout``). Never run ``git checkout``,
   ``git switch`` or ``git worktree add`` in a repository the session did not ask

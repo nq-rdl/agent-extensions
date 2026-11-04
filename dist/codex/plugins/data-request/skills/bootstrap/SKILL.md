@@ -5,8 +5,8 @@ description: 'Scope a piece of SQL work with the Data Engineer before the SQL is
   an interview that produces .sqlreview/reviews/<slug>/scope.json and the rendered
   scope.md (intent, inputs, outputs, assumptions, open questions), preserving recorded
   upstream confirmations. Re-running on an existing scope walks through what changed.
-  Use at the start of the Data Request scoping workflow, after $data-request:setup
-  and before $data-request:analyse.'
+  Use first in the Data Request scoping workflow, after $data-request:setup and before
+  $data-request:analyse.'
 compatibility: .sqlreview schema 2 (schema 1 remains readable) (docs/specs/2026-09-15-sql-review-plugin-design.md);
   bash 3.2+, jq >= 1.6, git required for SQL-bound scopes.
 metadata:
@@ -30,9 +30,8 @@ The engineer owns technical sources, grain mechanics, keys, timezones, joins and
 the clinical grain unit) as an engineer confirmation. Write it as an `Analyst question:` item
 and route it back to the analyst, who can answer it in a `$data-request:intake` re-run.
 
-For RDL cohort SQL, read `${PLUGIN_ROOT}/skills/guardrails/SKILL.md` before
-scoping or reviewing. Apply **Engineer decisions: proceed and flag** in its
-`references/decision-authority.rst`: implement evidenced technical defaults within the agreed task,
+For RDL cohort SQL, invoke `$data-request:guardrails` before scoping or reviewing. Apply **Engineer decisions: proceed and flag** in
+`${PLUGIN_ROOT}/skills/guardrails/references/decision-authority.rst`: implement evidenced technical defaults within the agreed task,
 flag them for analyst review, and batch only remaining research questions. This does not park the build for analyst approval
 or replace formal engineer confirmation. Deliver requested outputs only; offer extras, do not build them.
 Consult dataops/column-spec evidence; never invent human confirmation.
@@ -101,7 +100,7 @@ Re-run lint after edits; decision-source warnings require a source check, not a 
 Reworded confirmed items need fresh human confirmation; do not retain their carried
 confirmation or edit the final JSON. Lint cannot grant confirmation.
 
-Apply guardrails **House defaults** without asking: reuse one standard assumption from
+Apply guardrails **House defaults** from their recorded confirmation, without a fresh question: reuse one standard assumption from
 setup's `tuh-facility` entry, with its `upstream` marker and recorded house confirmation
 (see `${PLUGIN_ROOT}/skills/setup/references/recurring-decisions.rst`). Do not ask a fresh facility question.
 If the request explicitly changes the cohort's facility set to another facility, the whole HHS or a network-wide cohort, put one

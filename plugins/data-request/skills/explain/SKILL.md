@@ -11,7 +11,7 @@ argument-hint: '<sql path | slug> [hand-off comment URL]'
 user-invocable: true
 compatibility: >-
   .sqlreview schema 2 (schema 1 remains readable) (docs/specs/2026-09-15-sql-review-plugin-design.md); bash 3.2+, jq >= 1.6.
-allowed-tools: Bash, Read, Glob, Grep, Write, AskUserQuestion
+allowed-tools: Bash, Read, Glob, Grep, Write, AskUserQuestion, Skill
 metadata:
   repo: https://github.com/nq-rdl/agent-extensions
 ---
@@ -22,7 +22,7 @@ The engineer completes `analyse`, the authorised operator run, UAT and the triag
 before the analyst reviews the extract here. The analyst accepts for release preparation,
 sends back or uses `amend`, then prepares and publishes the release. The engineer never releases.
 
-For RDL cohort SQL, read `${CLAUDE_PLUGIN_ROOT}/skills/guardrails/SKILL.md` when
+For RDL cohort SQL, invoke `/data-request:guardrails` when
 explaining storage facts or conversions. Label any conflict with current source
 metadata and return it to `/data-request:analyse`; do not silently rewrite the reviewed record.
 
@@ -170,19 +170,8 @@ before the first release. Logic changes and defects go to the engineer through
 `/data-request:fix`; a disagreement with a review item also requires `analyse --update`.
 Classify each finding; do not make the change or approve new meaning during explanation.
 
-For **Send back**, return this paste-ready note, with one finding block per change:
-
-```text
-outcome: send-back
-run commit: <operator run SHA, or missing>
-finding: <F1: observed issue and affected files>
-expected result: <analyst's requested outcome; mark undecided meaning explicitly>
-classification: <logic or defect | presentation>
-route: </data-request:fix | /data-request:amend>
-evidence: <review item/revision, SQL lines, run QA or output schema; no row-level data>
-open gates: <unanswered decisions, governance restrictions and missing evidence>
-return to review: <refresh analyse, operator-run/UAT evidence and triage hand-off>
-```
+For **Send back**, return the paste-ready note in
+[references/send-back-note.rst](references/send-back-note.rst), with one finding block per change.
 
 Present the note to the analyst; post nothing unless explicitly instructed. Keep
 `explain.json.completed` about the walkthrough only. Preserve review confirmations and
