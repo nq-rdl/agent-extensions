@@ -391,7 +391,7 @@ sr_uncommitted() { # <sql_path>: true when the run's git status lists it
 }
 
 # The next command for one review directory, on one line (#514). Derived only from records that
-# already exist: the state, scope.json and its scope.source.sql binding, the root answers.intake.json
+# already exist: the state, scope.json and its recorded SQL binding (sql_sha256), the root answers.intake.json
 # and explain.json. A bound scope whose SQL body moved on, or whose imported analyst decisions no
 # longer match the sidecar, names bootstrap as the rescope step. Cheap: a few jq and hash calls,
 # because status runs from a SessionStart hook with a 5-second timeout.
