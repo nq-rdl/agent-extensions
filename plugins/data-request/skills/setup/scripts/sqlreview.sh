@@ -746,12 +746,18 @@ cmd_materialize() (
   [ $# -eq 4 ] || usage
   sr_need_jq
   sr_require_root
-  local slug="$1" kind="$2" revision="$3" output doc current work staged=""
+  local slug="$1" kind="$2" revision="$3" output parent doc current work staged=""
   sr_safe_slug "$slug"
   case "$kind" in scope|review) ;; *) usage ;; esac
   case "$revision" in ""|*[!0-9]*|0|0*) sr_die 2 "revision must be a positive integer" ;; esac
   case "$4" in /*) output="$(sr_normpath "$4")" ;; *) sr_die 2 "output must be absolute and outside the git tree" ;; esac
   sr_source_context || exit 2
+  # Resolve the output directory to its physical path: the usual scratch locations are reached
+  # through symlinks (macOS /tmp and /var/folders), and a linked directory could otherwise point
+  # into the repository past a textual check. The file itself must not be a symlink.
+  parent="$(cd "$(dirname "$output")" 2>/dev/null && pwd -P)" || sr_die 2 "output directory does not exist"
+  output="${parent%/}/$(basename "$output")"
+  [ ! -L "$output" ] || sr_die 2 "symlink path refused: $output"
   sr_no_symlinks "$output" || exit 2
   case "$output" in "$SR_SOURCE_TOP"|"$SR_SOURCE_TOP"/*) sr_die 2 "output must be outside the git tree" ;; esac
   [ ! -e "$output" ] || [ -f "$output" ] || sr_die 2 "output is not a regular file"

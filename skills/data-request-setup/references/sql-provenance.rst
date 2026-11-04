@@ -41,7 +41,9 @@ clean tree.
 
 ``materialize SLUG scope|review REVISION OUTPUT`` writes the SQL of that exact
 recorded revision to an absolute temporary path outside the repository. The
-caller deletes it. It reads ``history/<kind>/<revision>.json`` or the matching
+helper resolves the output directory to its physical path, so a symlinked
+``/tmp`` works and a link into the repository is refused. The output file itself
+must not be a symlink. The caller deletes it. It reads ``history/<kind>/<revision>.json`` or the matching
 published record.
 
 Records and history
