@@ -37,7 +37,8 @@ If the analyst chooses **Send back** here, use the paste-ready send-back note in
 `${PLUGIN_ROOT}/skills/explain/references/send-back-note.rst`: logic changes or defects to `fix`, presentation
 changes to `amend` before or after release. Keep unresolved claims `pending` and the current
 candidate record `draft`; do not overwrite a previously approved release record, post the
-note or clear a gate. Refreshed review and operator-run/UAT evidence precede another hand-off.
+note or clear a gate. The note belongs on the deliverable PR, never the child issue or
+service-desk. See *Communication channel* in `${PLUGIN_ROOT}/skills/triage/references/handoff.rst`. Refreshed review and operator-run/UAT evidence precede another hand-off.
 
 For RDL cohort SQL, invoke `$data-request:guardrails` when a claim rests on
 a storage fact or conversion. Worked example:

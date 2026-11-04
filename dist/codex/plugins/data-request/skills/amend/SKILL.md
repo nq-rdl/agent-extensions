@@ -17,6 +17,8 @@ metadata:
 
 ## Codex execution
 
+Before shell examples, set PLUGIN_ROOT to the absolute installed plugin directory: two parent directories above this SKILL.md’s containing skill directory. Derive it from the loaded file path, never the working directory. This variable is not automatically supplied to ordinary shell tools. Quote it in commands.
+
 Here $ARGUMENTS means the user’s supplied skill arguments. Codex does not populate a shell variable for them. Pass arguments with shell quoting that preserves literal text; never evaluate user text as shell code.
 
 # Data Request — amend
@@ -72,7 +74,9 @@ State the result on its own line with the amendment record's values:
 ## 2. Engineer-required: stop and hand off
 
 Make no edit: not to the source, the SQL, the record or the extract. Return this hand-off,
-filled in and ready to paste to the data engineer, and stop:
+filled in and ready to paste on the deliverable PR for the data engineer, and stop. Post nothing
+on the child issue or service-desk. See *Communication channel* in
+`${PLUGIN_ROOT}/skills/triage/references/handoff.rst`:
 
 ```text
 classification: engineer-required
