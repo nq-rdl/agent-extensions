@@ -46,14 +46,15 @@ All reads are read-only:
 * ``data/Released/v*/`` versions and release tags (``git tag --list``).
 * Published releases and their notes, and ``.sqlreview/releases/*/release.json``.
 * ``data/Review/`` pointers.
-* The triage ledger and merged release PRs.
+* The triage ledger and merged release PRs. A ledger stage of ``release`` means that release
+  preparation started or finished. It is not delivery, so it never settles Released on its own.
 * The deliverable PR and the service-desk issue text. Agents read service-desk but never write to it.
 
 Settle the state from those signals:
 
-* **Released.** A released version, a release tag, a published release or a ledger
-  delivery entry settles it. Do not ask.
-* **Unreleased.** No released version, tag, published release or ledger delivery exists.
+* **Released.** A released version, a release tag, a published release or a merged
+  release PR settles it. Do not ask.
+* **Unreleased.** No released version, tag, published release or merged release PR exists.
   No ``data/Review/`` pointer exists, or the text says that its data stayed inside RDL.
   The human, the deliverable PR, the ledger or the service-desk issue says that nothing
   reached the requester. Do not ask.

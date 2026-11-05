@@ -28,6 +28,14 @@ def text(leaf):
 
 
 class HandoffContracts(unittest.TestCase):
+    def test_engineer_gate_and_explain_recheck_do_not_hold_on_open_amend_parts(self):
+        # #534: a handed-off amend part holds the release (exit 11), never the engineer's hand-off.
+        rst = " ".join((REPO / "skills/data-request-triage/references/handoff.rst").read_text().split())
+        self.assertIn('release.sh" evidence --no-amend-hold "<run commit>"', rst)
+        self.assertIn("never exits 11", rst)
+        self.assertIn("amend note:", rst)
+        self.assertIn("`release.sh evidence --no-amend-hold`", text("explain"))
+
     def test_analyse_routes_new_and_unchanged_reviews_to_existing_handoff(self):
         body = text("analyse")
         self.assertIn("## After review: operator run, UAT and analyst hand-off", body)

@@ -242,9 +242,11 @@ Before or after release, write the part states of each split request to
 ```
 
 A `done` part needs the commit that made the change. A `withdrawn` part needs the reason. Write
-the whole file again for each change. When you split a request, also set its triage ledger entry once, with `amend` in
+the whole file again for each change. When you split a request, also set its triage ledger entry, with `amend` in
 `stages_done` and the record path and SHA-256 as its `amend` artifact (`sqlreview.sh ledger set`).
-Reuse the entry if one exists, and put no part text or values in it. If the repository has no `.sqlreview/`, say so: release
+Reuse the entry if one exists, and put no part text or values in it. The record changes for each part,
+so set the entry again after each write of the record, with its new SHA-256, or the ledger reports the
+amend stage as stale. A single-part amendment writes no record: name no record artifact for it. If the repository has no `.sqlreview/`, say so: release
 needs `$data-request:setup` first.
 
 For a released extract, add one entry per amendment, with its classification, to the child's
@@ -332,4 +334,5 @@ PR and the record from step 5. Do not split the request again from the start.
   Do not post the hand-off again. If the comment is missing, draft it again for the human.
 
 Update the record line of each part whose status changed: `done` for a verified `done:` comment, and
-`withdrawn` for a `withdrawn:` comment. Update the part-state record (step 5) in the same way.
+`withdrawn` for a `withdrawn:` comment. Update the part-state record (step 5) in the same way, and
+set the ledger entry again with the new SHA-256 of the record.

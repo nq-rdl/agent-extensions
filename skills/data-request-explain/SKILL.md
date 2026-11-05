@@ -88,8 +88,8 @@ and SQL fingerprint with the review being explained. Read the linked run manifes
 QA, DVC provenance and UAT sections 1 to 3 for that run, plus open questions, flagged decisions,
 requester limitations and known approval restrictions. Read
 `${CLAUDE_PLUGIN_ROOT}/skills/triage/references/handoff.rst`, *Hand-off to review*, and recheck
-its gate, including the committed-review/source-evidence check and `release.sh evidence` at the run
-commit. Recheck any referenced release gates against their current evidence before outcomes.
+its gate, including the committed-review/source-evidence check and `release.sh evidence --no-amend-hold` at the run
+commit, and treat each `amend note:` as an open gate for release, not a failed recheck. Recheck any referenced release gates against their current evidence before outcomes.
 
 If the record, linked evidence or tools are missing, or any identity/revision differs, name
 what is missing or stale and do not offer acceptance. A SQL-only walkthrough and **Send back**

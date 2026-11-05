@@ -1,3 +1,3 @@
 kind: Fixed
-body: 'data-request: release names the send-back note as a shared reference and runs other skills by name, not by their SKILL.md'
+body: 'data-request: release names the send-back note as a shared reference (#534)'
 time: 2026-11-05T16:01:00.000000+10:00

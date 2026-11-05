@@ -47,9 +47,12 @@ Arguments: `$ARGUMENTS` — the release tag or candidate ref (for example `v1.0.
 given, work it out before you ask. Read the release tags (`git tag --list 'v*'`), published
 releases and their notes, `.sqlreview/releases/*/release.json`, the ledger and merged release
 PRs. Guardrails `references/release.rst`, **Release state from evidence**, lists these signals.
-When exactly one tag has no `approved` release record, use it and say so in one line. For
-example: "Candidate v1.1.0: v1.0.0 has an approved record, v1.1.0 has none." Ask only when no
-tag or more than one tag qualifies, and list the candidates in the question.
+Count only the tags that come after the newest tag with an `approved` record (`git tag --list
+'v*' --sort=version:refname`). A tag with no record before that tag is a legacy tag: ignore it.
+When exactly one tag qualifies, use it and say so in one line. For example: "Candidate v1.1.0:
+v1.0.0 has an approved record, v1.1.0 has none." Ask when no tag or more than one tag qualifies,
+and list the candidates in the question. If the analyst names a ref that is not a tag, that
+named ref is the candidate: never replace it with a tag.
 
 ```bash
 S="${CLAUDE_PLUGIN_ROOT}/skills/setup/scripts"
@@ -68,9 +71,10 @@ analyst gives. Read its comments, read-only, for each `amendment hand-off:` comm
 entries. Only a later comment whose first line has one of two forms closes a handed-off part:
 
 - **Completed:** `done: P<n> <commit>`, from the engineer. Set the part to `done` with that commit.
-  The script checks the commit as amend does: `git fetch origin --tags`, then `git rev-parse --verify`
-  to one full SHA, then `git merge-base --is-ancestor <full SHA> <ref>`. Only exit 0 verifies.
-  If the check fails or cannot run, the part stays open. Exit 128 and a failed fetch count as a failed check.
+  The script checks the commit as amend does: it fetches once, then `git rev-parse --verify`
+  gives one full SHA, then `git merge-base --is-ancestor <full SHA> <ref>`. Only exit 0 verifies.
+  If the check fails or cannot run, the part stays open. Exit 128 counts as a failed check. A failed fetch
+  does not decide: a commit that is in this clone and in the ref still verifies.
 - **Withdrawn:** `withdrawn: P<n> <reason>`, from the analyst. Set the part to `withdrawn` with that
   reason. A `withdrawn:` line with no reason leaves the part open.
 
@@ -80,7 +84,9 @@ comment with no record is a blocker: write the record with the part `handed off`
 holds when the ledger shows an `amend` stage and the record file is missing. If you cannot
 read the PR, say so and stop. Never assume that no part is open.
 
-Then run `bash "$S/release.sh" evidence "<ref>"`. Exit 11 means release held: stop before step 1.
+Then run `bash "$S/release.sh" evidence "<ref>"` once and keep its JSON for step 1. Exit 0 and
+exit 10 are not a hold here: go on to step 1, which reads the exit 10 reviews. Exit 2 means the ref
+is unknown: stop and ask for the tag or candidate ref. Exit 11 means release held: stop before step 1.
 Give its stderr in one or two lines, for example "Release held: P3 is handed off and open. Next:
 the engineer comments `done: P3 <commit>` on the PR, or you withdraw it there." Offer to draft
 `withdrawn: P3 <reason>` with the analyst's own reason. Do not draft it without a reason. Post
@@ -99,7 +105,8 @@ branch:
 
 For counts in that evidence, apply guardrails `references/release.rst`, **Probe disclosure control**, before quoting them.
 
-Then list the reviews and whether each describes the release:
+Then list the reviews and whether each describes the release. Step 0 already ran this, so reuse its
+JSON. Run it again only after the ref or an amendment record changed:
 
 ```bash
 bash "$S/release.sh" evidence "<tag>"   # exit 0 every review applies · 10 at least one does not · 11 amend hold · 2 unknown ref
