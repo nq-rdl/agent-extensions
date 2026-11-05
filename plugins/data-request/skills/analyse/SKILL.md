@@ -196,8 +196,8 @@ For a required update, there are no SQL hunks or impact hints to walk. Continue 
 steps 3–4 of *Changed SQL* below: draft the next revision, run `carryforward`, reassess
 items implicated by the grain/evidence change even when their SQL lines are unchanged,
 increment the revision and append to `changes[]`. Then follow *Confirm, write, render*,
-including confirmation/carry gates and publish → snapshot → render. Do not change SQL
-or auto-confirm a new or reworded item to make this update possible.
+including confirmation/carry gates and publish → snapshot → render. Leave the SQL
+unchanged. A new or reworded item needs the engineer's confirmation, which this update cannot supply.
 
 ### Changed SQL: reassess the review
 

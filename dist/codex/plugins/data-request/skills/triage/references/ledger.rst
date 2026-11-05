@@ -10,8 +10,8 @@ Where it lives
 
 In co-development, the default is the selected child's ``.sqlreview/ledger.json``
 on the agreed working branch, one entry per fully qualified service-desk ticket.
-No service-desk write is needed. Once the human agrees work on that child branch,
-use this default without asking them to invent a location. It needs no setup/init.
+No service-desk write is needed. When the human agrees to work on that child branch,
+use this default location. The human does not need to choose one. It needs no setup/init.
 Writing, committing or pushing still stays within the agreed task and branch;
 never write on another owner's branch or move ownership merely to resume.
 If there is no writable agreed branch yet, use the session file instead.

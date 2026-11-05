@@ -112,8 +112,9 @@ class LedgerDefaultLocation(unittest.TestCase):
     def test_default_is_durable_without_inventing_write_authorization(self):
         where = flat(rst_section("ledger.rst", "Where it lives"))
         self.assertIn(".sqlreview/ledger.json", where)
-        self.assertIn("agrees work on that child branch", where)
-        self.assertIn("use this default without asking", where)
+        self.assertIn("agrees to work on that child branch", where)
+        self.assertIn("use this default location", where)
+        self.assertIn("does not need to choose one", where)
         self.assertIn("no writable agreed branch yet, use the session file", where)
         self.assertIn("triage-only mode, return the entries as text", where)
         self.assertIn("save with ``--session``", where)
