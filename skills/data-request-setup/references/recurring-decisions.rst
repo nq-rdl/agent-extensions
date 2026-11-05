@@ -62,8 +62,9 @@ confirmation.
 
 ``list`` checks every ``house_default`` before it prints anything. It exits 4 for the whole list
 when any ``house_default`` lacks a recorded ``confirmed_by``, ``confirmed_at`` or ``decided``
-origin, and it names that entry on stderr. On exit 4 the skill stops and imports nothing. It
-reports the entry id and the failing field, never the values. It asks the engineer to repair the
+origin, and it names that entry on stderr. This refusal applies to every house default, not
+only ``tuh-facility``. ``broad-first-pass`` follows the same path. On exit 4 the skill stops and
+imports nothing. It reports the entry id and the failing field, never the values. It asks the engineer to repair the
 recurring-decisions record and run ``list`` again. If ``tuh-facility`` has no ``house_default`` at
 all, ``list`` still succeeds, but no human ruling is recorded. Import nothing, tell the engineer
 that no recorded ruling exists, and put one facility-scope question.
@@ -118,6 +119,11 @@ A request that applies an exclusion, or an analyst who overrides it for one crit
 keeps the normal row for that criterion and no ``upstream``. Gaining, dropping or changing
 the ``upstream`` of a row needs a fresh confirmation, so the carry helper walks such a row.
 A decision without a ``house_default`` is not imported: bootstrap asks per request.
+
+If ``list`` exits 4, follow the refusal path in *Recorded house default* above. Import no
+row. If ``broad-first-pass`` has no ``house_default`` at all, ``list`` still succeeds, but no
+human ruling is recorded. Import no row, tell the engineer that no recorded ruling exists, and
+give each exclusion an ordinary engineer-confirmed row.
 
 The rule against inventing stands: never invent a confirmer for the entry or its rows, and
 never invent a timestamp or confirmation for ``broad-first-pass`` or any other listed proposal.
