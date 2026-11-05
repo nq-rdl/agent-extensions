@@ -553,7 +553,9 @@ class Canary(unittest.TestCase):
         r = self.run_script(RL, "amend-check", "--stdin", stdin=json.dumps({"schemaVersion": 1, "parts": [
             {"id": "P1", "status": "handed off"}]}))
         self.assertEqual((r.returncode, r.stdout), (0, "ok\n"), r.stderr)
-        self.assertFalse(log.exists(), "amend-check --stdin started mktemp")
+        # The Bash 3.2 test shim makes its own temporary environment file with mktemp, so that call is skipped.
+        calls = [ln for ln in (log.read_text().splitlines() if log.exists() else []) if "b32env" not in ln]
+        self.assertEqual(calls, [], "amend-check --stdin started mktemp")
 
     def test_amend_check_name_option_uses_the_shared_rule(self):
         doc = json.dumps({"schemaVersion": 1, "parts": [{"id": "P1", "status": "handed off"}]})
