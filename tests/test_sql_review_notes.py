@@ -224,6 +224,7 @@ class Notes(unittest.TestCase):
                  ".sqlreview/reviews/reports__monthly/review.json"], p.root)
         self.assertEqual(r.returncode, 0, r.stderr)
         self.assertTrue(all(i["match"] is None for i in json.loads(r.stdout)["assumptions"]))
+        self.assertEqual(list((p.root / ".sqlreview").rglob("*.sql")), [])  # #505: no SQL copies in the store
 
 
 class NotesContract(unittest.TestCase):

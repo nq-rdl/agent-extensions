@@ -380,6 +380,7 @@ class CarryForwardHelper(Base):
         self.assertEqual(set(why), {"A3", "L1"})
         self.assertIn("A3", why["A3"])
         self.assertIn("rationale", why["L1"])
+        self.assertEqual(list((self.p.root / ".sqlreview").rglob("*.sql")), [])  # #505: no SQL copies in the store
 
         # Applying the helper's verdict publishes; carrying a walked item is refused.
         carry = {(c["kind"], c["id"]): c["set"] for c in out["carry"]}
@@ -396,6 +397,7 @@ class CarryForwardHelper(Base):
         self.assertEqual(r.returncode, 4, r.stdout + r.stderr)
         self.assertIn("A1", r.stdout + r.stderr)
         self.publish(doc)
+        self.assertEqual(list((self.p.root / ".sqlreview").rglob("*.sql")), [])  # #505: no SQL copies in the store
 
     def test_unchanged_sql_carries_all_matching_items(self):
         out = self.carryforward("review", self.draft_doc(SQL_V1, by=0))
