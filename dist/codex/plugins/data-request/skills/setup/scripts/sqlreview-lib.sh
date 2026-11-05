@@ -346,29 +346,44 @@ sr_source_workspace() (
   printf '%s\n' "$work"
 )
 
-# SQL paths that git reports as uncommitted (untracked, modified or staged), one per line between
-# newlines. cmd_status sets it once per run with ONE git call, before its loop over the reviews,
-# because analyse's fingerprint refuses uncommitted SQL. Paths are relative to $SR_ROOT. Empty when
-# git or the repository is unavailable: then no review is named as uncommitted.
+# Uncommitted source paths (untracked, modified or staged), one per line between newlines, and
+# their count. Fingerprint and a bound publish refuse ANY uncommitted source in the git tree
+# (sr_source_clean), not only the reviewed SQL, so the next command names a commit first whenever
+# this list is not empty. The exemptions are sr_source_clean's: review records under the store.
+# cmd_status sets both once per run with ONE git call, before its loop over the reviews. Paths are
+# relative to $SR_ROOT (outside it they start ../). Empty when git or the repository is unavailable:
+# then no commit is named.
 SR_NL='
 '
 sr_load_uncommitted() {
   local line p
-  SR_UNCOMMITTED="$SR_NL"
+  SR_UNCOMMITTED="$SR_NL"; SR_UNCOMMITTED_N=0
   command -v git >/dev/null 2>&1 || return 0
   while IFS= read -r line; do
     p="${line#???}"
-    # A quoted path (one with a space) loses its quotes. A path that git escapes does not match.
+    # A quoted path (one with a space) loses its quotes. A path that git escapes does not match
+    # a SQL path, but still counts as an uncommitted source.
     case "$p" in \"*\") p="${p#\"}"; p="${p%\"}" ;; esac
-    [ -z "$p" ] || SR_UNCOMMITTED="$SR_UNCOMMITTED$p$SR_NL"
+    case "$p" in
+      ''|"$SR_DIR"/reviews/*|"$SR_DIR"/releases/*|"$SR_DIR"/templates/*|"$SR_DIR"/ledger.json|"$SR_DIR"/.gitignore) ;;
+      *) SR_UNCOMMITTED="$SR_UNCOMMITTED$p$SR_NL"; SR_UNCOMMITTED_N=$((SR_UNCOMMITTED_N + 1)) ;;
+    esac
   done <<EOF
 $(git --no-optional-locks -C "$SR_ROOT" -c core.quotePath=false -c status.relativePaths=true -c color.status=false \
-    status --short --untracked-files=all --no-renames -- . ":(exclude)$SR_DIR" 2>/dev/null)
+    status --short --untracked-files=all --no-renames -- ':/' 2>/dev/null)
 EOF
 }
 sr_uncommitted() { # <sql_path>: true when the run's git status lists it
   case "${SR_UNCOMMITTED-}" in *"$SR_NL$1$SR_NL"*) return 0 ;; esac
   return 1
+}
+# The commit prerequisite for a step that fingerprints or binds <sql_path>, or nothing.
+sr_commit_first() { # <sql_path>
+  [ "${SR_UNCOMMITTED_N:-0}" -gt 0 ] || return 0
+  if [ -f "$SR_ROOT/$1" ] && sr_uncommitted "$1"; then
+    if [ "$SR_UNCOMMITTED_N" -gt 1 ]; then printf 'commit %s and the other uncommitted source changes (git status), then ' "$1"
+    else printf 'commit %s, then ' "$1"; fi
+  else printf 'commit the uncommitted source changes (git status), then '; fi
 }
 
 # The next command for one review directory, on one line (#514). Derived only from records that
@@ -416,8 +431,9 @@ $( { [ -f "$sidecar" ] && jq -rn --slurpfile s "$scope" --slurpfile i "$sidecar"
 EOF2
     case "$srev" in ''|*[!0-9]*) srev="" ;; esac
   fi
-  # Analyse fingerprints committed SQL only, so uncommitted SQL is committed first.
-  if [ -f "$SR_ROOT/$sql" ] && sr_uncommitted "$sql"; then pre="commit $sql, then "; fi
+  # Analyse fingerprints, and a bound bootstrap publishes, from a clean tree only (sr_source_clean),
+  # so any uncommitted source is committed first.
+  pre="$(sr_commit_first "$sql")"
   if [ -n "$srev" ]; then
     # The scope document's own staleness is the state itself. Under a review, test the scope
     # binding directly: analyse alone never refreshes scope.json. A scope framed before the SQL
@@ -446,7 +462,7 @@ EOF2
       elif [ "$bound" = n ]; then
         printf '%s/data-request:bootstrap %s to bind the scope to the SQL, then /data-request:analyse %s\n' "$pre" "$sql" "$sql"
       else printf '%s/data-request:analyse %s to review the SQL\n' "$pre" "$sql"; fi ;;
-    scoped-header-only) printf '/data-request:bootstrap %s to record the header revision of the scope\n' "$sql" ;;
+    scoped-header-only) printf '%s/data-request:bootstrap %s to record the header revision of the scope\n' "$pre" "$sql" ;;
     stale|no-baseline) printf '%s/data-request:analyse %s --update\n' "$pre" "$sql" ;;
     header-only) printf '%s/data-request:analyse %s to record the header revision of the review\n' "$pre" "$sql" ;;
     current)

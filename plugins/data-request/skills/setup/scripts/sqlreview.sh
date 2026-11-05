@@ -194,7 +194,7 @@ cmd_status() {
   if [ -n "$missing" ] && [ "$json" = 0 ]; then
     printf 'sqlreview: missing bundled template(s): %s; render installs them automatically, or add them now with: sqlreview.sh init --apply %s\n' "$missing" "$missing" >&2
   fi
-  # One git call per run, not one per review: which SQL is not committed yet (sr_next reads it).
+  # One git call per run, not one per review: which sources are not committed yet (sr_next reads it).
   sr_load_uncommitted
   if [ -d "$SR_REVIEWS" ]; then
     for d in "$SR_REVIEWS"/*/; do

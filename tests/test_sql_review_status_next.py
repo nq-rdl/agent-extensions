@@ -4,8 +4,9 @@ The next command comes from existing records only: the state, scope.json and its
 sql_sha256 binding, the root answers.intake.json and explain.json. When a bound scope's
 SQL body, its imported analyst intake or, for the scope that owns them, its research criteria
 changed after the scope, the next command is
-bootstrap, to publish the next scope revision, then analyse. Analyse fingerprints committed SQL
-only, so uncommitted SQL is named for a commit first. Each fixture that expects a committed state
+bootstrap, to publish the next scope revision, then analyse. Analyse fingerprints, and a bound
+bootstrap publishes, only from a tree with no uncommitted source (sr_source_clean), so any
+uncommitted source is named for a commit first. Each fixture that expects a committed state
 commits its SQL.
 """
 
@@ -48,11 +49,21 @@ class StatusNext(unittest.TestCase):
         self.tmp = tempfile.TemporaryDirectory()
         self.addCleanup(self.tmp.cleanup)
         self.p = Project(self.tmp.name)
+        # A real project commits .sqlreview/ (config.json is source); fingerprint refuses it uncommitted.
+        self.p.commit("init .sqlreview")
 
     def status(self):
         r = run(["status", "--json"], self.p.root)
         self.assertEqual(r.returncode, 0, r.stderr)
         return {row["slug"]: row for row in json.loads(r.stdout)["reviews"]}
+
+    def commit_sidecar(self, value):
+        """Write and commit the root answers.intake.json, as intake leaves it for the engineer."""
+        source = self.p.root / "answers.intake.json"
+        source.write_text(value if isinstance(value, str) else json.dumps(value))
+        git(self.p.root, "add", "--", "answers.intake.json")
+        git(self.p.root, "commit", "-q", "-m", "intake")
+        return source
 
     def sql(self, text, rel=SQL, commit=True):
         """Write the SQL and, unless commit is False, commit it, as analyse's fingerprint requires."""
@@ -92,8 +103,8 @@ class StatusNext(unittest.TestCase):
     def review(self):
         self.reviewed(SLUG, SQL)
 
-    def assert_rescope(self, row, why, then):
-        self.assertEqual(row["next"], f"{why} changed after scope revision 3: run /data-request:bootstrap {SQL} "
+    def assert_rescope(self, row, why, then, pre=""):
+        self.assertEqual(row["next"], f"{why} changed after scope revision 3: {pre}run /data-request:bootstrap {SQL} "
                                       f"to publish scope revision 4, then {then}")
 
     # --- scope only -------------------------------------------------------------------------
@@ -218,6 +229,69 @@ class StatusNext(unittest.TestCase):
                                              f"/data-request:bootstrap {SQL} to publish scope revision 4, "
                                              f"then /data-request:analyse {SQL}")
 
+    # Fingerprint and a bound publish refuse any uncommitted source (sr_source_clean), not only the SQL.
+    def test_uncommitted_builder_names_the_commit_before_analyse(self):
+        # The review comment's case: committed SQL and a bound scope, but builder.conf is modified.
+        self.p.sql("builder.conf", "a=1\n")
+        self.sql(SQL_V1)
+        self.scope(SQL_V1)
+        self.assertEqual(self.row()["next"], f"/data-request:analyse {SQL} to review the SQL")
+        self.p.sql("builder.conf", "a=2\n")
+        self.assertEqual(self.row()["next"], "commit the uncommitted source changes (git status), "
+                                             f"then /data-request:analyse {SQL} to review the SQL")
+        r = run(["fingerprint", SQL], self.p.root)  # the step it guards really is refused
+        self.assertEqual(r.returncode, 2, r.stdout)
+        self.assertIn("uncommitted source changes", r.stderr)
+
+    def test_uncommitted_intake_names_the_commit_before_bootstrap(self):
+        self.sql(SQL_V1)
+        source, imported = self.import_intake()
+        self.scope(SQL_V1, assumptions=scope_doc(revision=3)["assumptions"] + imported)
+        source.write_text(json.dumps(sidecar("Include adults aged 16 and over.")))  # not committed
+        self.assert_rescope(self.row(), "The analyst intake", f"/data-request:analyse {SQL}",
+                            pre="commit the uncommitted source changes (git status), then ")
+
+    def test_uncommitted_sql_and_another_source_are_named_together(self):
+        self.p.sql("builder.conf", "a=1\n")  # untracked
+        self.sql(SQL_V1, commit=False)
+        self.scope(sql_sha256=sha(SQL_V1))
+        self.assertEqual(self.row()["next"], f"commit {SQL} and the other uncommitted source changes (git status), "
+                                             f"then /data-request:analyse {SQL} to review the SQL")
+
+    def test_store_records_are_exempt_and_config_json_is_source(self):
+        self.sql(SQL_V1)
+        self.scope(SQL_V1)
+        self.p.commit("record scope")
+        # Review records under the store are exempt, as sr_source_clean exempts them.
+        for rel in ("reviews/x/scope.draft.json", "releases/r.json", "templates/extra.md", "ledger.json"):
+            path = self.p.root / ".sqlreview" / rel
+            path.parent.mkdir(parents=True, exist_ok=True)
+            path.write_text("{}")
+        self.assertEqual(self.row()["next"], f"/data-request:analyse {SQL} to review the SQL")
+        # config.json is source.
+        cfg = self.p.root / ".sqlreview" / "config.json"
+        cfg.write_text(cfg.read_text() + "\n")
+        self.assertTrue(self.row()["next"].startswith("commit the uncommitted source changes (git status), then "))
+
+    def test_uncommitted_source_above_a_nested_project_root_counts(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            top = os.path.realpath(tmp)
+            git(top, "init", "-q")
+            git(top, "config", "user.email", "t@example")
+            git(top, "config", "user.name", "t")
+            sub = os.path.join(top, "request")
+            os.makedirs(sub)
+            self.p = Project(sub, git_repo=False, init=False)
+            r = run(["init"], self.p.root, env={"SQLREVIEW_ROOT": sub})  # not the git top-level
+            self.assertEqual(r.returncode, 0, r.stderr)
+            self.sql(SQL_V1)
+            self.scope(SQL_V1)
+            self.p.commit("nested project")
+            self.assertEqual(self.row()["next"], f"/data-request:analyse {SQL} to review the SQL")
+            with open(os.path.join(top, "pins.txt"), "w") as f:
+                f.write("x\n")
+            self.assertTrue(self.row()["next"].startswith("commit the uncommitted source changes (git status), then "))
+
     def test_outside_a_git_repository_names_analyse_alone(self):
         with tempfile.TemporaryDirectory() as tmp:
             self.p = Project(tmp, git_repo=False)
@@ -289,8 +363,7 @@ class StatusNext(unittest.TestCase):
 
     # --- analyst intake ---------------------------------------------------------------------
     def import_intake(self):
-        source = self.p.root / "answers.intake.json"
-        source.write_text(json.dumps(sidecar()))
+        source = self.commit_sidecar(sidecar())
         r = run(["intake", str(source), "3"], self.p.root)
         self.assertEqual(r.returncode, 0, r.stderr)
         return source, json.loads(r.stdout)["assumptions"]
@@ -300,7 +373,7 @@ class StatusNext(unittest.TestCase):
         source, imported = self.import_intake()
         self.scope(SQL_V1, assumptions=scope_doc(revision=3)["assumptions"] + imported)
         self.assertEqual(self.row()["next"], f"/data-request:analyse {SQL} to review the SQL")
-        source.write_text(json.dumps(sidecar("Include adults aged 16 and over.")))
+        self.commit_sidecar(sidecar("Include adults aged 16 and over."))
         self.assert_rescope(self.row(), "The analyst intake", f"/data-request:analyse {SQL}")
 
     def test_intake_and_sql_changes_are_named_together(self):
@@ -309,14 +382,14 @@ class StatusNext(unittest.TestCase):
         self.scope(SQL_V1, assumptions=scope_doc(revision=3)["assumptions"] + imported)
         self.review()
         self.sql(SQL_V2)
-        source.write_text(json.dumps(sidecar("Include adults aged 16 and over.")))
+        self.commit_sidecar(sidecar("Include adults aged 16 and over."))
         self.assert_rescope(self.row(), "The SQL and the analyst intake", f"/data-request:analyse {SQL} --update")
 
     def test_unreadable_intake_gives_no_signal(self):
         self.sql(SQL_V1)
         source, imported = self.import_intake()
         self.scope(SQL_V1, assumptions=scope_doc(revision=3)["assumptions"] + imported)
-        source.write_text("{not json")
+        self.commit_sidecar("{not json")
         self.assertEqual(self.row()["next"], f"/data-request:analyse {SQL} to review the SQL")
 
     # --- research criteria (schema 2 intake) ------------------------------------------------
@@ -325,7 +398,7 @@ class StatusNext(unittest.TestCase):
         """A bound scope over SQL_V1 that owns the criteria, under a schema 2 sidecar."""
         value = criteria_sidecar()
         value["criteria"] = criteria
-        (self.p.root / "answers.intake.json").write_text(json.dumps(value))
+        self.commit_sidecar(value)
         self.sql(SQL_V1)
         self.scope(SQL_V1, criteria_status=full_status(3) if status is None else status,
                    recorded_at=recorded_at, **over)
@@ -361,7 +434,7 @@ class StatusNext(unittest.TestCase):
         criteria.append(dict(criteria[-1], id="D3", text="Ward at admission"))
         value = criteria_sidecar()
         value["criteria"] = criteria
-        (self.p.root / "answers.intake.json").write_text(json.dumps(value))
+        self.commit_sidecar(value)
         self.assert_rescope(self.row(), "The analyst intake", f"/data-request:analyse {SQL} --update")
 
     def test_criteria_confirmed_before_the_scope_or_without_a_utc_stamp_give_no_signal(self):
