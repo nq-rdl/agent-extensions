@@ -2,7 +2,7 @@
 # release.sh — evidence and record helper for /data-request:release (#407). The skill drafts the
 # researcher-facing release body; this helper answers the questions it must not guess, and checks
 # and renders the analyst's record. It writes no file: the skill writes the record, the guard checks it.
-# Only evidence runs git fetch, once and only when an amendment record exists, before it resolves REF.
+# No command here uses the network. Evidence reads local refs only: fetch before you run it.
 #
 #   evidence [--no-amend-hold] REF [SLUG...]
 #                            does each .sqlreview review apply to the release at REF? JSON
@@ -30,16 +30,16 @@
 #                            "done" (with commit), "handed off" or "withdrawn" (with reason).
 #                            A handed-off part, a done commit that is not verified in REF or a
 #                            malformed record holds the release (exit 11, ids and fields on stderr).
-#                            A done commit is verified as amend's step 2 does: git fetch --tags from
-#                            origin (else the first remote) before REF is resolved, then rev-parse
-#                            --verify to one full SHA, then merge-base --is-ancestor. Only exit 0 of
-#                            the last step verifies. Any other result keeps the part open. The fetch
-#                            is best effort: a failed fetch does not decide, the local check does.
+#                            A done commit is verified against local refs only: rev-parse --verify
+#                            to one full SHA, then merge-base --is-ancestor. Only exit 0 of the last
+#                            step verifies. Any other result keeps the part open, and the next line
+#                            says to fetch the remote and run evidence again. Fetch before evidence,
+#                            because stale local refs hold the release.
 #                            An entry of .sqlreview/ledger.json at the amend stage whose artifact
 #                            names a record file that does not exist holds too. An empty or
 #                            malformed record or ledger holds. --no-amend-hold is for the engineer
-#                            hand-off gate: it fetches nothing, never exits 11 and reports each open
-#                            part, malformed record or missing record on stderr as "amend note:".
+#                            hand-off gate: it never exits 11 and reports each open part,
+#                            malformed record or missing record on stderr as "amend note:".
 #   check FILE | check --stdin
 #                            validate a release record (.sqlreview/releases/<tag>/release.json):
 #                            one violation per line, exit 4; "ok" otherwise. Inside the project,
@@ -377,23 +377,8 @@ $(jq -rs "$RL_AMEND_LEDGER_JQ" "$ledger" 2>/dev/null || printf 'bad\n')
 EOT
 }
 
-# Update the remote refs once, before REF is resolved, so a REF such as origin/main is read after
-# the fetch. Best effort: the remote is origin, else the first remote. No remote, no network, or a
-# refusal to clobber a moved tag leaves the local refs as they are, and the local check decides.
-rl_amend_fetch() {
-  local remote nl='
-'
-  remote="$(git -C "$SR_ROOT" remote 2>/dev/null </dev/null)" || return 0
-  case "$nl$remote$nl" in
-    *"${nl}origin${nl}"*) remote=origin ;;
-    *) remote="${remote%%"$nl"*}" ;;
-  esac
-  [ -n "$remote" ] || return 0
-  GIT_TERMINAL_PROMPT=0 git -C "$SR_ROOT" fetch --quiet --tags "$remote" </dev/null >/dev/null 2>&1 || :
-}
-
-# Verify one done commit as /data-request:amend step 2 does: resolve to one full SHA, then
-# merge-base --is-ancestor. Only exit 0 of the last step verifies the part. Returns 0 verified,
+# Verify one done commit as /data-request:amend step 2 does, against local refs only: resolve to
+# one full SHA, then merge-base --is-ancestor. Only exit 0 of the last step verifies the part. Returns 0 verified,
 # 1 not in the release, 3 not a commit here, 4 check could not run (such as exit 128). stdin is
 # closed so git cannot read the record rows that the caller is looping over.
 rl_amend_verify() { # <commit> <release commit>
@@ -451,17 +436,17 @@ EOT
     printf 'next: the engineer comments done: %s <commit> or the analyst comments withdrawn: %s <reason> on the deliverable PR, then the record is updated\n' "$id" "$id" >&2
   done
   for id in $stale; do
-    printf 'next: %s is done by a commit outside %s: release from a ref that holds the commit, or the engineer comments done: %s <commit> with a commit in the ref\n' "$id" "$ref" "$id" >&2
+    printf 'next: %s is done by a commit outside %s: release from a ref that holds the commit, or the engineer comments done: %s <commit> with a commit in the ref. If the local refs are stale, fetch the remote (for example git fetch --tags <remote>) and run evidence again\n' "$id" "$ref" "$id" "$ref" >&2
   done
   for id in $unver; do
-    printf 'next: check that the commit of %s is in this clone (fetch it from the remote) and is in %s, then run evidence again\n' "$id" "$ref" >&2
+    printf 'next: %s is not verified against local refs: fetch the remote (for example git fetch --tags <remote>) and run evidence again\n' "$id" >&2
   done
   [ -z "$bad" ] || printf '%s\n' "next: correct each record field named above, then run evidence again" >&2
   return 11
 }
 
 cmd_evidence() {
-  local amend=hold any
+  local amend=hold
   if [ "${1:-}" = --no-amend-hold ]; then amend=note; shift; fi
   [ $# -ge 1 ] || usage
   sr_need_jq
@@ -470,12 +455,6 @@ cmd_evidence() {
   shift
   sr_require_root
   case "$ref" in ""|-*) sr_die 2 "unsafe ref: $ref" ;; esac
-  if [ "$amend" = hold ]; then
-    for any in "$SR_ROOT/$SR_DIR"/amendments/*.json; do
-      [ -e "$any" ] && rl_amend_fetch
-      break
-    done
-  fi
   commit="$(git -C "$SR_ROOT" rev-parse --verify --quiet "$ref^{commit}" 2>/dev/null)" ||
     sr_die 2 "unknown ref: $ref (give the release tag or candidate commit)"
   if [ $# -eq 0 ]; then

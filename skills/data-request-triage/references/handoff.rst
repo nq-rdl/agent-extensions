@@ -107,7 +107,7 @@ prepares and publishes the release. Never direct the engineer to release.
    stop for the engineer to complete its unpublished work. Run
    ``bash "$S/release.sh" evidence --no-amend-hold "<run commit>"`` with ``S`` set to the installed
    setup scripts only after these checks pass. The flag stops the engineer's own hand-off from
-   being held by a handed-off amend part: the script then fetches nothing, never exits 11 and
+   being held by a handed-off amend part: the script then never exits 11 and
    prints each open part as an ``amend note:`` on stderr. Name those notes in the hand-off as
    open delivery gates. The release run keeps the strict hold. Any ``changed``, ``missing-at-ref``,
    ``unreviewed``, ``unavailable`` or invalid review, or unproven run provenance

@@ -162,7 +162,8 @@ Before a tag exists, it is the ref that the analyst names, such as the branch to
 none is named, ask the analyst for it.
 
 1. Fetch first, so that both objects exist locally: `git fetch origin --tags`. For a branch,
-   use `origin/<branch>` as the release ref.
+   use `origin/<branch>` as the release ref. The release skill does the same fetch in its step 0,
+   because `release.sh evidence` uses no network.
 2. Resolve the commit to one full SHA: `git rev-parse --verify --quiet <commit>^{commit}`. A short
    SHA that matches several objects, or none, gives no SHA.
 3. Run `git merge-base --is-ancestor <full SHA> <release ref>`. Exit 0 verifies the part. Exit 1
