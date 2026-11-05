@@ -179,7 +179,7 @@ into `sql/v<N>/` first. The commands `notes` and `intake` also accept a file tha
 recipes pass such a render. Every file argument follows the same rules. This covers `check`, `lint`,
 `ledger`, `carryover`, `carryforward`, `remap`, `publish`, `publish-questions`, `intake`,
 `notes --against` and `--questions`, and the file arguments of the release and recurring-decision helpers.
-A refused command exits with code 2, names the rule and the path, and prints no file content.
+A refused command exits with code 2, names the rule only, and prints neither the path nor file content.
 It writes nothing. Do not work around it. Review a copy in a version directory that holds no
 values. `move OLD NEW` still accepts a refused OLD path, because that path is only the key of
 the record and is never read. An existing record can therefore move into a reviewed directory.
