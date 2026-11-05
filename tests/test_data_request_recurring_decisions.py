@@ -569,6 +569,7 @@ class MarkerCompatibility(unittest.TestCase):
         published = json.loads((path.parent / "scope.json").read_text())
         self.assertEqual(published["revision"], 2)
         self.assertEqual(published["assumptions"][0]["upstream"], {"decision": "raw-episode-mrn"})
+        self.assertEqual(list((self.root / ".sqlreview").rglob("*.sql")), [])  # #505: no SQL copies in the store
 
 if __name__ == "__main__":
     unittest.main()

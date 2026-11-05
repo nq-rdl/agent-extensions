@@ -75,5 +75,67 @@ class SourceWorkflows(unittest.TestCase):
         self.assertIn("test_sql_review_sources_bash32.Bash32Sources.test_committed_publish_diff_and_carry", text)
 
 
+# #505 criterion 1, static half: nothing in the data-request tree writes or stages rendered SQL under .sqlreview/.
+STORE = re.compile(r"\.sqlreview|\bSR_DIR\b|\bSR_REVIEWS\b|\$target\b|\breviews/")
+SQL_FILE = re.compile(r"\.sql\b")  # \b keeps ".sqlreview" from matching
+# A file write: a redirection to something other than /dev/null or an fd (2>&1, >&2), or cp/mv/tee/install/ln.
+WRITE_OP = re.compile(r"(?<![\d&>-])>>?(?![&>=])\s*(?!/dev/null)|\b(?:cp|mv|tee|install|ln)\b")
+# Each allow-listed logical line only NAMES legacy SQL paths. It never creates one.
+LEGACY_NAMING = (
+    # `init` writes the store's .gitignore: the line holds the legacy patterns as text, the redirection targets .gitignore.
+    "'/reviews/**/source.sql' '/reviews/**/scope.source.sql' '/reviews/**/history/*.sql'",
+)
+SQL_STORE_ADD = re.compile(r"git\s+add\b[^\n]*\.sqlreview[^\n]*\.sql\b")
+# A line that names a .sql path under .sqlreview/ and tells the reader to write it (a refusal or "never" line is fine).
+SQL_STORE_PATH = re.compile(r"\.sqlreview/\S*\.sql\b|\.sqlreview\b[^\n]{0,60}\.sql\b")
+WRITE_VERB = re.compile(r"\b(?:write|writes|create|creates|save|saves|copy|copies|store|stores|stage|stages|put|cp|mv|tee)\b", re.I)
+REFUSAL = re.compile(r"\b(?:never|nothing|no|not|legacy|refus\w*|den\w+|ignor\w+|without)\b", re.I)
+
+
+def logical_lines(text):
+    """Join backslash continuations and drop comment-only lines."""
+    joined = re.sub(r"\\\n\s*", " ", text)
+    return [l for l in joined.splitlines() if not l.lstrip().startswith("#")]
+
+
+class NoSqlCopiesInStore(unittest.TestCase):
+    def scripts(self):
+        found = sorted((REPO / "skills/data-request-setup/scripts").glob("*.sh")) + sorted((REPO / "hooks").glob("data-request-*.sh"))
+        self.assertTrue(found)
+        return found
+
+    def test_no_script_writes_or_copies_sql_into_the_store(self):
+        for path in self.scripts():
+            for line in logical_lines(path.read_text()):
+                if not (STORE.search(line) and SQL_FILE.search(line) and WRITE_OP.search(line)):
+                    continue
+                with self.subTest(script=path.name, line=line.strip()):
+                    self.assertTrue(any(n in line for n in LEGACY_NAMING), "writes a .sql file into the store")
+
+    def test_the_scan_catches_the_leak_it_guards_against(self):
+        leak = 'cp "$output" .sqlreview/reviews/leak/copy.sql'
+        self.assertTrue(STORE.search(leak) and SQL_FILE.search(leak) and WRITE_OP.search(leak))
+        redirect = 'printf %s "$sql" > "$SR_REVIEWS/$slug/current.sql"'
+        self.assertTrue(STORE.search(redirect) and SQL_FILE.search(redirect) and WRITE_OP.search(redirect))
+        for instruction in ("Write the SQL to .sqlreview/reviews/x/source.sql now", "Save a copy as .sqlreview/reviews/x/a.sql"):
+            self.assertTrue(SQL_STORE_PATH.search(instruction) and WRITE_VERB.search(instruction), instruction)
+            self.assertIsNone(REFUSAL.search(instruction), instruction)
+        self.assertTrue(SQL_STORE_ADD.search("git add .sqlreview/reviews/x/a.sql"))
+        for harmless in ('git show "$c:$p" > "$tmp/old.sql"', 'jq -r .x "$SR_REVIEWS/q/review.json" 2>/dev/null',
+                         'case "$rel" in reviews/*/source.sql) decide deny "legacy" ;;'):
+            self.assertFalse(STORE.search(harmless) and SQL_FILE.search(harmless) and WRITE_OP.search(harmless), harmless)
+
+    def test_no_instruction_adds_or_writes_sql_under_the_store(self):
+        docs = sorted(REPO.glob("skills/data-request-*/SKILL.md")) + sorted(REPO.glob("skills/data-request-*/references/*.rst"))
+        self.assertTrue(docs)
+        for path in docs:
+            text = path.read_text()
+            with self.subTest(doc=str(path.relative_to(REPO))):
+                self.assertIsNone(SQL_STORE_ADD.search(text), "stages SQL under .sqlreview")
+                for line in text.splitlines():
+                    if SQL_STORE_PATH.search(line) and WRITE_VERB.search(line):
+                        self.assertTrue(REFUSAL.search(line), f"tells the reader to write SQL under .sqlreview: {line.strip()}")
+
+
 if __name__ == "__main__":
     unittest.main()

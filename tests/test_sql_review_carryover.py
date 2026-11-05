@@ -58,6 +58,7 @@ class CarryOver(unittest.TestCase):
                          [("A1", "A1", "sql-unchanged"), ("A2", "A2", "sql-unchanged")])
         self.assertEqual(out["carry_over"][0]["rationale"], "Open stays have no discharge date.")
         self.assertEqual([(w["kind"], w["id"]) for w in out["walk"]], [("assumptions", "A3"), ("limitations", "L1")])
+        self.assertEqual(list((self.p.root / ".sqlreview").rglob("*.sql")), [])  # #505: no SQL copies in the store
 
     def test_changed_sql_carries_over_located_items_on_lines_and_intent_items_on_intent(self):
         self.scope()

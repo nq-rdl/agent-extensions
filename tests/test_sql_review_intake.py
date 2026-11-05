@@ -448,6 +448,7 @@ class Intake(unittest.TestCase):
             final = json.loads((draft.parent / "scope.json").read_text())["assumptions"][0]
             self.assertEqual((final["confirmed_revision"], final["carried_from_revision"]), (1, 1))
             self.assertEqual(final["confirmed_by"], "analyst-login")
+            self.assertEqual(list((p.root / ".sqlreview").rglob("*.sql")), [])  # #505: no SQL copies in the store
 
     def test_grain_and_finer_outputs_survive_import_publish_and_carry(self):
         for tree in ("skills/data-request-setup", "plugins/data-request/skills/setup",
