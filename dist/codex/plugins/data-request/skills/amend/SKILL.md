@@ -134,7 +134,10 @@ done: P<n> <commit>
 - **`withdrawn:`** The analyst writes it. The reason is required. A `withdrawn:` line with no
   reason does not close the part.
 - **`done:`** The engineer writes it when the change is merged. The commit must be in the release
-  ref. `$data-request:release` checks this before it continues.
+  ref. Check it yourself before you record `done`: run
+  `git merge-base --is-ancestor <commit> <release ref>`. The release ref is the release tag or
+  candidate ref. If the commit is not an ancestor, or no release ref is named yet, the part stays
+  handed off. Say which check failed.
 
 Any other comment that names the part leaves it open, for example "P3 is still in progress".
 Offer to draft the `withdrawn:` line for the analyst. Post it only when the analyst authorises
@@ -259,16 +262,18 @@ PR and the record from step 5. Do not split the request again from the start.
 
 - **Done part:** do not redo it. Confirm that its record entry and its regenerated SQL are still
   there. If either is missing, report it as a blocker.
-- **Handed-off part, done by the engineer:** a `done: P<n> <commit>` comment closes it. Report
-  it as done by the engineer, with the commit. Do not check or change it here.
+- **Handed-off part, done by the engineer:** a `done: P<n> <commit>` comment closes it only when
+  the commit is in the release ref. Run the check from *Close a handed-off part* (step 2). If it
+  passes, report the part as done by the engineer, with the commit. If it fails, the part stays
+  handed off. Do not change the engineer's work here.
 - **Handed-off part, sent back as analyst-safe:** the engineer may answer the open question and
-  call the part analyst-safe. Then complete it through steps 3 to 6 and cite the reply. A silence
-  or a "probably fine" is not an answer.
+  call the part analyst-safe. Then complete it through steps 3 to 6 and cite the reply. Silence
+  or "probably fine" is not an answer.
 - **Handed-off part, withdrawn by the analyst:** a `withdrawn: P<n> <reason>` comment closes
   it. Report it as withdrawn, with the reason. It no longer blocks the release. Do not complete
   it here.
 - **Any other handed-off part:** it stays handed off, whatever other comments name it.
   Do not post the hand-off again. If the comment is missing, draft it again for the human.
 
-Update the record line of each part whose status changed: `done` for a `done:` comment, and
+Update the record line of each part whose status changed: `done` for a verified `done:` comment, and
 `withdrawn` for a `withdrawn:` comment.

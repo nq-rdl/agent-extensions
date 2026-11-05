@@ -167,6 +167,9 @@ class Content(unittest.TestCase):
         self.assertIn("The reason is required", close)
         self.assertIn("A `withdrawn:` line with no\n  reason does not close the part", close)
         self.assertIn("The commit must be in the release\n  ref", close)
+        # Release does not check this yet, so amend must run the check itself and not claim release does.
+        self.assertIn("git merge-base --is-ancestor <commit> <release ref>", close)
+        self.assertNotIn("/data-request:release", close)
         self.assertIn("Any other comment that names the part leaves it open", close)
         self.assertIn("P3 is still in progress", close)
         self.assertIn("Post it only when the analyst authorises", close)
@@ -186,10 +189,12 @@ class Content(unittest.TestCase):
         self.assertIn("Do not add an entry for a handed-off part or a withdrawn part", self.body)
         self.assertIn('withdrawn: <each withdrawn part: P number and reason, or "none">', self.body)
         resume = flat(self.body.split("## Resume a split request", 1)[1])
-        self.assertIn("a `done: P<n> <commit>` comment closes it", resume)
+        self.assertIn("a `done: P<n> <commit>` comment closes it only when the commit is in the release ref", resume)
+        self.assertIn("Run the check from *Close a handed-off part* (step 2)", resume)
         self.assertIn("a `withdrawn: P<n> <reason>` comment closes it", resume)
         self.assertIn("It no longer blocks the release", resume)
         self.assertIn("it stays handed off, whatever other comments name it", resume)
+        self.assertIn("`done` for a verified `done:` comment", resume)
         self.assertIn("`withdrawn` for a `withdrawn:` comment", resume)
 
     def test_no_interim_workbook_route(self):
