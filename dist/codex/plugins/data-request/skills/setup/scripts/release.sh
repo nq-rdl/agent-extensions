@@ -284,7 +284,9 @@ rl_review_row() ( # <slug> <commit>
     return 0
   fi
   sql="$(jq -r '.sql_path' "$doc")"
-  sr_safe_sql "$sql"
+  # A stored path is read from git at REF, never from the work tree, so a legacy record bound to a path the
+  # input policy now refuses must not block the release: structural check only (#516).
+  sr_safe_path "$sql"
   reviewed="$(jq -r '.sql_sha256 // ""' "$doc")"
   local rc
   tmp="$(sr_source_workspace)" || return 2
@@ -323,7 +325,8 @@ rl_review_row() ( # <slug> <commit>
        fi ;;
   esac
   local question_doc question_rc
-  question_doc="$(bash "$SR_SCRIPT_DIR/sqlreview.sh" questions "$slug" "$kind")" || {
+  # Question evidence reads no SQL: structural path checks only, as status does.
+  question_doc="$(SR_Q_STRUCTURAL=1 bash "$SR_SCRIPT_DIR/sqlreview.sh" questions "$slug" "$kind")" || {
     question_rc=$?
     [ "$question_rc" -eq 4 ] || sr_die 2 "cannot read shared question evidence"
     jq -nc --arg slug "$slug" --arg kind "$kind" \
@@ -530,7 +533,7 @@ rl_scope_current() { # <slug> <commit>
   doc="$(git -C "$SR_ROOT" show "$commit:./$SR_DIR/reviews/$slug/scope.json" 2>/dev/null)" || return 2
   sql="$(printf '%s' "$doc" | jq -r '.sql_path // "" | strings' 2>/dev/null)" || return 2
   full="$(printf '%s' "$doc" | jq -r '.sql_sha256 // "" | strings' 2>/dev/null)" || return 2
-  [ -z "$sql" ] || sr_safe_sql "$sql"
+  [ -z "$sql" ] || sr_safe_path "$sql"
   tmp="$(mktemp -d)" || return 2
   if [ -n "$sql" ] && git -C "$SR_ROOT" show "$commit:./$sql" > "$tmp/sql" 2>/dev/null; then at="$(sr_sha256 "$tmp/sql")"; fi
   if [ "$at" = "$full" ]; then rm -rf "$tmp"; return 0; fi

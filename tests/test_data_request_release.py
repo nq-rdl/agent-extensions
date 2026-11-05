@@ -2498,5 +2498,51 @@ class EvalFixtures(unittest.TestCase):
                 self.assertLess(time.monotonic() - start, 5)
 
 
+@unittest.skipUnless(shutil.which("jq") and shutil.which("git"), "release.sh needs jq and git")
+class LegacyBoundRecord(unittest.TestCase):
+    """A record bound before #516 to pipeline SQL (sql/cohort_pipeline/x.sql) must not block a release.
+
+    evidence and criteria read that SQL from git at the ref, never from the work tree, so only the
+    structural path check applies to a stored path. New input paths keep the policy."""
+
+    LEGACY = "sql/cohort_pipeline/x.sql"
+    LEGACY_SLUG = "sql__cohort_pipeline__x"
+
+    def setUp(self):
+        self.tmp = tempfile.TemporaryDirectory()
+        self.addCleanup(self.tmp.cleanup)
+        self.out = tempfile.TemporaryDirectory()
+        self.addCleanup(self.out.cleanup)
+        self.p = CriteriaProject(self.tmp.name, self.out.name, self)
+        self.p.write(self.LEGACY, SQL_V1)
+        self.p.commit("pipeline sql")
+        self.p.review_commit = git(self.p.root, "rev-parse", "HEAD")
+        self.p.review(SQL_V1, slug=self.LEGACY_SLUG, sql_path=self.LEGACY)
+
+    def test_evidence_does_not_exit_2_for_a_legacy_bound_review(self):
+        self.p.commit("legacy review")
+        self.p.tag("v1.0.0")
+        r = self.p.evidence("v1.0.0")
+        self.assertEqual(r.returncode, 0, r.stderr)
+        rows = {row["slug"]: row for row in json.loads(r.stdout)["reviews"]}
+        self.assertIn(self.LEGACY_SLUG, rows)
+        self.assertEqual(rows[self.LEGACY_SLUG]["applies"], "current")
+        self.assertEqual(rows[SLUG]["applies"], "current")
+
+    def test_criteria_does_not_exit_2_for_a_legacy_bound_scope(self):
+        self.p.sidecar(CRITERIA_V1)
+        self.p.scope(STATUS_V1)
+        doc = json.loads((self.p.root / ".sqlreview/reviews" / SLUG / "scope.json").read_text())
+        (self.p.root / ".sqlreview/reviews" / SLUG / "scope.json").unlink()
+        doc.update(slug=self.LEGACY_SLUG, sql_path=self.LEGACY,
+                   sql_sha256=hashlib.sha256(SQL_V1.encode()).hexdigest())
+        self.p.write(f".sqlreview/reviews/{self.LEGACY_SLUG}/scope.json", json.dumps(doc, indent=2))
+        self.p.commit("legacy scope")
+        self.p.tag("0.1.0")
+        r = self.p.criteria("0.1.0", "--fingerprints", str(self.p.fp))
+        self.assertNotEqual(r.returncode, 2, r.stdout + r.stderr)
+        self.assertEqual(json.loads(r.stdout)["scope"], {"slug": self.LEGACY_SLUG, "revision": 1})
+
+
 if __name__ == "__main__":
     unittest.main()
