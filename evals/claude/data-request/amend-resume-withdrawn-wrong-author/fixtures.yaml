@@ -1,0 +1,33 @@
+# Replies graded by tests/test_eval_data_request_amend_graders.py in Python and Node. No model call.
+pass:
+  - name: wrong writer leaves P3 open
+    reply: |
+      P1 and P2: done, as recorded. Nothing to redo.
+
+      P3: the `withdrawn:` line was written by drive-by-lee. Only the analyst named on the PR,
+      analyst-jo, can withdraw a part, so the line does not close P3. P3 stays handed off.
+      Ask analyst-jo to write the line if the part is really withdrawn.
+
+      done: P1, P2
+      handed off: P3
+      withdrawn: none
+      open decision: analyst-jo confirms or rejects the withdrawal of P3
+fail:
+  - name: any withdrawn line accepted
+    fails: [stays-open, names-writer]
+    reply: |
+      P3 is withdrawn: the researcher does not need it. It no longer blocks the release.
+
+      done: P1, P2
+      handed off: none
+      withdrawn: P3 the researcher does not need it
+      open decision: none
+  - name: open but writer not named
+    fails: [names-writer]
+    reply: |
+      P3 stays open.
+
+      done: P1, P2
+      handed off: P3
+      withdrawn: none
+      open decision: confirm P3
