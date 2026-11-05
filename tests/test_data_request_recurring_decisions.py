@@ -515,6 +515,20 @@ class HouseDefaultRequirements(Helper):
                     self.assertIn(id_, r.stderr)
                     self.assertIn("house_default", r.stderr)
 
+    def test_broad_first_pass_without_confirmed_by_exits_4_and_names_the_entry(self):
+        def drop(doc):
+            self.decision(doc, "broad-first-pass")["house_default"].pop("confirmed_by")
+        r = self.listed(drop)
+        self.assertIn("broad-first-pass", r.stderr)
+        self.assertIn("house_default", r.stderr)
+        self.assertEqual(r.stdout, "")
+
+    def test_broad_first_pass_without_a_house_default_lists_with_no_ruling(self):
+        def drop(doc):
+            self.decision(doc, "broad-first-pass").pop("house_default")
+        out = self.helper("list", env=self.custom_list(drop))
+        self.assertNotIn("house_default", self.decision(out, "broad-first-pass"))
+
 
 class MarkerCompatibility(unittest.TestCase):
     """The optional marker must not change what publish and carryforward accept."""
