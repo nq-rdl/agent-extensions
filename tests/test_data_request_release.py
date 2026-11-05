@@ -1031,6 +1031,52 @@ class AmendGate(unittest.TestCase):
                 self.assertEqual(checked.returncode == 4, name not in ("valid", "kind absent", "withdrawn without a comment"))
                 self.assert_no_leak(checked)
 
+    def status_lines(self):
+        r = run(SQLREVIEW, ["status"], self.p.root)
+        self.assertEqual(r.returncode, 0, r.stderr)
+        self.assertNotIn("LEAK-C", r.stdout + r.stderr)
+        return [ln for ln in r.stdout.splitlines() if ln.startswith("amendment ")]
+
+    def test_status_names_each_record_that_the_hold_refuses(self):
+        # The hold and status read one validator: a record that holds the release (exit 11) has a status line
+        # with its file and field, and a record that passes has none.
+        h = self.head
+        bodies = {
+            "handed off": (json.dumps({"schemaVersion": 1, "parts": [self.part("P1", "handed off")]}), 11),
+            "malformed part": (json.dumps({"schemaVersion": 1, "parts": [self.part("P1", CANARY)]}), 11),
+            "empty parts": (json.dumps({"schemaVersion": 1, "parts": []}), 11),
+            "not JSON": ("{" + CANARY, 11),
+            "empty file": ("", 11),
+            "two documents": ('{"schemaVersion": 1}\n{"schemaVersion": 1}', 11),
+            "closed": (json.dumps({"schemaVersion": 1, "parts": [self.part("P1", "done", commit=h)]}), 0),
+        }
+        for name, (body, code) in bodies.items():
+            with self.subTest(name):
+                self.p.write(self.RECORD, body)
+                self.assertEqual(self.p.evidence("v1.0.0").returncode, code)
+                lines = self.status_lines()
+                self.assertEqual(len(lines) > 0, code == 11, lines)
+                if code == 11:
+                    self.assertTrue(all(ln.startswith("amendment enq9177-falls\t") for ln in lines), lines)
+
+    def test_status_names_a_symlinked_record_that_makes_evidence_fail(self):
+        target = self.p.root / "elsewhere.json"
+        target.write_text(json.dumps({"schemaVersion": 1, "parts": [self.part("P1", "done", commit=self.head)]}))
+        link = self.p.root / self.RECORD
+        link.parent.mkdir(parents=True, exist_ok=True)
+        link.symlink_to(target)
+        self.assertEqual(self.p.evidence("v1.0.0").returncode, 2)
+        self.assertEqual(self.status_lines(), [
+            next(ln for ln in self.status_lines() if "(file): must not be a symbolic link" in ln)])
+
+    def test_a_record_name_that_the_guard_refuses_prints_as_a_placeholder_in_the_hold(self):
+        self.p.write(".sqlreview/amendments/ENQ 9177.json", json.dumps({"schemaVersion": 1, "parts": []}))
+        r = self.p.evidence("v1.0.0")
+        self.assertEqual(r.returncode, 11, r.stderr)
+        self.assertIn("release held: .sqlreview/amendments/(invalid name).json: field parts is missing or invalid",
+                      r.stderr)
+        self.assertNotIn("ENQ 9177", r.stderr)
+
     def ledger(self, stages_done=("intake", "amend"), artifacts=None):
         # The triage ledger's own entry style: the amend stage lists the record as its artifact.
         amend = {"sources": ["pr"], "artifacts": artifacts if artifacts is not None else []}

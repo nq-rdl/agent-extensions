@@ -231,8 +231,8 @@ class ScopeBodyState(unittest.TestCase):
                 for args in (["delta", "q", "scope"], ["delta", "q"], ["impact", "q"]):
                     r = run(args, p.root)
                     self.assertEqual(r.returncode, 6, r.stdout + r.stderr)
-                    self.assertIn("scope q has no SQL binding: run /data-request:bootstrap q.sql "
-                                  "once the SQL exists to bind it", r.stderr)
+                    self.assertIn("scope q has no SQL binding: run /data-request:bootstrap with the reviewed "
+                                  "SQL path once the SQL exists to bind it", r.stderr)
                     self.assertNotIn("lacks clean immutable source evidence", r.stderr)
 
     def test_scope_baseline_symlink_is_not_binding_evidence(self):

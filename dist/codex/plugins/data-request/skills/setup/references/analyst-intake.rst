@@ -198,7 +198,9 @@ and ``analyst_questions``. For a schema 2 sidecar it also returns ``criteria``
 and ``fingerprints``, copied verbatim (``[]`` and ``null`` when the sidecar has
 none); schema 1 output is unchanged. A missing sidecar returns ``present: false`` with
 empty arrays. With a scope draft argument and a missing sidecar, the helper prints
-nothing and exits 0: keep the draft as it is, and do not redirect the output over it. Invalid fields fail with exit 4 without exposing values.
+the draft as it is and exits 0, so the temporary output file that you move over the draft
+holds the draft again. If the draft is not a readable file, the helper exits 4 with a fixed
+line and prints nothing. Invalid fields fail with exit 4 without exposing values.
 
 Imported scope IDs are ``A-intake-<id>``; reserve that prefix. Items are
 assumptions with null SQL location, the analyst's original actor/date, and the

@@ -138,8 +138,10 @@ legacy-encoded slug (`sql__cohort%5Fpipeline__x`). It keeps working as is; the c
 the readable slug (`sql__cohort_pipeline__x`) without marking it stale, then re-render its reports.
 Each `next=` names a commit first when git lists a source that fingerprint refuses: the SQL, a
 builder, configuration or a pin. An amendment record with a handed-off part adds one
-`amendment <request>` line with its part ids and next action. A ledger amendment whose record
-file is missing adds one `record missing` line with the step that writes it.
+`amendment <request>` line for each part, with the part id and its next action. A record that
+fails the amend check (invalid JSON, empty `parts`, a field with the wrong shape, or a symbolic
+link) adds one `invalid` line that names each field and its rule, never a value. A ledger
+amendment whose record file is missing adds one `record missing` line with the step that writes it.
 
 Tell the user the next stage: `/data-request:bootstrap <intended sql path>` before the SQL is
 written, or `/data-request:analyse <sql path>` for SQL that already exists. Suggest committing

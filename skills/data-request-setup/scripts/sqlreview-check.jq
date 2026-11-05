@@ -6,20 +6,21 @@
 include "sqlreview-slug";
 include "sqlreview-identity";
 include "sqlreview-criteria";
+include "sqlreview-noecho";
 def nonempty: type == "string" and length > 0;
 def integer: type == "number" and . >= 1 and . == floor;
 def line_range: type == "array" and length == 2 and all(.[]; integer) and .[0] <= .[1];
 def path_ok: nonempty and (startswith("/") | not) and (split("/") | all(.[]; . != "" and . != "." and . != ".."));
 def release_tag: type == "string" and test("^v?(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)$");
 def req($k): if has($k) then empty else "missing key: \($k)" end;
-# No-echo: a violation names the field and the rule, never a value. An id prints only when it is a
-# well-formed identifier, so free text placed in an id field never reaches the output.
-def safe_id: if type == "string" and test("^[A-Za-z0-9][A-Za-z0-9._-]{0,63}\\z") then . else "(invalid id)" end;
 
 def items($kind; $rev):
   (.[$kind] // []) as $arr
-  | ($arr | map(.id // "") | group_by(.) | map(select(length > 1) | .[0]) | .[] | "duplicate id in \($kind): \(safe_id)"),
-    ($arr[]
+  # An item that is not an object has no fields to check: one finding, and the checks below read the objects only.
+  | ($arr | map(objects)) as $objs
+  | (if ($objs | length) != ($arr | length) then "\($kind): every item must be an object" else empty end),
+    ($objs | map(.id // "") | group_by(.) | map(select(length > 1) | .[0]) | .[] | "duplicate id in \($kind): \(safe_id)"),
+    ($objs[]
       | (if (.id | type) != "string" or .id == "" then "item without id in \($kind)" else empty end),
         (.id | safe_id) as $id
       | (if (.text | nonempty | not) then "\($id): empty text" else empty end),
@@ -38,8 +39,10 @@ def items($kind; $rev):
         # Fresh: confirmed_revision == revision, no carried_from_revision. Carried (#348): an earlier
         # confirmed_revision with carried_from_revision == revision - 1; publish proves the claim
         # against the previous published document, this stateless check validates only the fields.
+        # An invalid revision is reported once, for the document, so it never blames the item.
         (.confirmed_revision as $cr | .carried_from_revision as $cf
-         | if ($cr | integer | not) or ($rev | integer | not) then "\($id): confirmed_revision must be an integer >= 1 that is not above revision — re-confirm for this revision"
+         | if ($cr | integer | not) then "\($id): confirmed_revision must be an integer >= 1 — re-confirm for this revision"
+           elif ($rev | integer | not) then empty
            elif $cr > $rev then "\($id): confirmed_revision \($cr) != revision \($rev) — re-confirm for this revision"
            elif $cr == $rev then (if $cf != null then "\($id): carried_from_revision on an item confirmed at revision \($rev) — remove it, or re-confirm for this revision" else empty end)
            elif $cf == null then "\($id): confirmed_revision \($cr) != revision \($rev) — re-confirm for this revision, or carry it forward with carried_from_revision (sqlreview.sh carryforward)"
@@ -55,7 +58,6 @@ def items($kind; $rev):
            then "\($id): unknown carried_basis"
            else empty end)
     );
-
 
 # Scope criteria_status (the scaffold's criteria design): the shape of the engineer's one state per research criterion.
 # Kind-independent, because this check runs on every write and cannot see the analyst's sidecar:
@@ -106,7 +108,7 @@ def lift_document($rev):
   (if .schemaVersion != 2 then "lifts requires schemaVersion 2" else empty end),
   (if (.recurring | type) != "boolean" then "recurring must be a boolean" else empty end),
   (if (.lifts | type) != "array" then "lifts must be an array" else
-    (.lifts | map(.id) | group_by(.)[] | select(length > 1) | "duplicate lift id: \(.[0] | safe_id)"),
+    (.lifts | map(objects | .id) | group_by(.)[] | select(length > 1) | "duplicate lift id: \(.[0] | safe_id)"),
     (.lifts[] |
       if type != "object" then "lift must be an object" else
       (.id | safe_id) as $id |
@@ -168,7 +170,7 @@ else
     (if has("question_store") and (.question_store != "questions.json" or has("open_questions")) then "question_store must be questions.json, without embedded open_questions" else empty end),
     (if has("open_questions") and ((.open_questions | type) != "array" or (.open_questions | all(.[]; type == "string") | not)) then "open_questions must be an array of strings" else empty end),
     (if has("changes") and ((.changes | type) != "array" or (.changes | all(.[]; type == "object" and (.revision | integer) and (.at | nonempty) and (.by | nonempty) and (.summary | nonempty)) | not)) then "changes must be an array of revision records" else empty end),
-    (if .kind == "review" and ((.purpose | nonempty | not) or (.sql_sha256 | test("^[0-9a-f]{64}$") | not)) then "review requires purpose and SHA256" else empty end),
+    (if .kind == "review" and ((.purpose | nonempty | not) or (.sql_sha256 | (type == "string" and test("^[0-9a-f]{64}$")) | not)) then "review requires purpose and SHA256" else empty end),
     (if .kind == "scope" and (.intent | nonempty | not) then "scope requires intent" else empty end),
     (if .kind == "scope" and .sql_sha256 != null and (.sql_sha256 | (type == "string" and test("^[0-9a-f]{64}$")) | not) then "scope sql_sha256 must be null or a SHA256" else empty end),
     (("sql_body_sha256") as $key | if has($key) and .[$key] != null and (.[$key] | (type == "string" and test("^[0-9a-f]{64}$")) | not) then "\($key) must be null or a SHA256" else empty end),

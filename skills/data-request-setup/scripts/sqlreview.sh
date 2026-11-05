@@ -11,7 +11,9 @@
 #                                              a commit before analyse when git lists the SQL or another source
 #                                              that fingerprint refuses as uncommitted; an open amendment part
 #                                              (.sqlreview/amendments/*.json, "handed off") gets its own line
-#                                              with its part ids and next action, and so does an amendment
+#                                              for each part id with its next action, a record that fails
+#                                              the amend check (release.sh amend-check) gets an invalid line
+#                                              with each field and rule, and so does an amendment
 #                                              in .sqlreview/ledger.json whose record file is missing; an
 #                                              empty project names bootstrap; --verbose: why invalid/missing,
 #                                              and the move that migrates a legacy-encoded slug); exit 3 when not initialised
@@ -45,11 +47,12 @@
 #   materialize SLUG scope|review REVISION OUTPUT  git show + SHA check of that revision into an external file; caller deletes it
 #   snapshot SLUG SQL                          verify the final review against the committed SQL; no SQL writes
 #   delta SLUG [scope|review]                  body binding + full hashes; exit 0 full/header-only, 10 body change, 6 no baseline
-#                                              (a scope with no SQL binding names the bootstrap bind step)
+#                                              (a scope with no SQL binding names the bootstrap bind step, not the path)
 #   carryover SLUG DRAFT                       review draft items matching confirmed, still-valid scope items (JSON)
 #   intake FILE REVISION [DRAFT]              read analyst answers sidecar; optional collision-safe scope draft merge
-#                                              missing FILE is a legacy no-op (with DRAFT it prints nothing);
-#                                              invalid intake exits 4; never writes
+#                                              missing FILE is a legacy no-op (with DRAFT it prints the draft unchanged,
+#                                              or exits 4 when the draft is not a readable file); invalid intake exits 4;
+#                                              never writes
 #   carryforward SLUG scope|review DRAFT       draft items whose previous-revision confirmation may be carried (JSON)
 #   remap SLUG [DRAFT]                         atomically remap unchanged location/logic ranges in a draft (JSON report)
 #                                              default: review.draft.json, else scope.draft.json; seed from published JSON
@@ -182,8 +185,64 @@ cmd_init() {
 }
 
 # ---------------------------------------------------------------------------------------------
+# What holds the release in .sqlreview/amendments (#534): one row for each handed-off part, each record
+# that the shared validator refuses, and each ledger amendment whose record file is missing. Release
+# holds (exit 11) or stops (exit 2) on the same records, so status names them before release is tried.
+# Rows go to $SR_AMEND_ROWS as name TAB kind TAB detail TAB next, and print as text lines unless JSON is on.
+#   open     detail is one part id, and there is one row for each part, as release.sh prints one next line each
+#   invalid  detail is "field: rule; field: rule" from the validator, or a symbolic link refusal, never a value
+#   missing  detail is empty
+# One jq read for each record and one for the ledger, and no other process: status runs from the hook.
+_status_amendments() { # <json 0|1>
+  local json="$1" arec aname akind aid af ac open findings nxt id lline lfile="$SR_ROOT/$SR_DIR/ledger.json"
+  SR_AMEND_ROWS=""
+  for arec in "$SR_ROOT/$SR_DIR"/amendments/*.json; do
+    [ -e "$arec" ] || continue
+    sr_amend_label "$arec"; aname="$SR_AMEND_NAME"
+    open=""; findings=""
+    if sr_no_symlinks "$arec" 2>/dev/null; then
+      while IFS="$SR_TAB" read -r akind aid af ac; do
+        case "$akind" in
+          open) open="${open:+$open }$aid" ;;
+          bad) findings="${findings:+$findings; }$af: $ac" ;;
+        esac
+      done <<EOT
+$(sr_amend_rows "$arec")
+EOT
+    else
+      findings="(file): must not be a symbolic link"
+    fi
+    for id in $open; do
+      nxt="the engineer comments done: $id <commit> or the analyst comments withdrawn: $id <reason> on the deliverable PR, then /data-request:amend updates $SR_DIR/amendments/$aname.json before release"
+      SR_AMEND_ROWS="$SR_AMEND_ROWS$aname${SR_TAB}open$SR_TAB$id$SR_TAB$nxt$SR_NL"
+      [ "$json" = 1 ] || printf 'amendment %s\thanded off: %s\tnext=%s\n' "$aname" "$id" "$nxt"
+    done
+    if [ -n "$findings" ]; then
+      nxt="correct each field named, then /data-request:amend writes the whole record again before release"
+      SR_AMEND_ROWS="$SR_AMEND_ROWS$aname${SR_TAB}invalid$SR_TAB$findings$SR_TAB$nxt$SR_NL"
+      [ "$json" = 1 ] || printf 'amendment %s\tinvalid: %s\tnext=%s\n' "$aname" "$findings" "$nxt"
+    fi
+  done
+  # The ledger shows an amendment but its record file is missing. The filter lists each path once.
+  if [ -f "$lfile" ] && [ ! -L "$lfile" ]; then
+    while IFS= read -r lline; do
+      case "$lline" in
+        path*) aname="${lline#path?}"
+          [ -f "$SR_ROOT/$aname" ] && continue
+          aname="${aname#"$SR_DIR"/amendments/}"; aname="${aname%.json}" ;;
+        *) continue ;;
+      esac
+      SR_AMEND_ROWS="$SR_AMEND_ROWS$aname${SR_TAB}missing$SR_TAB$SR_TAB$SR_AMEND_NEXT$SR_NL"
+      [ "$json" = 1 ] || printf 'amendment %s\trecord missing\tnext=%s\n' "$aname" "$SR_AMEND_NEXT"
+    done <<EOF
+$(jq -rs "$SR_AMEND_LEDGER_JQ" "$lfile" 2>/dev/null)
+EOF
+  fi
+}
+
+# ---------------------------------------------------------------------------------------------
 cmd_status() {
-  local json=0 verbose=0 d slug state reason migrate next schema lifts rows="[]" f missing="" seen=0
+  local json=0 verbose=0 d slug state reason migrate next schema lifts rows="[]" f missing="" seen=0 amend
   while [ $# -gt 0 ]; do
     case "$1" in --json) json=1 ;; --verbose) verbose=1 ;; *) usage ;; esac
     shift
@@ -245,46 +304,8 @@ EOF
       fi
     done
   fi
-  # An open amendment part (#534) holds the release: name each record's handed-off part ids and the
-  # next action on one line. One jq read per record and no other process, because status runs
-  # from the SessionStart hook. Part ids print only as P<n>, and a record name only as amend names it.
-  local arec aname aopen aex akind aid af ac amend=""
-  for arec in "$SR_ROOT/$SR_DIR"/amendments/*.json; do
-    [ -f "$arec" ] && [ ! -L "$arec" ] || continue
-    # The rows are the amend gate's own (SR_AMEND_JQ, shared with release.sh): an open row is a
-    # handed-off part with a valid id. No other value of the record is read.
-    aopen=""
-    while IFS="$SR_TAB" read -r akind aid af ac; do
-      if [ "$akind" = open ]; then aopen="${aopen:+$aopen }$aid"; fi
-    done <<EOT
-$(jq -rs "$SR_AMEND_JQ" "$arec" 2>/dev/null)
-EOT
-    [ -n "$aopen" ] || continue
-    aname="${arec##*/}"; aname="${aname%.json}"
-    case "$aname" in ""|-*|*[!a-z0-9-]*) aname="(invalid name)" ;; esac
-    case "$aopen" in *" "*) aex="P<n>" ;; *) aex="$aopen" ;; esac
-    next="the engineer comments done: $aex <commit> or the analyst comments withdrawn: $aex <reason> on the deliverable PR, then /data-request:amend updates $SR_DIR/amendments/$aname.json before release"
-    amend="$amend$aname$SR_TAB$aopen$SR_TAB$next$SR_NL"
-    [ "$json" = 1 ] || printf 'amendment %s\thanded off: %s\tnext=%s\n' "$aname" "$aopen" "$next"
-  done
-  # The ledger shows an amendment but its record file is missing: release holds on it, so status
-  # names it too. One jq read, and only when a ledger exists. Paths only, never a value.
-  local lline lfile="$SR_ROOT/$SR_DIR/ledger.json"
-  if [ -f "$lfile" ] && [ ! -L "$lfile" ]; then
-    while IFS= read -r lline; do
-      case "$lline" in
-        path*) aname="${lline#path?}"
-          [ -f "$SR_ROOT/$aname" ] && continue
-          aname="${aname#"$SR_DIR"/amendments/}"; aname="${aname%.json}" ;;
-        *) continue ;;
-      esac
-      next="$SR_AMEND_NEXT"
-      amend="$amend$aname${SR_TAB}missing$SR_TAB$next$SR_NL"
-      [ "$json" = 1 ] || printf 'amendment %s\trecord missing\tnext=%s\n' "$aname" "$next"
-    done <<EOF
-$(jq -rs "$SR_AMEND_LEDGER_JQ" "$lfile" 2>/dev/null)
-EOF
-  fi
+  _status_amendments "$json"
+  amend="$SR_AMEND_ROWS"
   # An empty project has one next step: scope the first SQL file.
   next=""
   [ "$seen" = 1 ] || next="/data-request:bootstrap <sql path> to scope the first SQL file"
@@ -292,9 +313,11 @@ EOF
   if [ "$json" = 1 ]; then
     printf '%s' "$rows" | jq --arg root "$SR_ROOT" --arg schema "$schema" --arg missing "$missing" --arg next "$next" --arg amend "$amend" \
       '{root: $root, schemaVersion: ($schema | tonumber? // $schema), reviews: ., next: (if $next == "" then null else $next end),
-        amendments: [$amend | split("\n")[] | select(. != "") | split("\t")
-                     | {record: ".sqlreview/amendments/\(.[0]).json", handed_off: (if .[1] == "missing" then [] else .[1] | split(" ") end), next: .[2]}
-                       + (if .[1] == "missing" then {missing: true} else {} end)],
+        amendments: [$amend | split("\n")[] | select(. != "") | split("\t") | . as [$name, $kind, $detail, $act]
+                     | {record: ".sqlreview/amendments/\($name).json", handed_off: (if $kind == "open" then [$detail] else [] end), next: $act}
+                       + (if $kind == "missing" then {missing: true}
+                          elif $kind == "invalid" then {invalid: ($detail | split("; ") | map(split(": ") | {field: .[0], rule: .[1]}))}
+                          else {} end)],
         counts: (group_by(.state) | map({key: .[0].state, value: length}) | from_entries | . + {total: (map(.) | add // 0)}),
         missing_templates: ($missing | split(" ") | map(select(. != ""))),
         missing_templates_fix: (if $missing == "" then null else "sqlreview.sh init --apply " + $missing end)}'
@@ -943,16 +966,17 @@ _delta_prepare() {
   cmd_check "$doc" >/dev/null || sr_die 4 "invalid document"
   local bound
   IFS="$SR_TAB" read -r SR_SQL_PATH bound <<EOF
-$(jq -r '[(.sql_path // ""), (if .kind == "scope" and .sql_sha256 == null then "unbound" else "bound" end)] | join("\t")' "$doc")
+$(jq -r '[(.sql_path // ""), (if .kind == "scope" and .sql_sha256 == null then "unbound" else "bound" end)] | join("\t")' "$doc" 2>/dev/null)
 EOF
   sr_safe_sql "$SR_SQL_PATH"
   # A scope framed before the SQL existed has no recorded SQL to compare with: name the bind step.
+  # The message names the step, not the path: the path is a document value (no-echo), and the scope has it.
   [ "$bound" = bound ] ||
-    sr_die 6 "scope $slug has no SQL binding: run /data-request:bootstrap $SR_SQL_PATH once the SQL exists to bind it"
+    sr_die 6 "scope $slug has no SQL binding: run /data-request:bootstrap with the reviewed SQL path once the SQL exists to bind it"
   SR_BASE="$work/base.sql"
   SR_CUR="$SR_ROOT/$SR_SQL_PATH"
   [ -f "$SR_CUR" ] || sr_die 2 "the reviewed SQL no longer exists: $SR_SQL_PATH (moved? see: sqlreview.sh move)"
-  sr_source_auth "$(sr_binding_doc "$SR_REVIEWS/$1" "$(jq -r .kind "$doc")" "$doc")" "$SR_BASE" || exit $?
+  sr_source_auth "$(sr_binding_doc "$SR_REVIEWS/$1" "$(jq -r .kind "$doc" 2>/dev/null)" "$doc")" "$SR_BASE" || exit $?
   local binding
   sr_binding "$doc" "$SR_CUR" "$SR_BASE"; binding=$?
   [ "$binding" = 10 ] && { printf 'header-only revision; SQL body unchanged\n'; return 0; }
@@ -1046,9 +1070,16 @@ cmd_intake() {
   sr_need_jq
   case "$2" in ''|*[!0-9]*|0) sr_die 1 "revision must be an integer >= 1" ;; esac
   if [ ! -e "$1" ]; then
-    # A legacy no-op. With DRAFT it prints nothing: the draft stays as it is, and its text is
-    # never echoed (no-echo).
-    [ $# -eq 3 ] && return 0
+    # A legacy no-op. With DRAFT it prints the draft as it is, the same output that the merge gives
+    # when the sidecar adds nothing. It must not print nothing: the documented pattern writes the output
+    # to a temporary file and moves that file over the draft, so an empty output would empty the draft.
+    # The draft is the caller's own file, so printing it echoes no document value. A draft that cannot be
+    # read exits 4 with a fixed line and no output, so the move does not happen.
+    if [ $# -eq 3 ]; then
+      [ -f "$3" ] && [ ! -L "$3" ] || sr_die 4 "cannot merge intake: the draft is not a regular file"
+      cat -- "$3" 2>/dev/null || sr_die 4 "cannot merge intake: the draft cannot be read"
+      return 0
+    fi
     printf '%s\n' '{"present":false,"assumptions":[],"analyst_questions":[]}'
     return 0
   fi
@@ -1641,7 +1672,7 @@ cmd_render() {
   vars="$(jq -c -L "$SR_SCRIPT_DIR" --argjson question_rows "$question_rows" --slurpfile cfgs "$cfg" -f "$SR_SCRIPT_DIR/sqlreview-render.jq" "$doc" 2>/dev/null)" || sr_die 2 "render failed for reviews/$slug/$kind.json"
   rendered="$(jq -r -n --rawfile tpl "$tpl" --argjson vars "$vars" \
     'reduce ($vars | keys[]) as $k ($tpl; gsub("\\{\\{\($k)\\}\\}"; $vars[$k]))' 2>/dev/null)" || sr_die 2 "render failed for reviews/$slug/$kind.json"
-  if jq -e '(.header_revisions // []) | length > 0' "$doc" >/dev/null; then
+  if jq -e '(.header_revisions // []) | length > 0' "$doc" >/dev/null 2>&1; then
     rendered="$rendered
 
 Header revision history: metadata changed without changing its corresponding SQL body; full-file header hashes and timestamps are recorded in $kind.json. Changed assumption text still requires confirmation."

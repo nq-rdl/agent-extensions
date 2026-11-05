@@ -320,7 +320,7 @@ sr_state_reason() { # <slug> <state>
       sql="$(jq -r '.sql_path // "" | strings' "$doc" 2>/dev/null || true)"
       if [ -n "$sql" ]; then
         case "$sql" in /*|*..*) why="$why; unsafe sql_path (not project-relative)" ;; *)
-          [ -f "$SR_ROOT/$sql" ] || why="$why; sql_path target missing: $sql" ;;
+          [ -f "$SR_ROOT/$sql" ] || why="$why; sql_path target missing" ;;
         esac
       fi
       case "$violations" in *"binding mismatch"*)
@@ -529,14 +529,35 @@ end;
 if length == 1 then .[0] | check else bad("(document)"; "must be one JSON document") end'
 
 # The triage ledger shows an amendment when an entry has the amend stage. Emits each recorded
-# amendment record path, or "bad" for a ledger that is empty or has no entries. An amended entry
+# amendment record path once, or "bad" for a ledger that is empty or has no entries. An amended entry
 # that names no record is a single-part amendment, so it adds no row. Paths only, no values. Release
 # holds on a named record that is missing, and status names it, so both read this one definition.
-SR_AMEND_LEDGER_JQ='def rec: type == "string" and test("^\\.sqlreview/amendments/[a-z0-9][a-z0-9-]*\\.json$");
+# Two entries that name one record give one row, so neither reader repeats a line.
+SR_AMEND_LEDGER_JQ='def rec: type == "string" and test("^\\.sqlreview/amendments/[a-z0-9][a-z0-9-]*\\.json\\z");
 def paths:
 if type != "object" or (.entries | type) != "array" then "bad"
-else .entries[] | objects | select(.stage == "amend" or ((.stages_done | arrays | index("amend")) != null))
-  | .stage_evidence.amend.artifacts | arrays | .[] | objects | .path | select(rec) | "path\t" + .
+else [.entries[] | objects | select(.stage == "amend" or ((.stages_done | arrays | index("amend")) != null))
+  | .stage_evidence | objects | .amend | objects | .artifacts | arrays | .[] | objects | .path | select(rec) | "path\t" + .]
+  | unique[]
 end;
 if length == 1 then .[0] | paths else "bad" end'
 SR_AMEND_NEXT='write it from the amendment hand-off comment on the deliverable PR (/data-request:amend step 5)'
+
+# The shape of an amendment record name, in one place: the guard (through amend-check --name), the
+# release hold and status all accept and print a name in this shape only. Lower-case letters, digits
+# and hyphens, with no leading hyphen.
+SR_AMEND_NAME_RULE='the record name must use lower-case letters, digits and hyphens'
+sr_amend_name_ok() { # <name>
+  case "$1" in ""|-*|*[!a-z0-9-]*) return 1 ;; esac
+}
+# The name a record file prints under: its name without .json, or "(invalid name)". Sets SR_AMEND_NAME.
+sr_amend_label() { # <record file path>
+  SR_AMEND_NAME="${1##*/}"; SR_AMEND_NAME="${SR_AMEND_NAME%.json}"
+  sr_amend_name_ok "$SR_AMEND_NAME" || SR_AMEND_NAME="(invalid name)"
+}
+# The validator rows (SR_AMEND_JQ) of one record file, or of standard input when no file is given. A
+# document that jq cannot parse is one fixed bad row, so every reader reports the same finding, and
+# jq error text, which can quote a value, never reaches the output.
+sr_amend_rows() { # [file]
+  jq -rs "$SR_AMEND_JQ" "$@" 2>/dev/null || printf 'bad\t-\t(document)\tnot valid JSON\n'
+}

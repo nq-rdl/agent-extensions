@@ -535,20 +535,92 @@ class StatusAmendment(unittest.TestCase):
         self.assertEqual(j["amendments"], [{"record": f".sqlreview/amendments/{self.REC}.json",
                                             "handed_off": ["P2"], "next": line[0].split("next=", 1)[1]}])
 
-    def test_several_open_parts_use_the_generic_part_form(self):
+    def test_several_open_parts_each_get_a_line_with_their_own_id(self):
+        # release.sh prints one next line for each part id, and status does the same.
         self.record([self.part("P2", "handed off"), self.part("P3", "handed off")])
+        lines = [ln for ln in self.text().splitlines() if ln.startswith("amendment ")]
+        self.assertEqual([ln.split("\t")[1] for ln in lines], ["handed off: P2", "handed off: P3"])
+        for part, line in zip(("P2", "P3"), lines):
+            self.assertIn(f"comments done: {part} <commit> or the analyst comments withdrawn: {part} <reason>", line)
+        self.assertNotIn("P<n>", "".join(lines))
         j = json.loads(run(["status", "--json"], self.p.root).stdout)
-        self.assertEqual(j["amendments"][0]["handed_off"], ["P2", "P3"])
-        self.assertIn("done: P<n> <commit>", j["amendments"][0]["next"])
+        self.assertEqual([a["handed_off"] for a in j["amendments"]], [["P2"], ["P3"]])
+        for part, row in zip(("P2", "P3"), j["amendments"]):
+            self.assertIn(f"done: {part} <commit>", row["next"])
+        self.sql(SQL_V1)
+        self.review()
+        ctx = decision(run_hook(PREFLIGHT, {"cwd": str(self.p.root)}, env_for()))["additionalContext"]
+        self.assertIn(f"(handed off: P2): the engineer comments done: P2 <commit>", ctx)
+        self.assertIn(f"(handed off: P3): the engineer comments done: P3 <commit>", ctx)
 
-    def test_closed_invalid_and_malformed_records_add_no_line(self):
+    def test_closed_records_add_no_line(self):
         self.record([self.part("P1", "done", commit="a" * 40), self.part("P2", "withdrawn", reason="r")])
-        self.record([self.part("LEAK-CANARY", "handed off")], name="enq9178-falls")
-        (self.p.root / ".sqlreview" / "amendments" / "enq9179-falls.json").write_text("{LEAK-CANARY")
         text = self.text()
         self.assertNotIn("amendment ", text)
-        self.assertNotIn("LEAK-C", text)
         self.assertEqual(json.loads(run(["status", "--json"], self.p.root).stdout)["amendments"], [])
+
+    def raw_record(self, body, name):
+        path = self.p.root / ".sqlreview" / "amendments" / f"{name}.json"
+        path.parent.mkdir(exist_ok=True)
+        path.write_text(body)
+        return path
+
+    def test_a_record_that_release_refuses_is_named_with_its_fields_and_rules(self):
+        # Release holds (exit 11) on each of these, so status names the record, the field and the rule.
+        cases = {
+            "enq9178-falls": (json.dumps({"schemaVersion": 1, "parts": [self.part("LEAK-CANARY", "handed off")]}),
+                              "parts[0].id: must be P<n>"),
+            "enq9179-falls": ("{LEAK-CANARY", "(document): not valid JSON"),
+            "enq9180-falls": (json.dumps({"schemaVersion": 1, "parts": []}), "parts: must be a nonempty array"),
+            "enq9181-falls": ("", "(document): must be one JSON document"),
+            "enq9182-falls": (json.dumps({"schemaVersion": 1, "parts": [self.part("P1", "LEAK-CANARY")]}),
+                              "parts[0].status: must be done, handed off or withdrawn"),
+            "enq9183-falls": (json.dumps({"parts": [self.part("P1", "done", commit="a" * 40)]}),
+                              "schemaVersion: must be 1"),
+        }
+        for name, (body, _) in cases.items():
+            self.raw_record(body, name)
+        lines = {ln.split("\t")[0]: ln for ln in self.text().splitlines() if ln.startswith("amendment ")}
+        for name, (_, finding) in cases.items():
+            with self.subTest(name):
+                line = lines[f"amendment {name}"]
+                self.assertIn(f"\tinvalid: ", line)
+                self.assertIn(finding, line)
+                self.assertIn(f"next=correct each field named, then /data-request:amend writes the whole record again", line)
+                self.assertNotIn("LEAK-C", line)
+        j = json.loads(run(["status", "--json"], self.p.root).stdout)
+        row = {a["record"]: a for a in j["amendments"]}[".sqlreview/amendments/enq9178-falls.json"]
+        self.assertEqual(row["handed_off"], [])
+        self.assertEqual(row["invalid"], [{"field": "parts[0].id", "rule": "must be P<n>"}])
+        ctx = decision(run_hook(PREFLIGHT, {"cwd": str(self.p.root)}, env_for()))["additionalContext"]
+        self.assertIn("- next for .sqlreview/amendments/enq9178-falls.json (invalid: parts[0].id must be P<n>): correct", ctx)
+        self.assertNotIn("LEAK-C", ctx)
+
+    def test_a_valid_handed_off_part_and_an_invalid_one_in_one_record_get_both_lines(self):
+        self.record([self.part("P1", "handed off"), self.part("P2", "done")])
+        lines = [ln for ln in self.text().splitlines() if ln.startswith("amendment ")]
+        self.assertEqual([ln.split("\t")[1] for ln in lines],
+                         ["handed off: P1", "invalid: parts[1].commit: required for a done part (a commit hash)"])
+
+    def test_a_symlinked_record_is_named_as_release_refuses_it(self):
+        target = self.p.root / "elsewhere.json"
+        target.write_text(json.dumps({"schemaVersion": 1, "parts": [self.part("P1", "handed off")]}))
+        link = self.p.root / ".sqlreview" / "amendments" / f"{self.REC}.json"
+        link.parent.mkdir(exist_ok=True)
+        link.symlink_to(target)
+        lines = [ln for ln in self.text().splitlines() if ln.startswith("amendment ")]
+        self.assertEqual([ln.split("\t")[:2] for ln in lines],
+                         [[f"amendment {self.REC}", "invalid: (file): must not be a symbolic link"]])
+        # A dangling link is not a record: release skips it, so status does too.
+        link.unlink()
+        link.symlink_to(self.p.root / "no-such-file.json")
+        self.assertNotIn("amendment ", self.text())
+
+    def test_a_record_name_prints_only_in_its_allowed_shape(self):
+        self.raw_record(json.dumps({"schemaVersion": 1, "parts": [self.part("P1", "handed off")]}), "LEAK-CANARY")
+        text = self.text()
+        self.assertIn("amendment (invalid name)\thanded off: P1", text)
+        self.assertNotIn("LEAK-C", text)
 
     def test_the_preflight_hook_names_the_open_part(self):
         self.record([self.part("P2", "handed off")])
@@ -588,6 +660,17 @@ class StatusAmendment(unittest.TestCase):
                                             "next": self.MISSING_NEXT, "missing": True}])
         ctx = decision(run_hook(PREFLIGHT, {"cwd": str(self.p.root)}, env_for()))["additionalContext"]
         self.assertIn(f"- next for .sqlreview/amendments/{self.REC}.json (record missing): {self.MISSING_NEXT}", ctx)
+
+    def test_two_ledger_entries_naming_one_record_give_one_line(self):
+        self.ledger([{"path": f".sqlreview/amendments/{self.REC}.json", "sha256": "0" * 64},
+                     {"path": f".sqlreview/amendments/{self.REC}.json", "sha256": "1" * 64}])
+        store = json.loads((self.p.root / ".sqlreview" / "ledger.json").read_text())
+        store["entries"].append(dict(store["entries"][0], ticket="rdl-service-desk/service-desk#9178"))
+        (self.p.root / ".sqlreview" / "ledger.json").write_text(json.dumps(store))
+        lines = [ln for ln in self.text().splitlines() if ln.startswith("amendment ")]
+        self.assertEqual(lines, [f"amendment {self.REC}\trecord missing\tnext={self.MISSING_NEXT}"])
+        j = json.loads(run(["status", "--json"], self.p.root).stdout)
+        self.assertEqual(len(j["amendments"]), 1)
 
     def test_a_single_part_amendment_names_no_record_and_adds_no_line(self):
         # A single-part amendment writes no record, so release does not hold on it either.

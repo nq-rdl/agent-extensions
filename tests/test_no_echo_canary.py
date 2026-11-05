@@ -158,14 +158,57 @@ class Canary(unittest.TestCase):
         return decision["permissionDecisionReason"]
 
     # --- F-2: a jq failure prints a fixed line ---------------------------------------------------
+    def failing_check_jq(self):
+        """A jq that crashes on the check program and quotes the canary, as a jq runtime error can."""
+        real = shutil.which("jq")
+        (self.bin / "jq").write_text(
+            '#!/bin/sh\ncase "$*" in *sqlreview-check.jq*) echo "jq: error: Cannot index string (\"LEAK-CANARY\")" >&2; exit 5 ;; esac\n'
+            f'exec "{real}" "$@"\n')
+
     def test_check_jq_failure_prints_a_fixed_line(self):
-        r = self.run_script(SR, "check", self.write("d.json", review(sql_sha256=[CANARY])))
+        # The last-resort fallback only: the rules below name the field for every input that used to crash.
+        self.failing_check_jq()
+        r = self.run_script(SR, "check", self.write("d.json", review()))
         self.assertClean(r, 4)
         self.assertEqual(r.stdout.strip(), "check failed to run")
 
+    def test_check_rules_replace_the_jq_crashes(self):
+        # Each document made check crash, so it printed only "check failed to run" and lost the rule.
+        cases = [
+            (review(assumptions=[CANARY, 5, None, {"id": "A1"}]), "assumptions: every item must be an object"),
+            (review(limitations=[[CANARY]]), "limitations: every item must be an object"),
+            (review(sql_sha256=[CANARY]), "review requires purpose and SHA256"),
+            (review(sql_sha256=5), "review requires purpose and SHA256"),
+            (scope(sql_sha256=[CANARY]), "scope sql_sha256 must be null or a SHA256"),
+        ]
+        for doc, rule in cases:
+            with self.subTest(rule=rule):
+                r = self.run_script(SR, "check", self.write("d.json", doc))
+                self.assertClean(r, 4)
+                self.assertIn(rule, r.stdout)
+                self.assertNotIn("check failed to run", r.stdout)
+        lifts = {"schemaVersion": 2, "kind": "lifts", "slug": "q", "sql_path": "q.sql", "revision": 1,
+                 "recurring": False, "lifts": [CANARY, None]}
+        r = self.run_script(SR, "check", self.write("d.json", lifts))
+        self.assertClean(r, 4)
+        self.assertIn("lift must be an object", r.stdout)
+
+    def test_check_does_not_blame_confirmed_revision_for_an_invalid_revision(self):
+        r = self.run_script(SR, "check", self.write("d.json", review(revision=CANARY)))
+        self.assertClean(r, 4)
+        self.assertIn("revision must be an integer >= 1", r.stdout)
+        self.assertNotIn("confirmed_revision", r.stdout)
+        r = self.run_script(SR, "check", self.write("d.json", review(assumptions=[item("A1", confirmed_revision=CANARY)])))
+        self.assertIn("A1: confirmed_revision must be an integer >= 1", r.stdout)
+
     def test_guard_denies_a_failing_check_without_the_value(self):
+        self.failing_check_jq()
         self.assertIn("check failed to run", self.assertDenied(
-            self.guard_write("reviews/q/review.json", review(sql_sha256=[CANARY]))))
+            self.guard_write("reviews/q/review.json", review())))
+
+    def test_guard_names_the_rule_for_a_document_that_used_to_crash_check(self):
+        reason = self.assertDenied(self.guard_write("reviews/q/review.json", review(assumptions=[CANARY])))
+        self.assertIn("assumptions: every item must be an object", reason)
 
     def test_carryover_jq_failure(self):
         self.write(".sqlreview/reviews/q/scope.json", scope())
@@ -217,6 +260,15 @@ class Canary(unittest.TestCase):
                 self.assertClean(r, 0, argv=False)  # argv: status reads --arg values (F-4)
                 self.assertIn("schemaVersion invalid", r.stdout)
 
+    def test_status_reason_names_a_missing_sql_path_target_without_the_value(self):
+        # An invalid document has an unchecked sql_path, so the reason names the field and not the text.
+        self.write(".sqlreview/reviews/q/review.json", review(sql_path=CANARY + " free text", schemaVersion=1, purpose=""))
+        for args in (("status", "--verbose"), ("status", "--json", "--verbose")):
+            with self.subTest(args=args):
+                r = self.run_script(SR, *args)
+                self.assertClean(r, 0, argv=False)
+                self.assertIn("sql_path target missing", r.stdout)
+
     def test_guard_denies_a_bad_status_without_the_value(self):
         reason = self.assertDenied(self.guard_write("reviews/q/review.json",
                                                     review(assumptions=[item("A1", status=CANARY)])))
@@ -225,6 +277,12 @@ class Canary(unittest.TestCase):
     def test_guard_denies_an_explain_identity_without_the_key(self):
         reason = self.assertDenied(self.guard_write("reviews/q/explain.json", {CANARY: {"by": "a@b.org"}}))
         self.assertIn("(key).by: by must be a handle", reason)
+
+    def test_identity_check_prints_no_key_that_ends_in_by(self):
+        # A key like "<text>_by" is a free-text key, so it prints as (key), not as the key.
+        r = self.run_script(SR, "check", self.write("d.json", review(**{CANARY + "_by": "a@b.org"})))
+        self.assertClean(r, 4)
+        self.assertIn("(key): (key) must be a handle", r.stdout)
 
     def test_release_check_claim_and_question_ids(self):
         doc = release_record(claims=[dict(release_record()["claims"][0], id=CANARY)] * 2,
@@ -245,11 +303,40 @@ class Canary(unittest.TestCase):
         doc = release_record(claims=[dict(release_record()["claims"][0], id=CANARY)])
         self.assertIn("claim id must be C<n>", self.assertDenied(self.guard_write("releases/v1.0.0/release.json", doc)))
 
-    # --- F-1: a missing intake sidecar with a DRAFT prints nothing --------------------------------
-    def test_intake_missing_file_never_prints_the_draft(self):
-        r = self.run_script(SR, "intake", self.root / "absent.json", "1", self.write("draft.json", CANARY + "\n"))
-        self.assertClean(r, 0)
-        self.assertEqual(r.stdout, "")
+    # --- F-1: a missing intake sidecar with a DRAFT prints the draft, so a move over it keeps it ---
+    def test_intake_missing_sidecar_with_a_draft_keeps_the_draft_through_the_documented_move(self):
+        draft = self.write("draft.json", json.dumps(scope(intent=CANARY)) + "\n")
+        before = draft.read_bytes()
+        out = self.root / "merged.tmp"
+        # The documented pattern: output to a separate temporary path, then move it over the draft.
+        r = self.run_script(SR, "intake", self.root / "absent.json", "1", draft)
+        self.assertEqual((r.returncode, r.stderr), (0, ""))
+        out.write_text(r.stdout)
+        out.replace(draft)
+        self.assertEqual(draft.read_bytes(), before)
+        self.assertGreater(len(before), 0)
+
+    def test_intake_missing_sidecar_with_an_unreadable_draft_fails_with_a_fixed_line(self):
+        # Exit non-zero, so `> tmp && mv tmp draft` never runs, and no path in the message.
+        r = self.run_script(SR, "intake", self.root / "absent.json", "1", self.root / f"{CANARY}-draft.json")
+        self.assertClean(r, 4, argv=False)
+        self.assertEqual((r.stdout, r.stderr.strip()),
+                         ("", "sqlreview: cannot merge intake: the draft is not a regular file"))
+
+    def test_intake_missing_sidecar_without_a_draft_is_the_legacy_empty_result(self):
+        r = self.run_script(SR, "intake", self.root / "absent.json", "1")
+        self.assertEqual(json.loads(r.stdout), {"present": False, "assumptions": [], "analyst_questions": []})
+
+    def test_delta_on_an_unbound_scope_names_the_step_and_not_the_path(self):
+        # The slug is derived from the path and is the argument of the call, so it may print. The path may not.
+        sql = "zz-dir/zz-hidden.sql"
+        self.write(".sqlreview/reviews/zz-dir__zz-hidden/scope.json", scope(sql_path=sql, slug="zz-dir__zz-hidden"))
+        for args in (("delta", "zz-dir__zz-hidden", "scope"), ("impact", "zz-dir__zz-hidden")):
+            with self.subTest(args=args):
+                r = self.run_script(SR, *args)
+                self.assertEqual(r.returncode, 6, r.stdout + r.stderr)
+                self.assertIn("run /data-request:bootstrap with the reviewed SQL path once the SQL exists to bind it", r.stderr)
+                self.assertNotIn(sql, r.stdout + r.stderr)
 
     # --- F-5: unsafe paths and malformed header lines name no text --------------------------------
     def test_notes_malformed_header_names_the_line_only(self):
@@ -453,6 +540,30 @@ class Canary(unittest.TestCase):
             with self.subTest(body=body[:6]):
                 self.assertClean(self.run_script(RL, "amend-check", "--stdin", stdin=body), 4)
 
+    def test_amend_check_without_a_record_file_names_no_path(self):
+        r = self.run_script(RL, "amend-check", self.root / f"{CANARY}.json")
+        self.assertClean(r, 2, argv=False)
+        self.assertEqual(r.stderr.strip(), "sqlreview: amend-check: the record file does not exist")
+
+    def test_amend_check_reads_standard_input_without_a_temporary_file(self):
+        # A mktemp shim logs each call. The old path copied the record to a temporary file with no trap.
+        log = self.tmp / "mktemp.log"
+        (self.bin / "mktemp").write_text(f'#!/bin/sh\necho "$*" >> "{log}"\nexec "{shutil.which("mktemp")}" "$@"\n')
+        (self.bin / "mktemp").chmod(0o755)
+        r = self.run_script(RL, "amend-check", "--stdin", stdin=json.dumps({"schemaVersion": 1, "parts": [
+            {"id": "P1", "status": "handed off"}]}))
+        self.assertEqual((r.returncode, r.stdout), (0, "ok\n"), r.stderr)
+        self.assertFalse(log.exists(), "amend-check --stdin started mktemp")
+
+    def test_amend_check_name_option_uses_the_shared_rule(self):
+        doc = json.dumps({"schemaVersion": 1, "parts": [{"id": "P1", "status": "handed off"}]})
+        for name, ok in (("enq9187-falls", True), ("ENQ 9187", False), ("-x", False), ("", False), (CANARY, False)):
+            with self.subTest(name=name):
+                r = self.run_script(RL, "amend-check", "--stdin", "--name", name, stdin=doc)
+                self.assertClean(r, 0 if ok else 4, argv=False)
+                if not ok:
+                    self.assertEqual(r.stdout.strip(), "(name): the record name must use lower-case letters, digits and hyphens")
+
     def test_guard_denies_an_amendment_record_without_a_value(self):
         doc = self.amend_project()
         reason = self.assertDenied(self.guard_write("amendments/enq9187-falls.json", doc))
@@ -482,6 +593,7 @@ class Canary(unittest.TestCase):
         for r in self.status_runs():
             self.assertClean(r, 0, argv=False)  # argv: status reads --arg values (F-4)
         text = self.run_script(SR, "status").stdout
+        self.assertIn("amendment enq9187-falls\tinvalid: schemaVersion: must be 1; kind: must be amendment;", text)
         self.assertIn("amendment enq9189-ok\thanded off: P2", text)
         self.assertIn("amendment enq9190-gone\trecord missing", text)
 
