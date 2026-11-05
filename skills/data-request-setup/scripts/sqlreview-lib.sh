@@ -168,7 +168,7 @@ sr_nlink() { # FILE
   printf '%s\n' "$n"
 }
 
-# A render the helper itself wrote (sr_source_show, materialize and the header-evidence check) carries FILE.sqlreview-render
+# A render the helper itself wrote (materialize, the header-evidence check and the release criteria sidecar) carries FILE.sqlreview-render
 # with the file's SHA-256. notes and intake accept an outside-project file only with a matching marker, so a
 # directory or file made by hand under any name is refused. Not a defence against a hostile
 # same-user process, which could write the marker too.

@@ -89,8 +89,8 @@ sr_source_show() { # REF SQL_PATH OUTPUT; copies the committed blob, sets SR_SOU
   ( umask 077; git -C "$SR_SOURCE_TOP" show "$SR_SOURCE_COMMIT:$path" > "$output" ) || {
     sr_source_error "committed SQL blob unavailable"; return 2;
   }
-  # Mark the render as the helper's own, so notes accepts it outside the project (#516).
-  sr_write_render_marker "$output" || { sr_source_error "cannot mark caller output"; return 2; }
+  # No render marker here: callers use this for internal workspace files (evidence, publish, delta, impact).
+  # Only materialize marks its output, and only for a record bound to a reviewed path (#516).
 }
 
 sr_source_auth() { # DOC OUTPUT; status 6 evidence unavailable, 2 operational failure

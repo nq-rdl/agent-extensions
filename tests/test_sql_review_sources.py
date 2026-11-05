@@ -174,25 +174,18 @@ class Sources(unittest.TestCase):
                     self.assertEqual(r.returncode, 2, r.stdout + r.stderr)
                     self.assertTrue(marker.is_symlink())
 
-    def test_source_show_never_writes_through_a_linked_render_marker(self):
+    def test_internal_renders_get_no_marker(self):
+        # sr_source_show feeds evidence, publish, delta and impact workspaces. Only materialize marks its
+        # output, so a committed pipeline file cannot become something notes or intake accepts (#516).
         old = self.committed()
-        repo_file = self.p.root / "keep.txt"
-        original = b"repository bytes\n"
-        repo_file.write_bytes(original)
-        for kind in ("hardlink", "symlink"):
-            with self.subTest(kind=kind), tempfile.TemporaryDirectory() as tmp:
-                target = Path(tmp) / "out.sql"
-                marker = Path(tmp) / "out.sql.sqlreview-render"
-                if kind == "hardlink":
-                    os.link(repo_file, marker)
-                else:
-                    os.symlink(repo_file, marker)
-                env = dict(os.environ, SR_ROOT=str(self.p.root), SR_SCRIPT_DIR=str(SCRIPTS))
-                r = subprocess.run(["bash", "-c", '. "$SR_SCRIPT_DIR/sqlreview-lib.sh"; sr_source_show "$@"',
-                                    "show", old, "sql/v1/request.sql", str(target)],
-                                   cwd=self.p.root, env=env, capture_output=True, text=True)
-                self.assertEqual(repo_file.read_bytes(), original, r.stderr)
-                self.assertEqual(r.returncode, 0 if kind == "hardlink" else 2, r.stderr)
+        with tempfile.TemporaryDirectory() as tmp:
+            target = Path(tmp) / "out.sql"
+            env = dict(os.environ, SR_ROOT=str(self.p.root), SR_SCRIPT_DIR=str(SCRIPTS))
+            r = subprocess.run(["bash", "-c", '. "$SR_SCRIPT_DIR/sqlreview-lib.sh"; sr_source_show "$@"',
+                                "show", old, "sql/v1/request.sql", str(target)],
+                               cwd=self.p.root, env=env, capture_output=True, text=True)
+            self.assertEqual(r.returncode, 0, r.stderr)
+            self.assertEqual(sorted(Path(tmp).iterdir()), [target])
 
     def test_corrupt_hash_is_unavailable_never_current(self):
         draft, doc = self.publish_committed()

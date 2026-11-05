@@ -146,6 +146,11 @@ class PathGuard(unittest.TestCase):
             r = run(["materialize", "sql__v2__q", "review", "1", str(out)], p.root)
             self.assertEqual(r.returncode, 0, r.stderr)
             self.assertEqual(out.read_text(), SQL_V1)
+            # The render of a record bound to a refused path carries no marker, so notes refuses it (#516).
+            self.assertFalse(Path(str(out) + ".sqlreview-render").exists())
+            r = run(["notes", str(out)], p.root)
+            self.assertEqual(r.returncode, 2, r.stdout + r.stderr)
+            self.assertIn("refused", r.stderr)
 
     def test_no_initialised_root_fails_closed_for_notes_and_the_other_file_arguments(self):
         # From a directory with no .sqlreview/ above it, the cwd must not become the project root:

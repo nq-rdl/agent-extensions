@@ -892,7 +892,12 @@ cmd_materialize() (
   [ ! -e "$output" ] || [ -f "$output" ] || sr_die 2 "output is not a regular file"
   mv "$staged" "$output" || sr_die 2 "cannot publish authenticated output"
   staged=""
-  sr_write_render_marker "$output" || sr_die 2 "cannot mark authenticated output"
+  # Mark the output so notes and intake accept it outside the project, but only when the record's own
+  # path passes the full policy: a record bound to pipeline SQL or data/ must not launder it through here.
+  # The record's sql_path is a document value, so a refusal prints nothing.
+  if ( sr_safe_sql "$(jq -r '.sql_path // ""' "$doc")" ) >/dev/null 2>&1; then
+    sr_write_render_marker "$output" || sr_die 2 "cannot mark authenticated output"
+  fi
 )
 
 # Remove a draft only at its canonical path, after the same slug and symlink checks as publish,
@@ -1541,7 +1546,7 @@ _header_decisions() ( # SQL DRAFT intended-human-confirmer parsed-notes
       esac
       if git -C "$root" show "$commit:$source_rel" > "$tmp/sql" 2>/dev/null; then
         # Our own render of a committed blob: mark it so the inner notes accepts it outside the project.
-        sr_sha256 "$tmp/sql" > "$tmp/sql.sqlreview-render" || row_safe=false
+        sr_write_render_marker "$tmp/sql" || row_safe=false
         bash "$SR_SCRIPT_DIR/sqlreview.sh" notes "$tmp/sql" > "$tmp/notes" 2>/dev/null || { printf 'null\n' > "$tmp/notes"; row_safe=false; }
         start="$(sr_body_start "$tmp/sql")" || { start=0; row_safe=false; }
       else

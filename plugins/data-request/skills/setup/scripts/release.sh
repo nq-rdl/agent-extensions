@@ -614,7 +614,7 @@ cmd_criteria() {
     rm -f "$tmp"; sr_die 2 "cannot read answers.intake.json at $tag"
   fi
   # A render of a committed blob, outside the project: mark it so intake accepts it there.
-  if ! sr_sha256 "$tmp" > "$tmp.sqlreview-render"; then
+  if ! sr_write_render_marker "$tmp"; then
     rm -f "$tmp" "$tmp.sqlreview-render"; sr_die 2 "cannot mark answers.intake.json at $tag"
   fi
   if ! intake="$(bash "$SR_SCRIPT_DIR/sqlreview.sh" intake "$tmp" 1 2>/dev/null)"; then
@@ -725,8 +725,10 @@ cmd="${1:-}"
 shift
 # File arguments go through the shared guard (#516): no data/, no unreviewed sql/, nothing outside the project.
 case "$cmd" in
-  check) [ $# -lt 1 ] || [ "$1" = --stdin ] || sr_guard_input "$1" ;;
-  render) [ $# -lt 1 ] || sr_guard_input "$1" ;;
+  # A release record is checked or rendered anywhere (it is not project input), so only data/ and unreviewed
+  # sql/ inside an initialised project are refused, as for amend-check.
+  check) [ $# -lt 1 ] || [ "$1" = --stdin ] || sr_guard_input "$1" outside-ok ;;
+  render) [ $# -lt 1 ] || sr_guard_input "$1" outside-ok ;;
 esac
 case "$cmd" in
   evidence) cmd_evidence "$@" ;;
