@@ -581,6 +581,9 @@ _verify_header_decisions() ( # DOC SQL binding reconfirm-all
   local doc="$1" sql="$2" binding="$3" reconfirm_all="$4" actor notes proof="$1" tmp
   jq -e 'any((.assumptions[], .limitations[]); .carried_basis == "header-decision")' "$doc" >/dev/null || return 0
   [ "$(jq -r .kind "$doc")" = review ] && [ "$reconfirm_all" = false ] || sr_die 4 "header-decision basis requires a review carry-all answer"
+  # publish has already applied the full policy to this record's sql_path. A render of that committed blob in the
+  # private workspace gets a marker, so the inner notes accepts it outside the project (#516).
+  case "$sql" in "$SR_ROOT"/*) ;; *) sr_write_render_marker "$sql" || sr_die 2 "cannot mark header evidence" ;; esac
   if [ "$binding" = 10 ]; then
     # The authenticated body binding permits the old full hash, but notes must inspect
     # current SQL. Refresh only the proof copy, never the published fingerprint/answers.

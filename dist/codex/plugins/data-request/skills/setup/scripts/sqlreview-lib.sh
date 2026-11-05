@@ -234,15 +234,22 @@ sr_refuse_unreviewed() { # ABS_PATH AS_GIVEN [helper-render]
 # (tests/test_sql_review_path_guard.py runs every command on a refused path and fails on an unlisted
 # command). A command that copies or reads the file later does not guard it a second time.
 # MODE is helper-render (accept an outside-project file that carries a helper marker) or outside-ok (accept any
-# file outside the project, but never data/ or unreviewed sql/ inside it). Without an initialised root the
-# project boundary is unknown, so the guard fails closed, except for outside-ok, which has nothing to protect.
+# file outside the project, but never data/ or unreviewed sql/ inside it).
+# Without an initialised .sqlreview/ the project boundary is unknown. The cwd must not be taken as the root
+# for a path that sits under a data or sql directory, so such a path is refused (fail closed). Other paths,
+# such as a scratch file in a temporary directory, are checked against the git top level or the cwd.
 sr_guard_input() { # PATH [helper-render|outside-ok]
+  local low
   if [ -z "${SR_ROOT:-}" ]; then
-    SR_ROOT="$(sr_find_root 2>/dev/null)" || {
+    if ! SR_ROOT="$(sr_find_root 2>/dev/null)"; then
       SR_ROOT=""
-      [ "${2:-}" = outside-ok ] && return 0
-      sr_die 2 "refused path: no initialised $SR_DIR/ project is found from here, so the path cannot be checked (fail closed)"
-    }
+      low="$(printf '/%s/' "$(sr_rawabs "$1")" | tr '[:upper:]' '[:lower:]')"
+      case "$low" in
+        *[[:cntrl:]]*) sr_die 2 "refused path: it contains a control character such as a newline, carriage return or tab (rule: no control characters in paths)" ;;
+        */data/*|*/sql/*) sr_die 2 "refused path: no initialised $SR_DIR/ project is found from here and the path is under a data or sql directory, so it cannot be checked (fail closed)" ;;
+      esac
+      SR_ROOT="$(sr_init_root)"
+    fi
   fi
   sr_refuse_unreviewed "$(sr_rawabs "$1")" "$1" "${2:-}" || exit 2
 }
