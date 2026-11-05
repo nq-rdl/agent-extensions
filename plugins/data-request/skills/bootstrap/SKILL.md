@@ -98,11 +98,9 @@ Re-run lint after edits; decision-source warnings require a source check, not a 
 Reworded confirmed items need fresh human confirmation; do not retain their carried
 confirmation or edit the final JSON. Lint cannot grant confirmation.
 
-Apply guardrails **House defaults**. `tuh-facility` is a recorded human ruling. You import it and you do not decide it.
-Import it only when its `house_default` holds `confirmed_by` and `confirmed_at`. If either is missing, put one facility-scope
-question instead. Reuse one standard assumption from setup's `tuh-facility` entry, with its `upstream` marker and recorded house
-confirmation (see `${CLAUDE_PLUGIN_ROOT}/skills/setup/references/recurring-decisions.rst`). Tell the engineer which item you
-imported, with the recorded decider and date. The engineer may override it before publish. Do not ask a fresh facility question.
+Apply guardrails **House defaults**: import the recorded `tuh-facility` ruling without a fresh question, as one standard
+assumption with its `upstream` marker. Tell the engineer which item you imported. The engineer may override it before publish.
+Setup's `${CLAUDE_PLUGIN_ROOT}/skills/setup/references/recurring-decisions.rst` holds the full rule, including the refusal path when `list` exits 4.
 If the request explicitly changes the cohort's facility set to another facility, the whole HHS or a network-wide cohort, put one
 `Analyst question:` about the facility set instead of the TUH default; do not apply or carry it.
 Reuse an already answered intake/scope exception; do not ask it again or intersect it with TUH.

@@ -63,10 +63,20 @@ class HouseDefaultContracts(unittest.TestCase):
             for leaf in ("map", "bootstrap", "draft"):
                 with self.subTest(tree=tree, leaf=leaf):
                     rule = text(tree, leaf)
-                    for token in ("House defaults", "tuh-facility", "upstream", "confirmed_by",
-                                  "confirmed_at", "may override", "one standard assumption",
-                                  "recurring-decisions.rst"):
+                    for token in ("House defaults", "tuh-facility", "upstream", "one standard assumption"):
                         self.assertIn(token, rule)
+
+    def test_every_stage_states_the_import_rule_and_cites_the_reference(self):
+        for tree in TREES:
+            for leaf in ("bootstrap", "draft", "map", "guardrails", "triage"):
+                with self.subTest(tree=tree, leaf=leaf):
+                    rule = text(tree, leaf)
+                    self.assertIn("skills/setup/references/recurring-decisions.rst", rule)
+                    lower = rule.lower()
+                    self.assertIn("without a fresh question", lower)
+                    self.assertIn("tell the engineer", lower)
+                    self.assertIn("override", lower)
+                    self.assertNotIn("put one facility-scope question instead", rule)
 
     def test_alternative_hhs_network_scope_gets_question_instead_of_default(self):
         for tree in TREES:
@@ -96,7 +106,9 @@ class HouseDefaultContracts(unittest.TestCase):
             with self.subTest(tree=tree):
                 rule = text(tree, "setup", "references/recurring-decisions.rst")
                 for token in ("Recorded house default", "tuh-facility", "human ruling",
-                              "you do not decide it", "may override it before publish",
+                              "you do not decide it", "without a fresh question",
+                              "Telling the engineer is not a question", "may override it before publish",
+                              "exits 4", "never the values", "no recorded ruling",
                               "confirmed_by", "confirmed_at", "confirmed_revision", "decided",
                               "date-only", "not a new engineer confirmation", "exact listed wording",
                               "changed wording", "Human confirmation is still", "upstream",

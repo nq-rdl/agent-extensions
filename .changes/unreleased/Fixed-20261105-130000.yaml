@@ -1,3 +1,3 @@
 kind: Fixed
-body: Data-request skills state the remaining human checkpoints positively, so a scanner no longer reads them as skipped
+body: 'data-request guardrails treat a captured lift candidate as unconfirmed evidence, not a decision'
 time: 2026-11-05T13:00:00.000000000Z
