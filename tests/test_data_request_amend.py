@@ -209,7 +209,7 @@ class Content(unittest.TestCase):
 
     def test_a_done_commit_is_fetched_resolved_and_checked_by_exit_code(self):
         close = flat(self.body.split("### Close a handed-off part", 1)[1].split("## 3.", 1)[0])
-        steps = [close.index(s) for s in ("git fetch origin --tags",
+        steps = [close.index(s) for s in ("fetch-command",
                                           "git rev-parse --verify --quiet <commit>^{commit}",
                                           "git merge-base --is-ancestor <full SHA> <release ref>")]
         self.assertEqual(steps, sorted(steps), "fetch, then resolve, then ancestry")
@@ -218,7 +218,8 @@ class Content(unittest.TestCase):
         self.assertIn("Exit 1 means the commit is not in the release ref", close)
         self.assertIn("Any other exit, such as 128 for an unknown object or ref, means not verified", close)
         self.assertIn("If a step fails, the part stays handed off", close)
-        self.assertIn("use `origin/<branch>` as the release ref", close)
+        self.assertIn("name a remote-tracking ref such as `origin/<branch>` or a tag as the release ref", close)
+        self.assertNotIn("git fetch origin", close)
 
     def test_the_release_ref_is_never_left_undefined(self):
         close = flat(self.body.split("### Close a handed-off part", 1)[1].split("## 3.", 1)[0])

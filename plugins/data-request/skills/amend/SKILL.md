@@ -158,8 +158,12 @@ Check a `done:` commit yourself before you record `done`. The release ref is the
 Before a tag exists, it is the ref that the analyst names, such as the branch to be released. If
 none is named, ask the analyst for it.
 
-1. Fetch first, so that both objects exist locally: `git fetch origin --tags`. For a branch,
-   use `origin/<branch>` as the release ref.
+1. Fetch first, so that both objects exist locally. Run the command that
+   `bash "${CLAUDE_PLUGIN_ROOT}/skills/setup/scripts/release.sh" fetch-command` prints. It has the form
+   `git -C '<project root>' fetch --tags <remote>`. It is the same
+   fetch as step 0 of the release skill, because `release.sh evidence` uses no network. A failed
+   fetch does not decide: report it, then run the checks below. A fetch does not update a local
+   branch, so name a remote-tracking ref such as `origin/<branch>` or a tag as the release ref.
 2. Resolve the commit to one full SHA: `git rev-parse --verify --quiet <commit>^{commit}`. A short
    SHA that matches several objects, or none, gives no SHA.
 3. Run `git merge-base --is-ancestor <full SHA> <release ref>`. Exit 0 verifies the part. Exit 1
