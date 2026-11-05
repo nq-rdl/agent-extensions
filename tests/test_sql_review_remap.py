@@ -90,6 +90,7 @@ class Remap(unittest.TestCase):
         self.draft.write_text(json.dumps(doc))
         r = run(["publish", "q", "review", str(self.draft)], self.p.root)
         self.assertEqual(r.returncode, 0, r.stdout + r.stderr)
+        self.assertEqual(list((self.p.root / ".sqlreview").rglob("*.sql")), [])  # #505: no SQL copies in the store
 
     def test_body_only_and_mixed_changes_leave_changed_ranges_untouched(self):
         for header in ("", "-- new header\n-- more header\n"):

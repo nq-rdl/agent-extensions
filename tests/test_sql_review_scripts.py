@@ -427,6 +427,7 @@ class Move(unittest.TestCase):
                 self.assertEqual((j["sql_path"], j["slug"]), ("archive/monthly.sql", "archive__monthly"))
             self.assertEqual(run(["delta", "archive__monthly"], p.root).returncode, 10)
             self.assertEqual(run(["move", "nope.sql", "x.sql"], p.root).returncode, 2)
+            self.assertEqual(list((p.root / ".sqlreview").rglob("*.sql")), [])  # #505: no SQL copies in the store
 
 
 class Render(unittest.TestCase):

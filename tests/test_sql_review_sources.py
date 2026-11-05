@@ -1,6 +1,7 @@
 """Committed SQL source: old SQL comes from git at the recorded commit, never from .sqlreview/."""
 import json
 import os
+import re
 import subprocess
 import shutil
 import tempfile
@@ -124,6 +125,39 @@ class Sources(unittest.TestCase):
             r = run(["materialize", "sql__v1__request", "review", "3", str(output)], self.p.root)
             self.assertEqual(r.returncode, 6, r.stdout + r.stderr)
             self.assertFalse(output.exists())
+        self.assertEqual(list((self.p.root / ".sqlreview").rglob("*.sql")), [])
+
+    def explain_walk_block(self):
+        """The fenced bash block of the explain skill that diffs the previous and reviewed revisions."""
+        body = (REPO / "skills/data-request-explain/SKILL.md").read_text()
+        blocks = [b for b in re.findall(r"```bash\n(.*?)```", body, re.S) if "git diff --no-index" in b]
+        self.assertEqual(len(blocks), 1, "exactly one explain block shows the line diff")
+        for command in ('materialize "$SLUG" review "$PREVIOUS" "$T/previous.sql"',
+                        'materialize "$SLUG" review "$REVISION" "$T/reviewed.sql"',
+                        'git diff --no-index -- "$T/previous.sql" "$T/reviewed.sql"'):
+            self.assertIn(command, blocks[0])
+        return blocks[0]
+
+    def test_explain_walk_shows_a_line_diff_between_reviewed_revisions(self):
+        # #505 criterion 2: the shipped explain block, run as written, prints the change as - and + lines.
+        block = self.explain_walk_block()
+        draft, doc = self.publish_committed()
+        self.change_sql(b"SELECT 2;\nSELECT 3;\n")
+        doc = dict(doc, revision=2, **json.loads(self.fingerprint().stdout))
+        doc["assumptions"][0]["confirmed_revision"] = 2
+        draft.write_text(json.dumps(doc))
+        r = run(["publish", "sql__request", "review", str(draft)], self.p.root)
+        self.assertEqual(r.returncode, 0, r.stdout + r.stderr)
+        explain = self.p.root / ".sqlreview/reviews/sql__request/explain.json"
+        explain.write_text(json.dumps({"review_revision": 1}))
+        env = dict(os.environ, S=str(SCRIPTS), SLUG="sql__request")
+        walk = subprocess.run(["bash", "-c", block], cwd=self.p.root, env=env, capture_output=True, text=True)
+        self.assertEqual(walk.returncode, 0, walk.stdout + walk.stderr)
+        lines = walk.stdout.splitlines()
+        self.assertIn("-SELECT 1;", lines)
+        self.assertIn("+SELECT 2;", lines)
+        self.assertNotIn("-SELECT 3;", lines)
+        self.assertNotIn("+SELECT 3;", lines)
         self.assertEqual(list((self.p.root / ".sqlreview").rglob("*.sql")), [])
 
     def test_materialize_refuses_in_repo_output(self):

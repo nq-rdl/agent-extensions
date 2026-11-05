@@ -404,6 +404,7 @@ class Publish(unittest.TestCase):
         # Absent is a no-op, so a re-run after a completed publish succeeds.
         again = self.run_helper("discard-draft", "q", "scope")
         self.assertEqual((again.returncode, again.stdout), (0, ""), again.stderr)
+        self.assert_no_sql_records()
 
     def test_discard_draft_refuses_unsafe_slugs_kinds_and_links(self):
         outside = Path(self.temp.name) / "outside.json"

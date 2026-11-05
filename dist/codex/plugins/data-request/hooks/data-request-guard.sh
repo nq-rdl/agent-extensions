@@ -16,7 +16,8 @@
 #   releases/*/release.md               deny  (rendered from the record by `release.sh render`)
 #   reviews/*/explain.json              Write → its `by` must be a handle, not an email (#419); Edit → deny
 #   amendments/<request>.json           Write → content run through `release.sh amend-check`; Edit → deny
-#   reviews/*/*.draft.json, source.sql, templates/*   pass
+#   reviews/*/*.draft.json, templates/*   pass
+#   reviews/*/source.sql, scope.source.sql, history/*.sql   deny (legacy SQL snapshot paths: reviews hold hashes and commits, #505)
 # This is an invariant check, not proof that a human answered: it makes "forgot to ask" a denied
 # tool call with the offending ids named, and leaves a fabricated confirmation auditable in the
 # recorded document. Bash heredocs into .sqlreview/ are out of its reach by design (guardrail, not sandbox).

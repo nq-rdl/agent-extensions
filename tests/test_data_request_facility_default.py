@@ -115,6 +115,24 @@ class HouseDefaultContracts(unittest.TestCase):
                               "Never invent", "one item", "no carried_from_revision"):
                     self.assertIn(token, rule)
 
+    def test_broad_first_pass_refusal_uses_the_one_reference_rule(self):
+        for tree in TREES:
+            with self.subTest(tree=tree):
+                bootstrap = text(tree, "bootstrap")
+                self.assertNotIn("If either is missing, treat the exclusions as ordinary", bootstrap)
+                start = bootstrap.index("**House default:** `broad-first-pass`")
+                passage = bootstrap[start:start + 2400]
+                for token in ("`list` exits 4, stop and import nothing", "refusal path",
+                              "skills/setup/references/recurring-decisions.rst",
+                              "has no `house_default`, no ruling is recorded",
+                              "ordinary engineer-confirmed rows", "needs no fresh question"):
+                    self.assertIn(token, passage)
+                rule = text(tree, "setup", "references/recurring-decisions.rst")
+                for token in ("This refusal applies to every house default, not only ``tuh-facility``",
+                              "``broad-first-pass`` follows the same path",
+                              "If ``broad-first-pass`` has no ``house_default`` at all"):
+                    self.assertIn(token, rule)
+
     def test_shared_entry_preserves_code_and_independent_origin(self):
         for tree in TREES:
             with self.subTest(tree=tree):

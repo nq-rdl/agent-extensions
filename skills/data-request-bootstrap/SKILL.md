@@ -222,9 +222,10 @@ in that section.
 **House default:** `broad-first-pass` is a human ruling that is already recorded. You import it and you
 do not decide it. Like `tuh-facility`, it needs no fresh question when the request is on its first
 pass (no earlier delivery exists for it). When it is not, the default is not applied and
-exclusions get ordinary engineer-confirmed rows. Read it with `recurring-decisions.sh list`. Import it
-only when its `house_default` holds `confirmed_by` and `confirmed_at`. If either is missing, treat the
-exclusions as ordinary engineer-confirmed rows. Give each exclusion that the request does not override
+exclusions get ordinary engineer-confirmed rows. Read it with `recurring-decisions.sh list`. If `list`
+exits 4, stop and import nothing. Follow the refusal path in `${CLAUDE_PLUGIN_ROOT}/skills/setup/references/recurring-decisions.rst`.
+If `broad-first-pass` has no `house_default`, no ruling is recorded, so exclusions get ordinary
+engineer-confirmed rows. Otherwise give each exclusion that the request does not override
 a row with state `not-applied`, `reason` the decision's `proposal.text` and `upstream: {"source": "recurring-decision", "id": "broad-first-pass"}`.
 Copy `confirmed_by` and `confirmed_at` from its `house_default`, set `confirmed_revision` to the import
 revision, and put no `decided` on the row. Invent no other confirmer. Write no assumption or limitation
