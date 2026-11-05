@@ -12,17 +12,17 @@ Primary
 -------
 
 - Extensions reference (rendered):
-  https://github.github.io/spec-kit/reference/extensions.html
+  https://github.github.io/spec-kit/extensions/overview.html
 - Publishing Guide (release/tag flow, catalog-entry schema, distribution
   paths):
-  https://raw.githubusercontent.com/github/spec-kit/main/extensions/EXTENSION-PUBLISHING-GUIDE.md
+  https://github.github.io/spec-kit/extensions/publishing.html
 - Development Guide (manifest schema, validation rules, minimal example,
   .extensionignore):
-  https://raw.githubusercontent.com/github/spec-kit/main/extensions/EXTENSION-DEVELOPMENT-GUIDE.md
+  https://github.github.io/spec-kit/extensions/developing.html
 - Official scaffold (mirror this):
   https://github.com/github/spec-kit/tree/main/extensions/template
 - API reference (Python classes, hook events):
-  https://raw.githubusercontent.com/github/spec-kit/main/extensions/EXTENSION-API-REFERENCE.md
+  https://github.github.io/spec-kit/extensions/api.html
 
 Context
 -------
