@@ -30,8 +30,8 @@ complete during the build.
   build the prohibited output, and route the conflict to the approver or custodian.
   Validation listings and study-ID link tables remain undelivered, as below.
 * Enquiry approval does not override runtime tool permissions, hooks or the
-  selected task's scope. Triage-only stays read-only. Warehouse queries,
-  service-desk writes and release actions retain their separate authorisation.
+  selected task's scope. Triage-only stays read-only. Warehouse queries and
+  release actions retain their separate authorisation. Agents never write to service-desk.
   If a runtime action is denied, report it and stop; never retry in another form
   or route through another agent to evade the denial. Only the engineer may
   change host permission settings, not the agent.
