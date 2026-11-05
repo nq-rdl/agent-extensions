@@ -18,6 +18,8 @@ CASES = {
     "handoff-stale-run": {"gate", "destination", "board", "reviewer", "release_owner"},
     "handoff-prerelease-presentation": {"workflow", "classification", "baseline", "record", "row_keys", "review"},
     "handoff-analyst-send-back": {"outcome", "logic_route", "presentation_route", "release", "posted"},
+    "handoff-pr-channel": {"destination", "child_issue", "service_desk", "board"},
+    "handoff-send-back-complete": {"outcome", "route", "follow_up", "resolved"},
 }
 
 
@@ -26,6 +28,14 @@ def text(leaf):
 
 
 class HandoffContracts(unittest.TestCase):
+    def test_engineer_gate_and_explain_recheck_do_not_hold_on_open_amend_parts(self):
+        # #534: a handed-off amend part holds the release (exit 11), never the engineer's hand-off.
+        rst = " ".join((REPO / "skills/data-request-triage/references/handoff.rst").read_text().split())
+        self.assertIn('release.sh" evidence --no-amend-hold "<run commit>"', rst)
+        self.assertIn("never exits 11", rst)
+        self.assertIn("amend note:", rst)
+        self.assertIn("`release.sh evidence --no-amend-hold`", text("explain"))
+
     def test_analyse_routes_new_and_unchanged_reviews_to_existing_handoff(self):
         body = text("analyse")
         self.assertIn("## After review: operator run, UAT and analyst hand-off", body)
@@ -43,6 +53,24 @@ class HandoffContracts(unittest.TestCase):
         self.assertIn("stop", handoff)
         self.assertIn("restricted", handoff)
 
+    def test_deliverable_pr_is_the_only_engineer_analyst_channel(self):
+        # #539: the hand-off goes on the PR; service-desk is read-only and board moves stay human.
+        handoff = " ".join((REPO / "skills/data-request-triage/references/handoff.rst").read_text().split())
+        for token in ("Communication channel", "The deliverable PR is the channel",
+                      "The service-desk request issue is read-only for agents", "yes, do that",
+                      "The child tracking issue gets no hand-off", "Board moves stay with the human",
+                      "Comment** on the deliverable PR", "Make no write to service-desk"):
+            self.assertIn(token, handoff)
+        for stale in ("a PR comment alone is incomplete", "as any write to service-desk does",
+                      "Comment** on the child repository's tracking issue"):
+            self.assertNotIn(stale, handoff)
+        for leaf in ("triage", "analyse", "explain", "amend", "release"):
+            with self.subTest(leaf=leaf):
+                self.assertIn("Communication channel", text(leaf))
+                self.assertNotIn("child-issue comment", text(leaf))
+                self.assertNotIn("child-issue hand-off", text(leaf))
+        self.assertIn("No instruction permits writing to service-desk", text("triage"))
+
     def test_explain_loads_durable_handoff_before_outcomes_on_fresh_invocation(self):
         for path in (REPO / "skills/data-request-explain/SKILL.md",
                      REPO / "plugins/data-request/skills/explain/SKILL.md",
@@ -56,6 +84,13 @@ class HandoffContracts(unittest.TestCase):
                               "flagged decisions", "restrictions", "linked evidence", "ask",
                               "do not offer acceptance", "walkthrough", "Send back"):
                     self.assertIn(token, load)
+                # The tracking issue is checked read-only, next to the child repository and PR check.
+                self.assertIn("child repository and deliverable PR match this request", load)
+                self.assertIn("also confirm that the child tracking issue links to the same deliverable PR "
+                              "and the same request", load)
+                self.assertIn("Never write to that issue", load)
+                self.assertLess(load.index("child repository and deliverable PR match"),
+                                load.index("child tracking issue links to the same"))
                 self.assertLess(body.index("## Load the durable hand-off"), body.index("## Analyst outcome"))
                 outcome = body.split("## Analyst outcome", 1)[1]
                 self.assertIn("loaded and rechecked", outcome)
@@ -90,6 +125,20 @@ class HandoffContracts(unittest.TestCase):
             self.assertIn(token, explain)
         self.assertIn("Send back", text("release"))
         self.assertIn("Data Analyst", text("release"))
+
+    def test_send_back_carries_what_the_engineer_needs(self):
+        # #534: the engineer's reply to a send-back is the change, not a request for detail.
+        # The note and its completeness check live in the shared reference file (#551).
+        note = REPO / "skills/data-request-explain/references/send-back-note.rst"
+        explain = text("explain") + " " + " ".join(note.read_text().split())
+        self.assertIn("completeness check", text("explain"))
+        for token in ("deliverable PR:", "review: <slug> revision <n>",
+                      "already resolved by the analyst:", "affected files:", "waiting on:",
+                      "The note must let the engineer act without a reply that asks for more detail",
+                      "finish the analyst's share", "is concrete", "Offer to draft that question",
+                      "Never leave a gap for the engineer to ask about later"):
+            self.assertIn(token, explain)
+        self.assertNotIn("mark undecided meaning explicitly", explain)
 
     def test_order_is_visible_at_each_delivery_entrypoint(self):
         for leaf in ("analyse", "explain", "amend", "fix", "release", "triage"):

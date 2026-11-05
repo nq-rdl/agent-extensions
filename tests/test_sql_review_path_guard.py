@@ -295,9 +295,10 @@ SQLREVIEW_INPUTS = {
 }
 SQLREVIEW_NOINPUT = {"init", "status", "roles", "guard", "lifts-stale", "materialize", "delta", "impact",
                      "questions", "migrate-questions", "render", "discard-draft"}
-RELEASE_INPUTS = {"check": [[D]], "render": [[D]]}
+RELEASE_INPUTS = {"check": [[D]], "render": [[D]], "amend-check": [[D], ["--name", "r", D]]}
 # criteria reads a --fingerprints file of four sha256 strings that it validates strictly, so no value can pass through.
-RELEASE_NOINPUT = {"evidence", "criteria"}
+# fetch-command takes no argument and reads only the remotes.
+RELEASE_NOINPUT = {"evidence", "criteria", "fetch-command"}
 RECURRING_INPUTS = {"match": [[D], ["--any-kind", D]], "marked": [[D], ["sql/v1/q.sql", D]]}
 RECURRING_NOINPUT = {"list"}
 

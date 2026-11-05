@@ -58,8 +58,8 @@ proposed research choices on separate lines. "Blocked (cannot proceed)" must
 name a guardrails authority class (governance, cohort expansion, released grain,
 requester-defined measure) or an evidenced operational class from ``checks.rst``;
 never report a technical choice merely as "waiting for the analyst". When a
-deliverable PR is ready for review, add the hand-off comment and the board moves
-from ``handoff.rst``. Include no patient data, credentials or identifiers beyond
+deliverable PR is ready for review, add the PR hand-off comment and the board moves
+for the human from ``handoff.rst``. Include no patient data, credentials or identifiers beyond
 the enquiry, approval and issue references. In triage-only mode, end the reply by
 stating that nothing was posted, pushed or changed in this run.
 For an execution run, report the actual actions and evidence, including any work

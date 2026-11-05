@@ -47,12 +47,26 @@ library issue that would retire it. Treat the epic and every library issue as pu
 Recorded house default
 ----------------------
 
-For ``tuh-facility``, when cohort facility scope is unstated or explicitly TUH, apply it from
-its recorded confirmation, without a fresh question to the engineer or analyst. Read ``list`` and use the exact listed wording
-and rationale as **one item**, with ``upstream: {decision: "tuh-facility", source:
-"house-default"}``; reuse that item by id through map, bootstrap, draft and review,
-not a separate assumption for each source system or stage. Do not copy the list into
-projects; only the applicable assumption goes into scope/SQL.
+``tuh-facility`` is a human ruling that is already recorded. You import it and you do not
+decide it. Import it when cohort facility scope is unstated or explicitly TUH. Import it without a
+fresh question to the engineer or analyst. Telling the engineer is not a question. Read ``list``
+and use the exact listed wording and rationale as **one item**, with ``upstream: {decision:
+"tuh-facility", source: "house-default"}``. Reuse that item by id through map, bootstrap, draft
+and review, not a separate assumption for each source system or stage. Do not copy the list into
+projects. Only the applicable assumption goes into scope/SQL.
+
+Tell the engineer which item you imported, with its recorded decider and date. Both come from
+``confirmed_by`` and ``confirmed_at`` in the ``house_default``. These two fields also gate the
+import. The engineer may override it before publish. An override gets a normal item and a fresh
+confirmation.
+
+``list`` checks every ``house_default`` before it prints anything. It exits 4 for the whole list
+when any ``house_default`` lacks a recorded ``confirmed_by``, ``confirmed_at`` or ``decided``
+origin, and it names that entry on stderr. On exit 4 the skill stops and imports nothing. It
+reports the entry id and the failing field, never the values. It asks the engineer to repair the
+recurring-decisions record and run ``list`` again. If ``tuh-facility`` has no ``house_default`` at
+all, ``list`` still succeeds, but no human ruling is recorded. Import nothing, tell the engineer
+that no recorded ruling exists, and put one facility-scope question.
 
 The ``house_default`` preserves JoshKgh's recorded human confirmation from #436.
 Copy its ``confirmed_by``, ``confirmed_at`` and ``decided`` verbatim. Keep the

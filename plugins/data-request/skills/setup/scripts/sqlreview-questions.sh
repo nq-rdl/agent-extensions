@@ -10,12 +10,15 @@ _q_context() { # slug: load validated store or a read-only legacy projection int
     [ ! -e "$d/$f.json" ] || [ -f "$d/$f.json" ] || sr_die 2 "question source is not a regular file"
     [ -f "$d/$f.json" ] || continue
     cmd_check "$d/$f.json" >/dev/null || sr_die 4 "invalid question source: $f.json"
-    local bound
-    bound="$(jq -r .sql_path "$d/$f.json")"
+    local bound own store
+    # One jq call for three fields (status reads every review). \037 keeps empty fields in place.
+    IFS="$SR_US" read -r bound own store <<EOF
+$(jq -r '[(.sql_path | tostring), (.slug | tostring), (has("question_store") | tostring)] | join("\u001f")' "$d/$f.json" 2>/dev/null)
+EOF
     [ -z "$path" ] || [ "$path" = "$bound" ] || sr_die 4 "question sources have conflicting sql_path"
     path="$bound"
-    [ "$(jq -r .slug "$d/$f.json")" = "$slug" ] || sr_die 4 "question source slug mismatch"
-    jq -e 'has("question_store")' "$d/$f.json" >/dev/null && declared=true
+    [ "$own" = "$slug" ] || sr_die 4 "question source slug mismatch"
+    [ "$store" != true ] || declared=true
     if [ "$f" = scope ]; then scope="$d/$f.json"; else review="$d/$f.json"; fi
   done
   [ -n "$path" ] || sr_die 4 "questions require an existing scope or review"
@@ -23,17 +26,17 @@ _q_context() { # slug: load validated store or a read-only legacy projection int
   if [ -e "$d/questions.json" ]; then
     [ -f "$d/questions.json" ] || sr_die 2 "question store is not a regular file"
     cmd_check "$d/questions.json" >/dev/null || sr_die 4 "invalid questions.json"
-    jq -e --arg slug "$slug" --arg path "$path" '.slug == $slug and .sql_path == $path' "$d/questions.json" >/dev/null || sr_die 4 "question store binding mismatch"
+    jq -e --arg slug "$slug" --arg path "$path" '.slug == $slug and .sql_path == $path' "$d/questions.json" >/dev/null 2>&1 || sr_die 4 "question store binding mismatch"
     # Old embedded arrays are historical. Refuse new untracked strings rather than hide them.
     if [ "${2:-}" != publish ]; then
       jq -e -L "$SR_SCRIPT_DIR" --slurpfile scope "$scope" --slurpfile review "$review" '
-        include "sqlreview-questions"; legacy_covered($scope[0]; $review[0])' "$d/questions.json" >/dev/null || sr_die 4 "untracked legacy questions; reconcile in questions.json, not scope/review"
+        include "sqlreview-questions"; legacy_covered($scope[0]; $review[0])' "$d/questions.json" >/dev/null 2>&1 || sr_die 4 "untracked legacy questions; reconcile in questions.json, not scope/review"
     fi
-    Q_DOC="$(jq . "$d/questions.json")" || sr_die 4 "cannot read questions"
+    Q_DOC="$(jq . "$d/questions.json" 2>/dev/null)" || sr_die 4 "cannot read questions"
   else
     [ "$declared" = false ] || [ "${2:-}" = publish ] || sr_die 4 "declared questions.json is missing"
     Q_DOC="$(jq -n -L "$SR_SCRIPT_DIR" --slurpfile scope "$scope" --slurpfile review "$review" --arg slug "$slug" --arg path "$path" '
-      include "sqlreview-questions"; legacy_questions($scope[0]; $review[0]; $slug; $path)')" || sr_die 4 "cannot project legacy questions"
+      include "sqlreview-questions"; legacy_questions($scope[0]; $review[0]; $slug; $path)' 2>/dev/null)" || sr_die 4 "cannot project legacy questions"
   fi
   Q_SCOPE="$scope" Q_REVIEW="$review"
 }
@@ -44,7 +47,7 @@ cmd_questions() (
   local kind="${2:-review}" Q_DOC
   case "$kind" in scope|review) ;; *) usage ;; esac
   _q_context "$1"
-  printf '%s\n' "$Q_DOC" | jq -L "$SR_SCRIPT_DIR" --arg kind "$kind" 'include "sqlreview-questions"; visible_questions($kind)'
+  printf '%s\n' "$Q_DOC" | jq -L "$SR_SCRIPT_DIR" --arg kind "$kind" 'include "sqlreview-questions"; visible_questions($kind)' 2>/dev/null
 )
 
 # Serialize both writers before reading history. mkdir is portable to macOS Bash 3.2;
@@ -77,11 +80,11 @@ cmd_migrate_questions() (
 cmd_publish_questions() (
   [ $# -eq 2 ] || usage
   sr_need_jq; sr_require_root
-  local slug="$1" draft="$2" Q_DOC Q_LOCK="" tmp="" dest="$SR_REVIEWS/$1/questions.json"
+  local slug="$1" draft="$2" here Q_DOC Q_LOCK="" tmp="" dest="$SR_REVIEWS/$1/questions.json"
   _q_lock "$slug"
   _q_context "$slug" publish
   # Keep original components: normalizing link/../ first hides the symlink.
-  case "$draft" in /*) ;; *) draft="$(pwd -P)/$draft" ;; esac
+  case "$draft" in /*) ;; *) here="$(pwd -P)"; draft="$here/$draft" ;; esac
   sr_no_symlinks "$draft" || exit 2
   [ -f "$draft" ] || sr_die 2 "no such question draft"
   tmp="$(mktemp "$SR_REVIEWS/$slug/.questions.XXXXXX")" || sr_die 2 "mktemp failed"

@@ -24,7 +24,7 @@ metadata:
 The queue entrypoint decides what to work on next and in what order. Stage skills do the
 work; this skill routes to them without restating procedures. Arguments: `$ARGUMENTS`. Invoke
 `/data-request:guardrails` for source hierarchy and **Engineer decisions: proceed and flag**;
-`${CLAUDE_PLUGIN_ROOT}/skills/guardrails/references/decision-authority.rst` distinguishes technical defaults from analyst questions and genuine blockers.
+`${CLAUDE_PLUGIN_ROOT}/skills/guardrails/references/decision-authority.rst` distinguishes technical defaults from analyst questions and genuine blockers. Engineer–analyst communication goes on the deliverable PR, never the child issue or service-desk: see *Communication channel* in [references/handoff.rst](references/handoff.rst).
 
 ## Choose the mode
 
@@ -81,7 +81,7 @@ Recheck affected evidence/artifacts, not every stage. See [references/ledger.rst
    approval overrides a broader intake list. Build requested identifiers and free text even when approval is unchecked; the analyst checks coverage during review. Confirm
    source system and grain with the engineer before `/data-request:bootstrap`; proceed and flag technical decisions. Bare `Patient` is unconfirmed: propose evidenced grain using guardrails `references/grain.rst`, not the answers default.
    Separate confirmed requirements, engineer decisions and proposals; silence is not approval. Supplied cohorts mean linkage.
-   Use explicit codes as written, not a broader library concept. Apply guardrails **House defaults**: TUH `00200` needs no facility question; see [references/checks.rst](references/checks.rst).
+   Use explicit codes as written, not a broader library concept. Apply guardrails **House defaults**: TUH `00200` is a recorded human ruling (`tuh-facility`) imported without a fresh question. Tell the engineer that the default applies. The engineer may override it before publish. See [references/checks.rst](references/checks.rst) and `${CLAUDE_PLUGIN_ROOT}/skills/setup/references/recurring-decisions.rst`.
    When the request explicitly changes the cohort's facility set to another facility, the whole HHS or a network-wide cohort, return one `Analyst question:` about the facility set instead of the TUH default. Reuse an exception already answered in intake or a prior scope; do not ask it again or intersect it with TUH.
 7. **Recheck every gap claim**, whether yours, a worker's or a register row, against current
    code, tests, releases and dependency topology before you plan or file it. A delivered
@@ -126,9 +126,9 @@ Attribute each commit and PR to the model that actually authored it; an instruct
 
 ## Never infer permission
 
-Each of these needs an explicit instruction from the human for that action:
+No instruction permits writing to service-desk (comments, labels, edits or project fields). "Yes, do that" is not such an instruction. Each of these needs an explicit instruction from the human for that action:
 
-- writing to service-desk (comments, labels or project fields);
+- posting on the deliverable PR, or a link on the child issue that the human asked for;
 - running an extract or any query against the warehouse;
 - releasing a library, merging a PR or pushing to a child's `main`;
 - bypassing, disabling or working around hooks and checks;

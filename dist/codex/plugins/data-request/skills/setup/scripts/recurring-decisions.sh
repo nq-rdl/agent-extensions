@@ -89,7 +89,7 @@ def summary($list):
 load_list() {
   [ -f "$RD_LIST" ] || die "no list at $RD_LIST"
   local errs
-  errs="$(jq -r "$RD_JQ"' list_errors' "$RD_LIST" 2>&1)" || die "list is not valid JSON: $RD_LIST" 4
+  errs="$(jq -r "$RD_JQ"' list_errors' "$RD_LIST" 2>/dev/null)" || die "list is not valid JSON: $RD_LIST" 4
   [ -z "$errs" ] || { printf '%s\n' "$errs" >&2; exit 4; }
 }
 
@@ -121,7 +121,7 @@ cmd_match() {
          | $l.decisions[] | select(. as $d | ($any or $k == $d.kind + "s") and ($i | hit($d)))
          | {kind: $k, id: $i.id, decision: .id, expected_kind: .kind,
             marked: ($i.upstream.decision == .id), proposal}
-           + summary($l)]}' "$1" || die "match failed on $1"
+           + summary($l)]}' "$1" 2>/dev/null || die "match failed on $1"  # no-echo: jq errors can quote values
 }
 
 cmd_marked() {
@@ -131,7 +131,7 @@ cmd_marked() {
   for f in "$@"; do
     check_doc "$f"
     more="$(jq -c --arg file "$f" '[("assumptions", "limitations") as $k | (.[$k] // [])[]
-      | select(has("upstream")) | {decision: .upstream.decision, file: $file, kind: $k, id, text}]' "$f")" \
+      | select(has("upstream")) | {decision: .upstream.decision, file: $file, kind: $k, id, text}]' "$f" 2>/dev/null)" \
       || die "marked failed on $f"
     rows="$(jq -cn --argjson a "$rows" --argjson b "$more" '$a + $b')"
   done

@@ -34,7 +34,8 @@ class LegacyReviews(unittest.TestCase):
         text = self.status("--verbose").stdout
         self.assertIn("reason=review.json: slug/sql_path binding mismatch", text)
         self.assertIn("schemaVersion 1", text)
-        self.assertIn("sql_path target missing: old/aaa_screening_log.sql", text)
+        self.assertIn("sql_path target missing", text)
+        self.assertNotIn("old/aaa_screening_log.sql", text.split("reason=", 1)[1])
         self.assertIn(f"move --slug {LEGACY_SLUG}", text)
         row = json.loads(self.status("--json", "--verbose").stdout)["reviews"][0]
         self.assertIn("binding mismatch", row["reason"])

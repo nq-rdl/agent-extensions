@@ -33,7 +33,7 @@ explaining storage facts or conversions. Label any conflict with current source
 metadata and return it to `$data-request:analyse`; do not silently rewrite the reviewed record.
 
 Arguments: `$ARGUMENTS` — a SQL path or a slug from `status`, optionally followed by
-its child-issue hand-off comment URL.
+its hand-off comment URL on the deliverable PR.
 
 ```bash
 S="${PLUGIN_ROOT}/skills/setup/scripts"
@@ -79,19 +79,22 @@ bash "$S/sqlreview.sh" materialize "$SLUG" review "$REVISION" "$T/reviewed.sql" 
 ## Load the durable hand-off
 
 On every invocation, including a fresh session with no `explain.json`, read the hand-off
-comment URL supplied by the analyst. If none is supplied, locate it through the request's
-agreed durable triage ledger and child tracking issue; if ambiguous or unavailable, ask for
-the exact comment URL. Read that comment and its linked evidence with `gh` or available
-GitHub read tools, not a recollection of an earlier session. Make no GitHub writes.
+comment URL supplied by the analyst. If none is supplied, find the deliverable PR in the
+request's agreed durable triage ledger, then the hand-off comment on that PR. The child tracking
+issue only links to the PR. If the comment is ambiguous or unavailable, ask for the exact URL.
+Read that comment and its linked evidence with `gh` or available GitHub read tools, not a
+recollection of an earlier session. Make no GitHub writes while you load the hand-off.
 
-Verify the child repository, tracking issue and deliverable PR match this request. Read the
+Verify the child repository and deliverable PR match this request. With a read-only call, also
+confirm that the child tracking issue links to the same deliverable PR and the same request. If
+it does not, name the difference and do not offer acceptance. Never write to that issue. Read the
 current PR head SHA from GitHub and compare the hand-off's head SHA, run commit, review revision
 and SQL fingerprint with the review being explained. Read the linked run manifest, counts-only
 QA, DVC provenance and UAT sections 1 to 3 for that run, plus open questions, flagged decisions,
 requester limitations and known approval restrictions. Read
 `${PLUGIN_ROOT}/skills/triage/references/handoff.rst`, *Hand-off to review*, and recheck
-its gate, including the committed-review/source-evidence check and `release.sh evidence` at the run
-commit. Recheck any referenced release gates against their current evidence before outcomes.
+its gate, including the committed-review/source-evidence check and `release.sh evidence --no-amend-hold` at the run
+commit, and treat each `amend note:` as an open gate for release, not a failed recheck. Recheck any referenced release gates against their current evidence before outcomes.
 
 If the record, linked evidence or tools are missing, or any identity/revision differs, name
 what is missing or stale and do not offer acceptance. A SQL-only walkthrough and **Send back**
@@ -178,7 +181,11 @@ Classify each finding; do not make the change or approve new meaning during expl
 
 For **Send back**, return the paste-ready note in
 [references/send-back-note.rst](references/send-back-note.rst), with one finding block per change.
+Run its completeness check before you present the note. The engineer must be able to act on it
+without a reply that asks for more detail.
 
-Present the note to the analyst; post nothing unless explicitly instructed. Keep
+Present the note to the analyst; post nothing unless explicitly instructed. When instructed,
+post it on the deliverable PR, addressed to the engineer. Never post it on the child issue or
+service-desk. See *Communication channel* in the triage `references/handoff.rst`. Keep
 `explain.json.completed` about the walkthrough only. Preserve review confirmations and
 release records; send-back does not create a new approval field or approve the release.

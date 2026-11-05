@@ -46,7 +46,7 @@ Every file argument follows the same rules. This covers ``check``, ``lint``,
 ``ledger``, ``carryover``, ``carryforward``, ``remap``, ``publish``,
 ``publish-questions``, ``intake`` and ``notes --against`` and ``--questions``. It
 also covers the files given to ``release.sh`` and ``recurring-decisions.sh``.
-A refused command exits with code 2 and names the rule and the path as given.
+A refused command exits with code 2 and names the rule. It never prints the path.
 It never prints file content and writes nothing under ``.sqlreview/``.
 
 The rule stops accidental copies by agents and users. It does not stop a hostile

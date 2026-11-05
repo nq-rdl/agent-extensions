@@ -33,8 +33,9 @@ Read [references/decision-authority.rst](references/decision-authority.rst) for 
 ## House defaults
 
 The cohort is **Townsville University Hospital**, facility string `00200`, unless the request explicitly changes the cohort's facility set to another facility, the whole HHS or a network-wide cohort.
-This house default was confirmed by Data Engineer **JoshKgh** on **2026-09-29** ([#436](https://github.com/nq-rdl/agent-extensions/issues/436)). Apply it from that recorded confirmation, without a fresh question; record one upstream-marked assumption, not a new request-specific decision.
-Read [references/sources.rst](references/sources.rst) for HBCIS/ePADT fields, ieMR facility-crosswalk verification and exception routing; setup's recurring-decisions reference owns the wording and recorded confirmation.
+This house default was confirmed by Data Engineer **JoshKgh** on **2026-09-29** ([#436](https://github.com/nq-rdl/agent-extensions/issues/436)). This is a recorded human ruling. Import it without a fresh question and record one upstream-marked assumption, not a new request-specific decision.
+Tell the engineer which item you imported, with the recorded decider and date. The engineer may override it before publish.
+Read [references/sources.rst](references/sources.rst) for HBCIS/ePADT fields, ieMR facility-crosswalk verification and exception routing; `${CLAUDE_PLUGIN_ROOT}/skills/setup/references/recurring-decisions.rst` owns the wording, the recorded confirmation and the refusal path when `list` exits 4.
 
 ## Confirm sources before using a fact
 
@@ -78,8 +79,8 @@ Before SQL outside the composition API, inspect the actual dependency pin's spec
 resolver and tests. Record a `candidate` in the pipeline's `.sqlreview` lift ledger
 with that pin, inspected paths/revisions, need, shortfall and workaround location.
 Read `${CLAUDE_PLUGIN_ROOT}/skills/setup/references/lifts.rst` for the record and
-publish commands. Capture it silently; the confirmation question waits for close-out, where
-`/data-request:lift` classifies and confirms it.
+publish commands. Capture the candidate without a confirmation question mid-draft. A candidate is unconfirmed
+evidence, not a decision. Classification and human confirmation belong to `/data-request:lift` at close-out.
 **No published entry means no hand SQL.** A missing source is not proof of a gap.
 The ledger permits a pinned-deadline workaround under this guidance, but does not
 override an explicit repository prohibition. Check the request's dependency pin

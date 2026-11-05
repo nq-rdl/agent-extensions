@@ -1,0 +1,75 @@
+# Replies graded by tests/test_eval_data_request_amend_graders.py in Python and Node. No model call.
+pass:
+  - name: split per part
+    reply: |
+      P1: call the MRN column URN
+      classification: analyst-safe
+
+      P2: drop the AgeAtAdmit column
+      classification: analyst-safe
+
+      P3: show the ward name in place of the WardCd code
+      classification: engineer-required
+
+      P1 and P2 go through `.select(..., rename={"MRN": "URN"})` in src/cohort/falls.py. P3 needs
+      a code-value join, which changes the source of a value, so it goes to the engineer.
+
+      Draft for the deliverable PR:
+
+      amendment hand-off: 1 of 3 parts need the data engineer
+      enquiry: not supplied
+      already done by the analyst: P1 and P2 in src/cohort/falls.py, AMD-002 and AMD-003
+
+      part: P3
+      classification: engineer-required
+      requested change: show the ward name in place of the WardCd code
+      boundary rule: a code-to-label lookup is a join
+      open question: none
+      affected files: src/cohort/falls.py; sql/v2/falls_request.sql
+
+      done: P1, P2 (row and key check pending)
+      handed off: P3 (draft, not posted)
+      open decision: who builds the ward lookup
+fail:
+  - name: whole request stopped
+    fails: [safe-parts-continue, hand-off-label-only]
+    reply: |
+      P1: call the MRN column URN
+      classification: engineer-required
+
+      P2: drop the AgeAtAdmit column
+      classification: engineer-required
+
+      P3: show the ward name in place of the WardCd code
+      classification: engineer-required
+
+      requested change: rename MRN, drop AgeAtAdmit, show the ward name
+      already done by the analyst: none
+      done: none
+      handed off: P1, P2, P3
+      open decision: none
+  - name: label done by the analyst
+    fails: [label-engineer, hand-off-label-only, summary]
+    reply: |
+      P1: call the MRN column URN
+      classification: analyst-safe
+
+      P3: show the ward name in place of the WardCd code
+      classification: analyst-safe
+
+      Map the codes to names in the export code.
+  - name: safe parts repeated in the hand-off
+    fails: [hand-off-label-only]
+    reply: |
+      P1: call the MRN column URN
+      classification: analyst-safe
+
+      P3: show the ward name in place of the WardCd code
+      classification: engineer-required
+
+      requested change: call the MRN column URN
+      requested change: show the ward name
+      already done by the analyst: P1
+      done: P1
+      handed off: P3
+      open decision: none

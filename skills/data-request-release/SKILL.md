@@ -29,23 +29,82 @@ file, and it never publishes a release, pushes a tag or posts the body.
 Order: the Data Engineer completes `analyse`, the authorised operator run, UAT and the triage
 hand-off; the Data Analyst runs `explain`, accepts for release preparation, sends back or
 amends presentation, then drafts here and publishes. Never direct the engineer to release.
-If the analyst chooses **Send back** here, use the paste-ready send-back note in
-`${CLAUDE_PLUGIN_ROOT}/skills/explain/references/send-back-note.rst`: logic changes or defects to `fix`, presentation
-changes to `amend` before or after release. Keep unresolved claims `pending` and the current
+If the analyst chooses **Send back** here, use the paste-ready send-back note in the shared reference
+`${CLAUDE_PLUGIN_ROOT}/skills/explain/references/send-back-note.rst`, with its completeness check. Open
+that reference file only. To run `explain`, `fix` or `amend`, invoke it by name through the Skill tool,
+such as `/data-request:fix`, and do not list the plugin's skills or open their `SKILL.md` files. Route logic changes or
+defects to `fix`, and presentation changes to `amend` before or after release. Add two lines after `outcome:`: `release ref: <tag
+or candidate ref>`, and `release claims: <claim and question ids, with the conflicting sources
+for each>`. The engineer then has the claim, its sources and the expected result in one comment. Keep unresolved claims `pending` and the current
 candidate record `draft`; do not overwrite a previously approved release record, post the
-note or clear a gate. Refreshed review and operator-run/UAT evidence precede another hand-off.
+note or clear a gate. The note belongs on the deliverable PR, never the child issue or
+service-desk. See *Communication channel* in `${CLAUDE_PLUGIN_ROOT}/skills/triage/references/handoff.rst`. Refreshed review and operator-run/UAT evidence precede another hand-off.
 
 For RDL cohort SQL, invoke `/data-request:guardrails` when a claim rests on
 a storage fact or conversion. Worked example:
 [references/worked-example.rst](references/worked-example.rst).
 
 Arguments: `$ARGUMENTS` — the release tag or candidate ref (for example `v1.0.0`). If none is
-given, ask for it.
+given, work it out before you ask. Read the release tags (`git tag --list 'v*'`), published
+releases and their notes, `.sqlreview/releases/*/release.json`, the ledger and merged release
+PRs. Guardrails `references/release.rst`, **Release state from evidence**, lists these signals.
+Count only the tags that come after the newest tag with an `approved` record (`git tag --list
+'v*' --sort=version:refname`). A tag with no record before that tag is a legacy tag: ignore it.
+When exactly one tag qualifies, use it and say so in one line. For example: "Candidate v1.1.0:
+v1.0.0 has an approved record, v1.1.0 has none." Ask when no tag or more than one tag qualifies,
+and list the candidates in the question. If the analyst names a ref that is not a tag, that
+named ref is the candidate: never replace it with a tag.
 
 ```bash
 S="${CLAUDE_PLUGIN_ROOT}/skills/setup/scripts"
 bash "$S/sqlreview.sh" status --json   # exit 3 → stop: not initialised, run /data-request:setup first
 ```
+
+## 0. Amend gate
+
+Do this before any other step. A part that `/data-request:amend` handed off blocks the release
+until a strict comment on the deliverable PR closes it. `release.sh evidence` enforces this from
+amend's part-state record, `.sqlreview/amendments/<request>.json` (amend step 5). Each part has
+the status `done`, `handed off` or `withdrawn`.
+
+First fetch, as a visible step. Run the command that `bash "$S/release.sh" fetch-command` prints. It
+has the form `git -C '<project root>' fetch --tags origin`, so it runs from any directory. It
+fetches tags from `origin`, else from the first configured remote. With no remote it prints a comment,
+so skip the fetch and say so. This is the one fetch instruction. The amend skill and the hand-off
+reference use the same command. A fetch updates tags and remote-tracking refs such as `origin/main`.
+It does not update a local branch. Name a remote-tracking ref or a tag as the release ref, or
+fast-forward the local branch first. Evidence checks exactly the ref that you give.
+
+A fetch never decides the release. If it fails, report the failure to the human. For example, git
+refuses to overwrite a local tag that moved on the remote. Do not force the fetch, and still run
+evidence below. `release.sh evidence` uses no network. It verifies each done commit against local
+refs and holds the release when a commit is missing or is not in the ref.
+
+Then bring the record up to date. Find the deliverable PR in the ledger, or use the PR URL the
+analyst gives. Read its comments, read-only, for each `amendment hand-off:` comment and its `part:`
+entries. Only a later comment whose first line has one of two forms closes a handed-off part:
+
+- **Completed:** `done: P<n> <commit>`, from the engineer. Set the part to `done` with that commit.
+  The script checks the commit against local refs, as amend does after its fetch: `git rev-parse --verify`
+  gives one full SHA, then `git merge-base --is-ancestor <full SHA> <ref>`. Only exit 0 verifies.
+  If the check fails or cannot run, the part stays open. Exit 128 counts as a failed check. A commit
+  that is missing locally holds the release. Run the fetch command and run evidence again.
+- **Withdrawn:** `withdrawn: P<n> <reason>`, from the analyst. Set the part to `withdrawn` with that
+  reason. A `withdrawn:` line with no reason leaves the part open.
+
+Any other comment that names the part leaves it open, for example "P3 is still in progress".
+For each handed-off part, say in one line which comment you read and what it decided. A hand-off
+comment with no record is a blocker: write the record with the part `handed off`. The script also
+holds when the ledger shows an `amend` stage and the record file is missing. If you cannot
+read the PR, say so and stop. Never assume that no part is open.
+
+Then run `bash "$S/release.sh" evidence "<ref>"` once and keep its JSON for step 1. Exit 0 and
+exit 10 are not a hold here: go on to step 1, which reads the exit 10 reviews. Exit 2 means the ref
+is unknown: stop and ask for the tag or candidate ref. Exit 11 means release held: stop before step 1.
+Give its stderr in one or two lines, for example "Release held: P3 is handed off and open. Next:
+the engineer comments `done: P3 <commit>` on the PR, or you withdraw it there." Offer to draft
+`withdrawn: P3 <reason>` with the analyst's own reason. Do not draft it without a reason. Post
+nothing. Never edit the record to pass the gate without a strict comment.
 
 ## 1. Gather the release evidence
 
@@ -60,10 +119,11 @@ branch:
 
 For counts in that evidence, apply guardrails `references/release.rst`, **Probe disclosure control**, before quoting them.
 
-Then list the reviews and whether each describes the release:
+Then list the reviews and whether each describes the release. Step 0 already ran this, so reuse its
+JSON. Run it again only after the ref or an amendment record changed:
 
 ```bash
-bash "$S/release.sh" evidence "<tag>"   # exit 0 every review applies · 10 at least one does not · 2 unknown ref
+bash "$S/release.sh" evidence "<tag>"   # exit 0 every review applies · 10 at least one does not · 11 amend hold · 2 unknown ref
 ```
 
 For each slug, load `bash "$S/sqlreview.sh" questions "$SLUG" review`: `questions.json`

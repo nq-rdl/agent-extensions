@@ -1,0 +1,3 @@
+kind: Fixed
+body: 'data-request: check names the rule for a non-object item or a non-string sql_sha256 instead of failing to run'
+time: 2026-11-05T18:10:05.000000000Z
