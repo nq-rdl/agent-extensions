@@ -199,27 +199,10 @@ sr_write_render_marker() { # FILE
   rm -f "$staged"; return 2
 }
 
-sr_refuse_unreviewed() { # ABS_PATH AS_GIVEN [helper-render]
-  local root phys rel links first second re='^v[0-9]+([.-][0-9]+)*$'
-  # First, before any canonicalisation: command substitution strips trailing newlines, so a name
-  # such as "alias.sql<LF>" would be checked as a different path from the one opened. Refuse
-  # newline, CR, tab and every other control character outright (fail closed).
-  case "$1$2${SR_ROOT:-}" in
-    *[[:cntrl:]]*) sr_die 2 "refused path: it contains a control character such as a newline, carriage return or tab (rule: no control characters in paths)" ;;
-  esac
-  [ -n "${SR_ROOT:-}" ] || sr_die 2 "refused path: the project root is unknown, so the path cannot be checked (fail closed)"
-  root="$(sr_realpath_m "$SR_ROOT")" && phys="$(sr_realpath_m "$1")" ||
-    sr_die 2 "refused path: the path cannot be resolved, so it cannot be checked (fail closed)"
-  case "$phys" in
-    "$root"/*) ;;
-    *)
-      # notes and intake pass "helper-render": the documented flows run them on a render the helper wrote.
-      [ "${3:-}" = helper-render ] && sr_helper_render_marker "$phys" && return 0
-      # amend-check prints rule lines only, so a record file outside the project may be checked there.
-      [ "${3:-}" = outside-ok ] && return 0
-      sr_die 2 "refused path: it resolves outside the project root; copy it into sql/v<N>/ first (rule: no paths that leave the project)" ;;
-  esac
-  rel="${phys#"$root"/}"
+# The data/ and sql/ rules for a physical path PHYS inside the initialised project ROOT (both already resolved).
+sr_policy_under() { # ROOT PHYS
+  local rel first second re='^v[0-9]+([.-][0-9]+)*$'
+  rel="${2#"$1"/}"
   first="${rel%%/*}"
   case "$rel" in */*) second="${rel#*/}"; second="${second%%/*}" ;; *) second="" ;; esac
   first="$(printf '%s' "$first" | tr '[:upper:]' '[:lower:]')"
@@ -229,6 +212,46 @@ sr_refuse_unreviewed() { # ABS_PATH AS_GIVEN [helper-render]
     sql)
       [[ "$second" =~ $re ]] ||
         sr_die 2 "refused path: only a reviewed version directory sql/v<N>/ may be read into $SR_DIR/; pipeline SQL under sql/<name>/ may hold cohort values (rule: sql/ paths must be inside sql/v[0-9]+([.-][0-9]+)*/)" ;;
+  esac
+}
+
+# Nearest initialised project above a physical path, from the path's own location and not from the cwd.
+# Prints nothing and returns 1 when no directory above it holds .sqlreview/.
+sr_root_of_path() { # PHYS
+  local d="${1%/*}"
+  while [ -n "$d" ]; do
+    [ ! -d "$d/$SR_DIR" ] || { printf '%s\n' "$d"; return 0; }
+    d="${d%/*}"
+  done
+  return 1
+}
+
+sr_refuse_unreviewed() { # ABS_PATH AS_GIVEN [helper-render|outside-ok]
+  local root phys links d
+  # First, before any canonicalisation: command substitution strips trailing newlines, so a name
+  # such as "alias.sql<LF>" would be checked as a different path from the one opened. Refuse
+  # newline, CR, tab and every other control character outright (fail closed).
+  case "$1$2${SR_ROOT:-}" in
+    *[[:cntrl:]]*) sr_die 2 "refused path: it contains a control character such as a newline, carriage return or tab (rule: no control characters in paths)" ;;
+  esac
+  [ -n "${SR_ROOT:-}" ] || sr_die 2 "refused path: the project root is unknown, so the path cannot be checked (fail closed)"
+  root="$(sr_realpath_m "$SR_ROOT")" && phys="$(sr_realpath_m "$1")" ||
+    sr_die 2 "refused path: the path cannot be resolved, so it cannot be checked (fail closed)"
+  # Every initialised project above the file applies its own data/ and sql/ rules to it, whatever the cwd or
+  # SQLREVIEW_ROOT says: a file in another project, or a nested one, is judged by that project too.
+  d="${phys%/*}"
+  while [ -n "$d" ]; do
+    if [ "$d" != "$root" ] && [ -d "$d/$SR_DIR" ]; then sr_policy_under "$d" "$phys"; fi
+    d="${d%/*}"
+  done
+  case "$phys" in
+    "$root"/*) sr_policy_under "$root" "$phys" ;;
+    *)
+      # notes and intake pass "helper-render": the documented flows run them on a render the helper wrote.
+      [ "${3:-}" = helper-render ] && sr_helper_render_marker "$phys" && return 0
+      # amend-check prints rule lines only, so a record file outside the project may be checked there.
+      [ "${3:-}" = outside-ok ] && return 0
+      sr_die 2 "refused path: it resolves outside the project root; copy it into sql/v<N>/ first (rule: no paths that leave the project)" ;;
   esac
   # The kernel opens the path as given, but callers fold ".." lexically (sr_relpath, sr_abspath) and then use the
   # folded form. If a symlink makes the two differ, the folded path names a file this policy never judged.
@@ -249,20 +272,31 @@ sr_refuse_unreviewed() { # ABS_PATH AS_GIVEN [helper-render]
 # command). A command that copies or reads the file later does not guard it a second time.
 # MODE is helper-render (accept an outside-project file that carries a helper marker) or outside-ok (accept any
 # file outside the project, but never data/ or unreviewed sql/ inside it).
-# Without an initialised .sqlreview/ the project boundary is unknown. The cwd must not be taken as the root
-# for a path that sits under a data or sql directory, so such a path is refused (fail closed). Other paths,
-# such as a scratch file in a temporary directory, are checked against the git top level or the cwd.
+# With no initialised .sqlreview/ from the cwd, the project is discovered from the file itself: the nearest
+# initialised directory above its physical path governs it, so an alias into data/ is refused as data/.
+# With no project above the file either, a path that has a data or sql directory in its spelling or in its
+# physical form is refused (fail closed). Other paths, such as a scratch file in a temporary directory,
+# are checked against the git top level or the cwd.
 sr_guard_input() { # PATH [helper-render|outside-ok]
-  local low
+  local low phys
   if [ -z "${SR_ROOT:-}" ]; then
     if ! SR_ROOT="$(sr_find_root 2>/dev/null)"; then
       SR_ROOT=""
       low="$(printf '/%s/' "$(sr_rawabs "$1")" | tr '[:upper:]' '[:lower:]')"
       case "$low" in
         *[[:cntrl:]]*) sr_die 2 "refused path: it contains a control character such as a newline, carriage return or tab (rule: no control characters in paths)" ;;
-        */data/*|*/sql/*) sr_die 2 "refused path: no initialised $SR_DIR/ project is found from here and the path is under a data or sql directory, so it cannot be checked (fail closed)" ;;
       esac
-      SR_ROOT="$(sr_init_root)"
+      phys="$(sr_realpath_m "$(sr_rawabs "$1")")" ||
+        sr_die 2 "refused path: the path cannot be resolved, so it cannot be checked (fail closed)"
+      if SR_ROOT="$(sr_root_of_path "$phys")"; then :
+      else
+        SR_ROOT=""
+        low="$low$(printf '/%s/' "$phys" | tr '[:upper:]' '[:lower:]')"
+        case "$low" in
+          */data/*|*/sql/*) sr_die 2 "refused path: no initialised $SR_DIR/ project is found from here or above the file and the path is under a data or sql directory, so it cannot be checked (fail closed)" ;;
+        esac
+        SR_ROOT="$(sr_init_root)"
+      fi
     fi
   fi
   sr_refuse_unreviewed "$(sr_rawabs "$1")" "$1" "${2:-}" || exit 2

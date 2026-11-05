@@ -372,6 +372,96 @@ def dispatched(script, pattern):
     return {m.group(1) for m in re.finditer(pattern, tail, re.M)}
 
 
+class RootDiscovery(unittest.TestCase):
+    """The project that governs a file is found from the file, not from the cwd (Codex round 2 on #552)."""
+
+    def setUp(self):
+        self._tmp = tempfile.TemporaryDirectory()
+        self.addCleanup(self._tmp.cleanup)
+        self.parent = Path(os.path.realpath(self._tmp.name))
+        self.env = {k: v for k, v in os.environ.items() if not k.startswith("SQLREVIEW_")}
+
+    def sh(self, script, args, cwd):
+        return subprocess.run(["bash", str(SCRIPTS / script), *args], cwd=cwd, env=self.env,
+                              capture_output=True, text=True, timeout=60)
+
+    def project(self, name="proj"):
+        (self.parent / name).mkdir(parents=True, exist_ok=True)
+        p = Project(self.parent / name)
+        p.sql("data/cohort.sql", f"-- {MARKER}\n{SQL_V1}")
+        p.sql("sql/pipeline_a/q.sql", f"-- {MARKER}\n{SQL_V1}")
+        p.sql("sql/v1/q.sql", SQL_V1)
+        p.commit()
+        os.symlink("data", p.root / "inputs")
+        os.symlink("sql/pipeline_a", p.root / "pipe")
+        return p
+
+    def refused(self, script, args, cwd, rule):
+        r = self.sh(script, args, cwd)
+        self.assertEqual(r.returncode, 2, (script, args, r.stdout, r.stderr))
+        self.assertIn(rule, r.stderr)
+        self.assertNotIn(MARKER, r.stdout + r.stderr)
+        self.assertEqual(r.stdout, "")
+
+    def test_alias_to_data_is_refused_from_the_parent_of_the_project(self):
+        self.project()
+        for args in (["notes", "proj/inputs/cohort.sql"], ["check", "proj/inputs/cohort.sql"],
+                     ["lint", "proj/inputs/cohort.sql"], ["notes", "proj/data/cohort.sql"]):
+            with self.subTest(args=args):
+                self.refused("sqlreview.sh", args, self.parent, RULE_DATA)
+        self.refused("release.sh", ["check", "proj/inputs/cohort.sql"], self.parent, RULE_DATA)
+        self.refused("recurring-decisions.sh", ["match", "proj/inputs/cohort.sql"], self.parent, RULE_DATA)
+
+    def test_alias_to_pipeline_sql_is_refused_from_the_parent_of_the_project(self):
+        self.project()
+        self.refused("sqlreview.sh", ["notes", "proj/pipe/q.sql"], self.parent, RULE_SQL)
+        self.refused("sqlreview.sh", ["notes", "proj/sql/pipeline_a/q.sql"], self.parent, RULE_SQL)
+        # A reviewed directory in the same project is not refused by the data or sql rules.
+        r = self.sh("sqlreview.sh", ["notes", "proj/sql/v1/q.sql"], self.parent)
+        self.assertEqual(r.returncode, 0, r.stderr)
+
+    def test_alias_into_data_with_no_project_anywhere_is_refused(self):
+        (self.parent / "bare/data").mkdir(parents=True)
+        (self.parent / "bare/data/cohort.sql").write_text(f"-- {MARKER}\n{SQL_V1}")
+        os.symlink("data", self.parent / "bare/inputs")
+        self.refused("sqlreview.sh", ["notes", "bare/inputs/cohort.sql"], self.parent,
+                     "no initialised .sqlreview/ project is found")
+
+    def test_a_plain_scratch_file_with_no_project_still_works(self):
+        (self.parent / "scratch").mkdir()
+        (self.parent / "scratch/q.sql").write_text(SQL_V1)
+        for cwd, arg in ((self.parent / "scratch", "q.sql"), (self.parent, "scratch/q.sql")):
+            r = self.sh("sqlreview.sh", ["notes", arg], cwd)
+            self.assertEqual(r.returncode, 0, r.stderr)
+
+    def test_a_nested_project_does_not_hide_the_outer_projects_data(self):
+        # cwd is in an inner initialised project: the outer project's data/ is still data/.
+        outer = self.project("outer")
+        (outer.root / "inner").mkdir()
+        inner = Project(outer.root / "inner", git_repo=False, init=False)
+        (inner.root / ".sqlreview/reviews").mkdir(parents=True)  # init would find the outer project instead
+        inner.sql("q.sql", SQL_V1)
+        self.refused("sqlreview.sh", ["notes", "../data/cohort.sql"], inner.root, RULE_DATA)
+        self.refused("release.sh", ["check", "../data/cohort.sql"], inner.root, RULE_DATA)
+        self.refused("recurring-decisions.sh", ["match", "../data/cohort.sql"], inner.root, RULE_DATA)
+
+    def test_another_projects_data_is_refused_in_outside_ok_modes(self):
+        a, b = self.project("a"), self.project("b")
+        self.refused("release.sh", ["check", "../a/data/cohort.sql"], b.root, RULE_DATA)
+        self.refused("release.sh", ["amend-check", "../a/inputs/cohort.sql"], b.root, RULE_DATA)
+        # SQLREVIEW_ROOT may name a different project than the file's own: the file's project still governs it.
+        self.env["SQLREVIEW_ROOT"] = str(b.root)
+        self.refused("release.sh", ["check", str(a.root / "inputs/cohort.sql")], self.parent, RULE_DATA)
+        self.refused("sqlreview.sh", ["notes", str(a.root / "inputs/cohort.sql")], self.parent, RULE_DATA)
+
+    def test_a_planted_inner_root_does_not_launder_data(self):
+        # `init` inside data/ makes data/ look like a project root; the outer project's rule still applies.
+        p = self.project()
+        (p.root / "data/.sqlreview").mkdir()
+        self.refused("sqlreview.sh", ["notes", "data/cohort.sql"], p.root, RULE_DATA)
+        self.refused("sqlreview.sh", ["notes", "proj/data/cohort.sql"], self.parent, RULE_DATA)
+
+
 class EveryEntryPoint(unittest.TestCase):
     """Issue 516 root cause: one unguarded entry point at a time kept being found, so walk them all."""
 
