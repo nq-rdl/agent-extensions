@@ -335,8 +335,8 @@ cmd_slug() {
   sr_need_jq
   sr_require_root
   local rel slug doc bound
+  # sr_relpath applies the reviewed-tree rule, so a second sr_safe_sql on its result is not needed.
   rel="$(sr_relpath "$1")" || exit $?
-  sr_safe_sql "$rel"
   slug="$(sr_slug "$rel")" || exit $?
   sr_safe_slug "$slug"
   if doc="$(sr_doc_for "$slug")"; then
@@ -826,7 +826,6 @@ cmd_fingerprint() (
   sr_require_root
   local rel sha body="" tmp
   rel="$(sr_relpath "$1")" || exit $?
-  sr_safe_sql "$rel"
   sr_source_clean || exit 2
   umask 077
   tmp="$(sr_private_tmpdir sqlreview-fingerprint)" || exit 2
@@ -918,7 +917,6 @@ cmd_snapshot() (
   sr_require_root
   local slug="$1" rel doc work binding original head
   rel="$(sr_relpath "$2")" || exit $?
-  sr_safe_sql "$rel"
   sr_safe_slug "$slug"
   [ "$slug" = "$(sr_slug "$rel")" ] || sr_die 2 "slug/path mismatch"
   doc="$SR_REVIEWS/$slug/review.json"
@@ -1419,8 +1417,7 @@ cmd_notes() {
   [ -n "$sql" ] || usage
   sr_need_jq
   # notes reads the file as given (no relpath step), so apply the reviewed-tree rule here (#516).
-  SR_ROOT="${SR_ROOT:-$(sr_init_root)}"
-  sr_refuse_unreviewed "$(sr_rawabs "$sql")" "$sql" helper-render || exit 2
+  sr_guard_input "$sql" helper-render
   [ -f "$sql" ] && [ -r "$sql" ] || sr_die 2 "no such readable file: $sql"
   if [ -n "$against" ]; then
     [ -f "$against" ] && [ -r "$against" ] || sr_die 2 "no such readable file: $against"
@@ -1604,7 +1601,6 @@ cmd_move() {
     sr_safe_path "$oldrel"
     oldslug="$(sr_slug "$oldrel")"
   fi
-  sr_safe_sql "$newrel"
   newslug="$(sr_slug_new "$newrel")"
   sr_safe_slug "$oldslug"
   sr_safe_slug "$newslug"
@@ -1725,8 +1721,10 @@ _sr_guard_command_inputs() { # COMMAND ARGS...
       [ "${1:-}" != --session ] || shift
       case "${1:-}" in
         check) [ $# -lt 2 ] || sr_guard_input "$2" ;;
-        set) [ $# -lt 3 ] || sr_guard_input "$3" ;;
-        get) [ "${3:-}" != --against ] || [ $# -lt 4 ] || sr_guard_input "$4" ;;
+        # The documented staging files live outside the project (and --session works outside any repository),
+        # so only data/ and unreviewed sql/ inside the project are refused for these two arguments.
+        set) [ $# -lt 3 ] || sr_guard_input "$3" outside-ok ;;
+        get) [ "${3:-}" != --against ] || [ $# -lt 4 ] || sr_guard_input "$4" outside-ok ;;
       esac ;;
   esac
 }

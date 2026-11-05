@@ -203,7 +203,7 @@ sr_refuse_unreviewed() { # ABS_PATH AS_GIVEN [helper-render]
   case "$phys" in
     "$root"/*) ;;
     *)
-      # Only notes passes "helper-render": the documented flows run it on a render the helper wrote.
+      # notes and intake pass "helper-render": the documented flows run them on a render the helper wrote.
       [ "${3:-}" = helper-render ] && sr_helper_render_marker "$phys" && return 0
       # amend-check prints rule lines only, so a record file outside the project may be checked there.
       [ "${3:-}" = outside-ok ] && return 0
@@ -231,14 +231,21 @@ sr_refuse_unreviewed() { # ABS_PATH AS_GIVEN [helper-render]
 # record or prints (#516): the full policy (data/, unreviewed sql/, outside the project root unless
 # a helper-marked render is allowed, symlink target, hard-link count), exiting 2 when refused.
 # Every subcommand's file arguments go through here, either as sr_guard_input at the dispatch
-# (tests/test_sql_review_path_guard.py walks the dispatch tables and fails on an unlisted
-# command) or via the read/copy wrappers below.
-sr_guard_input() { # PATH [helper-render]
-  [ -n "${SR_ROOT:-}" ] || SR_ROOT="$(sr_find_root 2>/dev/null || sr_init_root)"
+# (tests/test_sql_review_path_guard.py runs every command on a refused path and fails on an unlisted
+# command). A command that copies or reads the file later does not guard it a second time.
+# MODE is helper-render (accept an outside-project file that carries a helper marker) or outside-ok (accept any
+# file outside the project, but never data/ or unreviewed sql/ inside it). Without an initialised root the
+# project boundary is unknown, so the guard fails closed, except for outside-ok, which has nothing to protect.
+sr_guard_input() { # PATH [helper-render|outside-ok]
+  if [ -z "${SR_ROOT:-}" ]; then
+    SR_ROOT="$(sr_find_root 2>/dev/null)" || {
+      SR_ROOT=""
+      [ "${2:-}" = outside-ok ] && return 0
+      sr_die 2 "refused path: no initialised $SR_DIR/ project is found from here, so the path cannot be checked (fail closed)"
+    }
+  fi
   sr_refuse_unreviewed "$(sr_rawabs "$1")" "$1" "${2:-}" || exit 2
 }
-sr_read_guarded() { sr_guard_input "$1" "${2:-}"; cat "$1"; } # PATH [helper-render]
-sr_copy_guarded() { sr_guard_input "$1"; cp "$1" "$2"; }       # SRC DEST
 
 # Structural checks on a stored or derived project-relative path (no policy; see sr_safe_sql).
 sr_safe_path() {

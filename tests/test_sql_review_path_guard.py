@@ -147,6 +147,28 @@ class PathGuard(unittest.TestCase):
             self.assertEqual(r.returncode, 0, r.stderr)
             self.assertEqual(out.read_text(), SQL_V1)
 
+    def test_no_initialised_root_fails_closed_for_notes_and_the_other_file_arguments(self):
+        # From a directory with no .sqlreview/ above it, the cwd must not become the project root:
+        # `notes proj/data/cohort.sql` used to be accepted from $HOME.
+        with tempfile.TemporaryDirectory() as home:
+            home = Path(home)
+            (home / "proj/data").mkdir(parents=True)
+            (home / "proj/data/cohort.sql").write_text(f"SELECT '{MARKER}';\n")
+            (home / "proj/sql/v1").mkdir(parents=True)
+            (home / "proj/sql/v1/q.sql").write_text(SQL_V1)
+            env = {k: v for k, v in os.environ.items() if not k.startswith("SQLREVIEW_")}
+            for args in (["notes", "proj/data/cohort.sql"], ["notes", "proj/sql/v1/q.sql"],
+                         ["check", "proj/data/cohort.sql"], ["lint", "proj/data/cohort.sql"]):
+                r = subprocess.run(["bash", str(SCRIPT), *args], cwd=home, env=env, capture_output=True, text=True)
+                self.assertEqual(r.returncode, 2, (args, r.stdout, r.stderr))
+                self.assertIn("no initialised", r.stderr)
+                self.assertNotIn(MARKER, r.stdout + r.stderr)
+                self.assertNotIn("cohort.sql", r.stderr)
+                self.assertEqual(r.stdout, "")
+            # init still works there, since it takes no file argument.
+            r = subprocess.run(["bash", str(SCRIPT), "init"], cwd=home, env=env, capture_output=True, text=True)
+            self.assertEqual(r.returncode, 0, r.stderr)
+
     def test_status_keeps_the_state_of_a_record_bound_to_a_refused_path(self):
         # A scope that passes check but names pipeline SQL must not turn `invalid` in status: the real state
         # stays visible so the engineer can move the record into sql/v<N>/. Writes keep the policy.
