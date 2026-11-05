@@ -22,7 +22,9 @@ EOF
     if [ "$f" = scope ]; then scope="$d/$f.json"; else review="$d/$f.json"; fi
   done
   [ -n "$path" ] || sr_die 4 "questions require an existing scope or review"
-  sr_safe_sql "$path"
+  # status sets SR_Q_STRUCTURAL: a record bound to a path the input policy now refuses keeps its state
+  # (and the migration hint), so only the structural checks run. Every write path keeps the policy.
+  if [ -n "${SR_Q_STRUCTURAL:-}" ]; then sr_safe_path "$path"; else sr_safe_sql "$path"; fi
   if [ -e "$d/questions.json" ]; then
     [ -f "$d/questions.json" ] || sr_die 2 "question store is not a regular file"
     cmd_check "$d/questions.json" >/dev/null || sr_die 4 "invalid questions.json"

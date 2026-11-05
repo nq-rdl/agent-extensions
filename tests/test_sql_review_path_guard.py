@@ -147,6 +147,23 @@ class PathGuard(unittest.TestCase):
             self.assertEqual(r.returncode, 0, r.stderr)
             self.assertEqual(out.read_text(), SQL_V1)
 
+    def test_status_keeps_the_state_of_a_record_bound_to_a_refused_path(self):
+        # A scope that passes check but names pipeline SQL must not turn `invalid` in status: the real state
+        # stays visible so the engineer can move the record into sql/v<N>/. Writes keep the policy.
+        slug, old = "sql__pipeline_a__q", "sql/pipeline_a/q.sql"
+        self.p.write_json(slug, "scope.json", scope_doc(slug, old))
+        self.assertEqual(run(["check", str(self.root / ".sqlreview/reviews" / slug / "scope.json")], self.root).returncode, 0)
+        status = run(["status", "--json"], self.root)
+        self.assertEqual(status.returncode, 0, status.stderr)
+        rows = [r for r in json.loads(status.stdout)["reviews"] if r["slug"] == slug]
+        self.assertEqual(len(rows), 1, status.stdout)
+        self.assertEqual(rows[0]["state"], "scoped", rows[0])
+        self.assertEqual(rows[0]["sql_path"], old)
+        self.assertNotIn(MARKER, status.stdout + status.stderr)
+        # The read command and the write commands still refuse the path.
+        self.refused(["questions", slug], RULE_SQL)
+        self.refused(["migrate-questions", slug], RULE_SQL)
+
     def test_status_path_adds_no_canonicalisation(self):
         # The SessionStart hook has a 5 second limit, so status must not run the canonical check per folder.
         # status reads stored paths through sr_state, which must use only the structural check.

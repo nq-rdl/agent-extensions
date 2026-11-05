@@ -415,7 +415,8 @@ EOF
   if [ "$kind" != lifts ]; then
     # The question store must load, as `sqlreview.sh questions` loads it. In a subshell, not a child
     # bash, which would read sqlreview.sh again per review. Its review filter keeps every question.
-    ( _q_context "$1" ) >/dev/null 2>&1 || { printf 'invalid\t\t\n'; return 0; }
+    # Structural path checks only: the input policy applies to what is read, and status reads nothing new.
+    ( SR_Q_STRUCTURAL=1; _q_context "$1" ) >/dev/null 2>&1 || { printf 'invalid\t\t\n'; return 0; }
   fi
   sr_safe_path "$sql"
   case "$kind" in
