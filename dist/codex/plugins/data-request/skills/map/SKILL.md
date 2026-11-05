@@ -23,7 +23,8 @@ Return unanswered research choices to the Data Analyst; establish technical
 source, key and join evidence with the engineer.
 
 Invoke `$data-request:guardrails` first and follow its source hierarchy and **House defaults**.
-Apply TUH `00200` without asking when no alternative facility scope is named: reuse
+Apply TUH `00200` from its recorded confirmation, without a fresh question, when no alternative
+facility scope is named: reuse
 one standard assumption from setup's `tuh-facility` entry with its `upstream` marker.
 Read `${PLUGIN_ROOT}/skills/setup/references/recurring-decisions.rst` for wording
 and original confirmation; mapping returns the assumption as a proposal/handoff, never initialises a store.
@@ -83,6 +84,10 @@ Indigenous status from `PERSON_INFO`. Offer country of birth and preferred langu
 as optional surrogates; the requester or engineer decides. Record the limitation
 that ethnicity is not held. Check the pinned library for surrogate units; a missing
 unit is a lift candidate. Guardrails holds the convention.
+
+**Supplied cohort:** map it by shape (name, columns, types, key, join target) and propose a `SuppliedCohort`
+declaration; the runner loads the file into a `#` table. Never read `data/00_raw/` or copy a value
+into the mapping, a comment or chat. Follow `${PLUGIN_ROOT}/skills/guardrails/references/supplied-cohorts.rst`.
 
 ## Lookup evidence for codes
 

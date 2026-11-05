@@ -104,7 +104,7 @@ class Content(unittest.TestCase):
 
     def test_records_the_amendment_with_its_classification(self):
         self.assertIn("specs/amendments.md", self.body)
-        self.assertIn("data-analysis-scaffold/issues/234", self.body)
+        self.assertNotIn("data-analysis-scaffold/issues", self.body)
 
     def test_validation_gates(self):
         for gate in ("sql_gate", "spec-validate", "final projection", "row count", "key set",
@@ -113,7 +113,7 @@ class Content(unittest.TestCase):
                 self.assertIn(gate, self.body)
 
     def test_reuses_sibling_actions_by_reference(self):
-        self.assertIn("${CLAUDE_PLUGIN_ROOT}/skills/guardrails/SKILL.md", self.body)
+        self.assertIn("`/data-request:guardrails`", self.body)
         for leaf in ("validate", "fix", "analyse"):
             with self.subTest(leaf=leaf):
                 self.assertIn(f"/data-request:{leaf}", self.body)

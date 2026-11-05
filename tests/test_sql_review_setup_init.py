@@ -59,7 +59,9 @@ class InitReviewsPlaceholder(unittest.TestCase):
             j = json.loads(r.stdout)
             self.assertEqual((j["reviews"], j["counts"]["total"]), ([], 0))
             text = run(["status"], p.root)
-            self.assertEqual((text.returncode, text.stdout), (0, ""))
+            # An empty project has one line: the bootstrap step that starts the first review.
+            self.assertEqual((text.returncode, text.stdout),
+                             (0, "no reviews yet\tnext=/data-request:bootstrap <sql path> to scope the first SQL file\n"))
 
     def test_rerun_reports_no_difference_for_the_placeholder(self):
         with tempfile.TemporaryDirectory() as tmp:

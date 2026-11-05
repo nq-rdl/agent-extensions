@@ -24,7 +24,7 @@ Here $ARGUMENTS means the user’s supplied skill arguments. Codex does not popu
 The **Data Engineer** applies technical fixes and settled pre-release changes.
 The Data Analyst resolves any missing research decision with the requester.
 
-Arguments: `$ARGUMENTS`. Read `${PLUGIN_ROOT}/skills/guardrails/SKILL.md`
+Arguments: `$ARGUMENTS`. Invoke `$data-request:guardrails`
 and apply the rules relevant to the affected SQL or source mappings. This action
 works without `.sqlreview/`; a small correction does not require setup, bootstrap
 or a formal review before editing.

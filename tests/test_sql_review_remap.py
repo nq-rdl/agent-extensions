@@ -7,6 +7,8 @@ import shutil
 import tempfile
 import unittest
 
+from test_sql_review_sources import committed
+
 try:
     from test_sql_review_scripts import Project, SQL_V1, item, review_doc, run, scope_doc
 except ModuleNotFoundError:
@@ -34,22 +36,24 @@ class Remap(unittest.TestCase):
         self.seed(self.prior, SQL_V1)
 
     def seed(self, doc, sql):
+        self.sql.write_bytes(sql.encode())
+        doc = dict(doc, git_commit=committed(self.p), git_dirty=False)
         self.prior = doc
         self.kind = doc["kind"]
         self.published = self.d / (self.kind + ".json")
-        self.baseline = self.d / ("source.sql" if self.kind == "review" else "scope.source.sql")
         self.published.write_text(json.dumps(doc))
-        self.baseline.write_text(sql)
-        self.before = {p: p.read_bytes() for p in (self.published, self.baseline)}
+        self.before = {self.published: self.published.read_bytes()}
 
     def stage(self):
         draft = copy.deepcopy(self.prior)
         draft["revision"] = 2
-        draft["sql_sha256"] = sha(self.sql.read_text())
+        draft["git_commit"] = committed(self.p)
+        draft["sql_sha256"] = hashlib.sha256(self.sql.read_bytes()).hexdigest()
         self.draft.write_text(json.dumps(draft))
         return draft
 
     def remap(self, explicit=True, expected=0):
+        committed(self.p)
         args = ["remap", "q"] + ([str(self.draft)] if explicit else [])
         r = run(args, self.p.root)
         self.assertEqual(r.returncode, expected, r.stdout + r.stderr)
@@ -155,13 +159,17 @@ class Remap(unittest.TestCase):
         self.sql.write_text("-- header\n" + SQL_V1)
         self.stage()
         before = self.draft.read_bytes()
-        self.baseline.unlink()
+        prior = json.loads(self.published.read_text())
+        original = dict(prior)
+        prior["git_commit"] = "f" * 40
+        self.published.write_text(json.dumps(prior))
         self.remap(expected=6)
         self.assertEqual(self.draft.read_bytes(), before)
-        self.baseline.write_text("corrupt\n")
-        self.remap(expected=2)
+        prior.update(git_commit=original["git_commit"], sql_sha256="0" * 64)
+        self.published.write_text(json.dumps(prior))
+        self.remap(expected=6)
         self.assertEqual(self.draft.read_bytes(), before)
-        self.baseline.write_text(SQL_V1)
+        self.published.write_text(json.dumps(original))
         doc = self.read()
         doc["logic"][1]["lines"] = [0, 2]
         self.draft.write_text(json.dumps(doc))
@@ -256,6 +264,7 @@ class Remap(unittest.TestCase):
         stub = tools / "diff"
         stub.write_text("#!/bin/sh\nexit 2\n")
         stub.chmod(0o755)
+        committed(self.p)
         r = run(["remap", "q", str(self.draft)], self.p.root,
                 env={"PATH": str(tools) + os.pathsep + os.environ["PATH"]})
         self.assertEqual(r.returncode, 2, r.stdout + r.stderr)
@@ -270,6 +279,7 @@ class Remap(unittest.TestCase):
         stub = tools / "diff"
         stub.write_text(f'#!/bin/sh\nprintf "concurrent work" > "{self.draft}"\nexec "{shutil.which("diff")}" "$@"\n')
         stub.chmod(0o755)
+        committed(self.p)
         r = run(["remap", "q", str(self.draft)], self.p.root,
                 env={"PATH": str(tools) + os.pathsep + os.environ["PATH"]})
         self.assertEqual(r.returncode, 2, r.stdout + r.stderr)
@@ -283,6 +293,7 @@ class Remap(unittest.TestCase):
         stub = tools / "diff"
         stub.write_text(f'#!/bin/sh\nprintf "concurrent work" > "{self.draft}"\nexec "{shutil.which("diff")}" "$@"\n')
         stub.chmod(0o755)
+        committed(self.p)
         r = run(["remap", "q"], self.p.root,
                 env={"PATH": str(tools) + os.pathsep + os.environ["PATH"]})
         self.assertEqual(r.returncode, 2, r.stdout + r.stderr)
@@ -292,7 +303,7 @@ class Remap(unittest.TestCase):
         self.stage()
         saved = self.p.root / "saved.sql"
         saved.write_text(SQL_V1)
-        for path in (self.baseline, self.sql):
+        for path in (self.sql,):
             path.unlink()
             path.symlink_to(saved)
             self.remap(expected=2)

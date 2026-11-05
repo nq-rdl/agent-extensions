@@ -26,11 +26,12 @@ class CompletePublication(unittest.TestCase):
         self.env = {k: v for k, v in os.environ.items() if not k.startswith("SQLREVIEW_")}
         self.env.update(S=str(self.scripts), SLUG="q")
         project.sql("q.sql", "select 1;\n")
-        sha = hashlib.sha256((self.workspace / "q.sql").read_bytes()).hexdigest()
+        project.commit()
+        fp = json.loads(self.helper("fingerprint", "q.sql").stdout)
         self.directory = self.workspace / ".sqlreview/reviews/q"
         self.directory.mkdir(parents=True)
         self.draft = self.directory / "review.draft.json"
-        self.draft.write_text(json.dumps(review_doc("q", "q.sql", sql_sha256=sha)))
+        self.draft.write_text(json.dumps(review_doc("q", **fp)))
         self.assertEqual(self.helper("publish", "q", "review", str(self.draft)).returncode, 0)
         self.assertEqual(self.helper("snapshot", "q", "q.sql").returncode, 0)
         self.final_bytes = (self.directory / "review.json").read_bytes()
@@ -49,19 +50,22 @@ class CompletePublication(unittest.TestCase):
     def test_header_only_completion_records_revision_without_reconfirming(self):
         sql = self.workspace / "q.sql"
         sql.write_text("-- corrected header\nselect 1;\n")
+        Project(self.workspace, git_repo=False, init=False).commit("header update")
         self.assertEqual(self.helper("delta", "q").returncode, 0)
         result = self.recover()
         self.assertEqual(result.returncode, 0, result.stderr)
         published = json.loads((self.directory / "review.json").read_text())
         self.assertEqual(published["revision"], 1)
         self.assertEqual(published["header_revisions"][-1]["sql_sha256"], hashlib.sha256(sql.read_bytes()).hexdigest())
-        self.assertEqual((self.directory / "source.sql").read_text(), "select 1;\n")
+        self.assertEqual(published["sql_sha256"], hashlib.sha256(b"select 1;\n").hexdigest())
+        self.assertEqual(list(self.directory.rglob("*.sql")), [])
         self.assertIn("Header revision", (self.directory / "review.md").read_text())
         self.assertFalse(self.draft.exists(), "helper-owned history is not unpublished work")
 
     def test_header_recovery_preserves_semantically_changed_draft(self):
         sql = self.workspace / "q.sql"
         sql.write_text("-- corrected header\nselect 1;\n")
+        Project(self.workspace, git_repo=False, init=False).commit("header update")
         draft = json.loads(self.draft.read_text())
         draft["assumptions"][0]["rationale"] = "Unpublished rationale"
         self.draft.write_text(json.dumps(draft))
@@ -101,7 +105,7 @@ class CompletePublication(unittest.TestCase):
         self.assertEqual(result.returncode, 0, result.stderr)
         self.assertTrue((self.directory / "review.md").is_file())
         self.assertEqual((self.directory / "review.json").read_bytes(), self.final_bytes)
-        self.assertEqual(sorted(p.name for p in (self.directory / "history").iterdir()), ["1.sql"])
+        self.assertFalse((self.directory / "history").exists())
         self.assertFalse(self.draft.exists())
 
     def test_no_draft_allows_unchanged_review_to_continue(self):
@@ -126,7 +130,7 @@ class CompletePublication(unittest.TestCase):
 
     def test_recovery_publishes_pending_first_store_before_render_without_new_revision(self):
         pending, questions = self.referenced_review_with_pending_questions()
-        before = {p.name: p.read_bytes() for p in (self.directory / "history").iterdir()}
+        before = {p.name: p.read_bytes() for p in self.directory.glob("history/**/*.json")}
         final = (self.directory / "review.json").read_bytes()
         self.assertEqual(self.helper("render", "q", "review").returncode, 4)
         result = self.recover()
@@ -134,7 +138,7 @@ class CompletePublication(unittest.TestCase):
         self.assertEqual(json.loads((self.directory / "questions.json").read_text()), questions)
         self.assertIn("Q1", (self.directory / "review.md").read_text())
         self.assertEqual((self.directory / "review.json").read_bytes(), final)
-        self.assertEqual({p.name: p.read_bytes() for p in (self.directory / "history").iterdir()}, before)
+        self.assertEqual({p.name: p.read_bytes() for p in self.directory.glob("history/**/*.json")}, before)
         self.assertEqual(json.loads(pending.read_text()), questions)
 
     def test_recovery_keeps_bad_pending_questions_and_reports_incomplete(self):

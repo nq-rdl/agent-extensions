@@ -8,6 +8,7 @@ No model call is made; the behavioural side lives in evals/claude/data-request/f
 """
 
 import re
+import textwrap
 import unittest
 from pathlib import Path
 
@@ -113,7 +114,7 @@ class LedgerDefaultLocation(unittest.TestCase):
         where = flat(rst_section("ledger.rst", "Where it lives"))
         self.assertIn(".sqlreview/ledger.json", where)
         self.assertIn("agrees work on that child branch", where)
-        self.assertIn("use this default without asking", where)
+        self.assertIn("use this default; do not make them choose a location", where)
         self.assertIn("no writable agreed branch yet, use the session file", where)
         self.assertIn("triage-only mode, return the entries as text", where)
         self.assertIn("save with ``--session``", where)
@@ -353,15 +354,22 @@ class SpecKitDirectMode(unittest.TestCase):
         # rdl-team:house-style reuses only {"decision": "generativeMode", "value": "direct", by, at, scope}
         # (PR #402's directAuthorised()). Triage cannot know the unit's worktree path, so it records the
         # repository owner/name and the main session translates it into the unit's physicalWorktree.
-        for name in ("handoff.rst", "ledger.rst"):
+        handoff = [yaml.safe_load(m) for m in re.findall(r'\{"decision": "generativeMode"[^}]*\}',
+                                                         (REFS / "handoff.rst").read_text())]
+        # The ledger example is one YAML entry; read its decisions as data, not by text shape.
+        # Anchor on the "Example entry" lead-in so another YAML block elsewhere cannot be picked up.
+        example = (REFS / "ledger.rst").read_text().split("Example entry", 1)[1]
+        example = example.split(".. code-block:: yaml\n", 1)[1]
+        example = re.split(r"\n(?=\S)", example.lstrip("\n"), maxsplit=1)[0]
+        ledger = [d for d in yaml.safe_load(textwrap.dedent(example))["decisions"]
+                  if d.get("decision") == "generativeMode"]
+        for name, objs in (("handoff.rst", handoff), ("ledger.rst", ledger)):
             with self.subTest(ref=name):
-                objs = [yaml.safe_load(m) for m in re.findall(r'\{"decision": "generativeMode"[^}]*\}',
-                                                              (REFS / name).read_text())]
                 self.assertTrue(objs, f"{name} has no generativeMode decision object")
                 for obj in objs:
                     self.assertEqual(set(obj), {"decision", "value", "by", "at", "scope"})
                     self.assertEqual(obj["value"], "direct")
-                    self.assertEqual(obj["scope"], "<owner/name>")
+                    self.assertEqual(obj["scope"], "nq-rdl/query-builder")  # owner/name, not a guessed path
         spec = flat(rst_section("handoff.rst", "Library work through spec-kit"))
         self.assertRegex(spec, r"``scope`` as the repository ``owner/name``")
         self.assertRegex(spec, r"(?i)keep these five keys exactly")
