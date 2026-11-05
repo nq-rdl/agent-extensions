@@ -318,7 +318,7 @@ class BootstrapContract(unittest.TestCase):
                 self.assertRegex(body, r"[/\$]data-request:fix")
                 self.assertIn('if [ -f "<sql path>" ]', body)
                 self.assertIn("malformed", body)
-                self.assertIn("no warning", body)
+                self.assertIn("nothing to report", body)
 
     def test_no_sql_still_allows_scope_publication(self):
         with tempfile.TemporaryDirectory() as tmp:

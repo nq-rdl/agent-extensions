@@ -254,7 +254,7 @@ class SkillContract(unittest.TestCase):
                 self.assertLess(body.index("## 0. Amend gate"), body.index("## 1. Gather the release evidence"))
                 text = flat(section(body, "## 0. Amend gate"))
                 for token in ("`handed off`", "`amendment hand-off:`", "`part:`", "**Completed:**",
-                              "**Withdrawn:**", "`git merge-base --is-ancestor <commit> <ref>`",
+                              "**Withdrawn:**", "`git merge-base --is-ancestor <full SHA> <ref>`",
                               "stop before step 1", "one or two lines", "Release held:",
                               "`withdrawn: P3 <reason>`", "Post nothing",
                               "Never assume that no part is open"):
@@ -285,9 +285,15 @@ class SkillContract(unittest.TestCase):
                 text = flat(section(self.body(tree), "## 0. Amend gate"))
                 for token in ("`.sqlreview/amendments/<request>.json`", "`release.sh evidence` enforces this",
                               "Exit 11 means release held: stop before step 1",
-                              "Never edit the record to pass the gate without a strict comment"):
+                              "Never edit the record to pass the gate without a strict comment",
+                              "once and keep its JSON for step 1", "Exit 2 means the ref",
+                              "go on to step 1", "A failed fetch does not decide"):
                     self.assertIn(token, text)
+        text = flat(section(self.body(), "## 1. Gather the release evidence"))
+        self.assertIn("Step 0 already ran this, so reuse its JSON", text)
         amend = flat((REPO / "skills/data-request-amend/SKILL.md").read_text())
+        self.assertIn("set the entry again after each write of the record, with its new SHA-256", amend)
+        self.assertIn("A single-part amendment writes no record", amend)
         self.assertIn("`.sqlreview/amendments/<request>.json`", amend)
         self.assertIn("`release.sh evidence` reads this file and holds the release", amend)
 
@@ -295,9 +301,11 @@ class SkillContract(unittest.TestCase):
         for text in self.each():
             self.assertIn("work it out before you ask", text)
             self.assertIn("**Release state from evidence**", text)
-            self.assertIn("When exactly one tag has no `approved` release record, use it and say so "
-                          "in one line", text)
-            self.assertIn("Ask only when no tag or more than one tag qualifies", text)
+            self.assertIn("Count only the tags that come after the newest tag with an `approved` record", text)
+            self.assertIn("A tag with no record before that tag is a legacy tag: ignore it", text)
+            self.assertIn("When exactly one tag qualifies, use it and say so in one line", text)
+            self.assertIn("Ask when no tag or more than one tag qualifies", text)
+            self.assertIn("that named ref is the candidate: never replace it with a tag", text)
             self.assertNotIn("If none is given, ask for it.", text)
 
     def test_send_back_adds_the_release_claims(self):
@@ -807,6 +815,12 @@ class AmendGate(unittest.TestCase):
         self.p = Project(self.tmp.name)
         self.p.tag("v1.0.0")
         self.head = git(self.p.root, "rev-parse", "HEAD")
+        # A done commit is verified after a fetch, as amend does, so the project needs an origin.
+        self.remote = tempfile.TemporaryDirectory()
+        self.addCleanup(self.remote.cleanup)
+        git(Path(self.remote.name), "init", "-q", "--bare")
+        git(self.p.root, "remote", "add", "origin", self.remote.name)
+        git(self.p.root, "push", "-q", "origin", "main", "--tags")
 
     def record(self, parts, **extra):
         doc = {"schemaVersion": 1, "kind": "amendment", "enquiry": "THHSRDLENQ-9177", "parts": parts}
@@ -827,9 +841,23 @@ class AmendGate(unittest.TestCase):
         self.assertEqual(r.returncode, 11, r.stderr)
         self.assertIn("release held: amend part handed off and open: P2", r.stderr)
         self.assertNotIn("P1", r.stderr.splitlines()[0])
-        self.assertIn("next:", r.stderr)
+        # The next line names the real part id, not a P<n> placeholder (N2).
+        self.assertIn("next: the engineer comments done: P2 <commit> or the analyst comments withdrawn: P2 <reason>",
+                      r.stderr)
+        self.assertNotIn("P<n>", r.stderr)
         self.assertLessEqual(len(r.stderr.strip().splitlines()), 2, r.stderr)
         self.assertEqual(json.loads(r.stdout)["reviews"][0]["applies"], "current")
+        self.assert_no_leak(r)
+
+    def test_each_open_part_gets_its_own_next_line_with_its_id(self):
+        self.record([self.part("P1", "handed off"), self.part("P4", "handed off")])
+        r = self.p.evidence("v1.0.0")
+        self.assertEqual(r.returncode, 11, r.stderr)
+        nexts = [line for line in r.stderr.splitlines() if line.startswith("next:")]
+        self.assertEqual(len(nexts), 2, r.stderr)
+        self.assertIn("done: P1 <commit>", nexts[0])
+        self.assertIn("withdrawn: P4 <reason>", nexts[1])
+        self.assertNotIn("P<n>", r.stderr)
         self.assert_no_leak(r)
 
     def test_every_part_done_passes(self):
@@ -858,6 +886,90 @@ class AmendGate(unittest.TestCase):
         self.assertEqual(r.returncode, 11, r.stderr)
         self.assertIn("not in v1.0.0: P3", r.stderr)
         self.assertEqual(self.p.evidence("HEAD").returncode, 0)
+
+    def assert_unverified(self, r, part="P3"):
+        self.assertEqual(r.returncode, 11, r.stderr)
+        self.assertIn(f"commit is not verified (rev-parse or merge-base did not succeed): {part}", r.stderr)
+        self.assertIn(f"next: check that the commit of {part} is in this clone", r.stderr)
+        self.assertNotIn("not in v1.0.0", r.stderr)
+        self.assert_no_leak(r)
+
+    def test_failed_fetch_does_not_decide_when_the_commit_is_here(self):
+        # The fetch is best effort: a commit that is a local ancestor of the ref stays verified.
+        self.record([self.part("P3", "done", commit=self.head)])
+        git(self.p.root, "remote", "set-url", "origin", str(Path(self.tmp.name) / "no-such-remote"))
+        r = self.p.evidence("v1.0.0")
+        self.assertEqual(r.returncode, 0, r.stderr)
+        self.assertEqual(r.stderr, "")
+
+    def test_failed_fetch_keeps_a_commit_that_is_not_here_open(self):
+        git(self.p.root, "remote", "set-url", "origin", str(Path(self.tmp.name) / "no-such-remote"))
+        self.record([self.part("P3", "done", commit="0123456789abcdef0123456789abcdef01234567")])
+        self.assert_unverified(self.p.evidence("v1.0.0"))
+
+    def test_no_remote_verifies_a_local_ancestor(self):
+        self.record([self.part("P3", "done", commit=self.head)])
+        git(self.p.root, "remote", "remove", "origin")
+        self.assertEqual(self.p.evidence("v1.0.0").returncode, 0)
+
+    def test_fetch_uses_the_remote_the_repo_has(self):
+        self.record([self.part("P3", "done", commit=self.head)])
+        git(self.p.root, "remote", "rename", "origin", "upstream")
+        self.assertEqual(self.p.evidence("v1.0.0").returncode, 0)
+
+    def test_moved_tag_clobber_refusal_does_not_unverify_a_part(self):
+        # `fetch --tags` refuses to move a local tag, exits non-zero, and must not decide the result.
+        self.record([self.part("P3", "done", commit=self.head)])
+        other = Path(self.tmp.name).parent / f"{Path(self.tmp.name).name}-other"
+        self.addCleanup(shutil.rmtree, other, True)
+        git(Path(self.tmp.name).parent, "clone", "-q", "-b", "main", self.remote.name, str(other))
+        git(other, "config", "user.email", "t@example.org")
+        git(other, "config", "user.name", "T")
+        (other / "moved.txt").write_text("x")
+        git(other, "add", "moved.txt")
+        git(other, "commit", "-q", "-m", "move the tag")
+        git(other, "tag", "-f", "v1.0.0")
+        git(other, "push", "-q", "-f", "origin", "v1.0.0")
+        r = self.p.evidence("v1.0.0")
+        self.assertEqual(r.returncode, 0, r.stderr)
+
+    def test_ref_is_resolved_after_the_fetch(self):
+        # origin/main moves on the remote: the done commit exists only there until the fetch.
+        other = Path(self.tmp.name).parent / f"{Path(self.tmp.name).name}-other"
+        self.addCleanup(shutil.rmtree, other, True)
+        git(Path(self.tmp.name).parent, "clone", "-q", "-b", "main", self.remote.name, str(other))
+        git(other, "config", "user.email", "t@example.org")
+        git(other, "config", "user.name", "T")
+        (other / "engineer.txt").write_text("x")
+        git(other, "add", "engineer.txt")
+        git(other, "commit", "-q", "-m", "engineer change")
+        pushed = git(other, "rev-parse", "HEAD")
+        git(other, "push", "-q", "origin", "HEAD:main")
+        self.record([self.part("P3", "done", commit=pushed)])
+        r = self.p.evidence("origin/main")
+        self.assertEqual(r.returncode, 0, r.stderr)
+        self.assertEqual(json.loads(r.stdout)["commit"], pushed)
+
+    def test_done_part_stays_open_when_the_commit_does_not_resolve(self):
+        for name, commit in (("unknown full SHA", "0123456789abcdef0123456789abcdef01234567"),
+                             ("unknown short SHA", "0123abc")):
+            with self.subTest(name):
+                self.record([self.part("P3", "done", commit=commit)])
+                self.assert_unverified(self.p.evidence("v1.0.0"))
+
+    def test_done_part_stays_open_when_merge_base_exits_128(self):
+        # A copy of the scripts has a git function that makes the ancestry step exit 128, as it does
+        # for an unknown object or ref. A function needs no PATH, so it works under any bash.
+        scripts = Path(self.tmp.name).parent / f"{Path(self.tmp.name).name}-scripts"
+        shutil.copytree(RELEASE.parent, scripts)
+        self.addCleanup(shutil.rmtree, scripts, True)
+        text = (scripts / "release.sh").read_text().split("\n", 1)
+        (scripts / "release.sh").write_text(
+            text[0] + '\ngit() { case " $* " in *" merge-base --is-ancestor "*) return 128 ;; esac; '
+            'command git "$@"; }\n' + text[1])
+        self.record([self.part("P3", "done", commit=self.head)])
+        self.assert_unverified(run(scripts / "release.sh", ["evidence", "v1.0.0"], self.p.root))
+        self.assertEqual(self.p.evidence("v1.0.0").returncode, 0)
 
     def test_hold_takes_precedence_over_a_stale_review(self):
         self.p.write(SQL_PATH, SQL_V2)
@@ -892,6 +1004,33 @@ class AmendGate(unittest.TestCase):
                 self.assertIn(f"release held: {self.RECORD}: field", r.stderr)
                 self.assert_no_leak(r)
 
+    def test_amend_check_and_the_hold_agree_on_what_is_valid(self):
+        # One validator: a record that amend-check refuses holds the release, and one it accepts does not.
+        h = self.head
+        docs = {
+            "valid": {"schemaVersion": 1, "kind": "amendment", "parts": [
+                self.part("P1", "done", commit=h), self.part("P2", "withdrawn", reason="r")]},
+            "kind absent": {"schemaVersion": 1, "parts": [self.part("P1", "done", commit=h)]},
+            "other kind": {"schemaVersion": 1, "kind": CANARY, "parts": [self.part("P1", "done", commit=h)]},
+            "schema": {"schemaVersion": 2, "parts": [self.part("P1", "done", commit=h)]},
+            "withdrawn without a comment": {"schemaVersion": 1, "parts": [self.part("P1", "withdrawn", reason="r")]},
+            "bad id": {"schemaVersion": 1, "parts": [self.part("p1", "done", commit=h)]},
+            "bad commit": {"schemaVersion": 1, "parts": [self.part("P1", "done", commit="HEAD")]},
+            "no parts": {"schemaVersion": 1, "parts": []},
+            "duplicate": {"schemaVersion": 1, "parts": [self.part("P1", "done", commit=h),
+                                                        self.part("P1", "done", commit=h)]},
+        }
+        raw = {"empty": "", "blank": " \n\t\n", "two documents": '{"schemaVersion": 1}\n{"schemaVersion": 1}',
+               "not JSON": "{" + CANARY}
+        for name, body in [(n, json.dumps(d)) for n, d in docs.items()] + list(raw.items()):
+            with self.subTest(name):
+                self.p.write(self.RECORD, body)
+                checked = run(RELEASE, ["amend-check", "--stdin"], self.p.root, stdin=body)
+                held = self.p.evidence("v1.0.0")
+                self.assertEqual(checked.returncode == 4, held.returncode == 11, (checked.stdout, held.stderr))
+                self.assertEqual(checked.returncode == 4, name not in ("valid", "kind absent", "withdrawn without a comment"))
+                self.assert_no_leak(checked)
+
     def ledger(self, stages_done=("intake", "amend"), artifacts=None):
         # The triage ledger's own entry style: the amend stage lists the record as its artifact.
         amend = {"sources": ["pr"], "artifacts": artifacts if artifacts is not None else []}
@@ -913,16 +1052,26 @@ class AmendGate(unittest.TestCase):
         return [{"path": self.RECORD, "sha256": "0" * 64}]
 
     def test_ledger_amendment_without_record_holds(self):
-        for name, artifacts, path in (("record named", self.artifact(), self.RECORD),
-                                      ("no record named", [], ".sqlreview/amendments/<request>.json")):
-            with self.subTest(name):
-                self.ledger(artifacts=artifacts)
-                r = self.p.evidence("v1.0.0")
-                self.assertEqual(r.returncode, 11, r.stderr)
-                self.assertIn(f"{path} is missing", r.stderr)
-                self.assertIn("amendment hand-off comment on the deliverable PR", r.stderr)
-                self.assertNotIn("comments done:", r.stderr)
-                self.assert_no_leak(r)
+        self.ledger(artifacts=self.artifact())
+        r = self.p.evidence("v1.0.0")
+        self.assertEqual(r.returncode, 11, r.stderr)
+        self.assertIn(f"{self.RECORD} is missing", r.stderr)
+        self.assertIn("amendment hand-off comment on the deliverable PR", r.stderr)
+        self.assertNotIn("comments done:", r.stderr)
+        self.assert_no_leak(r)
+
+    def test_single_part_amendment_without_a_record_passes(self):
+        # A single-part amendment writes no record, so an amend entry that names none does not hold.
+        self.ledger(artifacts=[])
+        r = self.p.evidence("v1.0.0")
+        self.assertEqual(r.returncode, 0, r.stderr)
+        self.assertEqual(r.stderr, "")
+        self.record([self.part("P1", "done", commit=self.head)])
+        self.assertEqual(self.p.evidence("v1.0.0").returncode, 0)
+        self.record([self.part("P1", "handed off")])
+        r = self.p.evidence("v1.0.0")
+        self.assertEqual(r.returncode, 11, r.stderr)
+        self.assertNotIn("is missing", r.stderr)
 
     def test_ledger_amendment_with_record_follows_the_record(self):
         self.ledger(artifacts=self.artifact())
@@ -949,6 +1098,45 @@ class AmendGate(unittest.TestCase):
         self.assertEqual(r.returncode, 11, r.stderr)
         self.assertIn("release held: .sqlreview/ledger.json: field entries is missing or invalid", r.stderr)
         self.assert_no_leak(r)
+
+    def test_empty_or_blank_files_hold_as_malformed(self):
+        for name, text in (("empty", ""), ("spaces", "  \n\t\n"), ("two documents", "{} {}")):
+            with self.subTest(f"record {name}"):
+                self.p.write(self.RECORD, text)
+                r = self.p.evidence("v1.0.0")
+                self.assertEqual(r.returncode, 11, r.stderr)
+                self.assertIn(f"release held: {self.RECORD}: field (document) is missing or invalid", r.stderr)
+                self.assert_no_leak(r)
+        (self.p.root / self.RECORD).unlink()
+        for name, text in (("empty", ""), ("spaces", "  \n\t\n")):
+            with self.subTest(f"ledger {name}"):
+                (self.p.root / ".sqlreview/ledger.json").write_text(text)
+                r = self.p.evidence("v1.0.0")
+                self.assertEqual(r.returncode, 11, r.stderr)
+                self.assertIn("release held: .sqlreview/ledger.json: field entries is missing or invalid",
+                              r.stderr)
+
+    def test_no_amend_hold_reports_open_parts_and_exits_zero(self):
+        # The engineer hand-off gate: handed-off parts are expected, so they are notes, not a hold.
+        self.record([self.part("P1", "handed off"), self.part("P2", "done", commit="0123abc")])
+        r = self.p.evidence("--no-amend-hold", "v1.0.0")
+        self.assertEqual(r.returncode, 0, r.stderr)
+        self.assertIn("amend note: amend part handed off and open: P1", r.stderr)
+        self.assertNotIn("release held", r.stderr)
+        self.assertNotIn("P2", r.stderr)
+        self.assertEqual(json.loads(r.stdout)["reviews"][0]["applies"], "current")
+        self.assert_no_leak(r)
+        self.assertEqual(self.p.evidence("v1.0.0").returncode, 11)
+        self.p.write(self.RECORD, "")
+        r = self.p.evidence("--no-amend-hold", "v1.0.0")
+        self.assertEqual(r.returncode, 0, r.stderr)
+        self.assertIn(f"amend note: {self.RECORD}: field (document) is missing or invalid", r.stderr)
+
+    def test_no_amend_hold_still_exits_ten_for_a_stale_review(self):
+        self.p.write(SQL_PATH, SQL_V2)
+        self.p.commit("widen criteria")
+        self.record([self.part("P1", "handed off")])
+        self.assertEqual(self.p.evidence("--no-amend-hold", "HEAD").returncode, 10)
 
     def test_every_record_is_read(self):
         self.record([self.part("P1", "done", commit=self.head)])
@@ -1244,8 +1432,9 @@ def decided(criteria, decision="accepted"):
 class AmendRecordGuard(unittest.TestCase):
     """The guard validates writes to .sqlreview/amendments/*.json like the other review documents.
 
-    The schema is #534's: schemaVersion 1, kind amendment, parts[] with a unique id P<n> and a status
-    done (with commit), handed off or withdrawn (with reason and comment). Never a value in the reason.
+    The schema is the amend gate's: schemaVersion 1, kind amendment (when present), parts[] with a unique
+    id P<n> and a status done (with commit), handed off or withdrawn (with reason). The evidence hold
+    reads the same validator. Never a value in the reason.
     """
     REL = "amendments/enq9177-falls.json"
     decide = Guard.decide
@@ -1287,14 +1476,13 @@ class AmendRecordGuard(unittest.TestCase):
     def test_part_rules_name_the_field_and_the_rule(self):
         parts = [{"id": CANARY, "status": "done", "commit": "a" * 40},
                  {"id": "P2", "status": "done", "commit": CANARY},
-                 {"id": "P3", "status": "withdrawn", "reason": " ", "comment": ""},
+                 {"id": "P3", "status": "withdrawn", "reason": " "},
                  {"id": "P3", "status": CANARY},
                  CANARY]
         reason = self.denied(self.doc(parts), "parts[0].id: must be P<n>",
                              "parts[1].commit: required for a done part",
                              "parts[2].reason: required for a withdrawn part",
-                             "parts[2].comment: required for a withdrawn part",
-                             "parts[].id: must be unique",
+                             "parts[].id (duplicate): must be unique",
                              "parts[3].status: must be done, handed off or withdrawn",
                              "parts[4]: must be an object")
         self.assertIn("release.sh amend-check", reason)

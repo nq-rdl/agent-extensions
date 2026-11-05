@@ -31,8 +31,7 @@ prefix its shared question's text `Analyst question:` and send it back through
 the handoff for the analyst to consult the requester. Do not relabel an
 engineer confirmation as an analyst confirmation.
 
-For RDL cohort SQL, read `${PLUGIN_ROOT}/skills/guardrails/SKILL.md` before
-scoping or reviewing. Consult its dataops/column-spec sources and carry evidence or
+For RDL cohort SQL, invoke `$data-request:guardrails` before scoping or reviewing. Consult its dataops/column-spec sources and carry evidence or
 unverified facts into the discussion; advisory findings do not replace human confirmation.
 
 Arguments: `$ARGUMENTS`.
@@ -175,7 +174,7 @@ fi
 bash "$S/sqlreview.sh" render "$SLUG" review || exit $?
 if jq -e -s 'length == 2 and (.[0] | del(.header_revisions)) == (.[1] | del(.header_revisions))' \
     ".sqlreview/reviews/$SLUG/review.draft.json" ".sqlreview/reviews/$SLUG/review.json" >/dev/null 2>&1; then
-  rm -f ".sqlreview/reviews/$SLUG/review.draft.json"
+  bash "$S/sqlreview.sh" discard-draft "$SLUG" review >/dev/null || exit $?
 fi
 if [ -e ".sqlreview/reviews/$SLUG/review.draft.json" ]; then
   printf 'Stop: review draft contains unpublished work; retain it for completion.\n' >&2
@@ -205,7 +204,8 @@ steps 3–4 of *Changed SQL* below: draft the next revision, run `carryforward`,
 items implicated by the grain/evidence change even when their SQL lines are unchanged,
 increment the revision and append to `changes[]`. Then follow *Confirm, write, render*,
 including confirmation/carry gates and publish → snapshot → render. Do not change SQL
-or auto-confirm a new or reworded item to make this update possible.
+or record a confirmation the human did not give for a new or reworded item to make this
+update possible.
 
 ### Changed SQL: reassess the review
 
@@ -406,7 +406,7 @@ change before continuing. Write the complete confirmed document to
 bash "$S/sqlreview.sh" publish "$SLUG" review ".sqlreview/reviews/$SLUG/review.draft.json" || exit $?
 bash "$S/sqlreview.sh" snapshot "$SLUG" "<sql path>" || exit $?  # verify only AFTER publish succeeds; writes no SQL
 bash "$S/sqlreview.sh" render "$SLUG" review || exit $?  # → reviews/<slug>/review.md (never hand-write it)
-rm -f ".sqlreview/reviews/$SLUG/review.draft.json"
+bash "$S/sqlreview.sh" discard-draft "$SLUG" review || exit $?
 ```
 
 Show `review.md`. Continue with *After review* below.

@@ -14,7 +14,7 @@ compatibility: >-
   Layout observed 2026-09-21 to 2026-09-23: requests are rdl-service-desk/service-desk issues,
   children are rdl-service-desk/<APPROVAL-ID> repositories rendered from data-analysis-scaffold,
   and query-builder-plugins is consolidated into query-builder. Re-check the layout before relying on it.
-allowed-tools: Bash, Read, Glob, Grep, Write, Edit, AskUserQuestion
+allowed-tools: Bash, Read, Glob, Grep, Write, Edit, AskUserQuestion, Skill
 metadata:
   repo: https://github.com/nq-rdl/agent-extensions
 ---
@@ -22,9 +22,9 @@ metadata:
 # Data Request — triage (Data Analyst / Data Engineer)
 
 The queue entrypoint decides what to work on next and in what order. Stage skills do the
-work; this skill routes to them without restating procedures. Arguments: `$ARGUMENTS`. Read
-`${CLAUDE_PLUGIN_ROOT}/skills/guardrails/SKILL.md` for source hierarchy and **Engineer decisions: proceed and flag**;
-its `references/decision-authority.rst` distinguishes technical defaults from analyst questions and genuine blockers. Engineer–analyst communication goes on the deliverable PR, never the child issue or service-desk: see *Communication channel* in [references/handoff.rst](references/handoff.rst).
+work; this skill routes to them without restating procedures. Arguments: `$ARGUMENTS`. Invoke
+`/data-request:guardrails` for source hierarchy and **Engineer decisions: proceed and flag**;
+`${CLAUDE_PLUGIN_ROOT}/skills/guardrails/references/decision-authority.rst` distinguishes technical defaults from analyst questions and genuine blockers. Engineer–analyst communication goes on the deliverable PR, never the child issue or service-desk: see *Communication channel* in [references/handoff.rst](references/handoff.rst).
 
 ## Choose the mode
 
@@ -82,7 +82,7 @@ Recheck affected evidence/artifacts, not every stage. See [references/ledger.rst
    source system and grain with the engineer before `/data-request:bootstrap`; proceed and flag technical decisions. Bare `Patient` is unconfirmed: propose evidenced grain using guardrails `references/grain.rst`, not the answers default.
    Separate confirmed requirements, engineer decisions and proposals; silence is not approval. Supplied cohorts mean linkage.
    Use explicit codes as written, not a broader library concept. Apply guardrails **House defaults**: TUH `00200` needs no facility question; see [references/checks.rst](references/checks.rst).
-   When the request explicitly changes the cohort's facility set to another facility, the whole HHS or a network-wide cohort, return one `Analyst question:` about the facility set instead of the TUH default. Reuse an already answered intake/prior-scope exception, without asking again or intersecting it with TUH.
+   When the request explicitly changes the cohort's facility set to another facility, the whole HHS or a network-wide cohort, return one `Analyst question:` about the facility set instead of the TUH default. Reuse an exception already answered in intake or a prior scope; do not ask it again or intersect it with TUH.
 7. **Recheck every gap claim**, whether yours, a worker's or a register row, against current
    code, tests, releases and dependency topology before you plan or file it. A delivered
    capability is closed; run and report the [read-only stale lift check](references/checks.rst).

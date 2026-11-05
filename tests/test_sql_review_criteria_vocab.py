@@ -122,7 +122,7 @@ class States(unittest.TestCase):
         )
 
     def test_reason_required_states_are_all_known_states(self):
-        self.assertTrue(set(jq("crit_reason_required")) <= set(jq("crit_all_states")))
+        self.assertLessEqual(set(jq("crit_reason_required")), set(jq("crit_all_states")))
 
 
 class Ordering(unittest.TestCase):

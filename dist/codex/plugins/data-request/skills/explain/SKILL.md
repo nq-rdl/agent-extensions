@@ -16,6 +16,8 @@ metadata:
 
 ## Codex execution
 
+When supporting references invoke a catalog skill as /subject:facet, use $subject:facet in Codex. Preserve slash syntax inside examples that configure or document another host.
+
 Before shell examples, set PLUGIN_ROOT to the absolute installed plugin directory: two parent directories above this SKILL.md’s containing skill directory. Derive it from the loaded file path, never the working directory. This variable is not automatically supplied to ordinary shell tools. Quote it in commands.
 
 Here $ARGUMENTS means the user’s supplied skill arguments. Codex does not populate a shell variable for them. Pass arguments with shell quoting that preserves literal text; never evaluate user text as shell code.
@@ -26,7 +28,7 @@ The engineer completes `analyse`, the authorised operator run, UAT and the triag
 before the analyst reviews the extract here. The analyst accepts for release preparation,
 sends back or uses `amend`, then prepares and publishes the release. The engineer never releases.
 
-For RDL cohort SQL, read `${PLUGIN_ROOT}/skills/guardrails/SKILL.md` when
+For RDL cohort SQL, invoke `$data-request:guardrails` when
 explaining storage facts or conversions. Label any conflict with current source
 metadata and return it to `$data-request:analyse`; do not silently rewrite the reviewed record.
 
@@ -83,14 +85,16 @@ issue only links to the PR. If the comment is ambiguous or unavailable, ask for 
 Read that comment and its linked evidence with `gh` or available GitHub read tools, not a
 recollection of an earlier session. Make no GitHub writes while you load the hand-off.
 
-Verify the child repository and deliverable PR match this request. Read the
+Verify the child repository and deliverable PR match this request. With a read-only call, also
+confirm that the child tracking issue links to the same deliverable PR and the same request. If
+it does not, name the difference and do not offer acceptance. Never write to that issue. Read the
 current PR head SHA from GitHub and compare the hand-off's head SHA, run commit, review revision
 and SQL fingerprint with the review being explained. Read the linked run manifest, counts-only
 QA, DVC provenance and UAT sections 1 to 3 for that run, plus open questions, flagged decisions,
 requester limitations and known approval restrictions. Read
 `${PLUGIN_ROOT}/skills/triage/references/handoff.rst`, *Hand-off to review*, and recheck
-its gate, including the committed-review/source-evidence check and `release.sh evidence` at the run
-commit. Recheck any referenced release gates against their current evidence before outcomes.
+its gate, including the committed-review/source-evidence check and `release.sh evidence --no-amend-hold` at the run
+commit, and treat each `amend note:` as an open gate for release, not a failed recheck. Recheck any referenced release gates against their current evidence before outcomes.
 
 If the record, linked evidence or tools are missing, or any identity/revision differs, name
 what is missing or stale and do not offer acceptance. A SQL-only walkthrough and **Send back**
@@ -175,38 +179,10 @@ before the first release. Logic changes and defects go to the engineer through
 `$data-request:fix`; a disagreement with a review item also requires `analyse --update`.
 Classify each finding; do not make the change or approve new meaning during explanation.
 
-For **Send back**, return this paste-ready note, with one finding block per change:
-
-```text
-outcome: send-back
-deliverable PR: <PR URL> at head <SHA>
-run commit: <operator run SHA, or missing>
-review: <slug> revision <n>, SQL fingerprint <hash>
-already resolved by the analyst: <requester answers, governance checks and decisions, with who and when, or "none">
-finding: <F1: observed issue>
-affected files: <maintained source, generated SQL to regenerate, runbook and UAT checklist>
-expected result: <the concrete value, column, rule or count the engineer must produce>
-waiting on: <"nothing", or the requester question with who asked it and when>
-classification: <logic or defect | presentation>
-route: <$data-request:fix | $data-request:amend>
-evidence: <review item/revision, SQL lines, run QA or output schema; no row-level data>
-open gates: <governance restrictions and missing evidence>
-return to review: <refresh analyse, operator-run/UAT evidence and triage hand-off>
-```
-
-The note must let the engineer act without a reply that asks for more detail. Before you
-present it, finish the analyst's share. Get answers the analyst can give now: the expected
-result, the requester's words and the governance check. Then check each finding:
-
-- `expected result:` is concrete. "Fix it" or "make it right" is not a result.
-- `affected files:` names paths, not a description.
-- `evidence:` names where the engineer looks: an item id, SQL lines or a QA output.
-- A meaning that only the requester can decide goes in `waiting on:`, with the requester
-  question. Offer to draft that question for the analyst. The engineer starts that finding
-  only after the analyst posts the answer on the PR.
-
-Fill each gap from the walkthrough, or ask the analyst now. Never leave a gap for the
-engineer to ask about later.
+For **Send back**, return the paste-ready note in
+[references/send-back-note.rst](references/send-back-note.rst), with one finding block per change.
+Run its completeness check before you present the note. The engineer must be able to act on it
+without a reply that asks for more detail.
 
 Present the note to the analyst; post nothing unless explicitly instructed. When instructed,
 post it on the deliverable PR, addressed to the engineer. Never post it on the child issue or

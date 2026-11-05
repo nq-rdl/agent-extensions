@@ -230,6 +230,21 @@ class Publish(unittest.TestCase):
         self.assertEqual(history.read_bytes(), before)
         self.assert_no_sql_records()
 
+    def test_refused_publish_with_uncommitted_sources_prints_no_ok(self):
+        fp = self.generated()
+        (self.workspace / "sql/request.sql").write_text("SELECT 2;\n")
+        result = self.publish(self.generated_doc(fp), "sql__request")
+        self.assertEqual(result.returncode, 2, result.stdout + result.stderr)
+        self.assertNotIn("ok", result.stdout.split())
+        self.assertIn("uncommitted source changes", result.stderr)
+        self.assertFalse((self.final / "review.json").exists())
+        # Once committed, the same publish succeeds and still reports the check result.
+        self.project.commit("body change")
+        fp = json.loads(self.run_helper("fingerprint", "sql/request.sql").stdout)
+        result = self.publish(self.generated_doc(fp), "sql__request")
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        self.assertEqual(result.stdout.split()[:1], ["ok"])
+
     def test_snapshot_refuses_uncommitted_sql(self):
         fp = self.generated()
         self.assertEqual(self.publish(self.generated_doc(fp), "sql__request").returncode, 0)
@@ -374,6 +389,36 @@ class Publish(unittest.TestCase):
         (self.final / "scope.json").symlink_to(outside)
         self.assertNotEqual(self.publish(scope_doc("q", "q.sql")).returncode, 0)
         self.assertEqual(outside.read_text(), "keep")
+
+    def test_discard_draft_removes_only_the_canonical_draft(self):
+        self.final.mkdir(parents=True)
+        draft = self.final / "scope.draft.json"
+        draft.write_text("{}")
+        keep = self.final / "review.draft.json"
+        keep.write_text("{}")
+        result = self.run_helper("discard-draft", "q", "scope")
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertEqual(result.stdout, "discarded\t.sqlreview/reviews/q/scope.draft.json\n")
+        self.assertFalse(draft.exists())
+        self.assertTrue(keep.exists())
+        # Absent is a no-op, so a re-run after a completed publish succeeds.
+        again = self.run_helper("discard-draft", "q", "scope")
+        self.assertEqual((again.returncode, again.stdout), (0, ""), again.stderr)
+
+    def test_discard_draft_refuses_unsafe_slugs_kinds_and_links(self):
+        outside = Path(self.temp.name) / "outside.json"
+        outside.write_text("keep")
+        self.assertNotEqual(self.run_helper("discard-draft", "../q", "scope").returncode, 0)
+        self.assertNotEqual(self.run_helper("discard-draft", "..", "scope").returncode, 0)
+        self.assertNotEqual(self.run_helper("discard-draft", "q", "questions").returncode, 0)
+        self.final.mkdir(parents=True)
+        (self.final / "review.draft.json").symlink_to(outside)
+        self.assertNotEqual(self.run_helper("discard-draft", "q", "review").returncode, 0)
+        self.assertEqual(outside.read_text(), "keep")
+        (self.final / "review.draft.json").unlink()
+        (self.final / "review.draft.json").mkdir()
+        self.assertEqual(self.run_helper("discard-draft", "q", "review").returncode, 2)
+        self.assertTrue((self.final / "review.draft.json").is_dir())
 
     def test_custom_roles_preserve_configuration_and_quote_user_answers(self):
         config = self.workspace / ".sqlreview/config.json"

@@ -18,7 +18,6 @@ import re
 import subprocess
 import tempfile
 import unittest
-from pathlib import Path
 
 try:
     from test_sql_review_scripts import REPO, Project, review_doc, run, scope_doc

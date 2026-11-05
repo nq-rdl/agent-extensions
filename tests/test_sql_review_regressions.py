@@ -25,6 +25,109 @@ class ReviewRegressions(unittest.TestCase):
         self.p.write_json('q', 'review.json', review_doc('q', **fp))
         self.assertEqual(run(['snapshot', 'q', 'q.sql'], self.p.root).returncode, 0)
 
+    def test_snapshot_after_reassessment_clears_the_move_marker(self):
+        self.reviewed()
+        self.assertEqual(run(['move', 'q.sql', 'renamed.sql'], self.p.root).returncode, 0)
+        moved = self.d.parent / 'renamed'
+        self.assertTrue((moved / 'rebind-required').is_file())
+        (self.p.root / 'q.sql').rename(self.p.root / 'renamed.sql')
+        # Before reassessment the recorded commit has no SQL at the new path: snapshot fails
+        # and the marker stays.
+        self.p.commit('move sql')
+        self.assertNotEqual(run(['snapshot', 'renamed', 'renamed.sql'], self.p.root).returncode, 0)
+        self.assertTrue((moved / 'rebind-required').is_file())
+        fp = json.loads(run(['fingerprint', 'renamed.sql'], self.p.root).stdout)
+        self.p.write_json('renamed', 'review.json', review_doc('renamed', **fp))
+        self.p.commit('reassessed review')
+        result = run(['snapshot', 'renamed', 'renamed.sql'], self.p.root)
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertFalse((moved / 'rebind-required').exists())
+        rows = json.loads(run(['status', '--json'], self.p.root).stdout)['reviews']
+        self.assertNotEqual({r['slug']: r['state'] for r in rows}['renamed'], 'stale')
+
+    def test_moved_reviews_keep_every_recorded_revision_readable(self):
+        outside = tempfile.TemporaryDirectory()  # drafts and outputs stay out of the project
+        self.addCleanup(outside.cleanup)
+        out = Path(outside.name)
+
+        def publish(slug, revision, path):
+            fp = json.loads(run(['fingerprint', path], self.p.root).stdout)
+            draft = out / 'draft.json'
+            draft.write_text(json.dumps(review_doc(slug, revision=revision, **fp)))
+            result = run(['publish', slug, 'review', str(draft)], self.p.root)
+            self.assertEqual(result.returncode, 0, result.stderr)
+
+        def moved(old, new, slug):
+            self.assertEqual(run(['move', old, new], self.p.root).returncode, 0)
+            (self.p.root / old).rename(self.p.root / new)
+            self.p.commit(f'move to {new}')
+            # Carry evidence comes from the archived binding before reassessment, too.
+            draft = out / 'carry.json'
+            current = json.loads((self.d.parent / slug / 'review.json').read_text())
+            draft.write_text(json.dumps(dict(current, revision=current['revision'] + 1)))
+            carry = run(['carryforward', slug, 'review', str(draft)], self.p.root)
+            self.assertEqual(carry.returncode, 0, carry.stderr)
+
+        self.p.commit()
+        publish('q', 1, 'q.sql')
+        self.p.sql('q.sql', SQL_V2)
+        self.p.commit('v2')
+        publish('q', 2, 'q.sql')
+        moved('q.sql', 'renamed.sql', 'renamed')
+        publish('renamed', 3, 'renamed.sql')
+        moved('renamed.sql', 'again.sql', 'again')
+        publish('again', 4, 'again.sql')
+        for revision, sql in ((1, SQL_V1), (2, SQL_V2), (3, SQL_V2), (4, SQL_V2)):
+            with self.subTest(revision=revision):
+                target = out / f'{revision}.sql'
+                result = run(['materialize', 'again', 'review', str(revision), str(target)], self.p.root)
+                self.assertEqual(result.returncode, 0, result.stderr)
+                self.assertEqual(target.read_text(), sql)
+        archived = json.loads((self.d.parent / 'again/history/review/2.json').read_text())
+        self.assertEqual((archived['slug'], archived['sql_path']), ('q', 'q.sql'))
+
+    def test_materialize_output_resolves_symlinked_directories_but_not_links_into_the_repo(self):
+        self.p.commit()
+        fp = json.loads(run(['fingerprint', 'q.sql'], self.p.root).stdout)
+        self.p.write_json('q', 'review.json', review_doc('q', **fp))
+        outside = tempfile.TemporaryDirectory()
+        self.addCleanup(outside.cleanup)
+        o = Path(outside.name)
+        (o / 'real').mkdir()
+        (o / 'tmp-link').symlink_to(o / 'real')      # as /tmp and /var/folders are on macOS
+        (o / 'into-repo').symlink_to(self.p.root)
+        (o / 'real' / 'final-link.sql').symlink_to(o / 'elsewhere.sql')
+
+        def materialize(target):
+            return run(['materialize', 'q', 'review', '1', str(target)], self.p.root)
+
+        ok = materialize(o / 'tmp-link' / 'reviewed.sql')
+        self.assertEqual(ok.returncode, 0, ok.stderr)
+        self.assertEqual((o / 'real' / 'reviewed.sql').read_text(), SQL_V1)
+        refused = materialize(o / 'into-repo' / 'leak.sql')
+        self.assertEqual(refused.returncode, 2)
+        self.assertIn('outside the git tree', refused.stderr)
+        self.assertFalse((self.p.root / 'leak.sql').exists())
+        self.assertEqual(materialize(o / 'real' / 'final-link.sql').returncode, 2)
+        self.assertFalse((o / 'elsewhere.sql').exists())
+        self.assertEqual(materialize(o / 'missing' / 'x.sql').returncode, 2)
+
+    def test_symlinked_tmpdir_is_resolved_for_helper_workspaces(self):
+        self.p.commit()
+        outside = tempfile.TemporaryDirectory()  # outside the project, which is self.tmp
+        self.addCleanup(outside.cleanup)
+        real = Path(outside.name) / 'real-tmp'
+        real.mkdir()
+        link = Path(outside.name) / 'link-tmp'
+        link.symlink_to(real)
+        env = {'TMPDIR': str(link)}
+        fp = run(['fingerprint', 'q.sql'], self.p.root, env=env)
+        self.assertEqual(fp.returncode, 0, fp.stderr)
+        self.p.write_json('q', 'review.json', review_doc('q', **json.loads(fp.stdout)))
+        snap = run(['snapshot', 'q', 'q.sql'], self.p.root, env=env)
+        self.assertEqual(snap.returncode, 0, snap.stderr)
+        self.assertEqual(list(real.iterdir()), [], 'helper workspaces are removed')
+
     def test_unsafe_paths_and_slugs_are_rejected(self):
         for slug in ['', '.', '..', '../../outside', '/tmp/outside']:
             for command in [['snapshot', slug, 'q.sql'], ['render', slug, 'review'], ['delta', slug], ['impact', slug]]:

@@ -351,7 +351,7 @@ Import session data from a JSON file or OpenCode share URL.
 ```bash
 opencode import <file>
 opencode import session.json
-opencode import <share-url>
+opencode import https://opncd.ai/s/abc123
 ```
 
 ---

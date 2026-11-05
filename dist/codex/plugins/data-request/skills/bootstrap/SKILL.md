@@ -6,8 +6,8 @@ description: 'Scope a piece of SQL work with the Data Engineer before the SQL is
   scope.md (intent, inputs, outputs, assumptions, open questions), preserving recorded
   upstream confirmations. Re-running on an existing scope walks through what changed.
   It is also the step that updates a scope after the SQL or the analyst intake changes,
-  before analyse runs again. Use at the start of the Data Request scoping workflow,
-  after $data-request:setup and before $data-request:analyse.'
+  before analyse runs again. Use first in the Data Request scoping workflow, after
+  $data-request:setup and before $data-request:analyse.'
 compatibility: .sqlreview schema 2 (schema 1 remains readable) (docs/specs/2026-09-15-sql-review-plugin-design.md);
   bash 3.2+, jq >= 1.6, git required for SQL-bound scopes.
 metadata:
@@ -31,9 +31,8 @@ The engineer owns technical sources, grain mechanics, keys, timezones, joins and
 the clinical grain unit) as an engineer confirmation. Write it as an `Analyst question:` item
 and route it back to the analyst, who can answer it in a `$data-request:intake` re-run.
 
-For RDL cohort SQL, read `${PLUGIN_ROOT}/skills/guardrails/SKILL.md` before
-scoping or reviewing. Apply **Engineer decisions: proceed and flag** in its
-`references/decision-authority.rst`: implement evidenced technical defaults within the agreed task,
+For RDL cohort SQL, invoke `$data-request:guardrails` before scoping or reviewing. Apply **Engineer decisions: proceed and flag** in
+`${PLUGIN_ROOT}/skills/guardrails/references/decision-authority.rst`: implement evidenced technical defaults within the agreed task,
 flag them for analyst review, and batch only remaining research questions. This does not park the build for analyst approval
 or replace formal engineer confirmation. Deliver requested outputs only; offer extras, do not build them.
 Consult dataops/column-spec evidence; never invent human confirmation.
@@ -102,7 +101,7 @@ Re-run lint after edits; decision-source warnings require a source check, not a 
 Reworded confirmed items need fresh human confirmation; do not retain their carried
 confirmation or edit the final JSON. Lint cannot grant confirmation.
 
-Apply guardrails **House defaults** without asking: reuse one standard assumption from
+Apply guardrails **House defaults** from their recorded confirmation, without a fresh question: reuse one standard assumption from
 setup's `tuh-facility` entry, with its `upstream` marker and recorded house confirmation
 (see `${PLUGIN_ROOT}/skills/setup/references/recurring-decisions.rst`). Do not ask a fresh facility question.
 If the request explicitly changes the cohort's facility set to another facility, the whole HHS or a network-wide cohort, put one
@@ -222,14 +221,18 @@ patients, an invalid URN, cancelled admissions) is not a criterion. Record it as
 assumption, reported under "Extraction Assumptions / Important limitations". Do not repeat a criterion
 in that section.
 
-**House default:** `broad-first-pass` applies without asking, like `tuh-facility`, when the request is
-on its first pass (no earlier delivery exists for it). When it is not, the default is not applied and
-exclusions get ordinary engineer-confirmed rows. Read it with `recurring-decisions.sh list`. Give
-each exclusion that the request does not override a row with state `not-applied`, `reason` the
-decision's `proposal.text` and `upstream: {"source": "recurring-decision", "id": "broad-first-pass"}`.
+**House default:** `broad-first-pass` is a human ruling that is already recorded. You import it and you
+do not decide it. Like `tuh-facility`, it needs no fresh question when the request is on its first
+pass (no earlier delivery exists for it). When it is not, the default is not applied and
+exclusions get ordinary engineer-confirmed rows. Read it with `recurring-decisions.sh list`. Import it
+only when its `house_default` holds `confirmed_by` and `confirmed_at`. If either is missing, treat the
+exclusions as ordinary engineer-confirmed rows. Give each exclusion that the request does not override
+a row with state `not-applied`, `reason` the decision's `proposal.text` and `upstream: {"source": "recurring-decision", "id": "broad-first-pass"}`.
 Copy `confirmed_by` and `confirmed_at` from its `house_default`, set `confirmed_revision` to the import
 revision, and put no `decided` on the row. Invent no other confirmer. Write no assumption or limitation
-for it, and leave inclusions, entry events and data elements alone. A request that applies an
+for it, and leave inclusions, entry events and data elements alone. Tell the engineer which rows
+you imported, with the recorded decider and date from `house_default.decided`. The engineer may override
+any row before publish. A request that applies an
 exclusion, or an engineer who overrides the default for one criterion, gets the normal row with no
 `upstream`, confirmed afresh. See `${PLUGIN_ROOT}/skills/setup/references/recurring-decisions.rst`.
 
@@ -443,7 +446,8 @@ rules. Known restrictions still apply.
 Re-run comparison after reconciliation. After SQL edits, also re-run fingerprint and the
 SQL-change checks above; changed framing or item wording needs the appropriate reconfirmation.
 Do not publish while a mismatch is unaddressed. If the matches are clean and no header settles
-an open question (including explicitly acknowledged provisional choices), give no warning.
+an open question (including explicitly acknowledged provisional choices),
+there is nothing to report; publish.
 Semantic checking is the agent/source-review obligation, not something `publish` proves.
 
 ```bash
@@ -461,7 +465,7 @@ header in `header_revisions`. Preserve the previous revision and increment it on
 
 ```bash
 bash "$S/sqlreview.sh" render "$SLUG" scope || exit $?  # → reviews/<slug>/scope.md (never hand-write it)
-rm -f ".sqlreview/reviews/$SLUG/scope.draft.json"
+bash "$S/sqlreview.sh" discard-draft "$SLUG" scope || exit $?
 ```
 
 

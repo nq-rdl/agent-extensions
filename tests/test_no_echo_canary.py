@@ -7,6 +7,9 @@ call. Messages name the field and the rule, never the value. Fixed paths fail he
 Known cases skip and name their deferred fix, so they do not fail CI:
   F-4  values passed to jq on argv (--arg, --argjson, --rawfile names)
   F-6  `lint --ste` names the matched word
+The amend gate (evidence holds and --no-amend-hold notes, amend-check), the status lines (amendment, record
+missing, commit first, criteria freshness), the preflight hook and the guard's amendment record check are
+covered too. The author check in the amend skill is skill text with no script path, so it has no case here.
 Intentional outputs stay allowed on stdout only: delta and impact SQL text, intake output,
 carryforward and evidence output, and the release table text. stderr stays clean for them too.
 Fake request numbers only (9xxx).
@@ -24,6 +27,7 @@ REPO = Path(__file__).resolve().parents[1]
 S = REPO / "skills/data-request-setup/scripts"
 SR, RL, RD = S / "sqlreview.sh", S / "release.sh", S / "recurring-decisions.sh"
 GUARD = REPO / "hooks/data-request-guard.sh"
+PREFLIGHT = REPO / "hooks/data-request-preflight.sh"
 CANARY = "LEAK-CANARY"
 FRAGS = ("LEAK-C", "CANARY")   # jq truncates long values in its errors, so a prefix counts too
 APPROVAL = "THHSAQUIRE-9187"
@@ -259,6 +263,87 @@ class Canary(unittest.TestCase):
         self.assertClean(r, 2)
         self.assertIn("unsafe sql_path", r.stderr)
 
+    # --- #548 late paths: move archive, materialize, discard-draft, publish from the archive -------
+    def reviewed_project(self, **over):
+        """A committed q.sql and a published review whose free-text fields all carry the canary."""
+        self.write("q.sql", "SELECT 1;\n")
+        self.commit()
+        fp = json.loads(self.run_script(SR, "fingerprint", "q.sql").stdout)
+        fp.pop("sql_path")
+        doc = review(purpose=CANARY + " purpose", title=CANARY + " title", grain=CANARY + " grain",
+                     assumptions=[item("A1", CANARY + " text", rationale=CANARY + " why")],
+                     limitations=[item("L1", CANARY + " limit")], open_questions=[CANARY + " question?"], **fp)
+        doc.update(over)
+        self.write(".sqlreview/reviews/q/review.json", doc)
+        return fp
+
+    def test_materialize_refusals_name_no_value(self):
+        self.reviewed_project()
+        out = self.tmp / "out.sql"
+        cases = (("q", "review", "9", out),                       # revision unavailable
+                 ("q", "review", "1", self.root / "inside.sql"),   # output inside the git tree
+                 ("q", "review", "1", "relative.sql"),             # output not absolute
+                 ("q", "lifts", "1", out))                         # kind refused
+        for args in cases:
+            with self.subTest(args=args[1:3]):
+                r = self.run_script(SR, "materialize", *args)
+                self.assertNotEqual(r.returncode, 0)
+                self.assertClean(r)
+        # A history entry the check refuses, with canary values in every field.
+        hist = self.root / ".sqlreview/reviews/q/history/review"
+        hist.mkdir(parents=True)
+        (hist / "1.json").write_text(json.dumps(review(slug=CANARY, kind=CANARY, sql_path="/" + CANARY,
+                                                       git_commit=CANARY, sql_sha256=CANARY)))
+        self.assertClean(self.run_script(SR, "materialize", "q", "review", "1", out))
+
+    def test_materialize_and_delta_from_an_archive_with_free_text(self):
+        fp = self.reviewed_project()
+        hist = self.root / ".sqlreview/reviews/q/history/review"
+        hist.mkdir(parents=True)
+        shutil.copy(self.root / ".sqlreview/reviews/q/review.json", hist / "1.json")
+        self.write("q.sql", "SELECT 2;\n")
+        self.commit()
+        out = self.tmp / "out.sql"
+        r = self.run_script(SR, "materialize", "q", "review", "1", out)
+        self.assertClean(r, 0, argv=False)  # argv: jq --arg values (F-4)
+        self.assertEqual(out.read_text(), "SELECT 1;\n")
+        self.assertClean(self.run_script(SR, "status", "--verbose"), 0, argv=False)
+        self.assertClean(self.run_script(SR, "delta", "q"), stdout=False, argv=False)
+
+    def test_discard_draft_never_reads_or_prints_the_draft(self):
+        self.write(".sqlreview/reviews/q/review.draft.json", review(purpose=CANARY))
+        r = self.run_script(SR, "discard-draft", "q", "review")
+        self.assertClean(r, 0)
+        self.assertFalse((self.root / ".sqlreview/reviews/q/review.draft.json").exists())
+        self.write(".sqlreview/reviews/q/scope.draft.json", CANARY)
+        (self.root / ".sqlreview/reviews/q/review.draft.json").mkdir()
+        for kind in ("review", "scope"):
+            with self.subTest(kind=kind):
+                r = self.run_script(SR, "discard-draft", "q", kind)
+                self.assertClean(r)
+        self.assertClean(self.run_script(SR, "discard-draft", "q", "lifts"), 0)
+
+    def test_move_archives_the_binding_without_echoing_values(self):
+        self.reviewed_project()
+        git(self.root, "mv", "q.sql", "r.sql")
+        self.commit()
+        r = self.run_script(SR, "move", "q.sql", "r.sql")
+        self.assertClean(r, 0, argv=False)  # argv: jq --arg values (F-4)
+        self.assertTrue((self.root / ".sqlreview/reviews/r/history/review/1.json").is_file())
+        out = self.tmp / "out.sql"
+        self.assertClean(self.run_script(SR, "materialize", "r", "review", "1", out), 0, argv=False)
+        self.assertEqual(out.read_text(), "SELECT 1;\n")
+        self.assertClean(self.run_script(SR, "move", "q.sql", "r.sql"))
+        self.assertClean(self.run_script(SR, "status", "--json", "--verbose"), 0, argv=False)
+
+    def test_publish_refusals_name_no_value(self):
+        self.reviewed_project()
+        draft = self.write(".sqlreview/reviews/q/review.draft.json",
+                           review(revision=2, purpose=CANARY, title=CANARY, assumptions=[item("A1", CANARY)]))
+        r = self.run_script(SR, "publish", "q", "review", draft)
+        self.assertNotEqual(r.returncode, 0)
+        self.assertClean(r, argv=False)  # argv: jq --arg values (F-4)
+
     # --- intentional outputs: allowed on stdout, never on stderr ---------------------------------
     def test_delta_and_impact_print_the_sql_text_by_design(self):
         self.write("q.sql", f"SELECT '{CANARY}';\n")
@@ -297,6 +382,145 @@ class Canary(unittest.TestCase):
         self.commit()
         git(self.root, "tag", "v1.0.0")
         self.assertClean(self.run_script(RL, "criteria", "v1.0.0"), stdout=False, argv=False)
+
+    # --- the amend gate, status and preflight: every output path added after the first leak fixes --
+    def amend_project(self):
+        """A committed, tagged project with one amendment record whose every field carries the canary."""
+        self.write("q.sql", "SELECT 1;\n")
+        self.commit()
+        git(self.root, "tag", "v1.0.0")
+        parts = [{"id": CANARY, "status": "done", "commit": CANARY, "text": CANARY},
+                 {"id": "P2", "status": CANARY, "hand_off": CANARY, "comment": CANARY, "reason": CANARY},
+                 {"id": "P3", "status": "withdrawn", "reason": " ", "comment": CANARY},
+                 {"id": "P4", "status": "handed off", "hand_off": CANARY, "text": CANARY},
+                 {"id": "P5", "status": "done", "commit": "0123456789abcdef0123456789abcdef01234567", "text": CANARY},
+                 CANARY]
+        doc = {"schemaVersion": CANARY, "kind": CANARY, "parts": parts, "text": CANARY}
+        self.write(".sqlreview/amendments/enq9187-falls.json", doc)
+        return doc
+
+    def test_amend_hold_and_its_notes_name_no_value(self):
+        self.amend_project()
+        # An empty record, a blank one and a document pair.
+        self.write(".sqlreview/amendments/empty.json", "")
+        self.write(".sqlreview/amendments/blank.json", " \n\t\n")
+        self.write(".sqlreview/amendments/pair.json", '{"parts": "' + CANARY + '"}\n{"parts": []}')
+        for call, code in ((("evidence", "v1.0.0"), 11), (("evidence", "--no-amend-hold", "v1.0.0"), 0)):
+            with self.subTest(call=call[1]):
+                r = self.run_script(RL, *call)
+                self.assertClean(r, code)
+                self.assertIn("release held:" if code == 11 else "amend note:", r.stderr)
+        # A record file named with the canary prints as a placeholder. Its path is on argv by design.
+        self.write(".sqlreview/amendments/LEAK-CANARY.json", {"schemaVersion": 1, "parts": []})
+        r = self.run_script(RL, "evidence", "v1.0.0")
+        self.assertClean(r, 11, argv=False)
+        self.assertIn("(invalid name).json", r.stderr)
+
+    def test_amend_hold_with_a_ledger_and_a_failing_fetch_names_no_value(self):
+        self.amend_project()
+        git(self.root, "remote", "add", "origin", f"file:///no-such-remote/{CANARY}")
+        self.write(".sqlreview/ledger.json", {"schemaVersion": 1, "entries": [{
+            "stage": "amend", "stages_done": ["amend"], "next_action": CANARY, "blockers": [{"detail": CANARY}],
+            "stage_evidence": {"amend": {"artifacts": [{"path": ".sqlreview/amendments/enq9188-x.json"},
+                                                       {"path": CANARY}]}}}]})
+        for call in (("evidence", "v1.0.0"), ("evidence", "--no-amend-hold", "v1.0.0")):
+            with self.subTest(call=call[1]):
+                r = self.run_script(RL, *call)
+                self.assertClean(r)
+                self.assertIn("enq9188-x.json is missing", r.stderr)
+        self.write(".sqlreview/ledger.json", CANARY)
+        self.assertClean(self.run_script(RL, "evidence", "v1.0.0"), 11)
+
+    def test_a_done_commit_that_git_cannot_resolve_names_no_value(self):
+        # The fetch, the rev-parse and the merge-base steps all fail here: git's own error text can
+        # quote the remote or the ref, so none of it may reach the output.
+        self.write("q.sql", "SELECT 1;\n")
+        self.commit()
+        git(self.root, "tag", "v1.0.0")
+        git(self.root, "remote", "add", "origin", f"https://example.invalid/{CANARY}.git")
+        self.write(".sqlreview/amendments/enq9187-falls.json", {"schemaVersion": 1, "parts": [
+            {"id": "P1", "status": "done", "commit": "0123abc", "text": CANARY}]})
+        r = self.run_script(RL, "evidence", "v1.0.0")
+        self.assertClean(r, 11)
+        self.assertIn("not verified", r.stderr)
+
+    def test_amend_check_names_the_field_and_the_rule_only(self):
+        doc = self.amend_project()
+        r = self.run_script(RL, "amend-check", "--stdin", stdin=json.dumps(doc))
+        self.assertClean(r, 4)
+        self.assertIn("schemaVersion: must be 1", r.stdout)
+        for body in ("", " \n", CANARY, '{"a": "' + CANARY + '"}\n{}'):
+            with self.subTest(body=body[:6]):
+                self.assertClean(self.run_script(RL, "amend-check", "--stdin", stdin=body), 4)
+
+    def test_guard_denies_an_amendment_record_without_a_value(self):
+        doc = self.amend_project()
+        reason = self.assertDenied(self.guard_write("amendments/enq9187-falls.json", doc))
+        self.assertIn("schemaVersion: must be 1", reason)
+        ev = {"tool_name": "Write", "cwd": str(self.root),
+              "tool_input": {"file_path": str(self.root / ".sqlreview/amendments" / (CANARY + ".json")),
+                             "content": json.dumps(doc)}}
+        self.assertDenied(self.run_script(GUARD, stdin=json.dumps(ev)))
+
+    def status_runs(self):
+        """Every status output channel: text, JSON, verbose and the preflight hook."""
+        outs = [self.run_script(SR, *a) for a in (("status",), ("status", "--json"), ("status", "--verbose"),
+                                                  ("status", "--json", "--verbose"))]
+        ev = {"hook_event_name": "SessionStart", "cwd": str(self.root)}
+        outs.append(subprocess.run(["bash", str(PREFLIGHT)], input=json.dumps(ev), capture_output=True, text=True,
+                                   cwd=self.root, timeout=60, env={**os.environ, "PATH": f"{self.bin}{os.pathsep}{os.environ['PATH']}"}))
+        return outs
+
+    def test_status_amendment_lines_name_no_value(self):
+        self.amend_project()
+        self.write(".sqlreview/amendments/enq9189-ok.json", {"schemaVersion": 1, "kind": "amendment", "parts": [
+            {"id": "P2", "status": "handed off", "hand_off": CANARY, "text": CANARY}]})
+        self.write(".sqlreview/amendments/LEAK-CANARY.json", {"parts": [{"id": "P1", "status": "handed off"}]})
+        self.write(".sqlreview/ledger.json", {"schemaVersion": 1, "entries": [{
+            "stage": "amend", "next_action": CANARY,
+            "stage_evidence": {"amend": {"artifacts": [{"path": ".sqlreview/amendments/enq9190-gone.json"}]}}}]})
+        for r in self.status_runs():
+            self.assertClean(r, 0, argv=False)  # argv: status reads --arg values (F-4)
+        text = self.run_script(SR, "status").stdout
+        self.assertIn("amendment enq9189-ok\thanded off: P2", text)
+        self.assertIn("amendment enq9190-gone\trecord missing", text)
+
+    def test_status_names_other_uncommitted_sources_without_their_paths(self):
+        # sr_commit_first counts every uncommitted source, but prints a path only for the reviewed SQL.
+        self.write("q.sql", "SELECT 1;\n")
+        self.write(".sqlreview/reviews/q/scope.json", scope())
+        self.commit()
+        self.write(f"{CANARY}-builder.py", "QUERY = 1\n")
+        self.write(f"pins {CANARY}.toml", "[workspace]\n")
+        for r in self.status_runs():
+            self.assertClean(r, 0, argv=False)
+        self.assertIn("commit the uncommitted source changes (git status), then", self.run_script(SR, "status").stdout)
+        self.write("q.sql", "SELECT 2;\n")
+        self.assertIn("commit q.sql and the other uncommitted source changes (git status), then",
+                      self.run_script(SR, "status").stdout)
+
+    def test_status_criteria_freshness_names_no_value(self):
+        # The criteria test compares ids and UTC stamps, and prints only a fixed line.
+        side = sidecar(CANARY)
+        side["criteria"][0]["id"] = "I-" + CANARY
+        side["criteria"][0]["confirmed_at"] = CANARY
+        side["criteria"][1]["confirmed_at"] = "2099-01-01T00:00:00Z"
+        self.write("answers.intake.json", side)
+        self.write("q.sql", "SELECT 1;\n")
+        self.write(".sqlreview/reviews/q/scope.json", scope(criteria_status=[
+            {"criterion": "I1", "state": "applied", "confirmed_by": "e", "confirmed_at": "2026-11-01T00:00:00Z",
+             "confirmed_revision": 1}]))
+        self.commit()
+        for r in self.status_runs():
+            self.assertClean(r, 0, argv=False)
+        self.assertIn("The analyst intake changed after scope revision 1", self.run_script(SR, "status").stdout)
+        for bad in (CANARY, [CANARY], {"criteria": CANARY}):
+            with self.subTest(bad=str(bad)[:8]):
+                side["criteria"] = bad
+                self.write("answers.intake.json", side)
+                self.commit()
+                for r in self.status_runs():
+                    self.assertClean(r, 0, argv=False)
 
     # --- known and deferred ------------------------------------------------------------------------
     def criteria_draft(self, **kw):

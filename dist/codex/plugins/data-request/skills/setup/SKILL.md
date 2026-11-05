@@ -5,9 +5,9 @@ description: 'Initialise project scope and review records for the Data Request w
   create the .sqlreview/ directory with config.json (settings + the shared assumption/limitation
   definitions) and the scope/review report templates, from the bundled default or
   from answers to a few questions. Safe to re-run — an existing setup is diffed file
-  by file and nothing is overwritten without confirmation. Use once per project before
-  $data-request:bootstrap, :analyse or :explain, or whenever one of them reports "not
-  initialised".'
+  by file and nothing is overwritten unless the user confirms it. Use once per project
+  before $data-request:bootstrap, :analyse or :explain, or whenever one of them reports
+  "not initialised".'
 compatibility: .sqlreview schema 2 (schema 1 remains readable) (docs/specs/2026-09-15-sql-review-plugin-design.md);
   bash 3.2+, jq >= 1.6, git required for SQL-bound records. macOS and Linux.
 metadata:
@@ -144,7 +144,8 @@ legacy-encoded slug (`sql__cohort%5Fpipeline__x`). It keeps working as is; the c
 the readable slug (`sql__cohort_pipeline__x`) without marking it stale, then re-render its reports.
 Each `next=` names a commit first when git lists a source that fingerprint refuses: the SQL, a
 builder, configuration or a pin. An amendment record with a handed-off part adds one
-`amendment <request>` line with its part ids and next action.
+`amendment <request>` line with its part ids and next action. A ledger amendment whose record
+file is missing adds one `record missing` line with the step that writes it.
 
 Tell the user the next stage: `$data-request:bootstrap <intended sql path>` before the SQL is
 written, or `$data-request:analyse <sql path>` for SQL that already exists. Suggest committing

@@ -28,6 +28,14 @@ def text(leaf):
 
 
 class HandoffContracts(unittest.TestCase):
+    def test_engineer_gate_and_explain_recheck_do_not_hold_on_open_amend_parts(self):
+        # #534: a handed-off amend part holds the release (exit 11), never the engineer's hand-off.
+        rst = " ".join((REPO / "skills/data-request-triage/references/handoff.rst").read_text().split())
+        self.assertIn('release.sh" evidence --no-amend-hold "<run commit>"', rst)
+        self.assertIn("never exits 11", rst)
+        self.assertIn("amend note:", rst)
+        self.assertIn("`release.sh evidence --no-amend-hold`", text("explain"))
+
     def test_analyse_routes_new_and_unchanged_reviews_to_existing_handoff(self):
         body = text("analyse")
         self.assertIn("## After review: operator run, UAT and analyst hand-off", body)
@@ -76,6 +84,13 @@ class HandoffContracts(unittest.TestCase):
                               "flagged decisions", "restrictions", "linked evidence", "ask",
                               "do not offer acceptance", "walkthrough", "Send back"):
                     self.assertIn(token, load)
+                # The tracking issue is checked read-only, next to the child repository and PR check.
+                self.assertIn("child repository and deliverable PR match this request", load)
+                self.assertIn("also confirm that the child tracking issue links to the same deliverable PR "
+                              "and the same request", load)
+                self.assertIn("Never write to that issue", load)
+                self.assertLess(load.index("child repository and deliverable PR match"),
+                                load.index("child tracking issue links to the same"))
                 self.assertLess(body.index("## Load the durable hand-off"), body.index("## Analyst outcome"))
                 outcome = body.split("## Analyst outcome", 1)[1]
                 self.assertIn("loaded and rechecked", outcome)
@@ -100,7 +115,10 @@ class HandoffContracts(unittest.TestCase):
                 self.assertNotIn("runs amend after release", opening)
 
     def test_analyst_send_back_is_a_paste_ready_outcome_without_approval(self):
-        explain = text("explain")
+        note = REPO / "skills/data-request-explain/references/send-back-note.rst"
+        explain = text("explain") + " " + " ".join(note.read_text().split())
+        self.assertIn("references/send-back-note.rst", text("explain"))
+        self.assertIn("skills/explain/references/send-back-note.rst", text("release"))
         for token in ("Accept for release preparation", "Send back", "Presentation amendment",
                       "finding:", "expected result:", "route:", "/data-request:fix",
                       "/data-request:amend", "open gates:", "paste-ready", "not acceptance"):
@@ -110,7 +128,10 @@ class HandoffContracts(unittest.TestCase):
 
     def test_send_back_carries_what_the_engineer_needs(self):
         # #534: the engineer's reply to a send-back is the change, not a request for detail.
-        explain = text("explain")
+        # The note and its completeness check live in the shared reference file (#551).
+        note = REPO / "skills/data-request-explain/references/send-back-note.rst"
+        explain = text("explain") + " " + " ".join(note.read_text().split())
+        self.assertIn("completeness check", text("explain"))
         for token in ("deliverable PR:", "review: <slug> revision <n>",
                       "already resolved by the analyst:", "affected files:", "waiting on:",
                       "The note must let the engineer act without a reply that asks for more detail",

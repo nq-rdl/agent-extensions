@@ -57,8 +57,8 @@ inventing confirmation. Prior SQL/delivery and requested elements can support
 an engineer technical proposal, not an analyst research answer. Guardrails'
 ``references/grain.rst`` owns evidence selection and once-only drift handling.
 
-Optional ``decided`` is ``{by, role, at, source}``, separate from confirmation:
-nonempty actor handle, role and evidence source; ``at`` uses the same UTC form
+Optional ``decided`` is an object with ``by``, ``role``, ``at`` and ``source``, separate from
+confirmation: nonempty actor handle, role and evidence source; ``at`` uses the same UTC form
 or a real ``YYYY-MM-DD`` date when the source gives only the day.
 The requester who made a decision can differ from the analyst who confirmed
 the intake. Omit provenance not actually known; never manufacture a dated
@@ -115,8 +115,9 @@ wording. Each criterion requires:
 
 Optional fields are ``decided`` (as for decisions), ``applied_by`` and
 ``withdrawn``. ``applied_by`` is ``rdl`` or ``researcher`` and is allowed only on ``inclusion``
-and ``exclusion``. When the request says who applies the item (for example
-"project team to apply the exclusion criteria"), record it without asking. Add
+and ``exclusion``. When the request states who applies the item (for example
+"project team to apply the exclusion criteria"), propose that value and quote the request's words.
+The analyst confirms or changes the value with the criterion, so it needs no separate question. Add
 ``decided`` only when the enquiry names who decided and when (``by``, ``role``,
 ``at`` and ``source``); never infer them. Ask the analyst only where the request is
 unclear, and omit ``applied_by`` when it stays unknown.

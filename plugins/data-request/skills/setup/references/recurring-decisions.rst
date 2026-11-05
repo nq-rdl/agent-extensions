@@ -14,7 +14,8 @@ The list lives in one file: ``assets/recurring-decisions.json`` in this skill (c
 ``skills/data-request-setup/assets/recurring-decisions.json`` in ``nq-rdl/agent-extensions``).
 Do not copy the list into a skill, a project or ``.sqlreview/``; records contain only
 applicable items. Read it through
-the helper beside ``sqlreview.sh`` (``$S`` is this skill's ``scripts`` directory):
+the helper beside ``sqlreview.sh`` (the shell variable ``S`` holds the path of the ``scripts`` directory of this skill; set it as
+the setup skill shows):
 
 ::
 
@@ -36,17 +37,18 @@ library issue that would retire it. Treat the epic and every library issue as pu
   This repository is public, so the list never names an enquiry. Per-enquiry evidence
   stays in the private request record; a library issue is not private merely because it is
   a library issue. A ``house_default`` also records the original ``confirmed_by`` /
-  ``confirmed_at`` and independent ``decided: {by, role, at, source}``. Only ``tuh-facility``
+  ``confirmed_at`` and an independent ``decided`` object with ``by``, ``role``, ``at`` and ``source``. Only ``tuh-facility``
   also records the string ``facility_code``; the list helper requires it there and nowhere else.
-  It is not generic permission to skip confirmation.
-* ``library_issue`` (URL or null), ``related_issues``, and ``retired_by`` (``{unit, version}``
-  when retired).
+  A ``house_default`` is the recorded ruling for its own
+  entry only. It never replaces the confirmation of any other item.
+* ``library_issue`` (URL or null), ``related_issues``, and ``retired_by`` (an object with
+  ``unit`` and ``version`` when retired).
 
 Recorded house default
 ----------------------
 
-For ``tuh-facility``, when cohort facility scope is unstated or explicitly TUH, apply
-without asking the engineer or analyst. Read ``list`` and use the exact listed wording
+For ``tuh-facility``, when cohort facility scope is unstated or explicitly TUH, apply it from
+its recorded confirmation, without a fresh question to the engineer or analyst. Read ``list`` and use the exact listed wording
 and rationale as **one item**, with ``upstream: {decision: "tuh-facility", source:
 "house-default"}``; reuse that item by id through map, bootstrap, draft and review,
 not a separate assumption for each source system or stage. Do not copy the list into
@@ -94,8 +96,9 @@ a ``criteria_status`` row with state ``not-applied``, the listed ``proposal.text
 row takes ``confirmed_by`` and ``confirmed_at`` from the entry's ``house_default``, and its
 ``confirmed_revision`` is the import revision. It carries no ``decided``: the decider stays on
 the entry, and the row claims no origin of its own. Bootstrap imports the rows without a
-fresh question, as it does for ``tuh-facility``. Do not write an assumption or a limitation
-for it. Inclusion, entry-event and data-element criteria are not touched.
+fresh question, as it does for ``tuh-facility``. It tells the engineer which rows it imported, with
+the recorded decider and date, and the engineer may override any row. Do not write an assumption
+or a limitation for it. Inclusion, entry-event and data-element criteria are not touched.
 
 A request that applies an exclusion, or an analyst who overrides it for one criterion,
 keeps the normal row for that criterion and no ``upstream``. Gaining, dropping or changing

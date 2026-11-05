@@ -267,11 +267,10 @@ sr_state() { # <slug>
   }
   cmd_check "$doc" >/dev/null || { printf 'invalid\t\t\n'; return 0; }
   # One jq call for five fields. \037 is not IFS whitespace, so an empty field stays in place.
-  # authentic: a clean recorded git_commit, so the reviewed SQL can be read back from git.
   IFS="$SR_US" read -r kind sql rev sha authentic <<EOF
 $(jq -r '[(.kind | tostring), (.sql_path // "" | tostring), (.revision // "" | tostring), (.sql_sha256 != null | tostring),
-  ((.git_commit | type == "string" and test("^[0-9a-f]{40}$|^[0-9a-f]{64}$")) and
-   (.git_dirty == null or .git_dirty == false) | tostring)] | join("\u001f")' "$doc" 2>/dev/null)
+  (((.git_commit | type == "string" and test("^[0-9a-f]{40}$|^[0-9a-f]{64}$")) and
+    (.git_dirty == null or .git_dirty == false)) | tostring)] | join("\u001f")' "$doc" 2>/dev/null)
 EOF
   if [ "$kind" != lifts ]; then
     # The question store must load, as `sqlreview.sh questions` loads it. In a subshell, not a child
@@ -279,8 +278,8 @@ EOF
     ( _q_context "$1" ) >/dev/null 2>&1 || { printf 'invalid\t\t\n'; return 0; }
   fi
   sr_safe_sql "$sql"
-  case "$doc" in
-    */scope.json)
+  case "$kind" in
+    scope)
       state="scoped"
       if [ "$sha" = true ]; then
         if [ ! -f "$SR_ROOT/$sql" ]; then state="missing"
@@ -289,7 +288,7 @@ EOF
           case "$bound" in 0) ;; 10) state="scoped-header-only" ;; *) state="stale" ;; esac
         fi
       fi ;;
-    */lifts.json) state="lifts" ;;
+    lifts) state="lifts" ;;
     *)
       if [ ! -f "$SR_ROOT/$sql" ]; then state="missing"
       elif [ "$authentic" != true ]; then state="no-baseline"
@@ -336,38 +335,51 @@ sr_state_reason() { # <slug> <state>
   printf '%s\n' "$why"
 }
 
+# A private scratch directory under TMPDIR, printed as its physical path. TMPDIR is often
+# reached through a symlink (macOS /var/folders and /tmp), and paths built from this one go
+# through sr_no_symlinks, which must refuse only caller-supplied links, not this one.
+sr_private_tmpdir() { # PREFIX
+  local dir
+  dir="$(mktemp -d "${TMPDIR:-/tmp}/$1.XXXXXX")" || return 1
+  (cd "$dir" && pwd -P) || {
+    rm -rf -- "$dir"
+    return 1
+  }
+}
+
 # Private consumer inputs must never live within the repository, even with a local TMPDIR.
 sr_source_workspace() (
   sr_source_context || exit 2
   umask 077
   local work
-  work="$(mktemp -d "${TMPDIR:-/tmp}/sqlreview-inputs.XXXXXX")" || exit 2
-  case "$(cd "$work" && pwd -P)" in "$SR_SOURCE_TOP"|"$SR_SOURCE_TOP"/*)
+  work="$(sr_private_tmpdir sqlreview-inputs)" || exit 2
+  case "$work" in "$SR_SOURCE_TOP"|"$SR_SOURCE_TOP"/*)
     rm -rf "$work"; sr_source_error "temporary inputs must be outside the git tree"; exit 2 ;;
   esac
   printf '%s\n' "$work"
 )
 
-# Uncommitted sources that git reports (untracked, modified or staged), one per line between
-# newlines. cmd_status sets it once per run with ONE git call, before its loop over the reviews,
-# because analyse's fingerprint refuses them (#548, sr_source_clean). The set is sr_source_clean's:
-# the whole repository, minus the review records under $SR_DIR (reviews/, releases/, templates/,
-# ledger.json and .gitignore). Paths are relative to $SR_ROOT ("../" for a path above it).
-# SR_DIRTY_N counts them. Both are empty when git or the repository is unavailable: then no
-# review is named as uncommitted.
+# Uncommitted source paths (untracked, modified or staged), one per line between newlines, and
+# their count. Fingerprint and a bound publish refuse ANY uncommitted source in the git tree
+# (sr_source_clean), not only the reviewed SQL, so the next command names a commit first whenever
+# this list is not empty. The exemptions are sr_source_clean's: review records under the store.
+# cmd_status sets both once per run with ONE git call, before its loop over the reviews. Paths are
+# relative to $SR_ROOT (outside it they start ../). Empty when git or the repository is unavailable:
+# then no commit is named.
 SR_NL='
 '
 sr_load_uncommitted() {
   local line p
-  SR_UNCOMMITTED="$SR_NL" SR_DIRTY_N=0
+  SR_UNCOMMITTED="$SR_NL"; SR_UNCOMMITTED_N=0
   command -v git >/dev/null 2>&1 || return 0
   while IFS= read -r line; do
     p="${line#???}"
-    # A quoted path (one with a space) loses its quotes. A path that git escapes does not match.
+    # A quoted path (one with a space) loses its quotes. A path that git escapes does not match
+    # a SQL path, but still counts as an uncommitted source.
     case "$p" in \"*\") p="${p#\"}"; p="${p%\"}" ;; esac
     case "$p" in
-      ""|"$SR_DIR"/reviews/*|"$SR_DIR"/releases/*|"$SR_DIR"/templates/*|"$SR_DIR"/ledger.json|"$SR_DIR"/.gitignore) ;;
-      *) SR_UNCOMMITTED="$SR_UNCOMMITTED$p$SR_NL"; SR_DIRTY_N=$((SR_DIRTY_N + 1)) ;;
+      ''|"$SR_DIR"/reviews/*|"$SR_DIR"/releases/*|"$SR_DIR"/templates/*|"$SR_DIR"/ledger.json|"$SR_DIR"/.gitignore) ;;
+      *) SR_UNCOMMITTED="$SR_UNCOMMITTED$p$SR_NL"; SR_UNCOMMITTED_N=$((SR_UNCOMMITTED_N + 1)) ;;
     esac
   done <<EOF
 $(git --no-optional-locks -C "$SR_ROOT" -c core.quotePath=false -c status.relativePaths=true -c color.status=false \
@@ -378,11 +390,20 @@ sr_uncommitted() { # <sql_path>: true when the run's git status lists it
   case "${SR_UNCOMMITTED-}" in *"$SR_NL$1$SR_NL"*) return 0 ;; esac
   return 1
 }
+# The commit prerequisite for a step that fingerprints or binds <sql_path>, or nothing.
+sr_commit_first() { # <sql_path>
+  [ "${SR_UNCOMMITTED_N:-0}" -gt 0 ] || return 0
+  if [ -f "$SR_ROOT/$1" ] && sr_uncommitted "$1"; then
+    if [ "$SR_UNCOMMITTED_N" -gt 1 ]; then printf 'commit %s and the other uncommitted source changes (git status), then ' "$1"
+    else printf 'commit %s, then ' "$1"; fi
+  else printf 'commit the uncommitted source changes (git status), then '; fi
+}
 
 # The next command for one review directory, on one line (#514). Derived only from records that
-# already exist: the state, scope.json and its recorded SQL binding, the root answers.intake.json
-# and explain.json. A bound scope whose SQL body moved on, or whose imported analyst decisions no
-# longer match the sidecar, names bootstrap as the rescope step. Cheap: a few jq and hash calls,
+# already exist: the state, scope.json and its recorded SQL binding (sql_sha256), the root answers.intake.json
+# and explain.json. A bound scope whose SQL body moved on, whose imported analyst decisions no
+# longer match the sidecar, or (for the scope that carries criteria_status) whose research criteria
+# moved on, names bootstrap as the rescope step. Cheap: a few jq and hash calls,
 # because status runs from a SessionStart hook with a 5-second timeout.
 sr_next() { # <slug> <state> <sql_path>
   local d="$SR_REVIEWS/$1" state="$2" sql="$3" scope srev="" bound="" intake="" why="" gap="" follow="" ex pre=""
@@ -401,10 +422,21 @@ sr_next() { # <slug> <state> <sql_path>
       def mine: [.assumptions[]? | select(.upstream.source? == "analyst-intake")
                  | {id, text, rationale, confirmed_by, confirmed_at, decided}] | sort_by(.id);
       def theirs: [.decisions[] | {id: ("A-intake-" + .id), text, rationale, confirmed_by, confirmed_at, decided}] | sort_by(.id);
+      # Only the scope that owns the criteria (it carries criteria_status) tracks them. It is behind
+      # when a live criterion has no row, a withdrawn one keeps its row, or a criterion was
+      # re-confirmed (reworded, or applied_by changed) after the scope revision was recorded. The
+      # time test runs only on UTC "Z" stamps, compared to the second, so another format is no signal.
+      def utc: if type == "string" and test("^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}(\\.[0-9]+)?Z$")
+               then .[0:19] else null end;
+      def criteria_moved($doc):
+        ($doc | has("criteria_status")) and ((.criteria | type) == "array")
+        and ([.criteria[] | select(.withdrawn == null)] as $live | ($doc.recorded_at | utc) as $at
+             | ([$live[].id] | sort) != ([$doc.criteria_status[]? | .criterion] | sort)
+               or ($at != null and any($live[]; (.confirmed_at | utc) as $c | $c != null and $c > $at)));
       $s[0] as $doc
       | [($doc.revision // "-" | tostring),
          (if ($doc.sql_sha256 | type) == "string" then "y" else "n" end),
-         (if $i == null then "n" else (try (if ($doc | mine) == ($i[0] | theirs) then "n" else "y" end) catch "n") end)]
+         (if $i == null then "n" else (try (if ($doc | mine) == ($i[0] | theirs) and ($i[0] | criteria_moved($doc) | not) then "n" else "y" end) catch "n") end)]
       | join("\t")'
     IFS="$SR_TAB" read -r srev bound intake <<EOF2
 $( { [ -f "$sidecar" ] && jq -rn --slurpfile s "$scope" --slurpfile i "$sidecar" "$prog" 2>/dev/null; } ||
@@ -412,12 +444,9 @@ $( { [ -f "$sidecar" ] && jq -rn --slurpfile s "$scope" --slurpfile i "$sidecar"
 EOF2
     case "$srev" in ''|*[!0-9]*) srev="" ;; esac
   fi
-  # Analyse fingerprints committed sources only (sr_source_clean), so they are committed first.
-  if [ -f "$SR_ROOT/$sql" ] && sr_uncommitted "$sql"; then
-    if [ "${SR_DIRTY_N:-0}" -gt 1 ]; then pre="commit $sql and the other uncommitted sources, then "
-    else pre="commit $sql, then "; fi
-  elif [ "${SR_DIRTY_N:-0}" -gt 0 ]; then pre="commit the uncommitted sources (builders, configuration, pins), then "
-  fi
+  # Analyse fingerprints, and a bound bootstrap publishes, from a clean tree only (sr_source_clean),
+  # so any uncommitted source is committed first.
+  pre="$(sr_commit_first "$sql")"
   if [ -n "$srev" ]; then
     # The scope document's own staleness is the state itself. Under a review, test the scope
     # binding directly: analyse alone never refreshes scope.json. A scope framed before the SQL
@@ -431,11 +460,12 @@ EOF2
     fi
     if [ "$intake" = y ]; then why="${why:+$why and the analyst intake}"; why="${why:-The analyst intake}"; fi
     if [ -n "$why" ]; then
-      if [ -f "$d/review.json" ]; then follow="$pre/data-request:analyse $sql --update"
-      elif [ -f "$SR_ROOT/$sql" ]; then follow="$pre/data-request:analyse $sql"
+      # Bootstrap binds the scope to committed SQL, so a commit comes before it, not after.
+      if [ -f "$d/review.json" ]; then follow="/data-request:analyse $sql --update"
+      elif [ -f "$SR_ROOT/$sql" ]; then follow="/data-request:analyse $sql"
       else follow="/data-request:draft to write $sql"; fi
-      printf '%s changed after scope revision %s%s: run /data-request:bootstrap %s to publish scope revision %s, then %s\n' \
-        "$why" "$srev" "$gap" "$sql" "$((srev + 1))" "$follow"
+      printf '%s changed after scope revision %s%s: %srun /data-request:bootstrap %s to publish scope revision %s, then %s\n' \
+        "$why" "$srev" "$gap" "$pre" "$sql" "$((srev + 1))" "$follow"
       return 0
     fi
   fi
@@ -443,9 +473,9 @@ EOF2
     scoped)
       if [ ! -f "$SR_ROOT/$sql" ]; then printf '/data-request:draft to write %s, then /data-request:analyse %s\n' "$sql" "$sql"
       elif [ "$bound" = n ]; then
-        printf '/data-request:bootstrap %s to bind the scope to the SQL, then %s/data-request:analyse %s\n' "$sql" "$pre" "$sql"
+        printf '%s/data-request:bootstrap %s to bind the scope to the SQL, then /data-request:analyse %s\n' "$pre" "$sql" "$sql"
       else printf '%s/data-request:analyse %s to review the SQL\n' "$pre" "$sql"; fi ;;
-    scoped-header-only) printf '/data-request:bootstrap %s to record the header revision of the scope\n' "$sql" ;;
+    scoped-header-only) printf '%s/data-request:bootstrap %s to record the header revision of the scope\n' "$pre" "$sql" ;;
     stale|no-baseline) printf '%s/data-request:analyse %s --update\n' "$pre" "$sql" ;;
     header-only) printf '%s/data-request:analyse %s to record the header revision of the review\n' "$pre" "$sql" ;;
     current)
@@ -463,3 +493,50 @@ EOF2
     *) printf '\n' ;;
   esac
 }
+
+# Amend gate: the one validator of an amendment record. The evidence hold (release.sh rl_amend_hold),
+# the write-time check (release.sh amend-check) and the status line all read its rows, so they
+# agree on what is valid. One TSV row per finding: kind, part id, field path, rule. It emits part
+# ids, field paths, fixed rules and done commits only, never part text, reasons or other values.
+SR_AMEND_JQ='def row($k; $id; $f; $r): [$k, $id, $f, $r] | join("\t");
+def bad($f; $r): row("bad"; "-"; $f; $r);
+def ne: type == "string" and test("\\S");
+def check:
+if type != "object" then bad("(document)"; "must be a JSON object")
+else
+  (if .schemaVersion == 1 then empty else bad("schemaVersion"; "must be 1") end),
+  (if (has("kind") | not) or .kind == "amendment" then empty else bad("kind"; "must be amendment") end),
+  (if (.parts | type) != "array" or (.parts | length) == 0 then bad("parts"; "must be a nonempty array")
+   else
+     (if [.parts[] | objects | .id | strings] | group_by(.) | any(length > 1)
+      then bad("parts[].id (duplicate)"; "must be unique") else empty end),
+     (.parts | to_entries[] | .key as $i | .value as $p | "parts[\($i)]" as $at
+      | if ($p | type) != "object" then bad($at; "must be an object")
+        else
+          (($p.id | type) == "string" and ($p.id | test("^P[1-9][0-9]*$"))) as $idok
+          | (if $idok then empty else bad("\($at).id"; "must be P<n>") end),
+            (if $p.status == "handed off" then (if $idok then row("open"; $p.id; "-"; "-") else empty end)
+             elif $p.status == "withdrawn" then
+               (if ($p.reason | ne) then empty else bad("\($at).reason"; "required for a withdrawn part") end)
+             elif $p.status == "done" then
+               (if ($p.commit | type) == "string" and ($p.commit | test("^[0-9a-f]{7,64}$"))
+                then (if $idok then row("done"; $p.id; "-"; $p.commit) else empty end)
+                else bad("\($at).commit"; "required for a done part (a commit hash)") end)
+             else bad("\($at).status"; "must be done, handed off or withdrawn") end)
+        end)
+   end)
+end;
+if length == 1 then .[0] | check else bad("(document)"; "must be one JSON document") end'
+
+# The triage ledger shows an amendment when an entry has the amend stage. Emits each recorded
+# amendment record path, or "bad" for a ledger that is empty or has no entries. An amended entry
+# that names no record is a single-part amendment, so it adds no row. Paths only, no values. Release
+# holds on a named record that is missing, and status names it, so both read this one definition.
+SR_AMEND_LEDGER_JQ='def rec: type == "string" and test("^\\.sqlreview/amendments/[a-z0-9][a-z0-9-]*\\.json$");
+def paths:
+if type != "object" or (.entries | type) != "array" then "bad"
+else .entries[] | objects | select(.stage == "amend" or ((.stages_done | arrays | index("amend")) != null))
+  | .stage_evidence.amend.artifacts | arrays | .[] | objects | .path | select(rec) | "path\t" + .
+end;
+if length == 1 then .[0] | paths else "bad" end'
+SR_AMEND_NEXT='write it from the amendment hand-off comment on the deliverable PR (/data-request:amend step 5)'

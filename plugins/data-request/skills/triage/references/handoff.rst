@@ -58,7 +58,7 @@ hands a ``/speckit.*`` command back to the human.
 
   .. code-block:: json
 
-     {"decision": "generativeMode", "value": "direct", "by": "<who>", "at": "<ISO time>", "scope": "<owner/name>"}
+     {"decision": "generativeMode", "value": "direct", "by": "engineer-handle", "at": "2026-11-04T09:30:00Z", "scope": "nq-rdl/query-builder"}
 
   ``by`` is the GitHub login of the human who authorised it, never an email
   address, and ``at`` is when. Record ``scope`` as the repository
@@ -84,9 +84,9 @@ prepares and publishes the release. Never direct the engineer to release.
 1. **Gate.** Continue only when the PR is out of draft, its CI is green on the
    current head commit (read the run for that SHA, not an older one), and its
    SQL review status is ``current``. Match the review to the SQL that actually ran,
-   using the recorded run commit and SQL fingerprint, not just the PR's current SQL.
+   using the recorded run commit and SQL fingerprint, not just the current SQL in the PR.
    ``release.sh evidence`` reads review records from the working tree, not the PR, and
-   the reviewed SQL from git at each record's ``git_commit``. Fetch the checked PR head SHA from GitHub and its commit locally; never
+   the reviewed SQL from git at the ``git_commit`` of each record. Fetch the checked PR head SHA from GitHub and its commit locally; never
    substitute local ``HEAD``. For every review used in the evidence, set ``SLUG`` to
    its slug and ``PR_HEAD`` to that checked SHA, then run from the request project root:
 
@@ -94,20 +94,22 @@ prepares and publishes the release. Never direct the engineer to release.
 
      for name in review.json; do
        path=".sqlreview/reviews/$SLUG/$name"
-       tmp="$(mktemp)" || exit 2
-       if ! git show "$PR_HEAD:./$path" > "$tmp" 2>/dev/null || ! cmp -s "$tmp" "$path"; then
-         rm -f "$tmp"
+       # Compare the committed bytes directly; no temporary copy to clean up.
+       if ! git cat-file -e "$PR_HEAD:./$path" 2>/dev/null ||
+          ! git show "$PR_HEAD:./$path" | cmp -s - "$path"; then
          printf 'Stop: %s is absent or differs at checked PR head %s\n' "$path" "$PR_HEAD" >&2
          exit 4
        fi
-       rm -f "$tmp"
      done
 
    Missing or differing records stop the hand-off, including uncommitted, untracked
    or locally committed but unpushed reviews. Retain any differing review draft and
    stop for the engineer to complete its unpublished work. Run
-   ``bash "$S/release.sh" evidence "<run commit>"`` with ``S`` set to the installed
-   setup scripts only after these checks pass. Any ``changed``, ``missing-at-ref``,
+   ``bash "$S/release.sh" evidence --no-amend-hold "<run commit>"`` with ``S`` set to the installed
+   setup scripts only after these checks pass. The flag stops the engineer's own hand-off from
+   being held by a handed-off amend part: the script then fetches nothing, never exits 11 and
+   prints each open part as an ``amend note:`` on stderr. Name those notes in the hand-off as
+   open delivery gates. The release run keeps the strict hold. Any ``changed``, ``missing-at-ref``,
    ``unreviewed``, ``unavailable`` or invalid review, or unproven run provenance
    stops the hand-off. A header-only
    result needs proof that only the leading comments differ. Compare the run manifest

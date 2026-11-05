@@ -16,9 +16,9 @@ How the cohort is loaded
 
 1. The request package declares the shape once in Python: ``SuppliedCohort`` with a name, a file
    name, a ``#`` temp table, a key and typed columns, each with a sensitivity.
-2. The built script holds the shape only. In order: one ``-- @supplied: {"format": 1, ...}``
-   header line per cohort, ``CREATE TABLE "#<table>"``, a unique key index, then a
-   ``-- @supplied-load: <name>`` batch whose guard fails if the table is empty. The join to the
+2. The built script holds the shape only. In order: one ``-- @supplied:`` header line per
+   cohort (the marker, then on the same line a JSON object with ``format`` 1 and the declared
+   shape), ``CREATE TABLE "#<table>"``, a unique key index, then a ``-- @supplied-load: <name>`` batch whose guard fails if the table is empty. The join to the
    cohort follows. The script is the same for every file the researcher sends.
 3. At run time the runner reads the file, checks every row against the declared types, then
    inserts all rows with one parameterised ``executemany`` (placeholders, no values in the SQL

@@ -220,7 +220,7 @@ case "$rel" in
     [ -n "$checker" ] || decide deny "SQL Review guard cannot find sqlreview.sh, so it cannot find release.sh next to it. Reinstall data-request@rdl-agent-extensions before writing $rel."
     command -v jq >/dev/null 2>&1 || decide deny "Amendment records are validated with jq, which is not installed. Install jq (>= 1.6) before writing $rel."
     out="$(field .tool_input.content | bash "$(dirname "$checker")/release.sh" amend-check --stdin 2>/dev/null)" ||
-      decide deny "$rel rejected by release.sh amend-check: $(printf '%s' "$out" | tr '\n' ';' | sed 's/;$//'). Write schemaVersion 1, kind amendment and parts with a unique id P<n> and a status done (with commit), handed off or withdrawn (with reason and comment)."
+      decide deny "$rel rejected by release.sh amend-check: $(printf '%s' "$out" | tr '\n' ';' | sed 's/;$//'). Write schemaVersion 1, kind amendment (when present) and parts with a unique id P<n> and a status done (with commit), handed off or withdrawn (with reason)."
     exit 0 ;;
   *) exit 0 ;;
 esac
