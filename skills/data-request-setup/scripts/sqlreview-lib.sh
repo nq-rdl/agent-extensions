@@ -177,6 +177,18 @@ sr_helper_render_marker() { # FILE
   [ "$(cat "$1.sqlreview-render" 2>/dev/null)" = "$(sr_sha256 "$1" 2>/dev/null)" ]
 }
 
+# Write FILE.sqlreview-render. Never write through an existing marker: a symlink or hard link there would
+# make a plain redirection overwrite the linked file. Refuse a symlink, stage a fresh file beside the
+# marker and rename it over the target, which replaces the directory entry and leaves the old inode alone.
+sr_write_render_marker() { # FILE
+  local marker="$1.sqlreview-render" staged
+  [ ! -L "$marker" ] || { printf 'sqlreview: symlink path refused for the render marker\n' >&2; return 2; }
+  [ ! -e "$marker" ] || [ -f "$marker" ] || return 2
+  staged="$(umask 077; mktemp "$marker.XXXXXX")" || return 2
+  if sr_sha256 "$1" > "$staged" && mv -f "$staged" "$marker"; then return 0; fi
+  rm -f "$staged"; return 2
+}
+
 sr_refuse_unreviewed() { # ABS_PATH AS_GIVEN [helper-render]
   local root phys rel links first second re='^v[0-9]+([.-][0-9]+)*$'
   # First, before any canonicalisation: command substitution strips trailing newlines, so a name

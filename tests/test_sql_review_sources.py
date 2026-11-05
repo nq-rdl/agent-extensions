@@ -148,6 +148,52 @@ class Sources(unittest.TestCase):
             # The helper also writes the SHA-256 marker that lets notes read this render outside the project.
             self.assertEqual(sorted(Path(tmp).iterdir()), sorted([output, output.with_name(output.name + ".sqlreview-render")]))
 
+    def test_materialize_never_writes_through_a_linked_render_marker(self):
+        # A marker that is a hard link or a symlink must not make the helper overwrite the linked file.
+        self.publish_committed()
+        repo_file = self.p.root / "keep.txt"
+        original = b"repository bytes\n"
+        repo_file.write_bytes(original)
+        for kind in ("hardlink", "symlink"):
+            with self.subTest(kind=kind), tempfile.TemporaryDirectory() as tmp:
+                output = Path(tmp) / "explained.sql"
+                marker = Path(tmp) / "explained.sql.sqlreview-render"
+                if kind == "hardlink":
+                    os.link(repo_file, marker)
+                else:
+                    os.symlink(repo_file, marker)
+                r = run(["materialize", "sql__v1__request", "review", "1", str(output)], self.p.root)
+                self.assertEqual(repo_file.read_bytes(), original, r.stdout + r.stderr)
+                if kind == "hardlink":
+                    self.assertEqual(r.returncode, 0, r.stdout + r.stderr)
+                    self.assertFalse(marker.is_symlink())
+                    self.assertEqual(len(marker.read_text().strip()), 64)
+                    self.assertEqual(sorted(p.name for p in Path(tmp).iterdir()),
+                                     ["explained.sql", "explained.sql.sqlreview-render"])
+                else:
+                    self.assertEqual(r.returncode, 2, r.stdout + r.stderr)
+                    self.assertTrue(marker.is_symlink())
+
+    def test_source_show_never_writes_through_a_linked_render_marker(self):
+        old = self.committed()
+        repo_file = self.p.root / "keep.txt"
+        original = b"repository bytes\n"
+        repo_file.write_bytes(original)
+        for kind in ("hardlink", "symlink"):
+            with self.subTest(kind=kind), tempfile.TemporaryDirectory() as tmp:
+                target = Path(tmp) / "out.sql"
+                marker = Path(tmp) / "out.sql.sqlreview-render"
+                if kind == "hardlink":
+                    os.link(repo_file, marker)
+                else:
+                    os.symlink(repo_file, marker)
+                env = dict(os.environ, SR_ROOT=str(self.p.root), SR_SCRIPT_DIR=str(SCRIPTS))
+                r = subprocess.run(["bash", "-c", '. "$SR_SCRIPT_DIR/sqlreview-lib.sh"; sr_source_show "$@"',
+                                    "show", old, "sql/v1/request.sql", str(target)],
+                                   cwd=self.p.root, env=env, capture_output=True, text=True)
+                self.assertEqual(repo_file.read_bytes(), original, r.stderr)
+                self.assertEqual(r.returncode, 0 if kind == "hardlink" else 2, r.stderr)
+
     def test_corrupt_hash_is_unavailable_never_current(self):
         draft, doc = self.publish_committed()
         draft.with_name("review.json").write_text(json.dumps(dict(doc, sql_sha256="0" * 64)))

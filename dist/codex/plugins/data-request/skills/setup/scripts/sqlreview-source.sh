@@ -90,7 +90,7 @@ sr_source_show() { # REF SQL_PATH OUTPUT; copies the committed blob, sets SR_SOU
     sr_source_error "committed SQL blob unavailable"; return 2;
   }
   # Mark the render as the helper's own, so notes accepts it outside the project (#516).
-  sr_sha256 "$output" > "$output.sqlreview-render" || { sr_source_error "cannot mark caller output"; return 2; }
+  sr_write_render_marker "$output" || { sr_source_error "cannot mark caller output"; return 2; }
 }
 
 sr_source_auth() { # DOC OUTPUT; status 6 evidence unavailable, 2 operational failure

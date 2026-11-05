@@ -893,7 +893,7 @@ cmd_materialize() (
   [ ! -e "$output" ] || [ -f "$output" ] || sr_die 2 "output is not a regular file"
   mv "$staged" "$output" || sr_die 2 "cannot publish authenticated output"
   staged=""
-  sr_sha256 "$output" > "$output.sqlreview-render" || sr_die 2 "cannot mark authenticated output"
+  sr_write_render_marker "$output" || sr_die 2 "cannot mark authenticated output"
 )
 
 # Remove a draft only at its canonical path, after the same slug and symlink checks as publish,
