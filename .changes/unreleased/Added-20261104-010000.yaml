@@ -1,0 +1,3 @@
+kind: Added
+body: 'sqlreview.sh discard-draft removes a slug''s canonical draft, so data-request skills no longer run rm on built paths'
+time: 2026-11-04T01:00:00.000000000Z

@@ -6,6 +6,9 @@
 SR_DIR=".sqlreview"
 # Where the jq programs live (sqlreview.sh sets it before sourcing this file).
 : "${SR_SCRIPT_DIR:=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd -P)}"
+# Field separators for `IFS=... read`, set once: $(printf) in a loop costs a fork per review.
+SR_TAB="$(printf '\t')"
+SR_US="$(printf '\037')"
 SR_SETUP_HINT="Run /data-request:setup to initialise the project (creates $SR_DIR/ with config.json and templates/)."
 
 sr_die() { # <exit-code> <message>
@@ -21,18 +24,20 @@ sr_need_jq() {
 # Collapse "." and ".." segments and duplicate slashes in an absolute path, without touching the
 # filesystem (the path may not exist yet — bootstrap names SQL that is still to be written).
 sr_normpath() {
-  printf '%s\n' "$1" | awk -F/ '{
-    n = 0
-    for (i = 1; i <= NF; i++) {
-      if ($i == "" || $i == ".") continue
-      if ($i == "..") { if (n > 0) n--; continue }
-      parts[++n] = $i
-    }
-    out = ""
-    for (i = 1; i <= n; i++) out = out "/" parts[i]
-    if (out == "") out = "/"
-    print out
-  }'
+  # Split only on slashes: line-oriented tools rewrite newline-containing names,
+  # and awk -v would also interpret backslash escapes in the path.
+  local rest="$1" part out=""
+  while :; do
+    part="${rest%%/*}"
+    case "$part" in
+      ""|.) ;;
+      ..) out="${out%/*}" ;;
+      *) out="$out/$part" ;;
+    esac
+    [ "$rest" != "$part" ] || break
+    rest="${rest#*/}"
+  done
+  printf '%s\n' "${out:-/}"
 }
 
 # Absolute, normalised form of a path given on the command line (relative paths resolve
@@ -84,12 +89,17 @@ sr_relpath() {
   esac
 }
 
-# Reject symlink components, including missing targets' existing ancestors.
+# Reject symlink components, including missing targets' existing ancestors. Walks up with
+# parameter expansion, not dirname: status calls this many times per review, inside a 5-second hook.
 sr_no_symlinks() {
   local p="$1"
-  while [ "$p" != / ]; do
+  while [ "$p" != / ] && [ "$p" != . ]; do
     [ ! -L "$p" ] || { printf 'sqlreview: symlink path refused: %s\n' "$p" >&2; return 2; }
-    p="$(dirname "$p")"
+    # dirname: drop trailing slashes, then the last component ("a" -> ".", "/a" -> "/").
+    while :; do case "$p" in ?*/) p="${p%/}" ;; *) break ;; esac; done
+    case "$p" in */*) p="${p%/*}" ;; *) p=. ;; esac
+    while :; do case "$p" in ?*/) p="${p%/}" ;; *) break ;; esac; done
+    p="${p:-/}"
   done
 }
 sr_safe_slug() {
@@ -122,13 +132,15 @@ sr_slug() {
   fi
 }
 
-sr_sha256() ( # <file> -> hex digest
-  set -o pipefail
-  # Hash stdin so filename escaping (e.g. backslashes) cannot prefix the digest.
-  if command -v sha256sum >/dev/null 2>&1; then sha256sum < "$1" | cut -d' ' -f1
-  elif command -v shasum >/dev/null 2>&1; then shasum -a 256 < "$1" | cut -d' ' -f1
+sr_sha256() { # <file> -> hex digest
+  # Hash stdin so filename escaping (e.g. backslashes) cannot prefix the digest. A brace body and
+  # ${h%% *}, not a subshell and cut: status hashes several files per review.
+  local h
+  if command -v sha256sum >/dev/null 2>&1; then h="$(sha256sum < "$1")" || return $?
+  elif command -v shasum >/dev/null 2>&1; then h="$(shasum -a 256 < "$1")" || return $?
   else sr_die 2 "neither sha256sum nor shasum is available"; fi
-)
+  printf '%s\n' "${h%% *}"
+}
 
 # Where the SQL body starts, after the leading comment header (#366): the first line number that
 # is not a blank line, a full-line `--` comment or part of a leading /* */ block. The body is then
@@ -184,14 +196,13 @@ sr_body_start() { # <file> -> line number (N+1 when the whole file is header)
     }' "$1"
 }
 # SHA256 of the SQL body (tail from sr_body_start). Prints nothing and returns 1 on any failure
-# (unterminated header, awk/tail/mktemp error): callers compare only two non-empty digests.
+# (unterminated header, awk/tail/hash error): callers compare only two non-empty digests.
 sr_body_sha256() { # <file> -> hex digest
-  local n tmp sha
+  local n sha
   n="$(sr_body_start "$1")" || return 1
   case "$n" in ""|*[!0-9]*) return 1 ;; esac
-  tmp="$(mktemp)" || return 1
-  if ! tail -n +"$n" "$1" > "$tmp"; then rm -f "$tmp"; return 1; fi
-  sha="$( (sr_sha256 "$tmp") 2>/dev/null )"; rm -f "$tmp"
+  # A pipe, not a temporary file: status hashes several bodies per review.
+  sha="$( (set -o pipefail; tail -n +"$n" "$1" | sr_sha256 /dev/stdin) 2>/dev/null )" || return 1
   case "$sha" in [0-9a-f]*) printf '%s\n' "$sha" ;; *) return 1 ;; esac
 }
 # True when both files' bodies are known and equal (a failure on either side counts as a change).
@@ -205,8 +216,9 @@ sr_body_same() { # <file> <file>
 sr_binding() { # <document> <current SQL> <optional baseline>; 0 full, 10 header-only, 1 changed
   local doc="$1" cur="$2" base="$3" full body current
   sr_no_symlinks "$base" || return 1
-  full="$(jq -r '.sql_sha256 // ""' "$doc")"
-  body="$(jq -r '.sql_body_sha256 // ""' "$doc")"
+  IFS="$SR_US" read -r full body <<EOF
+$(jq -r '[(.sql_sha256 // "" | tostring), (.sql_body_sha256 // "" | tostring)] | join("\u001f")' "$doc")
+EOF
   if [ -f "$base" ]; then
     [ "$(sr_sha256 "$base")" = "$full" ] || return 1
     if [ -n "$body" ]; then [ "$(sr_body_sha256 "$base")" = "$body" ] || return 1; fi
@@ -224,6 +236,8 @@ sr_binding() { # <document> <current SQL> <optional baseline>; 0 full, 10 header
 
 sr_now() { date -u +%Y-%m-%dT%H:%M:%SZ; }
 
+. "$SR_SCRIPT_DIR/sqlreview-source.sh"
+
 # The authoritative document of a review directory: review.json, else scope.json, else nothing.
 sr_doc_for() { # <slug> -> path
   sr_safe_slug "$1"
@@ -236,47 +250,51 @@ sr_doc_for() { # <slug> -> path
   else return 1; fi
 }
 
-# State of one review directory, from bytes on disk (never from git). Prints
+# State of one review directory, from the recorded hashes and the SQL on disk. It never runs
+# git: old SQL is read only where a diff, carry or release check needs it. Prints
 # "<state>\t<sql_path>\t<revision>" so a caller can `IFS=$'\t' read -r state sql rev`.
 #   scoped       scope.json only
 #   missing      the SQL file is gone
-#   no-baseline  review.json but no source.sql snapshot
-#   stale        source.sql differs from the current SQL
+#   no-baseline  review.json without a clean recorded git_commit, so old SQL cannot be read
+#   stale        the SQL differs from the recorded sql_sha256
 #   current      identical
 sr_state() { # <slug>
   sr_safe_slug "$1"
-  local d="$SR_REVIEWS/$1" doc sql rev state
+  local d="$SR_REVIEWS/$1" doc sql rev state kind sha authentic bound
   doc="$(sr_doc_for "$1")" || {
     if [ -f "$d/review.draft.json" ] || [ -f "$d/scope.draft.json" ]; then printf 'draft\t\t\n'; else printf 'invalid\t\t\n'; fi
     return 0
   }
-  sr_no_symlinks "$d/source.sql" || exit 2
   cmd_check "$doc" >/dev/null || { printf 'invalid\t\t\n'; return 0; }
-  if [ "$(jq -r .kind "$doc")" != lifts ]; then
-    bash "$SR_SCRIPT_DIR/sqlreview.sh" questions "$1" >/dev/null 2>&1 || { printf 'invalid\t\t\n'; return 0; }
+  # One jq call for five fields. \037 is not IFS whitespace, so an empty field stays in place.
+  IFS="$SR_US" read -r kind sql rev sha authentic <<EOF
+$(jq -r '[(.kind | tostring), (.sql_path // "" | tostring), (.revision // "" | tostring), (.sql_sha256 != null | tostring),
+  (((.git_commit | type == "string" and test("^[0-9a-f]{40}$|^[0-9a-f]{64}$")) and
+    (.git_dirty == null or .git_dirty == false)) | tostring)] | join("\u001f")' "$doc" 2>/dev/null)
+EOF
+  if [ "$kind" != lifts ]; then
+    # The question store must load, as `sqlreview.sh questions` loads it. In a subshell, not a child
+    # bash, which would read sqlreview.sh again per review. Its review filter keeps every question.
+    ( _q_context "$1" ) >/dev/null 2>&1 || { printf 'invalid\t\t\n'; return 0; }
   fi
-  sql="$(jq -r '.sql_path // ""' "$doc" 2>/dev/null)"
   sr_safe_sql "$sql"
-  rev="$(jq -r '.revision // ""' "$doc" 2>/dev/null)"
-  case "$doc" in
-    */scope.json)
+  case "$kind" in
+    scope)
       state="scoped"
-      if jq -e '.sql_sha256 != null' "$doc" >/dev/null; then
+      if [ "$sha" = true ]; then
         if [ ! -f "$SR_ROOT/$sql" ]; then state="missing"
         else
-          local bound
-          sr_binding "$doc" "$SR_ROOT/$sql" "$d/scope.source.sql"; bound=$?
+          sr_binding "$doc" "$SR_ROOT/$sql" /dev/null; bound=$?
           case "$bound" in 0) ;; 10) state="scoped-header-only" ;; *) state="stale" ;; esac
         fi
       fi ;;
-    */lifts.json) state="lifts" ;;
+    lifts) state="lifts" ;;
     *)
       if [ ! -f "$SR_ROOT/$sql" ]; then state="missing"
-      elif [ ! -f "$d/source.sql" ]; then state="no-baseline"
+      elif [ "$authentic" != true ]; then state="no-baseline"
       elif [ -f "$d/rebind-required" ]; then state="stale"
       else
-        local bound
-        sr_binding "$doc" "$SR_ROOT/$sql" "$d/source.sql"; bound=$?
+        sr_binding "$doc" "$SR_ROOT/$sql" /dev/null; bound=$?
         case "$bound" in 0) state="current" ;; 10) state="header-only" ;; *) state="stale" ;; esac
       fi ;;
   esac
@@ -306,9 +324,170 @@ sr_state_reason() { # <slug> <state>
       case "$violations" in *"binding mismatch"*)
         why="$why; the slug is not derived from any current path — rebind with: sqlreview.sh move --slug $slug <sql path>" ;;
       esac ;;
+    no-baseline)
+      why="the review records no clean git_commit, so its SQL cannot be read from git — reassess with /data-request:analyse --update" ;;
     missing)
       sql="$(jq -r '.sql_path // ""' "$(sr_doc_for "$slug")" 2>/dev/null)"
       why="sql_path target missing: $sql — if it moved, run: sqlreview.sh move '$sql' <new path>" ;;
   esac
   printf '%s\n' "$why"
+}
+
+# A private scratch directory under TMPDIR, printed as its physical path. TMPDIR is often
+# reached through a symlink (macOS /var/folders and /tmp), and paths built from this one go
+# through sr_no_symlinks, which must refuse only caller-supplied links, not this one.
+sr_private_tmpdir() { # PREFIX
+  local dir
+  dir="$(mktemp -d "${TMPDIR:-/tmp}/$1.XXXXXX")" || return 1
+  (cd "$dir" && pwd -P) || {
+    rm -rf -- "$dir"
+    return 1
+  }
+}
+
+# Private consumer inputs must never live within the repository, even with a local TMPDIR.
+sr_source_workspace() (
+  sr_source_context || exit 2
+  umask 077
+  local work
+  work="$(sr_private_tmpdir sqlreview-inputs)" || exit 2
+  case "$work" in "$SR_SOURCE_TOP"|"$SR_SOURCE_TOP"/*)
+    rm -rf "$work"; sr_source_error "temporary inputs must be outside the git tree"; exit 2 ;;
+  esac
+  printf '%s\n' "$work"
+)
+
+# Uncommitted source paths (untracked, modified or staged), one per line between newlines, and
+# their count. Fingerprint and a bound publish refuse ANY uncommitted source in the git tree
+# (sr_source_clean), not only the reviewed SQL, so the next command names a commit first whenever
+# this list is not empty. The exemptions are sr_source_clean's: review records under the store.
+# cmd_status sets both once per run with ONE git call, before its loop over the reviews. Paths are
+# relative to $SR_ROOT (outside it they start ../). Empty when git or the repository is unavailable:
+# then no commit is named.
+SR_NL='
+'
+sr_load_uncommitted() {
+  local line p
+  SR_UNCOMMITTED="$SR_NL"; SR_UNCOMMITTED_N=0
+  command -v git >/dev/null 2>&1 || return 0
+  while IFS= read -r line; do
+    p="${line#???}"
+    # A quoted path (one with a space) loses its quotes. A path that git escapes does not match
+    # a SQL path, but still counts as an uncommitted source.
+    case "$p" in \"*\") p="${p#\"}"; p="${p%\"}" ;; esac
+    case "$p" in
+      ''|"$SR_DIR"/reviews/*|"$SR_DIR"/releases/*|"$SR_DIR"/templates/*|"$SR_DIR"/ledger.json|"$SR_DIR"/.gitignore) ;;
+      *) SR_UNCOMMITTED="$SR_UNCOMMITTED$p$SR_NL"; SR_UNCOMMITTED_N=$((SR_UNCOMMITTED_N + 1)) ;;
+    esac
+  done <<EOF
+$(git --no-optional-locks -C "$SR_ROOT" -c core.quotePath=false -c status.relativePaths=true -c color.status=false \
+    status --short --untracked-files=all --no-renames -- ':/' 2>/dev/null)
+EOF
+}
+sr_uncommitted() { # <sql_path>: true when the run's git status lists it
+  case "${SR_UNCOMMITTED-}" in *"$SR_NL$1$SR_NL"*) return 0 ;; esac
+  return 1
+}
+# The commit prerequisite for a step that fingerprints or binds <sql_path>, or nothing.
+sr_commit_first() { # <sql_path>
+  [ "${SR_UNCOMMITTED_N:-0}" -gt 0 ] || return 0
+  if [ -f "$SR_ROOT/$1" ] && sr_uncommitted "$1"; then
+    if [ "$SR_UNCOMMITTED_N" -gt 1 ]; then printf 'commit %s and the other uncommitted source changes (git status), then ' "$1"
+    else printf 'commit %s, then ' "$1"; fi
+  else printf 'commit the uncommitted source changes (git status), then '; fi
+}
+
+# The next command for one review directory, on one line (#514). Derived only from records that
+# already exist: the state, scope.json and its recorded SQL binding (sql_sha256), the root answers.intake.json
+# and explain.json. A bound scope whose SQL body moved on, whose imported analyst decisions no
+# longer match the sidecar, or (for the scope that carries criteria_status) whose research criteria
+# moved on, names bootstrap as the rescope step. Cheap: a few jq and hash calls,
+# because status runs from a SessionStart hook with a 5-second timeout.
+sr_next() { # <slug> <state> <sql_path>
+  local d="$SR_REVIEWS/$1" state="$2" sql="$3" scope srev="" bound="" intake="" why="" gap="" follow="" ex pre=""
+  case "$state" in
+    draft)
+      if [ -f "$d/scope.draft.json" ]; then printf 'resume /data-request:bootstrap to finish the scope draft\n'
+      else printf 'resume /data-request:analyse to finish the review draft\n'; fi
+      return 0 ;;
+    invalid) printf 'run sqlreview.sh status --verbose to see why, then repair the documents\n'; return 0 ;;
+    lifts) printf '/data-request:lift to close out the lift ledger\n'; return 0 ;;
+    missing) printf "sqlreview.sh move '%s' <new path> if the SQL moved\n" "$sql"; return 0 ;;
+  esac
+  scope="$d/scope.json"
+  if [ -f "$scope" ]; then
+    local sidecar="$SR_ROOT/answers.intake.json" prog='
+      def mine: [.assumptions[]? | select(.upstream.source? == "analyst-intake")
+                 | {id, text, rationale, confirmed_by, confirmed_at, decided}] | sort_by(.id);
+      def theirs: [.decisions[] | {id: ("A-intake-" + .id), text, rationale, confirmed_by, confirmed_at, decided}] | sort_by(.id);
+      # Only the scope that owns the criteria (it carries criteria_status) tracks them. It is behind
+      # when a live criterion has no row, a withdrawn one keeps its row, or a criterion was
+      # re-confirmed (reworded, or applied_by changed) after the scope revision was recorded. The
+      # time test runs only on UTC "Z" stamps, compared to the second, so another format is no signal.
+      def utc: if type == "string" and test("^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}(\\.[0-9]+)?Z$")
+               then .[0:19] else null end;
+      def criteria_moved($doc):
+        ($doc | has("criteria_status")) and ((.criteria | type) == "array")
+        and ([.criteria[] | select(.withdrawn == null)] as $live | ($doc.recorded_at | utc) as $at
+             | ([$live[].id] | sort) != ([$doc.criteria_status[]? | .criterion] | sort)
+               or ($at != null and any($live[]; (.confirmed_at | utc) as $c | $c != null and $c > $at)));
+      $s[0] as $doc
+      | [($doc.revision // "-" | tostring),
+         (if ($doc.sql_sha256 | type) == "string" then "y" else "n" end),
+         (if $i == null then "n" else (try (if ($doc | mine) == ($i[0] | theirs) and ($i[0] | criteria_moved($doc) | not) then "n" else "y" end) catch "n") end)]
+      | join("\t")'
+    IFS="$SR_TAB" read -r srev bound intake <<EOF2
+$( { [ -f "$sidecar" ] && jq -rn --slurpfile s "$scope" --slurpfile i "$sidecar" "$prog" 2>/dev/null; } ||
+   jq -rn --slurpfile s "$scope" --argjson i null "$prog" 2>/dev/null )
+EOF2
+    case "$srev" in ''|*[!0-9]*) srev="" ;; esac
+  fi
+  # Analyse fingerprints, and a bound bootstrap publishes, from a clean tree only (sr_source_clean),
+  # so any uncommitted source is committed first.
+  pre="$(sr_commit_first "$sql")"
+  if [ -n "$srev" ]; then
+    # The scope document's own staleness is the state itself. Under a review, test the scope
+    # binding directly: analyse alone never refreshes scope.json. A scope framed before the SQL
+    # existed has no binding to compare, so a stale review over it also names the rescope.
+    if [ "$state" = stale ] && [ ! -f "$d/review.json" ]; then why="The SQL"
+    elif [ -f "$d/review.json" ] && [ "$bound" = y ] && [ -f "$SR_ROOT/$sql" ]; then
+      sr_binding "$scope" "$SR_ROOT/$sql" /dev/null >/dev/null 2>&1
+      [ $? -eq 1 ] && why="The SQL"
+    elif [ "$state" = stale ] && [ -f "$d/review.json" ] && [ "$bound" = n ]; then
+      why="The SQL"; gap=", which has no SQL binding"
+    fi
+    if [ "$intake" = y ]; then why="${why:+$why and the analyst intake}"; why="${why:-The analyst intake}"; fi
+    if [ -n "$why" ]; then
+      # Bootstrap binds the scope to committed SQL, so a commit comes before it, not after.
+      if [ -f "$d/review.json" ]; then follow="/data-request:analyse $sql --update"
+      elif [ -f "$SR_ROOT/$sql" ]; then follow="/data-request:analyse $sql"
+      else follow="/data-request:draft to write $sql"; fi
+      printf '%s changed after scope revision %s%s: %srun /data-request:bootstrap %s to publish scope revision %s, then %s\n' \
+        "$why" "$srev" "$gap" "$pre" "$sql" "$((srev + 1))" "$follow"
+      return 0
+    fi
+  fi
+  case "$state" in
+    scoped)
+      if [ ! -f "$SR_ROOT/$sql" ]; then printf '/data-request:draft to write %s, then /data-request:analyse %s\n' "$sql" "$sql"
+      elif [ "$bound" = n ]; then
+        printf '%s/data-request:bootstrap %s to bind the scope to the SQL, then /data-request:analyse %s\n' "$pre" "$sql" "$sql"
+      else printf '%s/data-request:analyse %s to review the SQL\n' "$pre" "$sql"; fi ;;
+    scoped-header-only) printf '%s/data-request:bootstrap %s to record the header revision of the scope\n' "$pre" "$sql" ;;
+    stale|no-baseline) printf '%s/data-request:analyse %s --update\n' "$pre" "$sql" ;;
+    header-only) printf '%s/data-request:analyse %s to record the header revision of the review\n' "$pre" "$sql" ;;
+    current)
+      ex=""
+      if [ -f "$d/explain.json" ] && [ ! -L "$d/explain.json" ]; then
+        ex="$(jq -rn --slurpfile e "$d/explain.json" --slurpfile r "$d/review.json" '
+          if ($e[0].sql_sha256 == $r[0].sql_sha256 and $e[0].review_revision == $r[0].revision)
+          then (if $e[0].completed == true then "done" else "partial" end) else "" end' 2>/dev/null)"
+      fi
+      case "$ex" in
+        done) printf '/data-request:release <candidate ref> after the analyst accepts the explained SQL\n' ;;
+        partial) printf '/data-request:explain %s to resume the walkthrough\n' "$sql" ;;
+        *) printf '/data-request:explain %s to walk the analyst through the review\n' "$sql" ;;
+      esac ;;
+    *) printf '\n' ;;
+  esac
 }

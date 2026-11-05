@@ -111,7 +111,8 @@ class Lifts(unittest.TestCase):
         text = f"{e['need']} resolved with in-repo SQL. Library unit tracked in {e['issue_url']}. Not backported."
         review = review_doc(slug=self.doc['slug'], sql_path='pipeline.py', schemaVersion=2,
                             assumptions=[], limitations=[item('L1', text, lift_id=e['id'])])
-        review['sql_sha256'] = hashlib.sha256((self.p.root / 'pipeline.py').read_bytes()).hexdigest()
+        self.p.commit()
+        review.update(json.loads(self.command("fingerprint", "pipeline.py").stdout))
         draft = self.p.write_json(self.doc['slug'], 'review.draft.json', review)
         self.command('publish', self.doc['slug'], 'review', str(draft))
         review['revision'] = 2

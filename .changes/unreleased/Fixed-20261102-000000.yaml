@@ -1,0 +1,3 @@
+kind: Fixed
+body: 'Criteria rows return to the review walk after any SQL body change instead of carrying forward unchanged'
+time: 2026-11-02T00:00:00.000000000Z

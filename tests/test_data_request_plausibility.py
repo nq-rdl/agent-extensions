@@ -132,6 +132,7 @@ class PopulationScopeRoundTrip(unittest.TestCase):
                 draft.write_text(invoke("intake", str(source), "1", str(draft)))
                 d = json.loads(draft.read_text())
                 imported = json.loads(json.dumps(d["assumptions"]))
+                p.commit("maintained intake")
                 invoke("publish", d["slug"], "scope", str(draft))
                 # Synthetic engineer confirmation of a defect, separate from analyst answers.
                 d["revision"] = 2
@@ -197,6 +198,7 @@ class PopulationScopeRoundTrip(unittest.TestCase):
                         prefix = "A" if record_kind == "assumptions" else "L"
                         d[record_kind].append(item(f"{prefix}-population-age", answer,
                                                    rationale=rationale, confirmed_by="engineer-login"))
+                    p.commit("project configuration")
                     records = d["assumptions"] + d["limitations"]
                     draft = p.write_json(d["slug"], "scope.draft.json", d)
                     invoke("publish", d["slug"], "scope", str(draft))

@@ -10,12 +10,15 @@ _q_context() { # slug: load validated store or a read-only legacy projection int
     [ ! -e "$d/$f.json" ] || [ -f "$d/$f.json" ] || sr_die 2 "question source is not a regular file"
     [ -f "$d/$f.json" ] || continue
     cmd_check "$d/$f.json" >/dev/null || sr_die 4 "invalid question source: $f.json"
-    local bound
-    bound="$(jq -r .sql_path "$d/$f.json")"
+    local bound own store
+    # One jq call for three fields (status reads every review). \037 keeps empty fields in place.
+    IFS="$SR_US" read -r bound own store <<EOF
+$(jq -r '[(.sql_path | tostring), (.slug | tostring), (has("question_store") | tostring)] | join("\u001f")' "$d/$f.json")
+EOF
     [ -z "$path" ] || [ "$path" = "$bound" ] || sr_die 4 "question sources have conflicting sql_path"
     path="$bound"
-    [ "$(jq -r .slug "$d/$f.json")" = "$slug" ] || sr_die 4 "question source slug mismatch"
-    jq -e 'has("question_store")' "$d/$f.json" >/dev/null && declared=true
+    [ "$own" = "$slug" ] || sr_die 4 "question source slug mismatch"
+    [ "$store" != true ] || declared=true
     if [ "$f" = scope ]; then scope="$d/$f.json"; else review="$d/$f.json"; fi
   done
   [ -n "$path" ] || sr_die 4 "questions require an existing scope or review"

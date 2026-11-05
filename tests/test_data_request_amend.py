@@ -104,7 +104,7 @@ class Content(unittest.TestCase):
 
     def test_records_the_amendment_with_its_classification(self):
         self.assertIn("specs/amendments.md", self.body)
-        self.assertIn("data-analysis-scaffold/issues/234", self.body)
+        self.assertNotIn("data-analysis-scaffold/issues", self.body)
 
     def test_validation_gates(self):
         for gate in ("sql_gate", "spec-validate", "final projection", "row count", "key set",
@@ -113,7 +113,7 @@ class Content(unittest.TestCase):
                 self.assertIn(gate, self.body)
 
     def test_reuses_sibling_actions_by_reference(self):
-        self.assertIn("${CLAUDE_PLUGIN_ROOT}/skills/guardrails/SKILL.md", self.body)
+        self.assertIn("`/data-request:guardrails`", self.body)
         for leaf in ("validate", "fix", "analyse"):
             with self.subTest(leaf=leaf):
                 self.assertIn(f"/data-request:{leaf}", self.body)
@@ -130,8 +130,6 @@ class Content(unittest.TestCase):
 
 
     def test_a_combined_request_is_split_per_part(self):
-        # #533: one engineer-required part no longer stops the analyst-safe parts.
-        self.assertNotIn("stops the whole request", self.body)
         self.assertIn("### Split a combined request", self.body)
         split = self.body.split("### Split a combined request", 1)[1].split("## 2.", 1)[0]
         self.assertRegex(split, r"P1: <the change[^>]*>\nclassification: <analyst-safe \| engineer-required>")
@@ -139,6 +137,20 @@ class Content(unittest.TestCase):
         self.assertIn("Do not guess", split)
         self.assertRegex(split, r"(?i)never change rows or meaning")
         self.assertRegex(split, r"(?i)one part does not stop the others")
+
+    def test_safe_parts_are_checked_one_at_a_time(self):
+        split = flat(self.body.split("### Split a combined request", 1)[1].split("## 2.", 1)[0])
+        self.assertIn("Do one part at a time in P order, and regenerate after each", split)
+        self.assertIn("so that a failed check belongs to that part", split)
+        self.assertIn("you cannot name the part, undo them all", split)
+        self.assertIn("apply and check them again one at a time", split)
+
+    def test_a_dependent_safe_part_keeps_its_classification(self):
+        split = flat(self.body.split("### Split a combined request", 1)[1].split("## 2.", 1)[0])
+        self.assertIn("Keep its classification `analyst-safe`", split)
+        self.assertIn('"held with P2"', split)
+        self.assertIn("classification: <engineer-required | analyst-safe, held with P<n>>", self.body)
+        self.assertIn("Never relabel a change to fit analyst-safe or engineer-required", self.body)
 
     def test_engineer_parts_share_one_hand_off_on_the_deliverable_pr(self):
         handoff = self.body.split("## 2.", 1)[1].split("## 3.", 1)[0]
@@ -149,6 +161,13 @@ class Content(unittest.TestCase):
                 self.assertIn(token, handoff)
         self.assertLess(handoff.index("amendment hand-off:"), handoff.index("\npart: <P3>"))
 
+    def test_hand_off_does_not_wait_for_an_operator_run(self):
+        handoff = flat(self.body.split("## 2.", 1)[1].split("## 3.", 1)[0])
+        self.assertIn("Draft it when the checks that can run in steps 3 to 6 have finished", handoff)
+        self.assertIn("Do not wait for a check that needs an operator run", handoff)
+        self.assertIn("List it as pending under `already done by the analyst:`", handoff)
+        self.assertIn("in a second comment that lists only that part", handoff)
+
     def test_split_evidence_and_resume_are_readable_by_the_next_run(self):
         for token in ("`done`, `handed off` or `withdrawn`", "Do not add an entry for a handed-off part",
                       "done:", "handed off:", "open decision:", "open delivery gate",
@@ -157,23 +176,57 @@ class Content(unittest.TestCase):
                 self.assertIn(token, self.body)
         resume = self.body.split("## Resume a split request", 1)[1]
         self.assertRegex(resume, r"(?i)do not redo it")
-        self.assertRegex(resume, r"(?i)sent back as analyst-safe")
+
+    def test_released_extract_keeps_part_lines_in_the_pr_description(self):
+        record = flat(self.body.split("## 5.", 1)[1].split("## 6.", 1)[0])
+        self.assertIn("On a released extract, put these lines in the pull request description", record)
+        self.assertIn("takes no entry for a handed-off or withdrawn part", record)
+        self.assertIn("part's own classification", record)
 
     def test_only_two_strict_forms_close_a_handed_off_part(self):
-        # A comment that only names the part, such as "P3 is still in progress", leaves it open.
         close = self.body.split("### Close a handed-off part", 1)[1].split("## 3.", 1)[0]
         self.assertIn("```text\nwithdrawn: P<n> <reason>\ndone: P<n> <commit>\n```", close)
         self.assertIn("Only two comment forms on the deliverable PR close a handed-off part", close)
         self.assertIn("The reason is required", close)
         self.assertIn("A `withdrawn:` line with no\n  reason does not close the part", close)
-        self.assertIn("The commit must be in the release\n  ref", close)
         self.assertIn("Any other comment that names the part leaves it open", close)
         self.assertIn("P3 is still in progress", close)
         self.assertIn("Post it only when the analyst authorises", close)
-        self.assertLess(self.body.index("route: </data-request:fix"),
-                        self.body.index("### Close a handed-off part"))
+        # Amend runs its own check and does not claim that the release skill does.
+        self.assertNotIn("/data-request:release", close)
 
-    def test_hand_off_keys_are_unchanged(self):
+    def test_a_close_line_counts_only_from_the_right_writer(self):
+        close = flat(self.body.split("### Close a handed-off part", 1)[1].split("## 3.", 1)[0])
+        self.assertIn("gh pr view <PR> --json author,assignees,reviewRequests,comments", close)
+        self.assertIn("`done:` counts only from the engineer named in the hand-off comment", close)
+        self.assertIn("only from the PR author or an assignee", close)
+        self.assertIn("`withdrawn:` counts only from the analyst named on the PR", close)
+        self.assertIn("The analyst cannot close a part with `done:`", close)
+        self.assertIn("The engineer cannot close one with `withdrawn:`", close)
+        self.assertIn("A line from anyone else leaves the part open", close)
+        # The writer is checked before the commit is.
+        self.assertLess(close.index("Check who wrote the line"), close.index("git merge-base"))
+
+    def test_a_done_commit_is_fetched_resolved_and_checked_by_exit_code(self):
+        close = flat(self.body.split("### Close a handed-off part", 1)[1].split("## 3.", 1)[0])
+        steps = [close.index(s) for s in ("git fetch origin --tags",
+                                          "git rev-parse --verify --quiet <commit>^{commit}",
+                                          "git merge-base --is-ancestor <full SHA> <release ref>")]
+        self.assertEqual(steps, sorted(steps), "fetch, then resolve, then ancestry")
+        self.assertIn("A short SHA that matches several objects, or none, gives no SHA", close)
+        self.assertIn("Exit 0 verifies the part", close)
+        self.assertIn("Exit 1 means the commit is not in the release ref", close)
+        self.assertIn("Any other exit, such as 128 for an unknown object or ref, means not verified", close)
+        self.assertIn("If a step fails, the part stays handed off", close)
+        self.assertIn("use `origin/<branch>` as the release ref", close)
+
+    def test_the_release_ref_is_never_left_undefined(self):
+        close = flat(self.body.split("### Close a handed-off part", 1)[1].split("## 3.", 1)[0])
+        self.assertNotIn("candidate ref", self.body)
+        self.assertIn("The release ref is the release tag. Before a tag exists, it is the ref that the analyst names", close)
+        self.assertIn("If none is named, ask the analyst for it", close)
+
+    def test_hand_off_entry_keys_in_order(self):
         handoff = self.body.split("```text\namendment hand-off:", 1)[1].split("```", 1)[0]
         keys = re.findall(r"^([a-z][a-z -]*):", "amendment hand-off:" + handoff, re.M)
         self.assertEqual(keys, ["amendment hand-off", "enquiry", "already done by the analyst", "part",
@@ -186,16 +239,20 @@ class Content(unittest.TestCase):
         self.assertIn("Do not add an entry for a handed-off part or a withdrawn part", self.body)
         self.assertIn('withdrawn: <each withdrawn part: P number and reason, or "none">', self.body)
         resume = flat(self.body.split("## Resume a split request", 1)[1])
-        self.assertIn("a `done: P<n> <commit>` comment closes it", resume)
-        self.assertIn("a `withdrawn: P<n> <reason>` comment closes it", resume)
+        self.assertIn("a `done: P<n> <commit>` comment closes it only when the author check and the commit check pass", resume)
+        self.assertIn("Run both from *Close a handed-off part* (step 2)", resume)
+        self.assertIn("a `withdrawn: P<n> <reason>` comment from the analyst named on the PR closes it", resume)
         self.assertIn("It no longer blocks the release", resume)
         self.assertIn("it stays handed off, whatever other comments name it", resume)
+        self.assertIn("`done` for a verified `done:` comment", resume)
         self.assertIn("`withdrawn` for a `withdrawn:` comment", resume)
 
-    def test_no_interim_workbook_route(self):
-        # The no-database-run route from #533 is an open design choice, not built here.
-        self.assertNotIn("build_workbook", self.body)
-        self.assertIn("Do not run a live extract", self.body)
+    def test_an_analyst_safe_reply_is_not_a_close_form(self):
+        resume = flat(self.body.split("## Resume a split request", 1)[1])
+        self.assertIn("a reply is not a close form and does not change the status", resume)
+        self.assertIn("ask them to confirm the new classification", resume)
+        self.assertIn("Only after they confirm, complete the part through steps 3 to 6", resume)
+        self.assertIn('Silence, "probably fine" or a reply from anyone else is not an answer', resume)
 
 
 class Routing(unittest.TestCase):
