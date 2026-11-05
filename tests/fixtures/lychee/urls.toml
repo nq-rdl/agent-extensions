@@ -345,3 +345,15 @@ repository = false
 url = "https://docs.conda.io/projects/conda/en/25.1.x/user-guide/configuration/settings.html#add-pip-as-python-dependency-add-pip-as-python-dependency"
 shipped = false
 repository = false
+
+# #555: OpenCode example share links expire (410), but the share host root and
+# the OpenCode docs are still checked.
+[[cases]]
+url = "https://opncd.ai/s/abc123"
+shipped = false
+repository = true
+
+[[cases]]
+url = "https://opncd.ai/"
+shipped = false
+repository = false
