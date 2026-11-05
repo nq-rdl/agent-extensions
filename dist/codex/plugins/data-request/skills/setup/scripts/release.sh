@@ -536,7 +536,7 @@ EOF
 
 cmd_criteria() {
   [ $# -ge 1 ] || usage
-  local tag="$1" mode=unchecked fpfile="" fp=null commit tmp intake path slug doc row rows="" scopes stale=false
+  local tag="$1" mode=unchecked fpfile="" fp=null commit tmp intake path slug doc row rows="" scopes stale=false review_prefix previous_src
   local prev previous=null current=null f out
   shift
   case "$tag" in ""|-*) usage ;; esac
@@ -578,9 +578,10 @@ cmd_criteria() {
   fi
   rm -f "$tmp"
   # Every scope at the tag that carries criteria_status; exactly one may own the criteria (research R6).
+  review_prefix="$SR_DIR/reviews/"
   while IFS= read -r path; do
     case "$path" in "$SR_DIR"/reviews/*/scope.json) ;; *) continue ;; esac
-    slug="${path#"$SR_DIR"/reviews/}"; slug="${slug%/scope.json}"
+    slug="${path#$review_prefix}"; slug="${slug%/scope.json}"
     case "$slug" in */*|.|..|*[!A-Za-z0-9_%.-]*) sr_die 2 "unsafe review directory name at $tag" ;; esac
     doc="$(git -C "$SR_ROOT" show "$commit:./$path" 2>/dev/null)" || sr_die 2 "cannot read $slug/scope.json at $tag"
     row="$(printf '%s' "$doc" | jq -c --arg slug "$slug" '
@@ -605,11 +606,11 @@ EOF
   fi
   prev="$(release_previous_tag "$tag")" || sr_die 2 "cannot list the release records at $tag"
   if [ -n "$prev" ]; then
-    previous="$(git -C "$SR_ROOT" show "$commit:./$SR_DIR/releases/$prev/release.json" 2>/dev/null |
-      jq -c --arg tag "$prev" '{tag: $tag, criteria: (.criteria // null)}' 2>/dev/null)" ||
+    previous_src="$(git -C "$SR_ROOT" show "$commit:./$SR_DIR/releases/$prev/release.json" 2>/dev/null)"
+    previous="$(printf '%s' "$previous_src" | jq -c --arg tag "$prev" '{tag: $tag, criteria: (.criteria // null)}' 2>/dev/null)" ||
       sr_die 2 "cannot read the release record of $prev at $tag"
   fi
-  # This tag's record in the working tree: its analyst decisions survive while a row's note is unchanged.
+  # The record of this tag in the working tree: its analyst decisions survive while the note of a row is unchanged.
   case "$tag" in
     *..*|*[!A-Za-z0-9._-]*|[!A-Za-z0-9]*) ;;
     *) f="$SR_ROOT/$SR_DIR/releases/$tag/release.json"
@@ -617,7 +618,7 @@ EOF
        if [ -f "$f" ]; then current="$(jq -c '.criteria // null' "$f" 2>/dev/null)" || current=null; fi
        [ -n "$current" ] || current=null ;;
   esac
-  # The owning scope's states describe the SQL it recorded. A changed SQL body at the tag holds the table.
+  # The states of the owning scope describe the SQL it recorded. A changed SQL body at the tag holds the table.
   local scope_stale=false
   if [ "$(printf '%s' "$scopes" | jq 'length')" = 1 ]; then
     slug="$(printf '%s' "$scopes" | jq -r '.[0].slug')"

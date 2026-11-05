@@ -59,8 +59,8 @@ def items($kind; $rev):
            else empty end)
     );
 
-# Scope criteria_status (the scaffold's criteria design): the shape of the engineer's one state per research criterion.
-# Kind-independent, because this check runs on every write and cannot see the analyst's sidecar:
+# Scope criteria_status (the criteria design of the scaffold): the shape of the one state that the engineer records for each research criterion.
+# Kind-independent, because this check runs on every write and cannot see the sidecar of the analyst:
 # states allowed by kind, coverage and the researcher-applies basis are `sqlreview.sh criteria`.
 # Findings are "<id>\t<field>\t<rule>" ("-" when no well-formed id); never a value.
 def criteria_status_findings($rev):
@@ -87,7 +87,7 @@ def criteria_status_findings($rev):
          end),
         (if has("upstream") and ((.upstream | type) != "object" or (.upstream.source | ine | not) or (.upstream.id | ine | not))
          then "\($id)\tupstream\tinvalid" else empty end),
-        # Confirmation as for scope assumptions (items above); a carried row's basis is criteria-unchanged.
+        # Confirmation as for scope assumptions (items above); the basis of a carried row is criteria-unchanged.
         (if (.confirmed_by | nonempty | not) then "\($id)\tconfirmed_by\trequired" else empty end),
         (if (.confirmed_at | nonempty | not) then "\($id)\tconfirmed_at\trequired" else empty end),
         (.confirmed_revision as $cr | .carried_from_revision as $cf

@@ -1,6 +1,6 @@
-# The one sanitiser of the no-echo rule: a violation names the field and the rule, never a value.
-# A string prints as itself only when it has the shape the caller expects. Anything else prints as the
-# fallback, so free text placed in an id or slug field never reaches the output.
+# The one sanitiser for the text of violations. A violation names the field and the rule, and never a
+# value. A string prints as itself only when it has the shape that the caller expects. Anything else
+# prints as the fallback, so free text placed in an id or slug field never reaches the output.
 # Run with `jq -L <this directory>`; sqlreview-check.jq, sqlreview-identity.jq and release.sh include it.
 def safe($re; $fallback): if type == "string" and test($re) then . else $fallback end;
 # A review item id (A1, L2, LIFT-3) or a lift id: a short token, never free text.

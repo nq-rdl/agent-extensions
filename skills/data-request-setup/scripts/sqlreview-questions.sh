@@ -80,11 +80,11 @@ cmd_migrate_questions() (
 cmd_publish_questions() (
   [ $# -eq 2 ] || usage
   sr_need_jq; sr_require_root
-  local slug="$1" draft="$2" Q_DOC Q_LOCK="" tmp="" dest="$SR_REVIEWS/$1/questions.json"
+  local slug="$1" draft="$2" here Q_DOC Q_LOCK="" tmp="" dest="$SR_REVIEWS/$1/questions.json"
   _q_lock "$slug"
   _q_context "$slug" publish
   # Keep original components: normalizing link/../ first hides the symlink.
-  case "$draft" in /*) ;; *) draft="$(pwd -P)/$draft" ;; esac
+  case "$draft" in /*) ;; *) here="$(pwd -P)"; draft="$here/$draft" ;; esac
   sr_no_symlinks "$draft" || exit 2
   [ -f "$draft" ] || sr_die 2 "no such question draft"
   tmp="$(mktemp "$SR_REVIEWS/$slug/.questions.XXXXXX")" || sr_die 2 "mktemp failed"

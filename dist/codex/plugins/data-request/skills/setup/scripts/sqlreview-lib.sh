@@ -6,7 +6,7 @@
 SR_DIR=".sqlreview"
 # Where the jq programs live (sqlreview.sh sets it before sourcing this file).
 : "${SR_SCRIPT_DIR:=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd -P)}"
-# Field separators for `IFS=... read`, set once: $(printf) in a loop costs a fork per review.
+# Field separators for the IFS of a read, set once: a command substitution in a loop costs a fork per review.
 SR_TAB="$(printf '\t')"
 SR_US="$(printf '\037')"
 SR_SETUP_HINT="Run /data-request:setup to initialise the project (creates $SR_DIR/ with config.json and templates/)."
@@ -43,9 +43,10 @@ sr_normpath() {
 # Absolute, normalised form of a path given on the command line (relative paths resolve
 # against the current directory).
 sr_abspath() {
+  local here
   case "$1" in
     /*) sr_normpath "$1" ;;
-    *)  sr_normpath "$(pwd -P)/$1" ;;
+    *)  here="$(pwd -P)"; sr_normpath "$here/$1" ;;
   esac
 }
 
@@ -73,7 +74,8 @@ sr_init_root() {
 }
 
 sr_require_root() {
-  SR_ROOT="$(sr_find_root)" || sr_die 3 "not initialised: no $SR_DIR/ found above $(pwd -P). $SR_SETUP_HINT"
+  local here
+  SR_ROOT="$(sr_find_root)" || { here="$(pwd -P)"; sr_die 3 "not initialised: no $SR_DIR/ found above $here. $SR_SETUP_HINT"; }
   SR_REVIEWS="$SR_ROOT/$SR_DIR/reviews"
   sr_no_symlinks "$SR_REVIEWS" || exit 2
 }
@@ -252,7 +254,7 @@ sr_doc_for() { # <slug> -> path
 
 # State of one review directory, from the recorded hashes and the SQL on disk. It never runs
 # git: old SQL is read only where a diff, carry or release check needs it. Prints
-# "<state>\t<sql_path>\t<revision>" so a caller can `IFS=$'\t' read -r state sql rev`.
+# "<state>\t<sql_path>\t<revision>", which a caller splits on the tab (SR_TAB) with read -r.
 #   scoped       scope.json only
 #   missing      the SQL file is gone
 #   no-baseline  review.json without a clean recorded git_commit, so old SQL cannot be read

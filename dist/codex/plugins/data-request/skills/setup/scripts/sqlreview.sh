@@ -99,7 +99,7 @@ usage() {
 
 # ---------------------------------------------------------------------------------------------
 cmd_init() {
-  local mode="create" json=0 apply=() root target f state rc=0 any=0 entries="[]"
+  local mode="create" json=0 apply=() root target f fdir state rc=0 any=0 entries="[]"
   while [ $# -gt 0 ]; do
     case "$1" in
       --diff) mode="diff" ;;
@@ -122,7 +122,8 @@ cmd_init() {
       case "$f" in config.json|templates/scope.md|templates/review.md|templates/lifts.md) ;; *) sr_die 2 "unknown bundled path: $f" ;; esac
       printf '%s\n' "$files" | grep -Fxq -- "$f" || sr_die 2 "no such file in the bundled default: $f"
       sr_no_symlinks "$target/$f" || exit 2
-      mkdir -p "$target/$(dirname "$f")" || sr_die 2 "cannot create target directory"
+      fdir="${f%/*}"; [ "$fdir" != "$f" ] || fdir=.
+      mkdir -p "$target/$fdir" || sr_die 2 "cannot create target directory"
       cp "$SR_ASSETS/$f" "$target/$f" || sr_die 2 "cannot copy $f"
       printf 'applied\t%s\n' "$f"
     done
@@ -139,7 +140,8 @@ cmd_init() {
   if [ "$mode" = "create" ] && { [ ! -d "$target" ] || [ "$ledger_only" = 1 ]; }; then
     for f in $files; do
       sr_no_symlinks "$target/$f" || exit 2
-      mkdir -p "$target/$(dirname "$f")" || sr_die 2 "cannot create target directory"
+      fdir="${f%/*}"; [ "$fdir" != "$f" ] || fdir=.
+      mkdir -p "$target/$fdir" || sr_die 2 "cannot create target directory"
       cp "$SR_ASSETS/$f" "$target/$f" || sr_die 2 "cannot copy $f"
     done
     # Git does not track an empty directory: a placeholder keeps reviews/ in a committed .sqlreview/
@@ -249,8 +251,7 @@ cmd_status() {
   done
   sr_need_jq
   sr_require_root
-  SR_CHECKED="
-"
+  SR_CHECKED="$SR_NL"
   SR_CHECK_TMP="$(mktemp)" || sr_die 2 "mktemp failed"
   trap 'rm -f "$SR_CHECK_TMP"' EXIT
   trap 'exit 2' HUP INT TERM
@@ -258,7 +259,7 @@ cmd_status() {
   # Bundled templates the project lacks (e.g. lifts.md in a project initialised before lifts, #349).
   for f in "$SR_ASSETS"/templates/*.md; do
     [ -f "$f" ] || continue
-    f="templates/$(basename "$f")"
+    f="templates/${f##*/}"
     [ -f "$SR_ROOT/$SR_DIR/$f" ] || missing="$missing${missing:+ }$f"
   done
   if [ -n "$missing" ] && [ "$json" = 0 ]; then
@@ -1392,6 +1393,11 @@ _notes_scan() { # <sql file> → records separated by \037: H start end · I kin
   ' "$1"
 }
 
+# Whether the parsed notes header (the JSON of cmd_notes) says that a header is present.
+_notes_present() { # <parsed JSON>
+  printf '%s' "$1" | jq -r .present
+}
+
 cmd_notes() {
   local sql="" against="" questions="" confirmer="" recs errs parsed
   while [ $# -gt 0 ]; do
@@ -1430,7 +1436,7 @@ cmd_notes() {
   if [ -n "$against" ] && [ "$(jq -r .kind "$against")" = scope ]; then
     _scope_notes "$against" "$questions" "$parsed"
   elif [ -n "$against" ] && [ "$(jq -r .kind "$against")" = review ] &&
-     { [ -n "$confirmer" ] || [ "$(printf '%s' "$parsed" | jq -r .present)" = true ]; }; then
+     { [ -n "$confirmer" ] || [ "$(_notes_present "$parsed")" = true ]; }; then
     _header_decisions "$sql" "$against" "$confirmer" "$parsed"
   else printf '%s\n' "$parsed"; fi
 }
@@ -1650,7 +1656,7 @@ cmd_render() {
   [ $# -eq 2 ] || usage
   sr_need_jq
   sr_require_root
-  local slug="$1" kind="$2" doc tpl cfg out rendered unknown
+  local slug="$1" kind="$2" doc tpl cfg out rendered unknown unknown_list
   case "$kind" in scope|review|lifts) ;; *) sr_die 2 "kind must be scope or review (got '$kind')" ;; esac
   sr_safe_slug "$slug"
   doc="$SR_REVIEWS/$slug/$kind.json"
@@ -1680,7 +1686,8 @@ Header revision history: metadata changed without changing its corresponding SQL
   printf '%s\n' "$rendered" > "$out" || sr_die 2 "cannot write rendered report"
   unknown="$(grep -o '{{[A-Za-z0-9_]*}}' "$out" | sort -u || true)"
   if [ -n "$unknown" ]; then
-    printf 'sqlreview: unknown placeholder(s) left in place: %s\n' "$(printf '%s' "$unknown" | tr '\n' ' ')" >&2
+    unknown_list="$(printf '%s' "$unknown" | tr '\n' ' ')"
+    printf 'sqlreview: unknown placeholder(s) left in place: %s\n' "$unknown_list" >&2
   fi
   printf 'rendered\t%s\n' "${out#"$SR_ROOT"/}"
 }
