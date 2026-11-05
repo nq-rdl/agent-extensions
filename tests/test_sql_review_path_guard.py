@@ -174,6 +174,23 @@ class PathGuard(unittest.TestCase):
             r = subprocess.run(["bash", str(SCRIPT), "init"], cwd=home, env=env, capture_output=True, text=True)
             self.assertEqual(r.returncode, 0, r.stderr)
 
+    def test_dotdot_after_a_symlink_that_folds_to_forbidden_sql_is_refused(self):
+        # sql/pipeline_a/link -> ../v1/sub: the kernel opens link/../q.sql as sql/v1/q.sql (reviewed), but the
+        # lexical fold is sql/pipeline_a/q.sql (pipeline SQL). Callers use the folded form, so the pair is refused.
+        (self.root / "sql/v1/sub").mkdir()
+        os.symlink("../v1/sub", self.root / "sql/pipeline_a/link")
+        path = "sql/pipeline_a/link/../q.sql"
+        rule = "no .. after a symlink"
+        self.refused(["fingerprint", path], rule)
+        self.refused(["slug", path], rule)
+        self.refused(["snapshot", "any", path], rule)
+        self.refused(["notes", path], rule)
+        self.refused(["move", "sql/v1/q.sql", path], rule)
+        self.refused(["lint", path], rule)
+        self.refused(["criteria", "sql/pipeline_a/link/../draft.json"], rule)
+        # The same link used without a following .. is judged by where it leads, as before.
+        self.assertEqual(run(["fingerprint", "sql/pipeline_a/link/../../v1/q.sql"], self.root).returncode, 2)
+
     def test_status_keeps_the_state_of_a_record_bound_to_a_refused_path(self):
         # A scope that passes check but names pipeline SQL must not turn `invalid` in status: the real state
         # stays visible so the engineer can move the record into sql/v<N>/. Writes keep the policy.

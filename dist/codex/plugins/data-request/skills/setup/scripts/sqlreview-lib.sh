@@ -89,6 +89,16 @@ sr_relpath() {
   if [ "${2:-}" != nopolicy ]; then
     case "$1" in /*) sr_refuse_unreviewed "$1" "$1" || return 2 ;; *) sr_refuse_unreviewed "$SR_ROOT/$1" "$1" || return 2 ;; esac
   fi
+  # sr_refuse_unreviewed applies the same fold-versus-resolution check to every policy path. move's old path
+  # skips the policy, but its folded form is the record key, so it gets the check here.
+  if [ "${2:-}" = nopolicy ]; then
+    local raw physraw physabs
+    case "$1" in /*) raw="$1" ;; *) raw="$SR_ROOT/$1" ;; esac
+    physraw="$(sr_realpath_m "$raw")" && physabs="$(sr_realpath_m "$abs")" ||
+      sr_die 2 "refused path: the path cannot be resolved, so it cannot be checked (fail closed)"
+    [ "$physraw" = "$physabs" ] ||
+      sr_die 2 "refused path: a .. component follows a symbolic link, so the path names different files before and after resolution (rule: no .. after a symlink)"
+  fi
   sr_no_symlinks "$abs" || return 2
   case "$abs" in
     "$SR_ROOT"/*) printf '%s\n' "${abs#"$SR_ROOT"/}" ;;
@@ -220,6 +230,10 @@ sr_refuse_unreviewed() { # ABS_PATH AS_GIVEN [helper-render]
       [[ "$second" =~ $re ]] ||
         sr_die 2 "refused path: only a reviewed version directory sql/v<N>/ may be read into $SR_DIR/; pipeline SQL under sql/<name>/ may hold cohort values (rule: sql/ paths must be inside sql/v[0-9]+([.-][0-9]+)*/)" ;;
   esac
+  # The kernel opens the path as given, but callers fold ".." lexically (sr_relpath, sr_abspath) and then use the
+  # folded form. If a symlink makes the two differ, the folded path names a file this policy never judged.
+  [ "$(sr_realpath_m "$(sr_normpath "$1")")" = "$phys" ] ||
+    sr_die 2 "refused path: a .. component follows a symbolic link, so the path names different files before and after resolution (rule: no .. after a symlink)"
   # A hard link shares the inode of a file the path rules never see (a data/ file linked into sql/v1/).
   if [ -f "$phys" ]; then
     links="$(sr_nlink "$phys")" || sr_die 2 "refused path: its hard-link count cannot be read, so it cannot be checked (fail closed)"
