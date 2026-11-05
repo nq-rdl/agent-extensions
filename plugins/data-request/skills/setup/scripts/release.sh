@@ -4,6 +4,12 @@
 # and renders the analyst's record. It writes no file: the skill writes the record, the guard checks it.
 # No command here uses the network. Evidence reads local refs only: fetch before you run it.
 #
+#   fetch-command            print the one fetch command for this project, and run nothing: tags
+#                            from origin, else the first configured remote. With no remote it
+#                            prints a comment line that says to skip the fetch and say so. A fetch
+#                            never decides a release: run it, report any failure to the human, and
+#                            run evidence anyway. Only exit 2 or 11 of evidence stops the release.
+#
 #   evidence [--no-amend-hold] REF [SLUG...]
 #                            does each .sqlreview review apply to the release at REF? JSON
 #                            {ref, commit, reviews: [{slug, kind, sql_path, revision, applies,
@@ -32,9 +38,12 @@
 #                            malformed record holds the release (exit 11, ids and fields on stderr).
 #                            A done commit is verified against local refs only: rev-parse --verify
 #                            to one full SHA, then merge-base --is-ancestor. Only exit 0 of the last
-#                            step verifies. Any other result keeps the part open, and the next line
-#                            says to fetch the remote and run evidence again. Fetch before evidence,
-#                            because stale local refs hold the release.
+#                            step verifies. Any other result keeps the part open. A commit that is
+#                            missing here gets the next line "run the fetch command, then run
+#                            evidence again". A commit that is here but not in REF gets the next
+#                            line "release from a ref that contains the commit". Evidence checks
+#                            exactly the REF given: a local branch is not updated by a fetch, so
+#                            name a remote-tracking ref such as origin/main, or a tag.
 #                            An entry of .sqlreview/ledger.json at the amend stage whose artifact
 #                            names a record file that does not exist holds too. An empty or
 #                            malformed record or ledger holds. --no-amend-hold is for the engineer
@@ -377,6 +386,40 @@ $(jq -rs "$RL_AMEND_LEDGER_JQ" "$ledger" 2>/dev/null || printf 'bad\n')
 EOT
 }
 
+# Print, and never run, the one fetch command: tags from origin, else the first configured remote.
+# No remote prints a comment line, so a shell that runs the output does nothing. Every skill and
+# every hint takes the command from here, so there is one instruction. This function uses no network.
+rl_fetch_command() {
+  local remote nl='
+'
+  remote="$(git -C "$SR_ROOT" remote 2>/dev/null </dev/null)" || remote=""
+  case "$nl$remote$nl" in
+    *"${nl}origin${nl}"*) remote=origin ;;
+    *) remote="${remote%%"$nl"*}" ;;
+  esac
+  case "$remote" in
+    ""|-*) printf '# no remote is configured: skip the fetch and say so\n' ;;
+    *) printf 'git fetch --tags %q\n' "$remote" ;;
+  esac
+}
+
+cmd_fetch_command() {
+  [ $# -eq 0 ] || usage
+  command -v git >/dev/null 2>&1 || sr_die 2 "git is required to read the remotes"
+  sr_require_root
+  rl_fetch_command
+}
+
+# The fixed line for a local branch that is behind its upstream. It compares two local refs and
+# uses no network. A fetch moves origin/<branch>, never the local branch itself.
+rl_behind_note() { # <ref>
+  local n
+  git -C "$SR_ROOT" show-ref --verify --quiet "refs/heads/$1" </dev/null 2>/dev/null || return 0
+  n="$(git -C "$SR_ROOT" rev-list --count "$1..$1@{upstream}" 2>/dev/null </dev/null)" || return 0
+  case "$n" in ""|0) return 0 ;; esac
+  printf 'next: %s is behind its upstream: fast-forward it, or release from the remote-tracking ref (such as origin/main), then run evidence again\n' "$1" >&2
+}
+
 # Verify one done commit as /data-request:amend step 2 does, against local refs only: resolve to
 # one full SHA, then merge-base --is-ancestor. Only exit 0 of the last step verifies the part. Returns 0 verified,
 # 1 not in the release, 3 not a commit here, 4 check could not run (such as exit 128). stdin is
@@ -393,7 +436,7 @@ rl_amend_verify() { # <commit> <release commit>
 # ids, files and fields only. Prints the hold on stderr and returns 11 when held. With mode "note"
 # it verifies no commit, prints "amend note:" lines for the open parts and findings, and returns 0.
 rl_amend_hold() { # <ref> <commit> [note]
-  local ref="$1" commit="$2" mode="${3:-hold}" f rel kind id field c rows open="" stale="" unver="" bad="" missing="" vrc nl='
+  local ref="$1" commit="$2" mode="${3:-hold}" f rel kind id field c rows open="" stale="" unver="" bad="" missing="" vrc fc nl='
 '
   for f in "$SR_ROOT/$SR_DIR"/amendments/*.json; do
     [ -e "$f" ] || continue
@@ -436,11 +479,19 @@ EOT
     printf 'next: the engineer comments done: %s <commit> or the analyst comments withdrawn: %s <reason> on the deliverable PR, then the record is updated\n' "$id" "$id" >&2
   done
   for id in $stale; do
-    printf 'next: %s is done by a commit outside %s: release from a ref that holds the commit, or the engineer comments done: %s <commit> with a commit in the ref. If the local refs are stale, fetch the remote (for example git fetch --tags <remote>) and run evidence again\n' "$id" "$ref" "$id" "$ref" >&2
+    printf 'next: %s is done by a commit outside %s: release from a ref that contains the commit, or the engineer comments done: %s <commit> with a commit in %s\n' "$id" "$ref" "$id" "$ref" >&2
   done
-  for id in $unver; do
-    printf 'next: %s is not verified against local refs: fetch the remote (for example git fetch --tags <remote>) and run evidence again\n' "$id" >&2
-  done
+  if [ -n "$unver" ]; then
+    fc="$(rl_fetch_command)"
+    case "$fc" in
+      "#"*) fc="no remote is configured, so fetch nothing: check that the commit is in this clone" ;;
+      *) fc="run $fc" ;;
+    esac
+    for id in $unver; do
+      printf 'next: the commit of %s is missing here or does not resolve: %s, then run evidence again\n' "$id" "$fc" >&2
+    done
+  fi
+  [ -z "$stale$unver" ] || rl_behind_note "$ref"
   [ -z "$bad" ] || printf '%s\n' "next: correct each record field named above, then run evidence again" >&2
   return 11
 }
@@ -642,6 +693,7 @@ cmd="${1:-}"
 shift
 case "$cmd" in
   evidence) cmd_evidence "$@" ;;
+  fetch-command) cmd_fetch_command "$@" ;;
   check) cmd_check "$@" ;;
   render) cmd_render "$@" ;;
   criteria) cmd_criteria "$@" ;;

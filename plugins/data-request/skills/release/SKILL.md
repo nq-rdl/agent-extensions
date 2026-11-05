@@ -66,10 +66,17 @@ until a strict comment on the deliverable PR closes it. `release.sh evidence` en
 amend's part-state record, `.sqlreview/amendments/<request>.json` (amend step 5). Each part has
 the status `done`, `handed off` or `withdrawn`.
 
-First fetch, as a visible step: run `git fetch --tags`, and also fetch the branch that the release ref
-names, if it names one (for example `git fetch origin main` for `origin/main`). `release.sh evidence`
-uses no network. It verifies each done commit against local refs, so stale refs hold the release. If
-the fetch fails, report the failure to the human and stop. Do not go on as if the commits were verified.
+First fetch, as a visible step. Run the command that `bash "$S/release.sh" fetch-command` prints. It
+fetches tags from `origin`, else from the first configured remote. With no remote it prints a comment,
+so skip the fetch and say so. This is the one fetch instruction. The amend skill and the hand-off
+reference use the same command. A fetch updates tags and remote-tracking refs such as `origin/main`.
+It does not update a local branch. Name a remote-tracking ref or a tag as the release ref, or
+fast-forward the local branch first. Evidence checks exactly the ref that you give.
+
+A fetch never decides the release. If it fails, report the failure to the human. For example, git
+refuses to overwrite a local tag that moved on the remote. Do not force the fetch, and still run
+evidence below. `release.sh evidence` uses no network. It verifies each done commit against local
+refs and holds the release when a commit is missing or is not in the ref.
 
 Then bring the record up to date. Find the deliverable PR in the ledger, or use the PR URL the
 analyst gives. Read its comments, read-only, for each `amendment hand-off:` comment and its `part:`
@@ -79,7 +86,7 @@ entries. Only a later comment whose first line has one of two forms closes a han
   The script checks the commit against local refs, as amend does after its fetch: `git rev-parse --verify`
   gives one full SHA, then `git merge-base --is-ancestor <full SHA> <ref>`. Only exit 0 verifies.
   If the check fails or cannot run, the part stays open. Exit 128 counts as a failed check. A commit
-  that is missing locally holds the release until you fetch and run evidence again.
+  that is missing locally holds the release. Run the fetch command and run evidence again.
 - **Withdrawn:** `withdrawn: P<n> <reason>`, from the analyst. Set the part to `withdrawn` with that
   reason. A `withdrawn:` line with no reason leaves the part open.
 

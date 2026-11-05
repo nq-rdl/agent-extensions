@@ -278,6 +278,25 @@ class SkillContract(unittest.TestCase):
                     self.assertIn(token, text)
                 self.assertNotIn("the engineer says the part is done", text)
 
+    def test_one_fetch_instruction_is_cited_everywhere(self):
+        amend = flat((REPO / "skills/data-request-amend/SKILL.md").read_text())
+        handoff = flat((REPO / "skills/data-request-triage/references/handoff.rst").read_text())
+        release = flat(section(self.body(), "## 0. Amend gate"))
+        for name, text in (("amend", amend), ("handoff", handoff), ("release", release)):
+            with self.subTest(name):
+                self.assertIn("fetch-command", text)
+                self.assertNotIn("git fetch origin", text)
+        self.assertIn("same fetch as step 0 of the release skill", amend)
+        self.assertIn("A failed fetch does not decide", amend)
+        self.assertIn("name a remote-tracking ref such as `origin/<branch>` or a tag as the release ref", amend)
+        self.assertNotIn("does the same fetch", amend)
+
+    def test_release_sh_runs_no_network_command(self):
+        text = (REPO / "skills/data-request-setup/scripts/release.sh").read_text()
+        for n, line in enumerate(text.splitlines(), 1):
+            if re.search(r"\bgit\b.*\b(fetch|ls-remote|pull|clone|push)\b", line) and not line.lstrip().startswith("#"):
+                self.assertIn("printf", line, f"release.sh:{n} must only print a command: {line}")
+
     def test_amend_gate_relies_on_the_script_hold(self):
         # #534: the skill updates amend's record from the strict comments; the script holds.
         for tree in SKILL:
@@ -287,12 +306,17 @@ class SkillContract(unittest.TestCase):
                               "Exit 11 means release held: stop before step 1",
                               "Never edit the record to pass the gate without a strict comment",
                               "once and keep its JSON for step 1", "Exit 2 means the ref",
-                              "go on to step 1", "`git fetch --tags`", "stale refs hold the release",
-                              "report the failure to the human"):
+                              "go on to step 1", "`bash \"$S/release.sh\" fetch-command`",
+                              "This is the one fetch instruction", "A fetch never decides the release",
+                              "report the failure to the human", "Do not force the fetch",
+                              "still run evidence below", "does not update a local branch",
+                              "Name a remote-tracking ref or a tag as the release ref"):
                     self.assertIn(token, text)
-                self.assertLess(text.index("`git fetch --tags`"), text.index('evidence "<ref>"'),
+                self.assertLess(text.index("fetch-command"), text.index('evidence "<ref>"'),
                                 "fetch before the evidence run")
                 self.assertNotIn("fetches once", text)
+                self.assertNotIn("git fetch", text, "the command comes from fetch-command only")
+                self.assertNotIn("and stop", text.split("A fetch never decides")[1].split("evidence below")[0])
         text = flat(section(self.body(), "## 1. Gather the release evidence"))
         self.assertIn("Step 0 already ran this, so reuse its JSON", text)
         amend = flat((REPO / "skills/data-request-amend/SKILL.md").read_text())
@@ -888,14 +912,151 @@ class AmendGate(unittest.TestCase):
         self.record([self.part("P3", "done", commit=late)])
         r = self.p.evidence("v1.0.0")
         self.assertEqual(r.returncode, 11, r.stderr)
-        self.assertIn("not in v1.0.0: P3", r.stderr)
+        # The whole stderr: one hold line and exactly one next line, with no fetch advice, because
+        # the commit is here and a fetch cannot put it in the ref (#534).
+        self.assertEqual(r.stderr.splitlines(), [
+            "release held: amend part done by a commit not in v1.0.0: P3",
+            "next: P3 is done by a commit outside v1.0.0: release from a ref that contains the commit, "
+            "or the engineer comments done: P3 <commit> with a commit in v1.0.0"], r.stderr)
+        self.assertNotIn("fetch", r.stderr)
+        self.assertNotIn("P<n>", r.stderr)
         self.assertEqual(self.p.evidence("HEAD").returncode, 0)
+
+    def test_each_stale_part_gets_exactly_one_next_line_with_its_own_id(self):
+        self.p.write("late.txt", "x")
+        self.p.commit("engineer change after the tag")
+        late = git(self.p.root, "rev-parse", "HEAD")
+        self.record([self.part("P2", "done", commit=late), self.part("P5", "done", commit=late),
+                     self.part("P6", "done", commit=self.head)])
+        r = self.p.evidence("v1.0.0")
+        self.assertEqual(r.returncode, 11, r.stderr)
+        lines = r.stderr.splitlines()
+        self.assertEqual(len(lines), 3, r.stderr)
+        self.assertEqual(lines[0], "release held: amend part done by a commit not in v1.0.0: P2 P5")
+        nexts = [line for line in lines if line.startswith("next:")]
+        self.assertEqual(len(nexts), 2, r.stderr)
+        self.assertTrue(nexts[0].startswith("next: P2 is done by a commit outside v1.0.0:"), nexts[0])
+        self.assertTrue(nexts[0].endswith("done: P2 <commit> with a commit in v1.0.0"), nexts[0])
+        self.assertTrue(nexts[1].startswith("next: P5 is done by a commit outside v1.0.0:"), nexts[1])
+        self.assertTrue(nexts[1].endswith("done: P5 <commit> with a commit in v1.0.0"), nexts[1])
+
+    def test_a_local_branch_behind_its_upstream_says_so_without_a_network_call(self):
+        # The commit is here, but the local main is behind origin/main, so the commit is not in main.
+        # A fetch moves origin/main and never main, so the line says to fast-forward or to use origin/main.
+        pushed = self.push_from_another_clone()
+        git(self.p.root, "fetch", "-q", "origin")
+        git(self.p.root, "branch", "-q", "-u", "origin/main", "main")
+        self.record([self.part("P3", "done", commit=pushed)])
+        r = self.p.evidence("main")
+        self.assertEqual(r.returncode, 11, r.stderr)
+        self.assertEqual(r.stderr.splitlines(), [
+            "release held: amend part done by a commit not in main: P3",
+            "next: P3 is done by a commit outside main: release from a ref that contains the commit, "
+            "or the engineer comments done: P3 <commit> with a commit in main",
+            "next: main is behind its upstream: fast-forward it, or release from the remote-tracking ref "
+            "(such as origin/main), then run evidence again"], r.stderr)
+        self.assertEqual(self.p.evidence("origin/main").returncode, 0)
+        git(self.p.root, "merge", "-q", "--ff-only", "origin/main")
+        self.assertEqual(self.p.evidence("main").returncode, 0)
+
+    def test_a_tag_that_does_not_contain_the_commit_gets_no_behind_line(self):
+        self.p.write("late.txt", "x")
+        self.p.commit("engineer change after the tag")
+        self.record([self.part("P3", "done", commit=git(self.p.root, "rev-parse", "HEAD"))])
+        self.assertNotIn("behind", self.p.evidence("v1.0.0").stderr)
+
+    def push_from_another_clone(self):
+        other = Path(self.tmp.name).parent / f"{Path(self.tmp.name).name}-other"
+        self.addCleanup(shutil.rmtree, other, True)
+        git(Path(self.tmp.name).parent, "clone", "-q", "-b", "main", self.remote.name, str(other))
+        git(other, "config", "user.email", "t@example.org")
+        git(other, "config", "user.name", "T")
+        (other / "pushed.txt").write_text("x")
+        git(other, "add", "pushed.txt")
+        git(other, "commit", "-q", "-m", "engineer change")
+        pushed = git(other, "rev-parse", "HEAD")
+        git(other, "push", "-q", "origin", "HEAD:main")
+        return pushed
+
+    def fetch_command(self, *env_args):
+        return run(RELEASE, ["fetch-command"], self.p.root)
+
+    def test_fetch_command_prefers_origin(self):
+        git(self.p.root, "remote", "add", "aaa", self.remote.name)
+        r = self.fetch_command()
+        self.assertEqual((r.returncode, r.stdout, r.stderr), (0, "git fetch --tags origin\n", ""))
+
+    def test_fetch_command_uses_the_only_remote_when_it_is_not_origin(self):
+        git(self.p.root, "remote", "rename", "origin", "upstream")
+        r = self.fetch_command()
+        self.assertEqual((r.returncode, r.stdout, r.stderr), (0, "git fetch --tags upstream\n", ""))
+        self.record([self.part("P3", "done", commit=self.head)])
+        self.assertEqual(self.p.evidence("v1.0.0").returncode, 0)
+        # The printed command runs as it stands and moves the remote-tracking ref.
+        pushed = self.push_from_another_clone()
+        self.record([self.part("P3", "done", commit=pushed)])
+        self.assertEqual(self.p.evidence("upstream/main").returncode, 11)
+        self.assertEqual(subprocess.run(["bash", "-c", r.stdout], cwd=self.p.root, env=clean_env(),
+                                        capture_output=True).returncode, 0)
+        self.assertEqual(self.p.evidence("upstream/main").returncode, 0)
+
+    def test_fetch_command_takes_the_first_remote_when_there_is_no_origin(self):
+        git(self.p.root, "remote", "rename", "origin", "zeta")
+        git(self.p.root, "remote", "add", "beta", self.remote.name)
+        self.assertEqual(self.fetch_command().stdout, "git fetch --tags beta\n")
+
+    def test_no_remote_says_to_skip_the_fetch_and_a_local_ancestor_verifies(self):
+        git(self.p.root, "remote", "remove", "origin")
+        r = self.fetch_command()
+        self.assertEqual((r.returncode, r.stderr), (0, ""))
+        self.assertEqual(r.stdout, "# no remote is configured: skip the fetch and say so\n")
+        # The comment is safe to run as it stands.
+        self.assertEqual(subprocess.run(["bash", "-c", r.stdout], capture_output=True).returncode, 0)
+        self.record([self.part("P3", "done", commit=self.head)])
+        self.assertEqual(self.p.evidence("v1.0.0").returncode, 0)
+
+    def test_no_remote_hint_says_there_is_nothing_to_fetch(self):
+        git(self.p.root, "remote", "remove", "origin")
+        self.record([self.part("P3", "done", commit="0123456789abcdef0123456789abcdef01234567")])
+        r = self.p.evidence("v1.0.0")
+        self.assertEqual(r.returncode, 11, r.stderr)
+        self.assertEqual(r.stderr.splitlines()[1:], [
+            "next: the commit of P3 is missing here or does not resolve: no remote is configured, so fetch "
+            "nothing: check that the commit is in this clone, then run evidence again"], r.stderr)
+
+    def test_a_fetch_that_refuses_to_clobber_a_moved_tag_does_not_stop_evidence(self):
+        # The fetch is best effort. Git refuses to move a local tag, so the printed command fails,
+        # and evidence still verifies a part whose commit is a local ancestor of the ref.
+        self.record([self.part("P3", "done", commit=self.head)])
+        other = Path(self.tmp.name).parent / f"{Path(self.tmp.name).name}-moved"
+        self.addCleanup(shutil.rmtree, other, True)
+        git(Path(self.tmp.name).parent, "clone", "-q", "-b", "main", self.remote.name, str(other))
+        git(other, "config", "user.email", "t@example.org")
+        git(other, "config", "user.name", "T")
+        (other / "moved.txt").write_text("x")
+        git(other, "add", "moved.txt")
+        git(other, "commit", "-q", "-m", "move the tag")
+        git(other, "tag", "-f", "v1.0.0")
+        git(other, "push", "-q", "-f", "origin", "v1.0.0")
+        cmd = self.fetch_command().stdout
+        fetch = subprocess.run(["bash", "-c", cmd], cwd=self.p.root, env=clean_env(), capture_output=True,
+                               text=True)
+        self.assertNotEqual(fetch.returncode, 0, "the fetch must refuse to clobber the tag")
+        self.assertIn("would clobber existing tag", fetch.stderr)
+        self.assertNotIn("--force", cmd)
+        r = self.p.evidence("v1.0.0")
+        self.assertEqual(r.returncode, 0, r.stderr)
+        self.assertEqual(r.stderr, "")
+        self.assertEqual(git(self.p.root, "rev-parse", "v1.0.0"), self.head, "the local tag stays put")
 
     def assert_unverified(self, r, part="P3"):
         self.assertEqual(r.returncode, 11, r.stderr)
         self.assertIn(f"commit is not verified (rev-parse or merge-base did not succeed): {part}", r.stderr)
-        self.assertIn(f"next: {part} is not verified against local refs: fetch the remote", r.stderr)
+        self.assertEqual(r.stderr.splitlines()[1:], [
+            f"next: the commit of {part} is missing here or does not resolve: run git fetch --tags origin, "
+            "then run evidence again"], r.stderr)
         self.assertNotIn("not in v1.0.0", r.stderr)
+        self.assertNotIn("P<n>", r.stderr)
         self.assert_no_leak(r)
 
     def test_a_local_ancestor_verifies_even_when_the_remote_is_unreachable(self):
@@ -910,8 +1071,6 @@ class AmendGate(unittest.TestCase):
         self.record([self.part("P3", "done", commit="0123456789abcdef0123456789abcdef01234567")])
         r = self.p.evidence("v1.0.0")
         self.assert_unverified(r)
-        self.assertIn("next: P3 is not verified against local refs: fetch the remote "
-                      "(for example git fetch --tags <remote>) and run evidence again", r.stderr)
 
     def test_an_ambiguous_short_sha_holds(self):
         # Two commits share a seven-digit prefix, so the short SHA resolves to no single commit.
@@ -920,18 +1079,28 @@ class AmendGate(unittest.TestCase):
         self.assert_unverified(self.p.evidence("v1.0.0"))
 
     def ambiguous_prefix(self):
+        # Build two real commits whose ids share a seven-digit prefix, with the hash that this
+        # repository uses (SHA-1 or SHA-256). The search is bounded.
+        fmt = subprocess.run(["git", "rev-parse", "--show-object-format"], cwd=self.p.root,
+                             capture_output=True, text=True, env=clean_env())
+        algo = fmt.stdout.strip() if fmt.returncode == 0 and fmt.stdout.strip() else "sha1"
+        self.assertIn(algo, ("sha1", "sha256"))
         tree = subprocess.run(["git", "hash-object", "-t", "tree", "-w", "--stdin"], cwd=self.p.root, input="",
                               capture_output=True, text=True, check=True, env=clean_env()).stdout.strip()
         seen = {}
-        for n in range(400000):
+        for n in range(600000):
             body = (f"tree {tree}\nauthor t <t@example> {1700000000 + n} +0000\n"
                     f"committer t <t@example> {1700000000 + n} +0000\n\nambiguous {n}\n").encode()
-            sha = hashlib.sha1(b"commit %d\0" % len(body) + body).hexdigest()
+            sha = hashlib.new(algo, b"commit %d\0" % len(body) + body).hexdigest()
             if sha[:7] in seen:
                 for other in (seen[sha[:7]], body):
                     subprocess.run(["git", "hash-object", "-t", "commit", "-w", "--stdin"], cwd=self.p.root,
                                    input=other.decode(), capture_output=True, text=True, check=True,
                                    env=clean_env())
+                # Prove the prefix is ambiguous for git itself, so a regression cannot pass by luck.
+                probe = subprocess.run(["git", "rev-parse", "--verify", "--quiet", sha[:7] + "^{commit}"],
+                                       cwd=self.p.root, capture_output=True, text=True, env=clean_env())
+                self.assertNotEqual(probe.returncode, 0, "the prefix must resolve to no single commit")
                 return sha[:7]
             seen[sha[:7]] = body
         self.fail("no two commits share a seven-digit prefix")
@@ -972,21 +1141,31 @@ class AmendGate(unittest.TestCase):
         self.addCleanup(shutil.rmtree, wrap, True)
         calls = wrap / "calls.log"
         script = wrap / "git"
+        # Any argument that names a network subcommand blocks the call, wherever global options such
+        # as --git-dir X or -C DIR put it. A false block fails the test, so it never hides a call.
         script.write_text(
             "#!/bin/sh\n"
-            'sub=""\nskip=0\n'
+            'prev=""\n'
             'for a in "$@"; do\n'
-            '  if [ "$skip" = 1 ]; then skip=0; continue; fi\n'
-            '  case "$a" in -C|-c) skip=1 ;; -*) ;; *) sub="$a"; break ;; esac\n'
+            '  case "$a" in\n'
+            f'    fetch|pull|ls-remote|clone|push) echo "$a" >> "{calls}"; exit 99 ;;\n'
+            f'    update) if [ "$prev" = remote ]; then echo "remote update" >> "{calls}"; exit 99; fi ;;\n'
+            "  esac\n"
+            '  prev="$a"\n'
             "done\n"
-            'case "$sub" in\n'
-            f'  fetch|pull|ls-remote|clone) echo "$sub" >> "{calls}"; exit 99 ;;\n'
-            "esac\n"
             f'exec "{real}" "$@"\n')
         script.chmod(0o755)
         env = {"PATH": f"{wrap}{os.pathsep}{os.environ['PATH']}"}
-        probe = subprocess.run(["git", "fetch"], cwd=self.p.root, env=clean_env(env), capture_output=True)
-        self.assertEqual(probe.returncode, 99, "the wrapper must fail on fetch")
+        gitdir = str(self.p.root / ".git")
+        for argv in (["fetch"], ["--git-dir", gitdir, "fetch"], ["-C", str(self.p.root), "fetch", "--tags"],
+                     ["--git-dir", gitdir, "--work-tree", str(self.p.root), "ls-remote", "origin"],
+                     ["-c", "core.quotepath=off", "remote", "update"], ["--git-dir", gitdir, "pull"],
+                     ["--git-dir", gitdir, "push", "origin"], ["--git-dir", gitdir, "clone", "x", "y"]):
+            probe = subprocess.run(["git", *argv], cwd=self.p.root, env=clean_env(env), capture_output=True)
+            self.assertEqual(probe.returncode, 99, f"the wrapper must fail on: git {' '.join(argv)}")
+        ok = subprocess.run(["git", "--git-dir", gitdir, "remote"], cwd=self.p.root, env=clean_env(env),
+                            capture_output=True, text=True)
+        self.assertEqual((ok.returncode, ok.stdout.strip()), (0, "origin"), "local remote listing passes")
         calls.unlink()
         for parts, want in (([self.part("P1", "done", commit=self.head)], 0),
                             ([self.part("P1", "done", commit="0123456789abcdef0123456789abcdef01234567")], 11),
@@ -1000,6 +1179,9 @@ class AmendGate(unittest.TestCase):
         r = run(RELEASE, ["evidence", "--no-amend-hold", "v1.0.0"], self.p.root, env=env)
         self.assertEqual(r.returncode, 0, r.stderr)
         self.assertFalse(calls.exists())
+        r = run(RELEASE, ["fetch-command"], self.p.root, env=env)
+        self.assertEqual((r.returncode, r.stdout), (0, "git fetch --tags origin\n"))
+        self.assertFalse(calls.exists(), "fetch-command only prints the command")
 
     def test_done_part_stays_open_when_the_commit_does_not_resolve(self):
         for name, commit in (("unknown full SHA", "0123456789abcdef0123456789abcdef01234567"),
