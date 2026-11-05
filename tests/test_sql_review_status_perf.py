@@ -76,10 +76,15 @@ def shim_dir(where, log):
 
 
 class StatusProcessCount(unittest.TestCase):
-    def count(self, units):
+    def count(self, units, amendments=0):
         with tempfile.TemporaryDirectory() as tmp:
             tmp = Path(tmp)
             p = build(tmp / "project", units)
+            for i in range(amendments):  # each record has one handed-off part
+                rec = p.root / ".sqlreview" / "amendments" / f"enq{9100 + i}.json"
+                rec.parent.mkdir(exist_ok=True)
+                rec.write_text(json.dumps({"schemaVersion": 1, "kind": "amendment", "parts": [
+                    {"id": "P1", "status": "done", "commit": "a" * 40}, {"id": "P2", "status": "handed off"}]}))
             log = tmp / "spawned.log"
             env = dict(os.environ, PATH=f"{shim_dir(tmp / 'shims', log)}{os.pathsep}{os.environ['PATH']}")
             r = subprocess.run(["bash", str(SCRIPT), "status", "--json"], cwd=p.root, env=env,
@@ -96,6 +101,11 @@ class StatusProcessCount(unittest.TestCase):
         # path component in each symlink check.
         for name in ("bash", "dirname", "basename"):
             self.assertEqual(per_folder.get(name, 0), 0, f"{name} runs once per review folder")
+
+    def test_each_amendment_record_costs_one_jq_read(self):
+        none, four = self.count(1), self.count(1, amendments=4)
+        extra = {name: four[name] - none[name] for name in set(none) | set(four) if four[name] != none[name]}
+        self.assertEqual(extra, {"jq": 4}, "one jq read per amendment record and no other process")
 
 
 class PreflightBudget(unittest.TestCase):

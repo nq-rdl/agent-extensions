@@ -243,7 +243,8 @@ Before or after release, write the part states of each split request to
 ```
 
 A `done` part needs the commit that made the change. A `withdrawn` part needs the reason. Write
-the whole file again for each change. When you split a request, also set its triage ledger entry, with `amend` in
+the whole file again for each change: the guard checks each Write with `release.sh amend-check`, the
+check that the release hold applies, and names the field and the rule of any violation. When you split a request, also set its triage ledger entry, with `amend` in
 `stages_done` and the record path and SHA-256 as its `amend` artifact (`sqlreview.sh ledger set`).
 Reuse the entry if one exists, and put no part text or values in it. The record changes for each part,
 so set the entry again after each write of the record, with its new SHA-256, or the ledger reports the

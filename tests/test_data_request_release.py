@@ -1279,6 +1279,79 @@ class AmendGate(unittest.TestCase):
                 self.assertIn(f"release held: {self.RECORD}: field", r.stderr)
                 self.assert_no_leak(r)
 
+    def test_amend_check_and_the_hold_agree_on_what_is_valid(self):
+        # One validator: a record that amend-check refuses holds the release, and one it accepts does not.
+        h = self.head
+        docs = {
+            "valid": {"schemaVersion": 1, "kind": "amendment", "parts": [
+                self.part("P1", "done", commit=h), self.part("P2", "withdrawn", reason="r")]},
+            "kind absent": {"schemaVersion": 1, "parts": [self.part("P1", "done", commit=h)]},
+            "other kind": {"schemaVersion": 1, "kind": CANARY, "parts": [self.part("P1", "done", commit=h)]},
+            "schema": {"schemaVersion": 2, "parts": [self.part("P1", "done", commit=h)]},
+            "withdrawn without a comment": {"schemaVersion": 1, "parts": [self.part("P1", "withdrawn", reason="r")]},
+            "bad id": {"schemaVersion": 1, "parts": [self.part("p1", "done", commit=h)]},
+            "bad commit": {"schemaVersion": 1, "parts": [self.part("P1", "done", commit="HEAD")]},
+            "no parts": {"schemaVersion": 1, "parts": []},
+            "duplicate": {"schemaVersion": 1, "parts": [self.part("P1", "done", commit=h),
+                                                        self.part("P1", "done", commit=h)]},
+        }
+        raw = {"empty": "", "blank": " \n\t\n", "two documents": '{"schemaVersion": 1}\n{"schemaVersion": 1}',
+               "not JSON": "{" + CANARY}
+        for name, body in [(n, json.dumps(d)) for n, d in docs.items()] + list(raw.items()):
+            with self.subTest(name):
+                self.p.write(self.RECORD, body)
+                checked = run(RELEASE, ["amend-check", "--stdin"], self.p.root, stdin=body)
+                held = self.p.evidence("v1.0.0")
+                self.assertEqual(checked.returncode == 4, held.returncode == 11, (checked.stdout, held.stderr))
+                self.assertEqual(checked.returncode == 4, name not in ("valid", "kind absent", "withdrawn without a comment"))
+                self.assert_no_leak(checked)
+
+    def status_lines(self):
+        r = run(SQLREVIEW, ["status"], self.p.root)
+        self.assertEqual(r.returncode, 0, r.stderr)
+        self.assertNotIn("LEAK-C", r.stdout + r.stderr)
+        return [ln for ln in r.stdout.splitlines() if ln.startswith("amendment ")]
+
+    def test_status_names_each_record_that_the_hold_refuses(self):
+        # The hold and status read one validator: a record that holds the release (exit 11) has a status line
+        # with its file and field, and a record that passes has none.
+        h = self.head
+        bodies = {
+            "handed off": (json.dumps({"schemaVersion": 1, "parts": [self.part("P1", "handed off")]}), 11),
+            "malformed part": (json.dumps({"schemaVersion": 1, "parts": [self.part("P1", CANARY)]}), 11),
+            "empty parts": (json.dumps({"schemaVersion": 1, "parts": []}), 11),
+            "not JSON": ("{" + CANARY, 11),
+            "empty file": ("", 11),
+            "two documents": ('{"schemaVersion": 1}\n{"schemaVersion": 1}', 11),
+            "closed": (json.dumps({"schemaVersion": 1, "parts": [self.part("P1", "done", commit=h)]}), 0),
+        }
+        for name, (body, code) in bodies.items():
+            with self.subTest(name):
+                self.p.write(self.RECORD, body)
+                self.assertEqual(self.p.evidence("v1.0.0").returncode, code)
+                lines = self.status_lines()
+                self.assertEqual(len(lines) > 0, code == 11, lines)
+                if code == 11:
+                    self.assertTrue(all(ln.startswith("amendment enq9177-falls\t") for ln in lines), lines)
+
+    def test_status_names_a_symlinked_record_that_makes_evidence_fail(self):
+        target = self.p.root / "elsewhere.json"
+        target.write_text(json.dumps({"schemaVersion": 1, "parts": [self.part("P1", "done", commit=self.head)]}))
+        link = self.p.root / self.RECORD
+        link.parent.mkdir(parents=True, exist_ok=True)
+        link.symlink_to(target)
+        self.assertEqual(self.p.evidence("v1.0.0").returncode, 2)
+        self.assertEqual(self.status_lines(), [
+            next(ln for ln in self.status_lines() if "(file): must not be a symbolic link" in ln)])
+
+    def test_a_record_name_that_the_guard_refuses_prints_as_a_placeholder_in_the_hold(self):
+        self.p.write(".sqlreview/amendments/ENQ 9177.json", json.dumps({"schemaVersion": 1, "parts": []}))
+        r = self.p.evidence("v1.0.0")
+        self.assertEqual(r.returncode, 11, r.stderr)
+        self.assertIn("release held: .sqlreview/amendments/(invalid name).json: field parts is missing or invalid",
+                      r.stderr)
+        self.assertNotIn("ENQ 9177", r.stderr)
+
     def ledger(self, stages_done=("intake", "amend"), artifacts=None):
         # The triage ledger's own entry style: the amend stage lists the record as its artifact.
         amend = {"sources": ["pr"], "artifacts": artifacts if artifacts is not None else []}
@@ -1674,6 +1747,88 @@ def decided(criteria, decision="accepted"):
         r.update(decision=decision, final_note=r["proposed_note"] if decision == "accepted" else None,
                  decided_by="analyst-login", decided_at="2026-10-15T01:00:00Z")
     return criteria
+
+
+@unittest.skipUnless(shutil.which("jq"), "the guard needs jq")
+class AmendRecordGuard(unittest.TestCase):
+    """The guard validates writes to .sqlreview/amendments/*.json like the other review documents.
+
+    The schema is the amend gate's: schemaVersion 1, kind amendment (when present), parts[] with a unique
+    id P<n> and a status done (with commit), handed off or withdrawn (with reason). The evidence hold
+    reads the same validator. Never a value in the reason.
+    """
+    REL = "amendments/enq9177-falls.json"
+    decide = Guard.decide
+
+    def doc(self, parts=None, **over):
+        d = {"schemaVersion": 1, "kind": "amendment", "parts": parts if parts is not None else [
+            {"id": "P1", "status": "done", "commit": "a" * 40},
+            {"id": "P2", "status": "handed off", "hand_off": "draft, not posted"},
+            {"id": "P3", "status": "withdrawn", "reason": "Not needed " + CANARY,
+             "comment": "https://github.com/example-org/extract-example/pull/9/comment-1"}]}
+        d.update(over)
+        return d
+
+    def denied(self, doc, *rules, rel=None):
+        decision, reason = self.decide("Write", rel or self.REL, doc if isinstance(doc, str) else json.dumps(doc))
+        self.assertEqual(decision, "deny", reason)
+        for rule in rules:
+            self.assertIn(rule, reason)
+        self.assertNotIn("LEAK-C", reason)
+        return reason
+
+    def test_a_valid_record_passes(self):
+        decision, reason = self.decide("Write", self.REL, json.dumps(self.doc()))
+        self.assertEqual(decision, "allow", reason)
+
+    def test_edit_is_denied(self):
+        decision, reason = self.decide("Edit", self.REL)
+        self.assertEqual(decision, "deny")
+        self.assertIn("Write the complete file", reason)
+
+    def test_document_fields(self):
+        self.denied(self.doc(schemaVersion=CANARY), "schemaVersion: must be 1")
+        self.denied(self.doc(kind=CANARY), "kind: must be amendment")
+        self.denied(self.doc(parts=[]), "parts: must be a nonempty array")
+        self.denied(self.doc(parts=CANARY), "parts: must be a nonempty array")
+        self.denied("[]", "(document): must be a JSON object")
+        self.denied('{"x": "' + CANARY + '",,}', "(document): not valid JSON")
+
+    def test_part_rules_name_the_field_and_the_rule(self):
+        parts = [{"id": CANARY, "status": "done", "commit": "a" * 40},
+                 {"id": "P2", "status": "done", "commit": CANARY},
+                 {"id": "P3", "status": "withdrawn", "reason": " "},
+                 {"id": "P3", "status": CANARY},
+                 CANARY]
+        reason = self.denied(self.doc(parts), "parts[0].id: must be P<n>",
+                             "parts[1].commit: required for a done part",
+                             "parts[2].reason: required for a withdrawn part",
+                             "parts[].id (duplicate): must be unique",
+                             "parts[3].status: must be done, handed off or withdrawn",
+                             "parts[4]: must be an object")
+        self.assertIn("release.sh amend-check", reason)
+
+    def test_the_record_name_is_checked(self):
+        self.denied(self.doc(), "lower-case letters, digits and hyphens", rel="amendments/ENQ 9177.json")
+
+    def test_amend_check_cli(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            f = Path(tmp) / "a.json"
+            f.write_text(json.dumps(self.doc()))
+            r = run(RELEASE, ["amend-check", str(f)], tmp)
+            self.assertEqual((r.returncode, r.stdout), (0, "ok\n"), r.stderr)
+            r = run(RELEASE, ["amend-check", "--stdin"], tmp, stdin=json.dumps(self.doc(kind=CANARY)))
+            self.assertEqual((r.returncode, r.stdout), (4, "kind: must be amendment\n"), r.stderr)
+            self.assertNotIn("LEAK-C", r.stdout + r.stderr)
+
+    def test_every_record_the_amend_skill_shows_passes(self):
+        # The JSON example in the amend skill is a valid record once its placeholders are filled.
+        for tree in (REPO / "skills/data-request-amend", REPO / "plugins/data-request/skills/amend"):
+            text = (tree / "SKILL.md").read_text()
+            block = text.split('```json\n{"schemaVersion": 1, "kind": "amendment"', 1)[1].split("```", 1)[0]
+            example = json.loads('{"schemaVersion": 1, "kind": "amendment"' + block.replace("<commit>", "a" * 7))
+            decision, reason = self.decide("Write", self.REL, json.dumps(example))
+            self.assertEqual(decision, "allow", reason)
 
 
 def render_record(doc):

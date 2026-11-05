@@ -1,0 +1,3 @@
+kind: Fixed
+body: 'data-request: the verbose status reason and delta name the field and the step, not the sql_path value'
+time: 2026-11-05T18:10:08.000000000Z

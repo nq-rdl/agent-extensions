@@ -219,6 +219,22 @@ class ScopeBodyState(unittest.TestCase):
             self.assertIn("scoped-header-only", run(["status"], p.root).stdout)
             self.assertEqual(run(["delta", "q", "scope"], p.root).returncode, 6)
 
+    def test_delta_on_an_unbound_scope_names_the_bind_step(self):
+        # A scope framed before the SQL existed has no SQL binding. delta and impact name bootstrap.
+        for sql_exists in (False, True):
+            with self.subTest(sql_exists=sql_exists), tempfile.TemporaryDirectory() as tmp:
+                p = Project(tmp)
+                if sql_exists:
+                    p.sql("q.sql", OLD)
+                    p.commit()
+                p.write_json("q", "scope.json", scope_doc("q", "q.sql", sql_sha256=None))
+                for args in (["delta", "q", "scope"], ["delta", "q"], ["impact", "q"]):
+                    r = run(args, p.root)
+                    self.assertEqual(r.returncode, 6, r.stdout + r.stderr)
+                    self.assertIn("scope q has no SQL binding: run /data-request:bootstrap with the reviewed "
+                                  "SQL path once the SQL exists to bind it", r.stderr)
+                    self.assertNotIn("lacks clean immutable source evidence", r.stderr)
+
     def test_scope_baseline_symlink_is_not_binding_evidence(self):
         with tempfile.TemporaryDirectory() as tmp:
             p = Project(tmp)

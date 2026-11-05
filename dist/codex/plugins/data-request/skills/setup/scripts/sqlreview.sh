@@ -8,7 +8,13 @@
 #                                              reviews/.gitkeep so git keeps reviews/); never overwrites
 #   status [--json] [--verbose]                reviews, their state and the next command (bootstrap first when the
 #                                              SQL or intake changed after the scope, or to bind an unbound scope;
-#                                              a commit before analyse when git lists the SQL as uncommitted; an
+#                                              a commit before analyse when git lists the SQL or another source
+#                                              that fingerprint refuses as uncommitted; an open amendment part
+#                                              (.sqlreview/amendments/*.json, "handed off") gets its own line
+#                                              for each part id with its next action, a record that fails
+#                                              the amend check (release.sh amend-check) gets an invalid line
+#                                              with each field and rule, and so does an amendment
+#                                              in .sqlreview/ledger.json whose record file is missing; an
 #                                              empty project names bootstrap; --verbose: why invalid/missing,
 #                                              and the move that migrates a legacy-encoded slug); exit 3 when not initialised
 #                                              missing bundled templates: JSON missing_templates, else one stderr line
@@ -41,9 +47,12 @@
 #   materialize SLUG scope|review REVISION OUTPUT  git show + SHA check of that revision into an external file; caller deletes it
 #   snapshot SLUG SQL                          verify the final review against the committed SQL; no SQL writes
 #   delta SLUG [scope|review]                  body binding + full hashes; exit 0 full/header-only, 10 body change, 6 no baseline
+#                                              (a scope with no SQL binding names the bootstrap bind step, not the path)
 #   carryover SLUG DRAFT                       review draft items matching confirmed, still-valid scope items (JSON)
 #   intake FILE REVISION [DRAFT]              read analyst answers sidecar; optional collision-safe scope draft merge
-#                                              missing FILE is a legacy no-op; invalid intake exits 4; never writes
+#                                              missing FILE is a legacy no-op (with DRAFT it prints the draft unchanged,
+#                                              or exits 4 when the draft is not a readable file); invalid intake exits 4;
+#                                              never writes
 #   carryforward SLUG scope|review DRAFT       draft items whose previous-revision confirmation may be carried (JSON)
 #   remap SLUG [DRAFT]                         atomically remap unchanged location/logic ranges in a draft (JSON report)
 #                                              default: review.draft.json, else scope.draft.json; seed from published JSON
@@ -90,7 +99,7 @@ usage() {
 
 # ---------------------------------------------------------------------------------------------
 cmd_init() {
-  local mode="create" json=0 apply=() root target f state rc=0 any=0 entries="[]"
+  local mode="create" json=0 apply=() root target f fdir state rc=0 any=0 entries="[]"
   while [ $# -gt 0 ]; do
     case "$1" in
       --diff) mode="diff" ;;
@@ -113,7 +122,8 @@ cmd_init() {
       case "$f" in config.json|templates/scope.md|templates/review.md|templates/lifts.md) ;; *) sr_die 2 "unknown bundled path: $f" ;; esac
       printf '%s\n' "$files" | grep -Fxq -- "$f" || sr_die 2 "no such file in the bundled default: $f"
       sr_no_symlinks "$target/$f" || exit 2
-      mkdir -p "$target/$(dirname "$f")" || sr_die 2 "cannot create target directory"
+      fdir="${f%/*}"; [ "$fdir" != "$f" ] || fdir=.
+      mkdir -p "$target/$fdir" || sr_die 2 "cannot create target directory"
       cp "$SR_ASSETS/$f" "$target/$f" || sr_die 2 "cannot copy $f"
       printf 'applied\t%s\n' "$f"
     done
@@ -130,7 +140,8 @@ cmd_init() {
   if [ "$mode" = "create" ] && { [ ! -d "$target" ] || [ "$ledger_only" = 1 ]; }; then
     for f in $files; do
       sr_no_symlinks "$target/$f" || exit 2
-      mkdir -p "$target/$(dirname "$f")" || sr_die 2 "cannot create target directory"
+      fdir="${f%/*}"; [ "$fdir" != "$f" ] || fdir=.
+      mkdir -p "$target/$fdir" || sr_die 2 "cannot create target directory"
       cp "$SR_ASSETS/$f" "$target/$f" || sr_die 2 "cannot copy $f"
     done
     # Git does not track an empty directory: a placeholder keeps reviews/ in a committed .sqlreview/
@@ -176,16 +187,71 @@ cmd_init() {
 }
 
 # ---------------------------------------------------------------------------------------------
+# What holds the release in .sqlreview/amendments (#534): one row for each handed-off part, each record
+# that the shared validator refuses, and each ledger amendment whose record file is missing. Release
+# holds (exit 11) or stops (exit 2) on the same records, so status names them before release is tried.
+# Rows go to $SR_AMEND_ROWS as name TAB kind TAB detail TAB next, and print as text lines unless JSON is on.
+#   open     detail is one part id, and there is one row for each part, as release.sh prints one next line each
+#   invalid  detail is "field: rule; field: rule" from the validator, or a symbolic link refusal, never a value
+#   missing  detail is empty
+# One jq read for each record and one for the ledger, and no other process: status runs from the hook.
+_status_amendments() { # <json 0|1>
+  local json="$1" arec aname akind aid af ac open findings nxt id lline lfile="$SR_ROOT/$SR_DIR/ledger.json"
+  SR_AMEND_ROWS=""
+  for arec in "$SR_ROOT/$SR_DIR"/amendments/*.json; do
+    [ -e "$arec" ] || continue
+    sr_amend_label "$arec"; aname="$SR_AMEND_NAME"
+    open=""; findings=""
+    if sr_no_symlinks "$arec" 2>/dev/null; then
+      while IFS="$SR_TAB" read -r akind aid af ac; do
+        case "$akind" in
+          open) open="${open:+$open }$aid" ;;
+          bad) findings="${findings:+$findings; }$af: $ac" ;;
+        esac
+      done <<EOT
+$(sr_amend_rows "$arec")
+EOT
+    else
+      findings="(file): must not be a symbolic link"
+    fi
+    for id in $open; do
+      nxt="the engineer comments done: $id <commit> or the analyst comments withdrawn: $id <reason> on the deliverable PR, then /data-request:amend updates $SR_DIR/amendments/$aname.json before release"
+      SR_AMEND_ROWS="$SR_AMEND_ROWS$aname${SR_TAB}open$SR_TAB$id$SR_TAB$nxt$SR_NL"
+      [ "$json" = 1 ] || printf 'amendment %s\thanded off: %s\tnext=%s\n' "$aname" "$id" "$nxt"
+    done
+    if [ -n "$findings" ]; then
+      nxt="correct each field named, then /data-request:amend writes the whole record again before release"
+      SR_AMEND_ROWS="$SR_AMEND_ROWS$aname${SR_TAB}invalid$SR_TAB$findings$SR_TAB$nxt$SR_NL"
+      [ "$json" = 1 ] || printf 'amendment %s\tinvalid: %s\tnext=%s\n' "$aname" "$findings" "$nxt"
+    fi
+  done
+  # The ledger shows an amendment but its record file is missing. The filter lists each path once.
+  if [ -f "$lfile" ] && [ ! -L "$lfile" ]; then
+    while IFS= read -r lline; do
+      case "$lline" in
+        path*) aname="${lline#path?}"
+          [ -f "$SR_ROOT/$aname" ] && continue
+          aname="${aname#"$SR_DIR"/amendments/}"; aname="${aname%.json}" ;;
+        *) continue ;;
+      esac
+      SR_AMEND_ROWS="$SR_AMEND_ROWS$aname${SR_TAB}missing$SR_TAB$SR_TAB$SR_AMEND_NEXT$SR_NL"
+      [ "$json" = 1 ] || printf 'amendment %s\trecord missing\tnext=%s\n' "$aname" "$SR_AMEND_NEXT"
+    done <<EOF
+$(jq -rs "$SR_AMEND_LEDGER_JQ" "$lfile" 2>/dev/null)
+EOF
+  fi
+}
+
+# ---------------------------------------------------------------------------------------------
 cmd_status() {
-  local json=0 verbose=0 d slug state reason migrate next schema lifts rows="[]" f missing="" seen=0
+  local json=0 verbose=0 d slug state reason migrate next schema lifts rows="[]" f missing="" seen=0 amend
   while [ $# -gt 0 ]; do
     case "$1" in --json) json=1 ;; --verbose) verbose=1 ;; *) usage ;; esac
     shift
   done
   sr_need_jq
   sr_require_root
-  SR_CHECKED="
-"
+  SR_CHECKED="$SR_NL"
   SR_CHECK_TMP="$(mktemp)" || sr_die 2 "mktemp failed"
   trap 'rm -f "$SR_CHECK_TMP"' EXIT
   trap 'exit 2' HUP INT TERM
@@ -193,7 +259,7 @@ cmd_status() {
   # Bundled templates the project lacks (e.g. lifts.md in a project initialised before lifts, #349).
   for f in "$SR_ASSETS"/templates/*.md; do
     [ -f "$f" ] || continue
-    f="templates/$(basename "$f")"
+    f="templates/${f##*/}"
     [ -f "$SR_ROOT/$SR_DIR/$f" ] || missing="$missing${missing:+ }$f"
   done
   if [ -n "$missing" ] && [ "$json" = 0 ]; then
@@ -239,13 +305,20 @@ EOF
       fi
     done
   fi
+  _status_amendments "$json"
+  amend="$SR_AMEND_ROWS"
   # An empty project has one next step: scope the first SQL file.
   next=""
   [ "$seen" = 1 ] || next="/data-request:bootstrap <sql path> to scope the first SQL file"
   if [ "$json" = 0 ] && [ -n "$next" ]; then printf 'no reviews yet\tnext=%s\n' "$next"; fi
   if [ "$json" = 1 ]; then
-    printf '%s' "$rows" | jq --arg root "$SR_ROOT" --arg schema "$schema" --arg missing "$missing" --arg next "$next" \
+    printf '%s' "$rows" | jq --arg root "$SR_ROOT" --arg schema "$schema" --arg missing "$missing" --arg next "$next" --arg amend "$amend" \
       '{root: $root, schemaVersion: ($schema | tonumber? // $schema), reviews: ., next: (if $next == "" then null else $next end),
+        amendments: [$amend | split("\n")[] | select(. != "") | split("\t") | . as [$name, $kind, $detail, $act]
+                     | {record: ".sqlreview/amendments/\($name).json", handed_off: (if $kind == "open" then [$detail] else [] end), next: $act}
+                       + (if $kind == "missing" then {missing: true}
+                          elif $kind == "invalid" then {invalid: ($detail | split("; ") | map(split(": ") | {field: .[0], rule: .[1]}))}
+                          else {} end)],
         counts: (group_by(.state) | map({key: .[0].state, value: length}) | from_entries | . + {total: (map(.) | add // 0)}),
         missing_templates: ($missing | split(" ") | map(select(. != ""))),
         missing_templates_fix: (if $missing == "" then null else "sqlreview.sh init --apply " + $missing end)}'
@@ -303,12 +376,13 @@ $src
     [ -n "${SR_CHECK_TMP-}" ] || rm -f "$tmp"; printf 'invalid JSON: the document does not parse\n'; return 4
   fi
   if [ "$kind" = true ]; then
-    out="$(jq -r -L "$SR_SCRIPT_DIR" 'include "sqlreview-questions"; question_errors' "$tmp" 2>&1)"; rc=$?
+    out="$(jq -r -L "$SR_SCRIPT_DIR" 'include "sqlreview-questions"; question_errors' "$tmp" 2>/dev/null)"; rc=$?
   else
-    out="$(jq -r -L "$SR_SCRIPT_DIR" -f "$SR_SCRIPT_DIR/sqlreview-check.jq" "$tmp" 2>&1)"; rc=$?
+    out="$(jq -r -L "$SR_SCRIPT_DIR" -f "$SR_SCRIPT_DIR/sqlreview-check.jq" "$tmp" 2>/dev/null)"; rc=$?
   fi
   [ -n "${SR_CHECK_TMP-}" ] || rm -f "$tmp"
-  if [ "$rc" -ne 0 ]; then printf 'check failed to run: %s\n' "$out"; return 4; fi
+  # jq's own error text can quote a document value, so it never reaches the output (no-echo).
+  if [ "$rc" -ne 0 ]; then printf 'check failed to run\n'; return 4; fi
   if [ -n "$out" ]; then printf '%s\n' "$out"; return 4; fi
   [ -z "${SR_CHECKED+x}" ] || [ "$src" = --stdin ] || SR_CHECKED="$SR_CHECKED$src
 "
@@ -891,12 +965,19 @@ _delta_prepare() {
     doc="$(sr_doc_for "$slug")" || sr_die 2 "reviews/$slug/ has no review.json or scope.json"
   fi
   cmd_check "$doc" >/dev/null || sr_die 4 "invalid document"
-  SR_SQL_PATH="$(jq -r '.sql_path // ""' "$doc")"
+  local bound
+  IFS="$SR_TAB" read -r SR_SQL_PATH bound <<EOF
+$(jq -r '[(.sql_path // ""), (if .kind == "scope" and .sql_sha256 == null then "unbound" else "bound" end)] | join("\t")' "$doc" 2>/dev/null)
+EOF
   sr_safe_sql "$SR_SQL_PATH"
+  # A scope framed before the SQL existed has no recorded SQL to compare with: name the bind step.
+  # The message names the step, not the path: the path is a document value (no-echo), and the scope has it.
+  [ "$bound" = bound ] ||
+    sr_die 6 "scope $slug has no SQL binding: run /data-request:bootstrap with the reviewed SQL path once the SQL exists to bind it"
   SR_BASE="$work/base.sql"
   SR_CUR="$SR_ROOT/$SR_SQL_PATH"
   [ -f "$SR_CUR" ] || sr_die 2 "the reviewed SQL no longer exists: $SR_SQL_PATH (moved? see: sqlreview.sh move)"
-  sr_source_auth "$(sr_binding_doc "$SR_REVIEWS/$1" "$(jq -r .kind "$doc")" "$doc")" "$SR_BASE" || exit $?
+  sr_source_auth "$(sr_binding_doc "$SR_REVIEWS/$1" "$(jq -r .kind "$doc" 2>/dev/null)" "$doc")" "$SR_BASE" || exit $?
   local binding
   sr_binding "$doc" "$SR_CUR" "$SR_BASE"; binding=$?
   [ "$binding" = 10 ] && { printf 'header-only revision; SQL body unchanged\n'; return 0; }
@@ -990,7 +1071,16 @@ cmd_intake() {
   sr_need_jq
   case "$2" in ''|*[!0-9]*|0) sr_die 1 "revision must be an integer >= 1" ;; esac
   if [ ! -e "$1" ]; then
-    if [ $# -eq 3 ]; then cat "$3"; return $?; fi
+    # A legacy no-op. With DRAFT it prints the draft as it is, the same output that the merge gives
+    # when the sidecar adds nothing. It must not print nothing: the documented pattern writes the output
+    # to a temporary file and moves that file over the draft, so an empty output would empty the draft.
+    # The draft is the caller's own file, so printing it echoes no document value. A draft that cannot be
+    # read exits 4 with a fixed line and no output, so the move does not happen.
+    if [ $# -eq 3 ]; then
+      [ -f "$3" ] && [ ! -L "$3" ] || sr_die 4 "cannot merge intake: the draft is not a regular file"
+      cat -- "$3" 2>/dev/null || sr_die 4 "cannot merge intake: the draft cannot be read"
+      return 0
+    fi
     printf '%s\n' '{"present":false,"assumptions":[],"analyst_questions":[]}'
     return 0
   fi
@@ -1076,7 +1166,9 @@ cmd_carryover() (
        carry_over: [$rows[] | select(.basis == "sql-unchanged" or .basis == "sql-body-unchanged" or .basis == "lines-unchanged")],
        carry_over_intent: [$rows[] | select(.basis == "scope-before-sql" or .basis == "intent-unchanged")],
        walk: [$rows[] | select(.basis == null) | {kind, id, why}
-              + (if has("decided") then {decided} else {} end)]}'
+              + (if has("decided") then {decided} else {} end)]}' 2>/dev/null ||
+    # jq error text can quote a draft value (no-echo), so only a fixed line is printed.
+    sr_die 4 "carryover failed to run: check the draft with sqlreview.sh check"
 )
 
 # ---------------------------------------------------------------------------------------------
@@ -1282,7 +1374,7 @@ _notes_scan() { # <sql file> → records separated by \037: H start end · I kin
           hasd = 1; iend = NR
           next
         }
-        bad(NR, "unexpected line in notes header: " line)
+        bad(NR, "unexpected line in notes header")
       }
       t = line; sub(/^[ \t]+/, "", t)
       if (t == "") next
@@ -1299,6 +1391,11 @@ _notes_scan() { # <sql file> → records separated by \037: H start end · I kin
     }
     END { if (!err && st == "hdr") printf "E\037%d\037%s\n", hstart, "unterminated notes header: no closing */ line" }
   ' "$1"
+}
+
+# Whether the parsed notes header (the JSON of cmd_notes) says that a header is present.
+_notes_present() { # <parsed JSON>
+  printf '%s' "$1" | jq -r .present
 }
 
 cmd_notes() {
@@ -1339,7 +1436,7 @@ cmd_notes() {
   if [ -n "$against" ] && [ "$(jq -r .kind "$against")" = scope ]; then
     _scope_notes "$against" "$questions" "$parsed"
   elif [ -n "$against" ] && [ "$(jq -r .kind "$against")" = review ] &&
-     { [ -n "$confirmer" ] || [ "$(printf '%s' "$parsed" | jq -r .present)" = true ]; }; then
+     { [ -n "$confirmer" ] || [ "$(_notes_present "$parsed")" = true ]; }; then
     _header_decisions "$sql" "$against" "$confirmer" "$parsed"
   else printf '%s\n' "$parsed"; fi
 }
@@ -1559,7 +1656,7 @@ cmd_render() {
   [ $# -eq 2 ] || usage
   sr_need_jq
   sr_require_root
-  local slug="$1" kind="$2" doc tpl cfg out rendered unknown
+  local slug="$1" kind="$2" doc tpl cfg out rendered unknown unknown_list
   case "$kind" in scope|review|lifts) ;; *) sr_die 2 "kind must be scope or review (got '$kind')" ;; esac
   sr_safe_slug "$slug"
   doc="$SR_REVIEWS/$slug/$kind.json"
@@ -1578,10 +1675,10 @@ cmd_render() {
     question_doc="$(cmd_questions "$slug" "$kind")" || return $?
     question_rows="$(printf '%s' "$question_doc" | jq -c .questions)"
   fi
-  vars="$(jq -c -L "$SR_SCRIPT_DIR" --argjson question_rows "$question_rows" --slurpfile cfgs "$cfg" -f "$SR_SCRIPT_DIR/sqlreview-render.jq" "$doc")" || sr_die 2 "render failed for reviews/$slug/$kind.json"
+  vars="$(jq -c -L "$SR_SCRIPT_DIR" --argjson question_rows "$question_rows" --slurpfile cfgs "$cfg" -f "$SR_SCRIPT_DIR/sqlreview-render.jq" "$doc" 2>/dev/null)" || sr_die 2 "render failed for reviews/$slug/$kind.json"
   rendered="$(jq -r -n --rawfile tpl "$tpl" --argjson vars "$vars" \
-    'reduce ($vars | keys[]) as $k ($tpl; gsub("\\{\\{\($k)\\}\\}"; $vars[$k]))')" || sr_die 2 "render failed for reviews/$slug/$kind.json"
-  if jq -e '(.header_revisions // []) | length > 0' "$doc" >/dev/null; then
+    'reduce ($vars | keys[]) as $k ($tpl; gsub("\\{\\{\($k)\\}\\}"; $vars[$k]))' 2>/dev/null)" || sr_die 2 "render failed for reviews/$slug/$kind.json"
+  if jq -e '(.header_revisions // []) | length > 0' "$doc" >/dev/null 2>&1; then
     rendered="$rendered
 
 Header revision history: metadata changed without changing its corresponding SQL body; full-file header hashes and timestamps are recorded in $kind.json. Changed assumption text still requires confirmation."
@@ -1589,7 +1686,8 @@ Header revision history: metadata changed without changing its corresponding SQL
   printf '%s\n' "$rendered" > "$out" || sr_die 2 "cannot write rendered report"
   unknown="$(grep -o '{{[A-Za-z0-9_]*}}' "$out" | sort -u || true)"
   if [ -n "$unknown" ]; then
-    printf 'sqlreview: unknown placeholder(s) left in place: %s\n' "$(printf '%s' "$unknown" | tr '\n' ' ')" >&2
+    unknown_list="$(printf '%s' "$unknown" | tr '\n' ' ')"
+    printf 'sqlreview: unknown placeholder(s) left in place: %s\n' "$unknown_list" >&2
   fi
   printf 'rendered\t%s\n' "${out#"$SR_ROOT"/}"
 }

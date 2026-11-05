@@ -11,8 +11,9 @@ ledger_check() {
 }
 
 ledger_resume() {
-  local saved="$1" current="$2" bad='[]' stage path expected actual
+  local saved="$1" current="$2" bad='[]' stage path expected actual artifact_rows
   ledger_check "$current" revisions
+  artifact_rows="$(printf '%s' "$saved" | jq -r '.stage_evidence | to_entries[] | .key as $stage | .value.artifacts[] | [$stage, .path, .sha256] | join("\t")')"
   # Artifact paths resolve in the child root, never the installed plugin or state directory.
   # Schema excludes tabs/newlines; raw joining preserves backslashes with read -r.
   while IFS="$(printf '\t')" read -r stage path expected; do
@@ -26,7 +27,7 @@ ledger_resume() {
       bad="$(printf '%s' "$bad" | jq -c --arg stage "$stage" '. + [$stage] | unique')" || exit 2
     fi
   done <<EOF
-$(printf '%s' "$saved" | jq -r '.stage_evidence | to_entries[] | .key as $stage | .value.artifacts[] | [$stage, .path, .sha256] | join("\t")')
+$artifact_rows
 EOF
   printf '%s' "$saved" | jq --slurpfile current "$current" --argjson bad "$bad" '
     . as $entry |

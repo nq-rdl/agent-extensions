@@ -51,6 +51,14 @@
 #                            malformed record or ledger holds. --no-amend-hold is for the engineer
 #                            hand-off gate: it never exits 11 and reports each open part,
 #                            malformed record or missing record on stderr as "amend note:".
+#   amend-check FILE | amend-check --stdin [--name NAME]
+#                            validate an amendment part-state record (.sqlreview/amendments/<request>.json),
+#                            as the guard does on each Write, with the rules that the amend gate applies:
+#                            one JSON object, schemaVersion 1, kind "amendment" when present, parts[]
+#                            with a unique id P<n> and a status done (with commit), handed off or
+#                            withdrawn (with reason). One "<field>: <rule>" line per violation, exit 4;
+#                            "ok" otherwise. Never a value. --name NAME also checks that the record name
+#                            has lower-case letters, digits and hyphens, as the guard needs
 #   check FILE | check --stdin
 #                            validate a release record (.sqlreview/releases/<tag>/release.json):
 #                            one violation per line, exit 4; "ok" otherwise. Inside the project,
@@ -94,6 +102,7 @@ usage() {
 
 # Shared jq definitions: record validation and rendering. The criteria table is release-criteria.jq.
 RL_JQ='include "sqlreview-identity";
+include "sqlreview-noecho";
 include "release-criteria";
 def str: type == "string" and length > 0;
 def arr: if type == "array" then . else [] end;
@@ -108,11 +117,11 @@ def src_errors($cid; $kept; $ev):
     if (.slug | str) and (.item | str) and (.revision | type) == "number" then
       if $kept | not then empty
       else . as $s | ([$ev[] | select(.slug == $s.slug)][0]) as $e
-        | if $e == null then "\($cid): review \(.slug) is not in evidence"
+        | if $e == null then "\($cid): review \(.slug | safe_slug) is not in evidence"
           elif $e.revision != .revision then
-            "\($cid): review \(.slug) revision \(.revision) is not the revision in evidence (\($e.revision))"
+            "\($cid): review \(.slug | safe_slug) revision \(.revision) is not the revision in evidence (\($e.revision))"
           elif $e.applies == "current" or $e.applies == "header-only" then empty
-          else "\($cid): review \(.slug) does not apply to the release (\($e.applies)); cite the release files that support the claim, or raise it as a question" end
+          else "\($cid): review \(.slug | safe_slug) does not apply to the release (\($e.applies)); cite the release files that support the claim, or raise it as a question" end
       end
     else "\($cid): a review source needs slug, item and revision" end
   elif .kind == "scope" then
@@ -122,8 +131,8 @@ def src_errors($cid; $kept; $ev):
     if (.path | str) and (.ref | str) then empty else "\($cid): a file source needs path and ref" end
   else "\($cid): source kind must be review, scope or file" end;
 def claim_errors($ev):
-  (.id // "?") as $id
-  | (if (.id | str) and (.id | test("^C[1-9][0-9]*$")) then empty else "claim id must be C<n>: \($id)" end),
+  (.id | safe_id("^C[1-9][0-9]*$")) as $id
+  | (if (.id | str) and (.id | test("^C[1-9][0-9]*$")) then empty else "claim id must be C<n>" end),
     (if .section == "summary" or .section == "assumptions" then empty
      else "\($id): section must be summary or assumptions" end),
     (if (.proposed | str) then empty else "\($id): proposed wording is empty" end),
@@ -144,8 +153,8 @@ def claim_errors($ev):
      then kept as $k | .sources[] | src_errors($id; $k; $ev)
      else "\($id): sources must be a nonempty array" end);
 def question_errors:
-  (.id // "?") as $id
-  | (if (.id | str) and (.id | test("^Q[1-9][0-9]*$")) then empty else "question id must be Q<n>: \($id)" end),
+  (.id | safe_id("^Q[1-9][0-9]*$")) as $id
+  | (if (.id | str) and (.id | test("^Q[1-9][0-9]*$")) then empty else "question id must be Q<n>" end),
     (if (.text | str) then empty else "\($id): text is empty" end),
     (if (.sources | type) == "array" then empty else "\($id): sources must be an array" end),
     (if .resolution == null then empty
@@ -171,11 +180,11 @@ def release_errors:
       (if (.claims | type) == "array" and (.claims | length) > 0 then empty else "claims must be a nonempty array" end),
       (.claims | arr | .[] | if type == "object" then claim_errors($ev) else "every claim must be an object" end),
       (.questions | arr | .[] | if type == "object" then question_errors else "every question must be an object" end),
-      (.claims | arr | map(objects | .id) | group_by(.)[] | select(length > 1) | "duplicate claim id \(.[0])"),
-      (.questions | arr | map(objects | .id) | group_by(.)[] | select(length > 1) | "duplicate question id \(.[0])"),
+      (.claims | arr | map(objects | .id) | group_by(.)[] | select(length > 1) | "duplicate claim id \(.[0] | safe_id("^C[1-9][0-9]*$"))"),
+      (.questions | arr | map(objects | .id) | group_by(.)[] | select(length > 1) | "duplicate question id \(.[0] | safe_id("^Q[1-9][0-9]*$"))"),
       (if .status != "approved" then empty else
-         (.claims | arr | .[] | objects | select(.decision == "pending") | "approved: \(.id) is pending"),
-         (.questions | arr | .[] | objects | select(.resolution == null) | "approved: \(.id) is unresolved"),
+         (.claims | arr | .[] | objects | select(.decision == "pending") | "approved: \(.id | safe_id("^C[1-9][0-9]*$")) is pending"),
+         (.questions | arr | .[] | objects | select(.resolution == null) | "approved: \(.id | safe_id("^Q[1-9][0-9]*$")) is unresolved"),
          (((.criteria | type) == "object") as $itemised
           | ("summary", "assumptions") as $s
           | if any(.claims | arr | .[] | objects; .section == $s and kept and limitation_shown($itemised)) then empty
@@ -332,38 +341,8 @@ rl_review_row() ( # <slug> <commit>
      open_questions: [$question_doc.questions[] | select(.status == "open") | .text]}' "$doc"
 )
 
-# Amend gate (#534): one TSV line per finding in an amendment record. It emits part ids, field
-# paths and done commits only, never part text, reasons or other record values.
-RL_AMEND_JQ='def bad($f): ["bad", "-", $f] | join("\t");
-def check:
-if type != "object" then bad("(document)")
-elif .schemaVersion != 1 then bad("schemaVersion")
-elif (.parts | type) != "array" or (.parts | length) == 0 then bad("parts")
-else
-  (if [.parts[] | objects | .id | strings] | group_by(.) | any(length > 1)
-   then bad("parts[].id (duplicate)") else empty end),
-  (.parts | to_entries[] | .key as $i | .value as $p | "parts[\($i)]" as $at
-   | if ($p | type) != "object" then bad($at)
-     elif ($p.id | type) != "string" or ($p.id | test("^P[1-9][0-9]*$") | not) then bad("\($at).id")
-     elif $p.status == "handed off" then ["open", $p.id] | join("\t")
-     elif $p.status == "withdrawn" then
-       (if ($p.reason | type) == "string" and ($p.reason | test("\\S")) then empty else bad("\($at).reason") end)
-     elif $p.status == "done" then
-       (if ($p.commit | type) == "string" and ($p.commit | test("^[0-9a-f]{7,64}$"))
-        then ["done", $p.id, "-", $p.commit] | join("\t") else bad("\($at).commit") end)
-     else bad("\($at).status") end)
-end;
-if length == 1 then .[0] | check else bad("(document)") end'
-
-# The triage ledger shows an amendment when an entry has the amend stage. Emits each recorded
-# amendment record path, or "bad" for a ledger that is empty or has no entries. Paths only, no values.
-RL_AMEND_LEDGER_JQ='def rec: type == "string" and test("^\\.sqlreview/amendments/[a-z0-9][a-z0-9-]*\\.json$");
-def paths:
-if type != "object" or (.entries | type) != "array" then "bad"
-else .entries[] | objects | select(.stage == "amend" or ((.stages_done | arrays | index("amend")) != null))
-  | .stage_evidence.amend.artifacts | arrays | .[] | objects | .path | select(rec) | "path\t" + .
-end;
-if length == 1 then .[0] | paths else "bad" end'
+# The amendment record validator (SR_AMEND_JQ) and the ledger filter (SR_AMEND_LEDGER_JQ) live in
+# sqlreview-lib.sh, because status reads the same definitions.
 
 # One jq read of .sqlreview/ledger.json. Sets $missing to one hold line per amended entry whose
 # amend artifact names a record file that does not exist. An amended entry that names no record is
@@ -371,7 +350,7 @@ if length == 1 then .[0] | paths else "bad" end'
 # JSON also holds.
 rl_amend_ledger_missing() {
   local ledger="$SR_ROOT/$SR_DIR/ledger.json" line nl='
-' next='write it from the amendment hand-off comment on the deliverable PR (/data-request:amend step 5)'
+' next="$SR_AMEND_NEXT"
   missing=""
   [ -e "$ledger" ] || return 0
   sr_no_symlinks "$ledger" || exit 2
@@ -384,7 +363,7 @@ rl_amend_ledger_missing() {
           missing="$missing${nl}release held: the ledger shows an amendment but $line is missing. Next: $next" ;;
     esac
   done <<EOT
-$(jq -rs "$RL_AMEND_LEDGER_JQ" "$ledger" 2>/dev/null || printf 'bad\n')
+$(jq -rs "$SR_AMEND_LEDGER_JQ" "$ledger" 2>/dev/null || printf 'bad\n')
 EOT
 }
 
@@ -447,9 +426,11 @@ rl_amend_hold() { # <ref> <commit> [note]
 '
   for f in "$SR_ROOT/$SR_DIR"/amendments/*.json; do
     [ -e "$f" ] || continue
-    rel="$SR_DIR/amendments/${f##*/}"
+    # A record file name prints only in the shape that the guard allows (no-echo), as status does.
+    sr_amend_label "$f"
+    rel="$SR_DIR/amendments/$SR_AMEND_NAME.json"
     sr_no_symlinks "$f" || exit 2
-    rows="$(jq -rs "$RL_AMEND_JQ" "$f" 2>/dev/null)" || rows="$(printf 'bad\t-\t(not valid JSON)')"
+    rows="$(sr_amend_rows "$f")"
     while IFS="$(printf '\t')" read -r kind id field c; do
       if [ "$kind" = open ]; then open="$open $id"
       elif [ "$kind" = bad ]; then bad="$bad${nl}release held: $rel: field $field is missing or invalid"
@@ -481,7 +462,7 @@ EOT
   [ -z "$bad" ] || printf '%s\n' "${bad#?}" >&2
   [ -z "$missing" ] || printf '%s\n' "${missing#?}" >&2
   # Each next line names the real part id, so the reader can paste it (N2). Part ids are the P<n>
-  # values already checked by RL_AMEND_JQ, so they carry no record text.
+  # values already checked by SR_AMEND_JQ, so they carry no record text.
   for id in $open; do
     printf 'next: the engineer comments done: %s <commit> or the analyst comments withdrawn: %s <reason> on the deliverable PR, then the record is updated\n' "$id" "$id" >&2
   done
@@ -592,7 +573,7 @@ EOF
 
 cmd_criteria() {
   [ $# -ge 1 ] || usage
-  local tag="$1" mode=unchecked fpfile="" fp=null commit tmp intake path slug doc row rows="" scopes stale=false
+  local tag="$1" mode=unchecked fpfile="" fp=null commit tmp intake path slug doc row rows="" scopes stale=false review_prefix previous_src
   local prev previous=null current=null f out
   shift
   case "$tag" in ""|-*) usage ;; esac
@@ -634,9 +615,10 @@ cmd_criteria() {
   fi
   rm -f "$tmp"
   # Every scope at the tag that carries criteria_status; exactly one may own the criteria (research R6).
+  review_prefix="$SR_DIR/reviews/"
   while IFS= read -r path; do
     case "$path" in "$SR_DIR"/reviews/*/scope.json) ;; *) continue ;; esac
-    slug="${path#"$SR_DIR"/reviews/}"; slug="${slug%/scope.json}"
+    slug="${path#$review_prefix}"; slug="${slug%/scope.json}"
     case "$slug" in */*|.|..|*[!A-Za-z0-9_%.-]*) sr_die 2 "unsafe review directory name at $tag" ;; esac
     doc="$(git -C "$SR_ROOT" show "$commit:./$path" 2>/dev/null)" || sr_die 2 "cannot read $slug/scope.json at $tag"
     row="$(printf '%s' "$doc" | jq -c --arg slug "$slug" '
@@ -661,11 +643,11 @@ EOF
   fi
   prev="$(release_previous_tag "$tag")" || sr_die 2 "cannot list the release records at $tag"
   if [ -n "$prev" ]; then
-    previous="$(git -C "$SR_ROOT" show "$commit:./$SR_DIR/releases/$prev/release.json" 2>/dev/null |
-      jq -c --arg tag "$prev" '{tag: $tag, criteria: (.criteria // null)}' 2>/dev/null)" ||
+    previous_src="$(git -C "$SR_ROOT" show "$commit:./$SR_DIR/releases/$prev/release.json" 2>/dev/null)"
+    previous="$(printf '%s' "$previous_src" | jq -c --arg tag "$prev" '{tag: $tag, criteria: (.criteria // null)}' 2>/dev/null)" ||
       sr_die 2 "cannot read the release record of $prev at $tag"
   fi
-  # This tag's record in the working tree: its analyst decisions survive while a row's note is unchanged.
+  # The record of this tag in the working tree: its analyst decisions survive while the note of a row is unchanged.
   case "$tag" in
     *..*|*[!A-Za-z0-9._-]*|[!A-Za-z0-9]*) ;;
     *) f="$SR_ROOT/$SR_DIR/releases/$tag/release.json"
@@ -673,7 +655,7 @@ EOF
        if [ -f "$f" ]; then current="$(jq -c '.criteria // null' "$f" 2>/dev/null)" || current=null; fi
        [ -n "$current" ] || current=null ;;
   esac
-  # The owning scope's states describe the SQL it recorded. A changed SQL body at the tag holds the table.
+  # The states of the owning scope describe the SQL it recorded. A changed SQL body at the tag holds the table.
   local scope_stale=false
   if [ "$(printf '%s' "$scopes" | jq 'length')" = 1 ]; then
     slug="$(printf '%s' "$scopes" | jq -r '.[0].slug')"
@@ -695,11 +677,46 @@ EOF
   printf '%s' "$out" | jq -e '. == null or .status == "complete"' >/dev/null || exit 10
 }
 
+cmd_amend_check() {
+  sr_need_jq
+  local rows kind id field rule out="" rc=0 nl='
+' name="" have_name=0 target=""
+  # Arguments: FILE or --stdin, then optionally --name NAME, the record name from the file name.
+  while [ $# -gt 0 ]; do
+    case "$1" in
+      --stdin) [ -z "$target" ] || usage; target=--stdin ;;
+      --name) [ $# -ge 2 ] && [ "$have_name" = 0 ] || usage; name="$2"; have_name=1; shift ;;
+      "") usage ;;
+      *) [ -z "$target" ] || usage; target="$1" ;;
+    esac
+    shift
+  done
+  [ -n "$target" ] || usage
+  # The rows are the ones the evidence hold reads (sr_amend_rows, SR_AMEND_JQ): a parse failure
+  # is one fixed row, because jq error text can quote a value (no-echo). Only bad rows are findings
+  # here. Standard input goes straight to jq, with no temporary file to clean up.
+  if [ "$target" = --stdin ]; then
+    rows="$(sr_amend_rows)"
+  else
+    [ -f "$target" ] || sr_die 2 "amend-check: the record file does not exist"
+    rows="$(sr_amend_rows "$target")"
+  fi
+  if [ "$have_name" = 1 ] && ! sr_amend_name_ok "$name"; then out="(name): $SR_AMEND_NAME_RULE"; fi
+  while IFS="$(printf '\t')" read -r kind id field rule; do
+    if [ "$kind" = bad ]; then out="$out${out:+$nl}$field: $rule"; fi
+  done <<EOT
+$rows
+EOT
+  if [ -n "$out" ]; then printf '%s\n' "$out"; rc=4; else printf 'ok\n'; fi
+  return "$rc"
+}
+
 cmd="${1:-}"
 [ -n "$cmd" ] || usage
 shift
 case "$cmd" in
   evidence) cmd_evidence "$@" ;;
+  amend-check) cmd_amend_check "$@" ;;
   fetch-command) cmd_fetch_command "$@" ;;
   check) cmd_check "$@" ;;
   render) cmd_render "$@" ;;
