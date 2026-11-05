@@ -345,3 +345,138 @@ sr_source_workspace() (
   esac
   printf '%s\n' "$work"
 )
+
+# Uncommitted source paths (untracked, modified or staged), one per line between newlines, and
+# their count. Fingerprint and a bound publish refuse ANY uncommitted source in the git tree
+# (sr_source_clean), not only the reviewed SQL, so the next command names a commit first whenever
+# this list is not empty. The exemptions are sr_source_clean's: review records under the store.
+# cmd_status sets both once per run with ONE git call, before its loop over the reviews. Paths are
+# relative to $SR_ROOT (outside it they start ../). Empty when git or the repository is unavailable:
+# then no commit is named.
+SR_NL='
+'
+sr_load_uncommitted() {
+  local line p
+  SR_UNCOMMITTED="$SR_NL"; SR_UNCOMMITTED_N=0
+  command -v git >/dev/null 2>&1 || return 0
+  while IFS= read -r line; do
+    p="${line#???}"
+    # A quoted path (one with a space) loses its quotes. A path that git escapes does not match
+    # a SQL path, but still counts as an uncommitted source.
+    case "$p" in \"*\") p="${p#\"}"; p="${p%\"}" ;; esac
+    case "$p" in
+      ''|"$SR_DIR"/reviews/*|"$SR_DIR"/releases/*|"$SR_DIR"/templates/*|"$SR_DIR"/ledger.json|"$SR_DIR"/.gitignore) ;;
+      *) SR_UNCOMMITTED="$SR_UNCOMMITTED$p$SR_NL"; SR_UNCOMMITTED_N=$((SR_UNCOMMITTED_N + 1)) ;;
+    esac
+  done <<EOF
+$(git --no-optional-locks -C "$SR_ROOT" -c core.quotePath=false -c status.relativePaths=true -c color.status=false \
+    status --short --untracked-files=all --no-renames -- ':/' 2>/dev/null)
+EOF
+}
+sr_uncommitted() { # <sql_path>: true when the run's git status lists it
+  case "${SR_UNCOMMITTED-}" in *"$SR_NL$1$SR_NL"*) return 0 ;; esac
+  return 1
+}
+# The commit prerequisite for a step that fingerprints or binds <sql_path>, or nothing.
+sr_commit_first() { # <sql_path>
+  [ "${SR_UNCOMMITTED_N:-0}" -gt 0 ] || return 0
+  if [ -f "$SR_ROOT/$1" ] && sr_uncommitted "$1"; then
+    if [ "$SR_UNCOMMITTED_N" -gt 1 ]; then printf 'commit %s and the other uncommitted source changes (git status), then ' "$1"
+    else printf 'commit %s, then ' "$1"; fi
+  else printf 'commit the uncommitted source changes (git status), then '; fi
+}
+
+# The next command for one review directory, on one line (#514). Derived only from records that
+# already exist: the state, scope.json and its recorded SQL binding (sql_sha256), the root answers.intake.json
+# and explain.json. A bound scope whose SQL body moved on, whose imported analyst decisions no
+# longer match the sidecar, or (for the scope that carries criteria_status) whose research criteria
+# moved on, names bootstrap as the rescope step. Cheap: a few jq and hash calls,
+# because status runs from a SessionStart hook with a 5-second timeout.
+sr_next() { # <slug> <state> <sql_path>
+  local d="$SR_REVIEWS/$1" state="$2" sql="$3" scope srev="" bound="" intake="" why="" gap="" follow="" ex pre=""
+  case "$state" in
+    draft)
+      if [ -f "$d/scope.draft.json" ]; then printf 'resume /data-request:bootstrap to finish the scope draft\n'
+      else printf 'resume /data-request:analyse to finish the review draft\n'; fi
+      return 0 ;;
+    invalid) printf 'run sqlreview.sh status --verbose to see why, then repair the documents\n'; return 0 ;;
+    lifts) printf '/data-request:lift to close out the lift ledger\n'; return 0 ;;
+    missing) printf "sqlreview.sh move '%s' <new path> if the SQL moved\n" "$sql"; return 0 ;;
+  esac
+  scope="$d/scope.json"
+  if [ -f "$scope" ]; then
+    local sidecar="$SR_ROOT/answers.intake.json" prog='
+      def mine: [.assumptions[]? | select(.upstream.source? == "analyst-intake")
+                 | {id, text, rationale, confirmed_by, confirmed_at, decided}] | sort_by(.id);
+      def theirs: [.decisions[] | {id: ("A-intake-" + .id), text, rationale, confirmed_by, confirmed_at, decided}] | sort_by(.id);
+      # Only the scope that owns the criteria (it carries criteria_status) tracks them. It is behind
+      # when a live criterion has no row, a withdrawn one keeps its row, or a criterion was
+      # re-confirmed (reworded, or applied_by changed) after the scope revision was recorded. The
+      # time test runs only on UTC "Z" stamps, compared to the second, so another format is no signal.
+      def utc: if type == "string" and test("^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}(\\.[0-9]+)?Z$")
+               then .[0:19] else null end;
+      def criteria_moved($doc):
+        ($doc | has("criteria_status")) and ((.criteria | type) == "array")
+        and ([.criteria[] | select(.withdrawn == null)] as $live | ($doc.recorded_at | utc) as $at
+             | ([$live[].id] | sort) != ([$doc.criteria_status[]? | .criterion] | sort)
+               or ($at != null and any($live[]; (.confirmed_at | utc) as $c | $c != null and $c > $at)));
+      $s[0] as $doc
+      | [($doc.revision // "-" | tostring),
+         (if ($doc.sql_sha256 | type) == "string" then "y" else "n" end),
+         (if $i == null then "n" else (try (if ($doc | mine) == ($i[0] | theirs) and ($i[0] | criteria_moved($doc) | not) then "n" else "y" end) catch "n") end)]
+      | join("\t")'
+    IFS="$(printf '\t')" read -r srev bound intake <<EOF2
+$( { [ -f "$sidecar" ] && jq -rn --slurpfile s "$scope" --slurpfile i "$sidecar" "$prog" 2>/dev/null; } ||
+   jq -rn --slurpfile s "$scope" --argjson i null "$prog" 2>/dev/null )
+EOF2
+    case "$srev" in ''|*[!0-9]*) srev="" ;; esac
+  fi
+  # Analyse fingerprints, and a bound bootstrap publishes, from a clean tree only (sr_source_clean),
+  # so any uncommitted source is committed first.
+  pre="$(sr_commit_first "$sql")"
+  if [ -n "$srev" ]; then
+    # The scope document's own staleness is the state itself. Under a review, test the scope
+    # binding directly: analyse alone never refreshes scope.json. A scope framed before the SQL
+    # existed has no binding to compare, so a stale review over it also names the rescope.
+    if [ "$state" = stale ] && [ ! -f "$d/review.json" ]; then why="The SQL"
+    elif [ -f "$d/review.json" ] && [ "$bound" = y ] && [ -f "$SR_ROOT/$sql" ]; then
+      sr_binding "$scope" "$SR_ROOT/$sql" /dev/null >/dev/null 2>&1
+      [ $? -eq 1 ] && why="The SQL"
+    elif [ "$state" = stale ] && [ -f "$d/review.json" ] && [ "$bound" = n ]; then
+      why="The SQL"; gap=", which has no SQL binding"
+    fi
+    if [ "$intake" = y ]; then why="${why:+$why and the analyst intake}"; why="${why:-The analyst intake}"; fi
+    if [ -n "$why" ]; then
+      # Bootstrap binds the scope to committed SQL, so a commit comes before it, not after.
+      if [ -f "$d/review.json" ]; then follow="/data-request:analyse $sql --update"
+      elif [ -f "$SR_ROOT/$sql" ]; then follow="/data-request:analyse $sql"
+      else follow="/data-request:draft to write $sql"; fi
+      printf '%s changed after scope revision %s%s: %srun /data-request:bootstrap %s to publish scope revision %s, then %s\n' \
+        "$why" "$srev" "$gap" "$pre" "$sql" "$((srev + 1))" "$follow"
+      return 0
+    fi
+  fi
+  case "$state" in
+    scoped)
+      if [ ! -f "$SR_ROOT/$sql" ]; then printf '/data-request:draft to write %s, then /data-request:analyse %s\n' "$sql" "$sql"
+      elif [ "$bound" = n ]; then
+        printf '%s/data-request:bootstrap %s to bind the scope to the SQL, then /data-request:analyse %s\n' "$pre" "$sql" "$sql"
+      else printf '%s/data-request:analyse %s to review the SQL\n' "$pre" "$sql"; fi ;;
+    scoped-header-only) printf '%s/data-request:bootstrap %s to record the header revision of the scope\n' "$pre" "$sql" ;;
+    stale|no-baseline) printf '%s/data-request:analyse %s --update\n' "$pre" "$sql" ;;
+    header-only) printf '%s/data-request:analyse %s to record the header revision of the review\n' "$pre" "$sql" ;;
+    current)
+      ex=""
+      if [ -f "$d/explain.json" ] && [ ! -L "$d/explain.json" ]; then
+        ex="$(jq -rn --slurpfile e "$d/explain.json" --slurpfile r "$d/review.json" '
+          if ($e[0].sql_sha256 == $r[0].sql_sha256 and $e[0].review_revision == $r[0].revision)
+          then (if $e[0].completed == true then "done" else "partial" end) else "" end' 2>/dev/null)"
+      fi
+      case "$ex" in
+        done) printf '/data-request:release <candidate ref> after the analyst accepts the explained SQL\n' ;;
+        partial) printf '/data-request:explain %s to resume the walkthrough\n' "$sql" ;;
+        *) printf '/data-request:explain %s to walk the analyst through the review\n' "$sql" ;;
+      esac ;;
+    *) printf '\n' ;;
+  esac
+}
