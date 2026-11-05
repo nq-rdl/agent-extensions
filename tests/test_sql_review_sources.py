@@ -146,11 +146,11 @@ class Sources(unittest.TestCase):
         doc = dict(doc, revision=2, **json.loads(self.fingerprint().stdout))
         doc["assumptions"][0]["confirmed_revision"] = 2
         draft.write_text(json.dumps(doc))
-        r = run(["publish", "sql__request", "review", str(draft)], self.p.root)
+        r = run(["publish", "sql__v1__request", "review", str(draft)], self.p.root)
         self.assertEqual(r.returncode, 0, r.stdout + r.stderr)
-        explain = self.p.root / ".sqlreview/reviews/sql__request/explain.json"
+        explain = self.p.root / ".sqlreview/reviews/sql__v1__request/explain.json"
         explain.write_text(json.dumps({"review_revision": 1}))
-        env = dict(os.environ, S=str(SCRIPTS), SLUG="sql__request")
+        env = dict(os.environ, S=str(SCRIPTS), SLUG="sql__v1__request")
         walk = subprocess.run(["bash", "-c", block], cwd=self.p.root, env=env, capture_output=True, text=True)
         self.assertEqual(walk.returncode, 0, walk.stdout + walk.stderr)
         lines = walk.stdout.splitlines()
