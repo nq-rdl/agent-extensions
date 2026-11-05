@@ -1,0 +1,3 @@
+kind: Fixed
+body: 'sqlreview.sh resolves its own temporary directories to physical paths, so a symlinked TMPDIR such as macOS /var/folders works'
+time: 2026-11-04T04:00:00.000000000Z

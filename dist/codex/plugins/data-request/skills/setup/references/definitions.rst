@@ -42,7 +42,7 @@ Every assumption and limitation carries ``status``, ``confirmed_by``, ``confirme
 ``confirmed_revision``. Fill these from an answered ``AskUserQuestion`` or preserve
 an evidenced imported confirmation: analyst intake (``analyst-intake.rst``) or the
 exact recorded TUH house default (``recurring-decisions.rst``). A generic decision
-origin or upstream marker supplies no confirmation. Never fabricate one. The
+origin or upstream marker does not count as a confirmation. Never fabricate one. The
 PreToolUse guard rejects a review or scope document in which any item lacks them.
 
 ``confirmed_revision`` is the revision at which a human confirmed the item. A freshly confirmed

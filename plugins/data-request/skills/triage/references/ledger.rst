@@ -11,14 +11,16 @@ Where it lives
 In co-development, the default is the selected child's ``.sqlreview/ledger.json``
 on the agreed working branch, one entry per fully qualified service-desk ticket.
 No service-desk write is needed. Once the human agrees work on that child branch,
-use this default without asking them to invent a location. It needs no setup/init.
+use this default; do not make them choose a location. It needs no setup/init.
 Writing, committing or pushing still stays within the agreed task and branch;
 never write on another owner's branch or move ownership merely to resume.
 If there is no writable agreed branch yet, use the session file instead.
 
 In triage-only mode, return the entries as text **and** save with ``--session``.
-The default session file is
-``${XDG_STATE_HOME:-$HOME/.local/state}/rdl-agent-extensions/data-request/ledger.json``.
+The default session file is::
+
+  ${XDG_STATE_HOME:-$HOME/.local/state}/rdl-agent-extensions/data-request/ledger.json
+
 This is a narrow session-file exception: it writes only local user state and
 private staging files, not children, libraries, service-desk, issues or projects.
 It does not authorize child work. Do not put XDG_STATE_HOME inside a repository.
@@ -82,9 +84,13 @@ Example entry (the same shape is returned as text; convert to JSON for ``set``):
          - {path: sql/cohort.sql, sha256: '<64 lowercase hex characters>'}
    decisions:
      - decision: Use supplied cohort
-       decided: {by: analyst-handle, role: Requester, at: '2026-09-29', source: 'unlinked (verbal)'}
+       decided: {by: analyst-handle, role: Requester, at: '2026-09-29', source: "unlinked (verbal)"}
      # spec-kit direct mode, in the shape /rdl-team:workflow reuses:
-     - {"decision": "generativeMode", "value": "direct", "by": "<who>", "at": "<date or ISO time>", "scope": "<owner/name>"}
+     - decision: generativeMode
+       value: direct
+       by: engineer-handle
+       at: '2026-09-29'
+       scope: nq-rdl/query-builder
    blockers:
      - {class: dependency, detail: Waiting on the resolver release}
    depends_on: [query-builder change merged and released, child re-pinned then scope re-bootstrapped]

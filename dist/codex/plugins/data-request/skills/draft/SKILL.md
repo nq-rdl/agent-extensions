@@ -25,8 +25,8 @@ their actors. Label missing research decisions `Analyst question:` and return
 them to the analyst to consult the requester; engineer technical choices do not
 replace those answers.
 
-Read `${PLUGIN_ROOT}/skills/guardrails/SKILL.md` first, including **Engineer decisions: proceed and flag**
-in its `references/decision-authority.rst`. Arguments: `$ARGUMENTS`.
+Invoke `$data-request:guardrails` first and apply its **Engineer decisions: proceed and flag**
+in `${PLUGIN_ROOT}/skills/guardrails/references/decision-authority.rst`. Arguments: `$ARGUMENTS`.
 Use the requested SQL path, existing SQL, request and any supplied scope. Drafting
 requires no formal scope/review record. Before writing SQL outside the composition
 API, silently publish a lift candidate under the pipeline path, following
@@ -41,7 +41,7 @@ required columns from explicit instructions or confirmed scope. Consult column-s
 metadata and dataops DDL comments for every field whose interpretation affects the
 result; use `$data-request:map` for unresolved source/resolver choices. Verify dialect and
 correctness-critical syntax using the canonical docs linked by guardrails.
-Apply guardrails **House defaults** without asking: use TUH `00200` unless the request
+Apply guardrails **House defaults** from their recorded confirmation, without a fresh question: use TUH `00200` unless the request
 explicitly changes the cohort's facility set (another facility/HHS/network scope). Reuse one standard assumption from setup's
 `tuh-facility` entry, its `upstream` marker and original confirmation per
 `${PLUGIN_ROOT}/skills/setup/references/recurring-decisions.rst`; do not duplicate an existing scope item.
@@ -61,6 +61,10 @@ Batch remaining questions with defaults/evidence into one analyst message; keep 
 Deliver only the narrowest supported request; offer extras in hand-off, do not build them.
 **Co-develop:** present alternatives and effects to the owning engineer or analyst, obtain the
 decision, then proceed and flag. Infer mode if absent. Neither mode manufactures confirmation fields.
+
+When the cohort is researcher-supplied, declare its shape with query-builder's `SuppliedCohort` and join to its
+`#` table; the runner loads the file at run time. Never write a cohort value into SQL, comments, specs or
+tests (use `example_rows(n)`), and never read the file under `data/00_raw/`. Follow `${PLUGIN_ROOT}/skills/guardrails/references/supplied-cohorts.rst`.
 
 Before proposing probes or carrying their evidence into headers, rationale or limitations,
 follow **Probe disclosure control** in

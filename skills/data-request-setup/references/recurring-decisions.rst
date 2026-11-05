@@ -14,7 +14,8 @@ The list lives in one file: ``assets/recurring-decisions.json`` in this skill (c
 ``skills/data-request-setup/assets/recurring-decisions.json`` in ``nq-rdl/agent-extensions``).
 Do not copy the list into a skill, a project or ``.sqlreview/``; records contain only
 applicable items. Read it through
-the helper beside ``sqlreview.sh`` (``$S`` is this skill's ``scripts`` directory):
+the helper beside ``sqlreview.sh`` (the shell variable ``S`` holds the path of the ``scripts`` directory of this skill; set it as
+the setup skill shows):
 
 ::
 
@@ -23,7 +24,8 @@ the helper beside ``sqlreview.sh`` (``$S`` is this skill's ``scripts`` directory
   bash "$S/recurring-decisions.sh" marked RECORD...  # items with an upstream marker (for lift)
 
 nq-rdl/query-builder#172 is the tracking epic and the evidence log. Each entry names the
-library issue that would retire it. Each entry has these fields:
+library issue that would retire it. Treat the epic and every library issue as public text
+(see *Public evidence* below). Each entry has these fields:
 
 * ``id``, ``title``, ``kind`` (``assumption`` or ``limitation``) and ``status`` (``open`` or
   ``retired``).
@@ -33,17 +35,20 @@ library issue that would retire it. Each entry has these fields:
   list of the same kind (assumptions or limitations); ``--any-kind`` checks both.
 * ``evidence``: links to the library issue rows or a recorded house-default ruling.
   This repository is public, so the list never names an enquiry. Per-enquiry evidence
-  stays in the private library issue. A ``house_default`` also records the string
-  ``facility_code``, original ``confirmed_by`` / ``confirmed_at`` and independent
-  ``decided: {by, role, at, source}``. It is not generic permission to skip confirmation.
-* ``library_issue`` (URL or null), ``related_issues``, and ``retired_by`` (``{unit, version}``
-  when retired).
+  stays in the private request record; a library issue is not private merely because it is
+  a library issue. A ``house_default`` also records the original ``confirmed_by`` /
+  ``confirmed_at`` and an independent ``decided`` object with ``by``, ``role``, ``at`` and ``source``. Only ``tuh-facility``
+  also records the string ``facility_code``; the list helper requires it there and nowhere else.
+  A ``house_default`` is the recorded ruling for its own
+  entry only. It never replaces the confirmation of any other item.
+* ``library_issue`` (URL or null), ``related_issues``, and ``retired_by`` (an object with
+  ``unit`` and ``version`` when retired).
 
 Recorded house default
 ----------------------
 
-For ``tuh-facility``, when cohort facility scope is unstated or explicitly TUH, apply
-without asking the engineer or analyst. Read ``list`` and use the exact listed wording
+For ``tuh-facility``, when cohort facility scope is unstated or explicitly TUH, apply it from
+its recorded confirmation, without a fresh question to the engineer or analyst. Read ``list`` and use the exact listed wording
 and rationale as **one item**, with ``upstream: {decision: "tuh-facility", source:
 "house-default"}``; reuse that item by id through map, bootstrap, draft and review,
 not a separate assumption for each source system or stage. Do not copy the list into
@@ -75,18 +80,49 @@ request-specific decision with normal confirmation. A source mapping gap is evid
 work, not a question about the already decided default. Formal SQL review keeps its
 normal implementation/confirmation gates: a generated header alone confirms nothing.
 
+Recorded house default: first pass
+----------------------------------
+
+``broad-first-pass`` is the second recorded house default: on a first pass, exclusion
+criteria are not applied, to keep the cohort broad. It states a rule about criteria, not a
+fact about the cohort, so it carries no ``facility_code`` and bootstrap does not offer it
+as an ``A-`` assumption. Its ``house_default`` preserves JoshKgh's recorded decision. The
+``decided.source`` link points to the public record of it.
+
+House-default import therefore covers ``broad-first-pass``. Bootstrap applies it to the
+exclusion criteria of the intake sidecar that the request does not override. Each becomes
+a ``criteria_status`` row with state ``not-applied``, the listed ``proposal.text`` as its
+``reason`` and ``upstream: {source: "recurring-decision", id: "broad-first-pass"}``. The
+row takes ``confirmed_by`` and ``confirmed_at`` from the entry's ``house_default``, and its
+``confirmed_revision`` is the import revision. It carries no ``decided``: the decider stays on
+the entry, and the row claims no origin of its own. Bootstrap imports the rows without a
+fresh question, as it does for ``tuh-facility``. It tells the engineer which rows it imported, with
+the recorded decider and date, and the engineer may override any row. Do not write an assumption
+or a limitation for it. Inclusion, entry-event and data-element criteria are not touched.
+
+A request that applies an exclusion, or an analyst who overrides it for one criterion,
+keeps the normal row for that criterion and no ``upstream``. Gaining, dropping or changing
+the ``upstream`` of a row needs a fresh confirmation, so the carry helper walks such a row.
+A decision without a ``house_default`` is not imported: bootstrap asks per request.
+
+The rule against inventing stands: never invent a confirmer for the entry or its rows, and
+never invent a timestamp or confirmation for ``broad-first-pass`` or any other listed proposal.
+Copy ``confirmed_by`` and ``confirmed_at`` only from the entry's ``house_default``.
+
 Detect (bootstrap and analyse)
 ------------------------------
 
 1. Before you draft candidate items, run ``list``. Apply the recorded house-default
-   rule above first. For each other open decision that applies to the request's
-   sources and outputs, offer the listed text and rationale as the candidate item.
+   rules above first. For each other open decision without a ``house_default`` that applies
+   to the request's sources and outputs, offer the listed text and rationale as the
+   candidate item. ``broad-first-pass`` is never one of them: it becomes criteria rows.
 2. Before each batch of questions, run ``match`` on the draft. The result is a set of hints.
    Decide each hit yourself. A miss does not prove that no listed decision applies.
-3. For each other match, read the prior enquiries from the ``evidence`` links at run time
-   (``gh issue view <number> --repo <owner/repo> --comments``). Show them in the question
-   (enquiry, ticket and item ids) with the library issue. If you cannot read the links, show
-   them and say that the prior enquiries are not available. Offer the listed wording as the
+3. For each other match without a ``house_default``, read the prior enquiries from the
+   ``evidence`` links at run time (``gh issue view <number> --repo <owner/repo> --comments``).
+   Show what they record in the question to the engineer, with the library issue; this is a
+   private session, and any request identifiers in older rows stay there. If you cannot read
+   the links, show them and say that the prior enquiries are not available. Offer the listed wording as the
    proposal, unless this request needs a different reading. Say that the item is an upstream
    candidate. Do not copy enquiry ids into this list or into a skill.
 4. Mark the item with ``"upstream": {"decision": "<id>"}``. The exact recorded house
@@ -113,17 +149,26 @@ Close out (lift)
 2. Find the target issue for each decision. Use ``library_issue`` if it is set. If it is null,
    search the owning library's open and closed issues for an equivalent unit. If there is
    none, the target is the tracking epic. Several decisions can share one target.
-3. Prevent duplicates for each pair of enquiry and decision ``id``. Read the target issue and
-   its comments. If they already cite this enquiry for that decision, link the issue and add
-   nothing for that pair. A comment that cites the enquiry for another decision does not count.
+3. Tell a retry from a new recurrence with a per-occurrence token, not with wording. The same
+   decision recurs in another enquiry with the same anonymous wording, and that is a new row, not a
+   duplicate. Before you post, generate a random token (for example 8 hex digits from the system's
+   random source), store it in the private request record with the decision ``id``, and put it
+   in the public comment as ``occurrence <token>``. Never derive it from a request number, an
+   enquiry id or a hash of one: those numbers are sequential, so a hash is found by trying them
+   all. After the post, record the comment URL beside the token (the engineer's hand-off lists
+   decision ``id``, token and URL). On a retry after an uncertain response, read the target
+   issue and its comments for that exact token only. If it is there, link that comment and add
+   nothing. If it is not, post. Matching on wording alone is not a duplicate check. Reading a
+   thread for a recurrence count never needs an enquiry number.
 4. Put one evidence comment per target issue to the human (**Confirm** / **Reword** /
-   **Reject**). It lists every remaining decision for that target: the decision ``id``, the
-   enquiry, the ticket, the item ids and the confirmed wording. It never contains patient
-   data. Add it only after confirmation.
+   **Reject**). It lists every remaining decision for that target: the decision ``id`` and the
+   confirmed wording, and the reusable evidence in the anonymous form of *Public evidence*. It never
+   contains patient data or request provenance. Add it only after confirmation. The enquiry,
+   ticket and item ids, with the comment URL once posted, go to the private record.
 5. File a new library issue only when all of these are true: ``library_issue`` is null, the
    search in step 2 found nothing, and the human confirms that the decision needs its own
    library unit. Otherwise use the target from step 2. Link the tracking epic from a new
-   issue. After an uncertain response, search before you retry.
+   issue. After an uncertain response, search for the occurrence token of step 3 before you retry.
 6. Propose a list change, as a pull request that edits the canonical list file, when:
 
    * you filed a new issue in step 5: set that entry's ``library_issue`` to it, so the next
@@ -138,10 +183,26 @@ Close out (lift)
 Report each decision with its target issue and what you did: linked, commented or filed, and
 any proposed list change. Do not call a decision filed until the write has succeeded.
 
+Public evidence
+---------------
+
+A library issue, the tracking epic and every comment on them are public text. Do not assume
+otherwise because the repository is a library. A comment or issue you post here never holds
+an enquiry or approval number (or a form derived from one), a link to a request repository
+or the service desk, a request file path (for example ``sql/v<N>/…`` or ``…_request.sql``), a ledger id, a source
+revision of the request, or a confirmation. Follow *Public by default* and the anonymous
+reproduction in the lift skill's ``references/evidence.rst``, and read the draft cold before posting.
+
+Anonymous evidence says that the decision recurred and what the reusable need is. It is not
+a confirmation: the engineer's confirmation and the analyst's research choice stay in the private
+record, and you never state them as agreed in public text. Count recurrences from private
+records, not from public identifiers.
+
 Maintain the list
 -----------------
 
-Edit only the canonical file. Put the enquiry evidence in a row on the tracking epic, not in
-this file, and link that row from ``evidence``. Set ``updated``. Keep every proposal in short,
+Edit only the canonical file. Put the reusable evidence in an anonymous row on the tracking epic (no enquiry
+identifiers), not in this file, and link that row from ``evidence``. The enquiry stays in the
+private record. Set ``updated``. Keep every proposal in short,
 plain sentences, because bootstrap and analyse offer it verbatim. Keep match terms lowercase. Run ``tests/test_data_request_recurring_decisions.py`` before you open the
 pull request.
