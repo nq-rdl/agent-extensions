@@ -12,6 +12,7 @@ import shutil
 import stat
 import subprocess
 import tempfile
+import time
 import unittest
 from collections import Counter
 from pathlib import Path
@@ -117,6 +118,36 @@ class PreflightBudget(unittest.TestCase):
                 r = run_hook(PREFLIGHT, event, env_for(SQLREVIEW_PREFLIGHT_BUDGET=budget))
                 ctx = json.loads(r.stdout)["hookSpecificOutput"]["additionalContext"]
                 self.assertIn("3 reviews: 1 current, 1 scoped (bootstrap only), 1 stale (r__stale0)", ctx)
+
+    def run_stub(self, body, budget="1"):
+        """Run the hook against a stub status helper; return the result and the seconds it took."""
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            helper = root / "plugin" / "skills" / "setup" / "scripts" / "sqlreview.sh"
+            helper.parent.mkdir(parents=True)
+            helper.write_text("#!/usr/bin/env bash\n" + body)
+            (root / "project").mkdir()
+            event = {"hook_event_name": "SessionStart", "cwd": str(root / "project")}
+            start = time.monotonic()
+            r = run_hook(PREFLIGHT, event, env_for(root / "plugin", SQLREVIEW_PREFLIGHT_BUDGET=budget))
+            return r, time.monotonic() - start
+
+    def test_status_blocked_in_a_child_is_stopped_at_the_budget(self):
+        # Bash defers its TERM trap until the child returns, so signalling only the status shell
+        # waited the full 6 seconds; signalling its process group does not.
+        for body in ('trap "exit 143" TERM\nsleep 6\n',
+                     'bash -c \'trap "" TERM; sleep 6\'\n'):  # a child that ignores TERM gets KILL
+            r, took = self.run_stub(body)
+            self.assertEqual(r.returncode, 0, r.stderr)
+            self.assertIn("did not finish in the 1-second", json.loads(r.stdout)["hookSpecificOutput"]["additionalContext"])
+            self.assertLess(took, 4, body)
+
+    def test_a_descendant_holding_stdout_does_not_hold_the_hook(self):
+        # Status has exited, but a background child still has its stdout. Before, the capture
+        # pipe stayed open until that child ended.
+        r, took = self.run_stub("(sleep 6) &\nexit 0\n", budget="30")
+        self.assertEqual(r.returncode, 0, r.stderr)
+        self.assertLess(took, 4)
 
 
 if __name__ == "__main__":
