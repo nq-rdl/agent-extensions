@@ -6,7 +6,6 @@ A PATH shim logs each command that status starts, so these tests count processes
 and do not depend on the speed of the machine.
 """
 
-import hashlib
 import json
 import os
 import shutil
@@ -25,10 +24,6 @@ except ModuleNotFoundError:
     from tests.test_sql_review_hooks import PREFLIGHT, env_for, run_hook
 
 
-def sha(text):
-    return hashlib.sha256(text.encode()).hexdigest()
-
-
 # Commands that status or its helpers can start. Each one gets a logging shim.
 SHIMMED = ("jq", "sha256sum", "shasum", "cat", "mktemp", "rm", "tail", "awk", "sed", "grep", "tr",
            "cut", "dirname", "basename", "bash", "git", "date", "sort", "head", "wc", "mkdir")
@@ -39,22 +34,30 @@ MAX_PER_FOLDER = 25
 
 def build(root, units):
     """`units` groups of three folders: a current review with a scope, a stale review with a
-    scope, and a bound scope without a review."""
+    scope, and a bound scope without a review. The SQL is committed and fingerprinted (#505)."""
     root.mkdir(parents=True, exist_ok=True)
     p = Project(str(root))
-    for i in range(units):
-        for kind in ("current", "stale", "scoped"):
-            slug, sql = f"r__{kind}{i}", f"r/{kind}{i}.sql"
-            p.sql(sql, SQL_V1)
-            p.review_dir(slug).joinpath("scope.source.sql").write_text(SQL_V1)
-            p.write_json(slug, "scope.json", scope_doc(slug, sql, revision=2, sql_sha256=sha(SQL_V1)))
-            if kind == "scoped":
-                continue
-            p.write_json(slug, "review.json", review_doc(slug, sql))
-            r = run(["snapshot", slug, sql], p.root)
-            assert r.returncode == 0, r.stderr
-            if kind == "stale":
-                p.sql(sql, SQL_V2)
+    folders = [(f"r__{kind}{i}", f"r/{kind}{i}.sql", kind) for i in range(units)
+               for kind in ("current", "stale", "scoped")]
+    for _, sql, _ in folders:
+        p.sql(sql, SQL_V1)
+    p.commit("reviewed maintained SQL")
+    for slug, sql, kind in folders:
+        r = run(["fingerprint", sql], p.root)
+        assert r.returncode == 0, r.stderr
+        fp = json.loads(r.stdout)
+        fp.pop("sql_path")
+        p.write_json(slug, "scope.json", scope_doc(slug, sql, revision=2, sql_sha256=fp["sql_sha256"],
+                                                   sql_body_sha256=fp["sql_body_sha256"]))
+        if kind == "scoped":
+            continue
+        p.write_json(slug, "review.json", review_doc(slug, sql, **fp))
+        r = run(["snapshot", slug, sql], p.root)
+        assert r.returncode == 0, r.stderr
+    for _, sql, kind in folders:
+        if kind == "stale":
+            p.sql(sql, SQL_V2)
+    p.commit("changed maintained SQL")
     return p
 
 

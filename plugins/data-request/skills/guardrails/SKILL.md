@@ -9,7 +9,7 @@ argument-hint: '[request, SQL path or resolver]'
 user-invocable: true
 compatibility: >-
   RDL cohort SQL; DATEADD and sys catalog examples target SQL Server 2022 (16.x).
-  record_assumption, record_limitation and isolation_level need query-builder 0.6.0 or later.
+  query-builder 0.8.0 is the floor for its identifier-literal gate (loader since 0.7.2). record_assumption, record_limitation and isolation_level need query-builder 0.6.0 or later.
   rdl-service-desk/query-builder is the retired legacy org.
   Source patterns from issues 313, 325 and 370 to 389 (2026-09-15 to 2026-09-28).
   Composition examples are schematic; verify pinned library APIs, deployed engine
@@ -32,7 +32,7 @@ Read [references/decision-authority.rst](references/decision-authority.rst) for 
 ## House defaults
 
 The cohort is **Townsville University Hospital**, facility string `00200`, unless the request explicitly changes the cohort's facility set to another facility, the whole HHS or a network-wide cohort.
-This house default was confirmed by Data Engineer **JoshKgh** on **2026-09-29** ([#436](https://github.com/nq-rdl/agent-extensions/issues/436)). Apply it without asking; record one upstream-marked assumption, not a new request-specific decision.
+This house default was confirmed by Data Engineer **JoshKgh** on **2026-09-29** ([#436](https://github.com/nq-rdl/agent-extensions/issues/436)). Apply it from that recorded confirmation, without a fresh question; record one upstream-marked assumption, not a new request-specific decision.
 Read [references/sources.rst](references/sources.rst) for HBCIS/ePADT fields, ieMR facility-crosswalk verification and exception routing; setup's recurring-decisions reference owns the wording and recorded confirmation.
 
 ## Confirm sources before using a fact
@@ -77,8 +77,8 @@ Before SQL outside the composition API, inspect the actual dependency pin's spec
 resolver and tests. Record a `candidate` in the pipeline's `.sqlreview` lift ledger
 with that pin, inspected paths/revisions, need, shortfall and workaround location.
 Read `${CLAUDE_PLUGIN_ROOT}/skills/setup/references/lifts.rst` for the record and
-publish commands. Capture silently, with no confirmation question mid-draft;
-classification and confirmation belong to `/data-request:lift` at close-out.
+publish commands. Capture it silently; the confirmation question waits for close-out, where
+`/data-request:lift` classifies and confirms it.
 **No published entry means no hand SQL.** A missing source is not proof of a gap.
 The ledger permits a pinned-deadline workaround under this guidance, but does not
 override an explicit repository prohibition. Check the request's dependency pin
@@ -109,17 +109,14 @@ current tags and source paths (`clinical/specifications.py`, `clinical/resolver.
 Re-check the pinned implementations and tests before adapting examples; the latest
 release does not establish availability in an older pin.
 
-Read the request's pin (`framework_ref`, `pyproject.toml`, lock file) before drafting.
-`rdl-service-desk/query-builder` is the retired legacy org. Older scaffold renders
-still pin it (scaffold v0.1.3 defaulted to its `v0.1.1`, which also lacks
-`register_result`), and GitHub redirects the old path, so an install can still succeed.
-Below `v0.6.0`, `record_assumption` and `record_limitation` are absent. Flag a pin on
-that org, or on `nq-rdl/query-builder` below `v0.6.0`, as a **blocker**: report the pin
-and the missing APIs, and propose a compatible released re-pin before drafting new SQL.
-Scaffold v0.5.0 defaulted to query-builder v0.5.0; inspect a fresh render's actual pin
-rather than assuming that the current scaffold default has changed. Amending or fixing an already-delivered
-enquiry is exempt: it stays on its delivered pin, with no backport. Agents never
-re-pin or run `copier update` unasked.
+Read the request's pin (`framework_ref`, `pyproject.toml`, lock file) before drafting. `rdl-service-desk/query-builder` is the retired legacy org. Older scaffold renders
+still pin it (scaffold v0.1.3 defaulted to its `v0.1.1`, which also lacks `register_result`), and GitHub redirects the old path, so an install can still succeed.
+Below `v0.6.0`, `record_assumption` and `record_limitation` are absent. The supplied-cohort loader (`SuppliedCohort`/`load_supplied()`) and the literal `VALUES` gate exist since `v0.7.2`. `v0.8.0` is the floor because of its identifier-literal gate. Flag a pin on
+that org, or on `nq-rdl/query-builder` below `v0.8.0`, as a **blocker**: report the pin and the missing APIs, and propose a compatible released re-pin before drafting new SQL.
+The harness gate (`rdl_etl_helpers.harness.literals`, run by `check_case_fast()`) fails literal `VALUES` rows on `PERSONAL`, `SENSITIVE` or `HEALTH` columns. From v0.8.0 it also fails literal `IN`/`=`/`LIKE`/`CASE` comparisons on identifier columns when a value has five or more digits or is not one plain literal, so a cohort of identifiers must be a
+supplied cohort loaded at run time: see [docs/SUPPLIED_COHORTS.md](https://github.com/nq-rdl/query-builder/blob/v0.8.0/docs/SUPPLIED_COHORTS.md).
+Scaffold v0.5.0 defaulted to query-builder v0.5.0; scaffold v0.5.3 defaults to v0.8.0, but an older render keeps its own pin, so read the actual pin. Amending or fixing an already-delivered
+enquiry is exempt: it stays on its delivered pin, with no backport. Agents never re-pin or run `copier update` unasked.
 
 Confirm the applicable rules in the current `.specify/memory/constitution.md`:
 
@@ -201,41 +198,35 @@ pin for per-table `WITH (NOLOCK)` hints (ADR 0004), rather than assuming absence
 [references/performance.rst](references/performance.rst) and the request repo's own
 `docs/READ_ISOLATION.md` where it has one.
 
+## Supplied cohorts: never inline, never read
+
+The runner loads a researcher-supplied cohort (study IDs, URNs) from `data/00_raw/` into a `#<table>` at run time; reviewed SQL declares its shape with `-- @supplied:` and joins to it.
+Never copy a cohort value into SQL, comments, specs, review records, issues, pull requests or chat, and never read the supplied file, even to check its format; describe it by shape only.
+The plugin guard denies `Read`, and the path argument of `Grep` and `Glob`, on `data/00_raw/**` (not its `.dvc` pointers or `.gitignore`), the narrower layer beside a scaffold child's own `Read(/data/**)` deny; the rule also binds `Bash` and every other route.
+Read [references/supplied-cohorts.rst](references/supplied-cohorts.rst) for the load sequence, the v0.8.0 literal gate and the test route.
+
 ## Timezone and source system
 
-The seed incident involved **BI-Reporting AEST** and **ieMR/emr UTC**. Treat these as
-source-level clues to verify, not a per-field truth table. Confirm each participating
-field and anchor via its DDL comments and column spec before comparing timestamps.
-Reconcile into the filtered column's timezone by transforming the anchor; avoid
-double conversion when a view or resolver already normalises it. Record the verified
-source and conversion in the task output, rather than copying field facts into this skill.
+The seed incident involved **BI-Reporting AEST** and **ieMR/emr UTC**. Treat these as source-level clues to verify, not a per-field truth table. Confirm each participating
+field and anchor via its DDL comments and column spec before comparing timestamps. Reconcile into the filtered column's timezone by transforming the anchor; avoid double
+conversion when a view or resolver already normalises it. Record the verified source and conversion in the task output, rather than copying field facts into this skill.
 
 ## Join and index patterns
 
-For any spec/resolver that requires a join, make the requirement and its rationale
-discoverable in the resolver's docstring/tests, column-spec metadata and dataops
-DDL/index comments. Inspect those sources for the actual tables and pinned resolver;
-cite which locations and revisions you checked, what each establishes, and any
-missing evidence. When changing a resolver, document and test its join requirement
-and flag missing or stale metadata/comments for the owning repository.
+For any spec/resolver that requires a join, make the requirement and its rationale discoverable in the resolver's docstring/tests, column-spec metadata and dataops DDL/index
+comments. Inspect those sources for the actual tables and pinned resolver; cite which locations and revisions you checked, what each establishes, and any missing evidence.
+When changing a resolver, document and test its join requirement and flag missing or stale metadata/comments for the owning repository.
 
-For person-level clinical-event selection, start with the known RDL pattern
-**`CLINICAL_EVENT → ENCOUNTER → person`**: the seed environment has no person-leading
-index on `CLINICAL_EVENT`. Confirm current key order, encounter/person keys and
-cardinality in DDL/index definitions before choosing the exact join. Do not infer
-that a person identifier's presence makes direct person filtering efficient.
+For person-level clinical-event selection, start with the known RDL pattern **`CLINICAL_EVENT → ENCOUNTER → person`**: the seed environment has no person-leading index on
+`CLINICAL_EVENT`. Confirm current key order, encounter/person keys and cardinality in DDL/index definitions before choosing the exact join. Do not infer that a person
+identifier's presence makes direct person filtering efficient.
 
-Every source needs its own grain check; the pattern above does not transfer. ieMR
-`SCH_APPT` holds one row per role per appointment, and a flat table such as
-BI-Reporting `OPD_Appointments` has no encounter join at all. For HBCIS–ieMR joins
-(the `mart_iemr_hbcis_mapping_*` views and their uniqueness guard) and the
-`CLINICAL_EVENT` `VALID_UNTIL_DT_TM` currency caveat, read
-[references/sources.rst](references/sources.rst).
+Every source needs its own grain check; the pattern above does not transfer. ieMR `SCH_APPT` holds one row per role per appointment, and a flat table such as BI-Reporting
+`OPD_Appointments` has no encounter join at all. For HBCIS–ieMR joins (the `mart_iemr_hbcis_mapping_*` views and their uniqueness guard) and the `CLINICAL_EVENT`
+`VALID_UNTIL_DT_TM` currency caveat, read [references/sources.rst](references/sources.rst).
 
-Check whether multiple encounters/events multiply the intended output grain. Choose
-joins or existence checks from the requested population and verified relationships;
-do not conceal an incorrect join with `DISTINCT`. If current indexes justify a
-different path, explain the evidence rather than treating the seed as timeless.
+Check whether multiple encounters/events multiply the intended output grain. Choose joins or existence checks from the requested population and verified relationships; do not
+conceal an incorrect join with `DISTINCT`. If current indexes justify a different path, explain the evidence rather than treating the seed as timeless.
 
 ## Leave modelling choices to the researcher
 
@@ -275,8 +266,7 @@ treat source limitations as permission to choose a model or promise unavailable 
 
 ## Review hand SQL
 
-Check hand SQL, and any hand-edited generated SQL, against the defect checklist in
-[references/checklist.rst](references/checklist.rst). Each of its seven patterns has a
+Check hand SQL, and any hand-edited generated SQL, against the defect checklist in [references/checklist.rst](references/checklist.rst). Each of its seven patterns has a
 symptom and a fix. Report each finding with its SQL location.
 
 ## Release conventions

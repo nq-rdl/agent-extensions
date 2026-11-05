@@ -1,0 +1,3 @@
+kind: Fixed
+body: 'sqlreview.sh materialize accepts an output under a symlinked directory such as macOS /tmp and refuses one that resolves into the repo'
+time: 2026-11-04T06:00:00.000000000Z

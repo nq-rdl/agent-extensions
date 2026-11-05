@@ -12,7 +12,7 @@ user-invocable: true
 compatibility: >-
   RDL request repos; verify the repository's SQL dialect, Python environment and installed library versions at use time.
   record_assumption/record_limitation need query-builder 0.6.0 or later.
-allowed-tools: Bash, Read, Glob, Grep, Write, Edit, AskUserQuestion
+allowed-tools: Bash, Read, Glob, Grep, Write, Edit, AskUserQuestion, Skill
 metadata:
   repo: https://github.com/nq-rdl/agent-extensions
 ---
@@ -22,7 +22,7 @@ metadata:
 The **Data Engineer** applies technical fixes and settled pre-release changes.
 The Data Analyst resolves any missing research decision with the requester.
 
-Arguments: `$ARGUMENTS`. Read `${CLAUDE_PLUGIN_ROOT}/skills/guardrails/SKILL.md`
+Arguments: `$ARGUMENTS`. Invoke `/data-request:guardrails`
 and apply the rules relevant to the affected SQL or source mappings. This action
 works without `.sqlreview/`; a small correction does not require setup, bootstrap
 or a formal review before editing.

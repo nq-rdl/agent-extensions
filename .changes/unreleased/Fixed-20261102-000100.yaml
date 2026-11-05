@@ -1,0 +1,3 @@
+kind: Fixed
+body: 'The release criteria table holds as scope-stale when the SQL body at the tag differs from the owning scope'
+time: 2026-11-02T00:01:00.000000000Z
