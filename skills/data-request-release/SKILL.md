@@ -68,6 +68,7 @@ amend's part-state record, `.sqlreview/amendments/<request>.json` (amend step 5)
 the status `done`, `handed off` or `withdrawn`.
 
 First fetch, as a visible step. Run the command that `bash "$S/release.sh" fetch-command` prints. It
+has the form `git -C '<project root>' fetch --tags origin`, so it runs from any directory. It
 fetches tags from `origin`, else from the first configured remote. With no remote it prints a comment,
 so skip the fetch and say so. This is the one fetch instruction. The amend skill and the hand-off
 reference use the same command. A fetch updates tags and remote-tracking refs such as `origin/main`.

@@ -981,15 +981,56 @@ class AmendGate(unittest.TestCase):
     def fetch_command(self, *env_args):
         return run(RELEASE, ["fetch-command"], self.p.root)
 
+    def fetch_line(self, remote, root=None):
+        # The printed form: the project root single-quoted after -C, then the remote.
+        return f"git -C '{root or self.p.root}' fetch --tags {remote}\n"
+
+    def push_tag_from_another_clone(self, tag):
+        other = Path(self.tmp.name).parent / f"{Path(self.tmp.name).name}-tag"
+        self.addCleanup(shutil.rmtree, other, True)
+        git(Path(self.tmp.name).parent, "clone", "-q", "-b", "main", self.remote.name, str(other))
+        git(other, "tag", tag)
+        git(other, "push", "-q", "origin", tag)
+
+    def test_fetch_command_names_another_project_root_and_fetches_into_it(self):
+        # SQLREVIEW_ROOT points outside the caller's directory. The printed command still fetches there.
+        self.push_tag_from_another_clone("v9.9.9")
+        unrelated = tempfile.mkdtemp()
+        self.addCleanup(shutil.rmtree, unrelated, True)
+        r = run(RELEASE, ["fetch-command"], unrelated, env={"SQLREVIEW_ROOT": str(self.p.root)})
+        self.assertEqual((r.returncode, r.stdout, r.stderr), (0, self.fetch_line("origin"), ""))
+        self.assertIn("-C '", r.stdout)
+        self.assertNotIn(unrelated, r.stdout)
+        self.assertEqual(git(self.p.root, "tag", "--list", "v9.9.9"), "")
+        done = subprocess.run(["bash", "-c", r.stdout], cwd=unrelated, env=clean_env(), capture_output=True,
+                              text=True)
+        self.assertEqual(done.returncode, 0, done.stderr)
+        self.assertEqual(git(self.p.root, "tag", "--list", "v9.9.9"), "v9.9.9")
+
+    def test_fetch_command_quotes_a_root_with_a_space_and_a_single_quote(self):
+        self.push_tag_from_another_clone("v9.9.8")
+        odd = Path(tempfile.mkdtemp()) / "my project's root"
+        self.addCleanup(shutil.rmtree, odd.parent, True)
+        shutil.copytree(self.p.root, odd, symlinks=True)
+        unrelated = tempfile.mkdtemp()
+        self.addCleanup(shutil.rmtree, unrelated, True)
+        r = run(RELEASE, ["fetch-command"], unrelated, env={"SQLREVIEW_ROOT": str(odd)})
+        self.assertEqual(r.returncode, 0, r.stderr)
+        self.assertEqual(r.stdout, f"git -C '{odd.parent}/my project'\\''s root' fetch --tags origin\n")
+        done = subprocess.run(["bash", "-c", r.stdout], cwd=unrelated, env=clean_env(), capture_output=True,
+                              text=True)
+        self.assertEqual(done.returncode, 0, done.stderr)
+        self.assertEqual(git(odd, "tag", "--list", "v9.9.8"), "v9.9.8")
+
     def test_fetch_command_prefers_origin(self):
         git(self.p.root, "remote", "add", "aaa", self.remote.name)
         r = self.fetch_command()
-        self.assertEqual((r.returncode, r.stdout, r.stderr), (0, "git fetch --tags origin\n", ""))
+        self.assertEqual((r.returncode, r.stdout, r.stderr), (0, self.fetch_line("origin"), ""))
 
     def test_fetch_command_uses_the_only_remote_when_it_is_not_origin(self):
         git(self.p.root, "remote", "rename", "origin", "upstream")
         r = self.fetch_command()
-        self.assertEqual((r.returncode, r.stdout, r.stderr), (0, "git fetch --tags upstream\n", ""))
+        self.assertEqual((r.returncode, r.stdout, r.stderr), (0, self.fetch_line("upstream"), ""))
         self.record([self.part("P3", "done", commit=self.head)])
         self.assertEqual(self.p.evidence("v1.0.0").returncode, 0)
         # The printed command runs as it stands and moves the remote-tracking ref.
@@ -1003,7 +1044,7 @@ class AmendGate(unittest.TestCase):
     def test_fetch_command_takes_the_first_remote_when_there_is_no_origin(self):
         git(self.p.root, "remote", "rename", "origin", "zeta")
         git(self.p.root, "remote", "add", "beta", self.remote.name)
-        self.assertEqual(self.fetch_command().stdout, "git fetch --tags beta\n")
+        self.assertEqual(self.fetch_command().stdout, self.fetch_line("beta"))
 
     def test_no_remote_says_to_skip_the_fetch_and_a_local_ancestor_verifies(self):
         git(self.p.root, "remote", "remove", "origin")
@@ -1051,9 +1092,10 @@ class AmendGate(unittest.TestCase):
 
     def assert_unverified(self, r, part="P3"):
         self.assertEqual(r.returncode, 11, r.stderr)
+        fetch = self.fetch_line("origin").strip()
         self.assertIn(f"commit is not verified (rev-parse or merge-base did not succeed): {part}", r.stderr)
         self.assertEqual(r.stderr.splitlines()[1:], [
-            f"next: the commit of {part} is missing here or does not resolve: run git fetch --tags origin, "
+            f"next: the commit of {part} is missing here or does not resolve: run {fetch}, "
             "then run evidence again"], r.stderr)
         self.assertNotIn("not in v1.0.0", r.stderr)
         self.assertNotIn("P<n>", r.stderr)
@@ -1180,7 +1222,7 @@ class AmendGate(unittest.TestCase):
         self.assertEqual(r.returncode, 0, r.stderr)
         self.assertFalse(calls.exists())
         r = run(RELEASE, ["fetch-command"], self.p.root, env=env)
-        self.assertEqual((r.returncode, r.stdout), (0, "git fetch --tags origin\n"))
+        self.assertEqual((r.returncode, r.stdout), (0, self.fetch_line("origin")))
         self.assertFalse(calls.exists(), "fetch-command only prints the command")
 
     def test_done_part_stays_open_when_the_commit_does_not_resolve(self):

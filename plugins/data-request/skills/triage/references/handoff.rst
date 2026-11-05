@@ -110,7 +110,7 @@ prepares and publishes the release. Never direct the engineer to release.
    being held by a handed-off amend part: the script then never exits 11 and
    prints each open part as an ``amend note:`` on stderr. This mode verifies no commit, so it needs
    no fetch. Where a later step needs one, use the command that ``release.sh fetch-command``
-   prints. Name those notes in the hand-off as open delivery gates. The release run keeps the strict hold. Any ``changed``, ``missing-at-ref``,
+   prints. It names the project root with ``-C``, so it runs from any directory. Name those notes in the hand-off as open delivery gates. The release run keeps the strict hold. Any ``changed``, ``missing-at-ref``,
    ``unreviewed``, ``unavailable`` or invalid review, or unproven run provenance
    stops the hand-off. A header-only
    result needs proof that only the leading comments differ. Compare the run manifest

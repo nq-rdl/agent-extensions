@@ -5,7 +5,9 @@
 # No command here uses the network. Evidence reads local refs only: fetch before you run it.
 #
 #   fetch-command            print the one fetch command for this project, and run nothing: tags
-#                            from origin, else the first configured remote. With no remote it
+#                            from origin, else the first configured remote, as
+#                            git -C '<project root>' fetch --tags <remote>, so it runs from any
+#                            directory. With no remote it
 #                            prints a comment line that says to skip the fetch and say so. A fetch
 #                            never decides a release: run it, report any failure to the human, and
 #                            run evidence anyway. Only exit 2 or 11 of evidence stops the release.
@@ -387,10 +389,13 @@ EOT
 }
 
 # Print, and never run, the one fetch command: tags from origin, else the first configured remote.
+# The command names the project root with -C, so it fetches into the project that the remotes came
+# from, whatever the caller's directory is. The root is single-quoted, and each embedded single quote
+# is written as '\'' . This is plain POSIX quoting, because printf %q differs between Bash versions.
 # No remote prints a comment line, so a shell that runs the output does nothing. Every skill and
 # every hint takes the command from here, so there is one instruction. This function uses no network.
 rl_fetch_command() {
-  local remote nl='
+  local remote root nl='
 '
   remote="$(git -C "$SR_ROOT" remote 2>/dev/null </dev/null)" || remote=""
   case "$nl$remote$nl" in
@@ -399,7 +404,9 @@ rl_fetch_command() {
   esac
   case "$remote" in
     ""|-*) printf '# no remote is configured: skip the fetch and say so\n' ;;
-    *) printf 'git fetch --tags %q\n' "$remote" ;;
+    *)
+      root="$(printf '%s\n' "$SR_ROOT" | sed "s/'/'\\\\''/g")"
+      printf "git -C '%s' fetch --tags %q\n" "$root" "$remote" ;;
   esac
 }
 
