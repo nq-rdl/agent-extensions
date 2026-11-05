@@ -38,8 +38,8 @@ recorded with both sources and a proposed correction; bare configuration drift i
   diagnosis **or** chief complaint **or** visit reason, and the review describes an OR rule
   over different fields. Proposed correction: state the pipeline's OR rule, after the analyst
   confirms that the pipeline is what was agreed.
-- **Q2, unit of observation.** Answers labels the grain ``measurement_granularity: Patient``,
-  and nothing confirms it. The stale review and the pipeline describe encounter-level records. Check
+- **Q2, unit of observation.** Answers says ``measurement_granularity: Patient``, but nobody
+  has confirmed it. The stale review and the pipeline describe encounter-level records. Check
   the tagged SQL, output manifest and intake/prior-delivery or requested-element evidence
   to settle the main grain and the finer ``Clinical_events`` output. Record the evidenced
   grain, not the bare Patient value. Reuse one ``L-grain-answers`` finding and offer the

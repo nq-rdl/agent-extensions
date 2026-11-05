@@ -84,9 +84,9 @@ def rc_note:
 #   $scopes    [{slug, revision, criteria_status}] for every scope at the tag carrying criteria_status;
 #              none, while a criterion is live, holds the table (no-owning-scope): the criteria are
 #              itemised but no scope records their states, so "not itemised" would be false (FR-017)
-#   $stale     true when the owning scope's review does not apply to the tag (scope-stale is rc_scope_stale)
+#   $stale     true when the review of the owning scope does not apply to the tag (scope-stale is rc_scope_stale)
 #   $previous  {tag, criteria} of the previous release (research R9), or null
-#   $current   the `criteria` of this tag's record in the working tree (its analyst decisions), or null
+#   $current   the `criteria` of the record of this tag in the working tree (its analyst decisions), or null
 #   $fp        the fingerprints file (validate-answers --fingerprints), or null
 #   $mode      "fingerprints", "answers-invalid" or "unchecked"
 def rc_build($intake; $scopes; $stale; $previous; $current; $fp; $mode):

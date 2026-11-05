@@ -22,7 +22,7 @@
 # (an absent reason, flag or upstream equals an absent one, so gaining or dropping an upstream is a
 # change, as at publish, R21). A row states what the SQL does, so any SQL body change walks every row, like a
 # changed assumption: the engineer confirms or changes each state, never in bulk. The SQL body is unchanged when
-# the SQL sha256 is equal at both revisions (both absent counts) or only the leading comment header changed. The set fields are the assumption ones minus status (confirmed_by, confirmed_at,
+# the SQL sha256 is equal at both revisions (an explicit absence at both counts) or only the leading comment header changed. The set fields are the assumption ones minus status (confirmed_by, confirmed_at,
 # confirmed_revision, carried_from_revision, carried_basis) plus the prior row's upstream when present;
 # a new criterion or a changed row does not qualify and goes to the walk list for fresh confirmation.
 # Output rows use kind "criteria_status" and id = the criterion.
@@ -40,7 +40,8 @@ def carry_criteria_rows($ctx):
   . as $d
   | $ctx.prior as $p
   | ($p.revision // null) as $pr
-  | (($ctx.prior_sha == $ctx.cur_sha) or ($ctx.body_unchanged // false)) as $body
+  | (($ctx.prior_sha != "" and $ctx.prior_sha == $ctx.cur_sha) or (($ctx.prior_absent // false) and ($ctx.cur_absent // false))
+     or ($ctx.body_unchanged // false)) as $body
   | [ ($d.criteria_status // [] | if type == "array" then .[] else empty end) | select(type == "object") | . as $i
       | ([($p.criteria_status // [] | if type == "array" then .[] else empty end)
           | select(type == "object" and .criterion == $i.criterion)][0]) as $m
@@ -62,7 +63,8 @@ def carry_criteria_rows($ctx):
 # Input: a (draft) scope/review document. $ctx:
 #   {kind: "scope"|"review", prior: document|null,
 #    base: string|null (prior baseline SQL, only when it is evidence), cur: string|null (current SQL),
-#    prior_sha: string ("" = SQL absent/unknown at the prior revision), cur_sha: string ("" = SQL absent now),
+#    prior_sha: string, cur_sha: string ("" means no authenticated SQL hash),
+#    prior_absent: boolean, cur_absent: boolean (explicit scope-before-SQL and committed absence),
 #    body_unchanged: boolean (baseline and current SQL differ at most in the leading comment header)}
 # Output: an array with one row per assumption/limitation object (and, for a scope, per criteria_status row):
 #   {kind, id, basis, set} when it qualifies ·
@@ -73,7 +75,7 @@ def carry_rows($ctx):
   | $ctx.prior as $p
   | ($ctx.kind // $d.kind) as $doc
   | ($ctx.prior_sha != "" and $ctx.cur_sha != "" and $ctx.prior_sha == $ctx.cur_sha) as $unchanged
-  | ($ctx.prior_sha == "" and $ctx.cur_sha == "") as $absent
+  | (($ctx.prior_absent // false) and ($ctx.cur_absent // false)) as $absent
   | ($unchanged or ($ctx.body_unchanged // false)) as $body
   | ($ctx.cur | cf_sql_lines) as $c
   | (if $ctx.base != null then ($ctx.base | cf_sql_lines) elif $unchanged then $c else null end) as $b

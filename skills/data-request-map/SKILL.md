@@ -8,7 +8,7 @@ description: >-
 argument-hint: '<request, scope path, answers.yaml, hand SQL path or resolver> [--autonomous|--co-develop]'
 user-invocable: true
 compatibility: RDL dataops DDL and query-builder column-spec metadata; inspect the checked-out schema and resolver API version.
-allowed-tools: Bash, Write, Read, Glob, Grep, AskUserQuestion
+allowed-tools: Bash, Write, Read, Glob, Grep, AskUserQuestion, Skill
 metadata:
   repo: https://github.com/nq-rdl/agent-extensions
 ---

@@ -1,0 +1,18 @@
+# Replies graded by tests/test_data_request_release.py in Python (and Node when present). No model call.
+pass:
+  - name: gate clear
+    reply: |
+      Amend gate clear: P1 and P2 are done, and you withdrew P3 on the PR.
+
+      ```yaml
+      release_prep: continue
+      blocking_part: none
+      ```
+fail:
+  - name: withdrawal ignored
+    fails: [prep-continue, no-blocker]
+    reply: |
+      ```yaml
+      release_prep: stopped
+      blocking_part: P3
+      ```

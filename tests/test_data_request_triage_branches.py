@@ -52,7 +52,7 @@ class EnquiryBranchNaming(unittest.TestCase):
                 self.assertIn("owner's agreement", text)
                 self.assertIn("Keep existing ``triage/<n>`` branch names", text)
                 self.assertIn("never rename a branch someone else owns", text)
-                self.assertIn("Reuse, rebase or delete it only when its owner agrees", text)
+                self.assertIn("never reuse, rebase or delete it unasked", text)
 
     def test_naming_rule_does_not_authorise_writes_in_triage_only(self):
         text = (REPO / "skills/data-request-triage/SKILL.md").read_text()

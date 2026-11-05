@@ -15,6 +15,7 @@
 #   releases/*/release.json             Write → content run through `release.sh check`; Edit → deny
 #   releases/*/release.md               deny  (rendered from the record by `release.sh render`)
 #   reviews/*/explain.json              Write → its `by` must be a handle, not an email (#419); Edit → deny
+#   amendments/<request>.json           Write → content run through `release.sh amend-check`; Edit → deny
 #   reviews/*/*.draft.json, source.sql, templates/*   pass
 # This is an invariant check, not proof that a human answered: it makes "forgot to ask" a denied
 # tool call with the offending ids named, and leaves a fabricated confirmation auditable in the
@@ -173,6 +174,8 @@ case "$abs" in
 esac
 
 case "$rel" in
+  reviews/*/source.sql|reviews/*/scope.source.sql|reviews/*/history/*.sql)
+    decide deny "$rel is a legacy SQL snapshot path. Store hashes and committed source provenance in the review JSON; use sqlreview.sh materialize for temporary SQL outside the repository." ;;
   ledger.json)
     decide deny "Triage ledger entries require validated atomic publication. Use sqlreview.sh ledger set <ticket> <entry.json>; direct Write/Edit of .sqlreview/ledger.json can corrupt other tickets." ;;
   config.json)
@@ -190,8 +193,8 @@ case "$rel" in
     [ "$tool" = "Write" ] || decide deny "$rel records who ran the walkthrough and is checked as a whole. Write the complete file instead of an Edit fragment."
     [ -n "$checker" ] || decide deny "SQL Review guard cannot find sqlreview.sh, so it cannot check $rel. Reinstall data-request@rdl-agent-extensions before writing it."
     command -v jq >/dev/null 2>&1 || decide deny "$rel is checked with jq, which is not installed. Install jq (>= 1.6) before writing it."
-    out="$(field .tool_input.content | jq -r -L "$(dirname "$checker")" 'include "sqlreview-identity"; identity_violations' 2>&1)" ||
-      decide deny "$rel is not valid JSON: $(printf '%s' "$out" | tr '\n' ';' | sed 's/;$//')"
+    out="$(field .tool_input.content | jq -r -L "$(dirname "$checker")" 'include "sqlreview-identity"; identity_violations' 2>/dev/null)" ||
+      decide deny "$rel is not valid JSON, or the identity check could not read it. Write the complete explain.json as one JSON object."
     [ -z "$out" ] || decide deny "$rel rejected: $(printf '%s' "$out" | tr '\n' ';' | sed 's/;$//'). Record the analyst by GitHub login, else git config user.name; never user.email. If neither is available, ask."
     exit 0 ;;
   releases/*/release.md)
@@ -207,6 +210,18 @@ case "$rel" in
     expected_tag="${rel#releases/}"; expected_tag="${expected_tag%/*}"
     printf '%s' "$content" | jq -e --arg t "$expected_tag" '.tag == $t' >/dev/null ||
       decide deny "The record's tag must match its directory: releases/$expected_tag/."
+    exit 0 ;;
+  amendments/*.json)
+    # The amendment part-state record (#534) holds a release while a part is handed off, so it is
+    # validated whole, like the other review documents. The reason names fields and rules only, and
+    # never the path: the record name is not checked until release.sh amend-check checks it, with the
+    # same rule that the release hold and status use (sr_amend_name_ok).
+    [ "$tool" = "Write" ] || decide deny "An amendment part-state record (.sqlreview/amendments/<request>.json) is validated as a whole. Write the complete file instead of an Edit fragment."
+    name="${rel#amendments/}"; name="${name%.json}"
+    [ -n "$checker" ] || decide deny "SQL Review guard cannot find sqlreview.sh, so it cannot find release.sh next to it. Reinstall data-request@rdl-agent-extensions before writing an amendment record."
+    command -v jq >/dev/null 2>&1 || decide deny "Amendment records are validated with jq, which is not installed. Install jq (>= 1.6) before writing an amendment record."
+    out="$(field .tool_input.content | bash "$(dirname "$checker")/release.sh" amend-check --stdin --name "$name" 2>/dev/null)" ||
+      decide deny "The amendment record (.sqlreview/amendments/<request>.json) was rejected by release.sh amend-check: $(printf '%s' "$out" | tr '\n' ';' | sed 's/;$//'). Write schemaVersion 1, kind amendment (when present) and parts with a unique id P<n> and a status done (with commit), handed off or withdrawn (with reason)."
     exit 0 ;;
   *) exit 0 ;;
 esac

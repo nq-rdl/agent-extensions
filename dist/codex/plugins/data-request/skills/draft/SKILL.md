@@ -25,8 +25,8 @@ their actors. Label missing research decisions `Analyst question:` and return
 them to the analyst to consult the requester; engineer technical choices do not
 replace those answers.
 
-Read `${PLUGIN_ROOT}/skills/guardrails/SKILL.md` first, including **Engineer decisions: proceed and flag**
-in its `references/decision-authority.rst`. Arguments: `$ARGUMENTS`.
+Invoke `$data-request:guardrails` first and apply its **Engineer decisions: proceed and flag**
+in `${PLUGIN_ROOT}/skills/guardrails/references/decision-authority.rst`. Arguments: `$ARGUMENTS`.
 Use the requested SQL path, existing SQL, request and any supplied scope. Drafting
 requires no formal scope/review record. Before writing SQL outside the composition
 API, silently publish a lift candidate under the pipeline path, following

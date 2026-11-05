@@ -1,9 +1,13 @@
 #!/usr/bin/env bash
 # SessionStart hook (data-request plugin): one declarative line of context about the session's
 # project — whether .sqlreview/ is initialised and which reviews are stale or missing — so the
-# model knows which /data-request:* stage applies before it is asked. Runs `sqlreview.sh status
-# --json` from the event's cwd. Advisory only: any failure (no helper, no cwd, no jq) is a silent
-# no-op, and an uninitialised project only gets a hint when it actually contains SQL files.
+# model knows which /data-request:* stage applies before it is asked. Each review that needs
+# action adds one line with its next command from status (bootstrap first when the scope is out
+# of date, #514). Each handed-off amendment part, each amendment record that fails its checks and each
+# ledger amendment whose record is missing adds one line too. Runs `sqlreview.sh status --json` from the
+# event's cwd. Advisory only: any failure (no helper, no cwd, no jq) is a silent
+# no-op, and an uninitialised project only gets a hint when it actually contains SQL files. When status
+# runs past its budget (SQLREVIEW_PREFLIGHT_BUDGET seconds, default 4), one line says so.
 set -u
 input="$(cat 2>/dev/null)" || exit 0
 field() {
@@ -29,9 +33,36 @@ for c in "${CLAUDE_PLUGIN_ROOT:-/nonexistent}/skills/setup/scripts/sqlreview.sh"
 done
 [ -n "$helper" ] || exit 0
 
-status="$(cd "$cwd" && bash "$helper" status --json 2>/dev/null)"; rc=$?
+# Claude Code stops this hook after 5 seconds and drops its output without a message. Status takes
+# about 0.15 s per review, so give it a budget and report a timeout instead of going silent.
+budget="${SQLREVIEW_PREFLIGHT_BUDGET:-4}"
+case "$budget" in ''|*[!0-9]*) budget=4 ;; esac
+# Status may be blocked in a child (git, jq) when the budget runs out. Bash defers its TERM trap
+# until that child returns, and a child can keep a capture pipe open, so status runs in its own
+# process group (set -m). The watchdog signals the whole group: TERM, then KILL half a second
+# later, so status can usually remove its temporary files first. Status writes to a file, which
+# nothing left behind can hold open.
+out="$(mktemp 2>/dev/null)" || exit 0
+trap 'rm -f "$out" "$out.timeout"' EXIT
+(cd "$cwd" || exit 1
+  set -m
+  bash "$helper" status --json >"$out" 2>/dev/null </dev/null & pid=$!
+  set +m
+  # The watchdog stops its own sleep when stopped, so no process outlives the hook.
+  ( s=""; trap 'kill "$s" 2>/dev/null; exit 0' TERM
+    sleep "$budget" & s=$!; wait "$s" || exit 0
+    : >"$out.timeout"; kill -TERM -- "-$pid"
+    sleep 0.5 & s=$!; wait "$s" && kill -KILL -- "-$pid" ) </dev/null >/dev/null 2>&1 & dog=$!
+  wait "$pid"; rc=$?
+  kill "$dog" 2>/dev/null; wait "$dog"
+  # The watchdog leaves a marker only when it stopped status. Then sweep anything left in the group.
+  [ -e "$out.timeout" ] && { kill -KILL -- "-$pid" 2>/dev/null; exit 124; }
+  exit "$rc") >/dev/null 2>&1; rc=$?
+status="$(cat "$out" 2>/dev/null)"
 ctx=""
-if [ "$rc" -eq 3 ]; then
+if [ "$rc" -eq 124 ]; then
+  ctx="SQL Review: status did not finish in the $budget-second session-start budget, so this summary is not available. Run sqlreview.sh status to see each review and its next command."
+elif [ "$rc" -eq 3 ]; then
   has_sql="$(cd "$cwd" && { git ls-files -- '*.sql' '**/*.sql' 2>/dev/null; find . -name .git -prune -o -type f -name '*.sql' -print 2>/dev/null; } | head -1)"
   [ -n "$has_sql" ] || exit 0
   ctx="SQL Review: this project contains SQL files but has no .sqlreview/ directory. /data-request:setup initialises it (once per project); then /data-request:bootstrap, :analyse and :explain use it."
@@ -52,10 +83,19 @@ elif [ "$rc" -eq 0 ] && [ -n "$status" ]; then
              (.counts.scoped // 0 | select(. > 0) | "\(.) scoped (bootstrap only)"),
              (.counts["scoped-header-only"] // 0 | select(. > 0) | "\(.) scoped-header-only (\(names("scoped-header-only"))) — /data-request:bootstrap: inspect the header diff and notes, then record the header revision if confirmations remain unchanged"),
              (.counts.stale // 0 | select(. > 0) | "\(.) stale (\(names("stale")))"),
-             (.counts["no-baseline"] // 0 | select(. > 0) | "\(.) without a baseline (\(names("no-baseline")))"),
+             (.counts["no-baseline"] // 0 | select(. > 0) | "\(.) without a clean recorded commit (\(names("no-baseline")))"),
              (.counts.missing // 0 | select(. > 0) | "\(.) whose SQL is missing (\(names("missing")))") ] | join(", "))
-        + ". Stale or baseline-less reviews need /data-request:analyse --update before /data-request:explain; a missing SQL file is rebound with sqlreview.sh move."
-      end' 2>/dev/null)"
+        + "."
+        # One line per review that needs action (#514). A current review only shows when its scope
+        # must be updated first, so a quiet project stays one line.
+        + ([ $r.reviews[] | select(.next != null and (.state != "current" or (.next | contains("/data-request:bootstrap"))))
+             | "\n- next for \(.slug) (\(.state)): \(.next)" ] | join(""))
+      end
+    # What holds the release (#534): one line per handed-off part, per record that the validator refuses
+    # (fields and rules only) and per missing record, with or without reviews.
+    + ([ ($r.amendments // [])[] | "\n- next for \(.record) (\(if .missing == true then "record missing"
+         elif (.invalid // []) | length > 0 then "invalid: " + ([.invalid[] | "\(.field) \(.rule)"] | join(", "))
+         else "handed off: " + (.handed_off | join(" ")) end)): \(.next)" ] | join(""))' 2>/dev/null)"
 fi
 [ -n "$ctx" ] || exit 0
 jq -nc --arg c "$ctx" '{hookSpecificOutput:{hookEventName:"SessionStart",additionalContext:$c}}'

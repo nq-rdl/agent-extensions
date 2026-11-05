@@ -1,0 +1,3 @@
+kind: Fixed
+body: 'data-request: status prints one next line for each handed-off amendment part, with the part id'
+time: 2026-11-05T18:10:03.000000000Z

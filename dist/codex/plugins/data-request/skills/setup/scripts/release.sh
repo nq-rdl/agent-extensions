@@ -1,12 +1,23 @@
 #!/usr/bin/env bash
 # release.sh — evidence and record helper for /data-request:release (#407). The skill drafts the
 # researcher-facing release body; this helper answers the questions it must not guess, and checks
-# and renders the analyst's record. It never writes: the skill writes the record, the guard checks it.
+# and renders the analyst's record. It writes no file: the skill writes the record, the guard checks it.
+# No command here uses the network. Evidence reads local refs only: fetch before you run it.
 #
-#   evidence REF [SLUG...]   does each .sqlreview review apply to the release at REF? JSON
+#   fetch-command            print the one fetch command for this project, and run nothing: tags
+#                            from origin, else the first configured remote, as
+#                            git -C '<project root>' fetch --tags <remote>, so it runs from any
+#                            directory. With no remote it
+#                            prints a comment line that says to skip the fetch and say so. A fetch
+#                            never decides a release: run it, report any failure to the human, and
+#                            run evidence anyway. Only exit 2 or 11 of evidence stops the release.
+#
+#   evidence [--no-amend-hold] REF [SLUG...]
+#                            does each .sqlreview review apply to the release at REF? JSON
 #                            {ref, commit, reviews: [{slug, kind, sql_path, revision, applies,
 #                            sql_sha256_reviewed, sql_sha256_at_ref, reviewed_commit,
-#                            reviewed_commit_in_ref, assumptions, limitations, open_questions}]}.
+#                            reviewed_commit_in_ref, other_paths_changed_since_review, assumptions,
+#                            limitations, open_questions}]}.
 #                            The reviews are read from the working tree (the newest record); the SQL
 #                            is read from REF, never the working tree. applies:
 #                              current         the SQL at REF is the reviewed SQL
@@ -14,9 +25,40 @@
 #                              changed         the SQL at REF differs: the review is stale for REF
 #                              missing-at-ref  REF has no file at sql_path: the review may describe a draft
 #                              unreviewed      scope only, no review
+#                              unavailable     the reviewed SQL cannot be read from git at the
+#                                              review's git_commit, or its SHA differs: reassess
 #                              invalid         the record fails sqlreview.sh check
 #                            reviewed_commit_in_ref: whether the review's git_commit is an ancestor of
 #                            REF (null when the review has none or git cannot tell).
+#                            other_paths_changed_since_review: committed paths outside sql_path and
+#                            .sqlreview/ that differ between git_commit and REF (null when unknown).
+#                            SQL can be unchanged while code, pins or exports change (#521).
+#                            Amend gate: each .sqlreview/amendments/<request>.json is
+#                            {schemaVersion: 1, parts: [{id: "P<n>", status, ...}]}, status
+#                            "done" (with commit), "handed off" or "withdrawn" (with reason).
+#                            A handed-off part, a done commit that is not verified in REF or a
+#                            malformed record holds the release (exit 11, ids and fields on stderr).
+#                            A done commit is verified against local refs only: rev-parse --verify
+#                            to one full SHA, then merge-base --is-ancestor. Only exit 0 of the last
+#                            step verifies. Any other result keeps the part open. A commit that is
+#                            missing here gets the next line "run the fetch command, then run
+#                            evidence again". A commit that is here but not in REF gets the next
+#                            line "release from a ref that contains the commit". Evidence checks
+#                            exactly the REF given: a local branch is not updated by a fetch, so
+#                            name a remote-tracking ref such as origin/main, or a tag.
+#                            An entry of .sqlreview/ledger.json at the amend stage whose artifact
+#                            names a record file that does not exist holds too. An empty or
+#                            malformed record or ledger holds. --no-amend-hold is for the engineer
+#                            hand-off gate: it never exits 11 and reports each open part,
+#                            malformed record or missing record on stderr as "amend note:".
+#   amend-check FILE | amend-check --stdin [--name NAME]
+#                            validate an amendment part-state record (.sqlreview/amendments/<request>.json),
+#                            as the guard does on each Write, with the rules that the amend gate applies:
+#                            one JSON object, schemaVersion 1, kind "amendment" when present, parts[]
+#                            with a unique id P<n> and a status done (with commit), handed off or
+#                            withdrawn (with reason). One "<field>: <rule>" line per violation, exit 4;
+#                            "ok" otherwise. Never a value. --name NAME also checks that the record name
+#                            has lower-case letters, digits and hyphens, as the guard needs
 #   check FILE | check --stdin
 #                            validate a release record (.sqlreview/releases/<tag>/release.json):
 #                            one violation per line, exit 4; "ok" otherwise. Inside the project,
@@ -43,7 +85,9 @@
 #
 # Exit codes: 0 ok · 1 usage · 2 error (unknown ref or slug, no jq or git) · 3 not initialised ·
 # 4 invalid record · 10 at least one review does not apply to REF (evidence), or the criteria
-# table is held (criteria).
+# table is held (criteria) · 11 release held by the amend gate (evidence): a part in
+# .sqlreview/amendments/*.json is handed off, empty, malformed or done by a commit outside REF.
+# The JSON is still printed. 11 takes precedence over 10. --no-amend-hold never gives 11.
 set -u
 SR_SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd -P)"
 # shellcheck source=sqlreview-lib.sh
@@ -58,6 +102,7 @@ usage() {
 
 # Shared jq definitions: record validation and rendering. The criteria table is release-criteria.jq.
 RL_JQ='include "sqlreview-identity";
+include "sqlreview-noecho";
 include "release-criteria";
 def str: type == "string" and length > 0;
 def arr: if type == "array" then . else [] end;
@@ -72,11 +117,11 @@ def src_errors($cid; $kept; $ev):
     if (.slug | str) and (.item | str) and (.revision | type) == "number" then
       if $kept | not then empty
       else . as $s | ([$ev[] | select(.slug == $s.slug)][0]) as $e
-        | if $e == null then "\($cid): review \(.slug) is not in evidence"
+        | if $e == null then "\($cid): review \(.slug | safe_slug) is not in evidence"
           elif $e.revision != .revision then
-            "\($cid): review \(.slug) revision \(.revision) is not the revision in evidence (\($e.revision))"
+            "\($cid): review \(.slug | safe_slug) revision \(.revision) is not the revision in evidence (\($e.revision))"
           elif $e.applies == "current" or $e.applies == "header-only" then empty
-          else "\($cid): review \(.slug) does not apply to the release (\($e.applies)); cite the release files that support the claim, or raise it as a question" end
+          else "\($cid): review \(.slug | safe_slug) does not apply to the release (\($e.applies)); cite the release files that support the claim, or raise it as a question" end
       end
     else "\($cid): a review source needs slug, item and revision" end
   elif .kind == "scope" then
@@ -86,8 +131,8 @@ def src_errors($cid; $kept; $ev):
     if (.path | str) and (.ref | str) then empty else "\($cid): a file source needs path and ref" end
   else "\($cid): source kind must be review, scope or file" end;
 def claim_errors($ev):
-  (.id // "?") as $id
-  | (if (.id | str) and (.id | test("^C[1-9][0-9]*$")) then empty else "claim id must be C<n>: \($id)" end),
+  (.id | safe_id("^C[1-9][0-9]*$")) as $id
+  | (if (.id | str) and (.id | test("^C[1-9][0-9]*$")) then empty else "claim id must be C<n>" end),
     (if .section == "summary" or .section == "assumptions" then empty
      else "\($id): section must be summary or assumptions" end),
     (if (.proposed | str) then empty else "\($id): proposed wording is empty" end),
@@ -108,8 +153,8 @@ def claim_errors($ev):
      then kept as $k | .sources[] | src_errors($id; $k; $ev)
      else "\($id): sources must be a nonempty array" end);
 def question_errors:
-  (.id // "?") as $id
-  | (if (.id | str) and (.id | test("^Q[1-9][0-9]*$")) then empty else "question id must be Q<n>: \($id)" end),
+  (.id | safe_id("^Q[1-9][0-9]*$")) as $id
+  | (if (.id | str) and (.id | test("^Q[1-9][0-9]*$")) then empty else "question id must be Q<n>" end),
     (if (.text | str) then empty else "\($id): text is empty" end),
     (if (.sources | type) == "array" then empty else "\($id): sources must be an array" end),
     (if .resolution == null then empty
@@ -135,11 +180,11 @@ def release_errors:
       (if (.claims | type) == "array" and (.claims | length) > 0 then empty else "claims must be a nonempty array" end),
       (.claims | arr | .[] | if type == "object" then claim_errors($ev) else "every claim must be an object" end),
       (.questions | arr | .[] | if type == "object" then question_errors else "every question must be an object" end),
-      (.claims | arr | map(objects | .id) | group_by(.)[] | select(length > 1) | "duplicate claim id \(.[0])"),
-      (.questions | arr | map(objects | .id) | group_by(.)[] | select(length > 1) | "duplicate question id \(.[0])"),
+      (.claims | arr | map(objects | .id) | group_by(.)[] | select(length > 1) | "duplicate claim id \(.[0] | safe_id("^C[1-9][0-9]*$"))"),
+      (.questions | arr | map(objects | .id) | group_by(.)[] | select(length > 1) | "duplicate question id \(.[0] | safe_id("^Q[1-9][0-9]*$"))"),
       (if .status != "approved" then empty else
-         (.claims | arr | .[] | objects | select(.decision == "pending") | "approved: \(.id) is pending"),
-         (.questions | arr | .[] | objects | select(.resolution == null) | "approved: \(.id) is unresolved"),
+         (.claims | arr | .[] | objects | select(.decision == "pending") | "approved: \(.id | safe_id("^C[1-9][0-9]*$")) is pending"),
+         (.questions | arr | .[] | objects | select(.resolution == null) | "approved: \(.id | safe_id("^Q[1-9][0-9]*$")) is unresolved"),
          (((.criteria | type) == "object") as $itemised
           | ("summary", "assumptions") as $s
           | if any(.claims | arr | .[] | objects; .section == $s and kept and limitation_shown($itemised)) then empty
@@ -208,7 +253,8 @@ cmd_check() {
     --stdin) [ $# -eq 1 ] || usage
       tmp="$(mktemp)" || sr_die 2 "mktemp failed"
       cat > "$tmp"
-      rl_check_file "$tmp"; rc=$?; rm -f "$tmp" ;;
+      rl_check_file "$tmp"; rc=$?
+      rm -f -- "$tmp" ;;
     "") usage ;;
     *) [ $# -eq 1 ] || usage
       f="$1"; [ -f "$f" ] || sr_die 2 "no such file: $f"
@@ -228,8 +274,8 @@ cmd_render() {
 }
 
 # One review directory -> one JSON row on stdout.
-rl_review_row() { # <slug> <commit>
-  local slug="$1" commit="$2" d="$SR_REVIEWS/$1" doc kind sql reviewed at="" body_at="" applies tmp gc inref="null" binding
+rl_review_row() ( # <slug> <commit>
+  local slug="$1" commit="$2" d="$SR_REVIEWS/$1" doc kind sql reviewed at="" body_at="" applies tmp gc inref="null" binding others="null"
   doc="$(sr_doc_for "$slug")" || return 1
   kind="$(jq -r '.kind // ""' "$doc")"
   if ! bash "$SR_SCRIPT_DIR/sqlreview.sh" check "$doc" >/dev/null 2>&1; then
@@ -240,26 +286,41 @@ rl_review_row() { # <slug> <commit>
   sql="$(jq -r '.sql_path' "$doc")"
   sr_safe_sql "$sql"
   reviewed="$(jq -r '.sql_sha256 // ""' "$doc")"
-  tmp="$(mktemp)" || sr_die 2 "mktemp failed"
-  # ./ makes the path relative to SR_ROOT, which need not be the repository top level.
-  if git -C "$SR_ROOT" cat-file -e "$commit:./$sql" 2>/dev/null &&
-     git -C "$SR_ROOT" show "$commit:./$sql" > "$tmp" 2>/dev/null; then
-    at="$(sr_sha256 "$tmp")"
-  fi
-  if [ "$kind" = scope ]; then applies="unreviewed"
-  elif [ -z "$at" ]; then applies="missing-at-ref"
+  local rc
+  tmp="$(sr_source_workspace)" || return 2
+  trap 'rm -rf "$tmp"' EXIT
+  trap 'exit 2' HUP INT TERM
+  applies=unavailable
+  if [ "$kind" = scope ]; then applies=unreviewed
   else
-    sr_no_symlinks "$d/source.sql" || exit 2
-    sr_binding "$doc" "$tmp" "$d/source.sql"; binding=$?
-    case "$binding" in 0) applies="current" ;; 10) applies="header-only" ;; *) applies="changed" ;; esac
+    sr_source_auth "$doc" "$tmp/recorded.sql"; rc=$?
+    case "$rc" in 0) ;; 6) ;; *) return 2 ;; esac
   fi
-  [ -z "$at" ] || body_at="$(sr_body_sha256 "$tmp" || true)"
-  rm -f "$tmp"
+  if [ "$kind" = scope ] || [ "$rc" = 0 ]; then
+    sr_source_show "$commit" "$sql" "$tmp/release.sql" 2>/dev/null; rc=$?
+    case "$rc" in
+      0)
+        at="$(sr_sha256 "$tmp/release.sql")" || return 2
+        body_at="$(sr_body_sha256 "$tmp/release.sql")" || return 2
+        if [ "$kind" != scope ]; then
+          sr_binding "$doc" "$tmp/release.sql" "$tmp/recorded.sql"; binding=$?
+          case "$binding" in 0) applies=current ;; 10) applies=header-only ;; *) applies=changed ;; esac
+        fi ;;
+      6) [ "$kind" = scope ] || applies=missing-at-ref ;;
+      *) return 2 ;;
+    esac
+  fi
   gc="$(jq -r '.git_commit // "" | strings' "$doc")"
   case "$gc" in
     ""|*[!0-9a-f]*) ;;
     *) if git -C "$SR_ROOT" merge-base --is-ancestor "$gc" "$commit" 2>/dev/null; then inref=true
-       elif [ $? -eq 1 ]; then inref=false; fi ;;
+       elif [ $? -eq 1 ]; then inref=false; fi
+       # SQL can stay identical while code, pins or exports change (#521). Report the paths as evidence;
+       # the reviewer decides whether a change matters.
+       if git -C "$SR_ROOT" diff --name-only -z "$gc" "$commit" -- . ":(exclude).sqlreview" ":(exclude)$sql" \
+         > "$tmp/others" 2>/dev/null; then
+         others="$(tr '\0' '\n' < "$tmp/others" | jq -Rsc 'split("\n") | map(select(length > 0))')" || return 2
+       fi ;;
   esac
   local question_doc question_rc
   question_doc="$(bash "$SR_SCRIPT_DIR/sqlreview.sh" questions "$slug" "$kind")" || {
@@ -269,18 +330,163 @@ rl_review_row() { # <slug> <commit>
       '{slug: $slug, kind: $kind, sql_path: null, revision: null, applies: "invalid"}'
     return 0
   }
-  jq -c --argjson question_doc "$question_doc" --arg slug "$slug" --arg applies "$applies" --arg at "$at" --arg body_at "$body_at" --argjson inref "$inref" '
+  jq -c --argjson question_doc "$question_doc" --arg slug "$slug" --arg applies "$applies" --arg at "$at" --arg body_at "$body_at" --argjson inref "$inref" --argjson others "$others" '
     def items: [(. // [])[] | {id, text, rationale, confirmed_revision}];
     {slug: $slug, kind, sql_path, revision, applies: $applies,
      sql_sha256_reviewed: .sql_sha256, sql_sha256_at_ref: (if $at == "" then null else $at end),
      sql_body_sha256_reviewed: (.sql_body_sha256 // null), sql_body_sha256_at_ref: (if $body_at == "" then null else $body_at end),
-     reviewed_commit: .git_commit, reviewed_commit_in_ref: $inref,
+     reviewed_commit: .git_commit, reviewed_commit_in_ref: $inref, other_paths_changed_since_review: $others,
      assumptions: (.assumptions | items), limitations: (.limitations | items),
      questions: $question_doc.questions,
      open_questions: [$question_doc.questions[] | select(.status == "open") | .text]}' "$doc"
+)
+
+# The amendment record validator (SR_AMEND_JQ) and the ledger filter (SR_AMEND_LEDGER_JQ) live in
+# sqlreview-lib.sh, because status reads the same definitions.
+
+# One jq read of .sqlreview/ledger.json. Sets $missing to one hold line per amended entry whose
+# amend artifact names a record file that does not exist. An amended entry that names no record is
+# a single-part amendment: it writes none, so it does not hold. A ledger that is empty or not valid
+# JSON also holds.
+rl_amend_ledger_missing() {
+  local ledger="$SR_ROOT/$SR_DIR/ledger.json" line nl='
+' next="$SR_AMEND_NEXT"
+  missing=""
+  [ -e "$ledger" ] || return 0
+  sr_no_symlinks "$ledger" || exit 2
+  while read -r line; do
+    case "$line" in
+      "") ;;
+      bad) missing="$missing${nl}release held: $SR_DIR/ledger.json: field entries is missing or invalid" ;;
+      path*) line="${line#path?}"
+        [ -f "$SR_ROOT/$line" ] ||
+          missing="$missing${nl}release held: the ledger shows an amendment but $line is missing. Next: $next" ;;
+    esac
+  done <<EOT
+$(jq -rs "$SR_AMEND_LEDGER_JQ" "$ledger" 2>/dev/null || printf 'bad\n')
+EOT
+}
+
+# Print, and never run, the one fetch command: tags from origin, else the first configured remote.
+# The command names the project root with -C, so it fetches into the project that the remotes came
+# from, whatever the caller's directory is. The root is single-quoted, and each embedded single quote
+# is written as '\'' . This is plain POSIX quoting, because printf %q differs between Bash versions.
+# No remote prints a comment line, so a shell that runs the output does nothing. Every skill and
+# every hint takes the command from here, so there is one instruction. This function uses no network.
+rl_fetch_command() {
+  local remote root nl='
+'
+  remote="$(git -C "$SR_ROOT" remote 2>/dev/null </dev/null)" || remote=""
+  case "$nl$remote$nl" in
+    *"${nl}origin${nl}"*) remote=origin ;;
+    *) remote="${remote%%"$nl"*}" ;;
+  esac
+  case "$remote" in
+    ""|-*) printf '# no remote is configured: skip the fetch and say so\n' ;;
+    *)
+      root="$(printf '%s\n' "$SR_ROOT" | sed "s/'/'\\\\''/g")"
+      printf "git -C '%s' fetch --tags %q\n" "$root" "$remote" ;;
+  esac
+}
+
+cmd_fetch_command() {
+  [ $# -eq 0 ] || usage
+  command -v git >/dev/null 2>&1 || sr_die 2 "git is required to read the remotes"
+  sr_require_root
+  rl_fetch_command
+}
+
+# The fixed line for a local branch that is behind its upstream. It compares two local refs and
+# uses no network. A fetch moves origin/<branch>, never the local branch itself.
+rl_behind_note() { # <ref>
+  local n
+  git -C "$SR_ROOT" show-ref --verify --quiet "refs/heads/$1" </dev/null 2>/dev/null || return 0
+  n="$(git -C "$SR_ROOT" rev-list --count "$1..$1@{upstream}" 2>/dev/null </dev/null)" || return 0
+  case "$n" in ""|0) return 0 ;; esac
+  printf 'next: %s is behind its upstream: fast-forward it, or release from the remote-tracking ref (such as origin/main), then run evidence again\n' "$1" >&2
+}
+
+# Verify one done commit as /data-request:amend step 2 does, against local refs only: resolve to
+# one full SHA, then merge-base --is-ancestor. Only exit 0 of the last step verifies the part. Returns 0 verified,
+# 1 not in the release, 3 not a commit here, 4 check could not run (such as exit 128). stdin is
+# closed so git cannot read the record rows that the caller is looping over.
+rl_amend_verify() { # <commit> <release commit>
+  local full rc=0
+  full="$(git -C "$SR_ROOT" rev-parse --verify --quiet "$1^{commit}" 2>/dev/null </dev/null)" || return 3
+  git -C "$SR_ROOT" merge-base --is-ancestor "$full" "$2" </dev/null >/dev/null 2>&1 || rc=$?
+  case "$rc" in 0) return 0 ;; 1) return 1 ;; *) return 4 ;; esac
+}
+
+# Hold while any part in .sqlreview/amendments/*.json is handed off, malformed, or done by a
+# commit that is not verified in the release. One jq read per document; the messages name part
+# ids, files and fields only. Prints the hold on stderr and returns 11 when held. With mode "note"
+# it verifies no commit, prints "amend note:" lines for the open parts and findings, and returns 0.
+rl_amend_hold() { # <ref> <commit> [note]
+  local ref="$1" commit="$2" mode="${3:-hold}" f rel kind id field c rows open="" stale="" unver="" bad="" missing="" vrc fc nl='
+'
+  for f in "$SR_ROOT/$SR_DIR"/amendments/*.json; do
+    [ -e "$f" ] || continue
+    # A record file name prints only in the shape that the guard allows (no-echo), as status does.
+    sr_amend_label "$f"
+    rel="$SR_DIR/amendments/$SR_AMEND_NAME.json"
+    sr_no_symlinks "$f" || exit 2
+    rows="$(sr_amend_rows "$f")"
+    while IFS="$(printf '\t')" read -r kind id field c; do
+      if [ "$kind" = open ]; then open="$open $id"
+      elif [ "$kind" = bad ]; then bad="$bad${nl}release held: $rel: field $field is missing or invalid"
+      elif [ "$kind" = done ] && [ "$mode" = hold ]; then
+        vrc=0
+        rl_amend_verify "$c" "$commit" || vrc=$?
+        case "$vrc" in
+          0) ;;
+          1) stale="$stale $id" ;;
+          *) unver="$unver $id" ;;
+        esac
+      fi
+    done <<EOT
+$rows
+EOT
+  done
+  rl_amend_ledger_missing  # sets missing: amended in the ledger, record file named but absent
+  [ -n "$open$stale$unver$bad$missing" ] || return 0
+  if [ "$mode" = note ]; then
+    [ -z "$open" ] || printf 'amend note: amend part handed off and open:%s\n' "$open" >&2
+    [ -z "$bad" ] || printf '%s\n' "${bad#?}" | sed 's/^release held:/amend note:/' >&2
+    [ -z "$missing" ] || printf '%s\n' "${missing#?}" | sed 's/^release held:/amend note:/' >&2
+    printf 'amend note: %s\n' "this does not block the hand-off, but the release stays held until the record is closed" >&2
+    return 0
+  fi
+  [ -z "$open" ] || printf 'release held: amend part handed off and open:%s\n' "$open" >&2
+  [ -z "$stale" ] || printf 'release held: amend part done by a commit not in %s:%s\n' "$ref" "$stale" >&2
+  [ -z "$unver" ] || printf 'release held: amend part done but its commit is not verified (rev-parse or merge-base did not succeed):%s\n' "$unver" >&2
+  [ -z "$bad" ] || printf '%s\n' "${bad#?}" >&2
+  [ -z "$missing" ] || printf '%s\n' "${missing#?}" >&2
+  # Each next line names the real part id, so the reader can paste it (N2). Part ids are the P<n>
+  # values already checked by SR_AMEND_JQ, so they carry no record text.
+  for id in $open; do
+    printf 'next: the engineer comments done: %s <commit> or the analyst comments withdrawn: %s <reason> on the deliverable PR, then the record is updated\n' "$id" "$id" >&2
+  done
+  for id in $stale; do
+    printf 'next: %s is done by a commit outside %s: release from a ref that contains the commit, or the engineer comments done: %s <commit> with a commit in %s\n' "$id" "$ref" "$id" "$ref" >&2
+  done
+  if [ -n "$unver" ]; then
+    fc="$(rl_fetch_command)"
+    case "$fc" in
+      "#"*) fc="no remote is configured, so fetch nothing: check that the commit is in this clone" ;;
+      *) fc="run $fc" ;;
+    esac
+    for id in $unver; do
+      printf 'next: the commit of %s is missing here or does not resolve: %s, then run evidence again\n' "$id" "$fc" >&2
+    done
+  fi
+  [ -z "$stale$unver" ] || rl_behind_note "$ref"
+  [ -z "$bad" ] || printf '%s\n' "next: correct each record field named above, then run evidence again" >&2
+  return 11
 }
 
 cmd_evidence() {
+  local amend=hold
+  if [ "${1:-}" = --no-amend-hold ]; then amend=note; shift; fi
   [ $# -ge 1 ] || usage
   sr_need_jq
   command -v git >/dev/null 2>&1 || sr_die 2 "git is required to read the release"
@@ -307,16 +513,20 @@ cmd_evidence() {
   done
   printf '%s' "$rows" | jq -s --arg ref "$ref" --arg commit "$commit" \
     '{ref: $ref, commit: $commit, reviews: .}' || sr_die 2 "cannot assemble evidence"
+  if [ "$amend" = note ]; then rl_amend_hold "$ref" "$commit" note
+  else rl_amend_hold "$ref" "$commit" || exit 11
+  fi
   printf '%s' "$rows" | jq -se 'all(.[]; .applies == "current" or .applies == "header-only")' >/dev/null || exit 10
 }
 
 # Is the owning scope current for the SQL at COMMIT? The body rule of carry_criteria_rows in
 # sqlreview-carry.jq: the full sha256 is equal (both absent counts), or the body sha256 of the SQL at
 # COMMIT equals a body the scope recorded, so a header-only change is current. The recorded bodies are
-# sql_body_sha256, each header_revisions body, and the body of an authenticated scope.source.sql (at
-# COMMIT, else in the working tree). One git show per file. Exit 0 current, 1 stale, 2 operational.
+# sql_body_sha256, each header_revisions body, and the body of the SQL at the scope's own git_commit
+# when its sha256 equals the recorded one (hash-only reviews, #548: no scope.source.sql copy exists).
+# One git show per file. Exit 0 current, 1 stale, 2 operational.
 rl_scope_current() { # <slug> <commit>
-  local slug="$1" commit="$2" doc sql full at="" body tmp known base="$SR_REVIEWS/$1/scope.source.sql"
+  local slug="$1" commit="$2" doc sql full gc at="" body tmp known
   doc="$(git -C "$SR_ROOT" show "$commit:./$SR_DIR/reviews/$slug/scope.json" 2>/dev/null)" || return 2
   sql="$(printf '%s' "$doc" | jq -r '.sql_path // "" | strings' 2>/dev/null)" || return 2
   full="$(printf '%s' "$doc" | jq -r '.sql_sha256 // "" | strings' 2>/dev/null)" || return 2
@@ -326,10 +536,14 @@ rl_scope_current() { # <slug> <commit>
   if [ "$at" = "$full" ]; then rm -rf "$tmp"; return 0; fi
   if [ -z "$at" ] || [ -z "$full" ] || ! body="$(sr_body_sha256 "$tmp/sql")"; then rm -rf "$tmp"; return 1; fi
   known="$(printf '%s' "$doc" | jq -r '(.sql_body_sha256, (.header_revisions // [] | .[]? | .sql_body_sha256)) | strings' 2>/dev/null)"
-  if git -C "$SR_ROOT" show "$commit:./$SR_DIR/reviews/$slug/scope.source.sql" > "$tmp/base" 2>/dev/null; then base="$tmp/base"
-  elif ! sr_no_symlinks "$base" || [ ! -f "$base" ]; then base=""; fi
-  if [ -n "$base" ] && [ "$(sr_sha256 "$base")" = "$full" ]; then known="$known
-$(sr_body_sha256 "$base" || true)"; fi
+  gc="$(printf '%s' "$doc" | jq -r '.git_commit // "" | strings' 2>/dev/null)" || gc=""
+  case "$gc" in
+    ""|*[!0-9a-f]*) ;;
+    *) if git -C "$SR_ROOT" show "$gc:./$sql" > "$tmp/base" 2>/dev/null && [ "$(sr_sha256 "$tmp/base")" = "$full" ]; then
+         known="$known
+$(sr_body_sha256 "$tmp/base" || true)"
+       fi ;;
+  esac
   rm -rf "$tmp"
   printf '%s\n' "$known" | grep -qx "$body"
 }
@@ -359,7 +573,7 @@ EOF
 
 cmd_criteria() {
   [ $# -ge 1 ] || usage
-  local tag="$1" mode=unchecked fpfile="" fp=null commit tmp intake path slug doc row rows="" scopes stale=false
+  local tag="$1" mode=unchecked fpfile="" fp=null commit tmp intake path slug doc row rows="" scopes stale=false review_prefix previous_src
   local prev previous=null current=null f out
   shift
   case "$tag" in ""|-*) usage ;; esac
@@ -401,9 +615,10 @@ cmd_criteria() {
   fi
   rm -f "$tmp"
   # Every scope at the tag that carries criteria_status; exactly one may own the criteria (research R6).
+  review_prefix="$SR_DIR/reviews/"
   while IFS= read -r path; do
     case "$path" in "$SR_DIR"/reviews/*/scope.json) ;; *) continue ;; esac
-    slug="${path#"$SR_DIR"/reviews/}"; slug="${slug%/scope.json}"
+    slug="${path#$review_prefix}"; slug="${slug%/scope.json}"
     case "$slug" in */*|.|..|*[!A-Za-z0-9_%.-]*) sr_die 2 "unsafe review directory name at $tag" ;; esac
     doc="$(git -C "$SR_ROOT" show "$commit:./$path" 2>/dev/null)" || sr_die 2 "cannot read $slug/scope.json at $tag"
     row="$(printf '%s' "$doc" | jq -c --arg slug "$slug" '
@@ -428,11 +643,11 @@ EOF
   fi
   prev="$(release_previous_tag "$tag")" || sr_die 2 "cannot list the release records at $tag"
   if [ -n "$prev" ]; then
-    previous="$(git -C "$SR_ROOT" show "$commit:./$SR_DIR/releases/$prev/release.json" 2>/dev/null |
-      jq -c --arg tag "$prev" '{tag: $tag, criteria: (.criteria // null)}' 2>/dev/null)" ||
+    previous_src="$(git -C "$SR_ROOT" show "$commit:./$SR_DIR/releases/$prev/release.json" 2>/dev/null)"
+    previous="$(printf '%s' "$previous_src" | jq -c --arg tag "$prev" '{tag: $tag, criteria: (.criteria // null)}' 2>/dev/null)" ||
       sr_die 2 "cannot read the release record of $prev at $tag"
   fi
-  # This tag's record in the working tree: its analyst decisions survive while a row's note is unchanged.
+  # The record of this tag in the working tree: its analyst decisions survive while the note of a row is unchanged.
   case "$tag" in
     *..*|*[!A-Za-z0-9._-]*|[!A-Za-z0-9]*) ;;
     *) f="$SR_ROOT/$SR_DIR/releases/$tag/release.json"
@@ -440,7 +655,7 @@ EOF
        if [ -f "$f" ]; then current="$(jq -c '.criteria // null' "$f" 2>/dev/null)" || current=null; fi
        [ -n "$current" ] || current=null ;;
   esac
-  # The owning scope's states describe the SQL it recorded. A changed SQL body at the tag holds the table.
+  # The states of the owning scope describe the SQL it recorded. A changed SQL body at the tag holds the table.
   local scope_stale=false
   if [ "$(printf '%s' "$scopes" | jq 'length')" = 1 ]; then
     slug="$(printf '%s' "$scopes" | jq -r '.[0].slug')"
@@ -462,11 +677,47 @@ EOF
   printf '%s' "$out" | jq -e '. == null or .status == "complete"' >/dev/null || exit 10
 }
 
+cmd_amend_check() {
+  sr_need_jq
+  local rows kind id field rule out="" rc=0 nl='
+' name="" have_name=0 target=""
+  # Arguments: FILE or --stdin, then optionally --name NAME, the record name from the file name.
+  while [ $# -gt 0 ]; do
+    case "$1" in
+      --stdin) [ -z "$target" ] || usage; target=--stdin ;;
+      --name) [ $# -ge 2 ] && [ "$have_name" = 0 ] || usage; name="$2"; have_name=1; shift ;;
+      "") usage ;;
+      *) [ -z "$target" ] || usage; target="$1" ;;
+    esac
+    shift
+  done
+  [ -n "$target" ] || usage
+  # The rows are the ones the evidence hold reads (sr_amend_rows, SR_AMEND_JQ): a parse failure
+  # is one fixed row, because jq error text can quote a value (no-echo). Only bad rows are findings
+  # here. Standard input goes straight to jq, with no temporary file to clean up.
+  if [ "$target" = --stdin ]; then
+    rows="$(sr_amend_rows)"
+  else
+    [ -f "$target" ] || sr_die 2 "amend-check: the record file does not exist"
+    rows="$(sr_amend_rows "$target")"
+  fi
+  if [ "$have_name" = 1 ] && ! sr_amend_name_ok "$name"; then out="(name): $SR_AMEND_NAME_RULE"; fi
+  while IFS="$(printf '\t')" read -r kind id field rule; do
+    if [ "$kind" = bad ]; then out="$out${out:+$nl}$field: $rule"; fi
+  done <<EOT
+$rows
+EOT
+  if [ -n "$out" ]; then printf '%s\n' "$out"; rc=4; else printf 'ok\n'; fi
+  return "$rc"
+}
+
 cmd="${1:-}"
 [ -n "$cmd" ] || usage
 shift
 case "$cmd" in
   evidence) cmd_evidence "$@" ;;
+  amend-check) cmd_amend_check "$@" ;;
+  fetch-command) cmd_fetch_command "$@" ;;
   check) cmd_check "$@" ;;
   render) cmd_render "$@" ;;
   criteria) cmd_criteria "$@" ;;

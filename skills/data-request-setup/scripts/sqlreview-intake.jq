@@ -1,5 +1,5 @@
 # Answers-sidecar contract: skills/setup/references/analyst-intake.rst (schema 1 and 2). The rules
-# mirror data-analysis-scaffold's validate_intake; the criterion vocabulary is sqlreview-criteria.jq,
+# mirror validate_intake of data-analysis-scaffold; the criterion vocabulary is sqlreview-criteria.jq,
 # so run this with `jq -L <this directory>`.
 # Never echo malformed source values in diagnostics.
 include "sqlreview-criteria";

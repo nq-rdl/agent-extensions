@@ -57,8 +57,8 @@ inventing confirmation. Prior SQL/delivery and requested elements can support
 an engineer technical proposal, not an analyst research answer. Guardrails'
 ``references/grain.rst`` owns evidence selection and once-only drift handling.
 
-Optional ``decided`` is ``{by, role, at, source}``, separate from confirmation:
-nonempty actor handle, role and evidence source; ``at`` uses the same UTC form
+Optional ``decided`` is an object with ``by``, ``role``, ``at`` and ``source``, separate from
+confirmation: nonempty actor handle, role and evidence source; ``at`` uses the same UTC form
 or a real ``YYYY-MM-DD`` date when the source gives only the day.
 The requester who made a decision can differ from the analyst who confirmed
 the intake. Omit provenance not actually known; never manufacture a dated
@@ -197,7 +197,10 @@ The read-only helper returns ``present``, ``approval_number``, ``assumptions``
 and ``analyst_questions``. For a schema 2 sidecar it also returns ``criteria``
 and ``fingerprints``, copied verbatim (``[]`` and ``null`` when the sidecar has
 none); schema 1 output is unchanged. A missing sidecar returns ``present: false`` with
-empty arrays. Invalid fields fail with exit 4 without exposing values.
+empty arrays. With a scope draft argument and a missing sidecar, the helper prints
+the draft as it is and exits 0, so the temporary output file that you move over the draft
+holds the draft again. If the draft is not a readable file, the helper exits 4 with a fixed
+line and prints nothing. Invalid fields fail with exit 4 without exposing values.
 
 Imported scope IDs are ``A-intake-<id>``; reserve that prefix. Items are
 assumptions with null SQL location, the analyst's original actor/date, and the
