@@ -28,9 +28,11 @@ file, and it never publishes a release, pushes a tag or posts the body.
 Order: the Data Engineer completes `analyse`, the authorised operator run, UAT and the triage
 hand-off; the Data Analyst runs `explain`, accepts for release preparation, sends back or
 amends presentation, then drafts here and publishes. Never direct the engineer to release.
-If the analyst chooses **Send back** here, use the paste-ready send-back note in
-`${CLAUDE_PLUGIN_ROOT}/skills/explain/references/send-back-note.rst`, with its completeness check: logic changes or defects to `fix`, presentation
-changes to `amend` before or after release. Add two lines after `outcome:`: `release ref: <tag
+If the analyst chooses **Send back** here, use the paste-ready send-back note in the shared reference
+`${CLAUDE_PLUGIN_ROOT}/skills/explain/references/send-back-note.rst`, with its completeness check. Open
+that reference file only. To run `explain`, `fix` or `amend`, invoke it by name through the Skill tool,
+such as `/data-request:fix`, and do not list the plugin's skills or open their `SKILL.md` files. Route logic changes or
+defects to `fix`, and presentation changes to `amend` before or after release. Add two lines after `outcome:`: `release ref: <tag
 or candidate ref>`, and `release claims: <claim and question ids, with the conflicting sources
 for each>`. The engineer then has the claim, its sources and the expected result in one comment. Keep unresolved claims `pending` and the current
 candidate record `draft`; do not overwrite a previously approved release record, post the
