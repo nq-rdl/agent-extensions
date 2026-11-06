@@ -1,0 +1,3 @@
+kind: Fixed
+body: Data-request review records keep the SQL SHA-256 and git commit, never SQL copies under .sqlreview/ (#505)
+time: 2026-10-30T00:00:01Z

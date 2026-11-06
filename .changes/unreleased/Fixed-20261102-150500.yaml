@@ -1,0 +1,3 @@
+kind: Fixed
+body: 'data-request: the guard validates writes to amendment part-state records and names the field and the rule'
+time: 2026-11-02T15:05:00.000000000Z

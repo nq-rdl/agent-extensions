@@ -48,6 +48,8 @@ SEED = {"death-date-raw", "mortality-undercount", "iemr-event-dates", "output-ae
 # Deliberate cross-matches between proposals of the same kind: one prior item (A17 in #172)
 # counts under the death-date, output-time-zone and raw-dated-events rows.
 DELIBERATE_OVERLAPS = {("death-date-raw", "output-aest"), ("death-date-raw", "raw-dated-events")}
+# JoshKgh's recorded decision for the broad-first-pass house default, a public comment on #515.
+BROAD_SOURCE = "https://github.com/nq-rdl/agent-extensions/pull/515#issuecomment-6487817741"
 # Fictional ids use a leading 9 (ENQ9001, ...-9901); anything else looks like a real enquiry.
 REAL_ID = re.compile(r"\b(?:ENQ(?!9)\d{3,}|[A-Z]{4,}-(?!9)\d{3,})\b")
 
@@ -114,6 +116,8 @@ class ListShape(unittest.TestCase):
                     # Per-enquiry rows stay private; the recorded house ruling is public.
                     if d["id"] == "tuh-facility":
                         self.assertEqual(url, "https://github.com/nq-rdl/agent-extensions/issues/436")
+                    elif d["id"] == "broad-first-pass":
+                        self.assertEqual(url, BROAD_SOURCE)
                     else:
                         self.assertRegex(url, r"^https://github\.com/nq-rdl/query-builder(-plugins)?/issues/\d+(#issuecomment-\d+)?$")
                 if d["library_issue"] is not None:
@@ -260,8 +264,8 @@ class Pointers(unittest.TestCase):
     def test_reference_keeps_confirmation_and_deduplication(self):
         text = " ".join(REFERENCE.read_text().split())
         for token in ("Human confirmation is still", "open and closed issues",
-                      "already cite this enquiry for that decision",
-                      "pair of enquiry and decision ``id``", "one evidence comment per target issue",
+                      "per-occurrence token, not with wording",
+                      "random token", "one evidence comment per target issue",
                       "set that entry's ``library_issue``", "the search in step 2 found nothing",
                       "Never edit the installed plugin copy", "copy ``upstream`` from the prior",
                       "do not authorise hand SQL", "retired_by"):
@@ -445,6 +449,87 @@ class Helper(unittest.TestCase):
         self.helper("list", env={"SQLREVIEW_RECURRING_DECISIONS": str(self.root / "absent.json")}, expected=2)
 
 
+class HouseDefaultRequirements(Helper):
+    """The scaffold's criteria design: `facility_code` is required only on `tuh-facility`, other fields on every house default."""
+
+    BROAD = {"confirmed_by": "JoshKgh", "confirmed_at": "2026-10-15",
+             "decided": {"by": "JoshKgh", "role": "Data Engineer", "at": "2026-10-15", "source": BROAD_SOURCE}}
+
+    def decision(self, doc, id_):
+        return next(d for d in doc["decisions"] if d["id"] == id_)
+
+    def listed(self, mutate):
+        return self.helper("list", expected=4, env=self.custom_list(mutate))
+
+    def test_shipped_broad_first_pass_validates_and_has_a_recorded_house_default(self):
+        self.helper("list")
+        d = self.decision(load_list(), "broad-first-pass")
+        self.assertEqual((d["kind"], d["status"]), ("assumption", "open"))
+        self.assertEqual(d["title"], "House default: first pass keeps exclusions unapplied")
+        self.assertEqual(d["proposal"]["text"],
+                         "Exclusion criteria are not applied on the first pass, to keep the cohort broad.")
+        self.assertIn(BROAD_SOURCE, d["proposal"]["rationale"])
+        self.assertIn("JoshKgh", d["proposal"]["rationale"])
+        self.assertNotIn("data-analysis-scaffold", d["proposal"]["rationale"])
+        self.assertEqual(d["evidence"], [BROAD_SOURCE])
+        h = d["house_default"]
+        self.assertEqual(h, self.BROAD)
+        self.assertNotIn("facility_code", h)
+        self.assertTrue(h["decided"]["source"].startswith("https://github.com/"))
+
+    def test_match_offers_broad_first_pass_with_its_house_default(self):
+        d = self.decision(load_list(), "broad-first-pass")
+        draft = self.write("scope.draft.json", {"kind": "scope", "assumptions": [
+            item("A1", "Exclusions are not applied on a first pass.", "Keeps the cohort broad.")], "limitations": []})
+        hits = [m for m in self.helper("match", draft)["matches"] if m["decision"] == "broad-first-pass"]
+        self.assertEqual([m["id"] for m in hits], ["A1"])
+        self.assertEqual(hits[0]["house_default"], d["house_default"])
+
+    def test_a_house_default_needs_no_facility_code_off_tuh_facility(self):
+        def add(doc):
+            self.decision(doc, "death-date-raw")["house_default"] = dict(self.BROAD)
+        self.helper("list", env=self.custom_list(add))
+
+    def test_tuh_facility_still_requires_its_facility_code(self):
+        def drop(doc):
+            self.decision(doc, "tuh-facility")["house_default"].pop("facility_code")
+        r = self.listed(drop)
+        self.assertIn("tuh-facility", r.stderr)
+        self.assertIn("house_default", r.stderr)
+
+    def test_every_house_default_still_requires_confirmation_and_origin(self):
+        mutations = {
+            "no confirmed_by": {"confirmed_by": None},
+            "email confirmer": {"confirmed_by": "engineer@example.com"},
+            "no confirmed_at": {"confirmed_at": None},
+            "no decided": {"decided": None},
+            "decided without source": {"decided": dict(self.BROAD["decided"], source="")},
+            "email decider": {"decided": dict(self.BROAD["decided"], by="engineer@example.com")},
+        }
+        for id_ in ("broad-first-pass", "death-date-raw"):
+            for name, fields in mutations.items():
+                with self.subTest(decision=id_, case=name):
+                    def mutate(doc, id_=id_, fields=fields):
+                        self.decision(doc, id_)["house_default"] = dict(self.BROAD, **fields)
+                    r = self.listed(mutate)
+                    self.assertIn(id_, r.stderr)
+                    self.assertIn("house_default", r.stderr)
+
+    def test_broad_first_pass_without_confirmed_by_exits_4_and_names_the_entry(self):
+        def drop(doc):
+            self.decision(doc, "broad-first-pass")["house_default"].pop("confirmed_by")
+        r = self.listed(drop)
+        self.assertIn("broad-first-pass", r.stderr)
+        self.assertIn("house_default", r.stderr)
+        self.assertEqual(r.stdout, "")
+
+    def test_broad_first_pass_without_a_house_default_lists_with_no_ruling(self):
+        def drop(doc):
+            self.decision(doc, "broad-first-pass").pop("house_default")
+        out = self.helper("list", env=self.custom_list(drop))
+        self.assertNotIn("house_default", self.decision(out, "broad-first-pass"))
+
+
 class MarkerCompatibility(unittest.TestCase):
     """The optional marker must not change what publish and carryforward accept."""
 
@@ -452,7 +537,9 @@ class MarkerCompatibility(unittest.TestCase):
         self.tmp = tempfile.TemporaryDirectory()
         self.addCleanup(self.tmp.cleanup)
         self.root = Path(self.tmp.name)
-        self.sqlreview("init")
+        from test_sql_review_scripts import Project
+        self.project = Project(self.root)
+        self.project.commit()
 
     def sqlreview(self, *args, expected=0):
         r = run(SQLREVIEW, list(args), self.root)
@@ -496,6 +583,7 @@ class MarkerCompatibility(unittest.TestCase):
         published = json.loads((path.parent / "scope.json").read_text())
         self.assertEqual(published["revision"], 2)
         self.assertEqual(published["assumptions"][0]["upstream"], {"decision": "raw-episode-mrn"})
+        self.assertEqual(list((self.root / ".sqlreview").rglob("*.sql")), [])  # #505: no SQL copies in the store
 
 if __name__ == "__main__":
     unittest.main()

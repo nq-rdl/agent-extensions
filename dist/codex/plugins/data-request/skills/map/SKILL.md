@@ -23,8 +23,9 @@ Return unanswered research choices to the Data Analyst; establish technical
 source, key and join evidence with the engineer.
 
 Invoke `$data-request:guardrails` first and follow its source hierarchy and **House defaults**.
-Apply TUH `00200` without asking when no alternative facility scope is named: reuse
+When no alternative facility scope is named, import the recorded `tuh-facility` ruling for TUH `00200` without a fresh question. Reuse
 one standard assumption from setup's `tuh-facility` entry with its `upstream` marker.
+Tell the engineer which item you imported. The engineer may override it before publish.
 Read `${PLUGIN_ROOT}/skills/setup/references/recurring-decisions.rst` for wording
 and original confirmation; mapping returns the assumption as a proposal/handoff, never initialises a store.
 If the request explicitly changes the cohort's facility set (alternative/HHS/network scope), leave the TUH default out, carry the
@@ -83,6 +84,10 @@ Indigenous status from `PERSON_INFO`. Offer country of birth and preferred langu
 as optional surrogates; the requester or engineer decides. Record the limitation
 that ethnicity is not held. Check the pinned library for surrogate units; a missing
 unit is a lift candidate. Guardrails holds the convention.
+
+**Supplied cohort:** map it by shape (name, columns, types, key, join target) and propose a `SuppliedCohort`
+declaration; the runner loads the file into a `#` table. Never read `data/00_raw/` or copy a value
+into the mapping, a comment or chat. Follow `${PLUGIN_ROOT}/skills/guardrails/references/supplied-cohorts.rst`.
 
 ## Lookup evidence for codes
 

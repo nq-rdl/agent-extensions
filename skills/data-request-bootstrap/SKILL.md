@@ -5,14 +5,15 @@ description: >-
   Scope a piece of SQL work with the Data Engineer before the SQL is written: an interview that
   produces .sqlreview/reviews/<slug>/scope.json and the rendered scope.md (intent, inputs,
   outputs, assumptions, open questions), preserving recorded upstream confirmations. Re-running
-  on an existing scope walks through what changed. Use at the start of the Data Request scoping workflow,
+  on an existing scope walks through what changed. It is also the step that updates a scope after
+  the SQL or the analyst intake changes, before analyse runs again. Use first in the Data Request scoping workflow,
   after /data-request:setup and before /data-request:analyse.
 argument-hint: '<intended sql path> [--update]'
 user-invocable: true
 compatibility: >-
   .sqlreview schema 2 (schema 1 remains readable) (docs/specs/2026-09-15-sql-review-plugin-design.md); bash 3.2+, jq >= 1.6,
-  git optional.
-allowed-tools: Bash, Read, Glob, Grep, Write, AskUserQuestion
+  git required for SQL-bound scopes.
+allowed-tools: Bash, Read, Glob, Grep, Write, AskUserQuestion, Skill
 metadata:
   repo: https://github.com/nq-rdl/agent-extensions
 ---
@@ -28,9 +29,8 @@ The engineer owns technical sources, grain mechanics, keys, timezones, joins and
 the clinical grain unit) as an engineer confirmation. Write it as an `Analyst question:` item
 and route it back to the analyst, who can answer it in a `/data-request:intake` re-run.
 
-For RDL cohort SQL, read `${CLAUDE_PLUGIN_ROOT}/skills/guardrails/SKILL.md` before
-scoping or reviewing. Apply **Engineer decisions: proceed and flag** in its
-`references/decision-authority.rst`: implement evidenced technical defaults within the agreed task,
+For RDL cohort SQL, invoke `/data-request:guardrails` before scoping or reviewing. Apply **Engineer decisions: proceed and flag** in
+`${CLAUDE_PLUGIN_ROOT}/skills/guardrails/references/decision-authority.rst`: implement evidenced technical defaults within the agreed task,
 flag them for analyst review, and batch only remaining research questions. This does not park the build for analyst approval
 or replace formal engineer confirmation. Deliver requested outputs only; offer extras, do not build them.
 Consult dataops/column-spec evidence; never invent human confirmation.
@@ -99,19 +99,19 @@ Re-run lint after edits; decision-source warnings require a source check, not a 
 Reworded confirmed items need fresh human confirmation; do not retain their carried
 confirmation or edit the final JSON. Lint cannot grant confirmation.
 
-Apply guardrails **House defaults** without asking: reuse one standard assumption from
-setup's `tuh-facility` entry, with its `upstream` marker and recorded house confirmation
-(see `${CLAUDE_PLUGIN_ROOT}/skills/setup/references/recurring-decisions.rst`). Do not ask a fresh facility question.
+Apply guardrails **House defaults**: import the recorded `tuh-facility` ruling without a fresh question, as one standard
+assumption with its `upstream` marker. Tell the engineer which item you imported. The engineer may override it before publish.
+Setup's `${CLAUDE_PLUGIN_ROOT}/skills/setup/references/recurring-decisions.rst` holds the full rule, including the refusal path when `list` exits 4.
 If the request explicitly changes the cohort's facility set to another facility, the whole HHS or a network-wide cohort, put one
 `Analyst question:` about the facility set instead of the TUH default; do not apply or carry it.
 Reuse an already answered intake/scope exception; do not ask it again or intersect it with TUH.
 Continue independent work while the dependent facility scope remains unresolved.
 
 Some decisions recur in every enquiry (#362). Before you put candidate items to the engineer, run
-`bash "$S/recurring-decisions.sh" match ".sqlreview/reviews/$SLUG/scope.draft.json"`. For each other match,
+`bash "$S/recurring-decisions.sh" match ".sqlreview/reviews/$SLUG/scope.draft.json"`. For each other match without a `house_default`,
 show the prior enquiries, offer the listed wording and mark the item `upstream`, as
 `${CLAUDE_PLUGIN_ROOT}/skills/setup/references/recurring-decisions.rst` says. The engineer still confirms each other item;
-the exact recorded TUH house default is imported, not put in a new confirmation batch.
+the exact recorded TUH house default is imported, not put in a new confirmation batch, and `broad-first-pass` is imported as criteria rows (see *Criteria states* below).
 Rows from `carryforward` include recorded `upstream` and `decided` fields: preserve them.
 
 ## Decision origin (#434)
@@ -184,25 +184,97 @@ An engineer's confirmation of the static SQL finding is not an analyst research 
 Continue independent work under the shared authority rule; do not widen or narrow a cohort
 silently. Recheck these answers on updates, including when SQL first becomes available.
 
+## Criteria states
+
+When `sqlreview.sh intake` returns `criteria` (a schema 2 sidecar), the scope says what the SQL does
+with each one. Record one `criteria_status` row per live criterion and none for a withdrawn id.
+The kind sets the allowed states:
+
+- `entry_event` (`N`): `applied` or `not-doable`. Several live entry events are alternatives that fix
+  one index date, not separate cohorts.
+- `inclusion` and `exclusion` (`I`, `E`): `applied`, `partially-applied`, `flagged`, `not-applied`,
+  `researcher-applies` or `not-doable`.
+- `data_element` (`D`): `delivered`, `not-delivered` or `not-doable`.
+
+A row is `{criterion, state, reason?, flag?, upstream?, confirmed_by, confirmed_at, confirmed_revision}`.
+Put the rows to the engineer in batches like candidate assumptions, options **Confirm (Recommended)** /
+**Reword** / **Reject**, each showing the criterion's wording, the proposed state and its reason. The
+engineer confirms what the SQL does or will do. The analyst's wording stays as intake recorded it.
+
+- A `reason` is required for `partially-applied`, `not-applied`, `not-delivered` and `not-doable`. For
+  `partially-applied` it names the part that is not applied.
+- `flagged` names the delivered output and column that carry the flag, as
+  `flag: {"output": "<output>", "column": "<column>"}`. The column must be one the SQL delivers.
+- `researcher-applies` needs `applied_by: researcher` on that criterion in the sidecar. Without it,
+  record `not-applied` for this iteration, with a reason that names the open analyst question on who
+  applies it. Put one `Analyst question:` for the analyst to answer through `/data-request:intake`,
+  which sets `applied_by`. The scope can publish meanwhile. Once the sidecar has `applied_by: researcher`,
+  a later revision may record `researcher-applies`, confirmed afresh. An engineer's confirmation is not
+  that answer.
+- A derived data element the researcher computes (a length of stay from delivered admission and
+  discharge datetimes) is `not-delivered`. Its reason names the delivered inputs.
+
+Criteria hold only what the researcher asked for. A row filter RDL adds on its own initiative (test
+patients, an invalid URN, cancelled admissions) is not a criterion. Record it as an engineer-confirmed
+assumption, reported under "Extraction Assumptions / Important limitations". Do not repeat a criterion
+in that section.
+
+**House default:** `broad-first-pass` is a human ruling that is already recorded. You import it and you
+do not decide it. Like `tuh-facility`, it needs no fresh question when the request is on its first
+pass (no earlier delivery exists for it). When it is not, the default is not applied and
+exclusions get ordinary engineer-confirmed rows. Read it with `recurring-decisions.sh list`. If `list`
+exits 4, stop and import nothing. Follow the refusal path in `${CLAUDE_PLUGIN_ROOT}/skills/setup/references/recurring-decisions.rst`.
+If `broad-first-pass` has no `house_default`, no ruling is recorded, so exclusions get ordinary
+engineer-confirmed rows. Otherwise give each exclusion that the request does not override
+a row with state `not-applied`, `reason` the decision's `proposal.text` and `upstream: {"source": "recurring-decision", "id": "broad-first-pass"}`.
+Copy `confirmed_by` and `confirmed_at` from its `house_default`, set `confirmed_revision` to the import
+revision, and put no `decided` on the row. Invent no other confirmer. Write no assumption or limitation
+for it, and leave inclusions, entry events and data elements alone. Tell the engineer which rows
+you imported, with the recorded decider and date from `house_default.decided`. The engineer may override
+any row before publish. A request that applies an
+exclusion, or an engineer who overrides the default for one criterion, gets the normal row with no
+`upstream`, confirmed afresh. See `${CLAUDE_PLUGIN_ROOT}/skills/setup/references/recurring-decisions.rst`.
+
+After the first delivery the default no longer holds, yet carry-forward keeps its rows, and their
+reason would still say first pass. On the first update after a delivery, walk every row whose `upstream` is `broad-first-pass`
+with the engineer, who re-confirms it: `not-applied` with the engineer's own reason, or the state
+the SQL now gives it. Either way, drop the `upstream`: a fresh confirmation, with no `decided`. The scope
+never carries a first-pass reason into a later release.
+
+Only one scope per repository carries `criteria_status`: the one that owns the request's criteria.
+Another scope in the repository leaves it out. Before publish, check the draft:
+
+```bash
+bash "$S/sqlreview.sh" criteria ".sqlreview/reviews/$SLUG/scope.draft.json"
+# exit 10 → one "<id>\t<field>\t<rule>" per finding, never a value; 2 → operational, stop
+```
+
+Fix each finding and run it again. Publish runs the same check and refuses with exit 4. On the update
+path, `carryforward` lists each unchanged row as `criteria_status` with basis `criteria-unchanged`:
+copy its `set` fields and keep its confirmation. A changed row, a new criterion and a row that gains
+or loses `upstream` are confirmed afresh. A row carries only when the SQL body is unchanged. After
+any SQL body change, `carryforward` puts every row in `walk`. Ask the engineer to confirm or change
+each state, one row at a time, never in bulk. Publish refuses a row that claims a carry.
+
 ## Existing scope → update path (#127 §2)
 
 If `.sqlreview/reviews/$SLUG/scope.json` exists (or `--update`):
 
-For `scoped-header-only` status, inspect the header diff against the authenticated
-`scope.source.sql` and reconcile its notes with the confirmed scope. If only header wording
+For `scoped-header-only` status, inspect the header diff from `delta "$SLUG" scope`
+and reconcile its notes with the confirmed scope. If only header wording
 changed, run the pre-publish header check below with the current shared questions, then
 republish the existing `scope.json` and render it to record a header revision without
 repeating unchanged confirmations or incrementing the semantic revision. Changed item text,
-rationale or framing still follows the update path below. `stale` includes a body change or
-corrupt baseline and requires reassessment.
+rationale or framing still follows the update path below. `stale` is a body change and
+requires reassessment.
 
 1. First inspect locally how the scope itself moved: `git log -p --follow -- .sqlreview/reviews/$SLUG/scope.json`
    when it is tracked (skip silently otherwise). Also inspect `git diff -- <scope path>` and
    `git diff --cached -- <scope path>` for unstaged and staged scope edits.
-2. If the SQL now exists, use `git diff --no-index -- ".sqlreview/reviews/$SLUG/scope.source.sql" "<sql path>"`
-   to inspect changes since the previous bootstrap (exit 1 means changes). Show only the linted
-   explanations, not raw scope/SQL diffs. If the baseline is absent,
-   explicitly say a historical delta is unavailable and do a full reassessment. Read the SQL and compare it with the scope's intent, inputs and outputs —
+2. If the SQL now exists, run `bash "$S/sqlreview.sh" delta "$SLUG" scope` to inspect changes
+   since the previous bootstrap. It reads the scope's SQL with `git show` at its recorded commit
+   (exit 10 means body changes). Show only the linted explanations, not raw scope/SQL diffs. On
+   exit 6, explicitly say a historical delta is unavailable and do a full reassessment. Read the SQL and compare it with the scope's intent, inputs and outputs —
    name each place the SQL does something the scope did not foresee.
 3. Before re-putting intent, inputs and outputs, stage and lint their proposed wording using
    the pre-presentation check above. **Re-put technical implementation of intent, inputs and outputs** to the engineer;
@@ -210,9 +282,9 @@ corrupt baseline and requires reassessment.
    imported upstream items first; changed or removed decisions go to the analyst
    for a recorded answer before dependent work proceeds. Then find which existing items keep
    their confirmation (#348): draft the next revision with each unchanged item's `id`, `text` and
-   `rationale` verbatim and its old `location` lines. When an authenticated `scope.source.sql`
-   exists, compute unchanged ranges first; missing/corrupt baseline means a manual reassessment,
-   not a guessed offset:
+   `rationale` verbatim and its old `location` lines. When git supplies the scope's SQL
+   with its recorded SHA, compute unchanged ranges first. Missing or corrupt evidence means a manual
+   reassessment, not a guessed offset:
 
    ```bash
    bash "$S/sqlreview.sh" remap "$SLUG" ".sqlreview/reviews/$SLUG/scope.draft.json"
@@ -225,7 +297,7 @@ corrupt baseline and requires reassessment.
    ranges (changed, split by an insertion, or ambiguous repeated text) stay untouched; reassess
    their current lines with the human before carryforward. It preserves new/manual ranges and
    is safe to retry. The explicit draft must be directly inside this slug's review directory,
-   not a published JSON or SQL snapshot.
+   not a published JSON.
 
    Copy each `carry` item's `set` fields onto it verbatim; it keeps the confirmation a human gave
    at `confirmed_revision` and is not asked again. Re-run the pre-presentation lint before each `walk` batch,
@@ -270,18 +342,19 @@ engineer stops, leave the draft and write nothing final — say so.
 
 ## SQL that changes during the interview
 
-When the SQL exists, the framing is confirmed *against its bytes*. On confirming intent, inputs
-and outputs, record `fingerprint`'s `sql_sha256` and `sql_body_sha256` in the draft and copy the SQL to
-`.sqlreview/reviews/$SLUG/scope.draft.sql` (guard-exempt working baseline). When the SQL does not
-exist yet, set `sql_sha256` to null.
+When the SQL exists, the framing is confirmed *against its committed bytes*. Commit the SQL first.
+On confirming intent, inputs and outputs, record `fingerprint`'s `sql_sha256`, `sql_body_sha256`,
+`git_commit` and `git_dirty` in the draft. Do not copy SQL under `.sqlreview/`. When the SQL does
+not exist yet, set `sql_sha256` to null.
 
-Before publishing, re-run `fingerprint`. A changed full hash with the same non-null body hash
-is a header revision: inspect and reconcile the notes without reconfirming unchanged items.
-If the body hash differs, is null, or a legacy full hash differs without an authenticated baseline, run `git diff --no-index -- ".sqlreview/reviews/$SLUG/scope.draft.sql" "<sql path>"`
-and, with the hunks in view, re-put intent, inputs and outputs (new or dropped columns, changed
-joins, conversions), plus every item whose `location` lines overlap a hunk or whose text or
-rationale names a changed column, table, filter or conversion. Then refresh `sql_sha256` and
-`scope.draft.sql`. Publish refuses a changed body or corrupt baseline; the full hash remains provenance for the original framing.
+Before publishing, commit any SQL edits and re-run `fingerprint`. A changed full hash with the same
+non-null body hash is a header revision: inspect and reconcile the notes without reconfirming
+unchanged items. If the body hash differs or is null, run
+`git diff "<draft git_commit>" HEAD -- "<sql path>"`. With the hunks in view, re-put intent, inputs
+and outputs: new or dropped columns, changed joins and conversions. Also re-put every item whose
+`location` lines overlap a hunk. Re-put every item whose text or rationale names a changed column,
+table, filter or conversion. Then refresh all `fingerprint` fields. Publish refuses a changed body or SQL that git
+cannot supply. The full hash remains the evidence for the original framing.
 
 Also self-check the confirmed wording before publish:
 
@@ -311,8 +384,8 @@ Write the complete confirmed document to
 {
   "schemaVersion": 2, "kind": "scope", "slug": "<SLUG>", "sql_path": "<intended sql path>",
   "title": "…", "revision": 1, "recorded_at": "<UTC ISO>", "recorded_by": "<user>",
-  "git_commit": "<git rev-parse HEAD or null>", "sql_sha256": "<fingerprint SHA the framing was confirmed against, or null>",
-  "sql_body_sha256": "<fingerprint body SHA, or null>",
+  "git_commit": "<fingerprint git_commit, or null>", "sql_sha256": "<fingerprint SHA the framing was confirmed against, or null>",
+  "sql_body_sha256": "<fingerprint body SHA, or null>", "git_dirty": false,
   "intent": "…",
   "inputs":  [{"name": "schema.table", "description": "one row per …"}],
   "outputs": [{"name": "column", "description": "…"}],
@@ -372,7 +445,8 @@ rules. Known restrictions still apply.
 Re-run comparison after reconciliation. After SQL edits, also re-run fingerprint and the
 SQL-change checks above; changed framing or item wording needs the appropriate reconfirmation.
 Do not publish while a mismatch is unaddressed. If the matches are clean and no header settles
-an open question (including explicitly acknowledged provisional choices), give no warning.
+an open question (including explicitly acknowledged provisional choices),
+there is nothing to report; publish.
 Semantic checking is the agent/source-review obligation, not something `publish` proves.
 
 ```bash
@@ -381,21 +455,16 @@ bash "$S/sqlreview.sh" publish-questions "$SLUG" ".sqlreview/reviews/$SLUG/quest
 ```
 
 Publish validates a staged copy, including confirmations and the next revision, before atomically
-replacing `scope.json`. It re-proves every carried item against the previous `scope.json` and
-`scope.source.sql`; on refusal (the SQL moved on since `carryforward`), re-run it and walk what it
-lists. Never copy or patch the draft directly into the final path.
-After publish succeeds, if SQL exists and the full fingerprint still matches, copy its reviewed bytes to
-`.sqlreview/reviews/$SLUG/scope.source.sql` (separate from analyse’s `source.sql`) and check the
-copy's SHA equals `sql_sha256`; if the copy fails, remove any old scope baseline and report that
-the next bootstrap needs a full reassessment. For a header-only update, retain the authenticated
-original scope baseline; do not overwrite it with new header bytes. If the original baseline is
-unavailable, recover its full-hash-matching bytes or perform a fresh reassessment.
-Preserve the previous revision and increment it on updates.
-
+replacing `scope.json`. It re-proves every carried item against the previous `scope.json` and its
+SQL, read with `git show` at the recorded commit and checked against `sql_sha256`. On refusal (the
+SQL moved on since `carryforward`), re-run it and walk what it lists. Never copy or patch the draft
+directly into the final path. Publish keeps the previous revision at `history/scope/<revision>.json`.
+A header-only update keeps the original full SHA, commit and confirmations, and records the new
+header in `header_revisions`. Preserve the previous revision and increment it on updates.
 
 ```bash
 bash "$S/sqlreview.sh" render "$SLUG" scope || exit $?  # → reviews/<slug>/scope.md (never hand-write it)
-rm -f ".sqlreview/reviews/$SLUG/scope.draft.json" ".sqlreview/reviews/$SLUG/scope.draft.sql"
+bash "$S/sqlreview.sh" discard-draft "$SLUG" scope || exit $?
 ```
 
 

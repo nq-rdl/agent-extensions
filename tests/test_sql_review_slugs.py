@@ -1,8 +1,8 @@
 """Issue 353: readable path-derived slugs, legacy-slug compatibility and one-command migration.
 
 Path-derived slugs keep `_` and `.` literal where that stays unambiguous, so
-`sql/cohort_pipeline/aaa_screening_log.sql` reviews live under
-`reviews/sql__cohort_pipeline__aaa_screening_log/`. Reviews created under the legacy
+`sql/v1/aaa_screening_log.sql` reviews live under
+`reviews/sql__v1__aaa_screening_log/`. Reviews created under the legacy
 encoding (every `_` and `.` percent-escaped) keep validating and working, and
 `move PATH PATH` migrates one to the readable slug without forcing a re-analysis.
 """
@@ -15,9 +15,9 @@ from urllib.parse import quote, unquote
 
 from test_sql_review_scripts import Project, SQL_V1, SQL_V2, review_doc, scope_doc, run
 
-PATH = "sql/cohort_pipeline/aaa_screening_log.sql"
-READABLE = "sql__cohort_pipeline__aaa_screening_log"
-LEGACY = "sql__cohort%5Fpipeline__aaa%5Fscreening%5Flog"
+PATH = "sql/v1/aaa_screening_log.sql"
+READABLE = "sql__v1__aaa_screening_log"
+LEGACY = "sql__v1__aaa%5Fscreening%5Flog"
 
 # Edge cases for the separator, the underscore rule and the dot rule. `x` and `x.sql` are
 # listed together on purpose: stripping `.sql` before encoding already made them collide
@@ -120,6 +120,13 @@ class Encoding(unittest.TestCase):
     def test_slug_and_check_stay_in_lockstep(self):
         paths = [p for p in EDGE_PATHS if p not in SQL_SUFFIX_COLLISION] + ["x", PATH]
         slugs = {p: self.slug(p) for p in paths}
+        # check refuses a quote in sql_path (M2). The slug still encodes, and check names the character rule.
+        for path in [p for p in paths if "'" in p]:
+            with self.subTest(refused=path):
+                r = self.check(slugs[path], path)
+                self.assertEqual(r.returncode, 4)
+                self.assertIn("sql_path must not contain quotes", r.stdout)
+        paths = [p for p in paths if "'" not in p]
         for path in paths:
             with self.subTest(path=path):
                 r = self.check(slugs[path], path)
@@ -140,8 +147,15 @@ class LegacyEncodedReview(unittest.TestCase):
         self.addCleanup(self.tmp.cleanup)
         self.p = Project(self.tmp.name)
         self.p.sql(PATH, SQL_V1)
-        self.p.write_json(LEGACY, "scope.json", scope_doc(LEGACY, PATH))
-        self.p.write_json(LEGACY, "review.json", review_doc(LEGACY, PATH))
+        self.p.commit()
+        fp = json.loads(run(["fingerprint", PATH], self.p.root).stdout)
+        self.p.write_json(LEGACY, "scope.json", scope_doc(LEGACY, **fp))
+        self.p.write_json(LEGACY, "review.json", review_doc(LEGACY, **fp))
+        # Existing legacy copies survive path-only moves; no workflow creates them.
+        d = self.reviews() / LEGACY
+        (d / "source.sql").write_text(SQL_V1)
+        (d / "history").mkdir()
+        (d / "history/1.sql").write_text(SQL_V1)
         self.cmd("snapshot", LEGACY, PATH)
         self.cmd("render", LEGACY, "review")
 
@@ -163,12 +177,15 @@ class LegacyEncodedReview(unittest.TestCase):
         self.cmd("delta", LEGACY)
         # publish a second revision under the legacy slug, snapshot it, then detect a change.
         self.p.sql(PATH, SQL_V2)
-        doc = review_doc(LEGACY, PATH, revision=2, sql_sha256=hashlib.sha256(SQL_V2.encode()).hexdigest())
+        self.p.commit("changed maintained source")
+        fp = json.loads(run(["fingerprint", PATH], self.p.root).stdout)
+        doc = review_doc(LEGACY, revision=2, **fp)
         draft = self.p.write_json(LEGACY, "review.draft.json", doc)
         self.cmd("publish", LEGACY, "review", str(draft))
         self.cmd("snapshot", LEGACY, PATH)
         self.cmd("delta", LEGACY)
         self.p.sql(PATH, SQL_V1)
+        self.p.commit("restored maintained source")
         self.cmd("delta", LEGACY, expected=10)
         self.assertFalse((self.reviews() / READABLE).exists())
 
@@ -204,15 +221,17 @@ class LegacyEncodedReview(unittest.TestCase):
         self.assertEqual(self.rows()[READABLE]["state"], "current")
 
     def test_move_to_another_path_lands_on_readable_slug_and_requires_rebind(self):
-        self.p.sql("sql/next_step/aaa_log.sql", SQL_V1)
-        r = self.cmd("move", PATH, "sql/next_step/aaa_log.sql")
-        self.assertEqual(r.stdout.strip().split("\t"), ["moved", LEGACY, "sql__next_step__aaa_log", "sql/next_step/aaa_log.sql"])
-        self.assertTrue((self.reviews() / "sql__next_step__aaa_log" / "rebind-required").is_file())
+        self.p.sql("sql/v2/aaa_log.sql", SQL_V1)
+        r = self.cmd("move", PATH, "sql/v2/aaa_log.sql")
+        self.assertEqual(r.stdout.strip().split("\t"), ["moved", LEGACY, "sql__v2__aaa_log", "sql/v2/aaa_log.sql"])
+        self.assertTrue((self.reviews() / "sql__v2__aaa_log" / "rebind-required").is_file())
 
     def test_verbose_status_flags_migratable_legacy_slugs(self):
         command = f"sqlreview.sh move '{PATH}' '{PATH}'"
         self.p.sql("reports/monthly.sql", SQL_V1)
-        self.p.write_json("reports__monthly", "review.json", review_doc())
+        self.p.commit("additional maintained source")
+        fp = json.loads(run(["fingerprint", "reports/monthly.sql"], self.p.root).stdout)
+        self.p.write_json("reports__monthly", "review.json", review_doc(**fp))
         text = self.cmd("status", "--verbose").stdout
         legacy_row = next(l for l in text.splitlines() if l.startswith(LEGACY + "\t"))
         self.assertTrue(legacy_row.endswith(f"\tmigrate={command}"), legacy_row)

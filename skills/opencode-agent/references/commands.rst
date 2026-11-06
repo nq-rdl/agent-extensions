@@ -165,7 +165,7 @@ This replaces:
 
 ### Shell output
 
-Use _!`command`_ to inject [bash command](https://opencode.ai/docs/tui/#bash-commands) output into your prompt.
+Use _!`command`_ to inject [bash command](https://opencode.ai/docs/tui/) output into your prompt.
 
 For example, to create a custom command that analyzes test coverage:
 

@@ -12,7 +12,9 @@ the confirmed scope and the `.sqlreview` reviews. These tests pin:
 * the worked example evaluates the named review items after an applicability check, with a
   fictional enquiry number;
 * the helper `release.sh`: `evidence` (does each review apply to the release tag), `check`
-  (the release record's invariants) and `render` (the paste-ready body);
+  (the release record's invariants), `render` (the paste-ready body) and `criteria` (the
+  "Criteria in this release" table of the scaffold's criteria design: previous tag, change values, held reasons and the
+  legacy line);
 * the guard validates a written release record;
 * the `release-*` eval cases, graded in Python always and in Node when it is on PATH.
 
@@ -237,13 +239,126 @@ class SkillContract(unittest.TestCase):
     def test_record_and_render(self):
         for tree in SKILL:
             with self.subTest(tree=tree):
-                text = flat(section(self.body(tree), "## 6. Record and render"))
+                text = flat(section(self.body(tree), "## 7. Record and render"))
                 self.assertIn(".sqlreview/releases/<tag>/release.json", text)
                 self.assertIn('bash "$S/release.sh" check', text)
                 self.assertIn('bash "$S/release.sh" render', text)
                 self.assertIn("The confirmed technical review is not changed", text)
                 self.assertIn("row-level data", text)
                 self.assertIn("paste-ready", text)
+
+    def test_amend_gate_comes_before_any_evidence(self):
+        for tree in SKILL:
+            with self.subTest(tree=tree):
+                body = self.body(tree)
+                self.assertLess(body.index("## 0. Amend gate"), body.index("## 1. Gather the release evidence"))
+                text = flat(section(body, "## 0. Amend gate"))
+                for token in ("`handed off`", "`amendment hand-off:`", "`part:`", "**Completed:**",
+                              "**Withdrawn:**", "`git merge-base --is-ancestor <full SHA> <ref>`",
+                              "stop before step 1", "one or two lines", "Release held:",
+                              "`withdrawn: P3 <reason>`", "Post nothing",
+                              "Never assume that no part is open"):
+                    self.assertIn(token, text)
+
+    def test_amend_gate_accepts_only_the_two_strict_forms(self):
+        # A comment that only names the part, such as "P3 is still in progress", leaves it open.
+        for tree in SKILL:
+            with self.subTest(tree=tree):
+                text = flat(section(self.body(tree), "## 0. Amend gate"))
+                for token in ("`done`, `handed off` or `withdrawn`",
+                              "whose first line has one of two forms closes a handed-off part",
+                              "**Completed:** `done: P<n> <commit>`, from the engineer",
+                              "If the check fails or cannot run, the part stays open",
+                              "**Withdrawn:** `withdrawn: P<n> <reason>`, from the analyst",
+                              "A `withdrawn:` line with no reason leaves the part open",
+                              "Any other comment that names the part leaves it open",
+                              '"P3 is still in progress"',
+                              "say in one line which comment you read",
+                              "with the analyst's own reason", "Do not draft it without a reason"):
+                    self.assertIn(token, text)
+                self.assertNotIn("the engineer says the part is done", text)
+
+    def test_amend_gate_checks_who_wrote_the_close_line(self):
+        # A done: or withdrawn: line closes a part only from the right writer, the same rule as amend.
+        for tree in SKILL:
+            with self.subTest(tree=tree):
+                text = flat(section(self.body(tree), "## 0. Amend gate"))
+                for token in ("Check who wrote the line first",
+                              "skills/setup/references/close-line-authors.rst",
+                              "gh pr view <PR> --json author,assignees,reviewRequests,comments",
+                              "The `done:` line counts only from the engineer",
+                              "the `withdrawn:` line counts only from the analyst",
+                              "A line from anyone else leaves the part open",
+                              "Say who wrote the line and which role was expected"):
+                    self.assertIn(token, text)
+                self.assertLess(text.index("Check who wrote the line first"), text.index("**Completed:**"))
+                self.assertNotIn("skills/amend/SKILL.md", text)
+        amend = flat((REPO / "skills/data-request-amend/SKILL.md").read_text())
+        self.assertIn("skills/setup/references/close-line-authors.rst", amend)
+
+    def test_one_fetch_instruction_is_cited_everywhere(self):
+        amend = flat((REPO / "skills/data-request-amend/SKILL.md").read_text())
+        handoff = flat((REPO / "skills/data-request-triage/references/handoff.rst").read_text())
+        release = flat(section(self.body(), "## 0. Amend gate"))
+        for name, text in (("amend", amend), ("handoff", handoff), ("release", release)):
+            with self.subTest(name):
+                self.assertIn("fetch-command", text)
+                self.assertNotIn("git fetch origin", text)
+        self.assertIn("same fetch as step 0 of the release skill", amend)
+        self.assertIn("A failed fetch does not decide", amend)
+        self.assertIn("name a remote-tracking ref such as `origin/<branch>` or a tag as the release ref", amend)
+        self.assertNotIn("does the same fetch", amend)
+
+    def test_release_sh_runs_no_network_command(self):
+        text = (REPO / "skills/data-request-setup/scripts/release.sh").read_text()
+        for n, line in enumerate(text.splitlines(), 1):
+            if re.search(r"\bgit\b.*\b(fetch|ls-remote|pull|clone|push)\b", line) and not line.lstrip().startswith("#"):
+                self.assertIn("printf", line, f"release.sh:{n} must only print a command: {line}")
+
+    def test_amend_gate_relies_on_the_script_hold(self):
+        # #534: the skill updates amend's record from the strict comments; the script holds.
+        for tree in SKILL:
+            with self.subTest(tree=tree):
+                text = flat(section(self.body(tree), "## 0. Amend gate"))
+                for token in ("`.sqlreview/amendments/<request>.json`", "`release.sh evidence` enforces this",
+                              "Exit 11 means release held: stop before step 1",
+                              "Never edit the record to pass the gate without a strict comment",
+                              "once and keep its JSON for step 1", "Exit 2 means the ref",
+                              "go on to step 1", "`bash \"$S/release.sh\" fetch-command`",
+                              "This is the one fetch instruction", "A fetch never decides the release",
+                              "report the failure to the human", "Do not force the fetch",
+                              "still run evidence below", "does not update a local branch",
+                              "Name a remote-tracking ref or a tag as the release ref"):
+                    self.assertIn(token, text)
+                self.assertLess(text.index("fetch-command"), text.index('evidence "<ref>"'),
+                                "fetch before the evidence run")
+                self.assertNotIn("fetches once", text)
+                self.assertNotIn("git fetch", text, "the command comes from fetch-command only")
+                self.assertNotIn("and stop", text.split("A fetch never decides")[1].split("evidence below")[0])
+        text = flat(section(self.body(), "## 1. Gather the release evidence"))
+        self.assertIn("Step 0 already ran this, so reuse its JSON", text)
+        amend = flat((REPO / "skills/data-request-amend/SKILL.md").read_text())
+        self.assertIn("set the entry again after each write of the record, with its new SHA-256", amend)
+        self.assertIn("A single-part amendment writes no record", amend)
+        self.assertIn("`.sqlreview/amendments/<request>.json`", amend)
+        self.assertIn("`release.sh evidence` reads this file and holds the release", amend)
+
+    def test_candidate_ref_comes_from_the_tags_before_asking(self):
+        for text in self.each():
+            self.assertIn("work it out before you ask", text)
+            self.assertIn("**Release state from evidence**", text)
+            self.assertIn("Count only the tags that come after the newest tag with an `approved` record", text)
+            self.assertIn("A tag with no record before that tag is a legacy tag: ignore it", text)
+            self.assertIn("When exactly one tag qualifies, use it and say so in one line", text)
+            self.assertIn("Ask when no tag or more than one tag qualifies", text)
+            self.assertIn("that named ref is the candidate: never replace it with a tag", text)
+            self.assertNotIn("If none is given, ask for it.", text)
+
+    def test_send_back_adds_the_release_claims(self):
+        for text in self.each():
+            self.assertIn("with its completeness check", text)
+            self.assertIn("`release ref: <tag or candidate ref>`", text)
+            self.assertIn("`release claims:", text)
 
     def test_worked_example_is_linked(self):
         for text in self.each():
@@ -269,6 +384,180 @@ class WorkedExample(unittest.TestCase):
                        "blocking discrepancy"):
             self.assertIn(phrase, text)
         self.assertIn("THHSAQUIRE-99", text, "use the fictional 9xxx range")
+
+
+class CriteriaTableSkill(unittest.TestCase):
+    """The scaffold's criteria design: the skill's criteria-table step, in every tree."""
+
+    HEADING = "## 6. Criteria in this release"
+
+    def step(self, tree):
+        return flat(section(frontmatter(SKILL[tree])[1], self.HEADING))
+
+    def test_step_sits_between_the_decisions_and_the_record(self):
+        for tree in SKILL:
+            with self.subTest(tree=tree):
+                body = frontmatter(SKILL[tree])[1]
+                self.assertLess(body.index("## 5. The analyst decides each claim"), body.index(self.HEADING))
+                self.assertLess(body.index(self.HEADING), body.index("## 7. Record and render"))
+
+    def test_describes_the_table_and_its_placement(self):
+        for tree in SKILL:
+            with self.subTest(tree=tree):
+                text = self.step(tree)
+                self.assertIn("`## Criteria in this release`", text)
+                self.assertIn("before **Extraction Assumptions / Important limitations**", text)
+                for column in ("ID", "Researcher's request", "This release", "Change since <previous tag>"):
+                    self.assertIn(column, text)
+                self.assertIn("entry event, inclusions, exclusions, data elements", text)
+                self.assertIn("`rows`", text)
+                self.assertIn("`criteria` object", text)
+
+    def test_fingerprints_come_from_the_validator_run_by_the_agent(self):
+        for tree in SKILL:
+            with self.subTest(tree=tree):
+                text = self.step(tree)
+                self.assertIn("`git show <tag>:answers.yaml`", text)
+                self.assertIn("temporary directory", text)
+                self.assertIn("beside it", text)
+                self.assertIn("pixi run python scripts/validate_answers.py", text)
+                self.assertIn("data-analysis-scaffold validate-answers", text)
+                self.assertIn("--fingerprints", text)
+                self.assertIn('bash "$S/release.sh" criteria "<tag>" --fingerprints', text)
+                self.assertIn("--answers-invalid", text)
+                self.assertNotIn("non-zero", text)
+                # Only a validation failure holds the table as answers-invalid (validate-answers contract).
+                for token in ("the child script's exit 3", "the generator CLI's exit 1 after it prints its "
+                              "`✗ <path>: N problem(s)` report", "Any other failure is not a verdict on the answers",
+                              "exit 2", "an older child that rejects `--fingerprints`",
+                              "when it cannot prepare the environment", "Stop and report it",
+                              "do not hold the table as `answers-invalid`"):
+                    self.assertIn(token, text)
+                self.assertIn("`release.sh` runs no Python and never runs the validator", text)
+                self.assertIn("`fingerprints-unchecked`", text)
+
+    def test_previous_tag_rule(self):
+        for tree in SKILL:
+            with self.subTest(tree=tree):
+                text = self.step(tree)
+                self.assertIn("`previous_tag`", text)
+                self.assertIn("greatest earlier stable `X.Y.Z` release whose record is in the tag's tree", text)
+                self.assertIn("never a prerelease, a later tag or the working tree", text)
+                self.assertIn("header reads `Change`", text)
+
+    def test_analyst_decides_each_row_on_the_note_only(self):
+        for tree in SKILL:
+            with self.subTest(tree=tree):
+                text = self.step(tree)
+                for option in ("**Accept (Recommended)**", "**Reword**", "**Reject**"):
+                    self.assertIn(option, text)
+                self.assertIn("`proposed_note`", text)
+                self.assertIn("`final_note`", text)
+                self.assertIn("The researcher's wording is never editable", text)
+                self.assertIn("Do not reword `text`", text)
+                self.assertIn("decisions carry over while the proposed note is unchanged", text)
+                self.assertIn("`decided_by`", text)
+
+    def test_rejection_goes_back_to_the_engineer_and_holds(self):
+        for tree in SKILL:
+            with self.subTest(tree=tree):
+                text = self.step(tree)
+                self.assertIn("`note-rejected:<id>`", text)
+                self.assertIn("back to the engineer", text)
+                self.assertIn("fix the scope", text)
+                self.assertIn('re-run `release.sh criteria`', text)
+                self.assertIn("never drops the row", text)
+
+    def test_a_rejection_is_recorded_by_rerunning_criteria_and_embedding_its_object(self):
+        for tree in SKILL:
+            with self.subTest(tree=tree):
+                text = self.step(tree)
+                self.assertIn("write the record with the row `rejected`, then re-run "
+                              "`release.sh criteria` with the same fingerprints file", text)
+                self.assertIn("embed the object it prints", text)
+                self.assertIn("rejected row fails `release.sh check` unless the embedded table is held "
+                              "with `note-rejected:<id>`", text)
+        for tree, path in EXAMPLE.items():
+            with self.subTest(tree=tree, file="example"):
+                text = flat(path.read_text())
+                self.assertIn("re-runs ``release.sh criteria v1.1.0 --fingerprints fp.json`` and embeds the "
+                              "object it prints", text)
+
+    def test_answers_invalid_goes_to_the_engineer_not_the_analyst(self):
+        for tree in SKILL:
+            with self.subTest(tree=tree):
+                text = self.step(tree)
+                self.assertIn("`answers-invalid` means the tag's `answers.yaml` failed validation", text)
+                self.assertIn("the tag cannot change", text)
+                self.assertIn("needs an engineer or intake fix and a new tag", text)
+                self.assertNotIn("the analyst fixes `answers-invalid`", text)
+
+    def test_held_table_is_never_presented_as_final(self):
+        for tree in SKILL:
+            with self.subTest(tree=tree):
+                text = self.step(tree)
+                self.assertIn("exit 10", text)
+                for reason in ("no-owning-scope", "review-stale", "state-missing:<id>", "fingerprint-mismatch:<field>",
+                               "owning-scope-ambiguous", "note-rejected:<id>", "answers-invalid",
+                               "fingerprints-unchecked"):
+                    self.assertIn(f"`{reason}`", text)
+                self.assertIn("`Criteria table held: <reasons>`", text)
+                self.assertIn("fails `release.sh check` only when the record is `approved`", text)
+                self.assertIn("keep the record `draft`", text)
+                self.assertIn("never present a held table as final", text)
+
+    def test_no_owning_scope_goes_to_the_engineer_through_bootstrap(self):
+        for tree in SKILL:
+            with self.subTest(tree=tree):
+                text = self.step(tree)
+                self.assertIn("`no-owning-scope` means the tag's sidecar itemises live criteria but no scope "
+                              "carries their states", text)
+                self.assertIn("run `/data-request:bootstrap` to record criteria states", text)
+                self.assertIn("never \"not itemised\"", text)
+                self.assertIn("`release.sh check` rejects an approved record without a criteria table", text)
+
+    def test_criterion_claims_stay_out_of_the_limitations(self):
+        for tree in SKILL:
+            with self.subTest(tree=tree):
+                text = self.step(tree)
+                self.assertIn("Never repeat a criterion in the limitations", text)
+                self.assertIn("a scope source whose `item` is a criterion id", text)
+                self.assertIn("hidden from the draft body", text)
+                self.assertIn("still blocks approval", text)
+                self.assertIn("resolve those claims too", text)
+
+    def test_legacy_repository_gets_the_one_line(self):
+        for tree in SKILL:
+            with self.subTest(tree=tree):
+                text = self.step(tree)
+                self.assertIn("`Criteria are not itemised for this request.`", text)
+                self.assertIn("prints `null`", text)
+                self.assertIn("the rest of the body is unchanged", text)
+                self.assertIn("With no sidecar, a schema 1 sidecar, or a schema 2 sidecar with no live criterion "
+                              "and no scope carrying criteria states", text)
+                self.assertNotIn("or no owning scope", text)
+
+    def test_record_shape_carries_the_criteria_object(self):
+        for tree in SKILL:
+            with self.subTest(tree=tree):
+                text = flat(section(frontmatter(SKILL[tree])[1], "## 7. Record and render"))
+                self.assertIn('"criteria"', text)
+                self.assertIn("`held_reasons`", text)
+
+    def test_worked_example_walks_the_table(self):
+        for tree, path in EXAMPLE.items():
+            with self.subTest(tree=tree):
+                text = flat(path.read_text())
+                self.assertIn("Criteria in this release", text)
+                self.assertIn("git show v1.1.0:answers.yaml", text)
+                self.assertIn("--fingerprints", text)
+                self.assertIn("`note-rejected:E2`", text)
+                self.assertIn("Criteria table held", text)
+                self.assertIn("Criteria are not itemised for this request.", text)
+                self.assertIn("THHSAQUIRE-99", text)
+                self.assertIn("``Criteria table held: no-owning-scope, state-missing:N1", text)
+                self.assertIn("Had it exited 3", text)
+                self.assertNotIn("non-zero", text)
 
 
 # --- helper: evidence -----------------------------------------------------------------------
@@ -320,7 +609,6 @@ class Project:
     def review(self, sql, slug=SLUG, sql_path=SQL_PATH):
         d = self.root / ".sqlreview/reviews" / slug
         d.mkdir(parents=True, exist_ok=True)
-        (d / "source.sql").write_text(sql)
         doc = {"schemaVersion": 2, "kind": "review", "slug": slug, "sql_path": sql_path,
                "title": "Falls", "revision": 2, "recorded_at": "2026-09-28T00:00:00Z",
                "recorded_by": "engineer-login",
@@ -422,7 +710,7 @@ class Evidence(unittest.TestCase):
         self.assertEqual(r.returncode, 0, r.stderr)
         self.assertEqual(self.only(r)[1]["applies"], "header-only")
 
-    def test_body_evidence_keeps_full_hash_and_refuses_corrupt_snapshot(self):
+    def test_body_evidence_keeps_full_hash_and_authenticates_recorded_source(self):
         path = self.p.root / ".sqlreview/reviews" / SLUG / "review.json"
         doc = json.loads(path.read_text())
         body = hashlib.sha256(SQL_V1.split("*/\n", 1)[1].encode()).hexdigest()
@@ -437,8 +725,11 @@ class Evidence(unittest.TestCase):
         self.assertEqual(row["sql_body_sha256_reviewed"], body)
         self.assertEqual(row["sql_body_sha256_at_ref"], body)
         self.assertNotEqual(row["sql_sha256_reviewed"], row["sql_sha256_at_ref"])
-        self.p.write(f".sqlreview/reviews/{SLUG}/source.sql", SQL_HEADER)
-        self.assertEqual(self.only(self.p.evidence("v1.0.0"))[1]["applies"], "changed")
+        doc["sql_sha256"] = "0" * 64
+        path.write_text(json.dumps(doc))
+        result = self.p.evidence("v1.0.0")
+        self.assertEqual(result.returncode, 10, result.stderr)
+        self.assertEqual(self.only(result)[1]["applies"], "unavailable")
 
     def test_review_of_draft_sql_absent_from_the_release(self):
         # SQL-only review on a branch; the release is cut from a pipeline without that file.
@@ -550,6 +841,664 @@ def record(**over):
                         "resolved_by": "analyst-login", "resolved_at": "2026-09-28T01:00:00Z"}]}
     d.update(over)
     return d
+
+
+CANARY = "LEAK-CANARY-9177"
+
+
+@unittest.skipUnless(shutil.which("jq") and shutil.which("git"), "release.sh needs jq and git")
+class AmendGate(unittest.TestCase):
+    """#534: `evidence` reads amend's record and holds (exit 11) while a part is handed off.
+
+    The hold names part ids, the file and the field only: never part text, reasons or values.
+    """
+
+    RECORD = ".sqlreview/amendments/enq9177-falls.json"
+
+    def setUp(self):
+        self.tmp = tempfile.TemporaryDirectory()
+        self.addCleanup(self.tmp.cleanup)
+        self.p = Project(self.tmp.name)
+        self.p.tag("v1.0.0")
+        self.head = git(self.p.root, "rev-parse", "HEAD")
+        # Evidence reads local refs only. The origin gives the tests a remote-tracking ref to read.
+        self.remote = tempfile.TemporaryDirectory()
+        self.addCleanup(self.remote.cleanup)
+        git(Path(self.remote.name), "init", "-q", "--bare")
+        git(self.p.root, "remote", "add", "origin", self.remote.name)
+        git(self.p.root, "push", "-q", "origin", "main", "--tags")
+
+    def record(self, parts, **extra):
+        doc = {"schemaVersion": 1, "kind": "amendment", "enquiry": "THHSRDLENQ-9177", "parts": parts}
+        doc.update(extra)
+        self.p.write(self.RECORD, json.dumps(doc))
+
+    def part(self, id_, status, **fields):
+        return {"id": id_, "status": status, "text": f"{CANARY} change {id_}", **fields}
+
+    def assert_no_leak(self, r):
+        self.assertNotIn(CANARY, r.stdout + r.stderr)
+        self.assertNotIn("THHSRDLENQ-9177", r.stderr)
+
+    def test_handed_off_part_holds_and_names_the_part(self):
+        self.record([self.part("P1", "done", commit=self.head),
+                     self.part("P2", "handed off", hand_off=f"draft, not posted {CANARY}")])
+        r = self.p.evidence("v1.0.0")
+        self.assertEqual(r.returncode, 11, r.stderr)
+        self.assertIn("release held: amend part handed off and open: P2", r.stderr)
+        self.assertNotIn("P1", r.stderr.splitlines()[0])
+        # The next line names the real part id, not a P<n> placeholder (N2).
+        self.assertIn("next: the engineer comments done: P2 <commit> or the analyst comments withdrawn: P2 <reason>",
+                      r.stderr)
+        self.assertNotIn("P<n>", r.stderr)
+        self.assertLessEqual(len(r.stderr.strip().splitlines()), 2, r.stderr)
+        self.assertEqual(json.loads(r.stdout)["reviews"][0]["applies"], "current")
+        self.assert_no_leak(r)
+
+    def test_each_open_part_gets_its_own_next_line_with_its_id(self):
+        self.record([self.part("P1", "handed off"), self.part("P4", "handed off")])
+        r = self.p.evidence("v1.0.0")
+        self.assertEqual(r.returncode, 11, r.stderr)
+        nexts = [line for line in r.stderr.splitlines() if line.startswith("next:")]
+        self.assertEqual(len(nexts), 2, r.stderr)
+        self.assertIn("done: P1 <commit>", nexts[0])
+        self.assertIn("withdrawn: P4 <reason>", nexts[1])
+        self.assertNotIn("P<n>", r.stderr)
+        self.assert_no_leak(r)
+
+    def test_every_part_done_passes(self):
+        self.record([self.part("P1", "done", commit=self.head), self.part("P2", "done", commit=self.head[:7])])
+        r = self.p.evidence("v1.0.0")
+        self.assertEqual(r.returncode, 0, r.stderr)
+        self.assertEqual(r.stderr, "")
+
+    def test_withdrawn_part_passes(self):
+        self.record([self.part("P1", "done", commit=self.head),
+                     self.part("P2", "withdrawn", reason=f"{CANARY} requester no longer needs it")])
+        r = self.p.evidence("v1.0.0")
+        self.assertEqual(r.returncode, 0, r.stderr)
+        self.assert_no_leak(r)
+
+    def test_no_record_passes(self):
+        r = self.p.evidence("v1.0.0")
+        self.assertEqual(r.returncode, 0, r.stderr)
+
+    def test_done_commit_outside_the_ref_holds(self):
+        self.p.write("late.txt", "x")
+        self.p.commit("engineer change after the tag")
+        late = git(self.p.root, "rev-parse", "HEAD")
+        self.record([self.part("P3", "done", commit=late)])
+        r = self.p.evidence("v1.0.0")
+        self.assertEqual(r.returncode, 11, r.stderr)
+        # The whole stderr: one hold line and exactly one next line, with no fetch advice, because
+        # the commit is here and a fetch cannot put it in the ref (#534).
+        self.assertEqual(r.stderr.splitlines(), [
+            "release held: amend part done by a commit not in v1.0.0: P3",
+            "next: P3 is done by a commit outside v1.0.0: release from a ref that contains the commit, "
+            "or the engineer comments done: P3 <commit> with a commit in v1.0.0"], r.stderr)
+        self.assertNotIn("fetch", r.stderr)
+        self.assertNotIn("P<n>", r.stderr)
+        self.assertEqual(self.p.evidence("HEAD").returncode, 0)
+
+    def test_each_stale_part_gets_exactly_one_next_line_with_its_own_id(self):
+        self.p.write("late.txt", "x")
+        self.p.commit("engineer change after the tag")
+        late = git(self.p.root, "rev-parse", "HEAD")
+        self.record([self.part("P2", "done", commit=late), self.part("P5", "done", commit=late),
+                     self.part("P6", "done", commit=self.head)])
+        r = self.p.evidence("v1.0.0")
+        self.assertEqual(r.returncode, 11, r.stderr)
+        lines = r.stderr.splitlines()
+        self.assertEqual(len(lines), 3, r.stderr)
+        self.assertEqual(lines[0], "release held: amend part done by a commit not in v1.0.0: P2 P5")
+        nexts = [line for line in lines if line.startswith("next:")]
+        self.assertEqual(len(nexts), 2, r.stderr)
+        self.assertTrue(nexts[0].startswith("next: P2 is done by a commit outside v1.0.0:"), nexts[0])
+        self.assertTrue(nexts[0].endswith("done: P2 <commit> with a commit in v1.0.0"), nexts[0])
+        self.assertTrue(nexts[1].startswith("next: P5 is done by a commit outside v1.0.0:"), nexts[1])
+        self.assertTrue(nexts[1].endswith("done: P5 <commit> with a commit in v1.0.0"), nexts[1])
+
+    def test_a_local_branch_behind_its_upstream_says_so_without_a_network_call(self):
+        # The commit is here, but the local main is behind origin/main, so the commit is not in main.
+        # A fetch moves origin/main and never main, so the line says to fast-forward or to use origin/main.
+        pushed = self.push_from_another_clone()
+        git(self.p.root, "fetch", "-q", "origin")
+        git(self.p.root, "branch", "-q", "-u", "origin/main", "main")
+        self.record([self.part("P3", "done", commit=pushed)])
+        r = self.p.evidence("main")
+        self.assertEqual(r.returncode, 11, r.stderr)
+        self.assertEqual(r.stderr.splitlines(), [
+            "release held: amend part done by a commit not in main: P3",
+            "next: P3 is done by a commit outside main: release from a ref that contains the commit, "
+            "or the engineer comments done: P3 <commit> with a commit in main",
+            "next: main is behind its upstream: fast-forward it, or release from the remote-tracking ref "
+            "(such as origin/main), then run evidence again"], r.stderr)
+        self.assertEqual(self.p.evidence("origin/main").returncode, 0)
+        git(self.p.root, "merge", "-q", "--ff-only", "origin/main")
+        self.assertEqual(self.p.evidence("main").returncode, 0)
+
+    def test_a_tag_that_does_not_contain_the_commit_gets_no_behind_line(self):
+        self.p.write("late.txt", "x")
+        self.p.commit("engineer change after the tag")
+        self.record([self.part("P3", "done", commit=git(self.p.root, "rev-parse", "HEAD"))])
+        self.assertNotIn("behind", self.p.evidence("v1.0.0").stderr)
+
+    def push_from_another_clone(self):
+        other = Path(self.tmp.name).parent / f"{Path(self.tmp.name).name}-other"
+        self.addCleanup(shutil.rmtree, other, True)
+        git(Path(self.tmp.name).parent, "clone", "-q", "-b", "main", self.remote.name, str(other))
+        git(other, "config", "user.email", "t@example.org")
+        git(other, "config", "user.name", "T")
+        (other / "pushed.txt").write_text("x")
+        git(other, "add", "pushed.txt")
+        git(other, "commit", "-q", "-m", "engineer change")
+        pushed = git(other, "rev-parse", "HEAD")
+        git(other, "push", "-q", "origin", "HEAD:main")
+        return pushed
+
+    def fetch_command(self, *env_args):
+        return run(RELEASE, ["fetch-command"], self.p.root)
+
+    def fetch_line(self, remote, root=None):
+        # The printed form: the project root single-quoted after -C, then the remote.
+        return f"git -C '{root or self.p.root}' fetch --tags {remote}\n"
+
+    def push_tag_from_another_clone(self, tag):
+        other = Path(self.tmp.name).parent / f"{Path(self.tmp.name).name}-tag"
+        self.addCleanup(shutil.rmtree, other, True)
+        git(Path(self.tmp.name).parent, "clone", "-q", "-b", "main", self.remote.name, str(other))
+        git(other, "tag", tag)
+        git(other, "push", "-q", "origin", tag)
+
+    def test_fetch_command_names_another_project_root_and_fetches_into_it(self):
+        # SQLREVIEW_ROOT points outside the caller's directory. The printed command still fetches there.
+        self.push_tag_from_another_clone("v9.9.9")
+        unrelated = tempfile.mkdtemp()
+        self.addCleanup(shutil.rmtree, unrelated, True)
+        r = run(RELEASE, ["fetch-command"], unrelated, env={"SQLREVIEW_ROOT": str(self.p.root)})
+        self.assertEqual((r.returncode, r.stdout, r.stderr), (0, self.fetch_line("origin"), ""))
+        self.assertIn("-C '", r.stdout)
+        self.assertNotIn(unrelated, r.stdout)
+        self.assertEqual(git(self.p.root, "tag", "--list", "v9.9.9"), "")
+        done = subprocess.run(["bash", "-c", r.stdout], cwd=unrelated, env=clean_env(), capture_output=True,
+                              text=True)
+        self.assertEqual(done.returncode, 0, done.stderr)
+        self.assertEqual(git(self.p.root, "tag", "--list", "v9.9.9"), "v9.9.9")
+
+    def test_fetch_command_quotes_a_root_with_a_space_and_a_single_quote(self):
+        self.push_tag_from_another_clone("v9.9.8")
+        odd = Path(tempfile.mkdtemp()) / "my project's root"
+        self.addCleanup(shutil.rmtree, odd.parent, True)
+        shutil.copytree(self.p.root, odd, symlinks=True)
+        unrelated = tempfile.mkdtemp()
+        self.addCleanup(shutil.rmtree, unrelated, True)
+        r = run(RELEASE, ["fetch-command"], unrelated, env={"SQLREVIEW_ROOT": str(odd)})
+        self.assertEqual(r.returncode, 0, r.stderr)
+        self.assertEqual(r.stdout, f"git -C '{odd.parent}/my project'\\''s root' fetch --tags origin\n")
+        done = subprocess.run(["bash", "-c", r.stdout], cwd=unrelated, env=clean_env(), capture_output=True,
+                              text=True)
+        self.assertEqual(done.returncode, 0, done.stderr)
+        self.assertEqual(git(odd, "tag", "--list", "v9.9.8"), "v9.9.8")
+
+    def test_fetch_command_single_quotes_a_remote_name_that_percent_q_would_escape(self):
+        # printf %q escapes $ ; and ' differently from one Bash version to the next. The remote is
+        # single-quoted like the root, and the printed command runs as it stands.
+        odd = "up$stream;x'y"
+        git(self.p.root, "remote", "rename", "origin", odd)
+        r = self.fetch_command()
+        self.assertEqual(r.returncode, 0, r.stderr)
+        self.assertEqual(r.stdout, f"git -C '{self.p.root}' fetch --tags 'up$stream;x'\\''y'\n")
+        self.assertNotIn("\\$", r.stdout)
+        done = subprocess.run(["bash", "-c", r.stdout], cwd=self.p.root, env=clean_env(), capture_output=True,
+                              text=True)
+        self.assertEqual(done.returncode, 0, done.stderr)
+
+    def test_fetch_command_prefers_origin(self):
+        git(self.p.root, "remote", "add", "aaa", self.remote.name)
+        r = self.fetch_command()
+        self.assertEqual((r.returncode, r.stdout, r.stderr), (0, self.fetch_line("origin"), ""))
+
+    def test_fetch_command_uses_the_only_remote_when_it_is_not_origin(self):
+        git(self.p.root, "remote", "rename", "origin", "upstream")
+        r = self.fetch_command()
+        self.assertEqual((r.returncode, r.stdout, r.stderr), (0, self.fetch_line("upstream"), ""))
+        self.record([self.part("P3", "done", commit=self.head)])
+        self.assertEqual(self.p.evidence("v1.0.0").returncode, 0)
+        # The printed command runs as it stands and moves the remote-tracking ref.
+        pushed = self.push_from_another_clone()
+        self.record([self.part("P3", "done", commit=pushed)])
+        self.assertEqual(self.p.evidence("upstream/main").returncode, 11)
+        self.assertEqual(subprocess.run(["bash", "-c", r.stdout], cwd=self.p.root, env=clean_env(),
+                                        capture_output=True).returncode, 0)
+        self.assertEqual(self.p.evidence("upstream/main").returncode, 0)
+
+    def test_fetch_command_takes_the_first_remote_when_there_is_no_origin(self):
+        git(self.p.root, "remote", "rename", "origin", "zeta")
+        git(self.p.root, "remote", "add", "beta", self.remote.name)
+        self.assertEqual(self.fetch_command().stdout, self.fetch_line("beta"))
+
+    def test_no_remote_says_to_skip_the_fetch_and_a_local_ancestor_verifies(self):
+        git(self.p.root, "remote", "remove", "origin")
+        r = self.fetch_command()
+        self.assertEqual((r.returncode, r.stderr), (0, ""))
+        self.assertEqual(r.stdout, "# no remote is configured: skip the fetch and say so\n")
+        # The comment is safe to run as it stands.
+        self.assertEqual(subprocess.run(["bash", "-c", r.stdout], capture_output=True).returncode, 0)
+        self.record([self.part("P3", "done", commit=self.head)])
+        self.assertEqual(self.p.evidence("v1.0.0").returncode, 0)
+
+    def test_no_remote_hint_says_there_is_nothing_to_fetch(self):
+        git(self.p.root, "remote", "remove", "origin")
+        self.record([self.part("P3", "done", commit="0123456789abcdef0123456789abcdef01234567")])
+        r = self.p.evidence("v1.0.0")
+        self.assertEqual(r.returncode, 11, r.stderr)
+        self.assertEqual(r.stderr.splitlines()[1:], [
+            "next: the commit of P3 is missing here or does not resolve: no remote is configured, so fetch "
+            "nothing: check that the commit is in this clone, then run evidence again"], r.stderr)
+
+    def test_a_fetch_that_refuses_to_clobber_a_moved_tag_does_not_stop_evidence(self):
+        # The fetch is best effort. Git refuses to move a local tag, so the printed command fails,
+        # and evidence still verifies a part whose commit is a local ancestor of the ref.
+        self.record([self.part("P3", "done", commit=self.head)])
+        other = Path(self.tmp.name).parent / f"{Path(self.tmp.name).name}-moved"
+        self.addCleanup(shutil.rmtree, other, True)
+        git(Path(self.tmp.name).parent, "clone", "-q", "-b", "main", self.remote.name, str(other))
+        git(other, "config", "user.email", "t@example.org")
+        git(other, "config", "user.name", "T")
+        (other / "moved.txt").write_text("x")
+        git(other, "add", "moved.txt")
+        git(other, "commit", "-q", "-m", "move the tag")
+        git(other, "tag", "-f", "v1.0.0")
+        git(other, "push", "-q", "-f", "origin", "v1.0.0")
+        cmd = self.fetch_command().stdout
+        fetch = subprocess.run(["bash", "-c", cmd], cwd=self.p.root, env=clean_env(), capture_output=True,
+                               text=True)
+        self.assertNotEqual(fetch.returncode, 0, "the fetch must refuse to clobber the tag")
+        self.assertIn("would clobber existing tag", fetch.stderr)
+        self.assertNotIn("--force", cmd)
+        r = self.p.evidence("v1.0.0")
+        self.assertEqual(r.returncode, 0, r.stderr)
+        self.assertEqual(r.stderr, "")
+        self.assertEqual(git(self.p.root, "rev-parse", "v1.0.0"), self.head, "the local tag stays put")
+
+    def assert_unverified(self, r, part="P3"):
+        self.assertEqual(r.returncode, 11, r.stderr)
+        fetch = self.fetch_line("origin").strip()
+        self.assertIn(f"commit is not verified (rev-parse or merge-base did not succeed): {part}", r.stderr)
+        self.assertEqual(r.stderr.splitlines()[1:], [
+            f"next: the commit of {part} is missing here or does not resolve: run {fetch}, "
+            "then run evidence again"], r.stderr)
+        self.assertNotIn("not in v1.0.0", r.stderr)
+        self.assertNotIn("P<n>", r.stderr)
+        self.assert_no_leak(r)
+
+    def test_a_local_ancestor_verifies_even_when_the_remote_is_unreachable(self):
+        # Evidence reads local refs only: the broken remote is never contacted.
+        self.record([self.part("P3", "done", commit=self.head)])
+        git(self.p.root, "remote", "set-url", "origin", str(Path(self.tmp.name) / "no-such-remote"))
+        r = self.p.evidence("v1.0.0")
+        self.assertEqual(r.returncode, 0, r.stderr)
+        self.assertEqual(r.stderr, "")
+
+    def test_a_commit_absent_locally_holds_and_says_to_fetch_then_run_evidence_again(self):
+        self.record([self.part("P3", "done", commit="0123456789abcdef0123456789abcdef01234567")])
+        r = self.p.evidence("v1.0.0")
+        self.assert_unverified(r)
+
+    def test_an_ambiguous_short_sha_holds(self):
+        # Two commits share a seven-digit prefix, so the short SHA resolves to no single commit.
+        prefix = self.ambiguous_prefix()
+        self.record([self.part("P3", "done", commit=prefix)])
+        self.assert_unverified(self.p.evidence("v1.0.0"))
+
+    def ambiguous_prefix(self):
+        # Build two real commits whose ids share a seven-digit prefix, with the hash that this
+        # repository uses (SHA-1 or SHA-256). The search is bounded.
+        fmt = subprocess.run(["git", "rev-parse", "--show-object-format"], cwd=self.p.root,
+                             capture_output=True, text=True, env=clean_env())
+        algo = fmt.stdout.strip() if fmt.returncode == 0 and fmt.stdout.strip() else "sha1"
+        self.assertIn(algo, ("sha1", "sha256"))
+        tree = subprocess.run(["git", "hash-object", "-t", "tree", "-w", "--stdin"], cwd=self.p.root, input="",
+                              capture_output=True, text=True, check=True, env=clean_env()).stdout.strip()
+        seen = {}
+        for n in range(600000):
+            body = (f"tree {tree}\nauthor t <t@example> {1700000000 + n} +0000\n"
+                    f"committer t <t@example> {1700000000 + n} +0000\n\nambiguous {n}\n").encode()
+            sha = hashlib.new(algo, b"commit %d\0" % len(body) + body).hexdigest()
+            if sha[:7] in seen:
+                for other in (seen[sha[:7]], body):
+                    subprocess.run(["git", "hash-object", "-t", "commit", "-w", "--stdin"], cwd=self.p.root,
+                                   input=other.decode(), capture_output=True, text=True, check=True,
+                                   env=clean_env())
+                # Prove the prefix is ambiguous for git itself, so a regression cannot pass by luck.
+                probe = subprocess.run(["git", "rev-parse", "--verify", "--quiet", sha[:7] + "^{commit}"],
+                                       cwd=self.p.root, capture_output=True, text=True, env=clean_env())
+                self.assertNotEqual(probe.returncode, 0, "the prefix must resolve to no single commit")
+                return sha[:7]
+            seen[sha[:7]] = body
+        self.fail("no two commits share a seven-digit prefix")
+
+    def test_a_remote_tracking_ref_is_read_as_it_is_until_the_human_fetches(self):
+        # origin/main moves on the remote. Evidence reads the local copy, so the new commit holds the
+        # release. After the human fetches, the same evidence run verifies it.
+        other = Path(self.tmp.name).parent / f"{Path(self.tmp.name).name}-other"
+        self.addCleanup(shutil.rmtree, other, True)
+        git(Path(self.tmp.name).parent, "clone", "-q", "-b", "main", self.remote.name, str(other))
+        git(other, "config", "user.email", "t@example.org")
+        git(other, "config", "user.name", "T")
+        (other / "engineer.txt").write_text("x")
+        git(other, "add", "engineer.txt")
+        git(other, "commit", "-q", "-m", "engineer change")
+        pushed = git(other, "rev-parse", "HEAD")
+        git(other, "push", "-q", "origin", "HEAD:main")
+        self.record([self.part("P3", "done", commit=pushed)])
+        r = self.p.evidence("origin/main")
+        self.assert_unverified(r)
+        self.assertEqual(json.loads(r.stdout)["commit"], self.head)
+        git(self.p.root, "fetch", "-q", "--tags", "origin")
+        r = self.p.evidence("origin/main")
+        self.assertEqual(r.returncode, 0, r.stderr)
+        self.assertEqual(json.loads(r.stdout)["commit"], pushed)
+
+    def test_a_local_remote_tracking_ref_verifies_a_local_ancestor(self):
+        self.record([self.part("P3", "done", commit=self.head)])
+        r = self.p.evidence("origin/main")
+        self.assertEqual(r.returncode, 0, r.stderr)
+        self.assertEqual(json.loads(r.stdout)["commit"], self.head)
+
+    def test_evidence_makes_no_network_call(self):
+        # A git wrapper on PATH fails and logs every network subcommand. Evidence must not call one.
+        real = shutil.which("git")
+        wrap = Path(self.tmp.name).parent / f"{Path(self.tmp.name).name}-gitwrap"
+        wrap.mkdir()
+        self.addCleanup(shutil.rmtree, wrap, True)
+        calls = wrap / "calls.log"
+        script = wrap / "git"
+        # Any argument that names a network subcommand blocks the call, wherever global options such
+        # as --git-dir X or -C DIR put it. A false block fails the test, so it never hides a call.
+        script.write_text(
+            "#!/bin/sh\n"
+            'prev=""\n'
+            'for a in "$@"; do\n'
+            '  case "$a" in\n'
+            f'    fetch|pull|ls-remote|clone|push) echo "$a" >> "{calls}"; exit 99 ;;\n'
+            f'    update) if [ "$prev" = remote ]; then echo "remote update" >> "{calls}"; exit 99; fi ;;\n'
+            "  esac\n"
+            '  prev="$a"\n'
+            "done\n"
+            f'exec "{real}" "$@"\n')
+        script.chmod(0o755)
+        env = {"PATH": f"{wrap}{os.pathsep}{os.environ['PATH']}"}
+        gitdir = str(self.p.root / ".git")
+        for argv in (["fetch"], ["--git-dir", gitdir, "fetch"], ["-C", str(self.p.root), "fetch", "--tags"],
+                     ["--git-dir", gitdir, "--work-tree", str(self.p.root), "ls-remote", "origin"],
+                     ["-c", "core.quotepath=off", "remote", "update"], ["--git-dir", gitdir, "pull"],
+                     ["--git-dir", gitdir, "push", "origin"], ["--git-dir", gitdir, "clone", "x", "y"]):
+            probe = subprocess.run(["git", *argv], cwd=self.p.root, env=clean_env(env), capture_output=True)
+            self.assertEqual(probe.returncode, 99, f"the wrapper must fail on: git {' '.join(argv)}")
+        ok = subprocess.run(["git", "--git-dir", gitdir, "remote"], cwd=self.p.root, env=clean_env(env),
+                            capture_output=True, text=True)
+        self.assertEqual((ok.returncode, ok.stdout.strip()), (0, "origin"), "local remote listing passes")
+        calls.unlink()
+        for parts, want in (([self.part("P1", "done", commit=self.head)], 0),
+                            ([self.part("P1", "done", commit="0123456789abcdef0123456789abcdef01234567")], 11),
+                            ([self.part("P1", "handed off")], 11)):
+            with self.subTest(want=want):
+                self.record(parts)
+                r = run(RELEASE, ["evidence", "v1.0.0"], self.p.root, env=env)
+                self.assertEqual(r.returncode, want, r.stderr)
+                self.assertFalse(calls.exists(), calls.read_text() if calls.exists() else "")
+        self.record([self.part("P1", "handed off")])
+        r = run(RELEASE, ["evidence", "--no-amend-hold", "v1.0.0"], self.p.root, env=env)
+        self.assertEqual(r.returncode, 0, r.stderr)
+        self.assertFalse(calls.exists())
+        r = run(RELEASE, ["fetch-command"], self.p.root, env=env)
+        self.assertEqual((r.returncode, r.stdout), (0, self.fetch_line("origin")))
+        self.assertFalse(calls.exists(), "fetch-command only prints the command")
+
+    def test_done_part_stays_open_when_the_commit_does_not_resolve(self):
+        for name, commit in (("unknown full SHA", "0123456789abcdef0123456789abcdef01234567"),
+                             ("unknown short SHA", "0123abc")):
+            with self.subTest(name):
+                self.record([self.part("P3", "done", commit=commit)])
+                self.assert_unverified(self.p.evidence("v1.0.0"))
+
+    def test_done_part_stays_open_when_merge_base_exits_128(self):
+        # A copy of the scripts has a git function that makes the ancestry step exit 128, as it does
+        # for an unknown object or ref. A function needs no PATH, so it works under any bash.
+        scripts = Path(self.tmp.name).parent / f"{Path(self.tmp.name).name}-scripts"
+        shutil.copytree(RELEASE.parent, scripts)
+        self.addCleanup(shutil.rmtree, scripts, True)
+        text = (scripts / "release.sh").read_text().split("\n", 1)
+        (scripts / "release.sh").write_text(
+            text[0] + '\ngit() { case " $* " in *" merge-base --is-ancestor "*) return 128 ;; esac; '
+            'command git "$@"; }\n' + text[1])
+        self.record([self.part("P3", "done", commit=self.head)])
+        self.assert_unverified(run(scripts / "release.sh", ["evidence", "v1.0.0"], self.p.root))
+        self.assertEqual(self.p.evidence("v1.0.0").returncode, 0)
+
+    def test_hold_takes_precedence_over_a_stale_review(self):
+        self.p.write(SQL_PATH, SQL_V2)
+        self.p.commit("widen criteria")
+        self.record([self.part("P1", "handed off")])
+        self.assertEqual(self.p.evidence("HEAD").returncode, 11)
+
+    def test_malformed_record_holds_and_names_file_and_field(self):
+        cases = {
+            "status": ([self.part("P1", f"{CANARY} in progress")], "parts[0].status"),
+            "missing status": ([{"id": "P1", "text": CANARY}], "parts[0].status"),
+            "withdrawn, no reason": ([self.part("P1", "withdrawn", reason="  ")], "parts[0].reason"),
+            "done, no commit": ([self.part("P1", "done", commit=CANARY)], "parts[0].commit"),
+            "id": ([self.part(CANARY, "done", commit=self.head)], "parts[0].id"),
+            "duplicate id": ([self.part("P1", "withdrawn", reason="r"), self.part("P1", "handed off")],
+                             "parts[].id (duplicate)"),
+            "no parts": ([], "parts"),
+        }
+        for name, (parts, field) in cases.items():
+            with self.subTest(name):
+                self.record(parts)
+                r = self.p.evidence("v1.0.0")
+                self.assertEqual(r.returncode, 11, r.stderr)
+                self.assertIn(f"release held: {self.RECORD}: field {field} is missing or invalid", r.stderr)
+                self.assert_no_leak(r)
+        for name, text in (("not JSON", f'{{"parts": "{CANARY}'), ("not an object", f'["{CANARY}"]'),
+                           ("schema", json.dumps({"schemaVersion": 2, "parts": [CANARY]}))):
+            with self.subTest(name):
+                self.p.write(self.RECORD, text)
+                r = self.p.evidence("v1.0.0")
+                self.assertEqual(r.returncode, 11, r.stderr)
+                self.assertIn(f"release held: {self.RECORD}: field", r.stderr)
+                self.assert_no_leak(r)
+
+    def test_amend_check_and_the_hold_agree_on_what_is_valid(self):
+        # One validator: a record that amend-check refuses holds the release, and one it accepts does not.
+        h = self.head
+        docs = {
+            "valid": {"schemaVersion": 1, "kind": "amendment", "parts": [
+                self.part("P1", "done", commit=h), self.part("P2", "withdrawn", reason="r")]},
+            "kind absent": {"schemaVersion": 1, "parts": [self.part("P1", "done", commit=h)]},
+            "other kind": {"schemaVersion": 1, "kind": CANARY, "parts": [self.part("P1", "done", commit=h)]},
+            "schema": {"schemaVersion": 2, "parts": [self.part("P1", "done", commit=h)]},
+            "withdrawn without a comment": {"schemaVersion": 1, "parts": [self.part("P1", "withdrawn", reason="r")]},
+            "bad id": {"schemaVersion": 1, "parts": [self.part("p1", "done", commit=h)]},
+            "bad commit": {"schemaVersion": 1, "parts": [self.part("P1", "done", commit="HEAD")]},
+            "no parts": {"schemaVersion": 1, "parts": []},
+            "duplicate": {"schemaVersion": 1, "parts": [self.part("P1", "done", commit=h),
+                                                        self.part("P1", "done", commit=h)]},
+        }
+        raw = {"empty": "", "blank": " \n\t\n", "two documents": '{"schemaVersion": 1}\n{"schemaVersion": 1}',
+               "not JSON": "{" + CANARY}
+        for name, body in [(n, json.dumps(d)) for n, d in docs.items()] + list(raw.items()):
+            with self.subTest(name):
+                self.p.write(self.RECORD, body)
+                checked = run(RELEASE, ["amend-check", "--stdin"], self.p.root, stdin=body)
+                held = self.p.evidence("v1.0.0")
+                self.assertEqual(checked.returncode == 4, held.returncode == 11, (checked.stdout, held.stderr))
+                self.assertEqual(checked.returncode == 4, name not in ("valid", "kind absent", "withdrawn without a comment"))
+                self.assert_no_leak(checked)
+
+    def status_lines(self):
+        r = run(SQLREVIEW, ["status"], self.p.root)
+        self.assertEqual(r.returncode, 0, r.stderr)
+        self.assertNotIn("LEAK-C", r.stdout + r.stderr)
+        return [ln for ln in r.stdout.splitlines() if ln.startswith("amendment ")]
+
+    def test_status_names_each_record_that_the_hold_refuses(self):
+        # The hold and status read one validator: a record that holds the release (exit 11) has a status line
+        # with its file and field, and a record that passes has none.
+        h = self.head
+        bodies = {
+            "handed off": (json.dumps({"schemaVersion": 1, "parts": [self.part("P1", "handed off")]}), 11),
+            "malformed part": (json.dumps({"schemaVersion": 1, "parts": [self.part("P1", CANARY)]}), 11),
+            "empty parts": (json.dumps({"schemaVersion": 1, "parts": []}), 11),
+            "not JSON": ("{" + CANARY, 11),
+            "empty file": ("", 11),
+            "two documents": ('{"schemaVersion": 1}\n{"schemaVersion": 1}', 11),
+            "closed": (json.dumps({"schemaVersion": 1, "parts": [self.part("P1", "done", commit=h)]}), 0),
+        }
+        for name, (body, code) in bodies.items():
+            with self.subTest(name):
+                self.p.write(self.RECORD, body)
+                self.assertEqual(self.p.evidence("v1.0.0").returncode, code)
+                lines = self.status_lines()
+                self.assertEqual(len(lines) > 0, code == 11, lines)
+                if code == 11:
+                    self.assertTrue(all(ln.startswith("amendment enq9177-falls\t") for ln in lines), lines)
+
+    def test_status_names_a_symlinked_record_that_makes_evidence_fail(self):
+        target = self.p.root / "elsewhere.json"
+        target.write_text(json.dumps({"schemaVersion": 1, "parts": [self.part("P1", "done", commit=self.head)]}))
+        link = self.p.root / self.RECORD
+        link.parent.mkdir(parents=True, exist_ok=True)
+        link.symlink_to(target)
+        self.assertEqual(self.p.evidence("v1.0.0").returncode, 2)
+        self.assertEqual(self.status_lines(), [
+            next(ln for ln in self.status_lines() if "(file): must not be a symbolic link" in ln)])
+
+    def test_a_record_name_that_the_guard_refuses_prints_as_a_placeholder_in_the_hold(self):
+        self.p.write(".sqlreview/amendments/ENQ 9177.json", json.dumps({"schemaVersion": 1, "parts": []}))
+        r = self.p.evidence("v1.0.0")
+        self.assertEqual(r.returncode, 11, r.stderr)
+        self.assertIn("release held: .sqlreview/amendments/(invalid name).json: field parts is missing or invalid",
+                      r.stderr)
+        self.assertNotIn("ENQ 9177", r.stderr)
+
+    def ledger(self, stages_done=("intake", "amend"), artifacts=None):
+        # The triage ledger's own entry style: the amend stage lists the record as its artifact.
+        amend = {"sources": ["pr"], "artifacts": artifacts if artifacts is not None else []}
+        entry = {"ticket": "rdl-service-desk/service-desk#9177", "enquiry": "ENQ9177", "stage": "release",
+                 "stages_done": list(stages_done), "evidence_revision": {"ticket": "2026-11-01", "pr": "abc1234"},
+                 "stage_evidence": {"intake": {"sources": ["ticket"], "artifacts": []}},
+                 "decisions": [], "blockers": [{"class": "note", "detail": CANARY}], "depends_on": [],
+                 "next_action": f"analyst-handle: release {CANARY}",
+                 "verification": {"status": "unverified", "commands": [], "at": "2026-11-01"}}
+        if "amend" in stages_done:
+            entry["stage_evidence"]["amend"] = amend
+        store = {"schemaVersion": 1, "entries": [entry]}
+        path = self.p.root / ".sqlreview/ledger.json"
+        path.write_text(json.dumps(store))
+        r = run(SQLREVIEW, ["ledger", "check", ".sqlreview/ledger.json"], self.p.root)
+        self.assertEqual(r.returncode, 0, r.stdout + r.stderr)
+
+    def artifact(self):
+        return [{"path": self.RECORD, "sha256": "0" * 64}]
+
+    def test_ledger_amendment_without_record_holds(self):
+        self.ledger(artifacts=self.artifact())
+        r = self.p.evidence("v1.0.0")
+        self.assertEqual(r.returncode, 11, r.stderr)
+        self.assertIn(f"{self.RECORD} is missing", r.stderr)
+        self.assertIn("amendment hand-off comment on the deliverable PR", r.stderr)
+        self.assertNotIn("comments done:", r.stderr)
+        self.assert_no_leak(r)
+
+    def test_single_part_amendment_without_a_record_passes(self):
+        # A single-part amendment writes no record, so an amend entry that names none does not hold.
+        self.ledger(artifacts=[])
+        r = self.p.evidence("v1.0.0")
+        self.assertEqual(r.returncode, 0, r.stderr)
+        self.assertEqual(r.stderr, "")
+        self.record([self.part("P1", "done", commit=self.head)])
+        self.assertEqual(self.p.evidence("v1.0.0").returncode, 0)
+        self.record([self.part("P1", "handed off")])
+        r = self.p.evidence("v1.0.0")
+        self.assertEqual(r.returncode, 11, r.stderr)
+        self.assertNotIn("is missing", r.stderr)
+
+    def test_ledger_amendment_with_record_follows_the_record(self):
+        self.ledger(artifacts=self.artifact())
+        self.record([self.part("P1", "done", commit=self.head), self.part("P2", "withdrawn", reason=CANARY)])
+        r = self.p.evidence("v1.0.0")
+        self.assertEqual(r.returncode, 0, r.stderr)
+        self.assert_no_leak(r)
+        self.record([self.part("P1", "done", commit=self.head), self.part("P2", "handed off")])
+        r = self.p.evidence("v1.0.0")
+        self.assertEqual(r.returncode, 11, r.stderr)
+        self.assertIn("open: P2", r.stderr)
+        self.assertNotIn("is missing", r.stderr)
+        self.assert_no_leak(r)
+
+    def test_ledger_without_amendment_and_no_record_passes(self):
+        self.ledger(stages_done=("intake",))
+        r = self.p.evidence("v1.0.0")
+        self.assertEqual(r.returncode, 0, r.stderr)
+        self.assertEqual(r.stderr, "")
+
+    def test_unreadable_ledger_holds(self):
+        (self.p.root / ".sqlreview/ledger.json").write_text(f'{{"entries": "{CANARY}')
+        r = self.p.evidence("v1.0.0")
+        self.assertEqual(r.returncode, 11, r.stderr)
+        self.assertIn("release held: .sqlreview/ledger.json: field entries is missing or invalid. Next: from the project "
+                      "root, run git restore --source=HEAD -- .sqlreview/ledger.json when HEAD holds a valid copy", r.stderr)
+        self.assertNotIn("ledger set", r.stderr)
+        self.assert_no_leak(r)
+
+    def test_empty_or_blank_files_hold_as_malformed(self):
+        for name, text in (("empty", ""), ("spaces", "  \n\t\n"), ("two documents", "{} {}")):
+            with self.subTest(f"record {name}"):
+                self.p.write(self.RECORD, text)
+                r = self.p.evidence("v1.0.0")
+                self.assertEqual(r.returncode, 11, r.stderr)
+                self.assertIn(f"release held: {self.RECORD}: field (document) is missing or invalid", r.stderr)
+                self.assert_no_leak(r)
+        (self.p.root / self.RECORD).unlink()
+        for name, text in (("empty", ""), ("spaces", "  \n\t\n")):
+            with self.subTest(f"ledger {name}"):
+                (self.p.root / ".sqlreview/ledger.json").write_text(text)
+                r = self.p.evidence("v1.0.0")
+                self.assertEqual(r.returncode, 11, r.stderr)
+                self.assertIn("release held: .sqlreview/ledger.json: field entries is missing or invalid",
+                              r.stderr)
+
+    def test_no_amend_hold_reports_open_parts_and_exits_zero(self):
+        # The engineer hand-off gate: handed-off parts are expected, so they are notes, not a hold.
+        self.record([self.part("P1", "handed off"), self.part("P2", "done", commit="0123abc")])
+        r = self.p.evidence("--no-amend-hold", "v1.0.0")
+        self.assertEqual(r.returncode, 0, r.stderr)
+        self.assertIn("amend note: amend part handed off and open: P1", r.stderr)
+        self.assertNotIn("release held", r.stderr)
+        self.assertNotIn("P2", r.stderr)
+        self.assertEqual(json.loads(r.stdout)["reviews"][0]["applies"], "current")
+        self.assert_no_leak(r)
+        self.assertEqual(self.p.evidence("v1.0.0").returncode, 11)
+        self.p.write(self.RECORD, "")
+        r = self.p.evidence("--no-amend-hold", "v1.0.0")
+        self.assertEqual(r.returncode, 0, r.stderr)
+        self.assertIn(f"amend note: {self.RECORD}: field (document) is missing or invalid", r.stderr)
+
+    def test_no_amend_hold_still_exits_ten_for_a_stale_review(self):
+        self.p.write(SQL_PATH, SQL_V2)
+        self.p.commit("widen criteria")
+        self.record([self.part("P1", "handed off")])
+        self.assertEqual(self.p.evidence("--no-amend-hold", "HEAD").returncode, 10)
+
+    def test_every_record_is_read(self):
+        self.record([self.part("P1", "done", commit=self.head)])
+        self.p.write(".sqlreview/amendments/enq9178-falls.json",
+                     json.dumps({"schemaVersion": 1, "parts": [self.part("P4", "handed off")]}))
+        r = self.p.evidence("v1.0.0")
+        self.assertEqual(r.returncode, 11, r.stderr)
+        self.assertIn("open: P4", r.stderr)
 
 
 def violations(doc):
@@ -743,6 +1692,730 @@ class Guard(unittest.TestCase):
         self.assertIn("release.sh render", reason)
 
 
+# --- helper: criteria table (the scaffold's criteria design) ---------------------------------
+
+CRIT_JQ = {
+    "canonical": SETUP / "scripts" / "release-criteria.jq",
+    "claude": REPO / "plugins/data-request/skills/setup/scripts/release-criteria.jq",
+    "codex": REPO / "dist/codex/plugins/data-request/skills/setup/scripts/release-criteria.jq",
+}
+LEAK_CANARY = "LEAK-CANARY"
+STAMP = {"confirmed_by": "analyst-login", "confirmed_role": "analyst", "confirmed_at": "2026-10-13T01:00:00Z"}
+FP_FIELDS = ("cohort_entry_event", "inclusion_criteria", "exclusion_criteria", "requested_data_elements")
+FINGERPRINTS = {k: "sha256:" + format(n, "x") * 64 for n, k in enumerate(FP_FIELDS, 1)}
+FLAG_NOTE = "Flagged: `patients.excl_prior_repair` = 1"
+
+
+def criterion(id_, kind, text, **over):
+    d = {"id": id_, "kind": kind, "text": text, **STAMP}
+    d.update(over)
+    return d
+
+
+def withdrawn(reason="Narrowed " + LEAK_CANARY, replaced_by=None):
+    d = {"reason": reason, "at": "2026-10-14"}
+    if replaced_by:
+        d["replaced_by"] = replaced_by
+    return d
+
+
+# Listed out of order on purpose: the table orders by kind, then id number (E10 after E2).
+CRITERIA_V1 = [
+    criterion("D3", "data_element", "Smoking status"),
+    criterion("E10", "exclusion", "Type 2 diabetes"),
+    criterion("E2", "exclusion", "Previous AAA repair"),
+    criterion("E5", "exclusion", "Transferred in " + LEAK_CANARY, withdrawn=withdrawn()),
+    criterion("E1", "exclusion", "Deceased patients"),
+    criterion("I2", "inclusion", "Consented to linkage", applied_by="researcher"),
+    criterion("I1", "inclusion", "Adults with AAA diagnosis at TUH | ward A", applied_by="rdl"),
+    criterion("N1", "entry_event", "First AAA admission"),
+]
+
+
+def status_row(cid, state, revision=1, **over):
+    d = {"criterion": cid, "state": state, "confirmed_by": "eng-login",
+         "confirmed_at": "2026-10-13T02:00:00Z", "confirmed_revision": revision}
+    d.update(over)
+    return d
+
+
+STATUS_V1 = [
+    status_row("N1", "applied"), status_row("I1", "applied"), status_row("I2", "researcher-applies"),
+    status_row("E1", "applied"),
+    status_row("E2", "not-applied", reason="First pass: cohort kept broad"),
+    status_row("E10", "partially-applied", reason="diagnosis codes only; medications not used"),
+    status_row("D3", "not-delivered", reason="no structured source"),
+]
+
+
+def criteria_v2():
+    """0.2.0: E1 withdrawn and replaced by E4, D3 withdrawn, I1 reworded, E2 now flagged."""
+    out = []
+    for c in CRITERIA_V1:
+        c = dict(c)
+        if c["id"] == "E1":
+            c["withdrawn"] = withdrawn(replaced_by="E4")
+        elif c["id"] == "D3":
+            c["withdrawn"] = withdrawn()
+        elif c["id"] == "I1":
+            c["text"] = "Adults with an AAA diagnosis at TUH | ward A"
+        out.append(c)
+    # E6 was added and withdrawn between the two releases: it was never in a table.
+    return out + [criterion("E4", "exclusion", "Died before the index admission"),
+                  criterion("E6", "exclusion", "Added then withdrawn", withdrawn=withdrawn())]
+
+
+STATUS_V2 = [
+    status_row("N1", "applied", 2), status_row("I1", "applied", 2), status_row("I2", "researcher-applies", 2),
+    status_row("E2", "flagged", 2, flag={"output": "patients", "column": "excl_prior_repair"}),
+    status_row("E4", "applied", 2),
+    status_row("E10", "partially-applied", 2, reason="diagnosis codes only; medications not used"),
+]
+
+
+def decided(criteria, decision="accepted"):
+    """The criteria object with every row decided by the analyst."""
+    criteria = json.loads(json.dumps(criteria))
+    for r in criteria["rows"]:
+        r.update(decision=decision, final_note=r["proposed_note"] if decision == "accepted" else None,
+                 decided_by="analyst-login", decided_at="2026-10-15T01:00:00Z")
+    return criteria
+
+
+@unittest.skipUnless(shutil.which("jq"), "the guard needs jq")
+class AmendRecordGuard(unittest.TestCase):
+    """The guard validates writes to .sqlreview/amendments/*.json like the other review documents.
+
+    The schema is the amend gate's: schemaVersion 1, kind amendment (when present), parts[] with a unique
+    id P<n> and a status done (with commit), handed off or withdrawn (with reason). The evidence hold
+    reads the same validator. Never a value in the reason.
+    """
+    REL = "amendments/enq9177-falls.json"
+    decide = Guard.decide
+
+    def doc(self, parts=None, **over):
+        d = {"schemaVersion": 1, "kind": "amendment", "parts": parts if parts is not None else [
+            {"id": "P1", "status": "done", "commit": "a" * 40},
+            {"id": "P2", "status": "handed off", "hand_off": "draft, not posted"},
+            {"id": "P3", "status": "withdrawn", "reason": "Not needed " + CANARY,
+             "comment": "https://github.com/example-org/extract-example/pull/9/comment-1"}]}
+        d.update(over)
+        return d
+
+    def denied(self, doc, *rules, rel=None):
+        decision, reason = self.decide("Write", rel or self.REL, doc if isinstance(doc, str) else json.dumps(doc))
+        self.assertEqual(decision, "deny", reason)
+        for rule in rules:
+            self.assertIn(rule, reason)
+        self.assertNotIn("LEAK-C", reason)
+        return reason
+
+    def test_a_valid_record_passes(self):
+        decision, reason = self.decide("Write", self.REL, json.dumps(self.doc()))
+        self.assertEqual(decision, "allow", reason)
+
+    def test_edit_is_denied(self):
+        decision, reason = self.decide("Edit", self.REL)
+        self.assertEqual(decision, "deny")
+        self.assertIn("Write the complete file", reason)
+
+    def test_document_fields(self):
+        self.denied(self.doc(schemaVersion=CANARY), "schemaVersion: must be 1")
+        self.denied(self.doc(kind=CANARY), "kind: must be amendment")
+        self.denied(self.doc(parts=[]), "parts: must be a nonempty array")
+        self.denied(self.doc(parts=CANARY), "parts: must be a nonempty array")
+        self.denied("[]", "(document): must be a JSON object")
+        self.denied('{"x": "' + CANARY + '",,}', "(document): not valid JSON")
+
+    def test_part_rules_name_the_field_and_the_rule(self):
+        parts = [{"id": CANARY, "status": "done", "commit": "a" * 40},
+                 {"id": "P2", "status": "done", "commit": CANARY},
+                 {"id": "P3", "status": "withdrawn", "reason": " "},
+                 {"id": "P3", "status": CANARY},
+                 CANARY]
+        reason = self.denied(self.doc(parts), "parts[0].id: must be P<n>",
+                             "parts[1].commit: required for a done part",
+                             "parts[2].reason: required for a withdrawn part",
+                             "parts[].id (duplicate): must be unique",
+                             "parts[3].status: must be done, handed off or withdrawn",
+                             "parts[4]: must be an object")
+        self.assertIn("release.sh amend-check", reason)
+
+    def test_the_record_name_is_checked(self):
+        self.denied(self.doc(), "lower-case letters, digits and hyphens", rel="amendments/ENQ 9177.json")
+
+    def test_amend_check_cli(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            f = Path(tmp) / "a.json"
+            f.write_text(json.dumps(self.doc()))
+            r = run(RELEASE, ["amend-check", str(f)], tmp)
+            self.assertEqual((r.returncode, r.stdout), (0, "ok\n"), r.stderr)
+            r = run(RELEASE, ["amend-check", "--stdin"], tmp, stdin=json.dumps(self.doc(kind=CANARY)))
+            self.assertEqual((r.returncode, r.stdout), (4, "kind: must be amendment\n"), r.stderr)
+            self.assertNotIn("LEAK-C", r.stdout + r.stderr)
+
+    def test_every_record_the_amend_skill_shows_passes(self):
+        # The JSON example in the amend skill is a valid record once its placeholders are filled.
+        for tree in (REPO / "skills/data-request-amend", REPO / "plugins/data-request/skills/amend"):
+            text = (tree / "SKILL.md").read_text()
+            block = text.split('```json\n{"schemaVersion": 1, "kind": "amendment"', 1)[1].split("```", 1)[0]
+            example = json.loads('{"schemaVersion": 1, "kind": "amendment"' + block.replace("<commit>", "a" * 7))
+            decision, reason = self.decide("Write", self.REL, json.dumps(example))
+            self.assertEqual(decision, "allow", reason)
+
+
+def render_record(doc):
+    with tempfile.TemporaryDirectory() as tmp:
+        f = Path(tmp) / "release.json"
+        f.write_text(json.dumps(doc))
+        return run(RELEASE, ["render", str(f)], tmp)
+
+
+class CriteriaProject(Project):
+    """Project plus the analyst's schema 2 sidecar and the owning scope of SLUG; `out` holds files
+    that must stay outside the repository (the fingerprints file)."""
+
+    def __init__(self, tmp, out, assertion):
+        super().__init__(tmp)
+        self.out = Path(out)
+        self.assertion = assertion
+        self.fp = self.out / "fingerprints.json"
+        self.fp.write_text(json.dumps(FINGERPRINTS))
+
+    def sidecar(self, criteria, schema=2):
+        doc = {"schemaVersion": schema, "approval_number": "THHSAQUIRE-9042", "decisions": [],
+               "open_questions": []}
+        if schema == 2:
+            doc.update(criteria=criteria, fingerprints=FINGERPRINTS)
+        self.write("answers.intake.json", json.dumps(doc, indent=2))
+
+    def scope(self, status, slug=SLUG, revision=1):
+        doc = {"schemaVersion": 1, "kind": "scope", "slug": slug, "sql_path": SQL_PATH,
+               "title": "Falls", "revision": revision, "recorded_at": "2026-09-28T00:00:00Z",
+               "recorded_by": "engineer-login", "git_commit": None, "intent": "Falls presentations.",
+               "inputs": [{"name": "ed.encounter", "description": "one row per encounter"}],
+               "outputs": [{"name": "encounter_id", "description": "encounter"}],
+               "assumptions": [], "limitations": [], "open_questions": [],
+               # the SQL this scope was confirmed against: a later SQL body change holds as scope-stale
+               "sql_sha256": hashlib.sha256((self.root / SQL_PATH).read_bytes()).hexdigest()}
+        if status is not None:
+            doc["criteria_status"] = status
+        self.write(f".sqlreview/reviews/{slug}/scope.json", json.dumps(doc, indent=2))
+
+    def record(self, tag, criteria=None, raw=None):
+        doc = raw if raw is not None else record(tag=tag, criteria=criteria)
+        self.write(f".sqlreview/releases/{tag}/release.json", json.dumps(doc, indent=2))
+
+    def criteria(self, *args):
+        return run(RELEASE, ["criteria", *args], self.root)
+
+    def table(self, tag, flags=None, code=0):
+        r = self.criteria(tag, *(("--fingerprints", str(self.fp)) if flags is None else flags))
+        self.assertion.assertEqual(r.returncode, code, r.stdout + r.stderr)
+        return json.loads(r.stdout)
+
+
+@unittest.skipUnless(shutil.which("jq") and shutil.which("git"), "release.sh needs jq and git")
+class CriteriaTable(unittest.TestCase):
+    """T047: `release.sh criteria <tag>` builds the record's `criteria` object."""
+
+    def setUp(self):
+        self.tmp = tempfile.TemporaryDirectory()
+        self.addCleanup(self.tmp.cleanup)
+        self.out = tempfile.TemporaryDirectory()
+        self.addCleanup(self.out.cleanup)
+        self.p = CriteriaProject(self.tmp.name, self.out.name, self)
+        self.p.sidecar(CRITERIA_V1)
+        self.p.scope(STATUS_V1)
+        self.p.commit("criteria")
+        self.p.tag("0.1.0")
+
+    def release_020(self):
+        """Record 0.1.0, add decoy records, move to the v2 sidecar and scope, tag 0.2.0."""
+        first = decided(self.p.table("0.1.0"))
+        self.p.record("0.1.0", first)
+        # Decoys: an older stable release, a pre-release, a later release and a non-version name.
+        self.p.record("0.0.9", raw={"criteria": None})
+        self.p.record("0.1.5-rc1", raw={"criteria": None})
+        self.p.record("0.3.0", raw={"criteria": None})
+        self.p.record("hotfix", raw={"criteria": None})
+        self.p.sidecar(criteria_v2())
+        self.p.scope(STATUS_V2, revision=2)
+        self.p.commit("criteria v2")
+        self.p.tag("0.2.0")
+        return self.p.table("0.2.0")
+
+    def by_id(self, table):
+        return {r["id"]: r for r in table["rows"]}
+
+    def test_first_release_has_no_previous_tag(self):
+        t = self.p.table("0.1.0")
+        self.assertIsNone(t["previous_tag"])
+        self.assertEqual(t["status"], "complete")
+        self.assertEqual(t["held_reasons"], [])
+        self.assertEqual(t["scope"], {"slug": SLUG, "revision": 1})
+        self.assertEqual([r["id"] for r in t["rows"]], ["N1", "I1", "I2", "E1", "E2", "E5", "E10", "D3"])
+        self.assertEqual({r["change"] for r in t["rows"]}, {"—"})
+        rows = self.by_id(t)
+        texts = {c["id"]: c["text"] for c in CRITERIA_V1}
+        for r in t["rows"]:
+            self.assertEqual(r["text"], texts[r["id"]], "text is copied verbatim")
+            self.assertEqual((r["decision"], r["final_note"]), ("pending", None))
+        self.assertEqual(rows["N1"]["proposed_note"], "Applied")
+        self.assertEqual(rows["I2"]["proposed_note"], "Researcher applies")
+        self.assertEqual(rows["E2"]["proposed_note"], "Not applied: First pass: cohort kept broad")
+        self.assertEqual(rows["E10"]["proposed_note"], "Partially applied: diagnosis codes only; medications not used")
+        self.assertEqual(rows["D3"]["proposed_note"], "Not delivered: no structured source")
+        self.assertEqual((rows["E5"]["state"], rows["E5"]["proposed_note"]), ("withdrawn", "Withdrawn by researcher"))
+
+    def test_previous_tag_and_change_values(self):
+        t = self.release_020()
+        self.assertEqual(t["previous_tag"], "0.1.0", "greatest earlier stable tag with a record")
+        self.assertEqual(t["status"], "complete", t)
+        rows = self.by_id(t)
+        self.assertEqual([r["id"] for r in t["rows"]], ["N1", "I1", "I2", "E1", "E2", "E4", "E10", "D3"],
+                         "E5 was withdrawn before 0.1.0 and is not repeated")
+        self.assertEqual(rows["N1"]["change"], "unchanged")
+        self.assertEqual(rows["I1"]["change"], "text-reworded")
+        self.assertEqual(rows["I1"]["text"], "Adults with an AAA diagnosis at TUH | ward A")
+        self.assertEqual((rows["I2"]["change"], rows["I2"]["proposed_note"]), ("unchanged", "Researcher applies"))
+        self.assertEqual((rows["E1"]["change"], rows["E1"]["replaced_by"]), ("replaced", "E4"))
+        self.assertEqual(rows["E1"]["proposed_note"], "Withdrawn by researcher")
+        self.assertEqual((rows["E2"]["change"], rows["E2"]["previous_state"]), ("changed", "not-applied"))
+        self.assertEqual((rows["E2"]["state"], rows["E2"]["proposed_note"]), ("flagged", FLAG_NOTE))
+        self.assertEqual(rows["E4"]["change"], "new")
+        self.assertEqual(rows["E10"]["change"], "unchanged")
+        self.assertEqual(rows["D3"]["change"], "withdrawn")
+        self.assertNotIn("replaced_by", rows["D3"])
+        self.assertNotIn(LEAK_CANARY, json.dumps([r.get("proposed_note") for r in t["rows"]]))
+
+    def test_criterion_withdrawn_between_releases_is_not_listed(self):
+        rows = self.by_id(self.release_020())
+        self.assertNotIn("E6", rows, "never in a previous table, so not reported")
+        self.assertIn("E1", rows)
+
+    def test_previous_tag_ignores_prerelease_later_and_lower_releases(self):
+        self.release_020()
+        # A v-prefixed stable release between them is the newer previous; 0.3.0 stays ignored.
+        self.p.record("v0.1.2", raw={"criteria": None})
+        self.p.commit("v0.1.2 record")
+        self.p.tag("0.2.1")
+        self.assertEqual(self.p.table("0.2.1")["previous_tag"], "v0.1.2")
+        # Numeric, not lexical: 0.10.0 sorts above 0.9.0.
+        self.p.record("0.9.0", raw={"criteria": None})
+        self.p.record("0.10.0", raw={"criteria": None})
+        self.p.commit("more records")
+        self.p.tag("1.0.0")
+        self.assertEqual(self.p.table("1.0.0")["previous_tag"], "0.10.0")
+        # Records committed after a tag are not at that tag.
+        self.assertEqual(self.p.table("0.2.0")["previous_tag"], "0.1.0")
+
+    def test_previous_release_without_a_table_compares_nothing(self):
+        self.p.record("0.0.9", raw={"criteria": None})
+        self.p.commit("legacy record")
+        self.p.tag("0.1.1")
+        t = self.p.table("0.1.1")
+        self.assertEqual(t["previous_tag"], "0.0.9")
+        self.assertEqual({r["change"] for r in t["rows"]}, {"—"})
+
+    def test_a_changed_note_resets_the_decision(self):
+        first = decided(self.p.table("0.1.0"))
+        e2 = next(r for r in first["rows"] if r["id"] == "E2")
+        e2.update(proposed_note="Not applied: an older reason", final_note="Not applied: an older reason")
+        self.p.record("0.1.0", first)
+        rows = self.by_id(self.p.table("0.1.0"))
+        self.assertEqual((rows["E2"]["decision"], rows["E2"]["final_note"]), ("pending", None))
+        self.assertNotIn("decided_by", rows["E2"])
+        self.assertEqual(rows["E10"]["decision"], "accepted", "unchanged notes keep their decision")
+
+    def test_analyst_decisions_are_kept_while_the_note_is_unchanged(self):
+        first = decided(self.p.table("0.1.0"))
+        self.p.record("0.1.0", first)
+        t = self.p.table("0.1.0")
+        self.assertEqual({r["decision"] for r in t["rows"]}, {"accepted"})
+
+    def held(self, tag, reasons, flags=None):
+        t = self.p.table(tag, flags, code=10)
+        self.assertEqual(t["status"], "held")
+        self.assertEqual(t["held_reasons"], reasons)
+        self.assertNotIn(LEAK_CANARY, json.dumps(t["held_reasons"]))
+        # Held means the approved record fails check and the body shows only the reasons.
+        code, out = violations(record(criteria=t))
+        self.assertEqual(code, 4, out)
+        self.assertIn("approved: criteria table held", out)
+        draft = record(status="draft", criteria=t)
+        self.assertEqual(violations(draft)[0], 0, violations(draft)[1])
+        r = render_record(draft)
+        self.assertEqual(r.returncode, 0, r.stdout + r.stderr)
+        body = r.stdout
+        self.assertIn("Criteria table held: " + ", ".join(reasons) + "\n", body)
+        self.assertNotIn("## Criteria in this release", body)
+        for r in t["rows"]:
+            self.assertNotIn(r["text"], body, "a held table renders no values")
+        return t
+
+    def test_held_fingerprints_unchecked_without_a_flag(self):
+        self.held("0.1.0", ["fingerprints-unchecked"], [])
+
+    def test_held_answers_invalid(self):
+        self.held("0.1.0", ["answers-invalid"], ["--answers-invalid"])
+
+    def test_held_fingerprint_mismatch(self):
+        other = dict(FINGERPRINTS, inclusion_criteria="sha256:" + "f" * 64,
+                     requested_data_elements="sha256:" + "e" * 64)
+        f = Path(self.out.name) / "other.json"
+        f.write_text(json.dumps(other))
+        self.held("0.1.0", ["fingerprint-mismatch:inclusion_criteria",
+                            "fingerprint-mismatch:requested_data_elements"], ["--fingerprints", str(f)])
+
+    def test_held_state_missing(self):
+        status = [r for r in STATUS_V1 if r["criterion"] not in ("E2", "D3")]
+        # A state the kind does not allow is no usable state either.
+        status = [status_row("N1", "flagged", flag={"output": "o", "column": "c"}) if r["criterion"] == "N1" else r
+                  for r in status]
+        self.p.scope(status)
+        self.p.commit("scope without E2")
+        self.p.tag("0.1.1")
+        t = self.held("0.1.1", ["state-missing:N1", "state-missing:E2", "state-missing:D3"])
+        self.assertIsNone(self.by_id(t)["E2"]["state"])
+
+    def test_held_owning_scope_ambiguous(self):
+        self.p.scope(STATUS_V1, slug="sql__v1__other")
+        self.p.commit("second owner")
+        self.p.tag("0.1.1")
+        t = self.held("0.1.1", ["owning-scope-ambiguous"])
+        self.assertIsNone(t["scope"])
+
+    def test_held_review_stale(self):
+        self.p.write(SQL_PATH, SQL_V2)
+        self.p.commit("sql changed after the review")
+        self.p.tag("0.1.1")
+        self.held("0.1.1", ["review-stale", "scope-stale"])
+
+    def test_held_note_rejected(self):
+        first = decided(self.p.table("0.1.0"))
+        e2 = next(r for r in first["rows"] if r["id"] == "E2")
+        e2.update(decision="rejected", final_note=None)
+        self.p.record("0.1.0", first)
+        t = self.held("0.1.0", ["note-rejected:E2"])
+        self.assertEqual(self.by_id(t)["E2"]["decision"], "rejected")
+
+    def test_recording_a_rejection_needs_the_rerun_table_embedded(self):
+        """The sequence the skill gives: reject, write, re-run criteria, embed its object, check."""
+        first = decided(self.p.table("0.1.0"))
+        next(r for r in first["rows"] if r["id"] == "E2").update(decision="rejected", final_note=None)
+        # Embedding the pre-rejection (complete) object fails check, on a draft record too.
+        code, out = violations(record(tag="0.1.0", status="draft", criteria=first))
+        self.assertEqual(code, 4, out)
+        self.assertIn("criteria E2: a rejected note holds the table with note-rejected:E2", out)
+        # Write the decision, re-run criteria with the same fingerprints file, embed what it prints.
+        self.p.record("0.1.0", first)
+        rerun = self.p.table("0.1.0", code=10)
+        self.assertEqual((rerun["status"], rerun["held_reasons"]), ("held", ["note-rejected:E2"]))
+        row = next(r for r in rerun["rows"] if r["id"] == "E2")
+        self.assertEqual((row["decision"], row["final_note"]), ("rejected", None), "decisions carry over")
+        code, out = violations(record(tag="0.1.0", status="draft", criteria=rerun))
+        self.assertEqual(code, 0, out)
+        code, out = violations(record(tag="0.1.0", criteria=rerun))
+        self.assertEqual(code, 4, out)
+        self.assertIn("approved: criteria table held", out)
+
+    def test_reasons_are_listed_together_in_contract_order(self):
+        self.p.write(SQL_PATH, SQL_V2)
+        self.p.scope([r for r in STATUS_V1 if r["criterion"] != "E2"])
+        self.p.commit("stale and missing")
+        self.p.tag("0.1.1")
+        self.held("0.1.1", ["review-stale", "state-missing:E2", "answers-invalid"], ["--answers-invalid"])
+
+    def test_held_no_owning_scope(self):
+        """Itemised criteria with no scope carrying criteria_status (the scope was published before
+        the criteria were itemised) hold the table: never "not itemised" (FR-017, SC-001)."""
+        self.p.scope(None)
+        self.p.commit("scope without criteria_status")
+        self.p.tag("0.1.1")
+        live = ["N1", "I1", "I2", "E1", "E2", "E10", "D3"]
+        t = self.held("0.1.1", ["no-owning-scope"] + [f"state-missing:{i}" for i in live])
+        self.assertIsNone(t["scope"])
+        rows = self.by_id(t)
+        self.assertEqual([r["id"] for r in t["rows"]], ["N1", "I1", "I2", "E1", "E2", "E5", "E10", "D3"])
+        for i in live:
+            self.assertEqual((rows[i]["state"], rows[i]["proposed_note"], rows[i]["decision"]), (None, None, "pending"))
+        self.assertEqual(rows["I1"]["text"], "Adults with AAA diagnosis at TUH | ward A", "text verbatim")
+        self.assertEqual(rows["E5"]["state"], "withdrawn")
+        # The other reasons still apply, after it in contract order.
+        self.held("0.1.1", ["no-owning-scope"] + [f"state-missing:{i}" for i in live] + ["answers-invalid"],
+                  ["--answers-invalid"])
+
+    def test_no_owning_scope_reason_names_no_scope(self):
+        t = self.p.table("0.1.0")
+        t.update(status="held", held_reasons=["no-owning-scope"])
+        code, out = violations(record(status="draft", criteria=t))
+        self.assertEqual(code, 4, out)
+        self.assertIn("criteria: a no-owning-scope table names no scope", out)
+
+    def test_check_rejects_an_approved_record_without_the_table_its_tag_itemises(self):
+        """An approved record with no criteria object, at a tag whose sidecar has live criteria."""
+        commit = git(self.p.root, "rev-parse", "0.1.0^{commit}")
+        for criteria in (None, "absent"):
+            with self.subTest(criteria=criteria):
+                doc = record(tag="0.1.0", commit=commit, criteria=None)
+                if criteria == "absent":
+                    del doc["criteria"]
+                r = run(RELEASE, ["check", "--stdin"], self.p.root, stdin=json.dumps(doc))
+                self.assertEqual(r.returncode, 4, r.stdout + r.stderr)
+                self.assertIn("approved: criteria are itemised at 0.1.0; embed the release.sh criteria table",
+                              r.stdout)
+                self.assertNotIn(LEAK_CANARY, r.stdout + r.stderr)
+                doc["status"] = "draft"
+                r = run(RELEASE, ["check", "--stdin"], self.p.root, stdin=json.dumps(doc))
+                self.assertEqual(r.returncode, 0, r.stdout + r.stderr)
+        # Nothing live at the tag (every criterion withdrawn, or no sidecar): a null table is right.
+        self.p.sidecar([dict(c, withdrawn=withdrawn()) for c in CRITERIA_V1])
+        self.p.commit("all withdrawn")
+        self.p.tag("0.1.1")
+        (self.p.root / "answers.intake.json").unlink()
+        self.p.commit("no sidecar")
+        self.p.tag("0.1.2")
+        for tag in ("0.1.1", "0.1.2"):
+            with self.subTest(tag=tag):
+                doc = record(tag=tag, commit=git(self.p.root, "rev-parse", f"{tag}^{{commit}}"), criteria=None)
+                r = run(RELEASE, ["check", "--stdin"], self.p.root, stdin=json.dumps(doc))
+                self.assertEqual(r.returncode, 0, r.stdout + r.stderr)
+
+    def test_legacy_repository_is_not_itemised(self):
+        def all_withdrawn():
+            self.p.sidecar([dict(c, withdrawn=withdrawn()) for c in CRITERIA_V1])
+            self.p.scope(None)
+        cases = {"no sidecar": lambda: (self.p.root / "answers.intake.json").unlink(),
+                 "schema 1": lambda: self.p.sidecar(None, schema=1),
+                 "schema 2, no live criteria, no owning scope": all_withdrawn}
+        for n, (name, change) in enumerate(cases.items()):
+            with self.subTest(name):
+                self.p.sidecar(CRITERIA_V1)
+                self.p.scope(STATUS_V1)
+                change()
+                self.p.commit(name)
+                self.p.tag(f"0.1.{n + 1}")
+                r = self.p.criteria(f"0.1.{n + 1}", "--fingerprints", str(self.p.fp))
+                self.assertEqual((r.returncode, r.stdout.strip()), (0, "null"), r.stderr)
+
+    def test_usage_and_errors(self):
+        self.assertEqual(self.p.criteria("0.1.0", "--answers-invalid", "--fingerprints", str(self.p.fp)).returncode, 1)
+        self.assertEqual(self.p.criteria().returncode, 1)
+        self.assertEqual(self.p.criteria("9.9.9").returncode, 2)
+        bad = Path(self.out.name) / "bad.json"
+        bad.write_text(json.dumps({"inclusion_criteria": LEAK_CANARY}))
+        r = self.p.criteria("0.1.0", "--fingerprints", str(bad))
+        self.assertEqual(r.returncode, 2)
+        self.assertNotIn(LEAK_CANARY, r.stdout + r.stderr)
+
+    def test_read_only(self):
+        self.p.table("0.1.0")
+        self.assertEqual(git(self.p.root, "status", "--porcelain"), "")
+
+    def test_packaged_module_is_the_canonical_bytes(self):
+        for tree in ("claude", "codex"):
+            with self.subTest(tree=tree):
+                self.assertEqual(CRIT_JQ[tree].read_bytes(), CRIT_JQ["canonical"].read_bytes())
+
+
+def crit_table(previous_tag="0.1.0"):
+    """An approved, complete criteria object in the shape `release.sh criteria` writes."""
+    def r(id_, kind, text, state, note, change, **over):
+        d = {"id": id_, "kind": kind, "text": text, "state": state, "proposed_note": note,
+             "final_note": note, "decision": "accepted", "change": change,
+             "decided_by": "analyst-login", "decided_at": "2026-10-15T01:00:00Z"}
+        d.update(over)
+        return d
+    return {"previous_tag": previous_tag, "scope": {"slug": SLUG, "revision": 2}, "status": "complete",
+            "held_reasons": [], "rows": [
+                r("N1", "entry_event", "First AAA admission", "applied", "Applied", "unchanged"),
+                r("I1", "inclusion", "Adults with an AAA diagnosis at TUH | ward A", "applied", "Applied",
+                  "text-reworded"),
+                r("I2", "inclusion", "Consented to linkage", "researcher-applies", "Researcher applies", "unchanged"),
+                r("E1", "exclusion", "Deceased patients", "withdrawn", "Withdrawn by researcher", "replaced",
+                  replaced_by="E4"),
+                r("E2", "exclusion", "Previous AAA repair", "flagged", FLAG_NOTE, "changed",
+                  previous_state="not-applied"),
+                r("E4", "exclusion", "Died before the index admission", "applied", "Applied", "new",
+                  decision="reworded", final_note="Applied in full"),
+                r("E10", "exclusion", "Type 2 diabetes", "partially-applied",
+                  "Partially applied: diagnosis codes only; medications not used", "unchanged"),
+                r("D3", "data_element", "Smoking status", "withdrawn", "Withdrawn by researcher", "withdrawn"),
+            ]}
+
+
+@unittest.skipUnless(shutil.which("jq"), "release.sh needs jq")
+class CriteriaCheck(unittest.TestCase):
+    """T051: check validates the criteria object and gates approval on it."""
+
+    def assertViolation(self, doc, fragment):
+        code, out = violations(doc)
+        self.assertEqual(code, 4, out)
+        self.assertIn(fragment, out)
+
+    def test_complete_table_and_legacy_records_pass(self):
+        for doc in (record(criteria=crit_table()), record(criteria=None), record()):
+            self.assertEqual(violations(doc)[0], 0, violations(doc)[1])
+
+    def test_pending_row_fails_approval(self):
+        t = crit_table()
+        t["rows"][1].update(decision="pending", final_note=None)
+        del t["rows"][1]["decided_by"], t["rows"][1]["decided_at"]
+        self.assertViolation(record(criteria=t), "approved: criteria I1 is pending")
+        self.assertEqual(violations(record(status="draft", criteria=t))[0], 0)
+
+    def test_shape(self):
+        def broken(mutate):
+            t = crit_table()
+            mutate(t)
+            return record(status="draft", criteria=t)
+        self.assertViolation(broken(lambda t: t.update(status="done")), "criteria: status must be complete or held")
+        self.assertViolation(broken(lambda t: t.update(rows=list(reversed(t["rows"])))),
+                             "criteria: rows must be in criteria order")
+        self.assertViolation(broken(lambda t: t["rows"][4].pop("previous_state")),
+                             "criteria E2: a changed row needs previous_state")
+        self.assertViolation(broken(lambda t: t["rows"][3].pop("replaced_by")),
+                             "criteria E1: a replaced row needs replaced_by")
+        self.assertViolation(broken(lambda t: t["rows"][0].update(change="moved")), "criteria N1: change must be")
+        self.assertViolation(broken(lambda t: t["rows"][0].update(kind="inclusion")),
+                             "criteria: every row needs a criterion id matching its kind")
+        self.assertViolation(broken(lambda t: t["rows"][0].update(state="delivered")),
+                             "criteria N1: state is not allowed for its kind")
+        self.assertViolation(broken(lambda t: t["rows"][0].update(final_note="Different")),
+                             "criteria N1: an accepted note keeps the proposed note as final")
+        self.assertViolation(broken(lambda t: t["rows"].append(dict(t["rows"][-1]))), "criteria: duplicate row D3")
+        self.assertViolation(broken(lambda t: t.update(previous_tag=None)),
+                             "criteria: a first release has no change but —")
+        self.assertViolation(broken(lambda t: t.update(status="held")), "criteria: a held table needs held_reasons")
+        self.assertViolation(broken(lambda t: t.update(held_reasons=["because " + LEAK_CANARY])),
+                             "criteria: unknown held reason")
+        self.assertNotIn(LEAK_CANARY, violations(broken(lambda t: t.update(held_reasons=[LEAK_CANARY])))[1])
+
+    def test_malformed_values_are_never_echoed(self):
+        t = crit_table()
+        t.update(status="held", held_reasons=["note-rejected:Patient " + LEAK_CANARY + " 1234"])
+        code, out = violations(record(status="draft", criteria=t))
+        self.assertEqual(code, 4, out)
+        self.assertIn("criteria: unknown held reason", out)
+        self.assertNotIn(LEAK_CANARY, out)
+        t = crit_table()
+        t["rows"] += [dict(t["rows"][0], id="Mrs " + LEAK_CANARY), dict(t["rows"][0], id="Mrs " + LEAK_CANARY)]
+        code, out = violations(record(status="draft", criteria=t))
+        self.assertEqual(code, 4, out)
+        self.assertIn("criteria: every row needs a criterion id matching its kind", out)
+        self.assertNotIn(LEAK_CANARY, out)
+
+    def test_pending_row_with_a_malformed_id_is_not_echoed_on_approval(self):
+        t = crit_table()
+        t["rows"].append(dict(t["rows"][0], id="Mrs " + LEAK_CANARY, decision="pending", final_note=None))
+        code, out = violations(record(criteria=t))
+        self.assertEqual(code, 4, out)
+        self.assertIn("criteria: every row needs a criterion id matching its kind", out)
+        self.assertNotIn(LEAK_CANARY, out)
+
+    def test_rejected_note_must_be_named_in_held_reasons(self):
+        t = crit_table()
+        t["rows"][4].update(decision="rejected", final_note=None)
+        t.update(status="held", held_reasons=["fingerprints-unchecked"])
+        self.assertViolation(record(status="draft", criteria=t),
+                             "criteria E2: a rejected note holds the table with note-rejected:E2")
+
+    def test_rejected_note_must_hold_the_table(self):
+        t = crit_table()
+        t["rows"][4].update(decision="rejected", final_note=None)
+        self.assertViolation(record(status="draft", criteria=t), "criteria E2: a rejected note holds the table")
+        t.update(status="held", held_reasons=["note-rejected:E2"])
+        self.assertEqual(violations(record(status="draft", criteria=t))[0], 0)
+        self.assertViolation(record(criteria=t), "approved: criteria table held: note-rejected:E2")
+
+
+@unittest.skipUnless(shutil.which("jq"), "release.sh needs jq")
+class CriteriaRender(unittest.TestCase):
+    """T051: the "Criteria in this release" section of the release body."""
+
+    def body(self, doc):
+        r = render_record(doc)
+        self.assertEqual(r.returncode, 0, r.stdout + r.stderr)
+        return r.stdout
+
+    def test_table_before_limitations(self):
+        out = self.body(record(criteria=crit_table()))
+        self.assertLess(out.index("## Extraction Summary"), out.index("## Criteria in this release"))
+        self.assertLess(out.index("## Criteria in this release"),
+                        out.index("## Extraction Assumptions / Important limitations"))
+        table = section(out, "## Criteria in this release")
+        expected = "\n".join([
+            "## Criteria in this release", "",
+            "| ID | Researcher's request | This release | Change since 0.1.0 |",
+            "|---|---|---|---|",
+            "| N1 | First AAA admission | Applied | — |",
+            "| I1 | Adults with an AAA diagnosis at TUH &#124; ward A | Applied | Reworded |",
+            "| I2 | Consented to linkage | Researcher applies | — |",
+            "| E1 | Deceased patients | Withdrawn by researcher | Replaced by E4 |",
+            "| E2 | Previous AAA repair | " + FLAG_NOTE + " | Changed (was not applied) |",
+            "| E4 | Died before the index admission | Applied in full | New |",
+            "| E10 | Type 2 diabetes | Partially applied: diagnosis codes only; medications not used | — |",
+            "| D3 | Smoking status | Withdrawn by researcher | Withdrawn by researcher |",
+        ])
+        self.assertEqual(table.strip(), expected)
+        self.assertNotIn("not itemised", out)
+
+    def test_first_release_header(self):
+        t = crit_table(previous_tag=None)
+        for r in t["rows"]:
+            r["change"] = "—"
+            r.pop("previous_state", None)
+            r.pop("replaced_by", None)
+        out = self.body(record(criteria=t))
+        self.assertIn("| ID | Researcher's request | This release | Change |\n", out)
+        self.assertIn("| E1 | Deceased patients | Withdrawn by researcher | — |", out)
+
+    def test_draft_shows_pending_notes(self):
+        t = crit_table()
+        t["rows"][0].update(decision="pending", final_note=None)
+        out = self.body(record(status="draft", criteria=t))
+        self.assertIn("| N1 | First AAA admission | [pending] Applied | — |", out)
+
+    def test_legacy_record_gets_one_line(self):
+        for doc in (record(), record(criteria=None)):
+            out = self.body(doc)
+            self.assertEqual(out.count("Criteria are not itemised for this request."), 1)
+            self.assertNotIn("## Criteria in this release", out)
+            self.assertLess(out.index("Criteria are not itemised for this request.\n"),
+                            out.index("## Extraction Assumptions / Important limitations"))
+            # The rest of the body is unchanged.
+            self.assertIn("- Age is the patient's age on the day they arrived.", out)
+
+    def test_legacy_record_keeps_a_claim_citing_a_criterion_like_item(self):
+        doc = record()
+        doc["claims"].append(claim("C4", "assumptions", "Encounters are deduplicated.",
+                                   sources=[{"kind": "scope", "slug": SLUG, "item": "E2", "revision": 2}]))
+        out = self.body(doc)
+        self.assertIn("- Encounters are deduplicated.",
+                      section(out, "## Extraction Assumptions / Important limitations"))
+        # And it counts towards approval, as before.
+        doc["claims"][1].update(decision="rejected", final=None)
+        self.assertEqual(violations(doc)[0], 0, violations(doc)[1])
+
+    def test_criteria_claims_are_not_repeated_in_limitations(self):
+        doc = record(criteria=crit_table())
+        doc["claims"].append(claim("C4", "assumptions", "Previous repairs are flagged, not removed.",
+                                   sources=[{"kind": "scope", "slug": SLUG, "item": "E2", "revision": 2}]))
+        self.assertEqual(violations(doc)[0], 0, violations(doc)[1])
+        out = self.body(doc)
+        self.assertNotIn("Previous repairs are flagged", out)
+        self.assertIn("- Age is the patient's age on the day they arrived.",
+                      section(out, "## Extraction Assumptions / Important limitations"))
+
+    def test_only_criteria_claims_do_not_satisfy_approval(self):
+        doc = record(criteria=crit_table())
+        doc["claims"][1]["sources"] = [{"kind": "scope", "slug": SLUG, "item": "E2", "revision": 2}]
+        code, out = violations(doc)
+        self.assertEqual(code, 4, out)
+        self.assertIn("approved: no kept claim in assumptions", out)
+
+
 # --- eval cases -----------------------------------------------------------------------------
 
 # Eval case -> the regex graders its answer is decided by.
@@ -753,6 +2426,19 @@ CASES = {
                                "blocker-missing-element"},
     "release-technical-limitation": {"include-l4", "internal-l3", "claims-no-sql-jargon",
                                      "claims-current-record"},
+    "release-criteria-table": {"table-before-limitations", "researcher-wording-unchanged",
+                               "held-not-final"},
+    # #534: a handed-off amend part holds release preparation until completed or withdrawn.
+    "release-amend-part-open": {"prep-stopped", "names-p3"},
+    "release-amend-part-withdrawn": {"prep-continue", "no-blocker"},
+    # Only `done: P<n> <commit>` in the release ref or `withdrawn: P<n> <reason>` close a part.
+    "release-amend-part-in-progress": {"prep-stopped", "names-p3", "not-closed"},
+    "release-amend-withdrawn-no-reason": {"prep-stopped", "names-p3", "not-closed"},
+    "release-amend-done-outside-ref": {"prep-stopped", "names-p3", "not-closed"},
+    "release-amend-part-done": {"prep-continue", "no-blocker", "closed-by-done"},
+    # A close line from the wrong writer leaves the part open.
+    "release-amend-done-wrong-author": {"prep-stopped", "names-p3", "not-closed", "names-writer"},
+    "release-amend-withdrawn-wrong-author": {"prep-stopped", "names-p3", "not-closed", "names-writer"},
 }
 NODE = shutil.which("node")
 NODE_SCRIPT = """
@@ -846,6 +2532,97 @@ class EvalFixtures(unittest.TestCase):
                 start = time.monotonic()
                 self.grade(regex_sources(case), reply)
                 self.assertLess(time.monotonic() - start, 5)
+
+
+@unittest.skipUnless(shutil.which("jq") and shutil.which("git"), "release.sh needs jq and git")
+class LegacyBoundRecord(unittest.TestCase):
+    """A record bound before #516 to pipeline SQL (sql/cohort_pipeline/x.sql) must not block a release.
+
+    evidence and criteria read that SQL from git at the ref, never from the work tree, so only the
+    structural path check applies to a stored path. New input paths keep the policy."""
+
+    LEGACY = "sql/cohort_pipeline/x.sql"
+    LEGACY_SLUG = "sql__cohort_pipeline__x"
+
+    def setUp(self):
+        self.tmp = tempfile.TemporaryDirectory()
+        self.addCleanup(self.tmp.cleanup)
+        self.out = tempfile.TemporaryDirectory()
+        self.addCleanup(self.out.cleanup)
+        self.p = CriteriaProject(self.tmp.name, self.out.name, self)
+        self.p.write(self.LEGACY, SQL_V1)
+        self.p.commit("pipeline sql")
+        self.p.review_commit = git(self.p.root, "rev-parse", "HEAD")
+        self.p.review(SQL_V1, slug=self.LEGACY_SLUG, sql_path=self.LEGACY)
+
+    def test_evidence_does_not_exit_2_for_a_legacy_bound_review(self):
+        self.p.commit("legacy review")
+        self.p.tag("v1.0.0")
+        r = self.p.evidence("v1.0.0")
+        self.assertEqual(r.returncode, 0, r.stderr)
+        rows = {row["slug"]: row for row in json.loads(r.stdout)["reviews"]}
+        self.assertIn(self.LEGACY_SLUG, rows)
+        self.assertEqual(rows[self.LEGACY_SLUG]["applies"], "current")
+        self.assertEqual(rows[SLUG]["applies"], "current")
+
+    def test_criteria_does_not_exit_2_for_a_legacy_bound_scope(self):
+        self.p.sidecar(CRITERIA_V1)
+        self.p.scope(STATUS_V1)
+        doc = json.loads((self.p.root / ".sqlreview/reviews" / SLUG / "scope.json").read_text())
+        (self.p.root / ".sqlreview/reviews" / SLUG / "scope.json").unlink()
+        doc.update(slug=self.LEGACY_SLUG, sql_path=self.LEGACY,
+                   sql_sha256=hashlib.sha256(SQL_V1.encode()).hexdigest())
+        self.p.write(f".sqlreview/reviews/{self.LEGACY_SLUG}/scope.json", json.dumps(doc, indent=2))
+        self.p.commit("legacy scope")
+        self.p.tag("0.1.0")
+        r = self.p.criteria("0.1.0", "--fingerprints", str(self.p.fp))
+        self.assertNotEqual(r.returncode, 2, r.stdout + r.stderr)
+        self.assertEqual(json.loads(r.stdout)["scope"], {"slug": self.LEGACY_SLUG, "revision": 1})
+
+
+@unittest.skipUnless(shutil.which("jq") and shutil.which("git"), "release.sh needs jq and git")
+class BodyHashUnavailableAtRef(unittest.TestCase):
+    """SQL at the ref whose header never closes has no body hash. That is a change to report, not a stop.
+
+    Before #548 the release evidence reported the review as changed. The note is fixed text: it never
+    echoes the SQL."""
+
+    UNCLOSED = "/* assumptions:\n  - ZZTEST-header-never-closed\nSELECT 1;\n"
+    NOTE = "The SQL body hash could not be computed at the ref."
+
+    def setUp(self):
+        self.tmp = tempfile.TemporaryDirectory()
+        self.addCleanup(self.tmp.cleanup)
+        self.out = tempfile.TemporaryDirectory()
+        self.addCleanup(self.out.cleanup)
+        self.p = CriteriaProject(self.tmp.name, self.out.name, self)
+
+    def test_evidence_reports_the_review_as_changed_with_a_fixed_note(self):
+        self.p.write(SQL_PATH, self.UNCLOSED)
+        self.p.commit("unclosed header")
+        self.p.tag("v1.0.0")
+        r = self.p.evidence("v1.0.0")
+        self.assertEqual(r.returncode, 10, r.stderr)
+        rev = json.loads(r.stdout)["reviews"][0]
+        self.assertEqual(rev["applies"], "changed")
+        self.assertIsNone(rev["sql_body_sha256_at_ref"])
+        self.assertEqual(rev["sql_body_sha256_note"], self.NOTE)
+        self.assertNotIn("ZZTEST-header-never-closed", r.stdout + r.stderr)
+
+    def test_a_hashable_body_carries_no_note(self):
+        self.p.tag("v1.0.0")
+        rev = json.loads(self.p.evidence("v1.0.0").stdout)["reviews"][0]
+        self.assertIsNone(rev["sql_body_sha256_note"])
+
+    def test_criteria_does_not_stop_with_exit_2(self):
+        self.p.sidecar(CRITERIA_V1)
+        self.p.scope(STATUS_V1)
+        self.p.write(SQL_PATH, self.UNCLOSED)
+        self.p.commit("unclosed header")
+        self.p.tag("0.1.0")
+        r = self.p.criteria("0.1.0", "--fingerprints", str(self.p.fp))
+        self.assertNotEqual(r.returncode, 2, r.stdout + r.stderr)
+        self.assertNotIn("ZZTEST-header-never-closed", r.stdout + r.stderr)
 
 
 if __name__ == "__main__":

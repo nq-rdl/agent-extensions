@@ -1,0 +1,3 @@
+kind: Fixed
+body: 'data-request: release.sh evidence holds a missing record only when the ledger amend artifact names it, so a single-part amendment passes (#534)'
+time: 2026-11-05T17:01:00.000000+10:00

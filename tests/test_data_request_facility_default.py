@@ -12,7 +12,7 @@ import unittest
 from pathlib import Path
 
 from test_data_request_recurring_decisions import run
-from test_sql_review_scripts import item, review_doc, scope_doc
+from test_sql_review_scripts import Project, item, review_doc, scope_doc
 
 REPO = Path(__file__).resolve().parent.parent
 TREES = {"canonical": REPO / "skills",
@@ -63,9 +63,20 @@ class HouseDefaultContracts(unittest.TestCase):
             for leaf in ("map", "bootstrap", "draft"):
                 with self.subTest(tree=tree, leaf=leaf):
                     rule = text(tree, leaf)
-                    for token in ("House defaults", "tuh-facility", "upstream", "without asking",
-                                  "one standard assumption", "recurring-decisions.rst"):
+                    for token in ("House defaults", "tuh-facility", "upstream", "one standard assumption"):
                         self.assertIn(token, rule)
+
+    def test_every_stage_states_the_import_rule_and_cites_the_reference(self):
+        for tree in TREES:
+            for leaf in ("bootstrap", "draft", "map", "guardrails", "triage"):
+                with self.subTest(tree=tree, leaf=leaf):
+                    rule = text(tree, leaf)
+                    self.assertIn("skills/setup/references/recurring-decisions.rst", rule)
+                    lower = rule.lower()
+                    self.assertIn("without a fresh question", lower)
+                    self.assertIn("tell the engineer", lower)
+                    self.assertIn("override", lower)
+                    self.assertNotIn("put one facility-scope question instead", rule)
 
     def test_alternative_hhs_network_scope_gets_question_instead_of_default(self):
         for tree in TREES:
@@ -94,11 +105,32 @@ class HouseDefaultContracts(unittest.TestCase):
         for tree in TREES:
             with self.subTest(tree=tree):
                 rule = text(tree, "setup", "references/recurring-decisions.rst")
-                for token in ("Recorded house default", "tuh-facility", "without asking",
+                for token in ("Recorded house default", "tuh-facility", "human ruling",
+                              "you do not decide it", "without a fresh question",
+                              "Telling the engineer is not a question", "may override it before publish",
+                              "exits 4", "never the values", "no recorded ruling",
                               "confirmed_by", "confirmed_at", "confirmed_revision", "decided",
                               "date-only", "not a new engineer confirmation", "exact listed wording",
                               "changed wording", "Human confirmation is still", "upstream",
                               "Never invent", "one item", "no carried_from_revision"):
+                    self.assertIn(token, rule)
+
+    def test_broad_first_pass_refusal_uses_the_one_reference_rule(self):
+        for tree in TREES:
+            with self.subTest(tree=tree):
+                bootstrap = text(tree, "bootstrap")
+                self.assertNotIn("If either is missing, treat the exclusions as ordinary", bootstrap)
+                start = bootstrap.index("**House default:** `broad-first-pass`")
+                passage = bootstrap[start:start + 2400]
+                for token in ("`list` exits 4, stop and import nothing", "refusal path",
+                              "skills/setup/references/recurring-decisions.rst",
+                              "has no `house_default`, no ruling is recorded",
+                              "ordinary engineer-confirmed rows", "needs no fresh question"):
+                    self.assertIn(token, passage)
+                rule = text(tree, "setup", "references/recurring-decisions.rst")
+                for token in ("This refusal applies to every house default, not only ``tuh-facility``",
+                              "``broad-first-pass`` follows the same path",
+                              "If ``broad-first-pass`` has no ``house_default`` at all"):
                     self.assertIn(token, rule)
 
     def test_shared_entry_preserves_code_and_independent_origin(self):
@@ -189,10 +221,13 @@ class FacilityHelperRoundTrips(unittest.TestCase):
         for tree in TREES:
             for kind in ("scope", "review"):
                 with self.subTest(tree=tree, kind=kind), tempfile.TemporaryDirectory() as tmp:
-                    root = Path(tmp)
+                    p = Project(tmp)
+                    root = p.root
                     sql = "SELECT 1;\n"
                     (root / "cohort.sql").write_text(sql)
                     self.helper(tree, tmp, "sqlreview", "init")
+                    p.commit()
+                    fp = json.loads(self.helper(tree, tmp, "sqlreview", "fingerprint", "cohort.sql").stdout)
                     slug = "cohort"
                     store = root / ".sqlreview/reviews" / slug
                     store.mkdir(parents=True, exist_ok=True)
@@ -202,8 +237,7 @@ class FacilityHelperRoundTrips(unittest.TestCase):
                              confirmed_by=h["confirmed_by"], confirmed_at=h["confirmed_at"],
                              decided=h["decided"], upstream={"decision": DECISION, "source": "house-default"})
                     factory = scope_doc if kind == "scope" else review_doc
-                    doc = factory(slug, "cohort.sql", schemaVersion=2, assumptions=[a], limitations=[],
-                                  sql_sha256=hashlib.sha256(sql.encode()).hexdigest(),
+                    doc = factory(slug, **fp, schemaVersion=2, assumptions=[a], limitations=[],
                                   logic=[{"step": 1, "title": "Select", "lines": [1, 1], "description": "Fixture"}])
                     draft = store / f"{kind}.draft.json"
                     draft.write_text(json.dumps(doc))
@@ -238,10 +272,12 @@ class FacilityHelperRoundTrips(unittest.TestCase):
     def test_default_publish_render_and_carry_keep_the_original_record(self):
         for tree in TREES:
             with self.subTest(tree=tree), tempfile.TemporaryDirectory() as tmp:
-                root = Path(tmp)
+                p = Project(tmp)
+                root = p.root
                 d = entry(tree)
                 h = d["house_default"]
                 self.helper(tree, tmp, "sqlreview", "init")
+                p.commit()
                 slug = self.helper(tree, tmp, "sqlreview", "slug", "cohort.sql").stdout.strip()
                 store = root / ".sqlreview/reviews" / slug
                 store.mkdir(parents=True, exist_ok=True)

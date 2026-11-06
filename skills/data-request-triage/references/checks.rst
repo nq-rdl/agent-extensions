@@ -9,10 +9,16 @@ not parked as analyst questions. Keep human decisions distinct from agent defaul
 Read-only stale lift check
 -------------------------
 
-For each existing ``lifts.json``, read the stale-check contract at
-``${CLAUDE_PLUGIN_ROOT}/skills/setup/references/lifts.rst``. Discover the latest
-stable tag of the entry's owning library through the shared tag-list policy at
-``${CLAUDE_PLUGIN_ROOT}/skills/guardrails/references/library.rst``. Run the shared
+For each existing ``lifts.json``, read the stale-check contract::
+
+  ${CLAUDE_PLUGIN_ROOT}/skills/setup/references/lifts.rst
+
+Discover the latest stable tag of the entry's owning library through the shared tag-list
+policy::
+
+  ${CLAUDE_PLUGIN_ROOT}/skills/guardrails/references/library.rst
+
+Run the shared
 helper's ``lifts-stale SLUG --tag TAG`` in the child's read-only checkout/scratch
 view; it never edits a ledger. Mixed-library ledgers need a run per library's
 latest tag, using only matching-library rows from each result.
