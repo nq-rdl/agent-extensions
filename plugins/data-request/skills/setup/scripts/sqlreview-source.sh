@@ -4,8 +4,8 @@
 # Callers supply an absolute output in their trapped private directory outside git.
 
 # A partial clone fetches a missing blob from its remote when git reads it. Release evidence must make no
-# network call, so every git here refuses that fetch (git 2.44 and later read this variable). An older git
-# ignores it, so sr_partial_gate fails closed instead.
+# network call, so every git here refuses that fetch (a git that reads this variable). Some gits ignore it, so
+# sr_partial_gate also refuses every partial clone.
 export GIT_NO_LAZY_FETCH=1
 
 # Status contract: 6 is unavailable or unauthenticated historical evidence;
@@ -13,29 +13,25 @@ export GIT_NO_LAZY_FETCH=1
 sr_source_error() { printf 'sqlreview: %s\n' "$*" >&2; return 2; }
 sr_source_unavailable() { printf 'sqlreview: %s\n' "$*" >&2; return 6; }
 
-# Fail closed in a partial clone when this git cannot refuse the lazy fetch (older than 2.44). The message
-# is fixed and names no path. The answer is kept in SR_PARTIAL_OK, which subshells inherit. Status never
-# calls this, so it adds no git call there.
+# Fail closed in a partial clone, whatever the git version. Version numbers do not tell whether a git refuses
+# a lazy fetch, so the rule does not use them. A partial clone has extensions.partialclone, a remote with
+# promisor=true, or a remote with partialclonefilter. The message is fixed and names no path. The answer is
+# kept in SR_PARTIAL_OK, which subshells inherit. Status never calls this, so it adds no git call there.
 sr_partial_gate() { # [DIR]
   [ -z "${SR_PARTIAL_OK:-}" ] || return 0
-  local dir="${1:-$SR_ROOT}" v major minor key val partial=""
-  # A partial clone names its promisor remote in extensions.partialclone (older git) or as remote.<name>.promisor
-  # (git clone --filter). Either key counts, unless its value is false.
+  local dir="${1:-$SR_ROOT}" key val partial=""
   while read -r key val; do
-    [ -z "$key" ] || [ "$val" = false ] || partial=1
+    [ -n "$key" ] || continue
+    case "$key" in
+      *.promisor) [ "$val" = false ] || partial=1 ;;
+      *) partial=1 ;;
+    esac
   done <<EOF2
-$(git -C "$dir" config --get-regexp '^(extensions\.partialclone|remote\..*\.promisor)$' 2>/dev/null)
+$(git -C "$dir" config --get-regexp '^(extensions\.partialclone|remote\..*\.(promisor|partialclonefilter))$' 2>/dev/null)
 EOF2
   if [ -n "$partial" ]; then
-    v="$(git --version 2>/dev/null)"; v="${v#git version }"
-    major="${v%%.*}"; minor="${v#*.}"; minor="${minor%%.*}"
-    case "$major.$minor" in
-      .|*[!0-9.]*|.*|*.) sr_source_error "this repository is a partial clone and the git version is unknown, so a read could fetch from the network. Use a full clone"; return 2 ;;
-    esac
-    if [ "$major" -lt 2 ] || { [ "$major" -eq 2 ] && [ "$minor" -lt 44 ]; }; then
-      sr_source_error "this repository is a partial clone and git is older than 2.44, so a read could fetch from the network. Fetch the blobs first, use a full clone, or update git"
-      return 2
-    fi
+    sr_source_error "this repository is a partial clone, so a read could fetch from the network. Use a full clone or fetch the missing blobs first"
+    return 2
   fi
   SR_PARTIAL_OK=1
 }

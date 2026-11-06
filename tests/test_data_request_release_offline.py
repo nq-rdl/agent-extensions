@@ -2,8 +2,8 @@
 
 A partial clone (--filter=blob:none) fetches a missing blob from its remote when git reads it. Evidence
 must not do that. Every git of the source helpers runs with GIT_NO_LAZY_FETCH=1 (git 2.44 and later read
-it). Where git is older than 2.44 and the repository is a partial clone, evidence fails closed with a
-fixed message. The tests count calls to the remote through a logging upload-pack, which sees every fetch,
+it). Some gits ignore it, and version numbers are unreliable. So evidence, criteria and the source helpers
+fail closed in every partial clone, with a fixed message. The tests count calls to the remote through a logging upload-pack, which sees every fetch,
 whatever process starts it. Synthetic data only.
 """
 
@@ -20,13 +20,7 @@ try:  # `unittest discover -s tests` puts tests/ on sys.path; `-m unittest tests
 except ModuleNotFoundError:
     from tests.test_data_request_release import RELEASE, SQL_PATH, SQL_V2, Project, clean_env, git, run
 
-MESSAGE = "this repository is a partial clone and git is older than 2.44"
-
-
-def git_version():
-    out = subprocess.run(["git", "--version"], capture_output=True, text=True).stdout.split()[2]
-    major, minor = out.split(".")[:2]
-    return int(major), int("".join(c for c in minor if c.isdigit()))
+MESSAGE = "this repository is a partial clone, so a read could fetch from the network"
 
 
 @unittest.skipUnless(shutil.which("jq") and shutil.which("git"), "release.sh needs jq and git")
@@ -63,15 +57,14 @@ class PartialClone(unittest.TestCase):
         self.assertFalse(self.log.exists(), "logging starts after the clone")
         return dest
 
-    def old_git(self, version, name="old"):
-        """A git on PATH that reports VERSION and logs GIT_NO_LAZY_FETCH, then runs the real git."""
+    def env_logger(self, name="envlog"):
+        """A git on PATH that logs GIT_NO_LAZY_FETCH, then runs the real git."""
         wrap = self.tmp / name
         wrap.mkdir()
-        env_log = self.tmp / f"{name}-env.log"
+        env_log = self.tmp / f"{name}.log"
         script = wrap / "git"
         script.write_text(
             "#!/bin/sh\n"
-            f'[ "$1" = "--version" ] && {{ echo "git version {version}"; exit 0; }}\n'
             f'echo "${{GIT_NO_LAZY_FETCH:-unset}}" >> "{env_log}"\n'
             f'exec "{shutil.which("git")}" "$@"\n')
         script.chmod(0o755)
@@ -91,46 +84,48 @@ class PartialClone(unittest.TestCase):
         r = run(RELEASE, ["evidence", "v1.0.0"], dest)
         self.assertFalse(self.log.exists(), "evidence reached the remote")
         self.assertEqual(r.returncode, 2, r.stdout + r.stderr)
-        if git_version() < (2, 44):
-            self.assertIn(MESSAGE, r.stderr)
-        self.assertNotIn(SQL_PATH, r.stderr)
-
-    def test_an_old_git_fails_closed_in_a_partial_clone_with_a_fixed_message(self):
-        bare = self.make_source(change_sql=False)
-        dest = self.clone(bare, "work")
-        env, _ = self.old_git("2.39.5")
-        r = run(RELEASE, ["evidence", "v1.0.0"], dest, env=env)
-        self.assertEqual(r.returncode, 2, r.stdout + r.stderr)
         self.assertIn(MESSAGE, r.stderr)
         self.assertIn("full clone", r.stderr)
-        self.assertEqual(r.stdout, "")
-        self.assertFalse(self.log.exists())
+        self.assertNotIn(SQL_PATH, r.stderr)
 
-    def test_criteria_also_fails_closed_with_an_old_git(self):
+    def test_a_real_partial_clone_is_refused_even_with_every_blob_present(self):
         bare = self.make_source(change_sql=False)
         dest = self.clone(bare, "work")
-        env, _ = self.old_git("2.39.5")
-        r = run(RELEASE, ["criteria", "v1.0.0"], dest, env=env)
-        self.assertEqual(r.returncode, 2, r.stdout + r.stderr)
-        self.assertIn(MESSAGE, r.stderr)
-
-    def test_a_current_git_reads_a_partial_clone_when_the_blobs_are_present(self):
-        bare = self.make_source(change_sql=False)
-        dest = self.clone(bare, "work")
-        env, env_log = self.old_git("2.44.0")
-        r = run(RELEASE, ["evidence", "v1.0.0"], dest, env=env)
-        self.assertEqual(r.returncode, 0, r.stdout + r.stderr)
-        self.assertIn('"applies": "current"', r.stdout.replace('"applies":"current"', '"applies": "current"'))
+        for args in (["evidence", "v1.0.0"], ["criteria", "v1.0.0"]):
+            with self.subTest(args=args):
+                r = run(RELEASE, args, dest)
+                self.assertEqual(r.returncode, 2, r.stdout + r.stderr)
+                self.assertIn(MESSAGE, r.stderr)
+                self.assertEqual(r.stdout, "")
         self.assertFalse(self.log.exists())
-        seen = set(env_log.read_text().split())
-        self.assertEqual(seen, {"1"}, "every git call runs with GIT_NO_LAZY_FETCH=1")
 
-    def test_a_full_clone_is_read_with_an_old_git(self):
+    def test_each_detection_key_is_refused(self):
+        # A full repository with only the key set, so the key alone decides.
         self.make_source(change_sql=False)
-        env, _ = self.old_git("2.39.5")
+        for key, value in (("extensions.partialclone", "origin"), ("remote.origin.promisor", "true"),
+                           ("remote.origin.partialclonefilter", "blob:none")):
+            with self.subTest(key=key):
+                git(self.src.root, "config", key, value)
+                for args in (["evidence", "v1.0.0"], ["criteria", "v1.0.0"]):
+                    r = run(RELEASE, args, self.src.root)
+                    self.assertEqual(r.returncode, 2, r.stdout + r.stderr)
+                    self.assertIn(MESSAGE, r.stderr)
+                    self.assertEqual(r.stdout, "")
+                git(self.src.root, "config", "--unset", key)
+
+    def test_a_promisor_set_to_false_is_not_a_partial_clone(self):
+        self.make_source(change_sql=False)
+        git(self.src.root, "config", "remote.origin.promisor", "false")
+        r = run(RELEASE, ["evidence", "v1.0.0"], self.src.root)
+        self.assertEqual(r.returncode, 0, r.stdout + r.stderr)
+
+    def test_a_full_clone_is_read_and_every_git_call_has_the_variable(self):
+        self.make_source(change_sql=False)
+        env, env_log = self.env_logger()
         r = run(RELEASE, ["evidence", "v1.0.0"], self.src.root, env=env)
         self.assertEqual(r.returncode, 0, r.stdout + r.stderr)
         self.assertNotIn(MESSAGE, r.stderr)
+        self.assertEqual(set(env_log.read_text().split()), {"1"}, "every git call runs with GIT_NO_LAZY_FETCH=1")
 
 
 if __name__ == "__main__":
