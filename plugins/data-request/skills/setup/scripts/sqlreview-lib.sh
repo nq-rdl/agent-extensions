@@ -58,7 +58,7 @@ sr_abspath() {
 # cwd that does. Prints nothing and returns 1 when the project is not initialised.
 sr_find_root() {
   if [ -n "${SQLREVIEW_ROOT:-}" ]; then
-    [ -d "$SQLREVIEW_ROOT/$SR_DIR" ] && { sr_normpath "$SQLREVIEW_ROOT"; return 0; }
+    [ -d "$SQLREVIEW_ROOT/$SR_DIR" ] && { sr_abspath "$SQLREVIEW_ROOT"; return 0; }
     return 1
   fi
   local d
@@ -72,7 +72,7 @@ sr_find_root() {
 
 # Where init creates the tree when nothing exists yet: $SQLREVIEW_ROOT, the git top-level, or the cwd.
 sr_init_root() {
-  if [ -n "${SQLREVIEW_ROOT:-}" ]; then sr_normpath "$SQLREVIEW_ROOT"; return 0; fi
+  if [ -n "${SQLREVIEW_ROOT:-}" ]; then sr_abspath "$SQLREVIEW_ROOT"; return 0; fi
   sr_find_root && return 0
   git rev-parse --show-toplevel 2>/dev/null || pwd -P
 }
