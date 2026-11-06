@@ -120,6 +120,13 @@ class Encoding(unittest.TestCase):
     def test_slug_and_check_stay_in_lockstep(self):
         paths = [p for p in EDGE_PATHS if p not in SQL_SUFFIX_COLLISION] + ["x", PATH]
         slugs = {p: self.slug(p) for p in paths}
+        # check refuses a quote in sql_path (M2). The slug still encodes, and check names the character rule.
+        for path in [p for p in paths if "'" in p]:
+            with self.subTest(refused=path):
+                r = self.check(slugs[path], path)
+                self.assertEqual(r.returncode, 4)
+                self.assertIn("sql_path must not contain quotes", r.stdout)
+        paths = [p for p in paths if "'" not in p]
         for path in paths:
             with self.subTest(path=path):
                 r = self.check(slugs[path], path)

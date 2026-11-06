@@ -3,16 +3,45 @@
 # Old SQL comes from git at the recorded commit, never from a copy under .sqlreview/.
 # Callers supply an absolute output in their trapped private directory outside git.
 
+# A partial clone fetches a missing blob from its remote when git reads it. Release evidence must make no
+# network call, so every git here refuses that fetch (a git that reads this variable). Some gits ignore it, so
+# sr_partial_gate also refuses every partial clone.
+export GIT_NO_LAZY_FETCH=1
+
 # Status contract: 6 is unavailable or unauthenticated historical evidence;
 # 2 is malformed invocation, unsafe paths or operational I/O/tool failure.
 sr_source_error() { printf 'sqlreview: %s\n' "$*" >&2; return 2; }
 sr_source_unavailable() { printf 'sqlreview: %s\n' "$*" >&2; return 6; }
+
+# Fail closed in a partial clone, whatever the git version. Version numbers do not tell whether a git refuses
+# a lazy fetch, so the rule does not use them. A partial clone has extensions.partialclone, a remote with
+# promisor=true, or a remote with partialclonefilter. The message is fixed and names no path. The answer is
+# kept in SR_PARTIAL_OK, which subshells inherit. Status never calls this, so it adds no git call there.
+sr_partial_gate() { # [DIR]
+  [ -z "${SR_PARTIAL_OK:-}" ] || return 0
+  local dir="${1:-$SR_ROOT}" key val partial=""
+  while read -r key val; do
+    [ -n "$key" ] || continue
+    case "$key" in
+      *.promisor) [ "$val" = false ] || partial=1 ;;
+      *) partial=1 ;;
+    esac
+  done <<EOF2
+$(git -C "$dir" config --get-regexp '^(extensions\.partialclone|remote\..*\.(promisor|partialclonefilter))$' 2>/dev/null)
+EOF2
+  if [ -n "$partial" ]; then
+    sr_source_error "this repository is a partial clone, so a read could fetch from the network. Use a full clone or fetch the missing blobs first"
+    return 2
+  fi
+  SR_PARTIAL_OK=1
+}
 
 sr_source_context() {
   SR_SOURCE_TOP="$(git -C "$SR_ROOT" rev-parse --show-toplevel 2>/dev/null)" || {
     sr_source_error "committed source requires a git repository"; return 2;
   }
   SR_SOURCE_TOP="$(cd "$SR_SOURCE_TOP" && pwd -P)" || return 2
+  sr_partial_gate "$SR_SOURCE_TOP" || return 2
   case "$SR_ROOT" in
     "$SR_SOURCE_TOP") SR_SOURCE_PREFIX="" ;;
     "$SR_SOURCE_TOP"/*) SR_SOURCE_PREFIX="${SR_ROOT#"$SR_SOURCE_TOP"/}" ;;
@@ -20,9 +49,9 @@ sr_source_context() {
   esac
   [ -z "$SR_SOURCE_PREFIX" ] || sr_safe_path "$SR_SOURCE_PREFIX"
   local grafts
-  grafts="$(git -C "$SR_SOURCE_TOP" rev-parse --git-path info/grafts)" || return 2
+  grafts="$(git -C "$SR_SOURCE_TOP" rev-parse --git-path info/grafts 2>/dev/null)" || return 2
   case "$grafts" in /*) ;; *) grafts="$SR_SOURCE_TOP/$grafts" ;; esac
-  if [ -s "$grafts" ] || [ -n "$(git -C "$SR_SOURCE_TOP" for-each-ref --format='%(refname)' refs/replace/)" ]; then
+  if [ -s "$grafts" ] || [ -n "$(git -C "$SR_SOURCE_TOP" for-each-ref --format='%(refname)' refs/replace/ 2>/dev/null)" ]; then
     sr_source_error "replacement refs/grafts refused for source evidence"; return 2
   fi
 }
@@ -34,7 +63,7 @@ sr_source_clean() {
   sr_source_context || return 2
   local tmp entry status path other store
   tmp="$(mktemp)" || return 2
-  if ! git -C "$SR_SOURCE_TOP" status --porcelain=v1 -z --untracked-files=all > "$tmp"; then
+  if ! git -C "$SR_SOURCE_TOP" status --porcelain=v1 -z --untracked-files=all > "$tmp" 2>/dev/null; then
     rm -f "$tmp"; sr_source_error "source status unavailable"; return 2
   fi
   store="${SR_SOURCE_PREFIX:+$SR_SOURCE_PREFIX/}.sqlreview"
@@ -78,7 +107,7 @@ sr_source_show() { # REF SQL_PATH OUTPUT; copies the committed blob, sets SR_SOU
   [ ! -e "$output" ] || [ -f "$output" ] || { sr_source_error "output is not a regular file"; return 2; }
   # Every request SQL file is committed, whatever sql/provenance.json says produced it.
   path="${SR_SOURCE_PREFIX:+$SR_SOURCE_PREFIX/}$2"
-  row="$(git -C "$SR_SOURCE_TOP" ls-tree "$SR_SOURCE_COMMIT" -- ":(literal)$path")" || {
+  row="$(git -C "$SR_SOURCE_TOP" ls-tree "$SR_SOURCE_COMMIT" -- ":(literal)$path" 2>/dev/null)" || {
     sr_source_error "cannot inspect committed SQL source"; return 2;
   }
   case "$row" in
@@ -86,7 +115,7 @@ sr_source_show() { # REF SQL_PATH OUTPUT; copies the committed blob, sets SR_SOU
     "") sr_source_unavailable "SQL source not committed at ${SR_SOURCE_COMMIT}: $2"; return 6 ;;
     *) sr_source_unavailable "committed SQL source is not a regular file (symlinks refused): $2"; return 6 ;;
   esac
-  ( umask 077; git -C "$SR_SOURCE_TOP" show "$SR_SOURCE_COMMIT:$path" > "$output" ) || {
+  ( umask 077; git -C "$SR_SOURCE_TOP" show "$SR_SOURCE_COMMIT:$path" > "$output" 2>/dev/null ) || {
     sr_source_error "committed SQL blob unavailable"; return 2;
   }
   # No render marker here: callers use this for internal workspace files (evidence, publish, delta, impact).

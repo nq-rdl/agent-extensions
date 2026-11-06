@@ -9,6 +9,10 @@ SR_DIR=".sqlreview"
 # Field separators for the IFS of a read, set once: a command substitution in a loop costs a fork per review.
 SR_TAB="$(printf '\t')"
 SR_US="$(printf '\037')"
+# Printed in place of a stored sql_path that holds characters beyond letters, digits and _ . / -.
+# SR_UNSAFE_RULE is the end of check's message for that rule.
+SR_UNSAFE='(unsafe sql_path)'
+SR_UNSAFE_RULE='sql_path must not contain quotes'
 SR_SETUP_HINT="Run /data-request:setup to initialise the project (creates $SR_DIR/ with config.json and templates/)."
 
 sr_die() { # <exit-code> <message>
@@ -54,7 +58,7 @@ sr_abspath() {
 # cwd that does. Prints nothing and returns 1 when the project is not initialised.
 sr_find_root() {
   if [ -n "${SQLREVIEW_ROOT:-}" ]; then
-    [ -d "$SQLREVIEW_ROOT/$SR_DIR" ] && { sr_normpath "$SQLREVIEW_ROOT"; return 0; }
+    [ -d "$SQLREVIEW_ROOT/$SR_DIR" ] && { sr_abspath "$SQLREVIEW_ROOT"; return 0; }
     return 1
   fi
   local d
@@ -68,7 +72,7 @@ sr_find_root() {
 
 # Where init creates the tree when nothing exists yet: $SQLREVIEW_ROOT, the git top-level, or the cwd.
 sr_init_root() {
-  if [ -n "${SQLREVIEW_ROOT:-}" ]; then sr_normpath "$SQLREVIEW_ROOT"; return 0; fi
+  if [ -n "${SQLREVIEW_ROOT:-}" ]; then sr_abspath "$SQLREVIEW_ROOT"; return 0; fi
   sr_find_root && return 0
   git rev-parse --show-toplevel 2>/dev/null || pwd -P
 }
@@ -302,6 +306,14 @@ sr_guard_input() { # PATH [helper-render|outside-ok]
   sr_refuse_unreviewed "$(sr_rawabs "$1")" "$1" "${2:-}" || exit 2
 }
 
+# True when a stored path holds only letters, digits and _ . / - (the rule of check for sql_path).
+# A bash case with the characters spelled out, so it starts no process and does not depend on the locale.
+# Status and the next-command hints print a path only when this holds.
+sr_path_printable() { # <path>
+  case "$1" in ''|*[!ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789_./-]*) return 1 ;; esac
+  return 0
+}
+
 # Structural checks on a stored or derived project-relative path (no policy; see sr_safe_sql).
 sr_safe_path() {
   case "$1" in ""|/*|*/../*|../*|*/..|..|./*|*/./*|*/.|*//*|*/) sr_die 2 "unsafe sql_path" ;; esac
@@ -467,7 +479,15 @@ sr_state() { # <slug>
     if [ -f "$d/review.draft.json" ] || [ -f "$d/scope.draft.json" ]; then printf 'draft\t\t\n'; else printf 'invalid\t\t\n'; fi
     return 0
   }
-  cmd_check "$doc" >/dev/null || { printf 'invalid\t\t\n'; return 0; }
+  cmd_check "$doc" >/dev/null || {
+    # A record whose sql_path holds unsafe characters reports a fixed text in place of the path, so the next
+    # command and the session-start context never repeat it. Only an invalid record pays for the second check.
+    case "$(cmd_check "$doc" 2>/dev/null)" in
+      *"$SR_UNSAFE_RULE"*) printf 'invalid\t%s\t\n' "$SR_UNSAFE" ;;
+      *) printf 'invalid\t\t\n' ;;
+    esac
+    return 0
+  }
   # One jq call for five fields. \037 is not IFS whitespace, so an empty field stays in place.
   IFS="$SR_US" read -r kind sql rev sha authentic <<EOF
 $(jq -r '[(.kind | tostring), (.sql_path // "" | tostring), (.revision // "" | tostring), (.sql_sha256 != null | tostring),
@@ -522,8 +542,10 @@ sr_state_reason() { # <slug> <state>
       why="$why; schemaVersion $schema"
       sql="$(jq -r '.sql_path // "" | strings' "$doc" 2>/dev/null || true)"
       if [ -n "$sql" ]; then
-        case "$sql" in /*|*..*) why="$why; unsafe sql_path (not project-relative)" ;; *)
-          [ -f "$SR_ROOT/$sql" ] || why="$why; sql_path target missing" ;;
+        case "$sql" in
+          /*|*..*) why="$why; unsafe sql_path (not project-relative)" ;;
+          *) if sr_path_printable "$sql"; then [ -f "$SR_ROOT/$sql" ] || why="$why; sql_path target missing"
+             else why="$why; (unsafe sql_path)"; fi ;;
         esac
       fi
       case "$violations" in *"binding mismatch"*)
@@ -533,7 +555,11 @@ sr_state_reason() { # <slug> <state>
       why="the review records no clean git_commit, so its SQL cannot be read from git — reassess with /data-request:analyse --update" ;;
     missing)
       sql="$(jq -r '.sql_path // ""' "$(sr_doc_for "$slug")" 2>/dev/null)"
-      why="sql_path target missing: $sql — if it moved, run: sqlreview.sh move '$sql' <new path>" ;;
+      # A record that check refuses never reaches this state. The test is a second layer: the path is
+      # free text, so it prints only when it holds safe characters only.
+      if sr_path_printable "$sql"; then
+        why="sql_path target missing: $sql — if it moved, run: sqlreview.sh move '$sql' <new path>"
+      else why="sql_path target missing: $SR_UNSAFE"; fi ;;
   esac
   printf '%s\n' "$why"
 }
@@ -610,6 +636,13 @@ sr_commit_first() { # <sql_path>
 # because status runs from a SessionStart hook with a 5-second timeout.
 sr_next() { # <slug> <state> <sql_path>
   local d="$SR_REVIEWS/$1" state="$2" sql="$3" scope srev="" bound="" intake="" why="" gap="" follow="" ex pre=""
+  # The path is free text from the record. A hint that names it is a paste-ready command, so an unsafe
+  # path (anything beyond letters, digits and _ . / -) gets a fixed text and no command.
+  if [ "$sql" = "$SR_UNSAFE" ] || { [ -n "$sql" ] && ! sr_path_printable "$sql"; }; then
+    case "$state" in draft|lifts) ;; *)
+      printf '%s repair the record, then run sqlreview.sh status --verbose\n' "$SR_UNSAFE"; return 0 ;;
+    esac
+  fi
   case "$state" in
     draft)
       if [ -f "$d/scope.draft.json" ]; then printf 'resume /data-request:bootstrap to finish the scope draft\n'

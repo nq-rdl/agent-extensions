@@ -205,6 +205,8 @@ class StatusNext(unittest.TestCase):
         self.assertEqual(self.row()["next"], f"/data-request:analyse {SQL} --update")
 
     def test_uncommitted_sql_with_a_space_in_its_path(self):
+        # A space is a valid sql_path, but status prints a path only from [A-Za-z0-9_./-] (M2), so the hint
+        # shows the fixed text instead of the path.
         rel = "reports/monthly report.sql"
         self.sql(SQL_V1, rel=rel, commit=False)
         r = run(["slug", rel], self.p.root)
@@ -212,7 +214,9 @@ class StatusNext(unittest.TestCase):
         slug = r.stdout.strip()
         self.reviewed(slug, rel)  # fingerprint commits the SQL first (#505)
         self.sql(SQL_V2, rel=rel, commit=False)
-        self.assertEqual(self.row(slug)["next"], f"commit {rel}, then /data-request:analyse {rel} --update")
+        row = self.row(slug)
+        self.assertEqual(row["state"], "stale")
+        self.assertEqual(row["next"], "(unsafe sql_path) repair the record, then run sqlreview.sh status --verbose")
 
     def test_uncommitted_unbound_and_rescope_lines_name_the_commit(self):
         self.scope()

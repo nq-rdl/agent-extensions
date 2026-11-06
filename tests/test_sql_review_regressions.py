@@ -149,7 +149,9 @@ class ReviewRegressions(unittest.TestCase):
             slug = result.stdout.strip()
             slugs.append(slug)
             doc = review_doc(slug, path)
-            self.assertEqual(run(['check', '--stdin'], self.p.root, stdin=json.dumps(doc)).returncode, 0)
+            # check refuses a quote in sql_path (M2); the slug of that path still encodes.
+            expected = 4 if "'" in path else 0
+            self.assertEqual(run(['check', '--stdin'], self.p.root, stdin=json.dumps(doc)).returncode, expected, path)
         self.assertEqual(len(slugs), len(set(slugs)))
 
     def test_nested_cwd_resolves_project_paths(self):

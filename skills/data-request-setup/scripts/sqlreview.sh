@@ -248,7 +248,7 @@ EOF
 
 # ---------------------------------------------------------------------------------------------
 cmd_status() {
-  local json=0 verbose=0 d slug state reason migrate next schema lifts rows="[]" f missing="" seen=0 amend
+  local json=0 verbose=0 d slug state reason migrate next schema lifts rows="[]" f missing="" seen=0 amend shown
   while [ $# -gt 0 ]; do
     case "$1" in --json) json=1 ;; --verbose) verbose=1 ;; *) usage ;; esac
     shift
@@ -289,10 +289,14 @@ EOF
       next="$(sr_next "$slug" "$state" "$SR_SQL_PATH")"
       [ "$verbose" = 1 ] && reason="$(sr_state_reason "$slug" "$state")"
       # A legacy-encoded slug (#353) of the path it records can be migrated to the readable one.
-      if [ "$verbose" = 1 ] && [ -n "$SR_SQL_PATH" ] &&
+      if [ "$verbose" = 1 ] && sr_path_printable "$SR_SQL_PATH" &&
          [ "$(sr_slug_pair "$SR_SQL_PATH" | sed -n 2p)" = "$slug" ] && [ "$(sr_slug_new "$SR_SQL_PATH")" != "$slug" ]; then
         migrate="sqlreview.sh move '$SR_SQL_PATH' '$SR_SQL_PATH'"
       fi
+      # The text column is a prose surface: a path prints there only when it holds letters, digits and _ . / -
+      # (the rule of the hints). The JSON field keeps the real path, because JSON encoding escapes it as data.
+      shown="$SR_SQL_PATH"
+      if [ -n "$shown" ] && [ "$shown" != "$SR_UNSAFE" ] && ! sr_path_printable "$shown"; then shown="$SR_UNSAFE"; fi
       if [ "$json" = 1 ]; then
         rows="$(printf '%s' "$rows" | jq -c --arg slug "$slug" --arg state "$state" --arg sql "$SR_SQL_PATH" --arg rev "$SR_REVISION" --argjson lifts "$lifts" \
           --arg reason "$reason" --arg migrate "$migrate" --argjson verbose "$verbose" --arg next "$next" \
@@ -301,7 +305,7 @@ EOF
                 + (if $verbose == 1 then {reason: (if $reason == "" then null else $reason end),
                                           migrate: (if $migrate == "" then null else $migrate end)} else {} end)]')"
       else
-        printf '%s\t%s\t%s\t%s\tlifts=%s' "$slug" "$state" "$SR_SQL_PATH" "$SR_REVISION" "$lifts"
+        printf '%s\t%s\t%s\t%s\tlifts=%s' "$slug" "$state" "$shown" "$SR_REVISION" "$lifts"
         [ -z "$next" ] || printf '\tnext=%s' "$next"
         [ -z "$reason" ] || printf '\treason=%s' "$reason"
         [ -z "$migrate" ] || printf '\tmigrate=%s' "$migrate"
