@@ -288,7 +288,7 @@ EOF
       next="$(sr_next "$slug" "$state" "$SR_SQL_PATH")"
       [ "$verbose" = 1 ] && reason="$(sr_state_reason "$slug" "$state")"
       # A legacy-encoded slug (#353) of the path it records can be migrated to the readable one.
-      if [ "$verbose" = 1 ] && [ -n "$SR_SQL_PATH" ] &&
+      if [ "$verbose" = 1 ] && sr_path_printable "$SR_SQL_PATH" &&
          [ "$(sr_slug_pair "$SR_SQL_PATH" | sed -n 2p)" = "$slug" ] && [ "$(sr_slug_new "$SR_SQL_PATH")" != "$slug" ]; then
         migrate="sqlreview.sh move '$SR_SQL_PATH' '$SR_SQL_PATH'"
       fi

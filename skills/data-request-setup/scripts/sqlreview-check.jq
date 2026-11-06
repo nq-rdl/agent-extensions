@@ -11,6 +11,10 @@ def nonempty: type == "string" and length > 0;
 def integer: type == "number" and . >= 1 and . == floor;
 def line_range: type == "array" and length == 2 and all(.[]; integer) and .[0] <= .[1];
 def path_ok: nonempty and (startswith("/") | not) and (split("/") | all(.[]; . != "" and . != "." and . != ".."));
+# sql_path is free text that status and the session-start context print inside paste-ready commands, so it holds
+# letters, digits and _ . / - only. \z, not $, because $ also matches before a final newline.
+def sql_path_chars_ok: test("^[A-Za-z0-9_./-]+\\z");
+def sql_path_ok: path_ok and sql_path_chars_ok;
 def release_tag: type == "string" and test("^v?(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)$");
 def req($k): if has($k) then empty else "missing key: \($k)" end;
 
@@ -162,9 +166,11 @@ if type != "object" then "document is not a JSON object"
 else
   .revision as $rev
   | identity_violations,
-    (if (.sql_path | path_ok | not) then "sql_path must be a normalized project-relative path" else empty end),
+    (if (.sql_path | path_ok | not) then "sql_path must be a normalized project-relative path"
+     elif (.sql_path | sql_path_chars_ok | not) then "sql_path may hold letters, digits and _ . / - only"
+     else empty end),
     (if (.slug | nonempty | not) or (.slug | test("^[A-Za-z0-9_%.-]+$") | not) or .slug == "." or .slug == ".." then "unsafe slug" else empty end),
-    (if (.sql_path | path_ok) and .slug != (.sql_path | path_slug) and .slug != (.sql_path | legacy_path_slug) then "slug/sql_path binding mismatch" else empty end),
+    (if (.sql_path | sql_path_ok) and .slug != (.sql_path | path_slug) and .slug != (.sql_path | legacy_path_slug) then "slug/sql_path binding mismatch" else empty end),
     ((if .kind == "lifts" then [] else ["inputs", "outputs"] end)[] as $key | if (.[$key] | type) != "array" or (.[$key] | all(.[]; type == "object" and (.name | nonempty) and (.description | type == "string")) | not) then "\($key) must be an array of named descriptions" else empty end),
     (if has("logic") and ((.logic | type) != "array" or (.logic | all(.[]; type == "object" and (.step | integer) and (.title | type == "string") and (.description | type == "string") and (.lines | line_range)) | not)) then "logic must be an array of numbered steps with line ranges" else empty end),
     (if has("question_store") and (.question_store != "questions.json" or has("open_questions")) then "question_store must be questions.json, without embedded open_questions" else empty end),

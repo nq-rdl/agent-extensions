@@ -267,6 +267,14 @@ class Canary(unittest.TestCase):
             with self.subTest(args=args):
                 r = self.run_script(SR, *args)
                 self.assertClean(r, 0, argv=False)
+                self.assertIn("(unsafe sql_path)", r.stdout)
+
+    def test_status_reason_names_a_safe_missing_sql_path_target_without_the_value(self):
+        self.write(".sqlreview/reviews/q/review.json", review(sql_path=CANARY + ".sql", schemaVersion=1, purpose=""))
+        for args in (("status", "--verbose"), ("status", "--json", "--verbose")):
+            with self.subTest(args=args):
+                r = self.run_script(SR, *args)
+                self.assertClean(r, 0, argv=False)
                 self.assertIn("sql_path target missing", r.stdout)
 
     def test_guard_denies_a_bad_status_without_the_value(self):
