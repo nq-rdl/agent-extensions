@@ -410,7 +410,7 @@ class Canary(unittest.TestCase):
         self.assertClean(self.run_script(SR, "materialize", "q", "review", "1", out))
 
     def test_materialize_and_delta_from_an_archive_with_free_text(self):
-        fp = self.reviewed_project()
+        self.reviewed_project()
         hist = self.root / ".sqlreview/reviews/q/history/review"
         hist.mkdir(parents=True)
         shutil.copy(self.root / ".sqlreview/reviews/q/review.json", hist / "1.json")
