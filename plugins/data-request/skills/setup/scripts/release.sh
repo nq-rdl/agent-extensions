@@ -15,7 +15,7 @@
 #   evidence [--no-amend-hold] REF [SLUG...]
 #                            does each .sqlreview review apply to the release at REF? JSON
 #                            {ref, commit, reviews: [{slug, kind, sql_path, revision, applies,
-#                            sql_sha256_reviewed, sql_sha256_at_ref, reviewed_commit,
+#                            sql_sha256_reviewed, sql_sha256_at_ref, sql_body_sha256_note, reviewed_commit,
 #                            reviewed_commit_in_ref, other_paths_changed_since_review, assumptions,
 #                            limitations, open_questions}]}.
 #                            The reviews are read from the working tree (the newest record); the SQL
@@ -285,7 +285,7 @@ cmd_render() {
 
 # One review directory -> one JSON row on stdout.
 rl_review_row() ( # <slug> <commit>
-  local slug="$1" commit="$2" d="$SR_REVIEWS/$1" doc kind sql reviewed at="" body_at="" applies tmp gc inref="null" binding others="null"
+  local slug="$1" commit="$2" d="$SR_REVIEWS/$1" doc kind sql reviewed at="" body_at="" body_note="" applies tmp gc inref="null" binding others="null"
   doc="$(sr_doc_for "$slug")" || return 1
   kind="$(jq -r '.kind // ""' "$doc")"
   if ! bash "$SR_SCRIPT_DIR/sqlreview.sh" check "$doc" >/dev/null 2>&1; then
@@ -313,7 +313,9 @@ rl_review_row() ( # <slug> <commit>
     case "$rc" in
       0)
         at="$(sr_sha256 "$tmp/release.sql")" || return 2
-        body_at="$(sr_body_sha256 "$tmp/release.sql")" || return 2
+        # SQL whose header never closes has no body hash. That is a change to report, not a stop.
+        # The note is fixed text and never echoes the SQL.
+        body_at="$(sr_body_sha256 "$tmp/release.sql")" || { body_at=""; body_note="The SQL body hash could not be computed at the ref."; }
         if [ "$kind" != scope ]; then
           sr_binding "$doc" "$tmp/release.sql" "$tmp/recorded.sql"; binding=$?
           case "$binding" in 0) applies=current ;; 10) applies=header-only ;; *) applies=changed ;; esac
@@ -343,11 +345,12 @@ rl_review_row() ( # <slug> <commit>
       '{slug: $slug, kind: $kind, sql_path: null, revision: null, applies: "invalid"}'
     return 0
   }
-  jq -c --argjson question_doc "$question_doc" --arg slug "$slug" --arg applies "$applies" --arg at "$at" --arg body_at "$body_at" --argjson inref "$inref" --argjson others "$others" '
+  jq -c --argjson question_doc "$question_doc" --arg slug "$slug" --arg applies "$applies" --arg at "$at" --arg body_at "$body_at" --arg body_note "$body_note" --argjson inref "$inref" --argjson others "$others" '
     def items: [(. // [])[] | {id, text, rationale, confirmed_revision}];
     {slug: $slug, kind, sql_path, revision, applies: $applies,
      sql_sha256_reviewed: .sql_sha256, sql_sha256_at_ref: (if $at == "" then null else $at end),
      sql_body_sha256_reviewed: (.sql_body_sha256 // null), sql_body_sha256_at_ref: (if $body_at == "" then null else $body_at end),
+     sql_body_sha256_note: (if $body_note == "" then null else $body_note end),
      reviewed_commit: .git_commit, reviewed_commit_in_ref: $inref, other_paths_changed_since_review: $others,
      assumptions: (.assumptions | items), limitations: (.limitations | items),
      questions: $question_doc.questions,

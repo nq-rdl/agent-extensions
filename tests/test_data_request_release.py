@@ -2567,5 +2567,50 @@ class LegacyBoundRecord(unittest.TestCase):
         self.assertEqual(json.loads(r.stdout)["scope"], {"slug": self.LEGACY_SLUG, "revision": 1})
 
 
+@unittest.skipUnless(shutil.which("jq") and shutil.which("git"), "release.sh needs jq and git")
+class BodyHashUnavailableAtRef(unittest.TestCase):
+    """SQL at the ref whose header never closes has no body hash. That is a change to report, not a stop.
+
+    Before #548 the release evidence reported the review as changed. The note is fixed text: it never
+    echoes the SQL."""
+
+    UNCLOSED = "/* assumptions:\n  - ZZTEST-header-never-closed\nSELECT 1;\n"
+    NOTE = "The SQL body hash could not be computed at the ref."
+
+    def setUp(self):
+        self.tmp = tempfile.TemporaryDirectory()
+        self.addCleanup(self.tmp.cleanup)
+        self.out = tempfile.TemporaryDirectory()
+        self.addCleanup(self.out.cleanup)
+        self.p = CriteriaProject(self.tmp.name, self.out.name, self)
+
+    def test_evidence_reports_the_review_as_changed_with_a_fixed_note(self):
+        self.p.write(SQL_PATH, self.UNCLOSED)
+        self.p.commit("unclosed header")
+        self.p.tag("v1.0.0")
+        r = self.p.evidence("v1.0.0")
+        self.assertEqual(r.returncode, 10, r.stderr)
+        rev = json.loads(r.stdout)["reviews"][0]
+        self.assertEqual(rev["applies"], "changed")
+        self.assertIsNone(rev["sql_body_sha256_at_ref"])
+        self.assertEqual(rev["sql_body_sha256_note"], self.NOTE)
+        self.assertNotIn("ZZTEST-header-never-closed", r.stdout + r.stderr)
+
+    def test_a_hashable_body_carries_no_note(self):
+        self.p.tag("v1.0.0")
+        rev = json.loads(self.p.evidence("v1.0.0").stdout)["reviews"][0]
+        self.assertIsNone(rev["sql_body_sha256_note"])
+
+    def test_criteria_does_not_stop_with_exit_2(self):
+        self.p.sidecar(CRITERIA_V1)
+        self.p.scope(STATUS_V1)
+        self.p.write(SQL_PATH, self.UNCLOSED)
+        self.p.commit("unclosed header")
+        self.p.tag("0.1.0")
+        r = self.p.criteria("0.1.0", "--fingerprints", str(self.p.fp))
+        self.assertNotEqual(r.returncode, 2, r.stdout + r.stderr)
+        self.assertNotIn("ZZTEST-header-never-closed", r.stdout + r.stderr)
+
+
 if __name__ == "__main__":
     unittest.main()
