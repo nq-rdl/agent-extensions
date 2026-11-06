@@ -81,7 +81,7 @@ Example entry (the same shape is returned as text; convert to JSON for ``set``):
      draft:
        sources: [ticket, mapping, sql]
        artifacts:
-         - {path: sql/cohort.sql, sha256: '<64 lowercase hex characters>'}
+         - {path: sql/v1/cohort.sql, sha256: '<64 lowercase hex characters>'}
    decisions:
      - decision: Use supplied cohort
        decided: {by: analyst-handle, role: Requester, at: '2026-09-29', source: "unlinked (verbal)"}
@@ -113,6 +113,8 @@ For unresolved intake use ``stages_done: []`` and ``stage_evidence: {}``.
 Every completed stage needs a nonempty ``sources`` list naming recorded revision
 keys and an ``artifacts`` list (empty only when no local artifact is expected).
 Paths are child-relative, traversal-free, non-symlink paths; digests are SHA-256.
+The helper never reads a ``data/`` path or a ``sql/`` path outside ``sql/v<N>/``.
+It marks that stage for recheck and prints a fixed message. List such a file only as a source revision.
 Allowed stages: intake, bootstrap, map, draft, validate, analyse, lift, report,
 review, fix, amend, release, parked. Verification status is unverified, partial or
 verified; commands record only actual runs and their results.
