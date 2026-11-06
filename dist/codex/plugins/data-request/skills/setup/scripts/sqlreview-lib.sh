@@ -591,12 +591,21 @@ sr_source_workspace() (
 # Uncommitted source paths (untracked, modified or staged), one per line between newlines, and
 # their count. Fingerprint and a bound publish refuse ANY uncommitted source in the git tree
 # (sr_source_clean), not only the reviewed SQL, so the next command names a commit first whenever
-# this list is not empty. The exemptions are sr_source_clean's: review records under the store.
+# this list is not empty. The exemptions are sr_store_exempt's: the records under the store.
 # cmd_status sets both once per run with ONE git call, before its loop over the reviews. Paths are
 # relative to $SR_ROOT (outside it they start ../). Empty when git or the repository is unavailable:
 # then no commit is named.
 SR_NL='
 '
+# The store paths that are records, never source: review, release and amendment records, templates, the
+# ledger and the store's .gitignore. The one definition, shared by sr_load_uncommitted (status) and
+# sr_source_clean (fingerprint and publish), so the two cannot disagree. A shell function runs no process.
+sr_store_exempt() { # <store dir as git prints it> <path>
+  case "$2" in
+    "$1"/reviews/*|"$1"/releases/*|"$1"/amendments/*|"$1"/templates/*|"$1"/ledger.json|"$1"/.gitignore) return 0 ;;
+  esac
+  return 1
+}
 sr_load_uncommitted() {
   local line p
   SR_UNCOMMITTED="$SR_NL"; SR_UNCOMMITTED_N=0
@@ -606,10 +615,9 @@ sr_load_uncommitted() {
     # A quoted path (one with a space) loses its quotes. A path that git escapes does not match
     # a SQL path, but still counts as an uncommitted source.
     case "$p" in \"*\") p="${p#\"}"; p="${p%\"}" ;; esac
-    case "$p" in
-      ''|"$SR_DIR"/reviews/*|"$SR_DIR"/releases/*|"$SR_DIR"/amendments/*|"$SR_DIR"/templates/*|"$SR_DIR"/ledger.json|"$SR_DIR"/.gitignore) ;;
-      *) SR_UNCOMMITTED="$SR_UNCOMMITTED$p$SR_NL"; SR_UNCOMMITTED_N=$((SR_UNCOMMITTED_N + 1)) ;;
-    esac
+    if [ -n "$p" ] && ! sr_store_exempt "$SR_DIR" "$p"; then
+      SR_UNCOMMITTED="$SR_UNCOMMITTED$p$SR_NL"; SR_UNCOMMITTED_N=$((SR_UNCOMMITTED_N + 1))
+    fi
   done <<EOF
 $(git --no-optional-locks -C "$SR_ROOT" -c core.quotePath=false -c status.relativePaths=true -c color.status=false \
     status --short --untracked-files=all --no-renames -- ':/' 2>/dev/null)

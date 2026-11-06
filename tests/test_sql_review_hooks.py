@@ -161,6 +161,31 @@ class GuardHook(unittest.TestCase):
                     result = decision(run_hook(GUARD, event, self.env))
                     self.assertEqual(result["permissionDecision"], "deny")
 
+    def test_trailing_blanks_and_dots_in_a_record_name_get_the_same_check(self):
+        # Some volumes ignore trailing blanks and dots, so review.json. is review.json there. The name check
+        # trims them for the authoritative documents as it does for SQL and table files.
+        store = self.root / ".sqlreview"
+        unconfirmed = json.dumps(review_doc(assumptions=[item("A1", "x", status="pending")]))
+        records = ("reviews/s/review.json", "reviews/s/scope.json", "reviews/s/explain.json",
+                   "releases/v1/release.json", "amendments/q.json", "reviews/s/review.md",
+                   "reviews/s/questions.json", "ledger.json", "config.json")
+        def verdict(path):
+            r = run_hook(GUARD, edit_event(path, self.root), self.env)
+            return decision(r)["permissionDecision"] if r.stdout.strip() else "allow"
+        for rel in records:
+            plain = verdict(store / rel)
+            self.assertIn(plain, ("deny", "ask"), rel)
+            for tail in (".", " ", "..", ". ", " ."):
+                with self.subTest(rel=rel, tail=repr(tail)):
+                    self.assertEqual(verdict(store / (rel + tail)), plain)
+        for tail in (".", " "):
+            with self.subTest(write="review.json", tail=repr(tail)):
+                d = decision(run_hook(GUARD, write_event(self.reviews / "s" / ("review.json" + tail), unconfirmed, self.root), self.env))
+                self.assertEqual(d["permissionDecision"], "deny")
+                self.assertIn("AskUserQuestion", d["permissionDecisionReason"])
+        self.assert_passthrough(run_hook(GUARD, write_event(self.reviews / "s" / "review.draft.json.", unconfirmed, self.root), self.env))
+        self.assert_passthrough(run_hook(GUARD, write_event(self.reviews / "s" / "notes.json.", "{}", self.root), self.env))
+
     def test_json_under_reviews_and_anything_under_templates_still_pass(self):
         store = self.root / ".sqlreview"
         self.assert_passthrough(run_hook(GUARD, write_event(self.reviews / "x" / "notes.json", "{}", self.root), self.env))
