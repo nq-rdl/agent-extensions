@@ -57,6 +57,23 @@ decide() { # <allow|deny|ask> <reason>
 }
 
 tool="$(field .tool_name)"
+# A shell command substitution trims trailing newlines and a later step can split on blanks, so a control
+# character in a path-like field could change what the checks below see. Test the raw JSON values first,
+# for every field that names a path or a glob (a Grep pattern is a regex and may hold a tab or newline), and fail closed.
+# The content fields are not tested.
+case "$tool" in Write|Edit|Read|Grep|Glob|NotebookEdit)
+  if command -v jq >/dev/null 2>&1; then
+    printf '%s' "$input" | jq -e '[.cwd, .tool_input.file_path, .tool_input.path, .tool_input.glob, (if .tool_name == "Glob" then .tool_input.pattern else null end), .tool_input.notebook_path] | any(.[]; type == "string" and any(explode[]; . < 32 or . == 127))' >/dev/null 2>&1 && ctl=1 || ctl=0
+  else
+    printf '%s' "$input" | python3 -c 'import json,re,sys
+try: d = json.load(sys.stdin)
+except Exception: sys.exit(1)
+t = d.get("tool_input") if isinstance(d.get("tool_input"), dict) else {}
+v = [d.get("cwd")] + [t.get(k) for k in ("file_path", "path", "glob", "notebook_path")] + ([t.get("pattern")] if d.get("tool_name") == "Glob" else [])
+sys.exit(0 if any(isinstance(x, str) and re.search("[\\x00-\\x1f\\x7f]", x) for x in v) else 1)' && ctl=1 || ctl=0
+  fi
+  [ "$ctl" = 0 ] || decide deny "A path, search root or search filter in this call contains a control character (a newline, tab or similar), so the guard cannot check it safely. Use a path without control characters."
+esac
 case "$tool" in
   Write|Edit|Read) path="$(field .tool_input.file_path)" ;;
   Grep|Glob) path="$(field .tool_input.path)" ;;  # the search root; no path means the cwd
@@ -81,6 +98,15 @@ case "$tool" in Grep|Glob) [ -n "$path" ] || path="." ;; esac  # no path means t
 [ -n "$path" ] || exit 0
 cwd="$(field .cwd)"; [ -n "$cwd" ] || cwd="$(pwd -P)"
 case "$path" in /*) abs="$path" ;; *) abs="$cwd/$path" ;; esac
+# Physical directory with every character kept: command substitution trims trailing newlines, so a sentinel
+# protects the name. A newline anywhere in a resolved name is refused, because the line-based cleanup below
+# could misread it. Sets PHYS.
+physdir() {
+  local o
+  o="$(cd -P -- "$1" 2>/dev/null && pwd -P && printf x)" || return 1
+  o="${o%x}"; PHYS="${o%$'\n'}"
+  case "$PHYS" in *$'\n'*) decide deny "A resolved directory name contains a newline, so the guard cannot rule out data/00_raw/. Use a path without a newline." ;; esac
+}
 normalize_path() {
   awk -F/ '{ n=0; for (i=1;i<=NF;i++) { if ($i==""||$i==".") continue; if ($i=="..") { if (n>0) n--; continue }; p[++n]=$i }; o=""; for (i=1;i<=n;i++) o=o "/" p[i]; print (o==""?"/":o) }'
 }
@@ -97,12 +123,14 @@ case "$tool" in Read|Grep|Glob)
   while :; do
     parent="$(dirname "$raw_physical")"; suffix="$(basename "$raw_physical")"
     while [ ! -d "$parent" ] && [ "$parent" != / ]; do suffix="$(basename "$parent")/$suffix"; parent="$(dirname "$parent")"; done
-    if physical_parent="$(cd -P -- "$parent" 2>/dev/null && pwd -P)"; then raw_physical="$physical_parent/$suffix"; else break; fi
+    if physdir "$parent"; then raw_physical="$PHYS/$suffix"; else break; fi
     raw_physical="$(printf '%s\n' "$raw_physical" | normalize_path)"
     [ -L "$raw_physical" ] || break
     hops=$((hops + 1))
     [ "$hops" -le 20 ] || decide deny "Read guard could not resolve a symlink chain (loop or over 20 links), so it cannot rule out data/00_raw/. Read the non-symlink path."
-    target="$(readlink "$raw_physical" 2>/dev/null)" || break
+    target="$(readlink -- "$raw_physical" 2>/dev/null; printf x)"; target="${target%x}"; target="${target%$'\n'}"
+    case "$target" in *$'\n'*) decide deny "A symlink target contains a newline, so the guard cannot rule out data/00_raw/. Read the non-symlink path." ;; esac
+    [ -n "$target" ] || break
     case "$target" in /*) raw_physical="$target" ;; *) raw_physical="$(dirname "$raw_physical")/$target" ;; esac
   done
   if [ "$tool" = Grep ] || [ "$tool" = Glob ]; then
@@ -111,10 +139,10 @@ case "$tool" in Read|Grep|Glob)
     found=()  # an array, so a path with a space, tab or newline stays one entry
     for base in "$raw_physical" "$raw_lexical"; do
       for cand in "$base/data/00_raw" "$base/00_raw"; do
-        if [ -d "$cand" ] && phys="$(cd -P -- "$cand" 2>/dev/null && pwd -P)"; then found[${#found[@]}]="$phys"; fi
+        if [ -d "$cand" ] && physdir "$cand"; then found[${#found[@]}]="$PHYS"; fi
       done
     done
-    up="$(cd -P -- "$cwd" 2>/dev/null && pwd -P)"
+    up=""; ! physdir "$cwd" || up="$PHYS"
     while [ -n "$up" ] && [ "$up" != / ]; do
       if [ -d "$up/data/00_raw" ]; then found[${#found[@]}]="$up/data/00_raw"; break; fi
       up="$(dirname "$up")"
@@ -163,8 +191,9 @@ while [ ! -d "$parent" ] && [ "$parent" != / ]; do
   suffix="$(basename "$parent")/$suffix"
   parent="$(dirname "$parent")"
 done
-physical_parent="$(cd -P -- "$parent" 2>/dev/null && pwd -P)" ||
+physdir "$parent" ||
   decide deny "SQL Review guard cannot resolve the destination's existing parent directory."
+physical_parent="$PHYS"
 abs="$physical_parent/$suffix"
 # Collapse absent suffixes. Physical protection wins; retain lexical protection
 # too when .sqlreview itself points outside the child.

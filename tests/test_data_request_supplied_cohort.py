@@ -298,18 +298,77 @@ class OddProjectPaths(unittest.TestCase):
                         self.assertEqual(self.search(root, tool, **tool_input)[0], "deny")
 
     def test_a_path_with_a_newline_fails_closed(self):
-        # The guard cleans paths line by line, so it refuses a newline instead of guessing.
+        # A control character in the project path is refused before any path step, so skills/ is denied too.
         root = self.project("with\nnewline")
         for tool in ("Grep", "Glob"):
             with self.subTest(tool=tool):
                 self.assertEqual(self.search(root, tool, path="skills")[0], "deny")
 
     def test_a_search_under_skills_still_passes(self):
-        for name in (n for n in self.NAMES if "\n" not in n):
+        for name in (n for n in self.NAMES if "\n" not in n and "\t" not in n):
             root = self.project(name)
             for tool in ("Grep", "Glob"):
                 with self.subTest(name=name, tool=tool):
                     self.assertEqual(self.search(root, tool, path="skills"), ("allow", ""))
+
+
+@unittest.skipUnless(shutil.which("jq"), "the guard needs jq")
+class ControlCharacters(unittest.TestCase):
+    """A control character in a hook field is denied before any shell step can trim or split it."""
+
+    def setUp(self):
+        self._tmp = tempfile.TemporaryDirectory()
+        self.addCleanup(self._tmp.cleanup)
+        self.base = Path(self._tmp.name).resolve()
+
+    def project(self, name):
+        root = self.base / name
+        (root / "data" / "00_raw").mkdir(parents=True)
+        (root / "skills").mkdir()
+        return root
+
+    def test_a_control_character_at_either_end_of_the_project_path_is_denied(self):
+        for suffix in ("\n", "\t", "\r", "\x01", "\x7f"):
+            for name in (f"proj{suffix}", f"{suffix}proj", f"pr{suffix}oj"):
+                root = self.project(name)
+                for tool in ("Grep", "Glob"):
+                    for tool_input in ({"path": "."}, {}, {"path": "data"}, {"path": "skills"}):
+                        with self.subTest(name=name, tool=tool, tool_input=tool_input):
+                            event = {"tool_name": tool, "cwd": str(root), "tool_input": dict(tool_input, pattern="x")}
+                            self.assertEqual(decide(event)[0], "deny")
+
+    def test_a_control_character_in_file_path_path_pattern_or_glob_is_denied(self):
+        root = self.project("proj")
+        cases = (
+            {"tool_name": "Read", "tool_input": {"file_path": str(root / "skills") + "\n"}},
+            {"tool_name": "Read", "tool_input": {"file_path": "\t" + str(root / "skills")}},
+            {"tool_name": "Glob", "tool_input": {"path": "skills", "pattern": "*.py\n"}},
+            {"tool_name": "Glob", "tool_input": {"path": "skills", "pattern": "\r*.py"}},
+            {"tool_name": "Grep", "tool_input": {"path": "skills", "pattern": "x", "glob": "*.py\n"}},
+            {"tool_name": "Grep", "tool_input": {"path": "skills\n", "pattern": "x"}},
+            {"tool_name": "Write", "tool_input": {"file_path": str(root / "a\n.txt"), "content": "x"}},
+        )
+        for event in cases:
+            with self.subTest(event=event):
+                self.assertEqual(decide(dict(event, cwd=str(root)))[0], "deny")
+
+    def test_normal_paths_and_multiline_content_still_pass(self):
+        root = self.project("proj")
+        for event in ({"tool_name": "Grep", "tool_input": {"path": "skills", "pattern": "a\nb", "glob": "*.py"}},
+                      {"tool_name": "Read", "tool_input": {"file_path": str(root / "skills" / "a.py")}},
+                      {"tool_name": "Write", "tool_input": {"file_path": str(root / "notes.txt"), "content": "a\nb\n"}}):
+            with self.subTest(tool=event["tool_name"]):
+                self.assertEqual(decide(dict(event, cwd=str(root))), ("allow", ""))
+
+    def test_a_symlink_to_a_directory_named_with_a_trailing_newline_is_denied(self):
+        target = self.base / "proj\n"
+        (target / "data" / "00_raw").mkdir(parents=True)
+        link = self.base / "link"
+        link.symlink_to(target)
+        for tool in ("Grep", "Glob"):
+            with self.subTest(tool=tool):
+                event = {"tool_name": tool, "cwd": str(self.base), "tool_input": {"path": "link", "pattern": "x"}}
+                self.assertEqual(decide(event)[0], "deny")
 
 
 class Wiring(unittest.TestCase):
