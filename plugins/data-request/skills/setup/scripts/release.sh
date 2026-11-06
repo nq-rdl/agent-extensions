@@ -111,9 +111,16 @@ def kept: .decision == "accepted" or .decision == "reworded";
 # "Extraction Assumptions / Important limitations" (FR-018; rc_criterion_claim). $itemised: the
 # record has a criteria object; a legacy record keeps every claim.
 def limitation_shown($itemised): .section != "assumptions" or ($itemised | not) or (rc_criterion_claim | not);
-def src_errors($cid; $kept; $ev):
-  if type != "object" then "\($cid): every source must be an object"
-  elif .kind == "review" then
+# A source label is written into an HTML comment of the paste-ready body. A double hyphen, an angle bracket or a
+# control character could close the comment and render text or a link. The finding names the field and the rule.
+def label_errors($cid):
+  ("slug", "item", "path", "ref") as $f
+  | if has($f) and .[$f] != null and (.[$f] | type) != "string" then "\($cid): source \($f) must be a string"
+    elif (.[$f] | type) == "string" and (.[$f] | test("--|<|>|[\\x00-\\x1f\\x7f]"))
+    then "\($cid): source \($f) must not contain --, < or > or control characters"
+    else empty end;
+def src_kind_errors($cid; $kept; $ev):
+  if .kind == "review" then
     if (.slug | str) and (.item | str) and (.revision | type) == "number" then
       if $kept | not then empty
       else . as $s | ([$ev[] | select(.slug == $s.slug)][0]) as $e
@@ -130,6 +137,9 @@ def src_errors($cid; $kept; $ev):
   elif .kind == "file" then
     if (.path | str) and (.ref | str) then empty else "\($cid): a file source needs path and ref" end
   else "\($cid): source kind must be review, scope or file" end;
+def src_errors($cid; $kept; $ev):
+  if type != "object" then "\($cid): every source must be an object"
+  else label_errors($cid), src_kind_errors($cid; $kept; $ev) end;
 def claim_errors($ev):
   (.id | safe_id("^C[1-9][0-9]*$")) as $id
   | (if (.id | str) and (.id | test("^C[1-9][0-9]*$")) then empty else "claim id must be C<n>" end),
