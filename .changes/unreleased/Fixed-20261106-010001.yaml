@@ -1,0 +1,3 @@
+kind: Fixed
+body: data-request guard denies a Grep or Glob rooted at or above data/00_raw and any glob that could name it
+time: 2026-11-06T01:00:01.000000+10:00

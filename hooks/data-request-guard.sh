@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
-# PreToolUse guard (data-request plugin), matchers Write|Edit and Read|Grep|Glob. Those three are denied for paths
-# under data/00_raw/ (researcher-supplied cohort files; *.dvc and .gitignore pass) and pass everywhere else. Write|Edit fire
+# PreToolUse guard (data-request plugin), matchers Write|Edit and Read|Grep|Glob. Read, Grep and Glob are denied for paths
+# under data/00_raw/ (researcher-supplied cohort files; *.dvc and .gitignore pass), for a Grep or Glob rooted at or above it
+# (no path means the cwd) and for a glob or pattern that could name it. They pass everywhere else. Write|Edit fire
 # only for paths under a .sqlreview/ directory; everything else passes silently. Decisions via
 # permissionDecision JSON:
 #   reviews/*/review.json, scope.json   Write → content run through `sqlreview.sh check`:
@@ -57,15 +58,25 @@ decide() { # <allow|deny|ask> <reason>
 tool="$(field .tool_name)"
 case "$tool" in
   Write|Edit|Read) path="$(field .tool_input.file_path)" ;;
-  Grep|Glob) path="$(field .tool_input.path)" ;;  # the search root; no path means the cwd, which this guard leaves alone
+  Grep|Glob) path="$(field .tool_input.path)" ;;  # the search root; no path means the cwd
   *) exit 0 ;;
 esac
 raw_denied="Reading or searching data/00_raw/ is denied: a researcher-supplied cohort file holds identifiers, and the runner loads it into a temp table at run time. Never read or search it, copy a value from it, or print one. For its shape read conf/base/supplied/<name>.template.csv (header only); for a load problem use the reason codes, row numbers and column names the runner reports (no value appears in them). Only a genuine small DVC pointer (*.dvc) or .gitignore file can be Read."
 lc() { printf '%s' "$1" | tr '[:upper:]' '[:lower:]'; }
-# A Grep glob or Glob pattern that names 00_raw reaches the directory even when path is absent or above it.
+# A Grep glob or Glob pattern is checked as text, because it can reach the directory from a root above it.
 # Case-insensitive, since a case-insensitive volume resolves data/00_RAW to the real directory.
 case "$tool" in Grep) filter="$(field .tool_input.glob)" ;; Glob) filter="$(field .tool_input.pattern)" ;; *) filter="" ;; esac
-case "$(lc "$filter")" in *00_raw*) decide deny "$raw_denied" ;; esac
+if [ -n "$filter" ]; then
+  filter_lc="$(lc "$filter")"
+  # Bracket, wildcard and brace characters are removed first, so 00_r[a]w and [0]0_raw read as 00_raw.
+  filter_bare="$(printf '%s' "$filter_lc" | tr -d '][?*{}!^,\\')"
+  filter_reason="A Grep glob or Glob pattern that contains raw, puts a wildcard right after data/, uses .. or starts at an absolute path could reach data/00_raw/, so it is denied. Pass a literal path under skills/ or src/ and a plain filter such as *.py."
+  case "$filter_bare" in *raw*) decide deny "$filter_reason" ;; esac
+  case "$filter_lc" in *..*|/*|'~'*) decide deny "$filter_reason" ;; esac
+  wild_after_data='data/[^/]*[]*?[{]'  # a wildcard in the segment after data/ (bash 3.2 ERE, kept in a variable)
+  if [[ "$filter_lc" =~ $wild_after_data ]]; then decide deny "$filter_reason"; fi
+fi
+case "$tool" in Grep|Glob) [ -n "$path" ] || path="." ;; esac  # no path means the cwd
 [ -n "$path" ] || exit 0
 cwd="$(field .cwd)"; [ -n "$cwd" ] || cwd="$(pwd -P)"
 case "$path" in /*) abs="$path" ;; *) abs="$cwd/$path" ;; esac
@@ -77,7 +88,7 @@ case "$tool" in Read|Grep|Glob)
   # identifiers. The runner loads them at run time; an agent never reads one. Resolve the
   # path physically (existing parent via cd -P, so a ".." after a symlinked directory is
   # followed on disk; then the final component's symlink chain) and also check the lexical
-  # path. A loop or a chain over 20 hops is denied, never allowed. Covers the Read tool and the path argument of Grep and Glob; Bash is the scaffold child's hook.
+  # path. A loop or a chain over 20 hops is denied, never allowed. Covers the Read tool and Grep and Glob (root and filter); Bash is the scaffold child's hook.
   raw_lexical="$(printf '%s\n' "$abs" | normalize_path)"
   raw_physical="$abs"; hops=0
   while :; do
@@ -91,6 +102,28 @@ case "$tool" in Read|Grep|Glob)
     target="$(readlink "$raw_physical" 2>/dev/null)" || break
     case "$target" in /*) raw_physical="$target" ;; *) raw_physical="$(dirname "$raw_physical")/$target" ;; esac
   done
+  if [ "$tool" = Grep ] || [ "$tool" = Glob ]; then
+    # A search root above data/00_raw/ (the project root, data/, or a parent) reaches the directory, and a
+    # filter cannot prove it will not. Look for the directory under the root and up from the cwd.
+    found=""
+    for base in "$raw_physical" "$raw_lexical"; do
+      for cand in "$base/data/00_raw" "$base/00_raw"; do
+        [ -d "$cand" ] && found="$found $(cd -P -- "$cand" 2>/dev/null && pwd -P)"
+      done
+    done
+    up="$(cd -P -- "$cwd" 2>/dev/null && pwd -P)"
+    while [ -n "$up" ] && [ "$up" != / ]; do
+      [ -d "$up/data/00_raw" ] && { found="$found $up/data/00_raw"; break; }
+      up="$(dirname "$up")"
+    done
+    for cand in $found; do
+      for base in "$raw_physical" "$raw_lexical"; do
+        case "$cand/" in "${base%/}/"*)
+          decide deny "A Grep or Glob rooted at or above data/00_raw/ can reach researcher-supplied identifiers, so it is denied. Pass a path that excludes data/, such as skills/ or src/. Never search data/00_raw/." ;;
+        esac
+      done
+    done
+  fi
   for candidate in "$raw_lexical" "$raw_physical"; do
     case "$(lc "$candidate")" in
       */data/00_raw/*.dvc|*/data/00_raw/.gitignore)

@@ -74,17 +74,20 @@ one.
 Layers of protection
 --------------------
 
-* The data-request plugin's guard (``hooks/data-request-guard.sh``) denies the agent ``Read`` tool,
-  and the ``path`` argument of ``Grep`` and ``Glob``, on any path under ``data/00_raw/``. It also denies a
-  ``Grep`` ``glob`` or ``Glob`` ``pattern`` that names ``00_raw``, with or without a ``path`` (for example
-  ``path`` ``data`` with ``glob`` ``00_raw/**``, or ``pattern`` ``data/00_raw/**``). Matching ignores case, because
-  a case-insensitive volume reaches the real file through ``data/00_RAW``. DVC
+* The data-request plugin's guard (``hooks/data-request-guard.sh``) denies the agent ``Read`` tool on any
+  path under ``data/00_raw/``. It denies ``Grep`` and ``Glob`` when the search root is that directory, is
+  inside it, or is above it, so ``.``, the project root and ``data`` are denied. A call with no ``path``
+  searches the working directory and follows the same rule when the project has a ``data/00_raw/``
+  directory. The denial message tells the agent to pass a path that excludes ``data/``. The guard also denies a
+  ``Grep`` ``glob`` or ``Glob`` ``pattern`` that contains ``raw`` once bracket, wildcard and brace characters are
+  removed, has a wildcard in the segment after ``data/``, uses ``..``, or starts at an absolute path. Matching
+  ignores case, because a case-insensitive volume reaches the real file through ``data/00_RAW``. DVC
   pointers (``*.dvc``) and ``.gitignore`` pass for ``Read`` only when they are small regular files (not links or
   directories) that look like what the name says: they hold hashes and rules, not values. It is
   the narrower layer: it covers that directory and those three tools only, and a shell command is out
-  of its reach by design (the scaffold child's own hook covers ``Bash``). A ``Grep`` or ``Glob``
-  rooted above the directory with no filter that names ``00_raw`` is not blocked by the plugin. It relies on
-  the child's own ``Read(/data/**)`` deny. The rule above still holds for ``Bash`` and every other route.
+  of its reach by design (the scaffold child's own hook covers ``Bash``). The rule above still holds for
+  ``Bash`` and every other route. A search rooted at a parent of the project, when the working directory is
+  not inside the project, relies on the child's own ``Read(/data/**)`` deny.
   Codex has no ``Read`` tool and its hook wiring is unchanged, so there the rule rests on this text alone.
 * A scaffold child separately denies ``Read(/data/**)`` and lets the runbook ``pixi run`` tasks
   through. The two are compatible: the child denies more, and the runbook tasks run the loader
