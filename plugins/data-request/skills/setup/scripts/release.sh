@@ -385,7 +385,7 @@ EOT
 
 # Print, and never run, the one fetch command: tags from origin, else the first configured remote.
 # The command names the project root with -C, so it fetches into the project that the remotes came
-# from, whatever the caller's directory is. The root is single-quoted, and each embedded single quote
+# from, whatever the caller's directory is. The root is single-quoted, and so is a remote name that is not plain; each embedded single quote
 # is written as '\'' . This is plain POSIX quoting, because printf %q differs between Bash versions.
 # No remote prints a comment line, so a shell that runs the output does nothing. Every skill and
 # every hint takes the command from here, so there is one instruction. This function uses no network.
@@ -401,7 +401,11 @@ rl_fetch_command() {
     ""|-*) printf '# no remote is configured: skip the fetch and say so\n' ;;
     *)
       root="$(printf '%s\n' "$SR_ROOT" | sed "s/'/'\\\\''/g")"
-      printf "git -C '%s' fetch --tags %q\n" "$root" "$remote" ;;
+      # A plain name stays bare. Any other name is single-quoted the same way as the root.
+      case "$remote" in
+        *[!A-Za-z0-9._@+=:/,-]*) remote="'$(printf '%s\n' "$remote" | sed "s/'/'\\\\''/g")'" ;;
+      esac
+      printf "git -C '%s' fetch --tags %s\n" "$root" "$remote" ;;
   esac
 }
 

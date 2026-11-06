@@ -1040,6 +1040,19 @@ class AmendGate(unittest.TestCase):
         self.assertEqual(done.returncode, 0, done.stderr)
         self.assertEqual(git(odd, "tag", "--list", "v9.9.8"), "v9.9.8")
 
+    def test_fetch_command_single_quotes_a_remote_name_that_percent_q_would_escape(self):
+        # printf %q escapes $ ; and ' differently from one Bash version to the next. The remote is
+        # single-quoted like the root, and the printed command runs as it stands.
+        odd = "up$stream;x'y"
+        git(self.p.root, "remote", "rename", "origin", odd)
+        r = self.fetch_command()
+        self.assertEqual(r.returncode, 0, r.stderr)
+        self.assertEqual(r.stdout, f"git -C '{self.p.root}' fetch --tags 'up$stream;x'\\''y'\n")
+        self.assertNotIn("\\$", r.stdout)
+        done = subprocess.run(["bash", "-c", r.stdout], cwd=self.p.root, env=clean_env(), capture_output=True,
+                              text=True)
+        self.assertEqual(done.returncode, 0, done.stderr)
+
     def test_fetch_command_prefers_origin(self):
         git(self.p.root, "remote", "add", "aaa", self.remote.name)
         r = self.fetch_command()
