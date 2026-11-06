@@ -268,6 +268,50 @@ class ReadGuard(unittest.TestCase):
         self.assertEqual(self.read(self.root / "data" / "00_raw" / "x.csv", "Write"), ("allow", ""))
 
 
+@unittest.skipUnless(shutil.which("jq"), "the guard needs jq")
+class OddProjectPaths(unittest.TestCase):
+    """A project path with a space, a tab, a newline or a leading dash must not weaken the Grep and Glob root check."""
+
+    NAMES = ("with space", "with\ttab", "with\nnewline", "-leading dash", "star*[x]")
+
+    def project(self, name):
+        tmp = tempfile.TemporaryDirectory()
+        self.addCleanup(tmp.cleanup)
+        root = Path(tmp.name).resolve() / name
+        (root / "data" / "00_raw").mkdir(parents=True)
+        (root / "skills").mkdir()
+        (root / "data" / "00_raw" / "sample_cohort.csv").write_text("study_id\nZZTEST-001\n")
+        return root
+
+    def search(self, root, tool, **tool_input):
+        tool_input = dict(tool_input)
+        if tool == "Grep":
+            tool_input.setdefault("pattern", "x")
+        return decide({"tool_name": tool, "cwd": str(root), "tool_input": tool_input})
+
+    def test_roots_at_or_above_the_directory_are_denied(self):
+        for name in self.NAMES:
+            root = self.project(name)
+            for tool in ("Grep", "Glob"):
+                for tool_input in ({"path": "."}, {}, {"path": "data"}, {"path": str(root)}):
+                    with self.subTest(name=name, tool=tool, tool_input=tool_input):
+                        self.assertEqual(self.search(root, tool, **tool_input)[0], "deny")
+
+    def test_a_path_with_a_newline_fails_closed(self):
+        # The guard cleans paths line by line, so it refuses a newline instead of guessing.
+        root = self.project("with\nnewline")
+        for tool in ("Grep", "Glob"):
+            with self.subTest(tool=tool):
+                self.assertEqual(self.search(root, tool, path="skills")[0], "deny")
+
+    def test_a_search_under_skills_still_passes(self):
+        for name in (n for n in self.NAMES if "\n" not in n):
+            root = self.project(name)
+            for tool in ("Grep", "Glob"):
+                with self.subTest(name=name, tool=tool):
+                    self.assertEqual(self.search(root, tool, path="skills"), ("allow", ""))
+
+
 class Wiring(unittest.TestCase):
     def test_hooks_json_routes_read_to_the_guard(self):
         for root in (REPO / "hooks" / "data-request", REPO / "plugins" / "data-request" / "hooks"):  # Codex has no Read tool

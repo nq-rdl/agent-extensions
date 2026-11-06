@@ -90,6 +90,8 @@ case "$tool" in Read|Grep|Glob)
   # path physically (existing parent via cd -P, so a ".." after a symlinked directory is
   # followed on disk; then the final component's symlink chain) and also check the lexical
   # path. A loop or a chain over 20 hops is denied, never allowed. Covers the Read tool and Grep and Glob (root and filter); Bash is the scaffold child's hook.
+  # The path cleanup below reads one line at a time, so a newline inside a path could hide data/00_raw/. Fail closed.
+  case "$abs$cwd" in *$'\n'*) decide deny "The path or working directory contains a newline, so the guard cannot rule out data/00_raw/. Use a path without a newline." ;; esac
   raw_lexical="$(printf '%s\n' "$abs" | normalize_path)"
   raw_physical="$abs"; hops=0
   while :; do
@@ -106,18 +108,18 @@ case "$tool" in Read|Grep|Glob)
   if [ "$tool" = Grep ] || [ "$tool" = Glob ]; then
     # A search root above data/00_raw/ (the project root, data/, or a parent) reaches the directory, and a
     # filter cannot prove it will not. Look for the directory under the root and up from the cwd.
-    found=""
+    found=()  # an array, so a path with a space, tab or newline stays one entry
     for base in "$raw_physical" "$raw_lexical"; do
       for cand in "$base/data/00_raw" "$base/00_raw"; do
-        [ -d "$cand" ] && found="$found $(cd -P -- "$cand" 2>/dev/null && pwd -P)"
+        if [ -d "$cand" ] && phys="$(cd -P -- "$cand" 2>/dev/null && pwd -P)"; then found[${#found[@]}]="$phys"; fi
       done
     done
     up="$(cd -P -- "$cwd" 2>/dev/null && pwd -P)"
     while [ -n "$up" ] && [ "$up" != / ]; do
-      [ -d "$up/data/00_raw" ] && { found="$found $up/data/00_raw"; break; }
+      if [ -d "$up/data/00_raw" ]; then found[${#found[@]}]="$up/data/00_raw"; break; fi
       up="$(dirname "$up")"
     done
-    for cand in $found; do
+    for cand in ${found[@]+"${found[@]}"}; do
       for base in "$raw_physical" "$raw_lexical"; do
         case "$cand/" in "${base%/}/"*)
           decide deny "A Grep or Glob rooted at or above data/00_raw/ can reach researcher-supplied identifiers, so it is denied. Pass a path that excludes data/, such as skills/ or src/. Never search data/00_raw/." ;;
