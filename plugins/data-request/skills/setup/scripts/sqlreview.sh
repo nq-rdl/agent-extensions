@@ -1529,7 +1529,12 @@ _header_decisions() ( # SQL DRAFT intended-human-confirmer parsed-notes
   # Publication supplies temporary authenticated bytes. Resolve their committed
   # path from the draft's project, rather than treating the temporary file as source.
   if [ -n "$project" ]; then
-    rel="$(jq -r '.sql_path' "$draft")"
+    # The history path comes from the draft, not the given file: publish passes a private render outside the
+    # project, which names no path. So the draft path is checked as publish checks it (structure, no symlink),
+    # and a missing or null one is refused with a fixed line, never read as the path "null".
+    rel="$(jq -r '.sql_path // "" | strings' "$draft" 2>/dev/null)" || rel=""
+    [ -n "$rel" ] || sr_die 2 "the review draft has no sql_path, so the header history cannot be read"
+    sr_safe_path "$rel"
     source_sql="$project/$rel"
   else source_sql="$sql"; fi
   if root="$(git -C "${project:-$(dirname "$source_sql")}" rev-parse --show-toplevel 2>/dev/null)"; then

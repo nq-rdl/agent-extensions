@@ -1,0 +1,3 @@
+kind: Fixed
+body: data-request notes --against refuses a review draft whose sql_path is missing, null or unsafe before reading history
+time: 2026-11-06T03:00:08.000000+10:00
