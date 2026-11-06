@@ -496,6 +496,7 @@ cmd_evidence() {
   local ref="$1" commit slug rows="" row
   shift
   sr_require_root
+  sr_partial_gate || exit 2
   case "$ref" in ""|-*) sr_die 2 "unsafe ref: $ref" ;; esac
   commit="$(git -C "$SR_ROOT" rev-parse --verify --quiet "$ref^{commit}" 2>/dev/null)" ||
     sr_die 2 "unknown ref: $ref (give the release tag or candidate commit)"
@@ -592,6 +593,7 @@ cmd_criteria() {
   sr_need_jq
   command -v git >/dev/null 2>&1 || sr_die 2 "git is required to read the release"
   sr_require_root
+  sr_partial_gate || exit 2
   commit="$(git -C "$SR_ROOT" rev-parse --verify --quiet "$tag^{commit}" 2>/dev/null)" ||
     sr_die 2 "unknown ref: $tag (give the release tag)"
   if [ "$mode" = fingerprints ]; then

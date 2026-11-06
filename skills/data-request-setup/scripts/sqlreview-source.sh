@@ -3,16 +3,49 @@
 # Old SQL comes from git at the recorded commit, never from a copy under .sqlreview/.
 # Callers supply an absolute output in their trapped private directory outside git.
 
+# A partial clone fetches a missing blob from its remote when git reads it. Release evidence must make no
+# network call, so every git here refuses that fetch (git 2.44 and later read this variable). An older git
+# ignores it, so sr_partial_gate fails closed instead.
+export GIT_NO_LAZY_FETCH=1
+
 # Status contract: 6 is unavailable or unauthenticated historical evidence;
 # 2 is malformed invocation, unsafe paths or operational I/O/tool failure.
 sr_source_error() { printf 'sqlreview: %s\n' "$*" >&2; return 2; }
 sr_source_unavailable() { printf 'sqlreview: %s\n' "$*" >&2; return 6; }
+
+# Fail closed in a partial clone when this git cannot refuse the lazy fetch (older than 2.44). The message
+# is fixed and names no path. The answer is kept in SR_PARTIAL_OK, which subshells inherit. Status never
+# calls this, so it adds no git call there.
+sr_partial_gate() { # [DIR]
+  [ -z "${SR_PARTIAL_OK:-}" ] || return 0
+  local dir="${1:-$SR_ROOT}" v major minor key val partial=""
+  # A partial clone names its promisor remote in extensions.partialclone (older git) or as remote.<name>.promisor
+  # (git clone --filter). Either key counts, unless its value is false.
+  while read -r key val; do
+    [ -z "$key" ] || [ "$val" = false ] || partial=1
+  done <<EOF2
+$(git -C "$dir" config --get-regexp '^(extensions\.partialclone|remote\..*\.promisor)$' 2>/dev/null)
+EOF2
+  if [ -n "$partial" ]; then
+    v="$(git --version 2>/dev/null)"; v="${v#git version }"
+    major="${v%%.*}"; minor="${v#*.}"; minor="${minor%%.*}"
+    case "$major.$minor" in
+      .|*[!0-9.]*|.*|*.) sr_source_error "this repository is a partial clone and the git version is unknown, so a read could fetch from the network. Use a full clone"; return 2 ;;
+    esac
+    if [ "$major" -lt 2 ] || { [ "$major" -eq 2 ] && [ "$minor" -lt 44 ]; }; then
+      sr_source_error "this repository is a partial clone and git is older than 2.44, so a read could fetch from the network. Fetch the blobs first, use a full clone, or update git"
+      return 2
+    fi
+  fi
+  SR_PARTIAL_OK=1
+}
 
 sr_source_context() {
   SR_SOURCE_TOP="$(git -C "$SR_ROOT" rev-parse --show-toplevel 2>/dev/null)" || {
     sr_source_error "committed source requires a git repository"; return 2;
   }
   SR_SOURCE_TOP="$(cd "$SR_SOURCE_TOP" && pwd -P)" || return 2
+  sr_partial_gate "$SR_SOURCE_TOP" || return 2
   case "$SR_ROOT" in
     "$SR_SOURCE_TOP") SR_SOURCE_PREFIX="" ;;
     "$SR_SOURCE_TOP"/*) SR_SOURCE_PREFIX="${SR_ROOT#"$SR_SOURCE_TOP"/}" ;;
