@@ -49,9 +49,9 @@ sr_source_context() {
   esac
   [ -z "$SR_SOURCE_PREFIX" ] || sr_safe_path "$SR_SOURCE_PREFIX"
   local grafts
-  grafts="$(git -C "$SR_SOURCE_TOP" rev-parse --git-path info/grafts)" || return 2
+  grafts="$(git -C "$SR_SOURCE_TOP" rev-parse --git-path info/grafts 2>/dev/null)" || return 2
   case "$grafts" in /*) ;; *) grafts="$SR_SOURCE_TOP/$grafts" ;; esac
-  if [ -s "$grafts" ] || [ -n "$(git -C "$SR_SOURCE_TOP" for-each-ref --format='%(refname)' refs/replace/)" ]; then
+  if [ -s "$grafts" ] || [ -n "$(git -C "$SR_SOURCE_TOP" for-each-ref --format='%(refname)' refs/replace/ 2>/dev/null)" ]; then
     sr_source_error "replacement refs/grafts refused for source evidence"; return 2
   fi
 }
@@ -63,7 +63,7 @@ sr_source_clean() {
   sr_source_context || return 2
   local tmp entry status path other store
   tmp="$(mktemp)" || return 2
-  if ! git -C "$SR_SOURCE_TOP" status --porcelain=v1 -z --untracked-files=all > "$tmp"; then
+  if ! git -C "$SR_SOURCE_TOP" status --porcelain=v1 -z --untracked-files=all > "$tmp" 2>/dev/null; then
     rm -f "$tmp"; sr_source_error "source status unavailable"; return 2
   fi
   store="${SR_SOURCE_PREFIX:+$SR_SOURCE_PREFIX/}.sqlreview"
@@ -107,7 +107,7 @@ sr_source_show() { # REF SQL_PATH OUTPUT; copies the committed blob, sets SR_SOU
   [ ! -e "$output" ] || [ -f "$output" ] || { sr_source_error "output is not a regular file"; return 2; }
   # Every request SQL file is committed, whatever sql/provenance.json says produced it.
   path="${SR_SOURCE_PREFIX:+$SR_SOURCE_PREFIX/}$2"
-  row="$(git -C "$SR_SOURCE_TOP" ls-tree "$SR_SOURCE_COMMIT" -- ":(literal)$path")" || {
+  row="$(git -C "$SR_SOURCE_TOP" ls-tree "$SR_SOURCE_COMMIT" -- ":(literal)$path" 2>/dev/null)" || {
     sr_source_error "cannot inspect committed SQL source"; return 2;
   }
   case "$row" in
@@ -115,7 +115,7 @@ sr_source_show() { # REF SQL_PATH OUTPUT; copies the committed blob, sets SR_SOU
     "") sr_source_unavailable "SQL source not committed at ${SR_SOURCE_COMMIT}: $2"; return 6 ;;
     *) sr_source_unavailable "committed SQL source is not a regular file (symlinks refused): $2"; return 6 ;;
   esac
-  ( umask 077; git -C "$SR_SOURCE_TOP" show "$SR_SOURCE_COMMIT:$path" > "$output" ) || {
+  ( umask 077; git -C "$SR_SOURCE_TOP" show "$SR_SOURCE_COMMIT:$path" > "$output" 2>/dev/null ) || {
     sr_source_error "committed SQL blob unavailable"; return 2;
   }
   # No render marker here: callers use this for internal workspace files (evidence, publish, delta, impact).

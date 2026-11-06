@@ -7,6 +7,7 @@ fail closed in every partial clone, with a fixed message. The tests count calls 
 whatever process starts it. Synthetic data only.
 """
 
+import json
 import os
 import shutil
 import stat
@@ -16,9 +17,9 @@ import unittest
 from pathlib import Path
 
 try:  # `unittest discover -s tests` puts tests/ on sys.path; `-m unittest tests.x` does not
-    from test_data_request_release import RELEASE, SQL_PATH, SQL_V2, Project, clean_env, git, run
+    from test_data_request_release import RELEASE, SLUG, SQL_PATH, SQL_V2, Project, clean_env, git, run
 except ModuleNotFoundError:
-    from tests.test_data_request_release import RELEASE, SQL_PATH, SQL_V2, Project, clean_env, git, run
+    from tests.test_data_request_release import RELEASE, SLUG, SQL_PATH, SQL_V2, Project, clean_env, git, run
 
 MESSAGE = "this repository is a partial clone, so a read could fetch from the network"
 
@@ -87,6 +88,7 @@ class PartialClone(unittest.TestCase):
         self.assertIn(MESSAGE, r.stderr)
         self.assertIn("full clone", r.stderr)
         self.assertNotIn(SQL_PATH, r.stderr)
+        self.assertNotIn("fatal:", r.stderr)
 
     def test_a_real_partial_clone_is_refused_even_with_every_blob_present(self):
         bare = self.make_source(change_sql=False)
@@ -126,6 +128,40 @@ class PartialClone(unittest.TestCase):
         self.assertEqual(r.returncode, 0, r.stdout + r.stderr)
         self.assertNotIn(MESSAGE, r.stderr)
         self.assertEqual(set(env_log.read_text().split()), {"1"}, "every git call runs with GIT_NO_LAZY_FETCH=1")
+
+
+    # git's own stderr can name an object or a path, so it never reaches the output (no-echo).
+    def assertNoGitText(self, r):
+        for text in ("fatal:", "bad object", "unable to read", SQL_PATH, "error:"):
+            self.assertNotIn(text, r.stderr)
+
+    def test_a_missing_blob_in_a_full_clone_prints_no_git_text(self):
+        self.src.write(SQL_PATH, SQL_V2)
+        self.src.commit("change sql")
+        self.src.tag("v1.0.0")
+        blob = git(self.src.root, "rev-parse", f"{self.src.review_commit}:{SQL_PATH}")
+        (self.src.root / ".git/objects" / blob[:2] / blob[2:]).unlink()
+        r = run(RELEASE, ["evidence", "v1.0.0"], self.src.root)
+        self.assertEqual(r.returncode, 2, r.stdout + r.stderr)
+        self.assertNoGitText(r)
+
+    def test_a_missing_commit_prints_no_git_text(self):
+        self.make_source(change_sql=False)
+        review = self.src.root / ".sqlreview/reviews" / SLUG / "review.json"
+        doc = json.loads(review.read_text())
+        doc["git_commit"] = "f" * 40
+        review.write_text(json.dumps(doc))
+        r = run(RELEASE, ["evidence", "v1.0.0"], self.src.root)
+        self.assertIn(r.returncode, (0, 10), r.stdout + r.stderr)
+        self.assertNoGitText(r)
+
+    def test_a_path_absent_at_the_ref_prints_no_git_text(self):
+        (self.src.root / SQL_PATH).unlink()
+        self.src.commit("remove sql")
+        self.src.tag("v1.0.0")
+        r = run(RELEASE, ["evidence", "v1.0.0"], self.src.root)
+        self.assertEqual(r.returncode, 10, r.stdout + r.stderr)
+        self.assertNoGitText(r)
 
 
 if __name__ == "__main__":
