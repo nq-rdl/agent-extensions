@@ -146,16 +146,11 @@ done: P<n> <commit>
 - **`done:`** The engineer writes it when the change is merged. The commit must be in the release
   ref.
 
-Check who wrote the line before you act on it. Read the comment authors from the deliverable PR
-(`gh pr view <PR> --json author,assignees,reviewRequests,comments`):
-
-- `done:` counts only from the engineer named in the hand-off comment. If it names none, it counts
-  only from the PR author or an assignee.
-- `withdrawn:` counts only from the analyst named on the PR, as assignee or requested reviewer.
-- The analyst cannot close a part with `done:`. The engineer cannot close one with `withdrawn:`.
-
-A line from anyone else leaves the part open. So does a PR that names no one for that role. Say who
-wrote the line and which role was expected. The human can then name the person.
+Check who wrote the line before you act on it. Follow
+`${PLUGIN_ROOT}/skills/setup/references/close-line-authors.rst`: read the comment authors from the
+deliverable PR with `gh pr view <PR> --json author,assignees,reviewRequests,comments`. The `done:` line
+counts only from the engineer, and the `withdrawn:` line counts only from the analyst. A line from
+anyone else leaves the part open. Say who wrote the line and which role was expected.
 
 Check a `done:` commit yourself before you record `done`. The release ref is the release tag.
 Before a tag exists, it is the ref that the analyst names, such as the branch to be released. If

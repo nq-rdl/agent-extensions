@@ -82,7 +82,11 @@ refs and holds the release when a commit is missing or is not in the ref.
 
 Then bring the record up to date. Find the deliverable PR in the ledger, or use the PR URL the
 analyst gives. Read its comments, read-only, for each `amendment hand-off:` comment and its `part:`
-entries. Only a later comment whose first line has one of two forms closes a handed-off part:
+entries. Only a later comment whose first line has one of two forms closes a handed-off part.
+Check who wrote the line first. Follow `${CLAUDE_PLUGIN_ROOT}/skills/setup/references/close-line-authors.rst`:
+read the authors with `gh pr view <PR> --json author,assignees,reviewRequests,comments`. The `done:` line
+counts only from the engineer, and the `withdrawn:` line counts only from the analyst. A line from anyone else
+leaves the part open. Say who wrote the line and which role was expected.
 
 - **Completed:** `done: P<n> <commit>`, from the engineer. Set the part to `done` with that commit.
   The script checks the commit against local refs, as amend does after its fetch: `git rev-parse --verify`
