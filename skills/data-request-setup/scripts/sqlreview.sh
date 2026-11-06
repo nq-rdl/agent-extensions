@@ -1310,7 +1310,9 @@ cmd_remap() (
   trap 'exit 2' HUP INT TERM
   cp "$input" "$work/draft.json" && cp "$prior" "$work/prior.json" &&
     cp "$SR_ROOT/$sql" "$work/current.sql" || sr_die 2 "cannot stage remap inputs"
-  sr_source_auth "$work/prior.json" "$work/base.sql" || exit $?
+  # After a move the published record names the new path at the old commit. The archived pre-move binding
+  # authenticates the baseline, as delta, carry and materialize do.
+  sr_source_auth "$(sr_binding_doc "$SR_REVIEWS/$slug" "$kind" "$work/prior.json")" "$work/base.sql" || exit $?
   local staged=""
   jq -e -L "$SR_SCRIPT_DIR" 'include "sqlreview-remap"; remap_valid' "$work/draft.json" >/dev/null || sr_die 4 "invalid draft ranges"
   LC_ALL=C diff -U 0 "$work/base.sql" "$work/current.sql" > "$work/diff"

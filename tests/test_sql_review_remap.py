@@ -4,6 +4,7 @@ import hashlib
 import json
 import os
 import shutil
+import subprocess
 import tempfile
 import unittest
 
@@ -155,6 +156,31 @@ class Remap(unittest.TestCase):
         out = self.remap()
         self.assertEqual(out["document"], "scope")
         self.assertEqual(self.read()["assumptions"][0]["location"]["lines"], [5, 5])
+
+    def test_a_scope_remaps_after_the_sql_moved_and_the_review_was_reassessed(self):
+        # Review finding 5: after move the scope names the new path at the old commit. The pre-move binding is
+        # archived under history/, and remap must authenticate that record, as delta and carry do.
+        (self.d / "review.json").unlink()
+        doc = scope_doc("q", "q.sql", sql_sha256=sha(SQL_V1),
+                        assumptions=self.prior["assumptions"], limitations=self.prior["limitations"])
+        self.seed(doc, SQL_V1)
+        git = lambda *a: subprocess.run(["git", "-C", str(self.p.root), *a], check=True, capture_output=True)
+        git("mv", "q.sql", "new.sql")
+        committed(self.p)
+        self.assertEqual(run(["move", "q.sql", "new.sql"], self.p.root).returncode, 0)
+        moved = self.p.root / ".sqlreview" / "reviews" / "new"
+        (moved / "rebind-required").unlink()  # what snapshot clears once the moved review is reassessed
+        (self.p.root / "new.sql").write_text("-- ZZTEST header\n-- rationale\n" + SQL_V1)
+        committed(self.p)
+        draft = json.loads((moved / "scope.json").read_text())
+        draft["revision"] = 2
+        draft["sql_sha256"] = sha((self.p.root / "new.sql").read_text())
+        draft["git_commit"] = committed(self.p)
+        (moved / "scope.draft.json").write_text(json.dumps(draft))
+        r = run(["remap", "new", str(moved / "scope.draft.json")], self.p.root)
+        self.assertEqual(r.returncode, 0, r.stdout + r.stderr)
+        out = json.loads((moved / "scope.draft.json").read_text())
+        self.assertEqual(out["assumptions"][0]["location"]["lines"], [5, 5])
 
     def test_missing_corrupt_baseline_and_invalid_range_fail_atomically(self):
         self.sql.write_text("-- header\n" + SQL_V1)
