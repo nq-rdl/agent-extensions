@@ -94,6 +94,7 @@ elif [ "$rc" -eq 0 ] && [ -n "$status" ]; then
     # What holds the release (#534): one line per handed-off part, per record that the validator refuses
     # (fields and rules only) and per missing record, with or without reviews.
     + ([ ($r.amendments // [])[] | "\n- next for \(.record) (\(if .missing == true then "record missing"
+         elif .ledger_invalid == true then "release held: ledger entries missing or invalid"
          elif (.invalid // []) | length > 0 then "invalid: " + ([.invalid[] | "\(.field) \(.rule)"] | join(", "))
          else "handed off: " + (.handed_off | join(" ")) end)): \(.next)" ] | join(""))' 2>/dev/null)"
 fi

@@ -236,12 +236,16 @@ EOT
         path*) aname="${lline#path?}"
           [ -f "$SR_ROOT/$aname" ] && continue
           aname="${aname#"$SR_DIR"/amendments/}"; aname="${aname%.json}" ;;
+        bad) # release holds on this too (rl_amend_ledger_missing): a fixed line, never the ledger text
+          SR_AMEND_ROWS="$SR_AMEND_ROWS-${SR_TAB}ledger$SR_TAB$SR_TAB$SR_AMEND_LEDGER_NEXT$SR_NL"
+          [ "$json" = 1 ] || printf 'ledger\t%s\tnext=%s\n' "$SR_AMEND_LEDGER_HELD" "$SR_AMEND_LEDGER_NEXT"
+          continue ;;
         *) continue ;;
       esac
       SR_AMEND_ROWS="$SR_AMEND_ROWS$aname${SR_TAB}missing$SR_TAB$SR_TAB$SR_AMEND_NEXT$SR_NL"
       [ "$json" = 1 ] || printf 'amendment %s\trecord missing\tnext=%s\n' "$aname" "$SR_AMEND_NEXT"
     done <<EOF
-$(jq -rs "$SR_AMEND_LEDGER_JQ" "$lfile" 2>/dev/null)
+$(jq -rs "$SR_AMEND_LEDGER_JQ" "$lfile" 2>/dev/null || printf 'bad\n')
 EOF
   fi
 }
@@ -323,8 +327,9 @@ EOF
     printf '%s' "$rows" | jq --arg root "$SR_ROOT" --arg schema "$schema" --arg missing "$missing" --arg next "$next" --arg amend "$amend" \
       '{root: $root, schemaVersion: ($schema | tonumber? // $schema), reviews: ., next: (if $next == "" then null else $next end),
         amendments: [$amend | split("\n")[] | select(. != "") | split("\t") | . as [$name, $kind, $detail, $act]
-                     | {record: ".sqlreview/amendments/\($name).json", handed_off: (if $kind == "open" then [$detail] else [] end), next: $act}
+                     | {record: (if $kind == "ledger" then ".sqlreview/ledger.json" else ".sqlreview/amendments/\($name).json" end), handed_off: (if $kind == "open" then [$detail] else [] end), next: $act}
                        + (if $kind == "missing" then {missing: true}
+                          elif $kind == "ledger" then {ledger_invalid: true}
                           elif $kind == "invalid" then {invalid: ($detail | split("; ") | map(split(": ") | {field: .[0], rule: .[1]}))}
                           else {} end)],
         counts: (group_by(.state) | map({key: .[0].state, value: length}) | from_entries | . + {total: (map(.) | add // 0)}),

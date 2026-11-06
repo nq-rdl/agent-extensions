@@ -704,6 +704,32 @@ class StatusAmendment(unittest.TestCase):
         self.assertNotIn("amendment ", text)
         self.assertNotIn("LEAK-C", text)
 
+    LEDGER_HELD = "release held: field entries is missing or invalid in .sqlreview/ledger.json"
+    LEDGER_NEXT = ("repair .sqlreview/ledger.json so it is one JSON object with an entries array "
+                   "(sqlreview.sh ledger set), then run status again")
+
+    def test_a_ledger_release_holds_on_is_named_with_a_fixed_line(self):
+        # Review finding 4: release holds (exit 11) on a ledger with no entries array or bad JSON.
+        for label, body in (("bad json", "{LEAK-CANARY"), ("empty", ""), ("no entries", '{"LEAK-CANARY": 1}'),
+                            ("entries not a list", '{"entries": "LEAK-CANARY"}')):
+            with self.subTest(label):
+                (self.p.root / ".sqlreview" / "ledger.json").write_text(body)
+                text = self.text()
+                self.assertIn(f"ledger\t{self.LEDGER_HELD}\tnext={self.LEDGER_NEXT}", text.splitlines())
+                self.assertNotIn("LEAK-C", text)
+                j = json.loads(run(["status", "--json"], self.p.root).stdout)
+                self.assertEqual(j["amendments"], [{"record": ".sqlreview/ledger.json", "handed_off": [],
+                                                    "next": self.LEDGER_NEXT, "ledger_invalid": True}])
+                ctx = decision(run_hook(PREFLIGHT, {"cwd": str(self.p.root)}, env_for()))["additionalContext"]
+                self.assertIn(f"- next for .sqlreview/ledger.json (release held: ledger entries missing or invalid): "
+                              f"{self.LEDGER_NEXT}", ctx)
+                self.assertNotIn("LEAK-C", ctx)
+
+    def test_a_valid_ledger_adds_no_ledger_line(self):
+        (self.p.root / ".sqlreview" / "ledger.json").write_text('{"schemaVersion": 1, "entries": []}')
+        self.assertNotIn("release held", self.text())
+
+
 
 if __name__ == "__main__":
     unittest.main()

@@ -777,6 +777,8 @@ else [.entries[] | objects | select(.stage == "amend" or ((.stages_done | arrays
   | unique[]
 end;
 if length == 1 then .[0] | paths else "bad" end'
+SR_AMEND_LEDGER_HELD='release held: field entries is missing or invalid in .sqlreview/ledger.json'
+SR_AMEND_LEDGER_NEXT='repair .sqlreview/ledger.json so it is one JSON object with an entries array (sqlreview.sh ledger set), then run status again'
 SR_AMEND_NEXT='write it from the amendment hand-off comment on the deliverable PR (/data-request:amend step 5)'
 
 # The shape of an amendment record name, in one place: the guard (through amend-check --name), the
