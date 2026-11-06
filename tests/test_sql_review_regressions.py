@@ -1,6 +1,7 @@
 """PR 297 regressions: containment, persistence failures, and resumable history."""
 import hashlib
 import json
+import re
 import os
 from pathlib import Path
 import shutil
@@ -149,7 +150,9 @@ class ReviewRegressions(unittest.TestCase):
             slug = result.stdout.strip()
             slugs.append(slug)
             doc = review_doc(slug, path)
-            self.assertEqual(run(['check', '--stdin'], self.p.root, stdin=json.dumps(doc)).returncode, 0)
+            # check records only letters, digits and _ . / - in sql_path (M2); the slug of any path still encodes.
+            expected = 0 if re.fullmatch(r'[A-Za-z0-9_./-]+', path) else 4
+            self.assertEqual(run(['check', '--stdin'], self.p.root, stdin=json.dumps(doc)).returncode, expected, path)
         self.assertEqual(len(slugs), len(set(slugs)))
 
     def test_nested_cwd_resolves_project_paths(self):
