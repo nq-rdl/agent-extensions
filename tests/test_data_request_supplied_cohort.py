@@ -164,6 +164,38 @@ class ReadGuard(unittest.TestCase):
                     self.assertIn("data/00_raw", reason)
                     self.assertIn("excludes data/", reason)
 
+    def test_a_search_rooted_levels_above_a_project_off_the_cwd_chain_is_denied(self):
+        # Review finding 1: the root is an ancestor of other projects, not of the cwd's own project.
+        with tempfile.TemporaryDirectory() as tmp:
+            top = Path(tmp).resolve()
+            (top / "notes").mkdir()
+            for levels in (1, 2, 3):
+                parts = [f"d{i}" for i in range(levels - 1)] + ["projB"]
+                raw = top.joinpath(*parts, "data", "00_raw")
+                raw.mkdir(parents=True)
+                (raw / "c.csv").write_text("study_id\nZZTEST-002\n")
+                for tool in ("Grep", "Glob"):
+                    with self.subTest(tool=tool, levels=levels):
+                        decision, reason = decide({"tool_name": tool, "cwd": str(top / "notes"),
+                                                   "tool_input": {"pattern": "x", "path": str(top)}})
+                        self.assertEqual(decision, "deny")
+                        self.assertIn("data/00_raw", reason)
+                        self.assertNotIn("ZZTEST-002", reason)
+                shutil.rmtree(top / parts[0])
+
+    def test_a_search_outside_any_project_with_no_raw_directory_beneath_passes(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            top = Path(tmp).resolve()
+            (top / "notes").mkdir()
+            (top / "projC" / "data" / "02_extracts").mkdir(parents=True)
+            for tool in ("Grep", "Glob"):
+                with self.subTest(tool=tool):
+                    self.assertEqual(decide({"tool_name": tool, "cwd": str(top / "notes"),
+                                             "tool_input": {"pattern": "x", "path": str(top)}}), ("allow", ""))
+                    self.assertEqual(decide({"tool_name": tool, "cwd": str(top / "notes"),
+                                             "tool_input": {"pattern": "x", "path": str(top / "projC" / "data")}}),
+                                     ("allow", ""))
+
     def test_a_search_with_no_path_is_denied_when_the_project_has_the_directory(self):
         for tool in ("Grep", "Glob"):
             with self.subTest(tool):

@@ -236,12 +236,16 @@ EOT
         path*) aname="${lline#path?}"
           [ -f "$SR_ROOT/$aname" ] && continue
           aname="${aname#"$SR_DIR"/amendments/}"; aname="${aname%.json}" ;;
+        bad) # release holds on this too (rl_amend_ledger_missing): a fixed line, never the ledger text
+          SR_AMEND_ROWS="$SR_AMEND_ROWS-${SR_TAB}ledger$SR_TAB$SR_TAB$SR_AMEND_LEDGER_NEXT$SR_NL"
+          [ "$json" = 1 ] || printf 'ledger\t%s\tnext=%s\n' "$SR_AMEND_LEDGER_HELD" "$SR_AMEND_LEDGER_NEXT"
+          continue ;;
         *) continue ;;
       esac
       SR_AMEND_ROWS="$SR_AMEND_ROWS$aname${SR_TAB}missing$SR_TAB$SR_TAB$SR_AMEND_NEXT$SR_NL"
       [ "$json" = 1 ] || printf 'amendment %s\trecord missing\tnext=%s\n' "$aname" "$SR_AMEND_NEXT"
     done <<EOF
-$(jq -rs "$SR_AMEND_LEDGER_JQ" "$lfile" 2>/dev/null)
+$(jq -rs "$SR_AMEND_LEDGER_JQ" "$lfile" 2>/dev/null || printf 'bad\n')
 EOF
   fi
 }
@@ -323,8 +327,9 @@ EOF
     printf '%s' "$rows" | jq --arg root "$SR_ROOT" --arg schema "$schema" --arg missing "$missing" --arg next "$next" --arg amend "$amend" \
       '{root: $root, schemaVersion: ($schema | tonumber? // $schema), reviews: ., next: (if $next == "" then null else $next end),
         amendments: [$amend | split("\n")[] | select(. != "") | split("\t") | . as [$name, $kind, $detail, $act]
-                     | {record: ".sqlreview/amendments/\($name).json", handed_off: (if $kind == "open" then [$detail] else [] end), next: $act}
+                     | {record: (if $kind == "ledger" then ".sqlreview/ledger.json" else ".sqlreview/amendments/\($name).json" end), handed_off: (if $kind == "open" then [$detail] else [] end), next: $act}
                        + (if $kind == "missing" then {missing: true}
+                          elif $kind == "ledger" then {ledger_invalid: true}
                           elif $kind == "invalid" then {invalid: ($detail | split("; ") | map(split(": ") | {field: .[0], rule: .[1]}))}
                           else {} end)],
         counts: (group_by(.state) | map({key: .[0].state, value: length}) | from_entries | . + {total: (map(.) | add // 0)}),
@@ -1305,7 +1310,9 @@ cmd_remap() (
   trap 'exit 2' HUP INT TERM
   cp "$input" "$work/draft.json" && cp "$prior" "$work/prior.json" &&
     cp "$SR_ROOT/$sql" "$work/current.sql" || sr_die 2 "cannot stage remap inputs"
-  sr_source_auth "$work/prior.json" "$work/base.sql" || exit $?
+  # After a move the published record names the new path at the old commit. The archived pre-move binding
+  # authenticates the baseline, as delta, carry and materialize do.
+  sr_source_auth "$(sr_binding_doc "$SR_REVIEWS/$slug" "$kind" "$work/prior.json")" "$work/base.sql" || exit $?
   local staged=""
   jq -e -L "$SR_SCRIPT_DIR" 'include "sqlreview-remap"; remap_valid' "$work/draft.json" >/dev/null || sr_die 4 "invalid draft ranges"
   LC_ALL=C diff -U 0 "$work/base.sql" "$work/current.sql" > "$work/diff"
@@ -1522,7 +1529,12 @@ _header_decisions() ( # SQL DRAFT intended-human-confirmer parsed-notes
   # Publication supplies temporary authenticated bytes. Resolve their committed
   # path from the draft's project, rather than treating the temporary file as source.
   if [ -n "$project" ]; then
-    rel="$(jq -r '.sql_path' "$draft")"
+    # The history path comes from the draft, not the given file: publish passes a private render outside the
+    # project, which names no path. So the draft path is checked as publish checks it (structure, no symlink),
+    # and a missing or null one is refused with a fixed line, never read as the path "null".
+    rel="$(jq -r '.sql_path // "" | strings' "$draft" 2>/dev/null)" || rel=""
+    [ -n "$rel" ] || sr_die 2 "the review draft has no sql_path, so the header history cannot be read"
+    sr_safe_path "$rel"
     source_sql="$project/$rel"
   else source_sql="$sql"; fi
   if root="$(git -C "${project:-$(dirname "$source_sql")}" rev-parse --show-toplevel 2>/dev/null)"; then

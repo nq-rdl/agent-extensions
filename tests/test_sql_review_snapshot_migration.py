@@ -228,6 +228,30 @@ class SnapshotMigration(unittest.TestCase):
         self.assertEqual((self.root / AUDIT).read_bytes(), before)
         self.assert_preserved()
 
+    def mode(self, path):
+        return os.stat(path).st_mode & 0o7777
+
+    def test_atomic_replacement_keeps_the_original_file_mode(self):
+        # Review finding 9: mktemp creates 0600, and the rename left that mode on the replaced file.
+        (self.root / AUDIT).parent.mkdir(parents=True)
+        self.write_json(self.root / AUDIT, {"schemaVersion": 1, "snapshots": {}})
+        for path, mode in ((self.root / AUDIT, 0o644), (self.store / ".gitignore", 0o664)):
+            os.chmod(path, mode)
+        result = self.run_cleanup()
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertEqual(json.loads((self.root / AUDIT).read_text()), self.expected_index())
+        self.assertEqual(self.mode(self.root / AUDIT), 0o644)
+        self.assertEqual(self.mode(self.store / ".gitignore"), 0o664)
+
+    def test_a_new_file_gets_the_default_mode_not_0600(self):
+        old = os.umask(0o022)
+        self.addCleanup(os.umask, old)
+        (self.store / ".gitignore").unlink()
+        result = self.run_cleanup()
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertEqual(self.mode(self.root / AUDIT), 0o644)
+        self.assertEqual(self.mode(self.store / ".gitignore"), 0o644)
+
     def test_ignore_without_final_newline_is_preserved_as_a_prefix(self):
         (self.store / ".gitignore").write_bytes(b"# custom\n/custom-private")
         result = self.run_cleanup()

@@ -6,13 +6,12 @@ path policy first. A refused artifact is not read, its stage is rechecked, and o
 stderr. Synthetic data only: the ZZTEST marker stands in for a researcher value.
 """
 import hashlib
+import importlib
 import json
 import unittest
 
-try:  # `unittest discover -s tests` puts tests/ on sys.path; `-m unittest tests.x` does not
-    import test_data_request_ledger as base
-except ModuleNotFoundError:
-    import tests.test_data_request_ledger as base
+# `unittest discover -s tests` puts tests/ on sys.path; `-m unittest tests.x` does not
+base = importlib.import_module(f"{__package__}.test_data_request_ledger" if __package__ else "test_data_request_ledger")
 
 TICKET, entry = base.TICKET, base.entry
 

@@ -159,6 +159,24 @@ class HeaderCarry(unittest.TestCase):
         subprocess.run(["git", "update-ref", "-d", "HEAD"], cwd=self.p.root, check=True, capture_output=True)
         self.walked()
 
+    def test_draft_sql_path_is_checked_before_the_header_history_is_read(self):
+        # Review finding 8: a missing, null or unsafe draft sql_path was used as the git history path.
+        for label, value in (("missing", None), ("null", ""), ("parent", "../ZZTEST-outside.sql"),
+                             ("absolute", "/ZZTEST-outside.sql"), ("dot", "./q.sql"), ("empty-segment", "a//q.sql")):
+            with self.subTest(label):
+                doc = dict(self.doc)
+                doc.pop("sql_path")
+                if label != "missing":
+                    doc["sql_path"] = None if label == "null" else value
+                self.draft.write_text(json.dumps(doc))
+                r = run(["notes", str(self.sql), "--against", str(self.draft), "--confirmed-by", "engineer-login"],
+                        self.p.root)
+                self.assertEqual(r.returncode, 2, r.stdout + r.stderr)
+                self.assertEqual(r.stdout, "")
+                self.assertRegex(r.stderr.strip(), r"^sqlreview: (the review draft has no sql_path, so the header "
+                                                   r"history cannot be read|unsafe sql_path)$")
+                self.assertNotIn("ZZTEST", r.stderr)
+
     def test_shallow_history_walks(self):
         head = subprocess.check_output(["git", "rev-parse", "HEAD"], cwd=self.p.root, text=True).strip()
         (self.p.root / ".git/shallow").write_text(head + "\n")

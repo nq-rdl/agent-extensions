@@ -36,6 +36,12 @@ check_file() {
     [ ! -L "$1" ] || fail "symlink refused: $1"
     if [ -e "$1" ]; then [ -f "$1" ] || fail "regular file required: $1"; fi
 }
+# mktemp creates 0600, and the rename would leave that mode on the replaced file. Give the temporary file the
+# mode of the file it replaces, or the umask default for a new file. cp -p copies the mode and works the same
+# on GNU and BSD, where stat has different flags. Bash 3.2 arithmetic reads the leading 0 of umask as octal.
+match_mode() { # <existing target> <temporary file>
+    if [ -f "$1" ]; then cp -p -- "$1" "$2"; else chmod "$(printf '%o' $((0666 & ~$(umask))))" "$2"; fi
+}
 check_json() {
     jq -s -e 'length == 1' "$1" >/dev/null 2>&1 || fail "invalid JSON: $1"
 }
@@ -141,6 +147,7 @@ if [ "$path_count" -gt 0 ]; then
     if [ ! -f "$audit" ] || ! jq -e --slurpfile expected "$scratch/index.json" '. == $expected[0]' "$audit" >/dev/null; then
         mkdir -p "$root/docs/maintenance"
         atomic_temp=$(mktemp "$root/docs/maintenance/.sqlreview-hashes.XXXXXX")
+        match_mode "$audit" "$atomic_temp"
         cat "$scratch/index.json" > "$atomic_temp"
         mv -f -- "$atomic_temp" "$audit"
         atomic_temp=
@@ -157,6 +164,7 @@ if [ -d "$store" ]; then
     done
     if [ ! -f "$ignore" ] || ! cmp -s "$ignore" "$scratch/ignore"; then
         atomic_temp=$(mktemp "$store/.sqlreview-ignore.XXXXXX")
+        match_mode "$ignore" "$atomic_temp"
         cat "$scratch/ignore" > "$atomic_temp"
         mv -f -- "$atomic_temp" "$ignore"
         atomic_temp=

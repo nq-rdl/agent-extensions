@@ -147,6 +147,16 @@ case "$tool" in Read|Grep|Glob)
       if [ -d "$up/data/00_raw" ]; then found[${#found[@]}]="$up/data/00_raw"; break; fi
       up="$(dirname "$up")"
     done
+    # A root further above a project that is not on the cwd chain would pass the probes above. Look for the
+    # directory beneath the root, to a fixed depth, so the guard stays fast: 6 levels cover a project up to 4
+    # directories below the root. A root higher than that is not searched deeper, which is the stated limit.
+    # head -n 1 stops the walk at the first hit and works on BSD find, which has no -quit.
+    if [ -d "$raw_physical" ]; then
+      deep="$(find "$raw_physical" -maxdepth 6 \( -name .git -o -name node_modules \) -prune -o -type d -iname 00_raw -ipath '*/data/00_raw' -print 2>/dev/null | head -n 1)"
+      if [ -n "$deep" ]; then
+        decide deny "A Grep or Glob rooted above a project that holds data/00_raw/ can reach researcher-supplied identifiers, so it is denied. Pass a path inside one project that excludes data/, such as skills/ or src/. Never search data/00_raw/."
+      fi
+    fi
     for cand in ${found[@]+"${found[@]}"}; do
       for base in "$raw_physical" "$raw_lexical"; do
         case "$cand/" in "${base%/}/"*)
