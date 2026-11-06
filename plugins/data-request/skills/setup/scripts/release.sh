@@ -370,7 +370,7 @@ rl_amend_ledger_missing() {
   while read -r line; do
     case "$line" in
       "") ;;
-      bad) missing="$missing${nl}release held: $SR_DIR/ledger.json: field entries is missing or invalid" ;;
+      bad) missing="$missing${nl}$SR_AMEND_LEDGER_HELD. Next: $SR_AMEND_LEDGER_NEXT" ;;
       path*) line="${line#path?}"
         [ -f "$SR_ROOT/$line" ] ||
           missing="$missing${nl}release held: the ledger shows an amendment but $line is missing. Next: $next" ;;

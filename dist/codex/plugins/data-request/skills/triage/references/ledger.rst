@@ -55,6 +55,11 @@ old store. A busy ``.ledger.lock`` fails: reload, reconcile and retry; after a
 crash, remove a stale lock only after verifying that no writer remains.
 Do not directly Write/Edit the final store.
 
+``set`` also refuses a store that is empty, is not valid JSON or has no ``entries`` array. ``status`` and the
+release hold name that state. To recover, run ``git restore --source=HEAD -- .sqlreview/ledger.json`` from the
+project root when ``HEAD`` holds a valid copy. Otherwise the human repairs the file to the schema above and runs
+``status`` again. No command repairs the store for you.
+
 Entry fields
 ------------
 

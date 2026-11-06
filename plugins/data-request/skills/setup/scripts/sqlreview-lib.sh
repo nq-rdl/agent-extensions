@@ -777,8 +777,10 @@ else [.entries[] | objects | select(.stage == "amend" or ((.stages_done | arrays
   | unique[]
 end;
 if length == 1 then .[0] | paths else "bad" end'
-SR_AMEND_LEDGER_HELD='release held: field entries is missing or invalid in .sqlreview/ledger.json'
-SR_AMEND_LEDGER_NEXT='repair .sqlreview/ledger.json so it is one JSON object with an entries array (sqlreview.sh ledger set), then run status again'
+SR_AMEND_LEDGER_HELD='release held: .sqlreview/ledger.json: field entries is missing or invalid'
+# ledger set refuses this state ("invalid ledger store schema"), so the recovery is outside it. Status makes no git call,
+# so the hint names both options. Release prints the same text.
+SR_AMEND_LEDGER_NEXT='from the project root, run git restore --source=HEAD -- .sqlreview/ledger.json when HEAD holds a valid copy, otherwise ask the human to repair the file to the schema in skills/data-request-triage/references/ledger.rst, then run status again'
 SR_AMEND_NEXT='write it from the amendment hand-off comment on the deliverable PR (/data-request:amend step 5)'
 
 # The shape of an amendment record name, in one place: the guard (through amend-check --name), the

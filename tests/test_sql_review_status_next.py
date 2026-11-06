@@ -704,9 +704,10 @@ class StatusAmendment(unittest.TestCase):
         self.assertNotIn("amendment ", text)
         self.assertNotIn("LEAK-C", text)
 
-    LEDGER_HELD = "release held: field entries is missing or invalid in .sqlreview/ledger.json"
-    LEDGER_NEXT = ("repair .sqlreview/ledger.json so it is one JSON object with an entries array "
-                   "(sqlreview.sh ledger set), then run status again")
+    LEDGER_HELD = "release held: .sqlreview/ledger.json: field entries is missing or invalid"
+    LEDGER_NEXT = ("from the project root, run git restore --source=HEAD -- .sqlreview/ledger.json when HEAD holds a "
+                   "valid copy, otherwise ask the human to repair the file to the schema in "
+                   "skills/data-request-triage/references/ledger.rst, then run status again")
 
     def test_a_ledger_release_holds_on_is_named_with_a_fixed_line(self):
         # Review finding 4: release holds (exit 11) on a ledger with no entries array or bad JSON.
@@ -724,6 +725,25 @@ class StatusAmendment(unittest.TestCase):
                 self.assertIn(f"- next for .sqlreview/ledger.json (release held: ledger entries missing or invalid): "
                               f"{self.LEDGER_NEXT}", ctx)
                 self.assertNotIn("LEAK-C", ctx)
+
+    def test_ledger_set_refuses_the_bad_store_and_the_git_restore_hint_clears_the_hold(self):
+        # Codex round 1: the old hint named ledger set, which refuses this exact state.
+        self.ledger([])
+        self.p.commit("valid ledger")
+        path = self.p.root / ".sqlreview" / "ledger.json"
+        entry = json.loads(path.read_text())["entries"][0]
+        for label, body in (("bad json", "{ZZTEST"), ("empty", ""), ("no entries", "{}"), ("not a list", '{"entries": 1}')):
+            with self.subTest(label):
+                path.write_text(body)
+                staged = self.p.root / "entry.json"
+                staged.write_text(json.dumps(entry))
+                r = run(["ledger", "set", entry["ticket"], str(staged)], self.p.root)
+                self.assertEqual(r.returncode, 4, r.stdout + r.stderr)
+                self.assertIn("invalid ledger store schema", r.stderr)
+                self.assertIn(f"ledger\t{self.LEDGER_HELD}\tnext={self.LEDGER_NEXT}", self.text().splitlines())
+                # Follow the restore option the hint names.
+                git(self.p.root, "restore", "--source=HEAD", "--", ".sqlreview/ledger.json")
+                self.assertNotIn("release held", self.text())
 
     def test_a_valid_ledger_adds_no_ledger_line(self):
         (self.p.root / ".sqlreview" / "ledger.json").write_text('{"schemaVersion": 1, "entries": []}')

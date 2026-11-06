@@ -1435,7 +1435,9 @@ class AmendGate(unittest.TestCase):
         (self.p.root / ".sqlreview/ledger.json").write_text(f'{{"entries": "{CANARY}')
         r = self.p.evidence("v1.0.0")
         self.assertEqual(r.returncode, 11, r.stderr)
-        self.assertIn("release held: .sqlreview/ledger.json: field entries is missing or invalid", r.stderr)
+        self.assertIn("release held: .sqlreview/ledger.json: field entries is missing or invalid. Next: from the project "
+                      "root, run git restore --source=HEAD -- .sqlreview/ledger.json when HEAD holds a valid copy", r.stderr)
+        self.assertNotIn("ledger set", r.stderr)
         self.assert_no_leak(r)
 
     def test_empty_or_blank_files_hold_as_malformed(self):
