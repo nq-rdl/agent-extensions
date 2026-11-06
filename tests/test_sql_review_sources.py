@@ -31,29 +31,29 @@ class Sources(unittest.TestCase):
     def committed(self, payload=b"SELECT 1;\n", source="builder"):
         # A scaffold child commits builder SQL. provenance.json never selects another route.
         p = self.p
-        (p.root / "sql").mkdir(exist_ok=True)
-        (p.root / "sql/request.sql").write_bytes(payload)
+        (p.root / "sql/v1").mkdir(parents=True, exist_ok=True)
+        (p.root / "sql/v1/request.sql").write_bytes(payload)
         if source is not None:
             (p.root / "sql/provenance.json").write_text(json.dumps({
-                "schema": 1, "requests": {"sql/request.sql": {"source": source}}}))
+                "schema": 1, "requests": {"sql/v1/request.sql": {"source": source}}}))
         return p.commit()
 
     def fingerprint(self):
-        return run(["fingerprint", "sql/request.sql"], self.p.root)
+        return run(["fingerprint", "sql/v1/request.sql"], self.p.root)
 
     def publish_committed(self, payload=b"SELECT 1;\nSELECT 3;\n"):
         self.committed(payload)
         fp = json.loads(self.fingerprint().stdout)
-        doc = review_doc("sql__request", **fp,
+        doc = review_doc("sql__v1__request", **fp,
                          assumptions=[item("A1", "Retain this range", location={"lines": [2, 2]})],
                          limitations=[], logic=[])
-        draft = self.p.write_json("sql__request", "review.draft.json", doc)
-        r = run(["publish", "sql__request", "review", str(draft)], self.p.root)
+        draft = self.p.write_json("sql__v1__request", "review.draft.json", doc)
+        r = run(["publish", "sql__v1__request", "review", str(draft)], self.p.root)
         self.assertEqual(r.returncode, 0, r.stdout + r.stderr)
         return draft, doc
 
     def change_sql(self, payload, commit=True):
-        (self.p.root / "sql/request.sql").write_bytes(payload)
+        (self.p.root / "sql/v1/request.sql").write_bytes(payload)
         if commit:
             self.p.commit("SQL update")
 
@@ -76,11 +76,11 @@ class Sources(unittest.TestCase):
         self.committed()
         self.change_sql(b"SELECT 2;\n", commit=False)
         self.assertEqual(self.fingerprint().returncode, 2)
-        git(self.p.root, "checkout", "--", "sql/request.sql")
-        (self.p.root / ".gitignore").write_text("sql/ignored.sql\n")
-        (self.p.root / "sql/ignored.sql").write_text("SELECT 1;\n")
+        git(self.p.root, "checkout", "--", "sql/v1/request.sql")
+        (self.p.root / ".gitignore").write_text("sql/v1/ignored.sql\n")
+        (self.p.root / "sql/v1/ignored.sql").write_text("SELECT 1;\n")
         self.p.commit("ignore")
-        r = run(["fingerprint", "sql/ignored.sql"], self.p.root)
+        r = run(["fingerprint", "sql/v1/ignored.sql"], self.p.root)
         self.assertEqual(r.returncode, 2, r.stderr)
         self.assertIn("not committed", r.stderr)
 
@@ -105,7 +105,7 @@ class Sources(unittest.TestCase):
             draft.with_name("review.json").write_text(json.dumps(dict(doc, **over)))
             r = run(["status", "--json"], self.p.root)
             self.assertEqual(json.loads(r.stdout)["reviews"][0]["state"], "no-baseline")
-            self.assertEqual(run(["delta", "sql__request"], self.p.root).returncode, 6)
+            self.assertEqual(run(["delta", "sql__v1__request"], self.p.root).returncode, 6)
 
     def test_materialize_exact_revision(self):
         draft, doc = self.publish_committed()
@@ -113,16 +113,16 @@ class Sources(unittest.TestCase):
         doc = dict(doc, revision=2, **json.loads(self.fingerprint().stdout))
         doc["assumptions"][0]["confirmed_revision"] = 2
         draft.write_text(json.dumps(doc))
-        r = run(["publish", "sql__request", "review", str(draft)], self.p.root)
+        r = run(["publish", "sql__v1__request", "review", str(draft)], self.p.root)
         self.assertEqual(r.returncode, 0, r.stdout + r.stderr)
         with tempfile.TemporaryDirectory() as tmp:
             output = Path(tmp) / "explained.sql"
             for revision, data in ((1, b"SELECT 1;\nSELECT 3;\n"), (2, b"SELECT 2;\nSELECT 3;\n")):
-                r = run(["materialize", "sql__request", "review", str(revision), str(output)], self.p.root)
+                r = run(["materialize", "sql__v1__request", "review", str(revision), str(output)], self.p.root)
                 self.assertEqual(r.returncode, 0, r.stdout + r.stderr)
                 self.assertEqual(output.read_bytes(), data)
                 output.unlink()
-            r = run(["materialize", "sql__request", "review", "3", str(output)], self.p.root)
+            r = run(["materialize", "sql__v1__request", "review", "3", str(output)], self.p.root)
             self.assertEqual(r.returncode, 6, r.stdout + r.stderr)
             self.assertFalse(output.exists())
         self.assertEqual(list((self.p.root / ".sqlreview").rglob("*.sql")), [])
@@ -146,11 +146,11 @@ class Sources(unittest.TestCase):
         doc = dict(doc, revision=2, **json.loads(self.fingerprint().stdout))
         doc["assumptions"][0]["confirmed_revision"] = 2
         draft.write_text(json.dumps(doc))
-        r = run(["publish", "sql__request", "review", str(draft)], self.p.root)
+        r = run(["publish", "sql__v1__request", "review", str(draft)], self.p.root)
         self.assertEqual(r.returncode, 0, r.stdout + r.stderr)
-        explain = self.p.root / ".sqlreview/reviews/sql__request/explain.json"
+        explain = self.p.root / ".sqlreview/reviews/sql__v1__request/explain.json"
         explain.write_text(json.dumps({"review_revision": 1}))
-        env = dict(os.environ, S=str(SCRIPTS), SLUG="sql__request")
+        env = dict(os.environ, S=str(SCRIPTS), SLUG="sql__v1__request")
         walk = subprocess.run(["bash", "-c", block], cwd=self.p.root, env=env, capture_output=True, text=True)
         self.assertEqual(walk.returncode, 0, walk.stdout + walk.stderr)
         lines = walk.stdout.splitlines()
@@ -162,34 +162,74 @@ class Sources(unittest.TestCase):
 
     def test_materialize_refuses_in_repo_output(self):
         self.publish_committed()
-        for output in (self.p.root / "leaked.sql", self.p.root / ".sqlreview/reviews/sql__request/source.sql"):
-            r = run(["materialize", "sql__request", "review", "1", str(output)], self.p.root)
+        for output in (self.p.root / "leaked.sql", self.p.root / ".sqlreview/reviews/sql__v1__request/source.sql"):
+            r = run(["materialize", "sql__v1__request", "review", "1", str(output)], self.p.root)
             self.assertEqual(r.returncode, 2, r.stdout + r.stderr)
             self.assertFalse(output.exists())
 
     def test_materialize_replaces_external_hardlink_without_modifying_repository(self):
         self.publish_committed()
-        alias = self.p.root / ".sqlreview/reviews/sql__request/alias.sql"
+        alias = self.p.root / ".sqlreview/reviews/sql__v1__request/alias.sql"
         original = b"preserve repository bytes\n"
         alias.write_bytes(original)
         with tempfile.TemporaryDirectory() as tmp:
             output = Path(tmp) / "explained.sql"
             os.link(alias, output)
-            r = run(["materialize", "sql__request", "review", "1", str(output)], self.p.root)
+            r = run(["materialize", "sql__v1__request", "review", "1", str(output)], self.p.root)
             self.assertEqual(r.returncode, 0, r.stdout + r.stderr)
             self.assertEqual(output.read_bytes(), b"SELECT 1;\nSELECT 3;\n")
             self.assertEqual(alias.read_bytes(), original)
-            self.assertEqual(list(Path(tmp).iterdir()), [output])
+            # The helper also writes the SHA-256 marker that lets notes read this render outside the project.
+            self.assertEqual(sorted(Path(tmp).iterdir()), sorted([output, output.with_name(output.name + ".sqlreview-render")]))
+
+    def test_materialize_never_writes_through_a_linked_render_marker(self):
+        # A marker that is a hard link or a symlink must not make the helper overwrite the linked file.
+        self.publish_committed()
+        repo_file = self.p.root / "keep.txt"
+        original = b"repository bytes\n"
+        repo_file.write_bytes(original)
+        for kind in ("hardlink", "symlink"):
+            with self.subTest(kind=kind), tempfile.TemporaryDirectory() as tmp:
+                output = Path(tmp) / "explained.sql"
+                marker = Path(tmp) / "explained.sql.sqlreview-render"
+                if kind == "hardlink":
+                    os.link(repo_file, marker)
+                else:
+                    os.symlink(repo_file, marker)
+                r = run(["materialize", "sql__v1__request", "review", "1", str(output)], self.p.root)
+                self.assertEqual(repo_file.read_bytes(), original, r.stdout + r.stderr)
+                if kind == "hardlink":
+                    self.assertEqual(r.returncode, 0, r.stdout + r.stderr)
+                    self.assertFalse(marker.is_symlink())
+                    self.assertEqual(len(marker.read_text().strip()), 64)
+                    self.assertEqual(sorted(p.name for p in Path(tmp).iterdir()),
+                                     ["explained.sql", "explained.sql.sqlreview-render"])
+                else:
+                    self.assertEqual(r.returncode, 2, r.stdout + r.stderr)
+                    self.assertTrue(marker.is_symlink())
+
+    def test_internal_renders_get_no_marker(self):
+        # sr_source_show feeds evidence, publish, delta and impact workspaces. Only materialize marks its
+        # output, so a committed pipeline file cannot become something notes or intake accepts (#516).
+        old = self.committed()
+        with tempfile.TemporaryDirectory() as tmp:
+            target = Path(tmp) / "out.sql"
+            env = dict(os.environ, SR_ROOT=str(self.p.root), SR_SCRIPT_DIR=str(SCRIPTS))
+            r = subprocess.run(["bash", "-c", '. "$SR_SCRIPT_DIR/sqlreview-lib.sh"; sr_source_show "$@"',
+                                "show", old, "sql/v1/request.sql", str(target)],
+                               cwd=self.p.root, env=env, capture_output=True, text=True)
+            self.assertEqual(r.returncode, 0, r.stderr)
+            self.assertEqual(sorted(Path(tmp).iterdir()), [target])
 
     def test_corrupt_hash_is_unavailable_never_current(self):
         draft, doc = self.publish_committed()
         draft.with_name("review.json").write_text(json.dumps(dict(doc, sql_sha256="0" * 64)))
         with tempfile.TemporaryDirectory() as tmp:
             output = Path(tmp) / "unproved.sql"
-            r = run(["materialize", "sql__request", "review", "1", str(output)], self.p.root)
+            r = run(["materialize", "sql__v1__request", "review", "1", str(output)], self.p.root)
             self.assertEqual(r.returncode, 6, r.stdout + r.stderr)
             self.assertFalse(output.exists())
-        r = run(["carryforward", "sql__request", "review", str(draft)], self.p.root)
+        r = run(["carryforward", "sql__v1__request", "review", str(draft)], self.p.root)
         self.assertEqual(r.returncode, 6, r.stdout + r.stderr)
         self.assertIn("full SHA mismatch", r.stderr)
 
@@ -203,7 +243,7 @@ class Sources(unittest.TestCase):
             row = json.loads(r.stdout)["reviews"][0]
             self.assertEqual(row["applies"], applies)
             self.assertTrue(row["reviewed_commit_in_ref"])
-        git(self.p.root, "rm", "-q", "sql/request.sql")
+        git(self.p.root, "rm", "-q", "sql/v1/request.sql")
         self.p.commit("drop SQL")
         self.assertEqual(json.loads(self.evidence("HEAD").stdout)["reviews"][0]["applies"], "missing-at-ref")
         draft.with_name("review.json").write_text(json.dumps(dict(doc, sql_sha256="0" * 64)))
@@ -230,7 +270,7 @@ class Sources(unittest.TestCase):
         self.change_sql(b"SELECT 2; -- shared_identifier\nSELECT shared_identifier;\n")
         with tempfile.TemporaryDirectory() as tmp:
             for command, expected in (("delta", 10), ("impact", 0)):
-                r = run([command, "sql__request"], self.p.root, env={"TMPDIR": tmp})
+                r = run([command, "sql__v1__request"], self.p.root, env={"TMPDIR": tmp})
                 self.assertEqual(r.returncode, expected, r.stdout + r.stderr)
                 if command == "delta":
                     self.assertIn("-SELECT 1;", r.stdout)
@@ -245,18 +285,18 @@ class Sources(unittest.TestCase):
         self.change_sql(b"SET NOCOUNT ON;\nSELECT 2;\nSELECT 3;\n")
         doc = dict(prior, revision=2, **json.loads(self.fingerprint().stdout))
         draft.write_text(json.dumps(doc))
-        r = run(["remap", "sql__request", str(draft)], self.p.root)
+        r = run(["remap", "sql__v1__request", str(draft)], self.p.root)
         self.assertEqual(r.returncode, 0, r.stdout + r.stderr)
         doc = json.loads(draft.read_text())
         self.assertEqual(doc["assumptions"][0]["location"]["lines"], [3, 3])
-        r = run(["carryforward", "sql__request", "review", str(draft)], self.p.root)
+        r = run(["carryforward", "sql__v1__request", "review", str(draft)], self.p.root)
         self.assertEqual(r.returncode, 0, r.stdout + r.stderr)
         row = json.loads(r.stdout)["carry"][0]
         self.assertEqual(row["basis"], "lines-unchanged")
         self.assertEqual(row["set"]["carried_from_revision"], 1)
         doc["assumptions"][0].update(row["set"])
         draft.write_text(json.dumps(doc))
-        r = run(["publish", "sql__request", "review", str(draft)], self.p.root)
+        r = run(["publish", "sql__v1__request", "review", str(draft)], self.p.root)
         self.assertEqual(r.returncode, 0, r.stdout + r.stderr)
         self.assertEqual(list((self.p.root / ".sqlreview").rglob("*.sql")), [])
 
@@ -264,17 +304,17 @@ class Sources(unittest.TestCase):
         draft, doc = self.publish_committed()
         doc["git_commit"] = "f" * 40
         draft.with_name("review.json").write_text(json.dumps(doc))
-        for command in (["carryforward", "sql__request", "review", str(draft)], ["delta", "sql__request"]):
+        for command in (["carryforward", "sql__v1__request", "review", str(draft)], ["delta", "sql__v1__request"]):
             r = run(command, self.p.root)
             self.assertEqual(r.returncode, 6, r.stdout + r.stderr)
             self.assertNotIn("sql-absent", r.stdout)
 
     def test_no_sql_scope_keeps_intent_carry(self):
         self.p.commit()
-        doc = scope_doc("sql__request", "sql/request.sql", sql_sha256=None)
-        self.p.write_json("sql__request", "scope.json", doc)
-        draft = self.p.write_json("sql__request", "scope.draft.json", dict(doc, revision=2))
-        r = run(["carryforward", "sql__request", "scope", str(draft)], self.p.root)
+        doc = scope_doc("sql__v1__request", "sql/v1/request.sql", sql_sha256=None)
+        self.p.write_json("sql__v1__request", "scope.json", doc)
+        draft = self.p.write_json("sql__v1__request", "scope.draft.json", dict(doc, revision=2))
+        r = run(["carryforward", "sql__v1__request", "scope", str(draft)], self.p.root)
         self.assertEqual(r.returncode, 0, r.stdout + r.stderr)
         self.assertEqual(json.loads(r.stdout)["carry"][0]["basis"], "sql-absent")
 
@@ -289,16 +329,16 @@ class Sources(unittest.TestCase):
             target = Path(output) / "out.sql"
             env = dict(os.environ, SR_ROOT=str(nested), SR_SCRIPT_DIR=str(SCRIPTS))
             r = subprocess.run(["bash", "-c", '. "$SR_SCRIPT_DIR/sqlreview-lib.sh"; sr_source_show "$@"',
-                                "show", old, "sql/request.sql", str(target)],
+                                "show", old, "sql/v1/request.sql", str(target)],
                                cwd=nested, env=env, capture_output=True, text=True)
             self.assertEqual(r.returncode, 0, r.stderr)
             self.assertEqual(target.read_bytes(), b"SELECT 1;\n")
 
     def test_symlinked_sql_and_replacement_refs_refused(self):
         head = self.committed()
-        (self.p.root / "sql/linked.sql").symlink_to("request.sql")
+        (self.p.root / "sql/v1/linked.sql").symlink_to("request.sql")
         self.p.commit("symlink")
-        self.assertEqual(run(["fingerprint", "sql/linked.sql"], self.p.root).returncode, 2)
+        self.assertEqual(run(["fingerprint", "sql/v1/linked.sql"], self.p.root).returncode, 2)
         git(self.p.root, "replace", head, head)
         self.assertEqual(self.fingerprint().returncode, 2)
 

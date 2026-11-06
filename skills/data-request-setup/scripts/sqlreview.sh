@@ -19,8 +19,8 @@
 #                                              and the move that migrates a legacy-encoded slug); exit 3 when not initialised
 #                                              missing bundled templates: JSON missing_templates, else one stderr line
 #   slug PATH                                  slug for a project path; exit 5 on a conflicting binding. Readable:
-#                                              sql/cohort_pipeline/x.sql -> sql__cohort_pipeline__x; an existing
-#                                              legacy-encoded reviews/sql__cohort%5Fpipeline__x/ is kept
+#                                              sql/v1/cohort_pipeline/x.sql -> sql__v1__cohort_pipeline__x; an existing
+#                                              legacy-encoded reviews/sql__v1__cohort%5Fpipeline__x/ is kept
 #   check FILE | check --stdin                 validate a review/scope JSON; exit 4 with one violation per line
 #   ledger [--session] get TICKET [--against REVISIONS]  load one triage entry; optional selective recheck
 #   ledger [--session] set TICKET ENTRY         validate, lock and atomically save .sqlreview/ledger.json
@@ -82,6 +82,9 @@
 #   render SLUG scope|review|lifts                   JSON + templates/<kind>.md -> reviews/SLUG/<kind>.md
 #                                              (a missing templates/<kind>.md is first installed from the bundled default)
 #
+# SQL paths (slug, fingerprint, snapshot, move's new path, notes, and the sql_path of drafts and records) and the
+# intake sidecar are refused when their canonical path is under data/ or under sql/ outside a reviewed
+# sql/v<N>/ directory (v[0-9]+([.-][0-9]+)*), or outside the project root, or cannot be resolved: exit 2, naming the rule (#516).
 # Exit codes: 0 ok · 1 usage · 2 error · 3 not initialised · 4 invalid document or notes header · 5 slug conflict ·
 # 6 no baseline · 10 differences or findings (init --diff / delta / lint / criteria).
 set -u
@@ -332,8 +335,8 @@ cmd_slug() {
   sr_need_jq
   sr_require_root
   local rel slug doc bound
+  # sr_relpath applies the reviewed-tree rule, so a second sr_safe_sql on its result is not needed.
   rel="$(sr_relpath "$1")" || exit $?
-  sr_safe_sql "$rel"
   slug="$(sr_slug "$rel")" || exit $?
   sr_safe_slug "$slug"
   if doc="$(sr_doc_for "$slug")"; then
@@ -578,6 +581,9 @@ _verify_header_decisions() ( # DOC SQL binding reconfirm-all
   local doc="$1" sql="$2" binding="$3" reconfirm_all="$4" actor notes proof="$1" tmp
   jq -e 'any((.assumptions[], .limitations[]); .carried_basis == "header-decision")' "$doc" >/dev/null || return 0
   [ "$(jq -r .kind "$doc")" = review ] && [ "$reconfirm_all" = false ] || sr_die 4 "header-decision basis requires a review carry-all answer"
+  # publish has already applied the full policy to this record's sql_path. A render of that committed blob in the
+  # private workspace gets a marker, so the inner notes accepts it outside the project (#516).
+  case "$sql" in "$SR_ROOT"/*) ;; *) sr_write_render_marker "$sql" || sr_die 2 "cannot mark header evidence" ;; esac
   if [ "$binding" = 10 ]; then
     # The authenticated body binding permits the old full hash, but notes must inspect
     # current SQL. Refresh only the proof copy, never the published fingerprint/answers.
@@ -636,6 +642,8 @@ cmd_publish() (
   dest="$SR_REVIEWS/$slug/$kind.json"
   sr_no_symlinks "$dest" || exit 2
   [ ! -d "$dest" ] || sr_die 2 "publish destination is a directory"
+  # The draft's own path is read into .sqlreview/ too, not only the sql_path inside it.
+  sr_refuse_unreviewed "$(sr_rawabs "$draft")" "$draft" || exit 2
   sr_no_symlinks "$(sr_abspath "$draft")" || exit 2
   [ -f "$draft" ] || sr_die 2 "no such draft: $draft"
   mkdir -p "$SR_REVIEWS/$slug" || sr_die 2 "cannot create review directory"
@@ -821,7 +829,6 @@ cmd_fingerprint() (
   sr_require_root
   local rel sha body="" tmp
   rel="$(sr_relpath "$1")" || exit $?
-  sr_safe_sql "$rel"
   sr_source_clean || exit 2
   umask 077
   tmp="$(sr_private_tmpdir sqlreview-fingerprint)" || exit 2
@@ -888,6 +895,12 @@ cmd_materialize() (
   [ ! -e "$output" ] || [ -f "$output" ] || sr_die 2 "output is not a regular file"
   mv "$staged" "$output" || sr_die 2 "cannot publish authenticated output"
   staged=""
+  # Mark the output so notes and intake accept it outside the project, but only when the record's own
+  # path passes the full policy: a record bound to pipeline SQL or data/ must not launder it through here.
+  # The record's sql_path is a document value, so a refusal prints nothing.
+  if ( sr_safe_sql "$(jq -r '.sql_path // ""' "$doc")" ) >/dev/null 2>&1; then
+    sr_write_render_marker "$output" || sr_die 2 "cannot mark authenticated output"
+  fi
 )
 
 # Remove a draft only at its canonical path, after the same slug and symlink checks as publish,
@@ -912,7 +925,6 @@ cmd_snapshot() (
   sr_require_root
   local slug="$1" rel doc work binding original head
   rel="$(sr_relpath "$2")" || exit $?
-  sr_safe_sql "$rel"
   sr_safe_slug "$slug"
   [ "$slug" = "$(sr_slug "$rel")" ] || sr_die 2 "slug/path mismatch"
   doc="$SR_REVIEWS/$slug/review.json"
@@ -1412,6 +1424,8 @@ cmd_notes() {
   done
   [ -n "$sql" ] || usage
   sr_need_jq
+  # notes reads the file as given (no relpath step), so apply the reviewed-tree rule here (#516).
+  sr_guard_input "$sql" helper-render
   [ -f "$sql" ] && [ -r "$sql" ] || sr_die 2 "no such readable file: $sql"
   if [ -n "$against" ]; then
     [ -f "$against" ] && [ -r "$against" ] || sr_die 2 "no such readable file: $against"
@@ -1534,6 +1548,8 @@ _header_decisions() ( # SQL DRAFT intended-human-confirmer parsed-notes
           done ;;
       esac
       if git -C "$root" show "$commit:$source_rel" > "$tmp/sql" 2>/dev/null; then
+        # Our own render of a committed blob: mark it so the inner notes accepts it outside the project.
+        sr_write_render_marker "$tmp/sql" || row_safe=false
         bash "$SR_SCRIPT_DIR/sqlreview.sh" notes "$tmp/sql" > "$tmp/notes" 2>/dev/null || { printf 'null\n' > "$tmp/notes"; row_safe=false; }
         start="$(sr_body_start "$tmp/sql")" || { start=0; row_safe=false; }
       else
@@ -1587,11 +1603,12 @@ cmd_move() {
     newrel="$(sr_relpath "$3")" || exit $?
   else
     [ $# -eq 2 ] || usage
-    oldrel="$(sr_relpath "$1")" || exit $?; newrel="$(sr_relpath "$2")" || exit $?
-    sr_safe_sql "$oldrel"
+    # The old path is only the key of an existing record, never read, so a record bound to a
+    # path the guard now refuses can still be moved into a reviewed sql/v<N>/ directory (#516).
+    oldrel="$(sr_relpath "$1" nopolicy)" || exit $?; newrel="$(sr_relpath "$2")" || exit $?
+    sr_safe_path "$oldrel"
     oldslug="$(sr_slug "$oldrel")"
   fi
-  sr_safe_sql "$newrel"
   newslug="$(sr_slug_new "$newrel")"
   sr_safe_slug "$oldslug"
   sr_safe_slug "$newslug"
@@ -1692,9 +1709,38 @@ Header revision history: metadata changed without changing its corresponding SQL
   printf 'rendered\t%s\n' "${out#"$SR_ROOT"/}"
 }
 
+# The file arguments each subcommand reads, all through sr_guard_input (#516). Commands whose
+# only inputs are slugs and project-relative SQL paths (resolved by sr_relpath/sr_safe_sql) need no
+# entry; tests/test_sql_review_path_guard.py lists every command and fails on a missing one.
+_sr_guard_command_inputs() { # COMMAND ARGS...
+  local c="$1" a prev="" last=""; shift
+  case "$c" in
+    check) [ $# -lt 1 ] || [ "$1" = --stdin ] || sr_guard_input "$1" ;;
+    # The sidecar and the optional drafts file are both read, and the sidecar's content is copied into
+    # drafts. Guarded here, not in cmd_intake, because criteria reads the sidecar at the git top level.
+    intake) [ $# -lt 1 ] || sr_guard_input "$1" helper-render; [ $# -lt 3 ] || sr_guard_input "$3" ;;
+    # A scope draft given by path is read like any other file argument. A bare slug is not a file.
+    criteria) case "${1:-}" in */*|*.json) sr_guard_input "$1" ;; esac ;;
+    lint) for a in "$@"; do last="$a"; done; [ -z "$last" ] || sr_guard_input "$last" ;;
+    carryover|remap|publish-questions) [ $# -lt 2 ] || sr_guard_input "$2" ;;
+    carryforward) [ $# -lt 3 ] || sr_guard_input "$3" ;;
+    notes) for a in "$@"; do case "$prev" in --against|--questions) sr_guard_input "$a" ;; esac; prev="$a"; done ;;
+    ledger)
+      [ "${1:-}" != --session ] || shift
+      case "${1:-}" in
+        check) [ $# -lt 2 ] || sr_guard_input "$2" ;;
+        # The documented staging files live outside the project (and --session works outside any repository),
+        # so only data/ and unreviewed sql/ inside the project are refused for these two arguments.
+        set) [ $# -lt 3 ] || sr_guard_input "$3" outside-ok ;;
+        get) [ "${3:-}" != --against ] || [ $# -lt 4 ] || sr_guard_input "$4" outside-ok ;;
+      esac ;;
+  esac
+}
+
 # ---------------------------------------------------------------------------------------------
 [ $# -ge 1 ] || usage
 cmd="$1"; shift
+_sr_guard_command_inputs "$cmd" "$@"
 case "$cmd" in
   init) cmd_init "$@" ;;
   status) cmd_status "$@" ;;

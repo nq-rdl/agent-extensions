@@ -80,10 +80,25 @@ sr_require_root() {
   sr_no_symlinks "$SR_REVIEWS" || exit 2
 }
 
-# Path relative to $SR_ROOT (dies when the path is outside the project).
+# Path relative to $SR_ROOT (dies when the path is outside the project). The reviewed-tree rule
+# applies unless the second argument is "nopolicy": move names a record's old path only to find it.
 sr_relpath() {
   local abs
   case "$1" in /*) abs="$(sr_normpath "$1")" ;; *) abs="$(sr_normpath "$SR_ROOT/$1")" ;; esac
+  # Checked on the path as given, not the folded one: "link/.." means different things to the two.
+  if [ "${2:-}" != nopolicy ]; then
+    case "$1" in /*) sr_refuse_unreviewed "$1" "$1" || return 2 ;; *) sr_refuse_unreviewed "$SR_ROOT/$1" "$1" || return 2 ;; esac
+  fi
+  # sr_refuse_unreviewed applies the same fold-versus-resolution check to every policy path. move's old path
+  # skips the policy, but its folded form is the record key, so it gets the check here.
+  if [ "${2:-}" = nopolicy ]; then
+    local raw physraw physabs
+    case "$1" in /*) raw="$1" ;; *) raw="$SR_ROOT/$1" ;; esac
+    physraw="$(sr_realpath_m "$raw")" && physabs="$(sr_realpath_m "$abs")" ||
+      sr_die 2 "refused path: the path cannot be resolved, so it cannot be checked (fail closed)"
+    [ "$physraw" = "$physabs" ] ||
+      sr_die 2 "refused path: a .. component follows a symbolic link, so the path names different files before and after resolution (rule: no .. after a symlink)"
+  fi
   sr_no_symlinks "$abs" || return 2
   case "$abs" in
     "$SR_ROOT"/*) printf '%s\n' "${abs#"$SR_ROOT"/}" ;;
@@ -108,9 +123,194 @@ sr_safe_slug() {
   case "$1" in ""|.|..|*[!A-Za-z0-9_%.-]*) sr_die 2 "unsafe slug: $1" ;; esac
   sr_no_symlinks "$SR_REVIEWS/$1" || exit 2
 }
-sr_safe_sql() {
+# Physical form of an absolute path: every symlink resolved, "." and ".." applied after resolution
+# (like realpath -m, which macOS lacks). The path may be missing; its missing tail is kept as
+# written. Returns 1 when it cannot be resolved (loop, unreadable link), so callers fail closed.
+sr_realpath_m() {
+  local rest="$1" cur="" hops=0 part cand target
+  case "$rest" in /*) rest="${rest#/}" ;; *) return 1 ;; esac
+  while [ -n "$rest" ]; do
+    case "$rest" in */*) part="${rest%%/*}"; rest="${rest#*/}" ;; *) part="$rest"; rest="" ;; esac
+    case "$part" in
+      ""|.) continue ;;
+      ..) cur="${cur%/*}"; continue ;;
+    esac
+    cand="$cur/$part"
+    if [ -L "$cand" ]; then
+      hops=$((hops + 1)); [ "$hops" -le 40 ] || return 1
+      # Sentinel keeps a trailing newline in the link text; a control character fails closed.
+      target="$(readlink "$cand"; printf x)" || return 1
+      target="${target%x}"; target="${target%$'\n'}"
+      case "$target" in ""|*[[:cntrl:]]*) return 1 ;; esac
+      case "$target" in
+        /*) cur=""; rest="${target#/}${rest:+/$rest}" ;;
+        *) rest="$target${rest:+/$rest}" ;;
+      esac
+    else
+      cur="$cand"
+    fi
+  done
+  printf '%s\n' "${cur:-/}"
+}
+
+# Absolute form of a path as the OS will open it: relative to the cwd, "." and ".." left for
+# sr_realpath_m to apply after symlink resolution (sr_abspath would fold ".." lexically first, so
+# sql/v1/link/../x.csv would be checked as sql/v1/x.csv while the kernel opens link's parent).
+sr_rawabs() {
+  local d
+  case "$1" in
+    /*) printf '%s\n' "$1" ;;
+    *) d="$(pwd -P; printf x)"; d="${d%x}"; printf '%s/%s\n' "${d%$'\n'}" "$1" ;;
+  esac
+}
+
+# Which files may be read into .sqlreview/ (#516). Researcher-supplied values live under data/ and
+# in pipeline SQL under sql/<name>/, so only a reviewed sql/v<N>/ tree (the scaffold's rule:
+# v[0-9]+([.-][0-9]+)*) may be copied, hashed or parsed into the committed review records.
+# Checked on the canonical path (symlinks and ".." resolved against the project root), so a
+# link or a ".." cannot lead a reviewed-looking path into data/ or sql/<name>/. Fails closed when
+# the path cannot be resolved. Messages name the rule, never the path or file content (no-echo).
+# Hard-link count of a file, portably (GNU stat -c, BSD stat -f). Fails when it cannot be read.
+sr_nlink() { # FILE
+  local n
+  n="$(stat -c %h "$1" 2>/dev/null)" || n="$(stat -f %l "$1" 2>/dev/null)" || return 1
+  case "$n" in ""|*[!0-9]*) return 1 ;; esac
+  printf '%s\n' "$n"
+}
+
+# A render the helper itself wrote (materialize, the header-evidence check and the release criteria sidecar) carries FILE.sqlreview-render
+# with the file's SHA-256. notes and intake accept an outside-project file only with a matching marker, so a
+# directory or file made by hand under any name is refused. Not a defence against a hostile
+# same-user process, which could write the marker too.
+sr_helper_render_marker() { # FILE
+  [ -f "$1" ] && [ ! -L "$1" ] && [ -f "$1.sqlreview-render" ] && [ ! -L "$1.sqlreview-render" ] || return 1
+  [ "$(cat "$1.sqlreview-render" 2>/dev/null)" = "$(sr_sha256 "$1" 2>/dev/null)" ]
+}
+
+# Write FILE.sqlreview-render. Never write through an existing marker: a symlink or hard link there would
+# make a plain redirection overwrite the linked file. Refuse a symlink, stage a fresh file beside the
+# marker and rename it over the target, which replaces the directory entry and leaves the old inode alone.
+sr_write_render_marker() { # FILE
+  local marker="$1.sqlreview-render" staged
+  [ ! -L "$marker" ] || { printf 'sqlreview: symlink path refused for the render marker\n' >&2; return 2; }
+  [ ! -e "$marker" ] || [ -f "$marker" ] || return 2
+  staged="$(umask 077; mktemp "$marker.XXXXXX")" || return 2
+  if sr_sha256 "$1" > "$staged" && mv -f "$staged" "$marker"; then return 0; fi
+  rm -f "$staged"; return 2
+}
+
+# The data/ and sql/ rules for a physical path PHYS inside the initialised project ROOT (both already resolved).
+sr_policy_under() { # ROOT PHYS
+  local rel first second re='^v[0-9]+([.-][0-9]+)*$'
+  rel="${2#"$1"/}"
+  first="${rel%%/*}"
+  case "$rel" in */*) second="${rel#*/}"; second="${second%%/*}" ;; *) second="" ;; esac
+  first="$(printf '%s' "$first" | tr '[:upper:]' '[:lower:]')"
+  case "$first" in
+    data)
+      sr_die 2 "refused path: data/ holds researcher-supplied values and is never read into $SR_DIR/ (rule: no data/ paths)" ;;
+    sql)
+      [[ "$second" =~ $re ]] ||
+        sr_die 2 "refused path: only a reviewed version directory sql/v<N>/ may be read into $SR_DIR/; pipeline SQL under sql/<name>/ may hold cohort values (rule: sql/ paths must be inside sql/v[0-9]+([.-][0-9]+)*/)" ;;
+  esac
+}
+
+# Nearest initialised project above a physical path, from the path's own location and not from the cwd.
+# Prints nothing and returns 1 when no directory above it holds .sqlreview/.
+sr_root_of_path() { # PHYS
+  local d="${1%/*}"
+  while [ -n "$d" ]; do
+    [ ! -d "$d/$SR_DIR" ] || { printf '%s\n' "$d"; return 0; }
+    d="${d%/*}"
+  done
+  return 1
+}
+
+sr_refuse_unreviewed() { # ABS_PATH AS_GIVEN [helper-render|outside-ok]
+  local root phys links d
+  # First, before any canonicalisation: command substitution strips trailing newlines, so a name
+  # such as "alias.sql<LF>" would be checked as a different path from the one opened. Refuse
+  # newline, CR, tab and every other control character outright (fail closed).
+  case "$1$2${SR_ROOT:-}" in
+    *[[:cntrl:]]*) sr_die 2 "refused path: it contains a control character such as a newline, carriage return or tab (rule: no control characters in paths)" ;;
+  esac
+  [ -n "${SR_ROOT:-}" ] || sr_die 2 "refused path: the project root is unknown, so the path cannot be checked (fail closed)"
+  root="$(sr_realpath_m "$SR_ROOT")" && phys="$(sr_realpath_m "$1")" ||
+    sr_die 2 "refused path: the path cannot be resolved, so it cannot be checked (fail closed)"
+  # Every initialised project above the file applies its own data/ and sql/ rules to it, whatever the cwd or
+  # SQLREVIEW_ROOT says: a file in another project, or a nested one, is judged by that project too.
+  d="${phys%/*}"
+  while [ -n "$d" ]; do
+    if [ "$d" != "$root" ] && [ -d "$d/$SR_DIR" ]; then sr_policy_under "$d" "$phys"; fi
+    d="${d%/*}"
+  done
+  case "$phys" in
+    "$root"/*) sr_policy_under "$root" "$phys" ;;
+    *)
+      # notes and intake pass "helper-render": the documented flows run them on a render the helper wrote.
+      [ "${3:-}" = helper-render ] && sr_helper_render_marker "$phys" && return 0
+      # amend-check prints rule lines only, so a record file outside the project may be checked there.
+      [ "${3:-}" = outside-ok ] && return 0
+      sr_die 2 "refused path: it resolves outside the project root; copy it into sql/v<N>/ first (rule: no paths that leave the project)" ;;
+  esac
+  # The kernel opens the path as given, but callers fold ".." lexically (sr_relpath, sr_abspath) and then use the
+  # folded form. If a symlink makes the two differ, the folded path names a file this policy never judged.
+  [ "$(sr_realpath_m "$(sr_normpath "$1")")" = "$phys" ] ||
+    sr_die 2 "refused path: a .. component follows a symbolic link, so the path names different files before and after resolution (rule: no .. after a symlink)"
+  # A hard link shares the inode of a file the path rules never see (a data/ file linked into sql/v1/).
+  if [ -f "$phys" ]; then
+    links="$(sr_nlink "$phys")" || sr_die 2 "refused path: its hard-link count cannot be read, so it cannot be checked (fail closed)"
+    [ "$links" -le 1 ] || sr_die 2 "refused path: the file has $links hard links, and one may be under data/ (rule: no hard-linked files)"
+  fi
+}
+
+# THE entry point for any user-supplied path whose content a command reads, copies, hashes into a
+# record or prints (#516): the full policy (data/, unreviewed sql/, outside the project root unless
+# a helper-marked render is allowed, symlink target, hard-link count), exiting 2 when refused.
+# Every subcommand's file arguments go through here, either as sr_guard_input at the dispatch
+# (tests/test_sql_review_path_guard.py runs every command on a refused path and fails on an unlisted
+# command). A command that copies or reads the file later does not guard it a second time.
+# MODE is helper-render (accept an outside-project file that carries a helper marker) or outside-ok (accept any
+# file outside the project, but never data/ or unreviewed sql/ inside it).
+# With no initialised .sqlreview/ from the cwd, the project is discovered from the file itself: the nearest
+# initialised directory above its physical path governs it, so an alias into data/ is refused as data/.
+# With no project above the file either, a path that has a data or sql directory in its spelling or in its
+# physical form is refused (fail closed). Other paths, such as a scratch file in a temporary directory,
+# are checked against the git top level or the cwd.
+sr_guard_input() { # PATH [helper-render|outside-ok]
+  local low phys
+  if [ -z "${SR_ROOT:-}" ]; then
+    if ! SR_ROOT="$(sr_find_root 2>/dev/null)"; then
+      SR_ROOT=""
+      low="$(printf '/%s/' "$(sr_rawabs "$1")" | tr '[:upper:]' '[:lower:]')"
+      case "$low" in
+        *[[:cntrl:]]*) sr_die 2 "refused path: it contains a control character such as a newline, carriage return or tab (rule: no control characters in paths)" ;;
+      esac
+      phys="$(sr_realpath_m "$(sr_rawabs "$1")")" ||
+        sr_die 2 "refused path: the path cannot be resolved, so it cannot be checked (fail closed)"
+      if SR_ROOT="$(sr_root_of_path "$phys")"; then :
+      else
+        SR_ROOT=""
+        low="$low$(printf '/%s/' "$phys" | tr '[:upper:]' '[:lower:]')"
+        case "$low" in
+          */data/*|*/sql/*) sr_die 2 "refused path: no initialised $SR_DIR/ project is found from here or above the file and the path is under a data or sql directory, so it cannot be checked (fail closed)" ;;
+        esac
+        SR_ROOT="$(sr_init_root)"
+      fi
+    fi
+  fi
+  sr_refuse_unreviewed "$(sr_rawabs "$1")" "$1" "${2:-}" || exit 2
+}
+
+# Structural checks on a stored or derived project-relative path (no policy; see sr_safe_sql).
+sr_safe_path() {
   case "$1" in ""|/*|*/../*|../*|*/..|..|./*|*/./*|*/.|*//*|*/) sr_die 2 "unsafe sql_path" ;; esac
   sr_no_symlinks "$SR_ROOT/$1" || exit 2
+}
+# A SQL path about to be read into .sqlreview/: the structural checks first (a no-echo "unsafe sql_path"), then the reviewed-tree rule.
+sr_safe_sql() {
+  sr_safe_path "$1"
+  case "$1" in /*) sr_refuse_unreviewed "$1" "$1" ;; *) sr_refuse_unreviewed "$SR_ROOT/$1" "$1" ;; esac || exit 2
 }
 # Both encodings of a path, readable then legacy, one per line. The definitions live in
 # sqlreview-slug.jq, shared with check's slug/sql_path binding rule (#353).
@@ -277,9 +477,10 @@ EOF
   if [ "$kind" != lifts ]; then
     # The question store must load, as `sqlreview.sh questions` loads it. In a subshell, not a child
     # bash, which would read sqlreview.sh again per review. Its review filter keeps every question.
-    ( _q_context "$1" ) >/dev/null 2>&1 || { printf 'invalid\t\t\n'; return 0; }
+    # Structural path checks only: the input policy applies to what is read, and status reads nothing new.
+    ( SR_Q_STRUCTURAL=1; _q_context "$1" ) >/dev/null 2>&1 || { printf 'invalid\t\t\n'; return 0; }
   fi
-  sr_safe_sql "$sql"
+  sr_safe_path "$sql"
   case "$kind" in
     scope)
       state="scoped"

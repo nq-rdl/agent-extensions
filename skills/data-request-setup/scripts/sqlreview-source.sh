@@ -18,7 +18,7 @@ sr_source_context() {
     "$SR_SOURCE_TOP"/*) SR_SOURCE_PREFIX="${SR_ROOT#"$SR_SOURCE_TOP"/}" ;;
     *) sr_source_error "unsafe project-root prefix"; return 2 ;;
   esac
-  [ -z "$SR_SOURCE_PREFIX" ] || sr_safe_sql "$SR_SOURCE_PREFIX"
+  [ -z "$SR_SOURCE_PREFIX" ] || sr_safe_path "$SR_SOURCE_PREFIX"
   local grafts
   grafts="$(git -C "$SR_SOURCE_TOP" rev-parse --git-path info/grafts)" || return 2
   case "$grafts" in /*) ;; *) grafts="$SR_SOURCE_TOP/$grafts" ;; esac
@@ -58,7 +58,9 @@ sr_source_clean() {
 sr_source_show() { # REF SQL_PATH OUTPUT; copies the committed blob, sets SR_SOURCE_{COMMIT,PREFIX}
   [ $# -eq 3 ] || { sr_source_error "render requires ref, sql_path and output"; return 2; }
   sr_source_context || return 2
-  sr_safe_sql "$2"
+  # Structural check only: every caller that takes a new path applies the reviewed-tree rule first, and a
+  # history entry kept by move may name a path the rule now refuses (its blob is read from Git, not the work tree).
+  sr_safe_path "$2"
   case "$1" in ""|-*) sr_source_error "unsafe source ref"; return 2 ;; esac
   local ref_status
   SR_SOURCE_COMMIT="$(git -C "$SR_SOURCE_TOP" rev-parse --verify --quiet "$1^{commit}" 2>/dev/null)" || {
@@ -87,6 +89,8 @@ sr_source_show() { # REF SQL_PATH OUTPUT; copies the committed blob, sets SR_SOU
   ( umask 077; git -C "$SR_SOURCE_TOP" show "$SR_SOURCE_COMMIT:$path" > "$output" ) || {
     sr_source_error "committed SQL blob unavailable"; return 2;
   }
+  # No render marker here: callers use this for internal workspace files (evidence, publish, delta, impact).
+  # Only materialize marks its output, and only for a record bound to a reviewed path (#516).
 }
 
 sr_source_auth() { # DOC OUTPUT; status 6 evidence unavailable, 2 operational failure

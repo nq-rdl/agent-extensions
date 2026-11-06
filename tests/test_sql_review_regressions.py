@@ -52,7 +52,7 @@ class ReviewRegressions(unittest.TestCase):
 
         def publish(slug, revision, path):
             fp = json.loads(run(['fingerprint', path], self.p.root).stdout)
-            draft = out / 'draft.json'
+            draft = self.p.root / '.sqlreview/reviews/draft.json'
             draft.write_text(json.dumps(review_doc(slug, revision=revision, **fp)))
             result = run(['publish', slug, 'review', str(draft)], self.p.root)
             self.assertEqual(result.returncode, 0, result.stderr)
@@ -62,7 +62,7 @@ class ReviewRegressions(unittest.TestCase):
             (self.p.root / old).rename(self.p.root / new)
             self.p.commit(f'move to {new}')
             # Carry evidence comes from the archived binding before reassessment, too.
-            draft = out / 'carry.json'
+            draft = self.p.root / '.sqlreview/reviews/carry.json'
             current = json.loads((self.d.parent / slug / 'review.json').read_text())
             draft.write_text(json.dumps(dict(current, revision=current['revision'] + 1)))
             carry = run(['carryforward', slug, 'review', str(draft)], self.p.root)

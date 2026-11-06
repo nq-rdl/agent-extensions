@@ -147,6 +147,11 @@ cmd_marked() {
 cmd="${1:-}"
 [ -n "$cmd" ] || usage
 shift
+# File arguments go through the shared guard (#516): no data/, no unreviewed sql/, nothing outside the project.
+. "$(cd "$(dirname "$0")" && pwd -P)/sqlreview-lib.sh"
+case "$cmd" in
+  match|marked) for f in "$@"; do case "$f" in --any-kind) ;; *) sr_guard_input "$f" ;; esac; done ;;
+esac
 case "$cmd" in
   list) cmd_list "$@" ;;
   match) cmd_match "$@" ;;

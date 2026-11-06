@@ -1,8 +1,8 @@
 """Issue 353: readable path-derived slugs, legacy-slug compatibility and one-command migration.
 
 Path-derived slugs keep `_` and `.` literal where that stays unambiguous, so
-`sql/cohort_pipeline/aaa_screening_log.sql` reviews live under
-`reviews/sql__cohort_pipeline__aaa_screening_log/`. Reviews created under the legacy
+`sql/v1/aaa_screening_log.sql` reviews live under
+`reviews/sql__v1__aaa_screening_log/`. Reviews created under the legacy
 encoding (every `_` and `.` percent-escaped) keep validating and working, and
 `move PATH PATH` migrates one to the readable slug without forcing a re-analysis.
 """
@@ -15,9 +15,9 @@ from urllib.parse import quote, unquote
 
 from test_sql_review_scripts import Project, SQL_V1, SQL_V2, review_doc, scope_doc, run
 
-PATH = "sql/cohort_pipeline/aaa_screening_log.sql"
-READABLE = "sql__cohort_pipeline__aaa_screening_log"
-LEGACY = "sql__cohort%5Fpipeline__aaa%5Fscreening%5Flog"
+PATH = "sql/v1/aaa_screening_log.sql"
+READABLE = "sql__v1__aaa_screening_log"
+LEGACY = "sql__v1__aaa%5Fscreening%5Flog"
 
 # Edge cases for the separator, the underscore rule and the dot rule. `x` and `x.sql` are
 # listed together on purpose: stripping `.sql` before encoding already made them collide
@@ -214,10 +214,10 @@ class LegacyEncodedReview(unittest.TestCase):
         self.assertEqual(self.rows()[READABLE]["state"], "current")
 
     def test_move_to_another_path_lands_on_readable_slug_and_requires_rebind(self):
-        self.p.sql("sql/next_step/aaa_log.sql", SQL_V1)
-        r = self.cmd("move", PATH, "sql/next_step/aaa_log.sql")
-        self.assertEqual(r.stdout.strip().split("\t"), ["moved", LEGACY, "sql__next_step__aaa_log", "sql/next_step/aaa_log.sql"])
-        self.assertTrue((self.reviews() / "sql__next_step__aaa_log" / "rebind-required").is_file())
+        self.p.sql("sql/v2/aaa_log.sql", SQL_V1)
+        r = self.cmd("move", PATH, "sql/v2/aaa_log.sql")
+        self.assertEqual(r.stdout.strip().split("\t"), ["moved", LEGACY, "sql__v2__aaa_log", "sql/v2/aaa_log.sql"])
+        self.assertTrue((self.reviews() / "sql__v2__aaa_log" / "rebind-required").is_file())
 
     def test_verbose_status_flags_migratable_legacy_slugs(self):
         command = f"sqlreview.sh move '{PATH}' '{PATH}'"

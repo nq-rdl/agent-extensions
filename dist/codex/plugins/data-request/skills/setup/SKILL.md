@@ -165,7 +165,25 @@ it, and its builder, configuration and pins before `fingerprint`. Diff, carry, e
 read old SQL with `git show` at the recorded commit and check its SHA first. Unavailable or
 mismatched SQL requires reassessment.
 
-SQL paths are supplied explicitly to bootstrap/analyse. To customise report sections, edit the
+SQL paths are supplied explicitly to bootstrap/analyse. Only reviewed request SQL under
+`sql/v<N>/` may be read into `.sqlreview/`. The directory name must match `v[0-9]+([.-][0-9]+)*`,
+for example `sql/v1/` or `sql/v2.1/`. The commands `slug`, `fingerprint`, `snapshot`, `notes` and
+`intake` refuse every path under `data/` and every path under `sql/` outside such a directory.
+So do the new path of `move` and the `sql_path` of any draft or record. Pipeline SQL in
+`sql/<name>/` can hold researcher-supplied cohort values. The helper resolves the path first
+(`..` and symlinks, from the project root), so a link from `sql/v1/` into `data/` is refused.
+It also refuses a path that cannot be resolved, a path that leaves the project root, a file with
+more than one hard link and a path with a control character. Copy a file from outside the project
+into `sql/v<N>/` first. The commands `notes` and `intake` also accept a file that the helper wrote itself
+(`materialize`), marked by a `FILE.sqlreview-render` file. The analyse, bootstrap and explain
+recipes pass such a render. Every file argument follows the same rules. This covers `check`, `lint`,
+`ledger`, `carryover`, `carryforward`, `remap`, `publish`, `publish-questions`, `intake`,
+`notes --against` and `--questions`, and the file arguments of the release and recurring-decision helpers.
+A refused command exits with code 2, names the rule only, and prints neither the path nor file content.
+It writes nothing. Do not work around it. Review a copy in a version directory that holds no
+values. `move OLD NEW` still accepts a refused OLD path, because that path is only the key of
+the record and is never read. An existing record can therefore move into a reviewed directory.
+`status` still lists such records. To customise report sections, edit the
 project templates; SQL glob filtering and section flags are not configuration options.
 
 Questions have an independent per-slug `questions.json` store: stable IDs, scope/review

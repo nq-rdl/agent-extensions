@@ -350,6 +350,24 @@ class Canary(unittest.TestCase):
         self.assertClean(r, 2)
         self.assertIn("unsafe sql_path", r.stderr)
 
+    # --- #516 path guard: a refused path is named by its rule, never by its value -------------------
+    def test_path_guard_refusals_name_the_rule_and_not_the_path(self):
+        self.write(f"data/{CANARY}.sql", "SELECT 1;\n")
+        self.write(f"sql/{CANARY}/q.sql", "SELECT 1;\n")
+        (self.root / "sql/v1").mkdir(parents=True, exist_ok=True)
+        os.symlink(self.root / "data", self.root / "sql/v1" / CANARY)
+        for rel in (f"data/{CANARY}.sql", f"sql/{CANARY}/q.sql", f"sql/v1/{CANARY}/{CANARY}.sql",
+                    f"../{CANARY}.sql", f"/nonexistent/{CANARY}.sql"):
+            for args in (("fingerprint", rel), ("slug", rel), ("notes", rel), ("snapshot", "q", rel),
+                         ("move", "sql/v1/old.sql", rel), ("intake", rel, "1")):
+                with self.subTest(args=args):
+                    r = self.run_script(SR, *args)
+                    self.assertNotEqual(r.returncode, 0, r.stdout)
+                    self.assertClean(r)
+        r = self.run_script(RL, "amend-check", self.root / f"data/{CANARY}.sql")
+        self.assertEqual(r.returncode, 2, r.stdout + r.stderr)
+        self.assertClean(r)
+
     # --- #548 late paths: move archive, materialize, discard-draft, publish from the archive -------
     def reviewed_project(self, **over):
         """A committed q.sql and a published review whose free-text fields all carry the canary."""

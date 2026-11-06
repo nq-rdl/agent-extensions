@@ -50,6 +50,39 @@ class Ledger(unittest.TestCase):
         self.draft.write_text(json.dumps(doc if doc is not None else entry()))
         return self.run_helper(*(['--session'] if session else []), 'set', TICKET, str(self.draft), ok=ok)
 
+    def test_entry_and_against_files_outside_the_project_are_accepted(self):
+        # The documented staging files (triage ledger.rst) live outside the project (#516 guard follow-up).
+        (self.root / '.sqlreview').mkdir()  # an initialised project, so the guard has a root
+        with tempfile.TemporaryDirectory(prefix='staging ') as staging:
+            staged = Path(staging) / 'entry.json'
+            staged.write_text(json.dumps(entry()))
+            self.run_helper('set', TICKET, str(staged))
+            self.assertEqual(json.loads(self.run_helper('get', TICKET).stdout), entry())
+            current = Path(staging) / 'current-revisions.json'
+            current.write_text(json.dumps({}))
+            self.run_helper('get', TICKET, '--against', str(current), ok=True)
+            # --session mode works with no initialised project at all.
+            bare = Path(staging) / 'bare'
+            bare.mkdir()
+            env = {k: v for k, v in os.environ.items() if not k.startswith('SQLREVIEW_')}
+            env['XDG_STATE_HOME'] = str(Path(staging) / 'state')
+            r = subprocess.run(['bash', str(SCRIPT), 'ledger', '--session', 'set', TICKET, str(staged)], cwd=bare,
+                               env=env, text=True, capture_output=True)
+            self.assertEqual(r.returncode, 0, r.stderr)
+            r = subprocess.run(['bash', str(SCRIPT), 'ledger', '--session', 'get', TICKET], cwd=bare,
+                               env=env, text=True, capture_output=True)
+            self.assertEqual(json.loads(r.stdout), entry())
+
+    def test_entry_file_under_data_in_the_project_is_still_refused(self):
+        (self.root / '.sqlreview').mkdir()
+        (self.root / 'data').mkdir()
+        (self.root / 'data/entry.json').write_text(json.dumps(entry()))
+        for args in (('set', TICKET, 'data/entry.json'), ('--session', 'set', TICKET, 'data/entry.json'),
+                     ('get', TICKET, '--against', 'data/entry.json')):
+            r = self.run_helper(*args, ok=False)
+            self.assertEqual(r.returncode, 2, (args, r.stderr))
+            self.assertIn('refused path', r.stderr)
+
     def test_new_session_loads_stored_entry_before_work(self):
         self.save()
         self.assertEqual(json.loads(self.run_helper('get', TICKET).stdout), entry())

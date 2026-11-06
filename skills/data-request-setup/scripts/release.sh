@@ -284,7 +284,9 @@ rl_review_row() ( # <slug> <commit>
     return 0
   fi
   sql="$(jq -r '.sql_path' "$doc")"
-  sr_safe_sql "$sql"
+  # A stored path is read from git at REF, never from the work tree, so a legacy record bound to a path the
+  # input policy now refuses must not block the release: structural check only (#516).
+  sr_safe_path "$sql"
   reviewed="$(jq -r '.sql_sha256 // ""' "$doc")"
   local rc
   tmp="$(sr_source_workspace)" || return 2
@@ -323,7 +325,8 @@ rl_review_row() ( # <slug> <commit>
        fi ;;
   esac
   local question_doc question_rc
-  question_doc="$(bash "$SR_SCRIPT_DIR/sqlreview.sh" questions "$slug" "$kind")" || {
+  # Question evidence reads no SQL: structural path checks only, as status does.
+  question_doc="$(SR_Q_STRUCTURAL=1 bash "$SR_SCRIPT_DIR/sqlreview.sh" questions "$slug" "$kind")" || {
     question_rc=$?
     [ "$question_rc" -eq 4 ] || sr_die 2 "cannot read shared question evidence"
     jq -nc --arg slug "$slug" --arg kind "$kind" \
@@ -530,7 +533,7 @@ rl_scope_current() { # <slug> <commit>
   doc="$(git -C "$SR_ROOT" show "$commit:./$SR_DIR/reviews/$slug/scope.json" 2>/dev/null)" || return 2
   sql="$(printf '%s' "$doc" | jq -r '.sql_path // "" | strings' 2>/dev/null)" || return 2
   full="$(printf '%s' "$doc" | jq -r '.sql_sha256 // "" | strings' 2>/dev/null)" || return 2
-  [ -z "$sql" ] || sr_safe_sql "$sql"
+  [ -z "$sql" ] || sr_safe_path "$sql"
   tmp="$(mktemp -d)" || return 2
   if [ -n "$sql" ] && git -C "$SR_ROOT" show "$commit:./$sql" > "$tmp/sql" 2>/dev/null; then at="$(sr_sha256 "$tmp/sql")"; fi
   if [ "$at" = "$full" ]; then rm -rf "$tmp"; return 0; fi
@@ -610,10 +613,14 @@ cmd_criteria() {
   if ! git -C "$SR_ROOT" show "$commit:answers.intake.json" > "$tmp" 2>/dev/null; then
     rm -f "$tmp"; sr_die 2 "cannot read answers.intake.json at $tag"
   fi
-  if ! intake="$(bash "$SR_SCRIPT_DIR/sqlreview.sh" intake "$tmp" 1 2>/dev/null)"; then
-    rm -f "$tmp"; sr_die 2 "invalid analyst intake (answers.intake.json) at $tag; run validate-answers and correct the sidecar"
+  # A render of a committed blob, outside the project: mark it so intake accepts it there.
+  if ! sr_write_render_marker "$tmp"; then
+    rm -f "$tmp" "$tmp.sqlreview-render"; sr_die 2 "cannot mark answers.intake.json at $tag"
   fi
-  rm -f "$tmp"
+  if ! intake="$(bash "$SR_SCRIPT_DIR/sqlreview.sh" intake "$tmp" 1 2>/dev/null)"; then
+    rm -f "$tmp" "$tmp.sqlreview-render"; sr_die 2 "invalid analyst intake (answers.intake.json) at $tag; run validate-answers and correct the sidecar"
+  fi
+  rm -f "$tmp" "$tmp.sqlreview-render"
   # Every scope at the tag that carries criteria_status; exactly one may own the criteria (research R6).
   review_prefix="$SR_DIR/reviews/"
   while IFS= read -r path; do
@@ -698,6 +705,8 @@ cmd_amend_check() {
   if [ "$target" = --stdin ]; then
     rows="$(sr_amend_rows)"
   else
+    # Inside the project, data/ and unreviewed sql/ paths are refused (#516). The output is rule lines only.
+    sr_guard_input "$target" outside-ok
     [ -f "$target" ] || sr_die 2 "amend-check: the record file does not exist"
     rows="$(sr_amend_rows "$target")"
   fi
@@ -714,6 +723,13 @@ EOT
 cmd="${1:-}"
 [ -n "$cmd" ] || usage
 shift
+# File arguments go through the shared guard (#516): no data/, no unreviewed sql/, nothing outside the project.
+case "$cmd" in
+  # A release record is checked or rendered anywhere (it is not project input), so only data/ and unreviewed
+  # sql/ inside an initialised project are refused, as for amend-check.
+  check) [ $# -lt 1 ] || [ "$1" = --stdin ] || sr_guard_input "$1" outside-ok ;;
+  render) [ $# -lt 1 ] || sr_guard_input "$1" outside-ok ;;
+esac
 case "$cmd" in
   evidence) cmd_evidence "$@" ;;
   amend-check) cmd_amend_check "$@" ;;

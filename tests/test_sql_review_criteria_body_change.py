@@ -23,8 +23,8 @@ except ModuleNotFoundError:
                                                  render_record, run, status_row, violations)
 
 LEAK_CANARY = "LEAK-CANARY"
-SLUG = "sql__adults"
-SQL_PATH = "sql/adults.sql"
+SLUG = "sql__v1__adults"
+SQL_PATH = "sql/v1/adults.sql"
 BASIS = "criteria-unchanged"
 
 HEADER = "/* assumptions:\n  - draft header\n*/\n"
