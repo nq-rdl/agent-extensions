@@ -292,11 +292,12 @@ EOF
          [ "$(sr_slug_pair "$SR_SQL_PATH" | sed -n 2p)" = "$slug" ] && [ "$(sr_slug_new "$SR_SQL_PATH")" != "$slug" ]; then
         migrate="sqlreview.sh move '$SR_SQL_PATH' '$SR_SQL_PATH'"
       fi
-      # A path prints only when it holds letters, digits and _ . / - (the same rule as the hints).
+      # The text column is a prose surface: a path prints there only when it holds letters, digits and _ . / -
+      # (the rule of the hints). The JSON field keeps the real path, because JSON encoding escapes it as data.
       shown="$SR_SQL_PATH"
       if [ -n "$shown" ] && [ "$shown" != "$SR_UNSAFE" ] && ! sr_path_printable "$shown"; then shown="$SR_UNSAFE"; fi
       if [ "$json" = 1 ]; then
-        rows="$(printf '%s' "$rows" | jq -c --arg slug "$slug" --arg state "$state" --arg sql "$shown" --arg rev "$SR_REVISION" --argjson lifts "$lifts" \
+        rows="$(printf '%s' "$rows" | jq -c --arg slug "$slug" --arg state "$state" --arg sql "$SR_SQL_PATH" --arg rev "$SR_REVISION" --argjson lifts "$lifts" \
           --arg reason "$reason" --arg migrate "$migrate" --argjson verbose "$verbose" --arg next "$next" \
           '. + [{slug: $slug, state: $state, sql_path: $sql, revision: ($rev | tonumber? // null), lifts: $lifts,
                  next: (if $next == "" then null else $next end)}

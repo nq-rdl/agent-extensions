@@ -71,14 +71,21 @@ class UnsafeSqlPath(unittest.TestCase):
                 r = run(["check", str(doc)], self.p.root)
                 self.assertEqual((r.returncode, r.stdout.strip()), (0, "ok"), r.stdout)
 
-    def test_a_valid_path_with_a_space_shows_the_fixed_text_in_status_and_preflight(self):
-        self.plant("reports/monthly report.sql")
-        for args in (["status"], ["status", "--json"], ["status", "--verbose"]):
+    def test_a_valid_path_with_a_space_is_masked_in_prose_and_raw_in_json(self):
+        path = "reports/monthly report.sql"
+        self.plant(path)
+        for args in (["status"], ["status", "--verbose"]):
             with self.subTest(args=args):
                 r = run(args, self.p.root)
                 self.assertEqual(r.returncode, 0, r.stderr)
                 self.assertIn(FIXED, r.stdout)
-                self.assertNotIn("monthly report", r.stdout.replace("monthly%20report", ""))
+                self.assertNotIn("monthly report", r.stdout)
+        # The JSON field keeps the real path as data. The next command is still masked.
+        r = run(["status", "--json"], self.p.root)
+        row = json.loads(r.stdout)["reviews"][0]
+        self.assertEqual(row["sql_path"], path)
+        self.assertIn(FIXED, row["next"])
+        self.assertNotIn("monthly report", row["next"])
         ctx = decision(run_hook(PREFLIGHT, {"cwd": str(self.p.root)}, env_for()))["additionalContext"]
         self.assertIn(FIXED, ctx)
         self.assertNotIn("monthly report", ctx)
