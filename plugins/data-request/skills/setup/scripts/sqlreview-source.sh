@@ -69,16 +69,12 @@ sr_source_clean() {
   store="${SR_SOURCE_PREFIX:+$SR_SOURCE_PREFIX/}.sqlreview"
   while IFS= read -r -d '' entry; do
     status="${entry:0:2}"; path="${entry:3}"
-    case "$path" in
-      "$store"/reviews/*|"$store"/releases/*|"$store"/amendments/*|"$store"/templates/*|"$store"/ledger.json|"$store"/.gitignore) ;;
-      *) rm -f "$tmp"; sr_source_error "uncommitted source changes; commit SQL, builders, configuration and pins before fingerprinting"; return 2 ;;
-    esac
+    sr_store_exempt "$store" "$path" || {
+      rm -f "$tmp"; sr_source_error "uncommitted source changes; commit SQL, builders, configuration and pins before fingerprinting"; return 2
+    }
     case "$status" in *R*|*C*)
       IFS= read -r -d '' other || { rm -f "$tmp"; return 2; }
-      case "$other" in
-        "$store"/reviews/*|"$store"/releases/*|"$store"/amendments/*|"$store"/templates/*|"$store"/ledger.json|"$store"/.gitignore) ;;
-        *) rm -f "$tmp"; sr_source_error "uncommitted source rename"; return 2 ;;
-      esac ;;
+      sr_store_exempt "$store" "$other" || { rm -f "$tmp"; sr_source_error "uncommitted source rename"; return 2; } ;;
     esac
   done < "$tmp"
   rm -f "$tmp"
