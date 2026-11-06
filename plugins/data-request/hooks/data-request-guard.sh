@@ -80,19 +80,102 @@ case "$tool" in
   *) exit 0 ;;
 esac
 raw_denied="Reading or searching data/00_raw/ is denied: a researcher-supplied cohort file holds identifiers, and the runner loads it into a temp table at run time. Never read or search it, copy a value from it, or print one. For its shape read conf/base/supplied/<name>.template.csv (header only); for a load problem use the reason codes, row numbers and column names the runner reports (no value appears in them). Only a genuine small DVC pointer (*.dvc) or .gitignore file can be Read."
+above_denied="A Grep or Glob rooted at or above data/00_raw/ (or above a project that holds it, or holding a link into it) can reach researcher-supplied identifiers, so it is denied. Pass a path inside one project that excludes data/, such as skills/ or src/. Never search data/00_raw/."
 lc() { printf '%s' "$1" | tr '[:upper:]' '[:lower:]'; }
-# A Grep glob or Glob pattern is checked as text, because it can reach the directory from a root above it.
-# Case-insensitive, since a case-insensitive volume resolves data/00_RAW to the real directory.
+NL='
+'
+# One rule decides every raw-data question. For each governing project, RAW_LEX is <project>/data/00_raw as
+# written and RAW_PHYS is its physical path (resolved, even when 00_raw or data is a symlink).
+#   Read target, Grep or Glob root  denied when its lexical OR physical path is at or under RAW_LEX or RAW_PHYS.
+#   Grep or Glob root               also denied when it is an ancestor of RAW_LEX or RAW_PHYS, when a bounded search
+#                                   under it finds a data/00_raw entry of ANY type, or when that search finds a
+#                                   symbolic link whose resolved target is at, under or above a RAW_PHYS, holds
+#                                   data/00_raw, or is one.
+#   Grep glob, Glob pattern         denied when a path segment of it could be 00_raw (GLOB_RAW_AWK below).
+# A governing project is any directory, from the target's lexical and physical path and from the cwd up, that
+# holds a data/00_raw entry of any type (a dangling link counts).
+# A glob is checked as text because it can reach the directory from a root above it. It is expanded (braces),
+# split into segments and matched against the name 00_raw, ignoring case and trailing blanks and dots. It is
+# denied only when a segment after a data/ or **/ boundary, or a segment with a literal character at the start,
+# could match that name. So *draw*.py and Drawing*.md pass; data/00_r[a]w/*, data/0?_raw/* and **/00_RAW/** do not.
+GLOB_RAW_AWK='
+function gm(p, pi, s, si,   c, ch, k, e, start, cl, neg, hit, lo, hi) {
+  while (pi <= length(p)) {
+    c = substr(p, pi, 1)
+    if (c == "*") {
+      while (substr(p, pi + 1, 1) == "*") pi++
+      pi++
+      if (pi > length(p)) return 1
+      for (k = si; k <= length(s) + 1; k++) if (gm(p, pi, s, k)) return 1
+      return 0
+    }
+    if (si > length(s)) return 0
+    ch = substr(s, si, 1)
+    if (c == "?") { pi++; si++; continue }
+    if (c == "\\") { c = substr(p, pi + 1, 1); pi += 2; if (c != ch) return 0; si++; continue }
+    if (c == "[") {
+      e = pi + 1; neg = 0
+      if (substr(p, e, 1) == "!" || substr(p, e, 1) == "^") { neg = 1; e++ }
+      start = e; cl = 0
+      for (k = start + 1; k <= length(p); k++) if (substr(p, k, 1) == "]") { cl = k; break }
+      if (cl == 0) { if (c != ch) return 0; pi++; si++; continue }
+      hit = 0; k = start
+      while (k < cl) {
+        lo = substr(p, k, 1)
+        if (substr(p, k + 1, 1) == "-" && k + 2 < cl) { hi = substr(p, k + 2, 1); if (ch >= lo && ch <= hi) hit = 1; k += 3 }
+        else { if (ch == lo) hit = 1; k++ }
+      }
+      if (hit == neg) return 0
+      pi = cl + 1; si++; continue
+    }
+    if (c != ch) return 0
+    pi++; si++
+  }
+  return si > length(s)
+}
+function names(seg, target,   t) { t = seg; sub(/[ .]+$/, "", t); return gm(seg, 1, target, 1) || gm(t, 1, target, 1) }
+function add(str) { if (++nout > 256) { over = 1; return } OUT[nout] = str }
+function expand(str,   i, c, d, s, e, pre, inner, post, cur) {
+  if (over) return
+  s = index(str, "{")
+  if (s == 0) { add(str); return }
+  d = 0; e = 0
+  for (i = s; i <= length(str); i++) { c = substr(str, i, 1); if (c == "{") d++; else if (c == "}") { d--; if (d == 0) { e = i; break } } }
+  if (e == 0) { gsub(/[{}]/, "", str); add(str); return }
+  pre = substr(str, 1, s - 1); inner = substr(str, s + 1, e - s - 1); post = substr(str, e + 1)
+  d = 0; cur = ""
+  for (i = 1; i <= length(inner); i++) {
+    c = substr(inner, i, 1)
+    if (c == "{") d++; else if (c == "}") d--
+    if (c == "," && d == 0) { expand(pre cur post); cur = "" } else cur = cur c
+  }
+  expand(pre cur post)
+}
+function haslit(x,   i) { for (i = 1; i <= length(x); i++) if (index("*?[]{}!^,\\", substr(x, i, 1)) == 0) return 1; return 0 }
+BEGIN {
+  f = tolower(ENVIRON["GLOB_TEXT"])
+  if (index(f, "[:") || index(f, "[.") || index(f, "[=")) { print "DENY"; exit }
+  sub(/^!+/, "", f)
+  expand(f)
+  if (over) { print "DENY"; exit }
+  for (a = 1; a <= nout; a++) {
+    n = split(OUT[a], parts, "/"); m = 0
+    for (i = 1; i <= n; i++) if (parts[i] != "" && parts[i] != ".") seg[++m] = parts[i]
+    for (i = 1; i <= m; i++) {
+      if (!names(seg[i], "00_raw")) continue
+      if (i > 1) { if (names(seg[i - 1], "data") || seg[i - 1] == "**") { print "DENY"; exit } }
+      else if (haslit(seg[i])) { print "DENY"; exit }
+    }
+    split("", seg)
+  }
+  print "OK"
+}'
 case "$tool" in Grep) filter="$(field .tool_input.glob)" ;; Glob) filter="$(field .tool_input.pattern)" ;; *) filter="" ;; esac
 if [ -n "$filter" ]; then
   filter_lc="$(lc "$filter")"
-  # Bracket, wildcard and brace characters are removed first, so 00_r[a]w and [0]0_raw read as 00_raw.
-  filter_bare="$(printf '%s' "$filter_lc" | tr -d '][?*{}!^,\\')"
-  filter_reason="A Grep glob or Glob pattern that contains raw, puts a wildcard right after data/, uses .. or starts at an absolute path could reach data/00_raw/, so it is denied. Pass a literal path under skills/ or src/ and a plain filter such as *.py."
-  case "$filter_bare" in *raw*) decide deny "$filter_reason" ;; esac
+  filter_reason="A Grep glob or Glob pattern with a path segment that could be 00_raw (a literal, or a wildcard that can match it), with .., or starting at an absolute path could reach data/00_raw/, so it is denied. Pass a literal path under skills/ or src/ and a plain filter such as *.py."
   case "$filter_lc" in *..*|/*|'~'*) decide deny "$filter_reason" ;; esac
-  wild_after_data='data/[^/]*[]*?[{]'  # a wildcard in the segment after data/ (bash 3.2 ERE, kept in a variable)
-  if [[ "$filter_lc" =~ $wild_after_data ]]; then decide deny "$filter_reason"; fi
+  [ "$(GLOB_TEXT="$filter_lc" awk "$GLOB_RAW_AWK" </dev/null 2>/dev/null)" = OK ] || decide deny "$filter_reason"
 fi
 case "$tool" in Grep|Glob) [ -n "$path" ] || path="." ;; esac  # no path means the cwd
 [ -n "$path" ] || exit 0
@@ -110,68 +193,76 @@ physdir() {
 normalize_path() {
   awk -F/ '{ n=0; for (i=1;i<=NF;i++) { if ($i==""||$i==".") continue; if ($i=="..") { if (n>0) n--; continue }; p[++n]=$i }; o=""; for (i=1;i<=n;i++) o=o "/" p[i]; print (o==""?"/":o) }'
 }
-case "$tool" in Read|Grep|Glob)
-  # Researcher-supplied cohort files live under data/00_raw/ (DVC, gitignored) and hold
-  # identifiers. The runner loads them at run time; an agent never reads one. Resolve the
-  # path physically (existing parent via cd -P, so a ".." after a symlinked directory is
-  # followed on disk; then the final component's symlink chain) and also check the lexical
-  # path. A loop or a chain over 20 hops is denied, never allowed. Covers the Read tool and Grep and Glob (root and filter); Bash is the scaffold child's hook.
-  # The path cleanup below reads one line at a time, so a newline inside a path could hide data/00_raw/. Fail closed.
-  case "$abs$cwd" in *$'\n'*) decide deny "The path or working directory contains a newline, so the guard cannot rule out data/00_raw/. Use a path without a newline." ;; esac
-  raw_lexical="$(printf '%s\n' "$abs" | normalize_path)"
-  raw_physical="$abs"; hops=0
+# Physical path of an absolute path: the existing parent via cd -P (so a ".." after a symlinked directory is
+# followed on disk), then the final component's symlink chain. A loop or a chain over 20 hops is denied, never
+# allowed. A name that does not exist yet keeps its absent suffix. Sets RPHYS.
+resolve_phys() {
+  local p="$1" hops=0 parent suffix target
   while :; do
-    parent="$(dirname "$raw_physical")"; suffix="$(basename "$raw_physical")"
+    parent="$(dirname "$p")"; suffix="$(basename "$p")"
     while [ ! -d "$parent" ] && [ "$parent" != / ]; do suffix="$(basename "$parent")/$suffix"; parent="$(dirname "$parent")"; done
-    if physdir "$parent"; then raw_physical="$PHYS/$suffix"; else break; fi
-    raw_physical="$(printf '%s\n' "$raw_physical" | normalize_path)"
-    [ -L "$raw_physical" ] || break
+    if physdir "$parent"; then p="$PHYS/$suffix"; else break; fi
+    p="$(printf '%s\n' "$p" | normalize_path)"
+    [ -L "$p" ] || break
     hops=$((hops + 1))
     [ "$hops" -le 20 ] || decide deny "Read guard could not resolve a symlink chain (loop or over 20 links), so it cannot rule out data/00_raw/. Read the non-symlink path."
-    target="$(readlink -- "$raw_physical" 2>/dev/null; printf x)"; target="${target%x}"; target="${target%$'\n'}"
+    target="$(readlink -- "$p" 2>/dev/null; printf x)"; target="${target%x}"; target="${target%$'\n'}"
     case "$target" in *$'\n'*) decide deny "A symlink target contains a newline, so the guard cannot rule out data/00_raw/. Read the non-symlink path." ;; esac
     [ -n "$target" ] || break
-    case "$target" in /*) raw_physical="$target" ;; *) raw_physical="$(dirname "$raw_physical")/$target" ;; esac
+    case "$target" in /*) p="$target" ;; *) p="$(dirname "$p")/$target" ;; esac
   done
-  if [ "$tool" = Grep ] || [ "$tool" = Glob ]; then
-    # A search root above data/00_raw/ (the project root, data/, or a parent) reaches the directory, and a
-    # filter cannot prove it will not. Look for the directory under the root and up from the cwd.
-    found=()  # an array, so a path with a space, tab or newline stays one entry
-    for base in "$raw_physical" "$raw_lexical"; do
-      for cand in "$base/data/00_raw" "$base/00_raw"; do
-        if [ -d "$cand" ] && physdir "$cand"; then found[${#found[@]}]="$PHYS"; fi
-      done
-    done
-    up=""; ! physdir "$cwd" || up="$PHYS"
-    while [ -n "$up" ] && [ "$up" != / ]; do
-      if [ -d "$up/data/00_raw" ]; then found[${#found[@]}]="$up/data/00_raw"; break; fi
-      up="$(dirname "$up")"
-    done
-    # A root further above a project that is not on the cwd chain would pass the probes above. Look for the
-    # directory beneath the root, to a fixed depth, so the guard stays fast: 6 levels cover a project up to 4
-    # directories below the root. A root higher than that is not searched deeper, which is the stated limit.
-    # head -n 1 stops the walk at the first hit and works on BSD find, which has no -quit.
-    if [ -d "$raw_physical" ]; then
-      deep="$(find "$raw_physical" -maxdepth 6 \( -name .git -o -name node_modules \) -prune -o -type d -iname 00_raw -ipath '*/data/00_raw' -print 2>/dev/null | head -n 1)"
-      if [ -n "$deep" ]; then
-        decide deny "A Grep or Glob rooted above a project that holds data/00_raw/ can reach researcher-supplied identifiers, so it is denied. Pass a path inside one project that excludes data/, such as skills/ or src/. Never search data/00_raw/."
+  RPHYS="$p"
+}
+under() { case "$1/" in "${2%/}/"*) return 0 ;; esac; return 1; }  # <path> <dir>: the path is the dir or is below it
+case "$tool" in Read|Grep|Glob)
+  # Researcher-supplied cohort files live under data/00_raw/ (DVC, gitignored) and hold identifiers. The runner
+  # loads them at run time; an agent never reads one. Covers the Read tool and Grep and Glob (root and filter);
+  # Bash is the scaffold child's hook.
+  # The path cleanup reads one line at a time, so a newline inside a path could hide data/00_raw/. Fail closed.
+  case "$abs$cwd" in *$'\n'*) decide deny "The path or working directory contains a newline, so the guard cannot rule out data/00_raw/. Use a path without a newline." ;; esac
+  raw_lexical="$(printf '%s\n' "$abs" | normalize_path)"
+  resolve_phys "$abs"; raw_physical="$RPHYS"
+  cwd_lexical="$(printf '%s\n' "$cwd" | normalize_path)"
+  cwd_physical="$cwd_lexical"; ! physdir "$cwd_lexical" || cwd_physical="$PHYS"
+  # The governing projects: each directory, from the target and from the cwd up, that holds data/00_raw.
+  projects=""
+  for start in "$raw_lexical" "$raw_physical" "$cwd_lexical" "$cwd_physical"; do
+    d="$start"
+    while :; do
+      if [ -e "$d/data/00_raw" ] || [ -L "$d/data/00_raw" ]; then
+        case "$NL$projects" in *"$NL$d$NL"*) ;; *) projects="$projects$d$NL" ;; esac
       fi
-    fi
-    for cand in ${found[@]+"${found[@]}"}; do
-      for base in "$raw_physical" "$raw_lexical"; do
-        case "$cand/" in "${base%/}/"*)
-          decide deny "A Grep or Glob rooted at or above data/00_raw/ can reach researcher-supplied identifiers, so it is denied. Pass a path that excludes data/, such as skills/ or src/. Never search data/00_raw/." ;;
-        esac
-      done
+      [ -n "$d" ] && [ "$d" != / ] || break
+      d="${d%/*}"; [ -n "$d" ] || d=/
     done
-  fi
+  done
+  raws=""  # RAW_LEX and RAW_PHYS of every project, one per line
+  while IFS= read -r d; do
+    [ -n "$d" ] || continue
+    resolve_phys "${d%/}/data/00_raw"
+    raws="$raws${d%/}/data/00_raw$NL$RPHYS$NL"
+  done <<EOF
+$projects
+EOF
+  in_raw=false
+  while IFS= read -r r; do
+    [ -n "$r" ] || continue
+    if under "$raw_lexical" "$r" || under "$raw_physical" "$r"; then in_raw=true; fi
+  done <<EOF
+$raws
+EOF
+  # The textual rule covers a project the walk cannot see (a directory that does not exist yet). It is
+  # case-insensitive, since a case-insensitive volume resolves data/00_RAW to the real directory.
   for candidate in "$raw_lexical" "$raw_physical"; do
-    case "$(lc "$candidate")" in
-      */data/00_raw/*.dvc|*/data/00_raw/.gitignore)
-        # DVC pointers and ignore rules hold hashes and rules, not values, so a Read of a genuine
-        # one passes. The name alone proves nothing: it must be a regular, non-symlink, small file
-        # whose content looks like what it claims. Grep and Glob never pass by suffix.
-        ok=false
+    case "$candidate" in */[dD][aA][tT][aA]/00_[rR][aA][wW]|*/[dD][aA][tT][aA]/00_[rR][aA][wW]/*) in_raw=true ;; esac
+  done
+  if [ "$in_raw" = true ]; then
+    # DVC pointers and ignore rules hold hashes and rules, not values, so a Read of a genuine one passes. The name
+    # alone proves nothing: it must be a regular, non-symlink, small file whose content looks like what it
+    # claims. Grep and Glob never pass by suffix.
+    ok=false
+    case "$(lc "$(basename "$raw_lexical")")" in
+      *.dvc|.gitignore)
         if [ "$tool" = Read ] && [ -f "$raw_physical" ] && [ ! -L "$abs" ] && [ ! -L "$raw_lexical" ] &&
            [ "$(basename "$raw_lexical")" = "$(basename "$raw_physical")" ]; then
           size="$(wc -c < "$raw_physical" 2>/dev/null | tr -d ' ')"
@@ -184,12 +275,46 @@ case "$tool" in Read|Grep|Glob)
                     ! grep -Evq '^([[:space:]]*(#.*)?|[A-Za-z_0-9]+:[[:space:]]*[^[:space:]]*|[[:space:]-]+[A-Za-z_0-9]+:[[:space:]]*[^[:space:]].*|[[:space:]]+[A-Za-z_0-9]+:[[:space:]]*)$' "$raw_physical"; then ok=true; fi ;;
             esac
           fi
-        fi
-        [ "$ok" = true ] || decide deny "$raw_denied" ;;
-      */data/00_raw|*/data/00_raw/*)
-        decide deny "$raw_denied" ;;
+        fi ;;
     esac
-  done
+    [ "$ok" = true ] || decide deny "$raw_denied"
+    exit 0
+  fi
+  if [ "$tool" = Grep ] || [ "$tool" = Glob ]; then
+    # The root is above data/00_raw/: the project root, data/, a parent, or the directory above a symlinked
+    # 00_raw's real files.
+    while IFS= read -r r; do
+      [ -n "$r" ] || continue
+      if under "$r" "$raw_lexical" || under "$r" "$raw_physical"; then decide deny "$above_denied"; fi
+    done <<EOF
+$raws
+EOF
+    # A root further above a project that is not on the cwd chain would pass the checks above, so look beneath
+    # the root, to a fixed depth that keeps the guard fast: 6 levels cover a project up to 4 directories below
+    # the root. A root higher than that is not searched deeper, which is the stated limit. One walk lists every
+    # data/00_raw entry of any type (a directory, a file, a link) and every symbolic link, and a link is
+    # resolved. More than 200 links is refused, because the guard cannot resolve them all quickly.
+    if [ -d "$raw_physical" ]; then
+      links=0
+      while IFS= read -r -d '' entry; do
+        case "$entry" in */[dD][aA][tT][aA]/00_[rR][aA][wW]) decide deny "$above_denied" ;; esac
+        links=$((links + 1))
+        [ "$links" -le 200 ] || decide deny "A Grep or Glob root holds more than 200 symbolic links, so the guard cannot rule out a link into data/00_raw/. Pass a narrower path, such as skills/ or src/."
+        resolve_phys "$entry"; target="$RPHYS"
+        case "$target" in */[dD][aA][tT][aA]/00_[rR][aA][wW]|*/[dD][aA][tT][aA]/00_[rR][aA][wW]/*) decide deny "$above_denied" ;; esac
+        if [ -d "$target" ]; then
+          if [ -e "$target/data/00_raw" ] || [ -L "$target/data/00_raw" ]; then decide deny "$above_denied"; fi
+          case "$target" in */[dD][aA][tT][aA]) if [ -e "$target/00_raw" ] || [ -L "$target/00_raw" ]; then decide deny "$above_denied"; fi ;; esac
+        fi
+        while IFS= read -r r; do
+          [ -n "$r" ] || continue
+          if under "$target" "$r" || under "$r" "$target"; then decide deny "$above_denied"; fi
+        done <<EOF
+$raws
+EOF
+      done < <(find "$raw_physical" -maxdepth 6 \( -name .git -o -name node_modules \) -prune -o \( \( -iname 00_raw -ipath '*/data/00_raw' \) -o -type l \) -print0 2>/dev/null)
+    fi
+  fi
   exit 0 ;;
 esac
 # Resolve existing parents before lexical cleanup: aliases can lead into .sqlreview,

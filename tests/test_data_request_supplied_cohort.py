@@ -301,6 +301,171 @@ class ReadGuard(unittest.TestCase):
 
 
 @unittest.skipUnless(shutil.which("jq"), "the guard needs jq")
+class PhysicalRawPaths(unittest.TestCase):
+    """One rule: a target or a search root is denied when its lexical or its physical path is at or under the
+    project's data/00_raw (lexical or physical), when a search root is above either, or when a bounded search
+    under the root finds a data/00_raw entry of any type or a link into it (review findings 1 to 3)."""
+
+    def setUp(self):
+        self._tmp = tempfile.TemporaryDirectory()
+        self.addCleanup(self._tmp.cleanup)
+        self.top = Path(self._tmp.name).resolve()
+        self.root = self.top / "proj"
+        self.store = self.top / "store" / "raw"  # the physical home of a symlinked 00_raw
+        for d in (self.root / "data", self.root / "skills", self.root / "src", self.store):
+            d.mkdir(parents=True)
+        (self.store / "sample_cohort.csv").write_text("study_id\nZZTEST-001\n")
+        (self.root / "data" / "00_raw").symlink_to(self.store)
+
+    def call(self, tool, path=None, cwd=None, **extra):
+        tool_input = dict(extra)
+        if path is not None:
+            tool_input["file_path" if tool == "Read" else "path"] = str(path)
+        if tool == "Grep":
+            tool_input.setdefault("pattern", "x")
+        return decide({"tool_name": tool, "cwd": str(cwd or self.root), "tool_input": tool_input})
+
+    def assertDenied(self, tool, path=None, **kw):
+        decision, reason = self.call(tool, path, **kw)
+        self.assertEqual(decision, "deny", (tool, path))
+        self.assertIn("data/00_raw", reason)
+        self.assertNotIn("ZZTEST-001", reason)
+
+    def test_finding_1_a_symlinked_00_raw_is_found_from_a_root_above_it(self):
+        for tool in ("Grep", "Glob"):
+            for root in (self.root, self.root / "data", self.top, ".", "data", ".."):
+                with self.subTest(tool=tool, root=str(root)):
+                    self.assertDenied(tool, root)
+            with self.subTest(tool=tool, root="the physical store's parent"):
+                self.assertDenied(tool, self.store.parent)
+
+    def test_finding_2_the_symlink_target_is_denied_when_read_directly(self):
+        self.assertDenied("Read", self.store / "sample_cohort.csv")
+        self.assertDenied("Read", self.store / "not_yet.csv")
+        self.assertDenied("Read", self.store)
+        for tool in ("Grep", "Glob"):
+            with self.subTest(tool=tool):
+                self.assertDenied(tool, self.store)
+                self.assertDenied(tool, self.store / "sample_cohort.csv")
+
+    def test_finding_2_a_genuine_dvc_pointer_in_the_physical_store_still_reads(self):
+        (self.store / "sample_cohort.csv.dvc").write_text(
+            "outs:\n- md5: d41d8cd98f00b204e9800998ecf8427e\n  size: 10\n  hash: md5\n  path: sample_cohort.csv\n")
+        self.assertEqual(self.call("Read", self.store / "sample_cohort.csv.dvc"), ("allow", ""))
+        self.assertDenied("Grep", self.store / "sample_cohort.csv.dvc")
+
+    def test_finding_2_holds_for_a_symlinked_data_directory_too(self):
+        (self.root / "data" / "00_raw").unlink()
+        far = self.top / "far" / "data"
+        (far / "00_raw").mkdir(parents=True)
+        (far / "00_raw" / "c.csv").write_text("study_id\nZZTEST-001\n")
+        shutil.rmtree(self.root / "data")
+        (self.root / "data").symlink_to(far)
+        self.assertDenied("Read", far / "00_raw" / "c.csv")
+        self.assertDenied("Grep", self.root)
+        self.assertDenied("Glob", far)
+
+    def test_finding_3_a_link_inside_the_root_into_00_raw_is_denied(self):
+        (self.root / "data" / "00_raw").unlink()
+        (self.root / "data" / "00_raw").mkdir()
+        (self.root / "data" / "00_raw" / "sample_cohort.csv").write_text("study_id\nZZTEST-001\n")
+        (self.root / "src" / "cohort").symlink_to("../data/00_raw")
+        (self.root / "src" / "one.csv").symlink_to("../data/00_raw/sample_cohort.csv")
+        (self.root / "skills" / "chain").symlink_to("../src/cohort")
+        for tool in ("Grep", "Glob"):
+            for root in ("src", "skills", str(self.root / "src")):
+                with self.subTest(tool=tool, root=root):
+                    self.assertDenied(tool, root)
+
+    def test_finding_3_a_link_to_a_physical_store_and_to_another_projects_raw_is_denied(self):
+        (self.root / "src" / "cohort").symlink_to(self.store)
+        self.assertDenied("Grep", "src")
+        (self.root / "src" / "cohort").unlink()
+        (self.root / "src" / "file").symlink_to(self.store / "sample_cohort.csv")
+        self.assertDenied("Glob", "src")
+        (self.root / "src" / "file").unlink()
+        other = self.top / "other" / "data" / "00_raw"
+        other.mkdir(parents=True)
+        (self.root / "src" / "theirs").symlink_to(other)
+        self.assertDenied("Grep", "src")
+
+    def test_a_data_00_raw_entry_of_any_type_below_the_root_is_denied(self):
+        (self.root / "data" / "00_raw").unlink()
+        (self.root / "data" / "00_raw").write_text("not a directory\n")  # a regular file
+        outer = self.top / "elsewhere"
+        outer.mkdir()
+        for tool in ("Grep", "Glob"):
+            with self.subTest(tool=tool, kind="file"):
+                self.assertDenied(tool, self.root, cwd=outer)
+        (self.root / "data" / "00_raw").unlink()
+        (self.root / "data" / "00_raw").symlink_to("missing")  # a dangling link
+        for tool in ("Grep", "Glob"):
+            with self.subTest(tool=tool, kind="dangling link"):
+                self.assertDenied(tool, self.root, cwd=outer)
+                self.assertDenied(tool, self.top, cwd=outer)
+
+    def test_roots_and_links_that_do_not_reach_the_directory_pass(self):
+        (self.root / "src" / "to_skills").symlink_to("../skills")
+        (self.root / "skills" / "a.py").write_text("x = 1\n")
+        for tool in ("Grep", "Glob"):
+            for root in ("skills", "src", str(self.root / "src")):
+                with self.subTest(tool=tool, root=root):
+                    self.assertEqual(self.call(tool, root), ("allow", ""))
+        self.assertEqual(self.call("Read", self.root / "src" / "to_skills" / "a.py"), ("allow", ""))
+
+    def test_a_link_with_no_project_around_it_into_a_stray_data_00_raw_is_denied(self):
+        stray = self.top / "stray"
+        (stray / "data" / "00_raw").mkdir(parents=True)
+        free = self.top / "free"
+        (free / "src").mkdir(parents=True)
+        (free / "src" / "l").symlink_to(stray / "data" / "00_raw")
+        for tool in ("Grep", "Glob"):
+            with self.subTest(tool=tool):
+                self.assertDenied(tool, free / "src", cwd=free)
+
+
+@unittest.skipUnless(shutil.which("jq"), "the guard needs jq")
+class FilterSegments(unittest.TestCase):
+    """Finding 5: a glob or pattern is denied only when one of its path segments could be 00_raw."""
+
+    def setUp(self):
+        self._tmp = tempfile.TemporaryDirectory()
+        self.addCleanup(self._tmp.cleanup)
+        self.root = Path(self._tmp.name).resolve()
+        (self.root / "data" / "00_raw").mkdir(parents=True)
+        (self.root / "src").mkdir()
+
+    def verdict(self, tool, spelling):
+        key = "glob" if tool == "Grep" else "pattern"
+        event = {"tool_name": tool, "cwd": str(self.root), "tool_input": {"path": "src", key: spelling}}
+        if tool == "Grep":
+            event["tool_input"]["pattern"] = "x"
+        return decide(event)
+
+    def test_names_that_only_contain_raw_pass(self):
+        for spelling in ("*draw*.py", "*raw_sql*", "straw", "Drawing*.md", "**/*raw_sql*.py", "src/**/draw*.py",
+                         "withdrawn/*.sql", "data/*.csv", "data/raw_*.sql", "**/straw/**", "{draw,straw}/*.py"):
+            for tool in ("Grep", "Glob"):
+                with self.subTest(tool=tool, spelling=spelling):
+                    self.assertEqual(self.verdict(tool, spelling), ("allow", ""))
+
+    def test_spellings_that_could_be_the_segment_are_denied(self):
+        for spelling in ("data/00_r[a]w/*", "data/0?_raw/*", "**/00_RAW/**", "data/**", "data/*", "*/00_raw",
+                         "data/00_raw*", "{data,x}/00_raw/*", "data/{00_raw,x}", "data/[0]0_[r]aw", "**/*raw*",
+                         "data/00_raw./*", "data/00_raw /*", "DATA/00_RAW/x", "data/*/x.csv", "data/0*",
+                         "!data/00_raw/*", "00_raw/**", "**/00_{raw,x}/*", "data/[!x]0_raw"):
+            for tool in ("Grep", "Glob"):
+                with self.subTest(tool=tool, spelling=spelling):
+                    decision, reason = self.verdict(tool, spelling)
+                    self.assertEqual(decision, "deny")
+                    self.assertIn("data/00_raw", reason)
+
+    def test_a_brace_list_that_is_too_long_to_check_is_denied(self):
+        spelling = "{" + ",".join(f"a{i}" for i in range(300)) + "}/*.py"
+        self.assertEqual(self.verdict("Glob", spelling)[0], "deny")
+
+
+@unittest.skipUnless(shutil.which("jq"), "the guard needs jq")
 class OddProjectPaths(unittest.TestCase):
     """A project path with a space, a tab, a newline or a leading dash must not weaken the Grep and Glob root check."""
 
