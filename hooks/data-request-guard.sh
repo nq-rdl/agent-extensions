@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
-# PreToolUse guard (data-request plugin), matchers Write|Edit and Read|Grep|Glob. Those three are denied for paths
-# under data/00_raw/ (researcher-supplied cohort files; *.dvc and .gitignore pass) and pass everywhere else. Write|Edit fire
+# PreToolUse guard (data-request plugin), matchers Write|Edit and Read|Grep|Glob. Read, Grep and Glob are denied for paths
+# under data/00_raw/ (researcher-supplied cohort files; *.dvc and .gitignore pass), for a Grep or Glob rooted at or above it
+# (no path means the cwd) and for a glob or pattern that could name it. They pass everywhere else. Write|Edit fire
 # only for paths under a .sqlreview/ directory; everything else passes silently. Decisions via
 # permissionDecision JSON:
 #   reviews/*/review.json, scope.json   Write → content run through `sqlreview.sh check`:
@@ -17,7 +18,8 @@
 #   reviews/*/explain.json              Write → its `by` must be a handle, not an email (#419); Edit → deny
 #   amendments/<request>.json           Write → content run through `release.sh amend-check`; Edit → deny
 #   reviews/*/*.draft.json, templates/*   pass
-#   reviews/*/source.sql, scope.source.sql, history/*.sql   deny (legacy SQL snapshot paths: reviews hold hashes and commits, #505)
+#   any name ending .sql .csv .tsv .parquet .xlsx .xls (case and trailing blanks or dots ignored), except under templates/   deny
+#                                       (the store holds JSON, hashes and commits only, #505)
 # This is an invariant check, not proof that a human answered: it makes "forgot to ask" a denied
 # tool call with the offending ids named, and leaves a fabricated confirmation auditable in the
 # recorded document. Bash heredocs into .sqlreview/ are out of its reach by design (guardrail, not sandbox).
@@ -55,20 +57,56 @@ decide() { # <allow|deny|ask> <reason>
 }
 
 tool="$(field .tool_name)"
+# A shell command substitution trims trailing newlines and a later step can split on blanks, so a control
+# character in a path-like field could change what the checks below see. Test the raw JSON values first,
+# for every field that names a path or a glob (a Grep pattern is a regex and may hold a tab or newline), and fail closed.
+# The content fields are not tested.
+case "$tool" in Write|Edit|Read|Grep|Glob|NotebookEdit)
+  if command -v jq >/dev/null 2>&1; then
+    printf '%s' "$input" | jq -e '[.cwd, .tool_input.file_path, .tool_input.path, .tool_input.glob, (if .tool_name == "Glob" then .tool_input.pattern else null end), .tool_input.notebook_path] | any(.[]; type == "string" and any(explode[]; . < 32 or . == 127))' >/dev/null 2>&1 && ctl=1 || ctl=0
+  else
+    printf '%s' "$input" | python3 -c 'import json,re,sys
+try: d = json.load(sys.stdin)
+except Exception: sys.exit(1)
+t = d.get("tool_input") if isinstance(d.get("tool_input"), dict) else {}
+v = [d.get("cwd")] + [t.get(k) for k in ("file_path", "path", "glob", "notebook_path")] + ([t.get("pattern")] if d.get("tool_name") == "Glob" else [])
+sys.exit(0 if any(isinstance(x, str) and re.search("[\\x00-\\x1f\\x7f]", x) for x in v) else 1)' && ctl=1 || ctl=0
+  fi
+  [ "$ctl" = 0 ] || decide deny "A path, search root or search filter in this call contains a control character (a newline, tab or similar), so the guard cannot check it safely. Use a path without control characters."
+esac
 case "$tool" in
   Write|Edit|Read) path="$(field .tool_input.file_path)" ;;
-  Grep|Glob) path="$(field .tool_input.path)" ;;  # the search root; no path means the cwd, which this guard leaves alone
+  Grep|Glob) path="$(field .tool_input.path)" ;;  # the search root; no path means the cwd
   *) exit 0 ;;
 esac
 raw_denied="Reading or searching data/00_raw/ is denied: a researcher-supplied cohort file holds identifiers, and the runner loads it into a temp table at run time. Never read or search it, copy a value from it, or print one. For its shape read conf/base/supplied/<name>.template.csv (header only); for a load problem use the reason codes, row numbers and column names the runner reports (no value appears in them). Only a genuine small DVC pointer (*.dvc) or .gitignore file can be Read."
 lc() { printf '%s' "$1" | tr '[:upper:]' '[:lower:]'; }
-# A Grep glob or Glob pattern that names 00_raw reaches the directory even when path is absent or above it.
+# A Grep glob or Glob pattern is checked as text, because it can reach the directory from a root above it.
 # Case-insensitive, since a case-insensitive volume resolves data/00_RAW to the real directory.
 case "$tool" in Grep) filter="$(field .tool_input.glob)" ;; Glob) filter="$(field .tool_input.pattern)" ;; *) filter="" ;; esac
-case "$(lc "$filter")" in *00_raw*) decide deny "$raw_denied" ;; esac
+if [ -n "$filter" ]; then
+  filter_lc="$(lc "$filter")"
+  # Bracket, wildcard and brace characters are removed first, so 00_r[a]w and [0]0_raw read as 00_raw.
+  filter_bare="$(printf '%s' "$filter_lc" | tr -d '][?*{}!^,\\')"
+  filter_reason="A Grep glob or Glob pattern that contains raw, puts a wildcard right after data/, uses .. or starts at an absolute path could reach data/00_raw/, so it is denied. Pass a literal path under skills/ or src/ and a plain filter such as *.py."
+  case "$filter_bare" in *raw*) decide deny "$filter_reason" ;; esac
+  case "$filter_lc" in *..*|/*|'~'*) decide deny "$filter_reason" ;; esac
+  wild_after_data='data/[^/]*[]*?[{]'  # a wildcard in the segment after data/ (bash 3.2 ERE, kept in a variable)
+  if [[ "$filter_lc" =~ $wild_after_data ]]; then decide deny "$filter_reason"; fi
+fi
+case "$tool" in Grep|Glob) [ -n "$path" ] || path="." ;; esac  # no path means the cwd
 [ -n "$path" ] || exit 0
 cwd="$(field .cwd)"; [ -n "$cwd" ] || cwd="$(pwd -P)"
 case "$path" in /*) abs="$path" ;; *) abs="$cwd/$path" ;; esac
+# Physical directory with every character kept: command substitution trims trailing newlines, so a sentinel
+# protects the name. A newline anywhere in a resolved name is refused, because the line-based cleanup below
+# could misread it. Sets PHYS.
+physdir() {
+  local o
+  o="$(cd -P -- "$1" 2>/dev/null && pwd -P && printf x)" || return 1
+  o="${o%x}"; PHYS="${o%$'\n'}"
+  case "$PHYS" in *$'\n'*) decide deny "A resolved directory name contains a newline, so the guard cannot rule out data/00_raw/. Use a path without a newline." ;; esac
+}
 normalize_path() {
   awk -F/ '{ n=0; for (i=1;i<=NF;i++) { if ($i==""||$i==".") continue; if ($i=="..") { if (n>0) n--; continue }; p[++n]=$i }; o=""; for (i=1;i<=n;i++) o=o "/" p[i]; print (o==""?"/":o) }'
 }
@@ -77,20 +115,46 @@ case "$tool" in Read|Grep|Glob)
   # identifiers. The runner loads them at run time; an agent never reads one. Resolve the
   # path physically (existing parent via cd -P, so a ".." after a symlinked directory is
   # followed on disk; then the final component's symlink chain) and also check the lexical
-  # path. A loop or a chain over 20 hops is denied, never allowed. Covers the Read tool and the path argument of Grep and Glob; Bash is the scaffold child's hook.
+  # path. A loop or a chain over 20 hops is denied, never allowed. Covers the Read tool and Grep and Glob (root and filter); Bash is the scaffold child's hook.
+  # The path cleanup below reads one line at a time, so a newline inside a path could hide data/00_raw/. Fail closed.
+  case "$abs$cwd" in *$'\n'*) decide deny "The path or working directory contains a newline, so the guard cannot rule out data/00_raw/. Use a path without a newline." ;; esac
   raw_lexical="$(printf '%s\n' "$abs" | normalize_path)"
   raw_physical="$abs"; hops=0
   while :; do
     parent="$(dirname "$raw_physical")"; suffix="$(basename "$raw_physical")"
     while [ ! -d "$parent" ] && [ "$parent" != / ]; do suffix="$(basename "$parent")/$suffix"; parent="$(dirname "$parent")"; done
-    if physical_parent="$(cd -P -- "$parent" 2>/dev/null && pwd -P)"; then raw_physical="$physical_parent/$suffix"; else break; fi
+    if physdir "$parent"; then raw_physical="$PHYS/$suffix"; else break; fi
     raw_physical="$(printf '%s\n' "$raw_physical" | normalize_path)"
     [ -L "$raw_physical" ] || break
     hops=$((hops + 1))
     [ "$hops" -le 20 ] || decide deny "Read guard could not resolve a symlink chain (loop or over 20 links), so it cannot rule out data/00_raw/. Read the non-symlink path."
-    target="$(readlink "$raw_physical" 2>/dev/null)" || break
+    target="$(readlink -- "$raw_physical" 2>/dev/null; printf x)"; target="${target%x}"; target="${target%$'\n'}"
+    case "$target" in *$'\n'*) decide deny "A symlink target contains a newline, so the guard cannot rule out data/00_raw/. Read the non-symlink path." ;; esac
+    [ -n "$target" ] || break
     case "$target" in /*) raw_physical="$target" ;; *) raw_physical="$(dirname "$raw_physical")/$target" ;; esac
   done
+  if [ "$tool" = Grep ] || [ "$tool" = Glob ]; then
+    # A search root above data/00_raw/ (the project root, data/, or a parent) reaches the directory, and a
+    # filter cannot prove it will not. Look for the directory under the root and up from the cwd.
+    found=()  # an array, so a path with a space, tab or newline stays one entry
+    for base in "$raw_physical" "$raw_lexical"; do
+      for cand in "$base/data/00_raw" "$base/00_raw"; do
+        if [ -d "$cand" ] && physdir "$cand"; then found[${#found[@]}]="$PHYS"; fi
+      done
+    done
+    up=""; ! physdir "$cwd" || up="$PHYS"
+    while [ -n "$up" ] && [ "$up" != / ]; do
+      if [ -d "$up/data/00_raw" ]; then found[${#found[@]}]="$up/data/00_raw"; break; fi
+      up="$(dirname "$up")"
+    done
+    for cand in ${found[@]+"${found[@]}"}; do
+      for base in "$raw_physical" "$raw_lexical"; do
+        case "$cand/" in "${base%/}/"*)
+          decide deny "A Grep or Glob rooted at or above data/00_raw/ can reach researcher-supplied identifiers, so it is denied. Pass a path that excludes data/, such as skills/ or src/. Never search data/00_raw/." ;;
+        esac
+      done
+    done
+  fi
   for candidate in "$raw_lexical" "$raw_physical"; do
     case "$(lc "$candidate")" in
       */data/00_raw/*.dvc|*/data/00_raw/.gitignore)
@@ -127,8 +191,9 @@ while [ ! -d "$parent" ] && [ "$parent" != / ]; do
   suffix="$(basename "$parent")/$suffix"
   parent="$(dirname "$parent")"
 done
-physical_parent="$(cd -P -- "$parent" 2>/dev/null && pwd -P)" ||
+physdir "$parent" ||
   decide deny "SQL Review guard cannot resolve the destination's existing parent directory."
+physical_parent="$PHYS"
 abs="$physical_parent/$suffix"
 # Collapse absent suffixes. Physical protection wins; retain lexical protection
 # too when .sqlreview itself points outside the child.
@@ -174,9 +239,19 @@ case "$abs" in
   *) exit 0 ;;
 esac
 
+# The store holds JSON records, never SQL or tabular copies (#505). Trim trailing blanks and dots, which some
+# volumes ignore, and fold case, then refuse a SQL or table file anywhere except under templates/.
+rel_name="$(printf '%s' "${rel##*/}" | tr '[:upper:]' '[:lower:]' | sed 's/[[:space:].]*$//')"
+case "$rel_name" in
+  *.sql|*.csv|*.tsv|*.parquet|*.xlsx|*.xls)
+    case "$(printf '%s' "$rel" | tr '[:upper:]' '[:lower:]')" in
+      templates/*) ;;
+      reviews/*/source.sql|reviews/*/scope.source.sql|reviews/*/history/*.sql)
+        decide deny "$rel is a legacy SQL snapshot path. Store hashes and committed source provenance in the review JSON; use sqlreview.sh materialize for temporary SQL outside the repository." ;;
+      *) decide deny "$rel is a SQL or table file. The SQL Review store holds JSON records, hashes and commits only. Keep SQL in the request repository, use sqlreview.sh materialize for temporary SQL outside it, and never store extract output here." ;;
+    esac ;;
+esac
 case "$rel" in
-  reviews/*/source.sql|reviews/*/scope.source.sql|reviews/*/history/*.sql)
-    decide deny "$rel is a legacy SQL snapshot path. Store hashes and committed source provenance in the review JSON; use sqlreview.sh materialize for temporary SQL outside the repository." ;;
   ledger.json)
     decide deny "Triage ledger entries require validated atomic publication. Use sqlreview.sh ledger set <ticket> <entry.json>; direct Write/Edit of .sqlreview/ledger.json can corrupt other tickets." ;;
   config.json)

@@ -156,6 +156,7 @@ cmd_init() {
     sr_no_symlinks "$target/.gitignore" || exit 2
     [ -e "$target/.gitignore" ] ||
       printf '%s\n' '/reviews/**/source.sql' '/reviews/**/scope.source.sql' '/reviews/**/history/*.sql' \
+        '*.sql' '*.csv' '*.tsv' '*.parquet' '*.xlsx' '*.xls' '!templates/**' \
         > "$target/.gitignore" || sr_die 2 "cannot create .gitignore"
     if [ "$json" = 1 ]; then
       jq -n --arg root "$root" --arg files "$files" '{root: $root, created: true, files: ($files | split("\n") + ["reviews/.gitkeep", ".gitignore"])}'

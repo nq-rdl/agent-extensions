@@ -3,7 +3,7 @@
 A researcher-supplied cohort is loaded by the runner at run time and its values never reach Git.
 These tests pin:
 
-* the data-request guard denies Read, and the path argument of Grep and Glob, under data/00_raw/ (by
+* the data-request guard denies Read, Grep and Glob under data/00_raw/ (Grep and Glob also by root at or above it and by glob text) (by
   relative path, `..` detour and symlink), lets *.dvc and .gitignore there and everything else through;
 * the guard still ignores tools other than Read, Write and Edit;
 * hooks.json wires the guard to Read as well as Write|Edit;
@@ -123,12 +123,15 @@ class ReadGuard(unittest.TestCase):
                 with self.subTest(tool=tool, target=target.name):
                     self.assertEqual(self.read(target, tool)[0], "deny")
 
-    def test_grep_and_glob_elsewhere_or_without_a_path_pass(self):
+    def test_grep_and_glob_elsewhere_pass(self):
+        (self.root / "skills").mkdir()
+        (self.root / "src").mkdir()
         for tool in ("Grep", "Glob"):
-            with self.subTest(tool):
-                self.assertEqual(self.read(self.root / "conf", tool), ("allow", ""))
-                self.assertEqual(decide({"tool_name": tool, "cwd": str(self.root), "tool_input": {"pattern": "x"}}),
-                                 ("allow", ""))
+            for sub in ("conf", "skills", "src", "data/02_extracts"):
+                with self.subTest(tool=tool, path=sub):
+                    self.assertEqual(self.read(self.root / sub, tool), ("allow", ""))
+            filtered = {"pattern": "x", "glob": "*.py"} if tool == "Grep" else {"pattern": "**/*.py"}
+            self.assertEqual(self.search(tool, path="skills", **filtered), ("allow", ""))
 
     def search(self, tool, **tool_input):
         return decide({"tool_name": tool, "cwd": str(self.root), "tool_input": tool_input})
@@ -151,11 +154,60 @@ class ReadGuard(unittest.TestCase):
         self.assertEqual(self.search("Glob", pattern="data/00_RAW/x")[0], "deny")
         self.assertEqual(self.search("Grep", pattern="x", glob="Data/00_Raw/*")[0], "deny")
 
-    def test_a_search_rooted_above_the_directory_with_no_filter_still_passes(self):
-        # The documented gap: the child's own Read(/data/**) deny covers it.
+    def test_a_search_rooted_above_the_directory_is_denied(self):
+        # The project root, data/ and a parent of the project reach data/00_raw/, so each is denied (M1).
+        for tool in ("Grep", "Glob"):
+            for root in (".", "data", str(self.root), str(self.root / "data"), str(self.root.parent), "..", "data/../conf/.."):
+                with self.subTest(tool=tool, root=root):
+                    decision, reason = self.search(tool, pattern="x", path=root)
+                    self.assertEqual(decision, "deny")
+                    self.assertIn("data/00_raw", reason)
+                    self.assertIn("excludes data/", reason)
+
+    def test_a_search_with_no_path_is_denied_when_the_project_has_the_directory(self):
         for tool in ("Grep", "Glob"):
             with self.subTest(tool):
-                self.assertEqual(self.search(tool, pattern="x", path="."), ("allow", ""))
+                decision, reason = self.search(tool, pattern="x")
+                self.assertEqual(decision, "deny")
+                self.assertIn("excludes data/", reason)
+
+    def test_a_search_with_no_path_passes_when_the_project_has_no_raw_directory(self):
+        shutil.rmtree(self.root / "data" / "00_raw")
+        for tool in ("Grep", "Glob"):
+            with self.subTest(tool):
+                self.assertEqual(self.search(tool, pattern="x"), ("allow", ""))
+
+    def test_a_search_rooted_in_a_subdirectory_of_a_project_with_the_directory_is_denied_only_above_it(self):
+        (self.root / "skills").mkdir()
+        decision = decide({"tool_name": "Grep", "cwd": str(self.root / "skills"), "tool_input": {"pattern": "x"}})
+        self.assertEqual(decision, ("allow", ""))  # cwd is below the project root, so it cannot reach data/
+        decision = decide({"tool_name": "Grep", "cwd": str(self.root / "skills"), "tool_input": {"pattern": "x", "path": ".."}})
+        self.assertEqual(decision[0], "deny")
+
+    def test_wildcard_and_bracket_spellings_of_the_directory_are_denied(self):
+        (self.root / "src").mkdir()
+        for tool, key in (("Grep", "glob"), ("Glob", "pattern")):
+            for spelling in ("data/00_r[a]w/*", "data/0?_raw/*", "data/[0]0_[r]aw/*", "data/00_r?w/*", "data/0*/*",
+                             "data/*/sample_cohort.csv", "**/00_{raw,x}/*", "**/0?_RAW/*", "../data/*", "/tmp/anything/*",
+                             "src/../data/00_r[a]w/*"):
+                with self.subTest(tool=tool, spelling=spelling):
+                    # path=src cannot reach the directory by itself, so the filter text alone must deny
+                    kwargs = {key: spelling}
+                    if tool == "Grep":
+                        kwargs["pattern"] = "x"
+                    decision, reason = self.search(tool, path="src", **kwargs)
+                    self.assertEqual(decision, "deny")
+                    self.assertIn("data/00_raw", reason)
+
+    def test_plain_filters_under_a_safe_root_pass(self):
+        (self.root / "src").mkdir()
+        for tool, key in (("Grep", "glob"), ("Glob", "pattern")):
+            for plain in ("*.py", "**/*.md", "test_*.py", "{a,b}/*.rst"):
+                with self.subTest(tool=tool, plain=plain):
+                    kwargs = {key: plain}
+                    if tool == "Grep":
+                        kwargs["pattern"] = "x"
+                    self.assertEqual(self.search(tool, path="src", **kwargs), ("allow", ""))
 
     POINTER = "outs:\n- md5: d41d8cd98f00b204e9800998ecf8427e\n  size: 10\n  hash: md5\n  path: sample_cohort.csv\n"
 
@@ -214,6 +266,109 @@ class ReadGuard(unittest.TestCase):
 
     def test_write_to_the_directory_is_not_this_guards_concern(self):
         self.assertEqual(self.read(self.root / "data" / "00_raw" / "x.csv", "Write"), ("allow", ""))
+
+
+@unittest.skipUnless(shutil.which("jq"), "the guard needs jq")
+class OddProjectPaths(unittest.TestCase):
+    """A project path with a space, a tab, a newline or a leading dash must not weaken the Grep and Glob root check."""
+
+    NAMES = ("with space", "with\ttab", "with\nnewline", "-leading dash", "star*[x]")
+
+    def project(self, name):
+        tmp = tempfile.TemporaryDirectory()
+        self.addCleanup(tmp.cleanup)
+        root = Path(tmp.name).resolve() / name
+        (root / "data" / "00_raw").mkdir(parents=True)
+        (root / "skills").mkdir()
+        (root / "data" / "00_raw" / "sample_cohort.csv").write_text("study_id\nZZTEST-001\n")
+        return root
+
+    def search(self, root, tool, **tool_input):
+        tool_input = dict(tool_input)
+        if tool == "Grep":
+            tool_input.setdefault("pattern", "x")
+        return decide({"tool_name": tool, "cwd": str(root), "tool_input": tool_input})
+
+    def test_roots_at_or_above_the_directory_are_denied(self):
+        for name in self.NAMES:
+            root = self.project(name)
+            for tool in ("Grep", "Glob"):
+                for tool_input in ({"path": "."}, {}, {"path": "data"}, {"path": str(root)}):
+                    with self.subTest(name=name, tool=tool, tool_input=tool_input):
+                        self.assertEqual(self.search(root, tool, **tool_input)[0], "deny")
+
+    def test_a_path_with_a_newline_fails_closed(self):
+        # A control character in the project path is refused before any path step, so skills/ is denied too.
+        root = self.project("with\nnewline")
+        for tool in ("Grep", "Glob"):
+            with self.subTest(tool=tool):
+                self.assertEqual(self.search(root, tool, path="skills")[0], "deny")
+
+    def test_a_search_under_skills_still_passes(self):
+        for name in (n for n in self.NAMES if "\n" not in n and "\t" not in n):
+            root = self.project(name)
+            for tool in ("Grep", "Glob"):
+                with self.subTest(name=name, tool=tool):
+                    self.assertEqual(self.search(root, tool, path="skills"), ("allow", ""))
+
+
+@unittest.skipUnless(shutil.which("jq"), "the guard needs jq")
+class ControlCharacters(unittest.TestCase):
+    """A control character in a hook field is denied before any shell step can trim or split it."""
+
+    def setUp(self):
+        self._tmp = tempfile.TemporaryDirectory()
+        self.addCleanup(self._tmp.cleanup)
+        self.base = Path(self._tmp.name).resolve()
+
+    def project(self, name):
+        root = self.base / name
+        (root / "data" / "00_raw").mkdir(parents=True)
+        (root / "skills").mkdir()
+        return root
+
+    def test_a_control_character_at_either_end_of_the_project_path_is_denied(self):
+        for suffix in ("\n", "\t", "\r", "\x01", "\x7f"):
+            for name in (f"proj{suffix}", f"{suffix}proj", f"pr{suffix}oj"):
+                root = self.project(name)
+                for tool in ("Grep", "Glob"):
+                    for tool_input in ({"path": "."}, {}, {"path": "data"}, {"path": "skills"}):
+                        with self.subTest(name=name, tool=tool, tool_input=tool_input):
+                            event = {"tool_name": tool, "cwd": str(root), "tool_input": dict(tool_input, pattern="x")}
+                            self.assertEqual(decide(event)[0], "deny")
+
+    def test_a_control_character_in_file_path_path_pattern_or_glob_is_denied(self):
+        root = self.project("proj")
+        cases = (
+            {"tool_name": "Read", "tool_input": {"file_path": str(root / "skills") + "\n"}},
+            {"tool_name": "Read", "tool_input": {"file_path": "\t" + str(root / "skills")}},
+            {"tool_name": "Glob", "tool_input": {"path": "skills", "pattern": "*.py\n"}},
+            {"tool_name": "Glob", "tool_input": {"path": "skills", "pattern": "\r*.py"}},
+            {"tool_name": "Grep", "tool_input": {"path": "skills", "pattern": "x", "glob": "*.py\n"}},
+            {"tool_name": "Grep", "tool_input": {"path": "skills\n", "pattern": "x"}},
+            {"tool_name": "Write", "tool_input": {"file_path": str(root / "a\n.txt"), "content": "x"}},
+        )
+        for event in cases:
+            with self.subTest(event=event):
+                self.assertEqual(decide(dict(event, cwd=str(root)))[0], "deny")
+
+    def test_normal_paths_and_multiline_content_still_pass(self):
+        root = self.project("proj")
+        for event in ({"tool_name": "Grep", "tool_input": {"path": "skills", "pattern": "a\nb", "glob": "*.py"}},
+                      {"tool_name": "Read", "tool_input": {"file_path": str(root / "skills" / "a.py")}},
+                      {"tool_name": "Write", "tool_input": {"file_path": str(root / "notes.txt"), "content": "a\nb\n"}}):
+            with self.subTest(tool=event["tool_name"]):
+                self.assertEqual(decide(dict(event, cwd=str(root))), ("allow", ""))
+
+    def test_a_symlink_to_a_directory_named_with_a_trailing_newline_is_denied(self):
+        target = self.base / "proj\n"
+        (target / "data" / "00_raw").mkdir(parents=True)
+        link = self.base / "link"
+        link.symlink_to(target)
+        for tool in ("Grep", "Glob"):
+            with self.subTest(tool=tool):
+                event = {"tool_name": tool, "cwd": str(self.base), "tool_input": {"path": "link", "pattern": "x"}}
+                self.assertEqual(decide(event)[0], "deny")
 
 
 class Wiring(unittest.TestCase):

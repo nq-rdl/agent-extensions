@@ -59,7 +59,8 @@ and the other stages all resolve the same `.sqlreview/` by walking up from the c
 Then confirm before writing (AskUserQuestion, skipped only with `--yes`): the target path and
 the file list — `config.json`, `templates/scope.md`, `templates/review.md`, `templates/lifts.md`,
 `reviews/.gitkeep` and `.gitignore`. Fresh ignores prevent SQL copies with
-`/reviews/**/source.sql`, `/reviews/**/scope.source.sql` and `/reviews/**/history/*.sql`.
+`/reviews/**/source.sql`, `/reviews/**/scope.source.sql` and `/reviews/**/history/*.sql`. They also
+keep `*.sql`, `*.csv`, `*.tsv`, `*.parquet`, `*.xlsx` and `*.xls` out of git, except under `templates/`.
 
 ```bash
 bash "$S/sqlreview.sh" init                # copies the bundled default; never touches existing files

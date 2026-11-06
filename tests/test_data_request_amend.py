@@ -198,14 +198,21 @@ class Content(unittest.TestCase):
     def test_a_close_line_counts_only_from_the_right_writer(self):
         close = flat(self.body.split("### Close a handed-off part", 1)[1].split("## 3.", 1)[0])
         self.assertIn("gh pr view <PR> --json author,assignees,reviewRequests,comments", close)
-        self.assertIn("`done:` counts only from the engineer named in the hand-off comment", close)
-        self.assertIn("only from the PR author or an assignee", close)
-        self.assertIn("`withdrawn:` counts only from the analyst named on the PR", close)
-        self.assertIn("The analyst cannot close a part with `done:`", close)
-        self.assertIn("The engineer cannot close one with `withdrawn:`", close)
+        self.assertIn("skills/setup/references/close-line-authors.rst", close)
+        self.assertIn("The `done:` line counts only from the engineer", close)
+        self.assertIn("the `withdrawn:` line counts only from the analyst", close)
         self.assertIn("A line from anyone else leaves the part open", close)
         # The writer is checked before the commit is.
         self.assertLess(close.index("Check who wrote the line"), close.index("git merge-base"))
+        rule = flat((REPO / "skills/data-request-setup/references/close-line-authors.rst").read_text())
+        for token in ("gh pr view PR --json author,assignees,reviewRequests,comments",
+                      "``done:`` line counts only from the engineer named in the hand-off comment",
+                      "only from the PR author or an assignee",
+                      "``withdrawn:`` line counts only from the analyst named on the PR",
+                      "The analyst cannot close a part with ``done:``",
+                      "The engineer cannot close a part with ``withdrawn:``",
+                      "A line from anyone else leaves the part open"):
+            self.assertIn(token, rule)
 
     def test_a_done_commit_is_fetched_resolved_and_checked_by_exit_code(self):
         close = flat(self.body.split("### Close a handed-off part", 1)[1].split("## 3.", 1)[0])

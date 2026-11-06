@@ -25,6 +25,7 @@ except ModuleNotFoundError:
 REPO = Path(__file__).resolve().parent.parent
 PLUGIN = REPO / "plugins" / "data-request"
 GUARD = REPO / "hooks" / "data-request-guard.sh"
+SKILLS_SETUP = REPO / "skills" / "data-request-setup" / "scripts"
 PREFLIGHT = REPO / "hooks" / "data-request-preflight.sh"
 
 
@@ -147,6 +148,40 @@ class GuardHook(unittest.TestCase):
                     result = decision(run_hook(GUARD, event, self.env))
                     self.assertEqual(result["permissionDecision"], "deny")
                     self.assertIn("legacy SQL snapshot", result["permissionDecisionReason"])
+
+    def test_any_sql_or_table_file_in_the_store_is_denied(self):
+        store = self.root / ".sqlreview"
+        probes = [store / "rendered.sql", self.reviews / "x" / "review.draft.sql", self.reviews / "x" / "out.csv",
+                  self.reviews / "x" / "SOURCE.SQL", self.reviews / "x" / "source.sql ", self.reviews / "x" / "source.sql.",
+                  self.reviews / "x" / "a.tsv", self.reviews / "x" / "a.parquet", self.reviews / "x" / "A.XLSX",
+                  self.reviews / "x" / "a.xls", store / "releases" / "v1" / "rows.csv", store / "amendments" / "q.sql"]
+        for path in probes:
+            for event in (write_event(path, "ZZTEST-001", self.root), edit_event(path, self.root)):
+                with self.subTest(name=path.name, tool=event["tool_name"]):
+                    result = decision(run_hook(GUARD, event, self.env))
+                    self.assertEqual(result["permissionDecision"], "deny")
+
+    def test_json_under_reviews_and_anything_under_templates_still_pass(self):
+        store = self.root / ".sqlreview"
+        self.assert_passthrough(run_hook(GUARD, write_event(self.reviews / "x" / "notes.json", "{}", self.root), self.env))
+        self.assert_passthrough(run_hook(GUARD, write_event(store / "templates" / "review.md", "# t", self.root), self.env))
+        for name in ("example.sql", "rows.csv"):
+            self.assert_passthrough(run_hook(GUARD, write_event(store / "templates" / name, "x", self.root), self.env))
+
+    def test_init_gitignore_lists_the_sql_and_table_patterns(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            r = subprocess.run(["bash", str(SKILLS_SETUP / "sqlreview.sh"), "init"], cwd=tmp, capture_output=True, text=True,
+                               env=self.env, timeout=60)
+            self.assertEqual(r.returncode, 0, r.stderr)
+            lines = (Path(tmp) / ".sqlreview" / ".gitignore").read_text().splitlines()
+            for pattern in ("*.sql", "*.csv", "*.tsv", "*.parquet", "*.xlsx", "*.xls", "!templates/**"):
+                self.assertIn(pattern, lines)
+            subprocess.run(["git", "init", "-q"], cwd=tmp, check=True)
+            ignored = lambda rel: subprocess.run(["git", "check-ignore", "-q", rel], cwd=tmp).returncode == 0
+            self.assertTrue(ignored(".sqlreview/reviews/x/out.csv"))
+            self.assertTrue(ignored(".sqlreview/rendered.sql"))
+            self.assertFalse(ignored(".sqlreview/templates/review.md"))
+            self.assertFalse(ignored(".sqlreview/templates/example.sql"))
 
     def test_rendered_markdown_is_denied(self):
         for name in ("review.md", "scope.md"):

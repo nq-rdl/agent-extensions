@@ -278,6 +278,24 @@ class SkillContract(unittest.TestCase):
                     self.assertIn(token, text)
                 self.assertNotIn("the engineer says the part is done", text)
 
+    def test_amend_gate_checks_who_wrote_the_close_line(self):
+        # A done: or withdrawn: line closes a part only from the right writer, the same rule as amend.
+        for tree in SKILL:
+            with self.subTest(tree=tree):
+                text = flat(section(self.body(tree), "## 0. Amend gate"))
+                for token in ("Check who wrote the line first",
+                              "skills/setup/references/close-line-authors.rst",
+                              "gh pr view <PR> --json author,assignees,reviewRequests,comments",
+                              "The `done:` line counts only from the engineer",
+                              "the `withdrawn:` line counts only from the analyst",
+                              "A line from anyone else leaves the part open",
+                              "Say who wrote the line and which role was expected"):
+                    self.assertIn(token, text)
+                self.assertLess(text.index("Check who wrote the line first"), text.index("**Completed:**"))
+                self.assertNotIn("skills/amend/SKILL.md", text)
+        amend = flat((REPO / "skills/data-request-amend/SKILL.md").read_text())
+        self.assertIn("skills/setup/references/close-line-authors.rst", amend)
+
     def test_one_fetch_instruction_is_cited_everywhere(self):
         amend = flat((REPO / "skills/data-request-amend/SKILL.md").read_text())
         handoff = flat((REPO / "skills/data-request-triage/references/handoff.rst").read_text())
@@ -2403,6 +2421,9 @@ CASES = {
     "release-amend-withdrawn-no-reason": {"prep-stopped", "names-p3", "not-closed"},
     "release-amend-done-outside-ref": {"prep-stopped", "names-p3", "not-closed"},
     "release-amend-part-done": {"prep-continue", "no-blocker", "closed-by-done"},
+    # A close line from the wrong writer leaves the part open.
+    "release-amend-done-wrong-author": {"prep-stopped", "names-p3", "not-closed", "names-writer"},
+    "release-amend-withdrawn-wrong-author": {"prep-stopped", "names-p3", "not-closed", "names-writer"},
 }
 NODE = shutil.which("node")
 NODE_SCRIPT = """

@@ -204,7 +204,10 @@ pin for per-table `WITH (NOLOCK)` hints (ADR 0004), rather than assuming absence
 
 The runner loads a researcher-supplied cohort (study IDs, URNs) from `data/00_raw/` into a `#<table>` at run time; reviewed SQL declares its shape with `-- @supplied:` and joins to it.
 Never copy a cohort value into SQL, comments, specs, review records, issues, pull requests or chat, and never read the supplied file, even to check its format; describe it by shape only.
-The plugin guard denies `Read`, and the path argument of `Grep` and `Glob`, on `data/00_raw/**` (not its `.dvc` pointers or `.gitignore`), the narrower layer beside a scaffold child's own `Read(/data/**)` deny; the rule also binds `Bash` and every other route.
+The plugin guard denies `Read` of `data/00_raw/**` (not its `.dvc` pointers or `.gitignore`).
+It also denies `Grep` and `Glob` when the search root is that directory, inside it or above it (no path means the working directory),
+and when a glob or pattern could name it. Pass a path such as `skills/` that excludes `data/`.
+This is the narrower layer beside a scaffold child's own `Read(/data/**)` deny. The rule also binds `Bash` and every other route.
 Read [references/supplied-cohorts.rst](references/supplied-cohorts.rst) for the load sequence, the v0.8.0 literal gate and the test route.
 
 ## Timezone and source system
