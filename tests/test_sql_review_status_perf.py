@@ -152,6 +152,22 @@ class PreflightBudget(unittest.TestCase):
             self.assertIn("did not finish in the 1-second", json.loads(r.stdout)["hookSpecificOutput"]["additionalContext"])
             self.assertLess(took, 4, body)
 
+    @unittest.skipUnless(os.path.exists("/proc/self/fd"), "the stub finds its output file through /proc")
+    def test_a_status_that_finished_as_the_budget_expired_is_not_reported_as_a_timeout(self):
+        # Review finding 10: the watchdog can create its marker just after status exits. The stub makes that
+        # outcome certain: it creates the marker itself, then prints a valid summary and exits 0.
+        body = ('out="$(readlink "/proc/$$/fd/1")"\n: > "$out.timeout"\n'
+                'printf \'%s\\n\' \'{"schemaVersion":2,"reviews":[],"counts":{"total":0},"amendments":[]}\'\nexit 0\n')
+        r, _ = self.run_stub(body, budget="30")
+        self.assertEqual(r.returncode, 0, r.stderr)
+        ctx = json.loads(r.stdout)["hookSpecificOutput"]["additionalContext"]
+        self.assertIn("is initialised (schema 2) with no reviews yet", ctx)
+        self.assertNotIn("did not finish", ctx)
+
+    def test_a_status_stopped_by_the_watchdog_is_still_a_timeout(self):
+        r, _ = self.run_stub('trap "exit 2" TERM\nsleep 6\n')
+        self.assertIn("did not finish in the 1-second", json.loads(r.stdout)["hookSpecificOutput"]["additionalContext"])
+
     def test_a_descendant_holding_stdout_does_not_hold_the_hook(self):
         # Status has exited, but a background child still has its stdout. Before, the capture
         # pipe stayed open until that child ended.

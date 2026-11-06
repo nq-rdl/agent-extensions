@@ -55,8 +55,14 @@ trap 'rm -f "$out" "$out.timeout"' EXIT
     sleep 0.5 & s=$!; wait "$s" && kill -KILL -- "-$pid" ) </dev/null >/dev/null 2>&1 & dog=$!
   wait "$pid"; rc=$?
   kill "$dog" 2>/dev/null; wait "$dog"
-  # The watchdog leaves a marker only when it stopped status. Then sweep anything left in the group.
-  [ -e "$out.timeout" ] && { kill -KILL -- "-$pid" 2>/dev/null; exit 124; }
+  # The watchdog leaves a marker before it signals status, so the marker alone does not prove a stop: status can
+  # exit 0 just as the budget runs out. A status that stopped by itself with exit 0 has finished, and its
+  # output wins. A stopped status never exits 0, because its TERM trap exits 2 and a KILL gives 137.
+  # In both cases sweep anything left in the group.
+  if [ -e "$out.timeout" ]; then
+    kill -KILL -- "-$pid" 2>/dev/null
+    [ "$rc" -eq 0 ] || exit 124
+  fi
   exit "$rc") >/dev/null 2>&1; rc=$?
 status="$(cat "$out" 2>/dev/null)"
 ctx=""
