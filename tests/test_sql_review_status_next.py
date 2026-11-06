@@ -204,13 +204,19 @@ class StatusNext(unittest.TestCase):
         self.sql(SQL_V2)
         self.assertEqual(self.row()["next"], f"/data-request:analyse {SQL} --update")
 
-    def test_a_space_in_the_sql_path_is_refused_by_check(self):
-        # A path with a space cannot be recorded: status prints a stored path inside paste-ready commands.
+    def test_uncommitted_sql_with_a_space_in_its_path(self):
+        # A space is a valid sql_path, but status prints a path only from [A-Za-z0-9_./-] (M2), so the hint
+        # shows the fixed text instead of the path.
         rel = "reports/monthly report.sql"
-        doc = self.p.write_json("spaced", "scope.json", scope_doc("spaced", rel))
-        r = run(["check", str(doc)], self.p.root)
-        self.assertEqual(r.returncode, 4, r.stdout)
-        self.assertIn("sql_path may hold letters, digits and _ . / - only", r.stdout)
+        self.sql(SQL_V1, rel=rel, commit=False)
+        r = run(["slug", rel], self.p.root)
+        self.assertEqual(r.returncode, 0, r.stderr)
+        slug = r.stdout.strip()
+        self.reviewed(slug, rel)  # fingerprint commits the SQL first (#505)
+        self.sql(SQL_V2, rel=rel, commit=False)
+        row = self.row(slug)
+        self.assertEqual(row["state"], "stale")
+        self.assertEqual(row["next"], "(unsafe sql_path) repair the record, then run sqlreview.sh status --verbose")
 
     def test_uncommitted_unbound_and_rescope_lines_name_the_commit(self):
         self.scope()

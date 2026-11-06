@@ -11,9 +11,10 @@ def nonempty: type == "string" and length > 0;
 def integer: type == "number" and . >= 1 and . == floor;
 def line_range: type == "array" and length == 2 and all(.[]; integer) and .[0] <= .[1];
 def path_ok: nonempty and (startswith("/") | not) and (split("/") | all(.[]; . != "" and . != "." and . != ".."));
-# sql_path is free text that status and the session-start context print inside paste-ready commands, so it holds
-# letters, digits and _ . / - only. \z, not $, because $ also matches before a final newline.
-def sql_path_chars_ok: test("^[A-Za-z0-9_./-]+\\z");
+# sql_path is free text. Check refuses the characters that can build a command or break a line: quotes, backtick,
+# $ ; | & < >, backslash and control characters. A space stays valid. Status prints a path only when it holds
+# letters, digits and _ . / - (sr_path_printable), otherwise a fixed text.
+def sql_path_chars_ok: test("[\"'`$;|&<>\\\\\\x00-\\x1f\\x7f]") | not;
 def sql_path_ok: path_ok and sql_path_chars_ok;
 def release_tag: type == "string" and test("^v?(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)$");
 def req($k): if has($k) then empty else "missing key: \($k)" end;
@@ -167,7 +168,7 @@ else
   .revision as $rev
   | identity_violations,
     (if (.sql_path | path_ok | not) then "sql_path must be a normalized project-relative path"
-     elif (.sql_path | sql_path_chars_ok | not) then "sql_path may hold letters, digits and _ . / - only"
+     elif (.sql_path | sql_path_chars_ok | not) then "sql_path must not contain quotes, backtick, $, ;, |, &, <, >, backslash or control characters"
      else empty end),
     (if (.slug | nonempty | not) or (.slug | test("^[A-Za-z0-9_%.-]+$") | not) or .slug == "." or .slug == ".." then "unsafe slug" else empty end),
     (if (.sql_path | sql_path_ok) and .slug != (.sql_path | path_slug) and .slug != (.sql_path | legacy_path_slug) then "slug/sql_path binding mismatch" else empty end),

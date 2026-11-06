@@ -12,7 +12,7 @@ SR_US="$(printf '\037')"
 # Printed in place of a stored sql_path that holds characters beyond letters, digits and _ . / -.
 # SR_UNSAFE_RULE is the end of check's message for that rule.
 SR_UNSAFE='(unsafe sql_path)'
-SR_UNSAFE_RULE='sql_path may hold letters, digits and _ . / - only'
+SR_UNSAFE_RULE='sql_path must not contain quotes'
 SR_SETUP_HINT="Run /data-request:setup to initialise the project (creates $SR_DIR/ with config.json and templates/)."
 
 sr_die() { # <exit-code> <message>

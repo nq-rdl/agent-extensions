@@ -15,8 +15,6 @@ from urllib.parse import quote, unquote
 
 from test_sql_review_scripts import Project, SQL_V1, SQL_V2, review_doc, scope_doc, run
 
-SAFE_PATH = re.compile(r"[A-Za-z0-9_./-]+\Z")
-
 PATH = "sql/v1/aaa_screening_log.sql"
 READABLE = "sql__v1__aaa_screening_log"
 LEGACY = "sql__v1__aaa%5Fscreening%5Flog"
@@ -122,14 +120,13 @@ class Encoding(unittest.TestCase):
     def test_slug_and_check_stay_in_lockstep(self):
         paths = [p for p in EDGE_PATHS if p not in SQL_SUFFIX_COLLISION] + ["x", PATH]
         slugs = {p: self.slug(p) for p in paths}
-        # check records only letters, digits and _ . / - in sql_path (M2). The slug of any other path still
-        # encodes, and check names the character rule instead of the binding.
-        for path in [p for p in paths if not SAFE_PATH.match(p)]:
-            with self.subTest(unsafe=path):
+        # check refuses a quote in sql_path (M2). The slug still encodes, and check names the character rule.
+        for path in [p for p in paths if "'" in p]:
+            with self.subTest(refused=path):
                 r = self.check(slugs[path], path)
                 self.assertEqual(r.returncode, 4)
-                self.assertIn("sql_path may hold letters, digits and _ . / - only", r.stdout)
-        paths = [p for p in paths if SAFE_PATH.match(p)]
+                self.assertIn("sql_path must not contain quotes", r.stdout)
+        paths = [p for p in paths if "'" not in p]
         for path in paths:
             with self.subTest(path=path):
                 r = self.check(slugs[path], path)

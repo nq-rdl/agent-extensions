@@ -23,7 +23,7 @@ except ModuleNotFoundError:
 SCRIPTS = SCRIPT.parent
 EVIL = "sql/v1/a' ; touch ZZTEST-PWNED ; echo '.sql"
 FIXED = "(unsafe sql_path)"
-RULE = "sql_path may hold letters, digits and _ . / - only"
+RULE = "sql_path must not contain quotes, backtick, $, ;, |, &, <, >, backslash or control characters"
 
 
 def slug_of(path):
@@ -55,13 +55,33 @@ class UnsafeSqlPath(unittest.TestCase):
         self.assertNoHostileText(r.stdout + r.stderr)
 
     def test_check_refuses_each_unsafe_character(self):
-        for ch in ("'", '"', ";", " ", "$", "`", "|", "&", "<", ">", "(", "\n", "\t", "*", "\\"):
+        for ch in ("'", '"', "`", "$", ";", "|", "&", "<", ">", "\\", "\n", "\t", "\r", "\x00", "\x1f", "\x7f"):
             with self.subTest(ch=repr(ch)):
                 path = f"sql/v1/a{ch}b.sql"
                 doc = self.p.write_json("x", "scope.json", scope_doc("x", path))
                 r = run(["check", str(doc)], self.p.root)
                 self.assertEqual(r.returncode, 4, r.stdout)
                 self.assertIn(RULE, r.stdout)
+
+    def test_check_accepts_a_space_and_other_harmless_characters(self):
+        for path in ("reports/monthly report.sql", "sql/v1/odd name (1).sql", "sql/v1/a%20b~c.sql", "sql/v1/déjà.sql"):
+            with self.subTest(path=path):
+                slug = slug_of(path)
+                doc = self.p.write_json(slug, "scope.json", scope_doc(slug, path))
+                r = run(["check", str(doc)], self.p.root)
+                self.assertEqual((r.returncode, r.stdout.strip()), (0, "ok"), r.stdout)
+
+    def test_a_valid_path_with_a_space_shows_the_fixed_text_in_status_and_preflight(self):
+        self.plant("reports/monthly report.sql")
+        for args in (["status"], ["status", "--json"], ["status", "--verbose"]):
+            with self.subTest(args=args):
+                r = run(args, self.p.root)
+                self.assertEqual(r.returncode, 0, r.stderr)
+                self.assertIn(FIXED, r.stdout)
+                self.assertNotIn("monthly report", r.stdout.replace("monthly%20report", ""))
+        ctx = decision(run_hook(PREFLIGHT, {"cwd": str(self.p.root)}, env_for()))["additionalContext"]
+        self.assertIn(FIXED, ctx)
+        self.assertNotIn("monthly report", ctx)
 
     def test_check_accepts_the_reviewed_directory_forms(self):
         for path in ("sql/v1/a.sql", "sql/v2.1/a-b_c.sql", "sql/v3-1/deep/dir/q.sql", "reports/monthly.sql"):
