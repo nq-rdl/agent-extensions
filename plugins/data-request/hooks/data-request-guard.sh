@@ -18,7 +18,8 @@
 #   reviews/*/explain.json              Write → its `by` must be a handle, not an email (#419); Edit → deny
 #   amendments/<request>.json           Write → content run through `release.sh amend-check`; Edit → deny
 #   reviews/*/*.draft.json, templates/*   pass
-#   reviews/*/source.sql, scope.source.sql, history/*.sql   deny (legacy SQL snapshot paths: reviews hold hashes and commits, #505)
+#   any name ending .sql .csv .tsv .parquet .xlsx .xls (case and trailing blanks or dots ignored), except under templates/   deny
+#                                       (the store holds JSON, hashes and commits only, #505)
 # This is an invariant check, not proof that a human answered: it makes "forgot to ask" a denied
 # tool call with the offending ids named, and leaves a fabricated confirmation auditable in the
 # recorded document. Bash heredocs into .sqlreview/ are out of its reach by design (guardrail, not sandbox).
@@ -207,9 +208,19 @@ case "$abs" in
   *) exit 0 ;;
 esac
 
+# The store holds JSON records, never SQL or tabular copies (#505). Trim trailing blanks and dots, which some
+# volumes ignore, and fold case, then refuse a SQL or table file anywhere except under templates/.
+rel_name="$(printf '%s' "${rel##*/}" | tr '[:upper:]' '[:lower:]' | sed 's/[[:space:].]*$//')"
+case "$rel_name" in
+  *.sql|*.csv|*.tsv|*.parquet|*.xlsx|*.xls)
+    case "$(printf '%s' "$rel" | tr '[:upper:]' '[:lower:]')" in
+      templates/*) ;;
+      reviews/*/source.sql|reviews/*/scope.source.sql|reviews/*/history/*.sql)
+        decide deny "$rel is a legacy SQL snapshot path. Store hashes and committed source provenance in the review JSON; use sqlreview.sh materialize for temporary SQL outside the repository." ;;
+      *) decide deny "$rel is a SQL or table file. The SQL Review store holds JSON records, hashes and commits only. Keep SQL in the request repository, use sqlreview.sh materialize for temporary SQL outside it, and never store extract output here." ;;
+    esac ;;
+esac
 case "$rel" in
-  reviews/*/source.sql|reviews/*/scope.source.sql|reviews/*/history/*.sql)
-    decide deny "$rel is a legacy SQL snapshot path. Store hashes and committed source provenance in the review JSON; use sqlreview.sh materialize for temporary SQL outside the repository." ;;
   ledger.json)
     decide deny "Triage ledger entries require validated atomic publication. Use sqlreview.sh ledger set <ticket> <entry.json>; direct Write/Edit of .sqlreview/ledger.json can corrupt other tickets." ;;
   config.json)

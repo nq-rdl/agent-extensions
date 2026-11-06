@@ -349,7 +349,8 @@ class Sources(unittest.TestCase):
             self.assertEqual(r.returncode, 0, r.stderr)
             self.assertIn("file\t.gitignore", r.stdout)
             self.assertEqual((p.root / ".sqlreview/.gitignore").read_text().splitlines(),
-                             ["/reviews/**/source.sql", "/reviews/**/scope.source.sql", "/reviews/**/history/*.sql"])
+                             ["/reviews/**/source.sql", "/reviews/**/scope.source.sql", "/reviews/**/history/*.sql",
+                              "*.sql", "*.csv", "*.tsv", "*.parquet", "*.xlsx", "*.xls", "!templates/**"])
 
 
 if __name__ == "__main__":
