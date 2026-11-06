@@ -248,10 +248,14 @@ case "$abs" in
   */.sqlreview/*) rel="${abs##*/.sqlreview/}" ;;
   *) exit 0 ;;
 esac
+# Some volumes ignore trailing blanks and dots, so review.json. and "review.json " name review.json there. Trim them
+# from the whole name once, so every check below (the SQL and table files, and each authoritative document) sees the
+# same name.
+while :; do case "$rel" in *[" ."]) rel="${rel%?}" ;; *) break ;; esac; done
 
-# The store holds JSON records, never SQL or tabular copies (#505). Trim trailing blanks and dots, which some
-# volumes ignore, and fold case, then refuse a SQL or table file anywhere except under templates/.
-rel_name="$(printf '%s' "${rel##*/}" | tr '[:upper:]' '[:lower:]' | sed 's/[[:space:].]*$//')"
+# The store holds JSON records, never SQL or tabular copies (#505). Fold case, then refuse a SQL or table file
+# anywhere except under templates/.
+rel_name="$(printf '%s' "${rel##*/}" | tr '[:upper:]' '[:lower:]')"
 case "$rel_name" in
   *.sql|*.csv|*.tsv|*.parquet|*.xlsx|*.xls)
     case "$(printf '%s' "$rel" | tr '[:upper:]' '[:lower:]')" in
