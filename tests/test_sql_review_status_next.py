@@ -277,6 +277,18 @@ class StatusNext(unittest.TestCase):
         cfg.write_text(cfg.read_text() + "\n")
         self.assertTrue(self.row()["next"].startswith("commit the uncommitted source changes (git status), then "))
 
+    def test_an_uncommitted_amendment_record_is_exempt_for_status_and_fingerprint(self):
+        # Review findings 2 and 3: the amendment part-state record is a store record, not source.
+        self.sql(SQL_V1)
+        self.scope(SQL_V1)
+        self.p.commit("record scope")
+        path = self.p.root / ".sqlreview" / "amendments" / "ZZTEST-req.json"
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text('{"schemaVersion": 1, "parts": []}')
+        self.assertEqual(self.row()["next"], f"/data-request:analyse {SQL} to review the SQL")  # status exempts it
+        r = run(["fingerprint", SQL], self.p.root)  # sr_source_clean exempts it
+        self.assertEqual(r.returncode, 0, r.stderr)
+
     def test_uncommitted_source_above_a_nested_project_root_counts(self):
         with tempfile.TemporaryDirectory() as tmp:
             top = os.path.realpath(tmp)

@@ -607,7 +607,7 @@ sr_load_uncommitted() {
     # a SQL path, but still counts as an uncommitted source.
     case "$p" in \"*\") p="${p#\"}"; p="${p%\"}" ;; esac
     case "$p" in
-      ''|"$SR_DIR"/reviews/*|"$SR_DIR"/releases/*|"$SR_DIR"/templates/*|"$SR_DIR"/ledger.json|"$SR_DIR"/.gitignore) ;;
+      ''|"$SR_DIR"/reviews/*|"$SR_DIR"/releases/*|"$SR_DIR"/amendments/*|"$SR_DIR"/templates/*|"$SR_DIR"/ledger.json|"$SR_DIR"/.gitignore) ;;
       *) SR_UNCOMMITTED="$SR_UNCOMMITTED$p$SR_NL"; SR_UNCOMMITTED_N=$((SR_UNCOMMITTED_N + 1)) ;;
     esac
   done <<EOF
