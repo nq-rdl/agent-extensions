@@ -11,13 +11,12 @@ import json
 import subprocess
 import tempfile
 import unittest
-from pathlib import Path
 
 try:  # `unittest discover -s tests` puts tests/ on sys.path; `-m unittest tests.x` does not
-    from test_sql_review_scripts import REPO, SCRIPT, SQL_V1, Project, review_doc, run, scope_doc
+    from test_sql_review_scripts import SCRIPT, Project, run, scope_doc
     from test_sql_review_hooks import PREFLIGHT, decision, env_for, run_hook
 except ModuleNotFoundError:
-    from tests.test_sql_review_scripts import REPO, SCRIPT, SQL_V1, Project, review_doc, run, scope_doc
+    from tests.test_sql_review_scripts import SCRIPT, Project, run, scope_doc
     from tests.test_sql_review_hooks import PREFLIGHT, decision, env_for, run_hook
 
 SCRIPTS = SCRIPT.parent

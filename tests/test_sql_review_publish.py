@@ -1,6 +1,5 @@
 """Exercise the sanctioned final-write path from an installed native package."""
 
-import hashlib
 import json
 import os
 from pathlib import Path
