@@ -1,0 +1,3 @@
+kind: Fixed
+body: OpenCode agent skill links point to the agents and config pages, whose section anchors no longer resolve
+time: 2026-11-08T11:40:00Z
