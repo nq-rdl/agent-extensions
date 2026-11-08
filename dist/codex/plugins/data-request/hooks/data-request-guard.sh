@@ -8,7 +8,8 @@
 #                                        every assumption/limitation must carry a complete
 #                                        confirmation record for the current revision, else deny
 #                                        (the violations and the AskUserQuestion step are named);
-#                                        carried confirmations → deny (only publish can prove them)
+#                                        carried confirmations, on assumptions, limitations or criteria_status rows → deny
+#                                        (only publish can prove them)
 #                                       Edit  → deny (a fragment cannot be validated; Write the whole file)
 #   reviews/*/review.md, scope.md       deny  (rendered from the JSON by `sqlreview.sh render`)
 #   ledger.json                         deny  (triage entries use validated atomic ledger set)
@@ -510,8 +511,11 @@ content="$(field .tool_input.content)"
 if printf '%s' "$content" | jq -e '.kind == "review" and any(.limitations[]; has("lift_id"))' >/dev/null 2>&1; then
   decide deny "Review limitations linked to lifts require ledger consistency checks. Write review.draft.json, then run sqlreview.sh publish <slug> review <draft>."
 fi
-if printf '%s' "$content" | jq -e 'any((.assumptions, .limitations | arrays | .[]); type == "object" and .carried_from_revision != null)' >/dev/null 2>&1; then
-  decide deny "Carried confirmations (carried_from_revision) must be proven against the previous revision. Write $(basename "${rel%.json}").draft.json, then run sqlreview.sh publish <slug> $(basename "${rel%.json}") <draft>."
+# A criteria_status row that claims a carry (carried_from_revision or carried_basis) is proven the same way. The shape
+# check below cannot see the previous revision or the analyst's sidecar, which publish reads, so a direct Write is denied.
+if printf '%s' "$content" | jq -e 'any((.assumptions, .limitations | arrays | .[]); type == "object" and .carried_from_revision != null)
+    or any(.criteria_status | arrays | .[]; type == "object" and (.carried_from_revision != null or .carried_basis != null))' >/dev/null 2>&1; then
+  decide deny "Carried confirmations (carried_from_revision or carried_basis on an assumption, a limitation or a criteria_status row) must be proven against the previous revision and the analyst intake. Write $(basename "${rel%.json}").draft.json, then run sqlreview.sh publish <slug> $(basename "${rel%.json}") <draft>."
 fi
 out="$(printf '%s' "$content" | bash "$checker" check --stdin 2>&1)"; rc=$?
 if [ "$rc" -eq 0 ]; then
