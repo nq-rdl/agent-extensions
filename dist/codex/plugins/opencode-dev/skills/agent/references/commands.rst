@@ -165,7 +165,7 @@ This replaces:
 
 ### Shell output
 
-Use _!`command`_ to inject [bash command](https://opencode.ai/docs/tui/#bash-commands) output into your prompt.
+Use _!`command`_ to inject [bash command](https://opencode.ai/docs/tui/) output into your prompt.
 
 For example, to create a custom command that analyzes test coverage:
 
@@ -259,7 +259,7 @@ This is shown as the description in the TUI when you type in the command.
 ### Agent
 
 Use the `agent` config to optionally specify which [agent](https://opencode.ai/docs/agents/) should execute this command.
-If this is a [subagent](https://opencode.ai/docs/agents/#subagents) the command will trigger a subagent invocation by default.
+If this is a [subagent](https://opencode.ai/docs/agents/) the command will trigger a subagent invocation by default.
 To disable this behavior, set `subtask` to `false`.
 
 ```json title="opencode.json"
@@ -278,7 +278,7 @@ This is an **optional** config option. If not specified, defaults to your curren
 
 ### Subtask
 
-Use the `subtask` boolean to force the command to trigger a [subagent](https://opencode.ai/docs/agents/#subagents) invocation.
+Use the `subtask` boolean to force the command to trigger a [subagent](https://opencode.ai/docs/agents/) invocation.
 This is useful if you want the command to not pollute your primary context and will **force** the agent to act as a subagent,
 even if `mode` is set to `primary` on the [agent](https://opencode.ai/docs/agents/) configuration.
 

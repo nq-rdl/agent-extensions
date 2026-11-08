@@ -14,7 +14,7 @@ compatibility: >-
   bash 3.2+, jq >= 1.6, git (reads the release tag). Scaffold paths (specs/amendments.md,
   .copier-answers.yml, runbook, UAT checklist) follow data-analysis-scaffold 0.5.0; verify the
   repository's own layout at use time.
-allowed-tools: Bash, Read, Glob, Grep, Write, AskUserQuestion
+allowed-tools: Bash, Read, Glob, Grep, Write, AskUserQuestion, Skill
 metadata:
   repo: https://github.com/nq-rdl/agent-extensions
 ---
@@ -29,23 +29,86 @@ file, and it never publishes a release, pushes a tag or posts the body.
 Order: the Data Engineer completes `analyse`, the authorised operator run, UAT and the triage
 hand-off; the Data Analyst runs `explain`, accepts for release preparation, sends back or
 amends presentation, then drafts here and publishes. Never direct the engineer to release.
-If the analyst chooses **Send back** here, use the paste-ready *Analyst outcome* note in
-`${CLAUDE_PLUGIN_ROOT}/skills/explain/SKILL.md`: logic changes or defects to `fix`, presentation
-changes to `amend` before or after release. Keep unresolved claims `pending` and the current
+If the analyst chooses **Send back** here, use the paste-ready send-back note in the shared reference
+`${CLAUDE_PLUGIN_ROOT}/skills/explain/references/send-back-note.rst`, with its completeness check. Open
+that reference file only. To run `explain`, `fix` or `amend`, invoke it by name through the Skill tool,
+such as `/data-request:fix`, and do not list the plugin's skills or open their `SKILL.md` files. Route logic changes or
+defects to `fix`, and presentation changes to `amend` before or after release. Add two lines after `outcome:`: `release ref: <tag
+or candidate ref>`, and `release claims: <claim and question ids, with the conflicting sources
+for each>`. The engineer then has the claim, its sources and the expected result in one comment. Keep unresolved claims `pending` and the current
 candidate record `draft`; do not overwrite a previously approved release record, post the
-note or clear a gate. Refreshed review and operator-run/UAT evidence precede another hand-off.
+note or clear a gate. The note belongs on the deliverable PR, never the child issue or
+service-desk. See *Communication channel* in `${CLAUDE_PLUGIN_ROOT}/skills/triage/references/handoff.rst`. Refreshed review and operator-run/UAT evidence precede another hand-off.
 
-For RDL cohort SQL, read `${CLAUDE_PLUGIN_ROOT}/skills/guardrails/SKILL.md` when a claim rests on
+For RDL cohort SQL, invoke `/data-request:guardrails` when a claim rests on
 a storage fact or conversion. Worked example:
 [references/worked-example.rst](references/worked-example.rst).
 
 Arguments: `$ARGUMENTS` — the release tag or candidate ref (for example `v1.0.0`). If none is
-given, ask for it.
+given, work it out before you ask. Read the release tags (`git tag --list 'v*'`), published
+releases and their notes, `.sqlreview/releases/*/release.json`, the ledger and merged release
+PRs. Guardrails `references/release.rst`, **Release state from evidence**, lists these signals.
+Count only the tags that come after the newest tag with an `approved` record (`git tag --list
+'v*' --sort=version:refname`). A tag with no record before that tag is a legacy tag: ignore it.
+When exactly one tag qualifies, use it and say so in one line. For example: "Candidate v1.1.0:
+v1.0.0 has an approved record, v1.1.0 has none." Ask when no tag or more than one tag qualifies,
+and list the candidates in the question. If the analyst names a ref that is not a tag, that
+named ref is the candidate: never replace it with a tag.
 
 ```bash
 S="${CLAUDE_PLUGIN_ROOT}/skills/setup/scripts"
 bash "$S/sqlreview.sh" status --json   # exit 3 → stop: not initialised, run /data-request:setup first
 ```
+
+## 0. Amend gate
+
+Do this before any other step. A part that `/data-request:amend` handed off blocks the release
+until a strict comment on the deliverable PR closes it. `release.sh evidence` enforces this from
+amend's part-state record, `.sqlreview/amendments/<request>.json` (amend step 5). Each part has
+the status `done`, `handed off` or `withdrawn`.
+
+First fetch, as a visible step. Run the command that `bash "$S/release.sh" fetch-command` prints. It
+has the form `git -C '<project root>' fetch --tags origin`, so it runs from any directory. It
+fetches tags from `origin`, else from the first configured remote. With no remote it prints a comment,
+so skip the fetch and say so. This is the one fetch instruction. The amend skill and the hand-off
+reference use the same command. A fetch updates tags and remote-tracking refs such as `origin/main`.
+It does not update a local branch. Name a remote-tracking ref or a tag as the release ref, or
+fast-forward the local branch first. Evidence checks exactly the ref that you give.
+
+A fetch never decides the release. If it fails, report the failure to the human. For example, git
+refuses to overwrite a local tag that moved on the remote. Do not force the fetch, and still run
+evidence below. `release.sh evidence` uses no network. It verifies each done commit against local
+refs and holds the release when a commit is missing or is not in the ref.
+
+Then bring the record up to date. Find the deliverable PR in the ledger, or use the PR URL the
+analyst gives. Read its comments, read-only, for each `amendment hand-off:` comment and its `part:`
+entries. Only a later comment whose first line has one of two forms closes a handed-off part.
+Check who wrote the line first. Follow `${CLAUDE_PLUGIN_ROOT}/skills/setup/references/close-line-authors.rst`:
+read the authors with `gh pr view <PR> --json author,assignees,reviewRequests,comments`. The `done:` line
+counts only from the engineer, and the `withdrawn:` line counts only from the analyst. A line from anyone else
+leaves the part open. Say who wrote the line and which role was expected.
+
+- **Completed:** `done: P<n> <commit>`, from the engineer. Set the part to `done` with that commit.
+  The script checks the commit against local refs, as amend does after its fetch: `git rev-parse --verify`
+  gives one full SHA, then `git merge-base --is-ancestor <full SHA> <ref>`. Only exit 0 verifies.
+  If the check fails or cannot run, the part stays open. Exit 128 counts as a failed check. A commit
+  that is missing locally holds the release. Run the fetch command and run evidence again.
+- **Withdrawn:** `withdrawn: P<n> <reason>`, from the analyst. Set the part to `withdrawn` with that
+  reason. A `withdrawn:` line with no reason leaves the part open.
+
+Any other comment that names the part leaves it open, for example "P3 is still in progress".
+For each handed-off part, say in one line which comment you read and what it decided. A hand-off
+comment with no record is a blocker: write the record with the part `handed off`. The script also
+holds when the ledger shows an `amend` stage and the record file is missing. If you cannot
+read the PR, say so and stop. Never assume that no part is open.
+
+Then run `bash "$S/release.sh" evidence "<ref>"` once and keep its JSON for step 1. Exit 0 and
+exit 10 are not a hold here: go on to step 1, which reads the exit 10 reviews. Exit 2 means the ref
+is unknown: stop and ask for the tag or candidate ref. Exit 11 means release held: stop before step 1.
+Give its stderr in one or two lines, for example "Release held: P3 is handed off and open. Next:
+the engineer comments `done: P3 <commit>` on the PR, or you withdraw it there." Offer to draft
+`withdrawn: P3 <reason>` with the analyst's own reason. Do not draft it without a reason. Post
+nothing. Never edit the record to pass the gate without a strict comment.
 
 ## 1. Gather the release evidence
 
@@ -60,10 +123,11 @@ branch:
 
 For counts in that evidence, apply guardrails `references/release.rst`, **Probe disclosure control**, before quoting them.
 
-Then list the reviews and whether each describes the release:
+Then list the reviews and whether each describes the release. Step 0 already ran this, so reuse its
+JSON. Run it again only after the ref or an amendment record changed:
 
 ```bash
-bash "$S/release.sh" evidence "<tag>"   # exit 0 every review applies · 10 at least one does not · 2 unknown ref
+bash "$S/release.sh" evidence "<tag>"   # exit 0 every review applies · 10 at least one does not · 11 amend hold · 2 unknown ref
 ```
 
 For each slug, load `bash "$S/sqlreview.sh" questions "$SLUG" review`: `questions.json`
@@ -119,7 +183,8 @@ or typo pass comes after.
 ## 4. Select and translate
 
 Go through each confirmed review item (`A1`, `L1`, ...), scope item, amendment and validation
-finding. Keep an item for the researcher when it affects cohort membership, field meaning,
+finding. A research criterion (`N1`, `I1`, `E1`, `D1`, ...) belongs in the table of step 6, not
+here. Keep an item for the researcher when it affects cohort membership, field meaning,
 completeness, comparability or interpretation. Merge related items. Keep implementation detail
 (locking hints, row order, query structure) in the internal review, unless its consequence
 matters to the researcher. Then state the consequence, not the mechanism. Use plain language and
@@ -153,7 +218,87 @@ the analyst's handle (GitHub login where known, else `git config user.name`, els
 `user.email` — `release.sh check` refuses an `@`). `recorded_by` and `resolved_by` follow the same rule. `decided_at` is now (UTC ISO). If
 the analyst stops, write a `draft` record with the undecided claims `pending`, and say so.
 
-## 6. Record and render
+## 6. Criteria in this release
+
+The body carries `## Criteria in this release` before **Extraction Assumptions / Important
+limitations**: every research criterion, in the order entry event, inclusions, exclusions, data
+elements, with the columns ID, Researcher's request, This release and Change since <previous tag>.
+`release.sh criteria` builds it as the record's `criteria` object (`previous_tag`, `scope`,
+`rows`, `status`, `held_reasons`) from `answers.intake.json` and the one scope that carries
+criteria states, both read at the tag.
+
+**Fingerprints first.** The agent runs the answers validator; `release.sh` runs no Python and
+never runs the validator. Write `git show <tag>:answers.yaml` to a temporary directory, with the
+tag's `answers.intake.json` beside it when the tag has one, and run the validator from the
+rendered child:
+
+```bash
+T="$(mktemp -d)"
+git show "<tag>:answers.yaml" > "$T/answers.yaml"
+git show "<tag>:answers.intake.json" > "$T/answers.intake.json" 2>/dev/null   # beside answers.yaml
+pixi run python scripts/validate_answers.py "$T/answers.yaml" --fingerprints > "$T/fp.json"
+# or: data-analysis-scaffold validate-answers "$T/answers.yaml" --fingerprints > "$T/fp.json"
+bash "$S/release.sh" criteria "<tag>" --fingerprints "$T/fp.json"   # exit 0 complete · 10 held · 2 error
+```
+
+Read the validator's exit status. Only a validation failure means `--answers-invalid` (pass it
+instead of `--fingerprints`): the child script's exit 3, or the generator CLI's exit 1 after it prints its
+`✗ <path>: N problem(s)` report. Any other failure is not a verdict on the answers: the child's
+exit 2 (operational, including an older child that rejects `--fingerprints`), `pixi run`'s exit 1
+when it cannot prepare the environment, or a generator exit 1 without that report. Stop and report
+it; do not hold the table as `answers-invalid`. With neither flag the table is held
+(`fingerprints-unchecked`). Remove the temporary directory afterwards.
+
+**Previous tag.** `previous_tag` is the greatest earlier stable `X.Y.Z` release whose record is in
+the tag's tree: never a prerelease, a later tag or the working tree. The change column compares
+with that record's table. With none, the header reads `Change` and every cell is `—`.
+
+**The analyst decides each row, on the note only.** Show every row through AskUserQuestion, in
+batches of at most four: the researcher's request quoted as recorded, the state, and the
+`proposed_note`, with **Accept (Recommended)** / **Reword** / **Reject**. Accept sets `final_note`
+to the proposed note. Reword takes the analyst's note, which is shown again. Reject leaves
+`final_note` null. The researcher's wording is never editable. Do not reword `text`, even to
+tidy it; a changed wording shows as a change in the next release. Fill `decided_by` and
+`decided_at` as in step 5. Row decisions carry over while the proposed note is unchanged, so re-running
+`release.sh criteria` after the record is written keeps them; a changed note is `pending` again.
+
+A rejection means the stated state is wrong. It sends the state back to the engineer: fix the
+scope, then re-run `release.sh criteria`. Record it in order: write the record with the row
+`rejected`, then re-run `release.sh criteria` with the same fingerprints file (exit 10; the
+decisions carry over), embed the object it prints, which names `note-rejected:<id>`, and write
+the record again. A rejected row fails `release.sh check` unless the embedded table is held
+with `note-rejected:<id>`, on a draft record too. The table never drops the row.
+
+**Held.** `release.sh criteria` ends with exit 10 and `status` is `held` for any of these `held_reasons`:
+`no-owning-scope`, `review-stale`, `scope-stale`, `state-missing:<id>`, `fingerprint-mismatch:<field>`, `owning-scope-ambiguous`,
+`note-rejected:<id>`, `answers-invalid` and `fingerprints-unchecked`. A free-text mismatch goes
+back to `/data-request:intake`; the others go to the engineer, except `fingerprints-unchecked`,
+which the analyst fixes by re-running the step above. `no-owning-scope` means the tag's sidecar itemises live criteria but no scope carries their states (a scope
+published before the analyst itemised): the engineer must run `/data-request:bootstrap` to record criteria states,
+and a new tag follows. It comes with `state-missing:<id>` for each live criterion, whose row shows the
+researcher's request with no state; such a table is never "not itemised". `scope-stale` means the SQL body at
+the tag differs from the body the owning scope recorded, so its states may be false. A header-only change
+does not hold. The engineer rescopes with `/data-request:bootstrap`, publishes, and a new tag follows. `answers-invalid` means the tag's
+`answers.yaml` failed validation and the tag cannot change, so it needs an engineer or intake fix
+and a new tag. The body then shows
+one line, `Criteria table held: <reasons>`, with no partial table. A held table, or any row whose
+decision is `pending`, fails `release.sh check` only when the record is `approved`: keep the
+record `draft`, and never present a held table as final.
+
+**No repeats.** Never repeat a criterion in the limitations. A claim whose source is a scope
+source whose `item` is a criterion id is left out of the limitations when the record has a
+`criteria` object. A pending one is hidden from the draft body yet still blocks approval, so
+resolve those claims too; the record still needs a kept non-criterion claim under
+**Extraction Assumptions / Important limitations**. A row filter RDL added on its own (test
+patients, cancelled admissions) is not a criterion: it stays a limitation.
+
+**Not itemised.** With no sidecar, a schema 1 sidecar, or a schema 2 sidecar with no live criterion and no scope carrying criteria states, `release.sh criteria` prints
+`null`. Write `"criteria": null` (or omit it). The body then carries one line, `Criteria are not
+itemised for this request.`, and the rest of the body is unchanged. Run inside the repository,
+`release.sh check` rejects an approved record without a criteria table when the sidecar at its
+commit has a live criterion.
+
+## 7. Record and render
 
 Write the whole record to `.sqlreview/releases/<tag>/release.json` (the guard validates it):
 
@@ -166,13 +311,21 @@ Write the whole record to `.sqlreview/releases/<tag>/release.json` (the guard va
              "sources": [{"kind": "review", "slug": "<slug>", "item": "A1", "revision": 3},
                          {"kind": "file", "path": "src/pipelines/x.py", "ref": "<tag>"}]}],
  "questions": [{"id": "Q1", "text": "…", "sources": [], "resolution": "…",
-                "resolved_by": "<analyst>", "resolved_at": "<UTC ISO>"}]}
+                "resolved_by": "<analyst>", "resolved_at": "<UTC ISO>"}],
+ "criteria": {"previous_tag": "0.1.0", "scope": {"slug": "<slug>", "revision": 5},
+              "rows": [{"id": "E2", "kind": "exclusion", "text": "<verbatim>", "state": "flagged",
+                        "proposed_note": "…", "final_note": "…", "decision": "accepted",
+                        "change": "changed", "previous_state": "not-applied",
+                        "decided_by": "<analyst>", "decided_at": "<UTC ISO>"}],
+              "status": "complete", "held_reasons": []}}
 ```
 
 `evidence` copies `slug`, `revision` and `applies` from `release.sh evidence`. `section` is
 `summary` or `assumptions`. `decision` is `pending`, `accepted` (`final` equals `proposed`),
 `reworded` (new `final`) or `rejected` (`final` is null). `status` is `approved` only when every
-claim is decided and every question is resolved.
+claim is decided and every question is resolved, and the `criteria` table (the object `release.sh
+criteria` printed, with your row decisions) is `complete` (empty `held_reasons`) with no `pending` row. Copy
+`text`, `state` and `change` as printed.
 
 ```bash
 bash "$S/release.sh" check ".sqlreview/releases/<tag>/release.json"    # exit 4 → one violation per line

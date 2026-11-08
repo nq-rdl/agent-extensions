@@ -44,14 +44,14 @@ def list_errors:
         (if .status == "open" or .status == "retired" then empty else "list: \($id): status must be open or retired" end),
         (if (.proposal.text | str) and (.proposal.rationale | str) then empty else "list: \($id): proposal needs text and rationale" end),
         (if has("house_default") and ((.house_default | type) != "object" or
-             (.house_default.facility_code | str | not) or
+             (.id == "tuh-facility" and (.house_default.facility_code | str | not)) or
              (.house_default.confirmed_by | (str and (contains("@") | not)) | not) or
              (.house_default.confirmed_at | str | not) or
              (.house_default.decided | type) != "object" or
              ([.house_default.decided.by, .house_default.decided.role,
                .house_default.decided.at, .house_default.decided.source] | all(.[]; str) | not) or
              (.house_default.decided.by | contains("@")))
-         then "list: \($id): house_default needs a string facility code, recorded confirmation and decided origin" else empty end),
+         then "list: \($id): house_default needs \(if .id == "tuh-facility" then "a string facility code, " else "" end)recorded confirmation and decided origin" else empty end),
         (if (.match | type) == "array" and (.match | length) > 0
             and (.match | all(.[]; type == "array" and length > 0 and all(.[]; str)))
          then (if (.match | all(.[][]; . == ascii_downcase)) then empty else "list: \($id): match terms must be lowercase" end)
@@ -89,7 +89,7 @@ def summary($list):
 load_list() {
   [ -f "$RD_LIST" ] || die "no list at $RD_LIST"
   local errs
-  errs="$(jq -r "$RD_JQ"' list_errors' "$RD_LIST" 2>&1)" || die "list is not valid JSON: $RD_LIST" 4
+  errs="$(jq -r "$RD_JQ"' list_errors' "$RD_LIST" 2>/dev/null)" || die "list is not valid JSON: $RD_LIST" 4
   [ -z "$errs" ] || { printf '%s\n' "$errs" >&2; exit 4; }
 }
 
@@ -121,7 +121,7 @@ cmd_match() {
          | $l.decisions[] | select(. as $d | ($any or $k == $d.kind + "s") and ($i | hit($d)))
          | {kind: $k, id: $i.id, decision: .id, expected_kind: .kind,
             marked: ($i.upstream.decision == .id), proposal}
-           + summary($l)]}' "$1" || die "match failed on $1"
+           + summary($l)]}' "$1" 2>/dev/null || die "match failed on $1"  # no-echo: jq errors can quote values
 }
 
 cmd_marked() {
@@ -131,7 +131,7 @@ cmd_marked() {
   for f in "$@"; do
     check_doc "$f"
     more="$(jq -c --arg file "$f" '[("assumptions", "limitations") as $k | (.[$k] // [])[]
-      | select(has("upstream")) | {decision: .upstream.decision, file: $file, kind: $k, id, text}]' "$f")" \
+      | select(has("upstream")) | {decision: .upstream.decision, file: $file, kind: $k, id, text}]' "$f" 2>/dev/null)" \
       || die "marked failed on $f"
     rows="$(jq -cn --argjson a "$rows" --argjson b "$more" '$a + $b')"
   done
@@ -147,6 +147,11 @@ cmd_marked() {
 cmd="${1:-}"
 [ -n "$cmd" ] || usage
 shift
+# File arguments go through the shared guard (#516): no data/, no unreviewed sql/, nothing outside the project.
+. "$(cd "$(dirname "$0")" && pwd -P)/sqlreview-lib.sh"
+case "$cmd" in
+  match|marked) for f in "$@"; do case "$f" in --any-kind) ;; *) sr_guard_input "$f" ;; esac; done ;;
+esac
 case "$cmd" in
   list) cmd_list "$@" ;;
   match) cmd_match "$@" ;;

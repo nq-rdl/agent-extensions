@@ -1,0 +1,3 @@
+kind: Fixed
+body: 'data-request guardrails treat a captured lift candidate as unconfirmed evidence, not a decision'
+time: 2026-11-05T13:00:00.000000000Z

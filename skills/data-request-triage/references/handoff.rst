@@ -5,6 +5,28 @@ Read this in co-development before fulfilment work, when a request's library
 work goes to spec-kit, and when a request's deliverable PR is ready for review.
 Observed in September 2026.
 
+Communication channel
+---------------------
+
+The data-request skills cite this section. It applies in every mode.
+
+* **The deliverable PR is the channel.** Write each hand-off, send-back, analyst
+  question, flagged decision, engineer reply and status update on the deliverable
+  PR. Address it to the person. A question about a review line can be a review
+  comment on that line.
+* **The service-desk request issue is read-only for agents.** Read it for the
+  request text, the approval and the enquiry number. Never comment on it, label it,
+  edit it or move its card. General authorisation, such as "yes, do that", does not
+  change this. The human makes every service-desk change.
+* **The child tracking issue gets no hand-off.** You can suggest a one-line link to
+  the PR. Post that link only when the human asks for it.
+* **Board moves stay with the human.** List each card to move, its board and its
+  target state. Do not move cards.
+
+Keep these states separate in each PR comment: progress, a request for human
+confirmation, an operator run, analyst acceptance and publication. A progress note
+does not ask for confirmation. Analyst acceptance does not publish the release.
+
 Fulfilment
 ----------
 
@@ -36,7 +58,7 @@ hands a ``/speckit.*`` command back to the human.
 
   .. code-block:: json
 
-     {"decision": "generativeMode", "value": "direct", "by": "<who>", "at": "<ISO time>", "scope": "<owner/name>"}
+     {"decision": "generativeMode", "value": "direct", "by": "engineer-handle", "at": "2026-11-04T09:30:00Z", "scope": "nq-rdl/query-builder"}
 
   ``by`` is the GitHub login of the human who authorised it, never an email
   address, and ``at`` is when. Record ``scope`` as the repository
@@ -62,37 +84,40 @@ prepares and publishes the release. Never direct the engineer to release.
 1. **Gate.** Continue only when the PR is out of draft, its CI is green on the
    current head commit (read the run for that SHA, not an older one), and its
    SQL review status is ``current``. Match the review to the SQL that actually ran,
-   using the recorded run commit and SQL fingerprint, not just the PR's current SQL.
-   ``release.sh evidence`` reads review records and snapshots from the working tree,
-   not the PR. Fetch the checked PR head SHA from GitHub and its commit locally; never
+   using the recorded run commit and SQL fingerprint, not just the current SQL in the PR.
+   ``release.sh evidence`` reads review records from the working tree, not the PR, and
+   the reviewed SQL from git at the ``git_commit`` of each record. Fetch the checked PR head SHA from GitHub and its commit locally; never
    substitute local ``HEAD``. For every review used in the evidence, set ``SLUG`` to
    its slug and ``PR_HEAD`` to that checked SHA, then run from the request project root:
 
    .. code-block:: bash
 
-     for name in review.json source.sql; do
+     for name in review.json; do
        path=".sqlreview/reviews/$SLUG/$name"
-       tmp="$(mktemp)" || exit 2
-       if ! git show "$PR_HEAD:./$path" > "$tmp" 2>/dev/null || ! cmp -s "$tmp" "$path"; then
-         rm -f "$tmp"
+       # Compare the committed bytes directly; no temporary copy to clean up.
+       if ! git cat-file -e "$PR_HEAD:./$path" 2>/dev/null ||
+          ! git show "$PR_HEAD:./$path" | cmp -s - "$path"; then
          printf 'Stop: %s is absent or differs at checked PR head %s\n' "$path" "$PR_HEAD" >&2
          exit 4
        fi
-       rm -f "$tmp"
      done
 
    Missing or differing records stop the hand-off, including uncommitted, untracked
    or locally committed but unpushed reviews. Retain any differing review draft and
    stop for the engineer to complete its unpublished work. Run
-   ``bash "$S/release.sh" evidence "<run commit>"`` with ``S`` set to the installed
-   setup scripts only after these checks pass. Any ``changed``, ``missing-at-ref``,
-   ``unreviewed`` or invalid review, a missing snapshot, or unproven run provenance
+   ``bash "$S/release.sh" evidence --no-amend-hold "<run commit>"`` with ``S`` set to the installed
+   setup scripts only after these checks pass. The flag stops the engineer's own hand-off from
+   being held by a handed-off amend part: the script then never exits 11 and
+   prints each open part as an ``amend note:`` on stderr. This mode verifies no commit, so it needs
+   no fetch. Where a later step needs one, use the command that ``release.sh fetch-command``
+   prints. It names the project root with ``-C``, so it runs from any directory. Name those notes in the hand-off as open delivery gates. The release run keeps the strict hold. Any ``changed``, ``missing-at-ref``,
+   ``unreviewed``, ``unavailable`` or invalid review, or unproven run provenance
    stops the hand-off. A header-only
    result needs proof that only the leading comments differ. Compare the run manifest
    and maintained pipeline too: a matching committed file alone does not prove it ran.
    Confirm DVC pointers and their corresponding objects are pushed, and that UAT sections
    1 to 3 are recorded for this run. Missing evidence is a failed gate, never a passed check.
-   ``current`` only means the SQL bytes match the reviewed snapshot: also confirm that
+   ``current`` only means the SQL bytes match the reviewed SQL: also confirm that
    ``/data-request:analyse`` re-ran
    (with ``--reconfirm-all``) after any pre-release logic change. Name every
    open delivery gate, including known governance restrictions. Flag approval-sensitive
@@ -100,14 +125,14 @@ prepares and publishes the release. Never direct the engineer to release.
    decisions for analyst review. The data analyst checks the delivered elements against
    the approval before release. An unchecked approval does not by itself prevent review;
    a known restriction remains a release gate. When the run-evidence or PR gate fails,
-   report which part failed and stop. Re-read the PR head before steps 2 to 4; if it
+   report which part failed and stop. Re-read the PR head before steps 2 and 3; if it
    changed, recheck the gate on the new SHA. Without ``gh``, reading CI runs can need
    the GitHub MCP Actions toolset; if it is not enabled, say so.
 2. **Assign** the PR to the reviewer the human names. Read ``roles.analyst`` from
    ``.sqlreview/config.json`` for the receiving role, not a person's login; if missing,
    ask for the role and reviewer. Never guess a reviewer. Re-resolve the child
    repository through the API before this write.
-3. **Comment** on the child repository's tracking issue: the PR link, what is
+3. **Comment** on the deliverable PR, addressed to the reviewer: what is
    handed over, run commit and head SHA, review slugs/revisions and SQL fingerprints,
    counts-only QA, links to the run manifest, DVC pointers and UAT evidence, open questions,
    flagged decisions, known governance restrictions and the limitations the requester
@@ -116,15 +141,16 @@ prepares and publishes the release. Never direct the engineer to release.
    preserve original decision provenance, separate from later confirmation.
    List agent-applied technical defaults separately, never as human decisions.
    Include offered extras (not built), not additional unrequested extracts.
-   Keep row-level data, identifiers and small cell counts out. The child
-   issue is the hand-off destination; a PR comment alone is incomplete. Draft it for the
-   human, or post it when the human authorises that post.
-4. **Move** both the child issue and the service-desk request issue to
-   **In-Review** on the Service Desk Request Tracking project board.
-5. **Record** the hand-off in the ledger: PR, head SHA, reviewer, board state and
-   date.
+   Keep row-level data, identifiers and small cell counts out. This PR comment is the
+   hand-off. Do not post it on the child issue or the service-desk issue. Draft it for
+   the human, or post it when the human authorises that post.
+4. **Move** (human only): list the child tracking issue card and the service-desk
+   request issue card, each to **In-Review** on the Service Desk Request Tracking
+   project board. The human moves them. Make no write to service-desk.
+5. **Record** the hand-off in the ledger: PR, head SHA, reviewer, board state as the
+   human reports it (``pending`` until then) and date.
 
-Each write in steps 2 to 4 needs the human's explicit instruction, as any write
-to service-desk does. In triage-only mode, post nothing: return the paste-ready
-comment, the reviewer to assign, and the list of board moves (issue, board and
-target state) for the human.
+Steps 2 and 3 each need the human's explicit instruction. Step 4 is never an agent
+write, whatever the instruction. In triage-only mode, post nothing: return the
+paste-ready PR comment, the reviewer to assign, and the list of board moves (card,
+board and target state) for the human.

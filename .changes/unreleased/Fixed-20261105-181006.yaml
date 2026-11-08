@@ -1,0 +1,3 @@
+kind: Fixed
+body: 'data-request: check does not blame confirmed_revision when revision is the invalid field'
+time: 2026-11-05T18:10:06.000000000Z

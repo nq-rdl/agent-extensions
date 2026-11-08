@@ -4,15 +4,15 @@ description: >-
   Review a finished SQL file for handoff: read it against its scope, record purpose, inputs,
   outputs, logic steps, assumptions and limitations in .sqlreview/reviews/<slug>/review.json,
   with every assumption and limitation confirmed by the human, and render the standardised
-  review.md. Re-running on reviewed SQL diffs against the stored snapshot, walks the human through
+  review.md. Re-running on reviewed SQL diffs against the reviewed commit in git, walks the human through
   the change, and reassesses every item the change touches. Use when SQL is ready to hand to the Data Analyst.
 argument-hint: '<sql path> [--update]'
 user-invocable: true
 compatibility: >-
   .sqlreview schema 2 (schema 1 remains readable) (docs/specs/2026-09-15-sql-review-plugin-design.md); bash 3.2+, jq >= 1.6,
-  git optional (required only for header-decision eligibility; diffs use the stored snapshot).
+  git required; diffs read the reviewed SQL from its recorded commit.
   The analysis-notes header read by `notes` needs query-builder 0.6.0 or later.
-allowed-tools: Bash, Read, Glob, Grep, Write, AskUserQuestion
+allowed-tools: Bash, Read, Glob, Grep, Write, AskUserQuestion, Skill
 metadata:
   repo: https://github.com/nq-rdl/agent-extensions
 ---
@@ -26,8 +26,7 @@ prefix its shared question's text `Analyst question:` and send it back through
 the handoff for the analyst to consult the requester. Do not relabel an
 engineer confirmation as an analyst confirmation.
 
-For RDL cohort SQL, read `${CLAUDE_PLUGIN_ROOT}/skills/guardrails/SKILL.md` before
-scoping or reviewing. Consult its dataops/column-spec sources and carry evidence or
+For RDL cohort SQL, invoke `/data-request:guardrails` before scoping or reviewing. Consult its dataops/column-spec sources and carry evidence or
 unverified facts into the discussion; advisory findings do not replace human confirmation.
 
 Arguments: `$ARGUMENTS`.
@@ -37,8 +36,11 @@ S="${CLAUDE_PLUGIN_ROOT}/skills/setup/scripts"
 bash "$S/sqlreview.sh" status --json                # exit 3 → stop: not initialised, run /data-request:setup first
 SLUG="$(bash "$S/sqlreview.sh" slug "<sql path>")"  # exit 5 → bound to another path: offer `sqlreview.sh move OLD NEW`;
                                                     # a stderr legacy-review note → offer its `move --slug OLD_SLUG NEW`
-bash "$S/sqlreview.sh" fingerprint "<sql path>"     # {sql_path, sql_sha256, sql_body_sha256, git_commit, git_dirty} — embed as-is
+bash "$S/sqlreview.sh" fingerprint "<sql path>"     # {sql_path, sql_sha256, sql_body_sha256, git_commit, git_dirty:false} — embed as-is
 ```
+
+Commit the SQL and its builder, configuration and pins first. `fingerprint` refuses uncommitted
+changes outside `.sqlreview/`, so the recorded `git_commit` identifies every input of the review.
 
 Read `definitions` from `.sqlreview/config.json` and use that wording verbatim when deciding and
 explaining what is an assumption and what is a limitation; never paraphrase it. If
@@ -49,6 +51,11 @@ Before the delta/unchanged-SQL path, apply guardrails `references/grain.rst`: co
 intake/scope and each output's actual grain with answers. Reuse one `L-grain-answers`
 drift record and offer an answers correction in the same change; preserve expected
 finer outputs. Bare Patient is not an agreed grain or a reason to change released SQL.
+
+**Supplied cohort:** review the `-- @supplied:` declaration and the join, never the file. Do not read
+`data/00_raw/`, and never put a cohort value in the review, scope, an assumption, a limitation, an issue or chat;
+a run may only report the rounded counts allowed by guardrails. A literal `VALUES`, `IN` or `=` list of identifiers
+in the SQL is a defect: send it back to be a supplied cohort. Follow `${CLAUDE_PLUGIN_ROOT}/skills/guardrails/references/supplied-cohorts.rst`.
 
 ## Before presenting prose (fresh or update)
 
@@ -76,7 +83,7 @@ confirmation or edit the final JSON. Lint cannot grant confirmation. A reworded 
 item no longer matches its scope text, so it is walked.
 
 Some decisions recur in every enquiry (#362). Before you put candidate items to the engineer, run
-`bash "$S/recurring-decisions.sh" match ".sqlreview/reviews/$SLUG/review.draft.json"`. For each other match,
+`bash "$S/recurring-decisions.sh" match ".sqlreview/reviews/$SLUG/review.draft.json"`. For each other match without a `house_default`,
 show the prior enquiries, offer the listed wording and mark the item `upstream`, as
 `${CLAUDE_PLUGIN_ROOT}/skills/setup/references/recurring-decisions.rst` says. The engineer still confirms each other item;
 the exact recorded TUH house default is not a fresh facility question. Preserve its upstream origin,
@@ -110,6 +117,16 @@ Reuse valid existing proposals on reruns but recheck scope, output columns and b
 is unchanged. Show this proposal table alongside `review.md`, not as a confirmed probe result.
 Unknown labels/thresholds remain unverified; do not fabricate confirmations to publish a review.
 
+When the scope has `criteria_status`, compare each row with the current SQL in the same read. This
+check runs no SQL either. An `applied` or `partially-applied` row needs logic in the SQL that does what
+the row says, and a `partially-applied` reason must match what the SQL leaves out. Check that
+each `flagged` row's named column exists in the named output, and that each `delivered` row's data element
+is a column of an output. Record each gap as a limitation `L-criterion-<id>` with the SQL lines (or the
+missing place), for the human to confirm like any other limitation. A gap does not change the state row,
+which the engineer confirmed, and the criterion stays out of the assumptions. A row does not carry
+across a SQL body change. If the SQL body changed after the scope was published, send the engineer
+to bootstrap's update path to reconfirm each row.
+
 The operator needs explicit authorisation to run approved probes before the delivery run.
 Returned counts inform UAT and the data dictionary; surprises go to the analyst, not an automatic
 cohort filter. Before showing counts, apply guardrails `references/release.rst`, **Probe disclosure control**. Apply *After review* below for the separate authorised run and handoff.
@@ -119,7 +136,7 @@ cohort filter. Before showing counts, apply guardrails `references/release.rst`,
 If `reviews/$SLUG/review.json` exists (or `--update`):
 
 ```bash
-bash "$S/sqlreview.sh" delta "$SLUG"     # exit 0 → check review-content changes before completion below · 10 changed · 6 no baseline → full review below (retain revision history) · 2 missing SQL → stop/rebind
+bash "$S/sqlreview.sh" delta "$SLUG"     # exit 0 → check review-content changes before completion below · 10 changed · 6 reviewed SQL not readable from git → full review below (retain revision history) · 2 missing SQL → stop/rebind
 ```
 
 ### Unchanged SQL: complete publication before stopping
@@ -134,7 +151,7 @@ completion. A body match does not confirm changed assumption text or rationale: 
 those differences and obtain fresh confirmation through the update path. For wording-only
 header corrections that leave the confirmed record intact, publish that record again to
 record the header revision, then render it.
-A previous run may have published and snapshotted successfully but failed or stopped
+A previous run may have published and verified successfully but failed or stopped
 before question publication or rendering. This recovery uses the existing confirmed
 revision; do not increment it or ask for its confirmations again. If the declared
 store is missing, Read the retained `questions.draft.json` and check its binding and
@@ -152,7 +169,7 @@ fi
 bash "$S/sqlreview.sh" render "$SLUG" review || exit $?
 if jq -e -s 'length == 2 and (.[0] | del(.header_revisions)) == (.[1] | del(.header_revisions))' \
     ".sqlreview/reviews/$SLUG/review.draft.json" ".sqlreview/reviews/$SLUG/review.json" >/dev/null 2>&1; then
-  rm -f ".sqlreview/reviews/$SLUG/review.draft.json"
+  bash "$S/sqlreview.sh" discard-draft "$SLUG" review >/dev/null || exit $?
 fi
 if [ -e ".sqlreview/reviews/$SLUG/review.draft.json" ]; then
   printf 'Stop: review draft contains unpublished work; retain it for completion.\n' >&2
@@ -182,7 +199,8 @@ steps 3–4 of *Changed SQL* below: draft the next revision, run `carryforward`,
 items implicated by the grain/evidence change even when their SQL lines are unchanged,
 increment the revision and append to `changes[]`. Then follow *Confirm, write, render*,
 including confirmation/carry gates and publish → snapshot → render. Do not change SQL
-or auto-confirm a new or reworded item to make this update possible.
+or record a confirmation the human did not give for a new or reworded item to make this
+update possible.
 
 ### Changed SQL: reassess the review
 
@@ -365,7 +383,7 @@ change before continuing. Write the complete confirmed document to
 {
   "schemaVersion": 2, "kind": "review", "slug": "<SLUG>", "sql_path": "<sql path>", "title": "…",
   "revision": 1, "recorded_at": "<UTC ISO>", "recorded_by": "<user>",
-  "sql_sha256": "<from fingerprint>", "sql_body_sha256": "<from fingerprint, or null if malformed>", "git_commit": "<from fingerprint>", "git_dirty": "<boolean from fingerprint; preserve its JSON type>",
+  "sql_sha256": "<from fingerprint>", "sql_body_sha256": "<from fingerprint, or null if malformed>", "git_commit": "<from fingerprint>", "git_dirty": false,
   "purpose": "…", "grain": "one row per …",
   "inputs":  [{"name": "schema.table", "description": "one row per …"}],
   "outputs": [{"name": "column", "description": "…"}],
@@ -381,20 +399,21 @@ change before continuing. Write the complete confirmed document to
 
 ```bash
 bash "$S/sqlreview.sh" publish "$SLUG" review ".sqlreview/reviews/$SLUG/review.draft.json" || exit $?
-bash "$S/sqlreview.sh" snapshot "$SLUG" "<sql path>" || exit $?  # only AFTER publish succeeds
+bash "$S/sqlreview.sh" snapshot "$SLUG" "<sql path>" || exit $?  # verify only AFTER publish succeeds; writes no SQL
 bash "$S/sqlreview.sh" render "$SLUG" review || exit $?  # → reviews/<slug>/review.md (never hand-write it)
-rm -f ".sqlreview/reviews/$SLUG/review.draft.json"
+bash "$S/sqlreview.sh" discard-draft "$SLUG" review || exit $?
 ```
 
 Show `review.md`. Continue with *After review* below.
 
-Publish validates a staged copy, confirmations, next revision and current SQL fingerprint before
-atomically replacing `review.json`, and re-proves each carried item against the previous
-`review.json` and `source.sql` (so snapshot must follow every publish); on refusal, re-run
-`carryforward` and walk what it lists. Never copy or patch the draft directly into the final path.
-Snapshot verifies the final review hash before advancing `source.sql` and preserves
-`history/<revision>.sql` for resumed explanations. Stop on any failure and keep the draft. A failed
-or interrupted publish must never advance the baseline; a failed snapshot leaves the review stale. A header-only snapshot retains the authenticated original bytes; never replace historical snapshots from a claimed body match.
+Publish validates the staged document, confirmations and fingerprint before atomically replacing
+`review.json`. It reads the previous reviewed SQL with `git show` at its recorded commit and checks
+its full SHA before it re-proves carried items. On refusal, re-run `carryforward` and walk what it
+lists. Missing or corrupt evidence in git requires reassessment. Never copy or patch the draft into
+the final path. Publish keeps each prior revision at `history/review/<revision>.json`. Header-only
+changes keep the original SHA, commit and confirmations in helper-owned `header_revisions`.
+Snapshot verifies the published evidence only. It writes no SQL. Stop on any failure and keep the
+draft. A failed or interrupted publish never advances the record or its history.
 
 ## After review: operator run, UAT and analyst hand-off
 
@@ -406,7 +425,8 @@ extract to the Data Analyst. The engineer never releases the extract. The analys
 
 Read `${CLAUDE_PLUGIN_ROOT}/skills/triage/references/handoff.rst`, *Hand-off to review*.
 Use that existing procedure after the operator run and UAT, including its run-evidence gate,
-child-issue comment, reviewer assignment and board moves. A rendered review alone does not
+reviewer assignment, hand-off comment on the deliverable PR and board moves listed for the human.
+Its *Communication channel* section applies: no hand-off on the child issue, no service-desk write. A rendered review alone does not
 complete the hand-off. Require the request runbook's **Delivery** section to point to this
 same triage hand-off and name the analyst's next step; flag a missing section for the engineer.
 Do not run the extract or write to GitHub without the procedure's explicit authorisation.

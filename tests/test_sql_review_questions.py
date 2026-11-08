@@ -22,9 +22,12 @@ class Questions(unittest.TestCase):
         self.addCleanup(self.tmp.cleanup)
         self.p = Project(self.tmp.name)
         self.p.sql("q.sql", SQL_V1)
+        (self.p.root / ".gitignore").write_text("questions.draft.json\n")
+        self.p.commit()
+        fp = json.loads(run(["fingerprint", "q.sql"], self.p.root).stdout)
         self.d = self.p.review_dir("q")
-        self.p.write_json("q", "scope.json", scope_doc("q", "q.sql", open_questions=["Which wards?", "Which wards?"]))
-        self.p.write_json("q", "review.json", review_doc("q", "q.sql", open_questions=["Which wards?", "Count transfers?"]))
+        self.p.write_json("q", "scope.json", scope_doc("q", **fp, open_questions=["Which wards?", "Which wards?"]))
+        self.p.write_json("q", "review.json", review_doc("q", **fp, open_questions=["Which wards?", "Count transfers?"]))
         self.assertEqual(run(["snapshot", "q", "q.sql"], self.p.root).returncode, 0)
         self.store = self.d / "questions.json"
         self.draft = self.p.root / "questions.draft.json"
@@ -169,7 +172,8 @@ class Questions(unittest.TestCase):
                 with self.subTest(path=path):
                     r = run(["publish-questions", "q", path], self.p.root)
                     self.assertEqual(r.returncode, 2, r.stdout + r.stderr)
-                    self.assertIn("symlink", r.stderr)
+                    # Refused before any copy: by the path guard (the link leads outside the project) or the symlink rule.
+                    self.assertRegex(r.stderr, "symlink|refused")
                     self.assertEqual(self.bytes(), before)
         (self.p.root / "safe").mkdir()
         self.assertEqual(run(["publish-questions", "q", "safe/../questions.draft.json"], self.p.root).returncode, 0)
