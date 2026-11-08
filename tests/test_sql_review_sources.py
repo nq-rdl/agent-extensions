@@ -354,3 +354,84 @@ class Sources(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class ReleaseEvidencePaths(unittest.TestCase):
+    """F5: other_paths_changed_since_review covers the whole repository, whichever directory holds .sqlreview/, and
+    the SQL file is excluded by its literal path, so glob characters in sql_path name only that file."""
+
+    def setUp(self):
+        self.tmp = tempfile.TemporaryDirectory()
+        self.addCleanup(self.tmp.cleanup)
+        self.top = Path(self.tmp.name)
+
+    def project(self, nested, sql_path="sql/v1/request.sql"):
+        """A git repository whose .sqlreview/ is at the top or in `nested`, with a published review of sql_path."""
+        self.p = Project(self.top, init=False)
+        self.root = self.top / nested if nested else self.top
+        self.root.mkdir(parents=True, exist_ok=True)
+        # init puts .sqlreview/ at the git top-level, so a nested project names its own directory.
+        r = run(["init"], self.root, env={"SQLREVIEW_ROOT": str(self.root)})
+        self.assertEqual(r.returncode, 0, r.stderr)
+        self.assertTrue((self.root / ".sqlreview").is_dir())
+        self.prefix = f"{nested}/" if nested else ""
+        self.sql_path = sql_path
+        (self.root / sql_path).parent.mkdir(parents=True, exist_ok=True)
+        (self.root / sql_path).write_bytes(b"SELECT 1;\nSELECT 3;\n")
+        (self.top / "pixi.toml").write_text("[workspace]\n")
+        self.p.commit("source")
+        slug = "sql__v1__req%5B1%5D" if "[" in sql_path else "sql__v1__request"
+        r = run(["fingerprint", sql_path], self.root)
+        self.assertEqual(r.returncode, 0, r.stdout + r.stderr)
+        fp = json.loads(r.stdout)
+        doc = review_doc(slug, **fp, assumptions=[item("A1", "Retain this range", location={"lines": [2, 2]})],
+                         limitations=[], logic=[])
+        draft = self.root / ".sqlreview" / "reviews" / slug / "review.draft.json"
+        draft.parent.mkdir(parents=True, exist_ok=True)
+        draft.write_text(json.dumps(doc))
+        r = run(["publish", slug, "review", str(draft)], self.root)
+        self.assertEqual(r.returncode, 0, r.stdout + r.stderr)
+
+    def others(self):
+        r = subprocess.run(["bash", str(SCRIPTS / "release.sh"), "evidence", "HEAD"], cwd=self.root,
+                           capture_output=True, text=True)
+        self.assertEqual(r.returncode, 0, r.stdout + r.stderr)
+        row = json.loads(r.stdout)["reviews"][0]
+        self.assertEqual(row["applies"], "current")
+        return row["other_paths_changed_since_review"]
+
+    def change(self, rel, text="x = 1\n"):
+        (self.top / rel).parent.mkdir(parents=True, exist_ok=True)
+        (self.top / rel).write_text(text)
+        self.p.commit(f"change {rel}")
+
+    def test_a_change_above_a_nested_project_is_reported(self):
+        self.project("analysis")
+        self.change("pixi.toml", "[workspace]\nname = 'zztest'\n")
+        self.change("answers.intake.json", "{}\n")
+        self.change("analysis/pipeline.py")
+        self.assertEqual(self.others(), ["analysis/pipeline.py", "answers.intake.json", "pixi.toml"])
+
+    def test_the_paths_are_the_same_with_the_project_at_the_top(self):
+        self.project(None)
+        self.change("pixi.toml", "[workspace]\nname = 'zztest'\n")
+        self.change("pipeline.py")
+        self.assertEqual(self.others(), ["pipeline.py", "pixi.toml"])
+
+    def test_the_sql_and_the_store_are_not_reported_in_a_nested_project(self):
+        self.project("analysis")
+        (self.root / ".sqlreview" / "notes.json").write_text("{}\n")
+        self.change("analysis/other/x.py")
+        self.assertEqual(self.others(), ["analysis/other/x.py"])
+
+    def test_glob_characters_in_sql_path_exclude_only_that_file(self):
+        self.project("analysis", sql_path="sql/v1/req[1].sql")
+        # The glob [1] would also match req1.sql, a different SQL file, so that one must still be reported.
+        self.change("analysis/sql/v1/req1.sql", "SELECT 2;\n")
+        self.change("analysis/sql/v1/reqX.sql", "SELECT 3;\n")
+        self.assertEqual(self.others(), ["analysis/sql/v1/req1.sql", "analysis/sql/v1/reqX.sql"])
+
+    def test_glob_characters_in_sql_path_at_the_top_exclude_only_that_file(self):
+        self.project(None, sql_path="sql/v1/req[1].sql")
+        self.change("sql/v1/req1.sql", "SELECT 2;\n")
+        self.assertEqual(self.others(), ["sql/v1/req1.sql"])
