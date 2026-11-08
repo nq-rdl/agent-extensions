@@ -1,6 +1,5 @@
 """Lift ledger publication, confirmation isolation, and opt-in hook behaviour."""
 import copy
-import hashlib
 import json
 import os
 import subprocess

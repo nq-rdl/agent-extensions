@@ -5,7 +5,6 @@ warehouse facts. Runtime cases exercise shipped Bash/jq helpers in temp repos.
 """
 
 import copy
-import hashlib
 import json
 import tempfile
 import unittest

@@ -6,7 +6,6 @@ Path-derived slugs keep `_` and `.` literal where that stays unambiguous, so
 encoding (every `_` and `.` percent-escaped) keep validating and working, and
 `move PATH PATH` migrates one to the readable slug without forcing a re-analysis.
 """
-import hashlib
 import json
 import re
 import tempfile
