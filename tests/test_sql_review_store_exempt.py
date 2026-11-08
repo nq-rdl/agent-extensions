@@ -10,7 +10,6 @@ import json
 import re
 import tempfile
 import unittest
-from pathlib import Path
 
 try:  # `unittest discover -s tests` puts tests/ on sys.path; `-m unittest tests.x` does not
     from test_sql_review_scripts import REPO, SQL_V1, Project, git, run, scope_doc
