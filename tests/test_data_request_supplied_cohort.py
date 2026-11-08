@@ -469,6 +469,74 @@ class FilterSegments(unittest.TestCase):
 
 
 @unittest.skipUnless(shutil.which("jq"), "the guard needs jq")
+class WildcardOnlyGlobs(unittest.TestCase):
+    """F9: a glob whose segment after **/ is only wildcards (as in **/*) is denied when the root is at or above
+    data/00_raw/, or when the root walk was cut short, and passes under a root the walk fully covered."""
+
+    PATTERNS = ("**/*", "**/*.py", "src/**/*", "**/**")
+
+    def setUp(self):
+        self._tmp = tempfile.TemporaryDirectory()
+        self.addCleanup(self._tmp.cleanup)
+        self.root = Path(self._tmp.name).resolve()
+        (self.root / "data" / "00_raw").mkdir(parents=True)
+        (self.root / "data" / "00_raw" / "sample_cohort.csv").write_text("study_id\nZZTEST-001\n")
+        (self.root / "src" / "pkg").mkdir(parents=True)
+        (self.root / "src" / "pkg" / "a.py").write_text("x = 1\n")
+
+    def verdict(self, tool, path, spelling):
+        key = "glob" if tool == "Grep" else "pattern"
+        tool_input = {"path": path, key: spelling}
+        if tool == "Grep":
+            tool_input["pattern"] = "x"
+        return decide({"tool_name": tool, "cwd": str(self.root), "tool_input": tool_input})
+
+    def test_a_wildcard_only_glob_passes_under_a_root_without_raw_data(self):
+        for tool in ("Grep", "Glob"):
+            for spelling in ("**/*", "**/*.py", "**/**"):
+                for path in ("src", "src/pkg"):
+                    with self.subTest(tool=tool, spelling=spelling, path=path):
+                        self.assertEqual(self.verdict(tool, path, spelling), ("allow", ""))
+
+    def test_the_same_glob_at_the_project_root_or_data_is_denied(self):
+        for tool in ("Grep", "Glob"):
+            for spelling in self.PATTERNS:
+                for path in (".", "data", str(self.root), "src/..", "src/../data"):
+                    with self.subTest(tool=tool, spelling=spelling, path=path):
+                        self.assertEqual(self.verdict(tool, path, spelling)[0], "deny")
+
+    def test_a_glob_that_names_the_directory_is_still_denied_under_a_clean_root(self):
+        for tool in ("Grep", "Glob"):
+            for spelling in ("**/00_RAW/**", "**/*raw*", "**/0*", "data/00_r[a]w/*", "**/00_raw", "**/?*"):
+                with self.subTest(tool=tool, spelling=spelling):
+                    self.assertEqual(self.verdict(tool, "src", spelling)[0], "deny")
+
+    def test_a_link_into_the_directory_denies_the_glob(self):
+        (self.root / "src" / "pkg" / "into_raw").symlink_to(self.root / "data" / "00_raw")
+        for tool in ("Grep", "Glob"):
+            with self.subTest(tool=tool):
+                self.assertEqual(self.verdict(tool, "src", "**/*")[0], "deny")
+
+    def test_a_root_deeper_than_the_walk_denies_the_glob(self):
+        deep = self.root / "src" / "d1" / "d2" / "d3" / "d4" / "d5" / "d6"
+        deep.mkdir(parents=True)
+        (deep / "x.py").write_text("x = 1\n")
+        for tool in ("Grep", "Glob"):
+            with self.subTest(tool=tool):
+                decision, reason = self.verdict(tool, "src", "**/*")
+                self.assertEqual(decision, "deny")
+                self.assertIn("narrower path inside the project", reason)
+            with self.subTest(tool=tool, plain="a plain filter still passes"):
+                self.assertEqual(self.verdict(tool, "src", "*.py"), ("allow", ""))
+
+    def test_a_deep_node_modules_or_git_tree_does_not_count_as_deeper(self):
+        deep = self.root / "src" / "node_modules" / "a" / "b" / "c" / "d" / "e"
+        deep.mkdir(parents=True)
+        (deep / "x.js").write_text("x = 1\n")
+        self.assertEqual(self.verdict("Glob", "src", "**/*"), ("allow", ""))
+
+
+@unittest.skipUnless(shutil.which("jq"), "the guard needs jq")
 class OddProjectPaths(unittest.TestCase):
     """A project path with a space, a tab, a newline or a leading dash must not weaken the Grep and Glob root check."""
 

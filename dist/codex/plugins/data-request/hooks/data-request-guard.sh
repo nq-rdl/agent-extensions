@@ -91,6 +91,7 @@ esac
 raw_denied="Reading or searching data/00_raw/ is denied: a researcher-supplied cohort file holds identifiers, and the runner loads it into a temp table at run time. Never read or search it, copy a value from it, or print one. For its shape read conf/base/supplied/<name>.template.csv (header only); for a load problem use the reason codes, row numbers and column names the runner reports (no value appears in them). Only a genuine small DVC pointer (*.dvc) or .gitignore file can be Read."
 above_denied="A Grep or Glob rooted at or above data/00_raw/ (or above a project that holds it, or holding a link into it) can reach researcher-supplied identifiers, so it is denied. Pass a path inside one project that excludes data/, such as skills/ or src/. Never search data/00_raw/."
 budget_denied="The raw-data check for this Grep or Glob root did not finish inside its time budget or hit a size cap, so the guard cannot rule out data/00_raw/. Pass a narrower path inside the project, such as skills/ or src/."
+deep_denied="A Grep glob or Glob pattern made only of wildcards, such as **/*, could reach data/00_raw/ here, because this root is deeper than the guard searches. Pass a narrower path inside the project, or a plain filter such as *.py."
 lc() { printf '%s' "$1" | tr '[:upper:]' '[:lower:]'; }
 NL='
 '
@@ -101,7 +102,8 @@ NL='
 #                                   under it finds a data/00_raw entry of ANY type, or when that search finds a
 #                                   symbolic link whose resolved target is at, under or above a RAW_PHYS, holds
 #                                   data/00_raw, or is one.
-#   Grep glob, Glob pattern         denied when a path segment of it could be 00_raw (GLOB_RAW_AWK below).
+#   Grep glob, Glob pattern         denied when a path segment of it could be 00_raw (GLOB_RAW_AWK below). A segment of
+#                                   only wildcards after **/ (as in **/*) is denied only when the root walk was cut short.
 # A governing project is any directory, from the target's lexical and physical path and from the cwd up, that
 # holds a data/00_raw entry of any type (a dangling link counts).
 # A glob is checked as text because it can reach the directory from a root above it. It is expanded (braces),
@@ -161,8 +163,10 @@ function expand(str,   i, c, d, s, e, pre, inner, post, cur) {
   }
   expand(pre cur post)
 }
+function wild(x) { return x ~ /^\*+$/ }
 function haslit(x,   i) { for (i = 1; i <= length(x); i++) if (index("*?[]{}!^,\\", substr(x, i, 1)) == 0) return 1; return 0 }
 BEGIN {
+  soft = 0
   f = tolower(ENVIRON["GLOB_TEXT"])
   if (index(f, "[:") || index(f, "[.") || index(f, "[=")) { print "DENY"; exit }
   sub(/^!+/, "", f)
@@ -173,19 +177,29 @@ BEGIN {
     for (i = 1; i <= n; i++) if (parts[i] != "" && parts[i] != ".") seg[++m] = parts[i]
     for (i = 1; i <= m; i++) {
       if (!names(seg[i], "00_raw")) continue
-      if (i > 1) { if (names(seg[i - 1], "data") || seg[i - 1] == "**") { print "DENY"; exit } }
+      if (i > 1) {
+        if (seg[i - 1] == "**") { if (wild(seg[i])) soft = 1; else { print "DENY"; exit } }
+        else if (names(seg[i - 1], "data")) { print "DENY"; exit }
+      }
       else if (haslit(seg[i])) { print "DENY"; exit }
     }
     split("", seg)
   }
-  print "OK"
+  print (soft ? "SOFT" : "OK")
 }'
 case "$tool" in Grep) filter="$(field .tool_input.glob)" ;; Glob) filter="$(field .tool_input.pattern)" ;; *) filter="" ;; esac
+soft_glob=false
 if [ -n "$filter" ]; then
   filter_lc="$(lc "$filter")"
   filter_reason="A Grep glob or Glob pattern with a path segment that could be 00_raw (a literal, or a wildcard that can match it), with .., or starting at an absolute path could reach data/00_raw/, so it is denied. Pass a literal path under skills/ or src/ and a plain filter such as *.py."
   case "$filter_lc" in *..*|/*|'~'*) decide deny "$filter_reason" ;; esac
-  [ "$(GLOB_TEXT="$filter_lc" awk "$GLOB_RAW_AWK" </dev/null 2>/dev/null)" = OK ] || decide deny "$filter_reason"
+  # A segment made only of wildcards after **/ (as in **/*) names 00_raw only by chance. It is held back (SOFT) and
+  # denied below only when the root walk shows data/00_raw is in reach or the walk did not cover the root.
+  case "$(GLOB_TEXT="$filter_lc" awk "$GLOB_RAW_AWK" </dev/null 2>/dev/null)" in
+    OK) ;;
+    SOFT) soft_glob=true ;;
+    *) decide deny "$filter_reason" ;;
+  esac
 fi
 case "$tool" in Grep|Glob) [ -n "$path" ] || path="." ;; esac  # no path means the cwd
 [ -n "$path" ] || exit 0
@@ -346,6 +360,18 @@ EOF
       # The loop also ends when the reader timed out, so a spent budget here means the walk is unfinished.
       [ "$SECONDS" -lt "$budget" ] || decide deny "$budget_denied"
     fi
+  fi
+  # A wildcard-only glob such as **/* passes when the root walk above found no data/00_raw entry or link and
+  # reached every level. An entry 7 levels down means the walk stopped short, so the glob is denied. A root that is
+  # not a directory has nothing beneath it.
+  if [ "$soft_glob" = true ] && [ -d "$raw_physical" ]; then
+    rem=$((budget - SECONDS))
+    [ "$rem" -gt 0 ] || decide deny "$budget_denied"
+    if IFS= read -r -d '' -t "$rem" _deep < <(bounded_find "$raw_physical" -mindepth 7 -maxdepth 7 ! -path '*/.git/*' ! -path '*/node_modules/*' -print0); then
+      case "$_deep" in :budget) decide deny "$budget_denied" ;; esac
+      decide deny "$deep_denied"
+    fi
+    [ "$SECONDS" -lt "$budget" ] || decide deny "$budget_denied"
   fi
   exit 0 ;;
 esac
