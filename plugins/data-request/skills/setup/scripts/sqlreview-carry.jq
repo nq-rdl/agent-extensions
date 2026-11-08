@@ -18,7 +18,11 @@
 # carried_from_revision to the prior revision and carried_basis to the basis (the evidence).
 #
 # criteria_status rows (scope only, the scaffold's criteria design) carry by `criterion` with basis criteria-unchanged: the
-# previous published scope has a row for the same criterion whose state, reason, flag and upstream are equal
+# previous published scope has a row for the same criterion whose state, reason, flag and upstream are equal,
+# and the analyst has not reworded or re-confirmed that criterion in answers.intake.json since that revision was recorded
+# (the criterion's confirmed_at is not later than the previous scope's recorded_at, the rule that status uses to name a rescope).
+# A reworded criterion keeps its id and gets a fresh confirmation, so that time is its revision marker. When it cannot be compared
+# (no valid sidecar, an unknown criterion or a stamp that is not UTC) the row is walked
 # (an absent reason, flag or upstream equals an absent one, so gaining or dropping an upstream is a
 # change, as at publish, R21). A row states what the SQL does, so any SQL body change walks every row, like a
 # changed assumption: the engineer confirms or changes each state, never in bulk. The SQL body is unchanged when
@@ -35,20 +39,31 @@
 def cf_sql_lines: if . == null then null elif . == "" then [] else rtrimstr("\n") | split("\n") end;
 def cf_range: type == "array" and length == 2 and all(.[]; type == "number" and . >= 1 and . == floor) and .[0] <= .[1];
 
+# The UTC second of a sidecar or scope stamp, or null for any other format (the status rule, sqlreview-lib.sh sr_next).
+def cf_utc: if type == "string" and test("^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}(\\.[0-9]+)?Z$") then .[0:19] else null end;
+
 # criteria_status rows of a scope draft, in carry_rows' output shape (see the header).
+# $ctx.criteria is the live sidecar's criteria array, or null when there is no valid schema 2 sidecar.
 def carry_criteria_rows($ctx):
   . as $d
   | $ctx.prior as $p
   | ($p.revision // null) as $pr
+  | ($ctx.criteria // null) as $cs
   | (($ctx.prior_sha != "" and $ctx.prior_sha == $ctx.cur_sha) or (($ctx.prior_absent // false) and ($ctx.cur_absent // false))
      or ($ctx.body_unchanged // false)) as $body
   | [ ($d.criteria_status // [] | if type == "array" then .[] else empty end) | select(type == "object") | . as $i
       | ([($p.criteria_status // [] | if type == "array" then .[] else empty end)
           | select(type == "object" and .criterion == $i.criterion)][0]) as $m
+      | ([$cs | arrays | .[] | select(type == "object" and .id == $i.criterion)][0]) as $c
       | {kind: "criteria_status", id: $i.criterion}
         + (if $p == null then {why: "no previous published scope to carry from"}
            elif $m == null then {why: "no row for \($i.criterion) in criteria_status at revision \($pr)"}
            elif $body | not then {why: "the SQL body changed since revision \($pr)"}
+           elif $cs == null then {why: "no valid analyst intake (answers.intake.json) to show that \($i.criterion) is unchanged since revision \($pr)"}
+           elif $c == null or ($c.confirmed_at | cf_utc) == null or ($p.recorded_at | cf_utc) == null
+           then {why: "cannot show that \($i.criterion) is unchanged in answers.intake.json since revision \($pr)"}
+           elif ($c.confirmed_at | cf_utc) > ($p.recorded_at | cf_utc)
+           then {why: "\($i.criterion) was reworded or re-confirmed in answers.intake.json after revision \($pr): rescope with the engineer and confirm the row afresh"}
            else (["state", "reason", "flag", "upstream"] | map(select($m[.] != $i[.])) | .[0]) as $f
              | if $f != null then {why: "\($f) differs from revision \($pr)"}
                else {basis: "criteria-unchanged"} end

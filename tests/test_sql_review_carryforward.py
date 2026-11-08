@@ -432,8 +432,10 @@ class CriteriaCarry(Base):
         self.v1 = full_status(1)
         self.publish_scope(1, self.v1)
 
-    def scope(self, revision, status):
-        return scope_doc("q", "q.sql", revision=revision, sql_sha256=sha(SQL_V1), assumptions=[], criteria_status=status)
+    def scope(self, revision, status, recorded_at="2026-10-14T00:00:00Z"):
+        # The analyst confirmed every sidecar criterion on 2026-10-13, so the engineer records the scope after it.
+        return scope_doc("q", "q.sql", revision=revision, sql_sha256=sha(SQL_V1), assumptions=[], criteria_status=status,
+                         recorded_at=recorded_at)
 
     def publish_scope(self, revision, status, expected=0):
         # Hash-only reviews (#505): publish reads committed sources, and nothing writes scope.source.sql.
@@ -558,6 +560,66 @@ class CriteriaCarry(Base):
         # D3 is new, so it needs a fresh confirmation at revision 2; the other rows carry
         self.publish_scope(2, [self.carried_row(r["criterion"]) for r in self.v1]
                            + [row("D3", "delivered", 2, confirmed_at="2026-10-14T00:00:00Z")])
+
+    # --- F4: a reworded criterion is not carried ---------------------------------------------
+    def reword_sidecar_criterion(self, id_, confirmed_at="2026-10-20T01:00:00Z", **over):
+        """The analyst rewords a criterion after revision 1 was recorded: the same id, new text, a fresh confirmation."""
+        path = self.p.root / "answers.intake.json"
+        value = json.loads(path.read_text())
+        for c in value["criteria"]:
+            if c["id"] == id_:
+                c.update(text="Reworded by the analyst ZZTEST", confirmed_at=confirmed_at, **over)
+        path.write_text(json.dumps(value))
+
+    def unchanged_draft(self):
+        return self.scope(2, [{k: v for k, v in r.items() if not k.startswith("confirmed")} for r in self.v1])
+
+    def test_a_reworded_criterion_is_walked_and_every_other_row_still_carries(self):
+        self.reword_sidecar_criterion("I1")
+        out = self.carryforward("scope", self.unchanged_draft())
+        self.assertEqual([(w["kind"], w["id"]) for w in out["walk"]], [("criteria_status", "I1")])
+        self.assertIn("answers.intake.json", out["walk"][0]["why"])
+        self.assertIn("rescope", out["walk"][0]["why"])
+        self.assertNotIn("ZZTEST", json.dumps(out))
+        self.assertEqual({c["id"] for c in out["carry"]}, {r["criterion"] for r in self.v1} - {"I1"})
+
+    def test_publish_refuses_to_carry_a_reworded_criterion_and_accepts_a_fresh_confirmation(self):
+        self.reword_sidecar_criterion("I1")
+        r = self.refused_claim(self.rev2(), "I1", "cannot carry the confirmation forward",
+                               "answers.intake.json", "re-confirm for this revision")
+        self.assertNotIn("ZZTEST", r.stdout + r.stderr)
+        fresh = self.fresh_row("I1", confirmed_at="2026-10-21T00:00:00Z")
+        self.publish_scope(2, self.rev2(I1=fresh), expected=0)
+
+    def test_a_criterion_confirmed_again_with_the_same_wording_is_also_not_carried(self):
+        # Applying `applied_by` afresh is a new analyst confirmation, so the engineer confirms the row again.
+        self.reword_sidecar_criterion("I1", applied_by="researcher")
+        out = self.carryforward("scope", self.unchanged_draft())
+        self.assertEqual([w["id"] for w in out["walk"]], ["I1"])
+
+    def test_status_names_a_rescope_for_the_reworded_criterion(self):
+        # Commit the revision 1 files first: status reads committed state and the sidecar in the working tree.
+        committed(self.p)
+        self.reword_sidecar_criterion("I1")
+        r = run(["status", "--json"], self.p.root)
+        row_q = next(x for x in json.loads(r.stdout)["reviews"] if x["slug"] == "q")
+        self.assertIn("/data-request:bootstrap", row_q["next"])
+        self.assertIn("changed after scope revision 1", row_q["next"])
+
+    def test_an_unchanged_criterion_still_carries(self):
+        # Rewriting the sidecar with the same confirmation time changes nothing the carry can see.
+        path = self.p.root / "answers.intake.json"
+        path.write_text(json.dumps(json.loads(path.read_text()), indent=2))
+        out = self.carryforward("scope", self.unchanged_draft())
+        self.assertEqual(out["walk"], [])
+        self.assertEqual(len(out["carry"]), len(self.v1))
+
+    def test_an_invalid_sidecar_walks_every_row(self):
+        # A date without a time is not a sidecar timestamp, so the sidecar is invalid and no row can be proven unchanged.
+        self.reword_sidecar_criterion("D1", confirmed_at="2026-10-20")
+        out = self.carryforward("scope", self.unchanged_draft())
+        self.assertEqual(out["carry"], [])
+        self.assertEqual(len(out["walk"]), len(self.v1))
 
     def test_absent_reason_and_flag_equal_absent(self):
         self.assertNotIn("reason", self.prior("D1"))

@@ -8,7 +8,8 @@
 #                                        every assumption/limitation must carry a complete
 #                                        confirmation record for the current revision, else deny
 #                                        (the violations and the AskUserQuestion step are named);
-#                                        carried confirmations → deny (only publish can prove them)
+#                                        carried confirmations, on assumptions, limitations or criteria_status rows → deny
+#                                        (only publish can prove them)
 #                                       Edit  → deny (a fragment cannot be validated; Write the whole file)
 #   reviews/*/review.md, scope.md       deny  (rendered from the JSON by `sqlreview.sh render`)
 #   ledger.json                         deny  (triage entries use validated atomic ledger set)
@@ -28,6 +29,15 @@
 # not silently pass. JSON in/out via jq, falling back to python3 for the event; neither present,
 # or malformed stdin → no-op when a parser is available.
 set -u
+# Claude Code stops this hook after 10 seconds and then lets the tool call run, so a slow check would fail open.
+# The Grep and Glob root walk therefore has its own time budget (SQLREVIEW_GUARD_BUDGET seconds, default 3, digits
+# only). When the walk or a link resolution runs past it, the guard denies. SECONDS is a shell builtin, so the
+# count costs no process.
+SECONDS=0
+budget="${SQLREVIEW_GUARD_BUDGET:-3}"
+case "$budget" in ''|*[!0-9]*) budget=3 ;; esac
+[ "${#budget}" -le 4 ] || budget=8
+budget=$((10#$budget)); [ "$budget" -le 8 ] || budget=8
 command -v jq >/dev/null 2>&1 || command -v python3 >/dev/null 2>&1 || {
   printf '%s\n' '{"hookSpecificOutput":{"hookEventName":"PreToolUse","permissionDecision":"deny","permissionDecisionReason":"SQL Review guard requires jq; no event parser is available. Install jq before writing."}}'
   exit 0
@@ -81,6 +91,8 @@ case "$tool" in
 esac
 raw_denied="Reading or searching data/00_raw/ is denied: a researcher-supplied cohort file holds identifiers, and the runner loads it into a temp table at run time. Never read or search it, copy a value from it, or print one. For its shape read conf/base/supplied/<name>.template.csv (header only); for a load problem use the reason codes, row numbers and column names the runner reports (no value appears in them). Only a genuine small DVC pointer (*.dvc) or .gitignore file can be Read."
 above_denied="A Grep or Glob rooted at or above data/00_raw/ (or above a project that holds it, or holding a link into it) can reach researcher-supplied identifiers, so it is denied. Pass a path inside one project that excludes data/, such as skills/ or src/. Never search data/00_raw/."
+budget_denied="The raw-data check for this Grep or Glob root did not finish inside its time budget or hit a size cap, so the guard cannot rule out data/00_raw/. Pass a narrower path inside the project, such as skills/ or src/."
+deep_denied="A Grep glob or Glob pattern made only of wildcards, such as **/*, could reach data/00_raw/ here, because this root is deeper than the guard searches. Pass a narrower path inside the project, or a plain filter such as *.py."
 lc() { printf '%s' "$1" | tr '[:upper:]' '[:lower:]'; }
 NL='
 '
@@ -91,7 +103,8 @@ NL='
 #                                   under it finds a data/00_raw entry of ANY type, or when that search finds a
 #                                   symbolic link whose resolved target is at, under or above a RAW_PHYS, holds
 #                                   data/00_raw, or is one.
-#   Grep glob, Glob pattern         denied when a path segment of it could be 00_raw (GLOB_RAW_AWK below).
+#   Grep glob, Glob pattern         denied when a path segment of it could be 00_raw (GLOB_RAW_AWK below). A segment of
+#                                   only wildcards after **/ (as in **/*) is denied only when the root walk was cut short.
 # A governing project is any directory, from the target's lexical and physical path and from the cwd up, that
 # holds a data/00_raw entry of any type (a dangling link counts).
 # A glob is checked as text because it can reach the directory from a root above it. It is expanded (braces),
@@ -151,8 +164,10 @@ function expand(str,   i, c, d, s, e, pre, inner, post, cur) {
   }
   expand(pre cur post)
 }
+function wild(x) { return x ~ /^\*+$/ }
 function haslit(x,   i) { for (i = 1; i <= length(x); i++) if (index("*?[]{}!^,\\", substr(x, i, 1)) == 0) return 1; return 0 }
 BEGIN {
+  soft = 0
   f = tolower(ENVIRON["GLOB_TEXT"])
   if (index(f, "[:") || index(f, "[.") || index(f, "[=")) { print "DENY"; exit }
   sub(/^!+/, "", f)
@@ -163,19 +178,29 @@ BEGIN {
     for (i = 1; i <= n; i++) if (parts[i] != "" && parts[i] != ".") seg[++m] = parts[i]
     for (i = 1; i <= m; i++) {
       if (!names(seg[i], "00_raw")) continue
-      if (i > 1) { if (names(seg[i - 1], "data") || seg[i - 1] == "**") { print "DENY"; exit } }
+      if (i > 1) {
+        if (seg[i - 1] == "**") { if (wild(seg[i])) soft = 1; else { print "DENY"; exit } }
+        else if (names(seg[i - 1], "data")) { print "DENY"; exit }
+      }
       else if (haslit(seg[i])) { print "DENY"; exit }
     }
     split("", seg)
   }
-  print "OK"
+  print (soft ? "SOFT" : "OK")
 }'
 case "$tool" in Grep) filter="$(field .tool_input.glob)" ;; Glob) filter="$(field .tool_input.pattern)" ;; *) filter="" ;; esac
+soft_glob=false
 if [ -n "$filter" ]; then
   filter_lc="$(lc "$filter")"
   filter_reason="A Grep glob or Glob pattern with a path segment that could be 00_raw (a literal, or a wildcard that can match it), with .., or starting at an absolute path could reach data/00_raw/, so it is denied. Pass a literal path under skills/ or src/ and a plain filter such as *.py."
   case "$filter_lc" in *..*|/*|'~'*) decide deny "$filter_reason" ;; esac
-  [ "$(GLOB_TEXT="$filter_lc" awk "$GLOB_RAW_AWK" </dev/null 2>/dev/null)" = OK ] || decide deny "$filter_reason"
+  # A segment made only of wildcards after **/ (as in **/*) names 00_raw only by chance. It is held back (SOFT) and
+  # denied below only when the root walk shows data/00_raw is in reach or the walk did not cover the root.
+  case "$(GLOB_TEXT="$filter_lc" awk "$GLOB_RAW_AWK" </dev/null 2>/dev/null)" in
+    OK) ;;
+    SOFT) soft_glob=true ;;
+    *) decide deny "$filter_reason" ;;
+  esac
 fi
 case "$tool" in Grep|Glob) [ -n "$path" ] || path="." ;; esac  # no path means the cwd
 [ -n "$path" ] || exit 0
@@ -212,6 +237,23 @@ resolve_phys() {
     case "$target" in /*) p="$target" ;; *) p="$(dirname "$p")/$target" ;; esac
   done
   RPHYS="$p"
+}
+# <find arguments>: runs find inside what is left of the time budget and prints its NUL-separated entries, then
+# the entry :budget when the time ran out (a name from find starts with /, so it cannot be mistaken). A timeout
+# command, when it works, stops find itself. Without one the reader gives up on its own, and find ends on the
+# closed pipe or finishes unseen. Call it only inside a process substitution: it drops stdin and stderr for good, so a
+# straggler holds no pipe of the hook open.
+bounded_find() {
+  local rem=$((budget - SECONDS)) rc
+  exec 2>/dev/null </dev/null
+  [ "$rem" -gt 0 ] || { printf ':budget\0'; return 0; }
+  if command -v timeout >/dev/null 2>&1 && timeout 1 true >/dev/null 2>&1; then
+    timeout "$rem" find "$@"
+  else
+    find "$@"
+  fi
+  rc=$?
+  [ "$rc" -lt 124 ] || printf ':budget\0'
 }
 under() { case "$1/" in "${2%/}/"*) return 0 ;; esac; return 1; }  # <path> <dir>: the path is the dir or is below it
 case "$tool" in Read|Grep|Glob)
@@ -293,13 +335,16 @@ EOF
     # the root, to a fixed depth that keeps the guard fast: 6 levels cover a project up to 4 directories below
     # the root. A root higher than that is not searched deeper, which is the stated limit. One walk lists every
     # data/00_raw entry of any type (a directory, a file, a link) and every symbolic link, and a link is
-    # resolved. More than 200 links is refused, because the guard cannot resolve them all quickly.
+    # resolved. More than 200 links is refused, because the guard cannot resolve them all quickly. The walk and
+    # the link resolution share the time budget set at the top. When it runs out the guard denies, because a
+    # hook that runs past the Claude Code timeout lets the tool call through.
     if [ -d "$raw_physical" ]; then
       links=0
-      while IFS= read -r -d '' entry; do
+      while rem=$((budget - SECONDS)); [ "$rem" -gt 0 ] && IFS= read -r -d '' -t "$rem" entry; do
+        case "$entry" in :budget) decide deny "$budget_denied" ;; esac
         case "$entry" in */[dD][aA][tT][aA]/00_[rR][aA][wW]) decide deny "$above_denied" ;; esac
         links=$((links + 1))
-        [ "$links" -le 200 ] || decide deny "A Grep or Glob root holds more than 200 symbolic links, so the guard cannot rule out a link into data/00_raw/. Pass a narrower path, such as skills/ or src/."
+        [ "$links" -le 200 ] || decide deny "$budget_denied"
         resolve_phys "$entry"; target="$RPHYS"
         case "$target" in */[dD][aA][tT][aA]/00_[rR][aA][wW]|*/[dD][aA][tT][aA]/00_[rR][aA][wW]/*) decide deny "$above_denied" ;; esac
         if [ -d "$target" ]; then
@@ -312,8 +357,22 @@ EOF
         done <<EOF
 $raws
 EOF
-      done < <(find "$raw_physical" -maxdepth 6 \( -name .git -o -name node_modules \) -prune -o \( \( -iname 00_raw -ipath '*/data/00_raw' \) -o -type l \) -print0 2>/dev/null)
+      done < <(bounded_find "$raw_physical" -maxdepth 6 \( -name .git -o -name node_modules \) -prune -o \( \( -iname 00_raw -ipath '*/data/00_raw' \) -o -type l \) -print0)
+      # The loop also ends when the reader timed out, so a spent budget here means the walk is unfinished.
+      [ "$SECONDS" -lt "$budget" ] || decide deny "$budget_denied"
     fi
+  fi
+  # A wildcard-only glob such as **/* passes when the root walk above found no data/00_raw entry or link and
+  # reached every level. An entry 7 levels down means the walk stopped short, so the glob is denied. A root that is
+  # not a directory has nothing beneath it.
+  if [ "$soft_glob" = true ] && [ -d "$raw_physical" ]; then
+    rem=$((budget - SECONDS))
+    [ "$rem" -gt 0 ] || decide deny "$budget_denied"
+    if IFS= read -r -d '' -t "$rem" _deep < <(bounded_find "$raw_physical" -mindepth 7 -maxdepth 7 ! -path '*/.git/*' ! -path '*/node_modules/*' -print0); then
+      case "$_deep" in :budget) decide deny "$budget_denied" ;; esac
+      decide deny "$deep_denied"
+    fi
+    [ "$SECONDS" -lt "$budget" ] || decide deny "$budget_denied"
   fi
   exit 0 ;;
 esac
@@ -452,8 +511,11 @@ content="$(field .tool_input.content)"
 if printf '%s' "$content" | jq -e '.kind == "review" and any(.limitations[]; has("lift_id"))' >/dev/null 2>&1; then
   decide deny "Review limitations linked to lifts require ledger consistency checks. Write review.draft.json, then run sqlreview.sh publish <slug> review <draft>."
 fi
-if printf '%s' "$content" | jq -e 'any((.assumptions, .limitations | arrays | .[]); type == "object" and .carried_from_revision != null)' >/dev/null 2>&1; then
-  decide deny "Carried confirmations (carried_from_revision) must be proven against the previous revision. Write $(basename "${rel%.json}").draft.json, then run sqlreview.sh publish <slug> $(basename "${rel%.json}") <draft>."
+# A criteria_status row that claims a carry (carried_from_revision or carried_basis) is proven the same way. The shape
+# check below cannot see the previous revision or the analyst's sidecar, which publish reads, so a direct Write is denied.
+if printf '%s' "$content" | jq -e 'any((.assumptions, .limitations | arrays | .[]); type == "object" and .carried_from_revision != null)
+    or any(.criteria_status | arrays | .[]; type == "object" and (.carried_from_revision != null or .carried_basis != null))' >/dev/null 2>&1; then
+  decide deny "Carried confirmations (carried_from_revision or carried_basis on an assumption, a limitation or a criteria_status row) must be proven against the previous revision and the analyst intake. Write $(basename "${rel%.json}").draft.json, then run sqlreview.sh publish <slug> $(basename "${rel%.json}") <draft>."
 fi
 out="$(printf '%s' "$content" | bash "$checker" check --stdin 2>&1)"; rc=$?
 if [ "$rc" -eq 0 ]; then

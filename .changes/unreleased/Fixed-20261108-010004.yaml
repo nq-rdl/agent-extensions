@@ -1,0 +1,3 @@
+kind: Fixed
+body: data-request guard denies a direct scope or review write that carries criteria_status rows, so only publish proves them
+time: 2026-11-08T01:00:04.000000+10:00

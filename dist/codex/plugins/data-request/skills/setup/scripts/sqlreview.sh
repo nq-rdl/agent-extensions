@@ -1203,7 +1203,8 @@ _carry_context() { # <slug> <scope|review> <sql_path>
   local d="$SR_REVIEWS/$1"
   CF_KIND="$2" CF_PRIOR=/dev/null CF_BASE=/dev/null CF_CUR=/dev/null
   CF_HAVE_BASE=false CF_HAVE_CUR=false CF_PRIOR_SHA="" CF_CUR_SHA=""
-  CF_BODY_SAME=false CF_PRIOR_ABSENT=false CF_CUR_ABSENT=false
+  CF_BODY_SAME=false CF_PRIOR_ABSENT=false CF_CUR_ABSENT=false CF_CRITERIA=null
+  [ "$2" != scope ] || _carry_criteria
   sr_no_symlinks "$d/$2.json" || exit 2
   if [ -f "$d/$2.json" ]; then
     cmd_check "$d/$2.json" >/dev/null || sr_die 4 "existing $2.json is invalid; see sqlreview.sh check"
@@ -1225,16 +1226,31 @@ _carry_context() { # <slug> <scope|review> <sql_path>
   if [ "$CF_HAVE_BASE" = true ] && [ "$CF_HAVE_CUR" = true ] && sr_body_same "$CF_BASE" "$CF_CUR"; then CF_BODY_SAME=true; fi
 }
 
+# Sets CF_CRITERIA to the live criteria array of the analyst's schema 2 sidecar (answers.intake.json at the git
+# top-level), or null when there is none, it is a symlink or it is invalid. The carry then cannot show that a
+# criteria_status row is unchanged, so it walks the row.
+_carry_criteria() {
+  local top sidecar intake
+  top="$(git -C "$SR_ROOT" rev-parse --show-toplevel 2>/dev/null)" || top="$SR_ROOT"
+  [ -n "$top" ] || top="$SR_ROOT"
+  sidecar="$top/answers.intake.json"
+  [ -f "$sidecar" ] && [ ! -L "$sidecar" ] || return 0
+  intake="$(cmd_intake "$sidecar" 1 2>/dev/null)" || return 0
+  CF_CRITERIA="$(printf '%s' "$intake" | jq -c '.criteria // null' 2>/dev/null)" || CF_CRITERIA=null
+  [ -n "$CF_CRITERIA" ] || CF_CRITERIA=null
+}
+
 # Run a jq filter over a draft with sqlreview-carry.jq included and $ctx bound (see its header).
 _carry_jq() { # <draft> <filter> [jq options...]
   local draft="$1" filter="$2"
   shift 2
   jq -r -L "$SR_SCRIPT_DIR" "$@" --slurpfile prior "$CF_PRIOR" --rawfile base "$CF_BASE" --rawfile cur "$CF_CUR" \
     --argjson have_base "$CF_HAVE_BASE" --argjson have_cur "$CF_HAVE_CUR" --arg prior_sha "$CF_PRIOR_SHA" --arg cur_sha "$CF_CUR_SHA" \
-    --argjson body_same "$CF_BODY_SAME" --argjson prior_absent "$CF_PRIOR_ABSENT" --argjson cur_absent "$CF_CUR_ABSENT" --arg cf_kind "$CF_KIND" \
+    --argjson body_same "$CF_BODY_SAME" --argjson criteria "$CF_CRITERIA" --argjson prior_absent "$CF_PRIOR_ABSENT" --argjson cur_absent "$CF_CUR_ABSENT" --arg cf_kind "$CF_KIND" \
     "include \"sqlreview-carry\";
      {kind: \$cf_kind, prior: \$prior[0], base: (if \$have_base then \$base else null end), cur: (if \$have_cur then \$cur else null end),
-      prior_sha: \$prior_sha, cur_sha: \$cur_sha, prior_absent: \$prior_absent, cur_absent: \$cur_absent, body_unchanged: \$body_same} as \$ctx | $filter" "$draft"
+      prior_sha: \$prior_sha, cur_sha: \$cur_sha, prior_absent: \$prior_absent, cur_absent: \$cur_absent, body_unchanged: \$body_same,
+      criteria: \$criteria} as \$ctx | $filter" "$draft"
 }
 
 # Which draft items may keep the confirmation of the previous published revision (#348). Read-only.

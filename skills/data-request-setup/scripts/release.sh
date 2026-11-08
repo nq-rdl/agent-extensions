@@ -30,8 +30,10 @@
 #                              invalid         the record fails sqlreview.sh check
 #                            reviewed_commit_in_ref: whether the review's git_commit is an ancestor of
 #                            REF (null when the review has none or git cannot tell).
-#                            other_paths_changed_since_review: committed paths outside sql_path and
-#                            .sqlreview/ that differ between git_commit and REF (null when unknown).
+#                            other_paths_changed_since_review: committed paths in the whole repository, outside
+#                            sql_path and .sqlreview/, that differ between git_commit and REF. The paths
+#                            are relative to the git top-level, also when .sqlreview/ is in a subdirectory
+#                            (null when unknown).
 #                            SQL can be unchanged while code, pins or exports change (#521).
 #                            Amend gate: each .sqlreview/amendments/<request>.json is
 #                            {schemaVersion: 1, parts: [{id: "P<n>", status, ...}]}, status
@@ -285,7 +287,7 @@ cmd_render() {
 
 # One review directory -> one JSON row on stdout.
 rl_review_row() ( # <slug> <commit>
-  local slug="$1" commit="$2" d="$SR_REVIEWS/$1" doc kind sql reviewed at="" body_at="" body_note="" applies tmp gc inref="null" binding others="null"
+  local slug="$1" commit="$2" d="$SR_REVIEWS/$1" doc kind sql reviewed at="" body_at="" body_note="" applies tmp gc inref="null" binding others="null" top prefix
   doc="$(sr_doc_for "$slug")" || return 1
   kind="$(jq -r '.kind // ""' "$doc")"
   if ! bash "$SR_SCRIPT_DIR/sqlreview.sh" check "$doc" >/dev/null 2>&1; then
@@ -331,7 +333,12 @@ rl_review_row() ( # <slug> <commit>
        elif [ $? -eq 1 ]; then inref=false; fi
        # SQL can stay identical while code, pins or exports change (#521). Report the paths as evidence;
        # the reviewer decides whether a change matters.
-       if git -C "$SR_ROOT" diff --name-only -z "$gc" "$commit" -- . ":(exclude).sqlreview" ":(exclude)$sql" \
+       # The whole repository counts, not only the subtree that holds .sqlreview/, because a pin or a sidecar can sit
+       # above it. Run from the git top-level, so the paths are relative to it, and exclude the store and the SQL by
+       # their literal paths: a [ or * in sql_path must not act as a pattern.
+       if top="$(git -C "$SR_ROOT" rev-parse --show-toplevel 2>/dev/null)" &&
+          prefix="$(git -C "$SR_ROOT" rev-parse --show-prefix 2>/dev/null)" &&
+          git -C "$top" diff --name-only -z "$gc" "$commit" -- . ":(exclude,literal)${prefix}.sqlreview" ":(exclude,literal)${prefix}$sql" \
          > "$tmp/others" 2>/dev/null; then
          others="$(tr '\0' '\n' < "$tmp/others" | jq -Rsc 'split("\n") | map(select(length > 0))')" || return 2
        fi ;;
