@@ -28,6 +28,15 @@
 # not silently pass. JSON in/out via jq, falling back to python3 for the event; neither present,
 # or malformed stdin → no-op when a parser is available.
 set -u
+# Claude Code stops this hook after 10 seconds and then lets the tool call run, so a slow check would fail open.
+# The Grep and Glob root walk therefore has its own time budget (SQLREVIEW_GUARD_BUDGET seconds, default 3, digits
+# only). When the walk or a link resolution runs past it, the guard denies. SECONDS is a shell builtin, so the
+# count costs no process.
+SECONDS=0
+budget="${SQLREVIEW_GUARD_BUDGET:-3}"
+case "$budget" in ''|*[!0-9]*) budget=3 ;; esac
+[ "${#budget}" -le 4 ] || budget=8
+budget=$((10#$budget)); [ "$budget" -le 8 ] || budget=8
 command -v jq >/dev/null 2>&1 || command -v python3 >/dev/null 2>&1 || {
   printf '%s\n' '{"hookSpecificOutput":{"hookEventName":"PreToolUse","permissionDecision":"deny","permissionDecisionReason":"SQL Review guard requires jq; no event parser is available. Install jq before writing."}}'
   exit 0
@@ -81,6 +90,7 @@ case "$tool" in
 esac
 raw_denied="Reading or searching data/00_raw/ is denied: a researcher-supplied cohort file holds identifiers, and the runner loads it into a temp table at run time. Never read or search it, copy a value from it, or print one. For its shape read conf/base/supplied/<name>.template.csv (header only); for a load problem use the reason codes, row numbers and column names the runner reports (no value appears in them). Only a genuine small DVC pointer (*.dvc) or .gitignore file can be Read."
 above_denied="A Grep or Glob rooted at or above data/00_raw/ (or above a project that holds it, or holding a link into it) can reach researcher-supplied identifiers, so it is denied. Pass a path inside one project that excludes data/, such as skills/ or src/. Never search data/00_raw/."
+budget_denied="The raw-data check for this Grep or Glob root did not finish inside its time budget or hit a size cap, so the guard cannot rule out data/00_raw/. Pass a narrower path inside the project, such as skills/ or src/."
 lc() { printf '%s' "$1" | tr '[:upper:]' '[:lower:]'; }
 NL='
 '
@@ -213,6 +223,23 @@ resolve_phys() {
   done
   RPHYS="$p"
 }
+# <find arguments>: runs find inside what is left of the time budget and prints its NUL-separated entries, then
+# the entry :budget when the time ran out (a name from find starts with /, so it cannot be mistaken). A timeout
+# command, when it works, stops find itself. Without one the reader gives up on its own, and find ends on the
+# closed pipe or finishes unseen. Call it only inside a process substitution: it drops stdin and stderr for good, so a
+# straggler holds no pipe of the hook open.
+bounded_find() {
+  local rem=$((budget - SECONDS)) rc
+  exec 2>/dev/null </dev/null
+  [ "$rem" -gt 0 ] || { printf ':budget\0'; return 0; }
+  if command -v timeout >/dev/null 2>&1 && timeout 1 true >/dev/null 2>&1; then
+    timeout "$rem" find "$@"
+  else
+    find "$@"
+  fi
+  rc=$?
+  [ "$rc" -lt 124 ] || printf ':budget\0'
+}
 under() { case "$1/" in "${2%/}/"*) return 0 ;; esac; return 1; }  # <path> <dir>: the path is the dir or is below it
 case "$tool" in Read|Grep|Glob)
   # Researcher-supplied cohort files live under data/00_raw/ (DVC, gitignored) and hold identifiers. The runner
@@ -293,13 +320,16 @@ EOF
     # the root, to a fixed depth that keeps the guard fast: 6 levels cover a project up to 4 directories below
     # the root. A root higher than that is not searched deeper, which is the stated limit. One walk lists every
     # data/00_raw entry of any type (a directory, a file, a link) and every symbolic link, and a link is
-    # resolved. More than 200 links is refused, because the guard cannot resolve them all quickly.
+    # resolved. More than 200 links is refused, because the guard cannot resolve them all quickly. The walk and
+    # the link resolution share the time budget set at the top. When it runs out the guard denies, because a
+    # hook that runs past the Claude Code timeout lets the tool call through.
     if [ -d "$raw_physical" ]; then
       links=0
-      while IFS= read -r -d '' entry; do
+      while rem=$((budget - SECONDS)); [ "$rem" -gt 0 ] && IFS= read -r -d '' -t "$rem" entry; do
+        case "$entry" in :budget) decide deny "$budget_denied" ;; esac
         case "$entry" in */[dD][aA][tT][aA]/00_[rR][aA][wW]) decide deny "$above_denied" ;; esac
         links=$((links + 1))
-        [ "$links" -le 200 ] || decide deny "A Grep or Glob root holds more than 200 symbolic links, so the guard cannot rule out a link into data/00_raw/. Pass a narrower path, such as skills/ or src/."
+        [ "$links" -le 200 ] || decide deny "$budget_denied"
         resolve_phys "$entry"; target="$RPHYS"
         case "$target" in */[dD][aA][tT][aA]/00_[rR][aA][wW]|*/[dD][aA][tT][aA]/00_[rR][aA][wW]/*) decide deny "$above_denied" ;; esac
         if [ -d "$target" ]; then
@@ -312,7 +342,9 @@ EOF
         done <<EOF
 $raws
 EOF
-      done < <(find "$raw_physical" -maxdepth 6 \( -name .git -o -name node_modules \) -prune -o \( \( -iname 00_raw -ipath '*/data/00_raw' \) -o -type l \) -print0 2>/dev/null)
+      done < <(bounded_find "$raw_physical" -maxdepth 6 \( -name .git -o -name node_modules \) -prune -o \( \( -iname 00_raw -ipath '*/data/00_raw' \) -o -type l \) -print0)
+      # The loop also ends when the reader timed out, so a spent budget here means the walk is unfinished.
+      [ "$SECONDS" -lt "$budget" ] || decide deny "$budget_denied"
     fi
   fi
   exit 0 ;;

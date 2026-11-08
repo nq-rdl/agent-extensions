@@ -18,18 +18,21 @@ import os
 import shutil
 import subprocess
 import tempfile
+import time
 import unittest
 from pathlib import Path
 
 REPO = Path(__file__).resolve().parent.parent
+BASH = shutil.which("bash") or "bash"
 GUARD = REPO / "hooks" / "data-request-guard.sh"
 REFERENCE = "references/supplied-cohorts.rst"
 SKILLS = ("guardrails", "draft", "map", "analyse", "explain", "intake", "triage")
 
 
-def decide(event):
+def decide(event, extra_env=None):
     env = {k: v for k, v in os.environ.items() if not k.startswith("SQLREVIEW_")}
-    r = subprocess.run(["bash", str(GUARD)], input=json.dumps(event), text=True, capture_output=True,
+    env.update(extra_env or {})
+    r = subprocess.run([BASH, str(GUARD)], input=json.dumps(event), text=True, capture_output=True,
                        env=env, timeout=60)
     if not r.stdout.strip():
         return "allow", ""
@@ -566,6 +569,113 @@ class ControlCharacters(unittest.TestCase):
             with self.subTest(tool=tool):
                 event = {"tool_name": tool, "cwd": str(self.base), "tool_input": {"path": "link", "pattern": "x"}}
                 self.assertEqual(decide(event)[0], "deny")
+
+
+@unittest.skipUnless(shutil.which("jq"), "the guard needs jq")
+class GuardBudget(unittest.TestCase):
+    """F2: the Grep and Glob root walk has its own time budget, well under the 10 second hook timeout. Claude Code
+    lets a tool call through when a hook times out, so a walk that runs past the budget must deny instead."""
+
+    def setUp(self):
+        self._tmp = tempfile.TemporaryDirectory()
+        self.addCleanup(self._tmp.cleanup)
+        self.top = Path(self._tmp.name).resolve()
+        self.root = self.top / "proj"
+        for d in ("data/00_raw", "src/pkg", "skills"):
+            (self.root / d).mkdir(parents=True)
+        (self.root / "data" / "00_raw" / "sample_cohort.csv").write_text("study_id\nZZTEST-001\n")
+        (self.root / "src" / "pkg" / "a.py").write_text("x = 1\n")
+        self.stubs = self.top / "stubs"
+        self.stubs.mkdir()
+        slow = self.stubs / "find"  # a walk that outlasts any budget used here
+        slow.write_text("#!/bin/sh\nsleep 6\n")
+        slow.chmod(0o755)
+
+    def search(self, path="src", tool="Glob", env=None, path_env=None):
+        tool_input = {"path": path, "pattern": "*.py"} if tool == "Glob" else {"path": path, "pattern": "x"}
+        event = {"tool_name": tool, "cwd": str(self.root), "tool_input": tool_input}
+        extra = dict(env or {})
+        if path_env is not None:
+            extra["PATH"] = path_env
+        return decide(event, extra)
+
+    def timed(self, **kw):
+        start = time.monotonic()
+        verdict = self.search(**kw)
+        return verdict, time.monotonic() - start
+
+    def test_a_walk_that_outlasts_the_budget_is_denied_inside_the_hook_timeout(self):
+        for tool in ("Grep", "Glob"):
+            with self.subTest(tool=tool):
+                (decision, reason), took = self.timed(
+                    tool=tool, env={"SQLREVIEW_GUARD_BUDGET": "1", "PATH": f"{self.stubs}:{os.environ['PATH']}"})
+                self.assertEqual(decision, "deny")
+                self.assertIn("narrower path inside the project", reason)
+                self.assertLess(took, 4)
+
+    def test_the_default_budget_is_well_under_the_hook_timeout(self):
+        (decision, reason), took = self.timed(env={"PATH": f"{self.stubs}:{os.environ['PATH']}"})
+        self.assertEqual(decision, "deny")
+        self.assertIn("narrower path inside the project", reason)
+        self.assertLess(took, 5)
+
+    def test_without_a_timeout_command_the_reader_still_stops_at_the_budget(self):
+        tools = self.top / "tools"
+        tools.mkdir()
+        wanted = ("jq", "awk", "tr", "sed", "dirname", "basename", "readlink", "wc", "grep", "cat", "sh", "sleep",
+                  "mktemp", "rm", "cut", "head", "sort", "uniq", "env", "printf")
+        for name in wanted:
+            found = shutil.which(name)
+            if found:
+                (tools / name).symlink_to(found)
+        shutil.copy(self.stubs / "find", tools / "find")
+        self.assertFalse((tools / "timeout").exists())
+        (decision, reason), took = self.timed(env={"SQLREVIEW_GUARD_BUDGET": "1"}, path_env=str(tools))
+        self.assertEqual(decision, "deny")
+        self.assertIn("narrower path inside the project", reason)
+        self.assertLess(took, 4)
+
+    def test_a_budget_of_zero_denies_every_walk(self):
+        for tool in ("Grep", "Glob"):
+            with self.subTest(tool=tool):
+                decision, reason = self.search(tool=tool, env={"SQLREVIEW_GUARD_BUDGET": "0"})
+                self.assertEqual(decision, "deny")
+                self.assertIn("narrower path inside the project", reason)
+
+    def test_a_budget_that_is_not_digits_falls_back_to_the_default(self):
+        for value in ("abc", "-1", "1.5", "", " 2", "9999999999999999999999"):
+            with self.subTest(value=value):
+                self.assertEqual(self.search(env={"SQLREVIEW_GUARD_BUDGET": value}), ("allow", ""))
+
+    def test_a_budget_with_a_leading_zero_is_a_number(self):
+        self.assertEqual(self.search(env={"SQLREVIEW_GUARD_BUDGET": "08"}), ("allow", ""))
+
+    def test_a_normal_search_inside_a_project_passes_and_stays_fast(self):
+        for tool in ("Grep", "Glob"):
+            for sub in ("src", "skills", "src/pkg"):
+                with self.subTest(tool=tool, path=sub):
+                    (decision, _), took = self.timed(tool=tool, path=sub)
+                    self.assertEqual(decision, "allow")
+                    self.assertLess(took, 2)
+
+    def test_more_than_200_links_is_denied_with_the_same_message(self):
+        links = self.root / "src" / "links"
+        links.mkdir()
+        for i in range(201):
+            (links / f"l{i}").symlink_to(self.root / "skills")
+        decision, reason = self.search()
+        self.assertEqual(decision, "deny")
+        self.assertIn("narrower path inside the project", reason)
+
+    def test_the_first_link_that_leads_to_raw_data_ends_the_check(self):
+        links = self.root / "src" / "links"
+        links.mkdir()
+        (links / "a_into_raw").symlink_to(self.root / "data" / "00_raw")
+        for i in range(150):
+            (links / f"z{i}").symlink_to(self.root / "skills")
+        decision, reason = self.search()
+        self.assertEqual(decision, "deny")
+        self.assertIn("data/00_raw", reason)
 
 
 class Wiring(unittest.TestCase):
