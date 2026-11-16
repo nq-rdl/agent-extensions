@@ -42,7 +42,7 @@ Lift has two entry points. Use the earlier one whenever a gap is known.
 
 - **Gap capture** runs before draft, from map or bootstrap. A verified source fact the library
   lacks, a request-local TypedTable, a request-local spec or a handler becomes a `candidate`
-  entry at once. Search the open library issues first and cite a match in the entry. Capture is
+  entry at once. Search the open library issues first and cite a match in the entry's `shortfall` text. Capture is
   silent and needs no human question. Close-out settles the classification later.
 - **Close-out** runs after analyse and before hand-off. It confirms every candidate, files the
   library work and records the delivery limitations.
@@ -110,7 +110,7 @@ The entry revision, not an unrelated newly appended candidate, binds the answer.
 Before filing, run a consumer fit check. Read the proposed library change against the
 request's own call sites, its pinned `framework_ref` and its output columns. A change that
 does not fit the request yet is a defect to fix in the issue before merge, not after. Record
-the result as one line in the entry evidence.
+the result as one line in the entry's `shortfall` text.
 
 Two ledger rules affect the order of work. One publish may move an entry up to two statuses,
 so a confirmed candidate can reach `filed` in a single publish when all evidence is present.

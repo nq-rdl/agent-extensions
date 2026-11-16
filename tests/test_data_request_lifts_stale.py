@@ -194,6 +194,7 @@ class UncoveredLocalUnits(unittest.TestCase):
         self.p.sql('pipeline.py', 'from qb import TypedTable\n\n'
                    'class LocalVisits(TypedTable):\n    pass\n\n'
                    'class CoveredLookup(TypedTable):\n    pass\n\n'
+                   'class WrappedVisits(\n    TypedTable,\n):\n    pass\n\n'
                    'class NotATable:\n    pass\n')
         self.doc = ledger()
         self.doc['lifts'][0]['local_units'] = ['CoveredLookup']
@@ -205,10 +206,10 @@ class UncoveredLocalUnits(unittest.TestCase):
         return json.loads(result.stdout)
 
     def test_local_typed_table_without_an_entry_is_reported(self):
-        self.assertEqual(self.uncovered()['uncovered'], ['LocalVisits'])
+        self.assertEqual(self.uncovered()['uncovered'], ['LocalVisits', 'WrappedVisits'])
 
     def test_need_text_naming_the_table_covers_it(self):
-        self.doc['lifts'][0]['need'] = 'LocalVisits current status'
+        self.doc['lifts'][0]['need'] = 'LocalVisits and WrappedVisits current status'
         self.p.write_json('pipeline.py', 'lifts.json', self.doc)
         self.assertEqual(self.uncovered()['uncovered'], [])
 

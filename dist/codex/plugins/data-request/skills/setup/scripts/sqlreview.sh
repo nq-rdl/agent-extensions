@@ -763,7 +763,7 @@ cmd_publish() (
         ([$old[0].lifts[] | select(.id == $new.id)][0]) as $prior |
         if $prior == null then .revision == 1 and .status == "candidate"
         else
-          if (.status | rank) < ($prior.status | rank) or (.status | rank) > (($prior.status | rank) + (if (.status | rank) <= 2 then 2 else 1 end)) then false
+          if (.status | rank) < ($prior.status | rank) or (.status | rank) > (($prior.status | rank) + (if (.status | rank) <= ("filed" | rank) then 2 else 1 end)) then false
           else (del(.status,.issue_url,.confirmed_by,.confirmed_at,.confirmed_revision,.revision,.release_evidence,.recomposition_evidence) ==
             ($prior | del(.status,.issue_url,.confirmed_by,.confirmed_at,.confirmed_revision,.revision,.release_evidence,.recomposition_evidence))) as $same |
           if $same then .revision == $prior.revision

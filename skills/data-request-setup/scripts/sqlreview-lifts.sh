@@ -98,6 +98,11 @@ cmd_lifts_stale() {
   jq -n --arg slug "$slug" --arg tag "$tag" --argjson entries "$entries" '{slug: $slug, tag: $tag, entries: $entries}'
 }
 
+_sr_typed_table_classes() { # FILE -> class names whose base list names TypedTable, wrapped lines included
+  local pat='class[[:space:]]+[A-Za-z_][A-Za-z0-9_]*[[:space:]]*\([^)]*TypedTable[^)]*\)'
+  tr '\n' ' ' < "$1" | grep -oE "$pat" | sed -E 's/^class[[:space:]]+([A-Za-z_][A-Za-z0-9_]*).*/\1/' || true
+}
+
 cmd_lifts_uncovered() { # SLUG -> request-local TypedTable classes that no ledger entry names
   [ $# -eq 1 ] || usage
   local slug="$1" ledger sql dir file names covered found='[]' name
@@ -112,7 +117,7 @@ cmd_lifts_uncovered() { # SLUG -> request-local TypedTable classes that no ledge
   for file in "$SR_ROOT/$sql" "$dir"/*.py; do
     [ -f "$file" ] && [ ! -L "$file" ] || continue
     names="$names
-$(sed -n -E 's/^[[:space:]]*class[[:space:]]+([A-Za-z_][A-Za-z0-9_]*)[[:space:]]*\([^)]*TypedTable[^)]*\).*/\1/p' "$file")"
+$(_sr_typed_table_classes "$file")"
   done
   # An entry covers a class when its local_units, need, shortfall or unit symbols name it as a whole token.
   covered="$(jq -c '[.lifts[] | ((.local_units // []) + [.need, .shortfall] + [(.units // [])[] | .symbol])
