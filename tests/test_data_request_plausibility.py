@@ -228,5 +228,43 @@ class PopulationScopeRoundTrip(unittest.TestCase):
                     self.assertEqual(final["open_questions"], questions)
 
 
+class VerdictProbeTemplate(unittest.TestCase):
+    def performance(self, tree):
+        return " ".join(path(tree, "guardrails", "references/performance.rst").read_text().split())
+
+    def test_template_is_present_and_self_checking(self):
+        for tree in TREES:
+            with self.subTest(tree=tree):
+                text = self.performance(tree)
+                section = text.split("Verdict probes", 2)[2]
+                for token in ("PASS", "FAIL", "NOT EXISTS, never NOT IN", "Cut labels before free text",
+                              "C0 source has rows", "canary", "Funnel form", "one indexed read",
+                              "not found by probe P<n>", "binary collation", "DATALENGTH", "Limit checks"):
+                    self.assertIn(token.lower(), section.lower())
+                self.assertNotIn("COUNT(", section)
+                self.assertNotIn(" NOT IN (", section)
+
+    def test_template_compares_one_type_and_handles_null(self):
+        for tree in TREES:
+            with self.subTest(tree=tree):
+                text = self.performance(tree)
+                section = text.split("Verdict probes", 2)[2]
+                # Both the C1 check and the canary need the NULL branch and the common type.
+                self.assertEqual(section.count("IS NULL AND d.v IS NULL"), 2)
+                self.assertEqual(section.count("DATALENGTH(CAST(d.v AS NVARCHAR(MAX)))"), 2)
+                self.assertNotRegex(section, r"NVARCHAR\((?!MAX\))")
+                self.assertNotIn("DATALENGTH(d.v)", section)
+                self.assertNotIn("DATALENGTH(s.lbl)", section)
+                self.assertNotIn("DATALENGTH(c.v)", section)
+
+    def test_plausibility_offers_the_verdict_before_the_count(self):
+        for tree in TREES:
+            with self.subTest(tree=tree):
+                text = self.performance(tree)
+                plaus = text.split("Pre-run plausibility", 1)[1]
+                self.assertLess(plaus.index("verdict probe"), plaus.index("count-only"))
+                self.assertIn("answer pass or fail", plaus)
+
+
 if __name__ == "__main__":
     unittest.main()

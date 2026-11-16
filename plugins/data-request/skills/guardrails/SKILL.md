@@ -263,6 +263,12 @@ Keep validation listings and the study-ID link table out of the delivery run. Us
 `scripts/run_extract.py` supports it: released scaffold runners (v0.5.0 and earlier)
 deliver a batch so marked. Delivered aggregates follow the assessment/approval.
 For probe and handover/open prose, read [Probe disclosure control](references/release.rst).
+Before any hand-over to the operator, read [references/operator-handover.rst](references/operator-handover.rst).
+It covers the branch, the sync to the pull request head, the head check, exact files, commit before push, never `git add -A`,
+and no probe through the extract runner. For a plausibility or checklist question, use the verdict probe in
+[references/performance.rst](references/performance.rst) by default: answer pass or fail, no numbers.
+A count reaches the agent only through a count exception that the Data Engineer approved for that probe before it ran.
+The agent never grants one. See "Default and count exception" in [references/release.rst](references/release.rst).
 Clinician and resource names are not personal information (governance ruling,
 2026-09-28); patient identifiers are. See "Personal information" in `release.rst`.
 

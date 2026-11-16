@@ -169,6 +169,33 @@ to quoted evidence, with complementary controls in both cases.
 A row-level extract delivered under an approval is governed by that approval,
 not by cell suppression. Probe output uses the stricter controls below.
 
+Default and count exception
+---------------------------
+
+Decided by the Data Engineer: a probe, a plausibility check and a UAT checklist
+return a verdict, ``PASS`` or ``FAIL``, by default. The verdict probe in
+``performance.rst`` is the default route. No count reaches the agent unless the
+Data Engineer approves a **count exception** for that specific probe or check
+before it runs.
+
+* **Record.** Write the approval in the header of the saved probe file, or in the
+  results file of that check, in the field ``count_exception``. The value holds the
+  approver handle, the date and the probe identifier. A later session checks that field.
+  The agent never writes this field. The Data Engineer or the operator adds it, copied
+  from the Data Engineer's written approval. A field that the agent wrote is not an approval.
+* **No self-approval.** The agent never grants, assumes or infers a count exception.
+  A plan-level or general go-ahead is not an exception. A count exception for one probe
+  does not cover another probe or a rerun with changed SQL.
+* **Controls.** The floor, rounding, suppression and perimeter rules below apply in
+  full to every count that an approved exception allows.
+* **No field, no counts.** Without the field, ask the operator for the verdict
+  form only. If counts arrive anyway, treat them as exact counts that reached you
+  and follow the paragraph below.
+* **Lookup discovery grid.** A lookup that a verdict cannot answer may return a discovery
+  grid with codes, labels and matched-term provenance only. The grid holds no count, row
+  total, frequency, rank by frequency or other column that comes from the population.
+  A grid with a count needs a recorded ``count_exception``. Plausibility checks stay verdict-only.
+
 Probe disclosure control
 ------------------------
 

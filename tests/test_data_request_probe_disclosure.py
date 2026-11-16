@@ -196,3 +196,61 @@ class ProbeDisclosure(unittest.TestCase):
         performance = (TREES[0] / "references/performance.rst").read_text()
         self.assertIn("release.rst#probe-disclosure-control", performance)
         self.assertIn("take MIN and MAX samples per group", performance)
+
+
+class VerdictFirstWording(unittest.TestCase):
+    ROOTS = ("skills/data-request-%s", "plugins/data-request/skills/%s",
+             "dist/codex/plugins/data-request/skills/%s")
+
+    def flat(self, root, leaf):
+        return " ".join((REPO / (root % leaf) / "SKILL.md").read_text().split())
+
+    def test_skills_offer_the_verdict_route_first(self):
+        wanted = (("validate", ("answer pass or fail, no numbers", "Verdict probes")),
+                  ("map", ("answer pass or fail, no numbers", "grain and join")),
+                  ("lookup", ("verdict probe first", "answer pass or fail, no numbers")),
+                  ("guardrails", ("answer pass or fail, no numbers", "verdict probe")))
+        for leaf, tokens in wanted:
+            for root in self.ROOTS:
+                text = self.flat(root, leaf)
+                for token in tokens:
+                    with self.subTest(leaf=leaf, root=root, token=token):
+                        self.assertIn(token, text)
+
+    def test_disclosure_rule_and_count_route_remain(self):
+        validate = self.flat(self.ROOTS[0], "validate")
+        self.assertIn("count-only distribution", validate)
+        self.assertIn("Probe disclosure control", validate)
+        self.assertIn("Use probe counts only when a recorded `count_exception` covers them",
+                      self.flat(self.ROOTS[0], "map"))
+
+
+class CountExceptionRule(unittest.TestCase):
+    def test_verdict_by_default_and_count_only_by_recorded_approval(self):
+        for tree in TREES:
+            text = " ".join((tree / "references/release.rst").read_text().split())
+            section = text.split("Default and count exception", 1)[1].split("Perimeter and fact kinds", 1)[0]
+            with self.subTest(tree=str(tree)):
+                for token in ("Decided by the Data Engineer", "return a verdict", "by default",
+                              "No count reaches the agent unless the Data Engineer approves a **count exception**",
+                              "for that specific probe or check before it runs",
+                              "``count_exception``", "approver handle, the date and the probe identifier",
+                              "The agent never grants, assumes or infers a count exception",
+                              "A plan-level or general go-ahead is not an exception",
+                              "apply in full to every count that an approved exception allows"):
+                    self.assertIn(token, section)
+
+    def test_skills_state_the_default_and_no_self_approval(self):
+        for tree in TREES:
+            text = " ".join((tree / "SKILL.md").read_text().split())
+            with self.subTest(tree=str(tree)):
+                self.assertIn("Data Engineer approved for that probe before it ran", text)
+                self.assertIn("The agent never grants one", text)
+        for root in ("skills/data-request-%s", "plugins/data-request/skills/%s",
+                     "dist/codex/plugins/data-request/skills/%s"):
+            for leaf in ("validate", "map"):
+                text = (REPO / (root % leaf) / "SKILL.md").read_text()
+                with self.subTest(root=root, leaf=leaf):
+                    self.assertIn("`count_exception`", text)
+        lookup = " ".join((REPO / "skills/data-request-lookup/SKILL.md").read_text().split())
+        self.assertIn("count exception recorded and approved by the Data Engineer", lookup)
