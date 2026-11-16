@@ -55,9 +55,9 @@ Run ``git status`` and ``git diff`` and confirm each of these:
 * ``answers.yaml`` and ``answers.intake.json`` are unchanged.
 * ``.copier-answers.yml`` names the scaffold, the chosen tag and the three values that you passed.
   A seed value that came through is a failed render. Render again.
-* The seed's workflow files under ``.github/workflows/`` are unchanged. Check ``release.yaml``,
-  ``template-sync.yml`` and ``copier-runner.yml`` when they exist. Triage lists each file that a
-  fresh render drops, as ``repositories.rst`` describes.
+* Intake only: the seed's workflow files under ``.github/workflows/`` are unchanged. Check
+  ``release.yaml``, ``template-sync.yml`` and ``copier-runner.yml`` when they exist. A triage
+  render drops some files on purpose and lists each one, as ``repositories.rst`` describes.
 * The rendered ``scripts/validate_answers.py`` passes. If the rendered ``scripts/`` has no
   ``analyst_intake.py``, report that the sidecar was not validated.
 
