@@ -149,6 +149,38 @@ class HandoffContracts(unittest.TestCase):
                 self.assertIn("analyst", body.lower())
 
 
+    def test_gate_waives_a_red_check_only_with_a_human_waiver_for_the_head(self):
+        # #570: a known CI failure needs a waiver the gate can verify, written by a human, for that head.
+        handoff = " ".join((REPO / "skills/data-request-triage/references/handoff.rst").read_text().split())
+        for token in ('sqlreview.sh" ledger waivers', "gate_waivers", "waived", "lapsed",
+                      "author is the login in ``by``", "Never write a waiver on your own",
+                      "A new failure that no waiver names stops the hand-off",
+                      "List each waiver in the hand-off comment",
+                      "Never write or post that comment for the human"):
+            self.assertIn(token, handoff)
+
+    def test_ready_for_review_has_a_named_owner_and_the_pr_stays_draft_until_then(self):
+        handoff = " ".join((REPO / "skills/data-request-triage/references/handoff.rst").read_text().split())
+        self.assertNotIn("Continue only when the PR is out of draft", handoff)
+        for token in ("**Ready.**", "The human marks the PR ready for review",
+                      "only on an explicit instruction from the human"):
+            self.assertIn(token, handoff)
+
+    def test_record_comes_before_the_comment_so_the_named_head_holds(self):
+        handoff = " ".join((REPO / "skills/data-request-triage/references/handoff.rst").read_text().split())
+        record = handoff.index("**Record**")
+        comment = handoff.index("**Comment**")
+        self.assertLess(record, comment)
+        self.assertIn("names the head that includes the ledger commit", handoff)
+
+    def test_pr_text_refresh_and_output_coverage_are_gate_steps(self):
+        # #568: every extract output appears in the runbook, the data dictionary and the UAT checklist.
+        handoff = " ".join((REPO / "skills/data-request-triage/references/handoff.rst").read_text().split())
+        for token in ("**Refresh**", "PR title and body", "-- @extract:", "runbook", "data dictionary",
+                      "UAT checklist", "delivery kind", "A missing or extra output stops the hand-off"):
+            self.assertIn(token, handoff)
+
+
 class CommittedHandoffEvidence(unittest.TestCase):
     """Execute the documented gate against a checked PR SHA, not merely local HEAD."""
 
