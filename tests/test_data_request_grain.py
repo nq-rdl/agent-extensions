@@ -259,7 +259,7 @@ class GrainRendering(unittest.TestCase):
                          "confirmed_at": "2026-09-29T10:00:00Z", "confirmed_revision": 1,
                          "decided": {"by": "engineer-login", "role": "Data Engineer", "at": "2026-09-29",
                                      "source": "admissions.csv at v1.0.0"}}
-                drift = {"id": "L-grain-answers", "text": "Answers says Patient; the output has one row per admission.",
+                drift = {"id": "L-grain-answers", "text": "Answers says Patient. The output has one row per admission.",
                          "rationale": "Prior delivery admissions.csv at v1.0.0 establishes admission grain.",
                          "location": None, "status": "confirmed", "confirmed_by": "engineer-login",
                          "confirmed_at": "2026-09-29T10:00:00Z", "confirmed_revision": 1}
