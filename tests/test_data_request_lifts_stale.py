@@ -186,5 +186,38 @@ class StaleGuidance(unittest.TestCase):
                 self.assertNotIn('postdate v0.6.0', text)
 
 
+class UncoveredLocalUnits(unittest.TestCase):
+    def setUp(self):
+        self.tmp = tempfile.TemporaryDirectory()
+        self.addCleanup(self.tmp.cleanup)
+        self.p = Project(self.tmp.name)
+        self.p.sql('pipeline.py', 'from qb import TypedTable\n\n'
+                   'class LocalVisits(TypedTable):\n    pass\n\n'
+                   'class CoveredLookup(TypedTable):\n    pass\n\n'
+                   'class NotATable:\n    pass\n')
+        self.doc = ledger()
+        self.doc['lifts'][0]['local_units'] = ['CoveredLookup']
+        self.p.write_json('pipeline.py', 'lifts.json', self.doc)
+
+    def uncovered(self):
+        result = run(['lifts-uncovered', 'pipeline.py'], self.p.root)
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        return json.loads(result.stdout)
+
+    def test_local_typed_table_without_an_entry_is_reported(self):
+        self.assertEqual(self.uncovered()['uncovered'], ['LocalVisits'])
+
+    def test_need_text_naming_the_table_covers_it(self):
+        self.doc['lifts'][0]['need'] = 'LocalVisits current status'
+        self.p.write_json('pipeline.py', 'lifts.json', self.doc)
+        self.assertEqual(self.uncovered()['uncovered'], [])
+
+    def test_report_writes_nothing(self):
+        before = {str(p): p.read_bytes() for p in (self.p.root / '.sqlreview').rglob('*') if p.is_file()}
+        self.uncovered()
+        after = {str(p): p.read_bytes() for p in (self.p.root / '.sqlreview').rglob('*') if p.is_file()}
+        self.assertEqual(before, after)
+
+
 if __name__ == '__main__':
     unittest.main()

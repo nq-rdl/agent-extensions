@@ -43,6 +43,7 @@
 #   guard string-sql on|off                    set only guard.require_lift_for_string_sql in config.json
 #   lifts-stale SLUG --tag TAG                  read-only JSON nudges for units newly present at a stable library tag
 #                                              uses authenticated gh GETs; unavailable evidence is unknown, never absent
+#   lifts-uncovered SLUG                        read-only JSON list of request-local TypedTable classes no ledger entry names
 #   fingerprint SQL                            committed SQL at a clean HEAD: hashes, git_commit, git_dirty:false
 #   materialize SLUG scope|review REVISION OUTPUT  git show + SHA check of that revision into an external file; caller deletes it
 #   snapshot SLUG SQL                          verify the final review against the committed SQL; no SQL writes
@@ -762,7 +763,7 @@ cmd_publish() (
         ([$old[0].lifts[] | select(.id == $new.id)][0]) as $prior |
         if $prior == null then .revision == 1 and .status == "candidate"
         else
-          if (.status | rank) < ($prior.status | rank) or (.status | rank) > (($prior.status | rank) + 1) then false
+          if (.status | rank) < ($prior.status | rank) or (.status | rank) > (($prior.status | rank) + (if (.status | rank) <= 2 then 2 else 1 end)) then false
           else (del(.status,.issue_url,.confirmed_by,.confirmed_at,.confirmed_revision,.revision,.release_evidence,.recomposition_evidence) ==
             ($prior | del(.status,.issue_url,.confirmed_by,.confirmed_at,.confirmed_revision,.revision,.release_evidence,.recomposition_evidence))) as $same |
           if $same then .revision == $prior.revision
@@ -1787,6 +1788,7 @@ case "$cmd" in
   roles) cmd_roles "$@" ;;
   guard) cmd_guard "$@" ;;
   lifts-stale) cmd_lifts_stale "$@" ;;
+  lifts-uncovered) cmd_lifts_uncovered "$@" ;;
   fingerprint) cmd_fingerprint "$@" ;;
   materialize) cmd_materialize "$@" ;;
   snapshot) cmd_snapshot "$@" ;;

@@ -46,6 +46,36 @@ customised template; ``status`` lists missing templates with the fix command.
 No published entry means no hand SQL. Classification may remain null during
 capture; close-out settles it. A draft alone does not satisfy the hook.
 
+Workaround location
+-------------------
+
+``workaround.lines`` holds one ``[first, last]`` range. When the workaround spans
+several places, add ``extra_lines``, a nonempty array of further ranges. Add
+``anchor``, a nonempty string naming a CTE or marker, when edits will move the lines.
+Changing any of these fields increments the entry revision.
+
+Status steps per publish
+------------------------
+
+The ledger moves forward through ``candidate``, ``confirmed``, ``filed``,
+``released`` and ``recomposed``. One publish may move an entry up to two statuses
+when the target is ``filed`` or earlier. A confirmed candidate therefore reaches
+``filed`` in one publish when the draft carries the classification, the human
+confirmation for the current entry revision and the issue URL. Moves to ``released``
+and ``recomposed`` stay one status per publish, because each needs its own evidence.
+No publish moves an entry backward.
+
+Gap capture and uncovered local units
+-------------------------------------
+
+Capture a candidate before draft, from map or bootstrap, as soon as a gap is
+verified. Draft adds a candidate for each request-local TypedTable, spec or handler
+it writes. Run ``sqlreview.sh lifts-uncovered SLUG`` to list request-local TypedTable
+classes in the pipeline file and its sibling ``.py`` files that no entry names. The
+command is read-only and prints ``{slug, uncovered}``. An entry covers a class when
+its ``need``, ``shortfall``, a unit ``symbol`` or its optional ``local_units`` array
+names that class as a whole word. ``local_units`` is a nonempty array of identifiers.
+
 Read-only release stale check
 -----------------------------
 

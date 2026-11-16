@@ -125,15 +125,67 @@ class Lifts(unittest.TestCase):
         self.publish()
         self.confirm()
         e = self.doc['lifts'][0]
-        e.update(status='filed', issue_url='https://github.com/nq-rdl/query-builder-plugins/issues/26')
+        e.update(status='released', issue_url='https://github.com/nq-rdl/query-builder-plugins/issues/26',
+                 release_evidence={'version': 'v0.2.0', 'url': 'https://example.org/r'})
         self.publish(expected=4)
         e.update(status='confirmed', issue_url=None)
+        e.pop('release_evidence')
         self.publish()
         self.doc['revision'] += 1
         self.doc['lifts'] = []
         self.publish()
         history = self.p.review_dir(self.doc['slug']) / 'history/lifts/2.json'
         self.assertEqual(json.loads(history.read_text())['lifts'][0]['status'], 'confirmed')
+
+    def test_candidate_reaches_filed_in_one_publish_with_all_evidence(self):
+        self.publish()
+        e = self.doc['lifts'][0]
+        e.update(classification='existing-unit-gap', revision=2, status='filed',
+                 confirmed_by='Test human', confirmed_at='2026-09-22T00:00:00Z', confirmed_revision=2,
+                 issue_url='https://github.com/nq-rdl/query-builder-plugins/issues/26')
+        self.doc['revision'] += 1
+        self.publish()
+        status = json.loads(self.command('status', '--json').stdout)
+        self.assertEqual(status['reviews'][0]['lifts'], {'filed': 1})
+
+    def test_one_publish_cannot_skip_past_filed_or_drop_evidence(self):
+        self.publish()
+        e = self.doc['lifts'][0]
+        self.doc['revision'] += 1
+        e.update(classification='existing-unit-gap', revision=2, status='released',
+                 confirmed_by='Test human', confirmed_at='2026-09-22T00:00:00Z', confirmed_revision=2,
+                 issue_url='https://github.com/nq-rdl/query-builder-plugins/issues/26',
+                 release_evidence={'version': 'v0.2.0', 'url': 'https://example.org/r'})
+        self.publish(expected=4)
+        e.update(status='filed', issue_url=None)
+        self.publish(expected=4)
+
+    def test_workaround_takes_several_ranges_and_an_anchor(self):
+        self.doc['lifts'][0]['workaround'].update(extra_lines=[[5, 8], [12, 12]], anchor='cohort_cte')
+        self.publish()
+        self.command('render', self.doc['slug'], 'lifts')
+        text = (self.p.review_dir(self.doc['slug']) / 'lifts.md').read_text()
+        self.assertIn('5-8', text)
+        self.assertIn('cohort_cte', text)
+
+    def test_workaround_rejects_malformed_extra_ranges_and_anchor(self):
+        for field, value in [('extra_lines', [[9, 3]]), ('extra_lines', 'x'), ('extra_lines', []),
+                             ('anchor', ''), ('anchor', 5)]:
+            with self.subTest(field=field, value=value):
+                self.doc = ledger()
+                self.doc['lifts'][0]['workaround'][field] = value
+                self.publish(expected=4)
+
+    def test_publish_step_rule_and_entry_points_are_documented(self):
+        rst = ' '.join((REPO / 'skills/data-request-setup/references/lifts.rst').read_text().split())
+        skill = ' '.join((REPO / 'skills/data-request-lift/SKILL.md').read_text().split())
+        self.assertIn('One publish may move an entry up to two statuses', rst)
+        self.assertIn('extra_lines', rst)
+        self.assertIn('lifts-uncovered', rst)
+        self.assertIn('## Entry points', skill)
+        self.assertIn('Gap capture', skill)
+        self.assertIn('Close-out', skill)
+        self.assertIn('open library issues', skill)
 
     def test_released_and_recomposed_require_evidence(self):
         self.publish()

@@ -45,7 +45,7 @@ $cfgs[0] as $cfg |
   recurring: ((.recurring // false) | tostring),
   definition_lift_candidate: (($cfg.definitions.lift_candidate // "") | tostring),
   lifts_list: ((.lifts // []) | if length == 0 then "_none recorded_" else map(
-    "## \(.id): \(.need)\n\nClassification: \(.classification // "unclassified") · status: \(.status)\n\nLibrary: \(.library) @ \(.pinned_version)\n\nInspected: \(.looked_in | map(.path + " @ " + .revision) | join(", "))\n\nShortfall: \(.shortfall)\n\nWorkaround: `\(.workaround.file)` lines \(lines(.workaround.lines))\n\nIssue: \(.issue_url // "none")\n\nConfirmed: \(.confirmed_by // "pending") · \(.confirmed_at // "") · revision \(.confirmed_revision // "")"
+    "## \(.id): \(.need)\n\nClassification: \(.classification // "unclassified") · status: \(.status)\n\nLibrary: \(.library) @ \(.pinned_version)\n\nInspected: \(.looked_in | map(.path + " @ " + .revision) | join(", "))\n\nShortfall: \(.shortfall)\n\nWorkaround: `\(.workaround.file)` lines \(([.workaround.lines] + (.workaround.extra_lines // []) | map(lines(.)) | join(", ")))\((if .workaround.anchor then " (anchor: " + .workaround.anchor + ")" else "" end))\n\nIssue: \(.issue_url // "none")\n\nConfirmed: \(.confirmed_by // "pending") · \(.confirmed_at // "") · revision \(.confirmed_revision // "")"
   ) | join("\n\n") end),
   title: ((.title // .slug) | tostring),
   slug: (.slug | tostring),
