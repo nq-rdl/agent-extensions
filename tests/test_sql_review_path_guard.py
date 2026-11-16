@@ -354,7 +354,7 @@ SQLREVIEW_INPUTS = {
     "move": [["sql/v1/q.sql", D]],
     "criteria": [[D]],
 }
-SQLREVIEW_NOINPUT = {"init", "status", "roles", "guard", "lifts-stale", "materialize", "delta", "impact",
+SQLREVIEW_NOINPUT = {"init", "status", "version", "roles", "guard", "lifts-stale", "materialize", "delta", "impact",
                      "questions", "migrate-questions", "render", "discard-draft"}
 RELEASE_INPUTS = {"check": [[D]], "render": [[D]], "amend-check": [[D], ["--name", "r", D]]}
 # criteria reads a --fingerprints file of four sha256 strings that it validates strictly, so no value can pass through.

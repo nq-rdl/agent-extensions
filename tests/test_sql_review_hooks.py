@@ -424,6 +424,111 @@ class PreflightHook(unittest.TestCase):
             self.assertEqual((r.returncode, r.stdout.strip()), (0, ""))
 
 
+def build_digest(root):
+    """The build digest that `sqlreview.sh version` prints, computed independently.
+
+    One "<sha256>  <path>" line per regular file under skills/, hooks/ and the manifest directory, sorted by
+    path in byte order, then the SHA-256 of those lines. Files the host adds at the plugin root (an in-use
+    marker) are outside the digest, so an installed copy matches the committed tree.
+    """
+    import hashlib
+    root = Path(root)
+    rels = sorted(str(f.relative_to(root)) for d in ("skills", "hooks", ".claude-plugin", ".codex-plugin")
+                  if (root / d).is_dir() for f in (root / d).rglob("*") if f.is_file())
+    manifest = "".join(f"{hashlib.sha256((root / r).read_bytes()).hexdigest()}  {r}\n" for r in rels)
+    return hashlib.sha256(manifest.encode()).hexdigest()
+
+
+class PluginBuild(unittest.TestCase):
+    """`sqlreview.sh version` and the preflight hook name the loaded plugin build (version and content digest)."""
+
+    VERSION = (REPO / "VERSION").read_text().strip()
+
+    def version(self, root, *args, env=None):
+        e = {k: v for k, v in os.environ.items() if not k.startswith(("SQLREVIEW_", "DATA_REQUEST_"))}
+        e.update(env or {})
+        return subprocess.run(["bash", str(Path(root) / "skills/setup/scripts/sqlreview.sh"), "version", *args],
+                              capture_output=True, text=True, env=e, timeout=60, cwd=root)
+
+    def installed(self, tmp):
+        """A copy of the plugin as the host caches it, with a marker file at its root."""
+        dest = Path(tmp) / "cache" / "data-request"
+        shutil.copytree(PLUGIN, dest)
+        (dest / ".in_use").write_text("session\n")
+        return dest
+
+    def test_version_prints_the_plugin_version_and_build_digest(self):
+        r = self.version(PLUGIN)
+        self.assertEqual(r.returncode, 0, r.stderr)
+        self.assertEqual(r.stdout, f"data-request {self.VERSION} build {build_digest(PLUGIN)}\n")
+        j = json.loads(self.version(PLUGIN, "--json").stdout)
+        self.assertEqual((j["plugin"], j["version"], j["build"]), ("data-request", self.VERSION, build_digest(PLUGIN)))
+
+    def test_an_installed_copy_has_the_same_build_and_an_edit_changes_it(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            dest = self.installed(tmp)
+            self.assertEqual(self.version(dest).stdout, self.version(PLUGIN).stdout)
+            with (dest / "skills/setup/SKILL.md").open("a") as fh:
+                fh.write("\nlocal edit\n")
+            r = self.version(dest)
+            self.assertEqual(r.returncode, 0, r.stderr)
+            self.assertNotIn(build_digest(PLUGIN), r.stdout)
+            self.assertIn(build_digest(dest), r.stdout)
+
+    def test_expect_compares_a_digest_prefix(self):
+        digest = build_digest(PLUGIN)
+        for expect in (digest, digest[:12], digest[:12].upper()):
+            with self.subTest(expect=expect):
+                r = self.version(PLUGIN, "--expect", expect)
+                self.assertEqual(r.returncode, 0, r.stdout + r.stderr)
+        r = self.version(PLUGIN, "--expect", "0" * 12)
+        self.assertEqual(r.returncode, 10, r.stdout + r.stderr)
+        self.assertIn("does not match", r.stderr)
+        for bad in ("abc", "not-a-digest-value", ""):
+            with self.subTest(bad=bad):
+                self.assertEqual(self.version(PLUGIN, "--expect", bad).returncode, 1)
+
+    def test_the_canonical_source_is_not_a_plugin_build(self):
+        r = subprocess.run(["bash", str(SKILLS_SETUP / "sqlreview.sh"), "version"], capture_output=True, text=True)
+        self.assertEqual(r.returncode, 0, r.stderr)
+        self.assertIn("not a plugin build", r.stdout)
+        r = subprocess.run(["bash", str(SKILLS_SETUP / "sqlreview.sh"), "version", "--expect", "0" * 12],
+                           capture_output=True, text=True)
+        self.assertEqual(r.returncode, 2, r.stdout + r.stderr)
+
+    def test_the_preflight_hook_names_the_build(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            p = Project(tmp)
+            ctx = decision(run_hook(PREFLIGHT, {"cwd": str(p.root)}, env_for()))["additionalContext"]
+            self.assertIn(f"Plugin build: data-request {self.VERSION} build {build_digest(PLUGIN)[:12]}", ctx)
+            self.assertNotIn("does not match", ctx)
+            ctx = decision(run_hook(PREFLIGHT, {"cwd": str(p.root)},
+                                    env_for(DATA_REQUEST_EXPECT_BUILD=build_digest(PLUGIN)[:12])))["additionalContext"]
+            self.assertNotIn("does not match", ctx)
+
+    def test_the_preflight_hook_warns_when_the_build_differs_from_the_expected_build(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            # Even a project with no SQL and no .sqlreview/ gets the warning: the check is about the session.
+            p = Project(tmp, init=False)
+            ctx = decision(run_hook(PREFLIGHT, {"cwd": str(p.root)},
+                                    env_for(DATA_REQUEST_EXPECT_BUILD="0" * 12)))["additionalContext"]
+            self.assertIn("does not match DATA_REQUEST_EXPECT_BUILD", ctx)
+            self.assertIn(build_digest(PLUGIN)[:12], ctx)
+
+    def test_status_warns_on_stderr_when_the_build_differs(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            p = Project(tmp)
+            helper = PLUGIN / "skills/setup/scripts/sqlreview.sh"
+            e = {k: v for k, v in os.environ.items() if not k.startswith(("SQLREVIEW_", "DATA_REQUEST_"))}
+            r = subprocess.run(["bash", str(helper), "status"], cwd=p.root, capture_output=True, text=True,
+                               env=dict(e, DATA_REQUEST_EXPECT_BUILD="0" * 12))
+            self.assertEqual(r.returncode, 0, r.stderr)
+            self.assertIn("does not match DATA_REQUEST_EXPECT_BUILD", r.stderr)
+            self.assertNotIn("DATA_REQUEST", r.stdout)
+            r = subprocess.run(["bash", str(helper), "status"], cwd=p.root, capture_output=True, text=True, env=e)
+            self.assertNotIn("DATA_REQUEST", r.stderr)
+
+
 class PluginCopies(unittest.TestCase):
     def test_hook_copies_match_canonical(self):
         for name in ("data-request-guard.sh", "data-request-preflight.sh"):

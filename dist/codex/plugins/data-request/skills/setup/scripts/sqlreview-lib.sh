@@ -636,12 +636,31 @@ sr_commit_first() { # <sql_path>
   else printf 'commit the uncommitted source changes (git status), then '; fi
 }
 
+# True when a stored project-relative path passes the data/ and sql/ rules of sr_policy_under, read from its
+# spelling only. Status must not canonicalise (the 5-second hook budget), and every helper that later takes
+# the path applies the full policy. A case pattern and a bash regex, so it starts no process.
+sr_reviewed_rel() { # <relative path>
+  local first second re='^v[0-9]+([.-][0-9]+)*$'
+  first="${1%%/*}"
+  case "$1" in */*) second="${1#*/}"; second="${second%%/*}" ;; *) second="" ;; esac
+  case "$first" in
+    [Dd][Aa][Tt][Aa]) return 1 ;;
+    [Ss][Qq][Ll]) [[ "$second" =~ $re ]] || return 1 ;;
+  esac
+  return 0
+}
+
 # The next command for one review directory, on one line (#514). Derived only from records that
 # already exist: the state, scope.json and its recorded SQL binding (sql_sha256), the root answers.intake.json
 # and explain.json. A bound scope whose SQL body moved on, whose imported analyst decisions no
 # longer match the sidecar, or (for the scope that carries criteria_status) whose research criteria
 # moved on, names bootstrap as the rescope step. Cheap: a few jq and hash calls,
 # because status runs from a SessionStart hook with a 5-second timeout.
+# The caller sets two flags once per run or per review, so this function starts no process for them:
+#   SR_HANDOFF=1     an entry of .sqlreview/ledger.json has a handoff object (the triage hand-off is recorded)
+#   SR_LIFTS_OPEN=1  this review's lifts.json has a candidate or confirmed entry (not yet closed out)
+# A current review names the operator run, UAT and the hand-off before explain, and open lift entries first.
+# A bound SQL path that the path guard refuses names the move into sql/v<N>/ before any other step.
 sr_next() { # <slug> <state> <sql_path>
   local d="$SR_REVIEWS/$1" state="$2" sql="$3" scope srev="" bound="" intake="" why="" gap="" follow="" ex pre=""
   # The path is free text from the record. A hint that names it is a paste-ready command, so an unsafe
@@ -660,6 +679,12 @@ sr_next() { # <slug> <state> <sql_path>
     lifts) printf '/data-request:lift to close out the lift ledger\n'; return 0 ;;
     missing) printf "sqlreview.sh move '%s' <new path> if the SQL moved\n" "$sql"; return 0 ;;
   esac
+  # Every helper that takes this path refuses it, so bootstrap or analyse on it would stop with exit 2.
+  if [ -n "$sql" ] && [ -f "$SR_ROOT/$sql" ] && ! sr_reviewed_rel "$sql"; then
+    printf "%s is outside a reviewed sql/v<N>/ directory, so the helpers refuse it: git mv %s sql/v<N>/<name>_request.sql, then run sqlreview.sh move '%s' sql/v<N>/<name>_request.sql\n" \
+      "$sql" "$sql" "$sql"
+    return 0
+  fi
   scope="$d/scope.json"
   if [ -f "$scope" ]; then
     local sidecar="$SR_ROOT/answers.intake.json" prog='
@@ -708,6 +733,10 @@ EOF2
       if [ -f "$d/review.json" ]; then follow="/data-request:analyse $sql --update"
       elif [ -f "$SR_ROOT/$sql" ]; then follow="/data-request:analyse $sql"
       else follow="/data-request:draft to write $sql"; fi
+      # An intake change alone may need new SQL. A draft after the rescope would change the body and name a
+      # second rescope, so the hint offers the draft first.
+      [ "$why" != "The analyst intake" ] ||
+        follow="$follow (when the new intake needs SQL changes, run /data-request:draft first, so one rescope covers both)"
       printf '%s changed after scope revision %s%s: %srun /data-request:bootstrap %s to publish scope revision %s, then %s\n' \
         "$why" "$srev" "$gap" "$pre" "$sql" "$((srev + 1))" "$follow"
       return 0
@@ -729,13 +758,58 @@ EOF2
           if ($e[0].sql_sha256 == $r[0].sql_sha256 and $e[0].review_revision == $r[0].revision)
           then (if $e[0].completed == true then "done" else "partial" end) else "" end' 2>/dev/null)"
       fi
+      # Open lift entries are closed out first. A walkthrough marker means the hand-off already happened.
+      # Otherwise explain waits for the hand-off that triage records in the ledger.
+      [ "${SR_LIFTS_OPEN:-0}" != 1 ] || printf '/data-request:lift to close out the open lift entries, then '
       case "$ex" in
         done) printf '/data-request:release <candidate ref> after the analyst accepts the explained SQL\n' ;;
         partial) printf '/data-request:explain %s to resume the walkthrough\n' "$sql" ;;
-        *) printf '/data-request:explain %s to walk the analyst through the review\n' "$sql" ;;
+        *)
+          if [ "${SR_HANDOFF:-0}" = 1 ]; then printf '/data-request:explain %s to walk the analyst through the review\n' "$sql"
+          else
+            printf 'the authorised operator run of %s and UAT, then /data-request:triage to record the hand-off in the ledger, then /data-request:explain %s\n' \
+              "$sql" "$sql"
+          fi ;;
       esac ;;
     *) printf '\n' ;;
   esac
+}
+
+# The plugin tree this helper runs from (<root>/skills/setup/scripts), when that root holds a Claude or Codex
+# plugin manifest. Prints nothing and returns 1 for the canonical source checkout, which is not a build.
+sr_plugin_root() {
+  local root
+  root="$(cd "$SR_SCRIPT_DIR/../../.." 2>/dev/null && pwd -P)" || return 1
+  [ -f "$root/.claude-plugin/plugin.json" ] || [ -f "$root/.codex-plugin/plugin.json" ] || return 1
+  printf '%s\n' "$root"
+}
+
+# The build digest of a plugin tree: one "<sha256>  <path>" line for each regular file under skills/, hooks/
+# and the manifest directory, sorted by path in byte order, then the SHA-256 of those lines. It depends on
+# file content only, so the committed plugins/ tree at a commit and an installed copy of it give one value.
+# Files the host adds at the plugin root (an in-use marker) are outside it. One hash process for all files.
+sr_build_digest() { # <plugin root>
+  local h hasher
+  if command -v sha256sum >/dev/null 2>&1; then hasher="sha256sum"
+  elif command -v shasum >/dev/null 2>&1; then hasher="shasum -a 256"
+  else sr_die 2 "neither sha256sum nor shasum is available"; fi
+  h="$( (cd "$1" || exit 2
+         set -o pipefail
+         dirs=""
+         for d in skills hooks .claude-plugin .codex-plugin; do [ ! -d "$d" ] || dirs="$dirs $d"; done
+         [ -n "$dirs" ] || exit 2
+         # shellcheck disable=SC2086
+         find $dirs -type f -print | LC_ALL=C sort | tr '\n' '\000' | xargs -0 $hasher | $hasher) 2>/dev/null )" || return 2
+  printf '%s\n' "${h%% *}"
+}
+
+# A DATA_REQUEST_EXPECT_BUILD value in lower case when it holds 12 to 64 hexadecimal characters, else nothing.
+sr_build_expect() { # <value>
+  local v
+  v="$(printf '%s' "$1" | tr '[:upper:]' '[:lower:]')"
+  case "$v" in ""|*[!0-9a-f]*) return 1 ;; esac
+  [ "${#v}" -ge 12 ] && [ "${#v}" -le 64 ] || return 1
+  printf '%s\n' "$v"
 }
 
 # Amend gate: the one validator of an amendment record. The evidence hold (release.sh rl_amend_hold),
