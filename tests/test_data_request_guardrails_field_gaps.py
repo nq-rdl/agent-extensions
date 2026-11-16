@@ -26,7 +26,8 @@ LIFTS_COPIES = (
     REPO / "dist" / "codex" / "plugins" / "data-request" / "skills" / "setup" / "references" / "lifts.rst",
 )
 REFERENCES = ("performance.rst", "sources.rst", "checklist.rst", "release.rst", "modelling.rst",
-              "library.rst", "decision-authority.rst", "grain.rst", "delivery.rst", "supplied-cohorts.rst")
+              "library.rst", "decision-authority.rst", "grain.rst", "delivery.rst", "supplied-cohorts.rst",
+              "house-conventions.rst")
 # The sentence guardrails, lifts.rst and map share for proposal-only entries (#372).
 PROPOSAL_ONLY = ("A proposal-only entry authorises no hand SQL: none is committed or run, "
                  "except exempt probes, until a writable run publishes the entry.")

@@ -28,6 +28,7 @@ Ordinary composition needs no `.sqlreview/` setup; hand SQL needs the lift ledge
 
 Proceed on evidenced technical choices; only unresolved authority questions block dependent work.
 Read [references/decision-authority.rst](references/decision-authority.rst) for ownership/provenance, batched questions and narrow scope; no tool permission or confirmation is granted. Read [references/grain.rst](references/grain.rst) to settle grain from intake/prior-delivery/element evidence, preserve finer outputs and report drift once; bare `Patient` is unconfirmed.
+Read [references/house-conventions.rst](references/house-conventions.rst) at bootstrap and before drafting for decision owners, read isolation, naming and test rules.
 
 ## House defaults
 

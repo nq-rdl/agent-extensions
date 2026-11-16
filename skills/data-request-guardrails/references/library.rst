@@ -41,7 +41,9 @@ Check these, in this order:
 #. **Code lists.** Use ``create_code_set_table`` and the child's documented code-list
    route. Reference code values are schema, so never invent a config format for them.
 #. **Schema extraction.** Use ``extract_mssql_schema.py`` for column metadata before
-   you read a table by hand.
+   you read a table by hand. It is ``scripts/extract_mssql_schema.py`` in the
+   query-builder repository at the pinned tag. It is not part of the installed package,
+   so read or run it from a checkout of that tag.
 #. **Coded result rows.** A multi-select or per-option answer often has its own coded
    rows. Check for them and for ``string_agg`` before you parse concatenated text with
    ``LIKE`` terms.
