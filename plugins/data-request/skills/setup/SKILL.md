@@ -81,8 +81,19 @@ On a fresh project or a re-run, when the request forbids hand-written SQL, tell 
 `guard.require_lift_for_string_sql` in `config.json` (default `false`). When `true`, the guard hook
 denies a Python or SQL write that passes a same-line f-string or concatenation to `execute`,
 `executemany`, `query` or `read_sql`, unless a lift ledger entry names the file. It is experimental
-and a reminder, not a sandbox: read `references/lifts.rst` (*Experimental write guard*) first, and
-measure false positives on three backlog enquiries before enabling it. Enable it only after the
+and a reminder, not a sandbox: read `references/lifts.rst` (*Experimental write guard*) first.
+Before you enable it, measure false positives on three backlog enquiries. Ask the engineer to name
+the repositories of three earlier requests. Run the guard's line pattern over each one and show the
+engineer the file and line numbers only:
+
+```bash
+git -C "<earlier request repository>" grep -nEi '(execute|executemany|query|read_sql)[[:space:]]*\(' -- '*.py' '*.sql' |
+  grep -Ei '(select|with|insert|update|delete|merge)[[:space:]]' |
+  grep -E "\([[:space:]]*([fF][rR]?|[rR][fF])[\"']|[\"'][[:space:]]*\+" | cut -d: -f1,2
+```
+
+A false positive is a hit that the engineer says is not SQL built from strings. With fewer than
+three earlier repositories, measure on those that exist and say so. Enable it only after the
 engineer confirms (AskUserQuestion; with `--yes`, report it and leave it off), through the helper:
 
 ```bash
@@ -179,6 +190,13 @@ values. `move OLD NEW` still accepts a refused OLD path, because that path is on
 the record and is never read. An existing record can therefore move into a reviewed directory.
 `status` still lists such records. To customise report sections, edit the
 project templates; SQL glob filtering and section flags are not configuration options.
+
+`publish` runs `lint` and `lint --ste` on a scope or review itself. A new hit refuses the publish
+(exit 4) and names the item, the field and the rule. Some hits are only `lint-warning` lines on
+stderr. These are a `decision-source` hit and a hit that the published revision already had. A hit
+in verbatim analyst-intake, lift or notes-header text is also a warning. This includes every field of
+an analyst-intake item and each analyst question. `discard-draft` keeps a draft that may hold
+unpublished work (exit 4). Pass `--unpublished` only when the engineer agrees to lose that work.
 
 Questions have an independent per-slug `questions.json` store: stable IDs, scope/review
 applicability, owner and answered closure provenance, with no SQL revision. Read
