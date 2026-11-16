@@ -1076,8 +1076,9 @@ cmd_publish() (
   mv "$tmp" "$dest" || sr_die 2 "cannot publish document"
   committed=true
   # The carry-list file only serves the question just answered: a stale copy must not stay in the store.
-  if [ -f "$SR_REVIEWS/$slug/carry-list.md" ] && [ ! -L "$SR_REVIEWS/$slug/carry-list.md" ]; then
-    rm -f -- "$SR_REVIEWS/$slug/carry-list.md" || true
+  local carry_list="$SR_REVIEWS/$slug/carry-list.md"
+  if [ -f "$carry_list" ] && [ ! -L "$carry_list" ]; then
+    rm -- "$carry_list" || printf 'warning: could not remove the carry list\n' >&2
   fi
   printf '%s\n' "$check_out"
   printf 'published\t%s\n' "${dest#"$SR_ROOT"/}"
