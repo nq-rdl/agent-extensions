@@ -83,6 +83,19 @@ class CarryOver(unittest.TestCase):
         self.assertNotIn("A3", text)  # a walked item is not in a carry list
         self.assertEqual(list((self.p.root / ".sqlreview").rglob("*.sql")), [])
 
+    def test_an_item_the_sql_does_not_implement_is_never_carried_over(self):
+        # The scope marks an intake item "not implemented by this SQL". The review must not carry it as confirmed.
+        commit = committed(self.p)
+        items = json.loads(json.dumps(SCOPE_ITEMS))
+        items["assumptions"][0]["sql_status"] = "not-implemented"
+        self.p.write_json("q", "scope.json", scope_doc("q", "q.sql", **items, git_commit=commit,
+                                                       sql_sha256=hashlib.sha256(SQL_V1.encode()).hexdigest()))
+        out = self.carryover()
+        self.assertNotIn("A1", [c["id"] for c in out["carry_over"] + out["carry_over_intent"]])
+        self.assertEqual(out["not_implemented"], [{"kind": "assumptions", "id": "A1", "scope_id": "A1"}])
+        why = {w["id"]: w["why"] for w in out["walk"]}
+        self.assertIn("not implemented by this SQL", why["A1"])
+
     def test_carry_list_refuses_bad_input(self):
         self.scope()
         self.assertEqual(run(["carry-list", "q", "sideways", str(self.draft)], self.p.root).returncode, 1)

@@ -442,8 +442,73 @@ class CarryForwardHelper(Base):
         r = run(["carry-list", "q", "carryforward", str(self.draft)], self.p.root)
         self.assertEqual(r.returncode, 0, r.stdout + r.stderr)
         listed = json.loads(r.stdout)["lists"]
-        self.assertEqual([(l["list"], [i["id"] for i in l["items"]]) for l in listed], [("bulk", ["A1"])])
+        self.assertEqual([(l["list"], [i["id"] for i in l["items"]]) for l in listed], [("carry_question", ["A1", "L1"])])
         self.assertIn("- Text: Only completed stays", (self.d / "carry-list.md").read_text())
+
+    def test_a_change_that_touches_two_items_walks_two_and_asks_one_carry_question(self):
+        # Decided re-walk rule: walk only what the diff touches, then one carry question for all the rest.
+        items = dict(
+            assumptions=[item("A1", "Stays come from the admissions table", rationale="Source.", location={"lines": [2, 2]}),
+                         item("A2", "Discharge date marks completion", rationale="Ward convention.", location={"lines": [3, 3]}),
+                         item("A3", "Months come from the stay", rationale="Grain.", location={"lines": [5, 5]}),
+                         item("A4", "Only completed stays", rationale="Whole query.")],
+            limitations=[item("L1", "One source table", rationale="Scope.", location={"lines": [6, 6]}),
+                         item("L2", "Monthly grain only", rationale="No daily data.", location={"lines": [7, 7]})])
+        (self.d / "review.json").unlink()
+        self.publish(review_doc("q", "q.sql", revision=1, sql_sha256=sha(SQL_V1), **items))
+        two = SQL_V1.replace("adm.stays", "adm.stays_v2").replace("IS NOT NULL", "IS NOT NULL AND ward <> 'X'")
+        self.sql.write_text(two)
+        draft = review_doc("q", "q.sql", revision=2, sql_sha256=sha(two),
+                           **{k: [self.candidate(i) for i in v] for k, v in items.items()})
+        out = self.carryforward("review", draft)
+        self.assertEqual(sorted(w["id"] for w in out["walk"]), ["A1", "A2"])
+        question = {q["id"]: q for q in out["carry_question"]}
+        self.assertEqual(sorted(question), ["A3", "A4", "L1", "L2"])
+        self.assertEqual(question["A3"]["basis"], "lines-unchanged")
+        self.assertIsNone(question["A4"]["basis"])  # a whole-SQL item: the answer is a fresh confirmation
+        r = run(["carry-list", "q", "carryforward", str(self.draft)], self.p.root)
+        self.assertEqual(r.returncode, 0, r.stdout + r.stderr)
+        self.assertEqual([(l["list"], l["count"]) for l in json.loads(r.stdout)["lists"]], [("carry_question", 4)])
+        text = (self.d / "carry-list.md").read_text()
+        for needle in ("### A3 (assumptions)", "- Text: Months come from the stay", "- Text: Only completed stays",
+                       "- Text: Monthly grain only"):
+            self.assertIn(needle, text)
+        self.assertNotIn("### A1", text)
+        # "Carry all": carried rows copy their set fields, the whole-SQL item gets the answer's confirmation.
+        carry = {(c["kind"], c["id"]): c["set"] for c in out["carry"]}
+        doc = json.loads(json.dumps(draft))
+        for k in ("assumptions", "limitations"):
+            for it in doc[k]:
+                it.update(carry.get((k, it["id"]), {"status": "confirmed", "confirmed_by": "engineer-login",
+                                                    "confirmed_at": "2026-09-23T00:00:00Z", "confirmed_revision": 2}))
+        self.publish(doc)
+
+    def test_a_failed_re_proof_makes_every_item_touched(self):
+        self.edit_prior_sha()
+        out = self.carryforward("review", self.draft_doc(SQL_V1, by=0))
+        self.assertTrue(out["reproof_failed"])
+        self.assertEqual((out["carry"], out["bulk"], out["carry_question"]), ([], [], []))
+        self.assertEqual(sorted(w["id"] for w in out["walk"]), ["A1", "A2", "A3", "L1"])
+        self.assertIn("cannot be re-proved", out["walk"][0]["why"])
+
+    def test_a_range_that_cannot_be_relocated_is_touched(self):
+        # The draft range still points at equal bytes, but the diff does not map the old range there.
+        text = "SELECT 1;\nSELECT 2;\nSELECT 3;\nSELECT 2;\n"
+        (self.d / "review.json").unlink()
+        a1 = item("A1", "Second select", location={"lines": [2, 2]})
+        self.sql.write_text(text)
+        self.publish(review_doc("q", "q.sql", revision=1, sql_sha256=sha(text), assumptions=[a1], limitations=[]))
+        moved = "SELECT 0;\n" + text  # the diff maps line 2 to line 3; line 5 holds a copy
+        self.sql.write_text(moved)
+        out = self.carryforward("review", review_doc("q", "q.sql", revision=2, sql_sha256=sha(moved),
+                                                     assumptions=[self.candidate(a1, location={"lines": [5, 5]})],
+                                                     limitations=[]))
+        self.assertEqual([w["id"] for w in out["walk"]], ["A1"])
+
+    def edit_prior_sha(self):
+        prior = json.loads((self.d / "review.json").read_text())
+        prior["sql_sha256"] = "0" * 64
+        (self.d / "review.json").write_text(json.dumps(prior))
 
     def test_errors(self):
         self.assertEqual(run(["carryforward", "q", "review"], self.p.root).returncode, 1)

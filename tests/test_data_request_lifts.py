@@ -61,7 +61,8 @@ class Lifts(unittest.TestCase):
         self.command('move', 'pipeline.py', 'next.py')
         moved = json.loads((self.p.review_dir('next.py') / 'lifts.json').read_text())
         self.assertEqual(moved['sql_path'], 'next.py')
-        self.assertFalse((self.p.review_dir('next.py') / 'lifts.md').exists())
+        # move renders the ledger again from the rebound JSON, so it names the new path.
+        self.assertIn('`next.py`', (self.p.review_dir('next.py') / 'lifts.md').read_text())
 
     def test_candidate_rejects_manufactured_confirmation_and_missing_evidence(self):
         for field, value in [('confirmed_by', 'Robot'), ('pinned_version', ''),

@@ -35,8 +35,30 @@ Changed text or rationale never carries. ``--reconfirm-all`` refuses every carri
 Update path: ``carryforward``
 -----------------------------
 
-``carry`` items keep their confirmation. Copy each ``set`` onto the item verbatim,
-``carried_basis`` included, and do not ask again.
+The re-walk rule (decided by the Data Engineer): after a change, walk only the items that the
+change touches. Then ask **one** carry question for all the other items. The helper decides
+what the change touches, from the diff and each item's recorded location. Do not add items to
+the walk by your own judgement.
+
+``walk``
+   The items that the change touches. This includes changed text or rationale, governed lines
+   that the diff changes or cannot re-locate, and a criteria row whose state or intake changed.
+   When ``reproof_failed`` is true, git cannot supply the recorded SQL with its SHA, so every
+   item is in ``walk``. Walk each item.
+``carry_question``
+   Every other item. A ``carry`` row keeps the earlier confirmation. A ``bulk`` row keeps its
+   wording, but the SQL changed under it because it has no location. Its answer is a fresh
+   confirmation.
+
+Run ``carry-list "$SLUG" carryforward <draft>`` before you ask. The one question lists each
+item's id and its confirmed text, copied verbatim from ``carry-list.md``. Ids alone are not
+enough. Options: **Carry all** / **Name the items to re-walk**. Do not mark either option
+recommended. When the impact hints or your reading show an indirect effect on a listed item,
+say so in the question. The human decides whether to re-walk it.
+
+On **Carry all**, copy each ``carry`` row's ``set`` onto the item verbatim, ``carried_basis``
+included. Give each ``bulk`` row fresh ``confirmed_*`` from the answer. The items that the human
+names go to the walk. An unanswered question confirms nothing.
 
 A ``walk`` or ``bulk`` row can list ``clear`` fields, such as ``carried_basis``. The draft item
 still holds them from an earlier carry. Remove them before you record the fresh answer, or
@@ -46,12 +68,9 @@ When ``first_binding`` is true, the previous scope was confirmed before the SQL 
 SQL against each carried item. Move to the walk any item the SQL contradicts, such as an item
 that names a table the SQL does not read.
 
-``bulk`` items keep their wording, but the SQL changed under them: no location, or a location
-added or removed. Move to the walk any bulk item the hunks or hints implicate. Then put the rest
-in **one** AskUserQuestion. It shows a one-line summary of the SQL delta, then each item's id,
-text, rationale and ``location`` lines (``null`` means the whole SQL). Options: **Carry these N
-forward** / **Walk each individually**. Do not mark either option recommended: the SQL changed.
-The answer is a fresh confirmation for this revision (``confirmed_*`` from the answer).
+An item marked ``sql_status: "not-implemented"`` states that this SQL does not implement it.
+The mark carries like the text. ``carryover`` never carries such a scope item into the review.
+It lists the item under ``not_implemented`` and in ``walk``.
 
 Scope to review: ``carryover``
 ------------------------------
@@ -78,18 +97,18 @@ replace decision origin with confirmation provenance. Walk moves them to the per
 Long lists: ``carry-list``
 --------------------------
 
-A carry question must show what it confirms. When a list has more than four items, run
-``carry-list`` before you ask. Use ``carryover`` for the scope lists and ``carryforward`` for the
-``bulk`` list of an update:
+A carry question must show what it confirms. For the update path, always run ``carry-list``.
+For the scope lists, run it when a list has more than four items. Use ``carryover`` for the
+scope lists and ``carryforward`` for the ``carry_question`` list of an update:
 
 .. code-block:: bash
 
    bash "$S/sqlreview.sh" carry-list "$SLUG" carryover ".sqlreview/reviews/$SLUG/review.draft.json"
 
 It writes ``reviews/<slug>/carry-list.md`` with each item's stored text and rationale verbatim.
-It prints the count, ids, bases and lines of each list. The question shows that summary and the
-file path, not the full text. Ask the human to read the file before they answer. The answer
-confirms the listed items only. Delete the file after the answer.
+A criteria row shows its state, reason and flag. It prints the count, ids, bases and lines of
+each list. The question shows each id with its confirmed text and gives the file path for the
+rationale and basis. The answer confirms the listed items only. Delete the file after the answer.
 
 Header to review: ``notes --against --confirmed-by``
 ---------------------------------------------------

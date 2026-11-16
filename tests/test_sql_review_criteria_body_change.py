@@ -1,9 +1,12 @@
-"""A criteria_status row does not carry across a SQL body change.
+"""A criteria_status row carries across a SQL body change only when the change does not touch it.
 
-A row states what the SQL does with a research criterion. When the SQL body changes, every live row
-goes to the review walk, like a changed assumption: the engineer confirms or changes each state, one
-row at a time. Publish refuses a row that still claims a carry, and names only the criterion id.
-A header-only change keeps the carry. The release table then shows the state the engineer confirmed.
+A row states what the SQL does with a research criterion. The decided re-walk rule: after a change, walk
+only the rows the diff touches, then put every other row in one carry question. A row with a recorded
+location carries when the diff maps its lines unchanged (criteria-lines-unchanged). A row the change
+touches is walked. A row with no location goes into the one carry question, and its answer is a fresh
+confirmation, never a carried one. Publish refuses a row that claims a carry it cannot prove, and names
+only the criterion id. A header-only change keeps the carry. The release table then shows the state the
+engineer confirmed.
 
 The rehearsal case: the age filter moves from 18 to 16, and the table must not say Applied for
 "Aged 18 and over" without a new confirmation.
@@ -172,23 +175,50 @@ class Base(unittest.TestCase):
 
 @unittest.skipUnless(shutil.which("jq") and shutil.which("git"), "sqlreview.sh needs jq and git")
 class CriteriaBodyChange(Base):
-    def test_body_change_walks_every_row_and_publish_refuses_a_carry(self):
+    def test_body_change_puts_rows_without_a_location_in_the_one_carry_question(self):
         self.write_sql(SQL_16)
         draft = [{k: v for k, v in r.items() if not k.startswith("confirmed")} for r in STATUS_V1]
         out = self.carryforward(2, SQL_16, draft)
         self.assertFalse(out["sql_body_unchanged"])
         self.assertEqual([c for c in out["carry"] if c["kind"] == "criteria_status"], [])
-        self.assertEqual(out["bulk"], [], "criteria rows never go to bulk confirm")
-        walked = {w["id"]: w for w in out["walk"]}
-        self.assertEqual(set(walked), {"N1", "I1", "D1"})
-        for w in walked.values():
-            self.assertEqual(w["kind"], "criteria_status")
-            self.assertEqual(w["why"], "the SQL body changed since revision 1")
+        self.assertEqual(out["walk"], [])
+        bulk = {b["id"]: b for b in out["bulk"]}
+        self.assertEqual(set(bulk), {"N1", "I1", "D1"})
+        for b in bulk.values():
+            self.assertEqual(b["kind"], "criteria_status")
+            self.assertEqual(b["why"], "the SQL body changed since revision 1")
+        self.assertEqual({q["id"] for q in out["carry_question"]}, {"N1", "I1", "D1"})
         self.assertNotIn(LEAK_CANARY, json.dumps(out))
         self.assert_refused(2, SQL_16, self.carried(2))
-        # The engineer reconfirms each row in the walk: publish passes.
+        # The carry question's answer is a fresh confirmation for each row: publish passes.
         self.publish(2, SQL_16, self.reconfirmed(2))
         self.assertEqual({r["confirmed_revision"] for r in self.published()["criteria_status"]}, {2})
+
+    def test_a_change_that_touches_one_located_row_walks_only_that_row(self):
+        # SQL_18 lines: 4 SELECT (D1), 5 FROM (N1), 6 WHERE age filter (I1).
+        where = {"N1": [5, 5], "I1": [6, 6], "D1": [4, 4]}
+        located = [dict(r, location={"lines": where[r["criterion"]]}) for r in STATUS_V1]
+        self.publish(2, SQL_18, [dict(r, confirmed_revision=2) for r in located])
+        self.write_sql(SQL_16)
+        out = self.carryforward(3, SQL_16, located)
+        self.assertEqual([w["id"] for w in out["walk"]], ["I1"])
+        self.assertEqual(out["bulk"], [])
+        self.assertEqual({(c["id"], c["basis"]) for c in out["carry"]},
+                         {("N1", "criteria-lines-unchanged"), ("D1", "criteria-lines-unchanged")})
+        self.assertEqual({q["id"] for q in out["carry_question"]}, {"N1", "D1"})
+        self.assertNotIn(LEAK_CANARY, json.dumps(out))
+        sets = {c["id"]: c["set"] for c in out["carry"]}
+        claim_all = [dict(r, **sets.get(r["criterion"], {"carried_from_revision": 2,
+                                                        "carried_basis": "criteria-lines-unchanged"})) for r in located]
+        r = self.publish(3, SQL_16, claim_all, expected=4)
+        self.assertIn("I1: cannot carry", r.stdout + r.stderr)
+        rows = [dict(r, **sets[r["criterion"]]) if r["criterion"] in sets
+                else dict(r, confirmed_revision=3, confirmed_at="2026-10-21T00:00:00Z") for r in located]
+        self.publish(3, SQL_16, rows)
+        published = {r["criterion"]: r for r in self.published()["criteria_status"]}
+        self.assertEqual(published["N1"]["carried_basis"], "criteria-lines-unchanged")
+        self.assertEqual(published["I1"]["confirmed_revision"], 3)
+        self.assertNotIn("carried_basis", published["I1"])
 
     def test_header_only_change_carries_as_before(self):
         self.write_sql(SQL_18_HEADER)
@@ -219,8 +249,9 @@ class CriteriaBodyChange(Base):
         for revision, sql in enumerate(steps, start=2):
             with self.subTest(revision=revision):
                 self.write_sql(sql)
-                walked = {w["id"] for w in self.carryforward(revision, sql, STATUS_V1)["walk"]}
-                self.assertIn("I1", walked)
+                out = self.carryforward(revision, sql, STATUS_V1)
+                self.assertNotIn("I1", {c["id"] for c in out["carry"]})
+                self.assertIn("I1", {w["id"] for w in out["walk"] + out["bulk"]})
                 self.assert_refused(revision, sql, self.carried(revision))
                 state = {"state": "not-applied", "reason": "Filter is below 18"} if revision == 4 else {}
                 self.publish(revision, sql, self.reconfirmed(revision, I1=state))

@@ -115,10 +115,23 @@ class Move(unittest.TestCase):
         archive.write_text(json.dumps(dict(doc, sql_sha256="0" * 64)))
         committed(self.p)
         draft = self.next_review(moved)
-        for args in (["delta", "new"], ["remap", "new", str(draft)], ["carryforward", "new", "review", str(draft)]):
+        for args in (["delta", "new"], ["remap", "new", str(draft)]):
             with self.subTest(command=args[0]):
                 r = run(args, self.p.root)
                 self.assertEqual(r.returncode, 6, r.stdout + r.stderr)
+        # carryforward reports the failed re-proof: every item is touched and walked, none carries.
+        r = run(["carryforward", "new", "review", str(draft)], self.p.root)
+        self.assertEqual(r.returncode, 0, r.stdout + r.stderr)
+        out = json.loads(r.stdout)
+        self.assertTrue(out["reproof_failed"])
+        self.assertEqual((out["carry"], out["carry_question"]), ([], []))
+        self.assertEqual(sorted(w["id"] for w in out["walk"]), ["A1", "L1"])
+        # publish still refuses a carried item when the re-proof fails.
+        doc = json.loads(draft.read_text())
+        for k in ("assumptions", "limitations"):
+            doc[k][0].update(carried_from_revision=1, carried_basis="sql-unchanged")
+        draft.write_text(json.dumps(doc))
+        self.assertEqual(run(["publish", "new", "review", str(draft)], self.p.root).returncode, 6)
 
     def test_changed_bytes_still_require_reassessment(self):
         self.reviewed()
@@ -198,7 +211,9 @@ class SkillContract(unittest.TestCase):
     def test_carry_reference(self):
         self.assert_tokens("data-request-analyse", "analyse", "references/carry.rst", (
             "carry-list", "more than four items", "``clear`` fields", "``first_binding`` is true",
-            "``header_settled``", "Delete the file after the answer"))
+            "``header_settled``", "Delete the file after the answer",
+            "decided by the Data Engineer", "``carry_question``", "**Carry all** / **Name the items to re-walk**",
+            "Do not add items to the walk by your own judgement", "``reproof_failed``", "not-implemented"))
 
     def test_analyse_names_the_two_move_outcomes(self):
         self.assert_tokens("data-request-analyse", "analyse", "SKILL.md", (
@@ -208,7 +223,9 @@ class SkillContract(unittest.TestCase):
         self.assert_tokens("data-request-bootstrap", "bootstrap", "SKILL.md", (
             "## Walk questions", "Define each id when the question first names it", "verbatim. Never shorten them",
             "Each option says what gets recorded", "exact new text counts as the re-ask",
-            "never to the header comment lines", "path moved with identical bytes", "`clear` fields"))
+            "never to the header comment lines", "path moved with identical bytes", "`clear` fields",
+            "walks only the rows that the change touches", "`criteria-lines-unchanged`",
+            "`sql_status: \"not-implemented\"`", "ask **one** carry question"))
 
 
 if __name__ == "__main__":
