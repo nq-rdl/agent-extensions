@@ -345,6 +345,7 @@ SQLREVIEW_INPUTS = {
     "publish": [[SLUG, "review", D]],
     "publish-questions": [[SLUG, D]],
     "intake": [["sql/v1/missing.json", "1", D], [D, "1"]],
+    "intake-draft": [[D]],
     "notes": [[D], ["sql/v1/q.sql", "--against", D], ["sql/v1/q.sql", "--questions", D]],
     "ledger": [["check", D], ["set", "nq-rdl/x#1", D], ["get", "nq-rdl/x#1", "--against", D],
                ["--session", "check", D]],
@@ -354,7 +355,7 @@ SQLREVIEW_INPUTS = {
     "move": [["sql/v1/q.sql", D]],
     "criteria": [[D]],
 }
-SQLREVIEW_NOINPUT = {"init", "status", "roles", "guard", "lifts-stale", "materialize", "delta", "impact",
+SQLREVIEW_NOINPUT = {"now", "init", "status", "roles", "guard", "lifts-stale", "materialize", "delta", "impact",
                      "questions", "migrate-questions", "render", "discard-draft"}
 RELEASE_INPUTS = {"check": [[D]], "render": [[D]], "amend-check": [[D], ["--name", "r", D]]}
 # criteria reads a --fingerprints file of four sha256 strings that it validates strictly, so no value can pass through.

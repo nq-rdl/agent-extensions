@@ -53,6 +53,12 @@
 #                                              missing FILE is a legacy no-op (with DRAFT it prints the draft unchanged,
 #                                              or exits 4 when the draft is not a readable file); invalid intake exits 4;
 #                                              never writes
+#   intake-draft answers.intake.draft.json      stage the interview so far: read a sidecar-shaped JSON document on stdin,
+#                                              validate it as intake does, then atomically replace the draft in the
+#                                              current directory; prints "staged<TAB>decisions<TAB>questions". Needs no
+#                                              .sqlreview/. Only that file name is written, never through a symlink;
+#                                              exit 4 for an invalid document (the old draft stays), 2 for any other name
+#   now                                        print the current UTC time as YYYY-MM-DDTHH:MM:SSZ, for confirmed_at
 #   carryforward SLUG scope|review DRAFT       draft items whose previous-revision confirmation may be carried (JSON)
 #   remap SLUG [DRAFT]                         atomically remap unchanged location/logic ranges in a draft (JSON report)
 #                                              default: review.draft.json, else scope.draft.json; seed from published JSON
@@ -1143,6 +1149,27 @@ cmd_intake() {
   fi
 }
 
+# The interview's resume point. The draft is a sidecar-shaped file, so `intake` reads it back with the same rules.
+# A document that fails them never replaces the last good draft, and no diagnostic carries a value.
+cmd_intake_draft() {
+  [ $# -eq 1 ] || usage
+  sr_need_jq
+  [ "$1" = answers.intake.draft.json ] || sr_die 2 "the draft file name must be answers.intake.draft.json in the current directory"
+  sr_no_symlinks "$1" || exit 2
+  local tmp counts
+  tmp="$(mktemp "./.answers.intake.draft.XXXXXX")" || sr_die 2 "cannot stage draft"
+  cat > "$tmp" || { rm -f "$tmp"; sr_die 2 "cannot stage draft"; }
+  if ! (cmd_intake "$tmp" 1 >/dev/null 2>&1); then
+    rm -f "$tmp"
+    sr_die 4 "invalid analyst intake draft; correct the document and stage it again"
+  fi
+  counts="$(jq -r '[(.decisions | length), (.open_questions | length)] | @tsv' "$tmp")" || { rm -f "$tmp"; sr_die 2 "cannot stage draft"; }
+  mv -f "$tmp" "$1" || { rm -f "$tmp"; sr_die 2 "cannot stage draft"; }
+  printf 'staged\t%s\n' "$counts"
+}
+
+cmd_now() { [ $# -eq 0 ] || usage; sr_now; }
+
 cmd_carryover() (
   [ $# -eq 2 ] || usage
   sr_need_jq
@@ -1751,6 +1778,7 @@ _sr_guard_command_inputs() { # COMMAND ARGS...
     check) [ $# -lt 1 ] || [ "$1" = --stdin ] || sr_guard_input "$1" ;;
     # The sidecar and the optional drafts file are both read, and the sidecar's content is copied into
     # drafts. Guarded here, not in cmd_intake, because criteria reads the sidecar at the git top level.
+    intake-draft) [ $# -lt 1 ] || sr_guard_input "$1" ;;
     intake) [ $# -lt 1 ] || sr_guard_input "$1" helper-render; [ $# -lt 3 ] || sr_guard_input "$3" ;;
     # A scope draft given by path is read like any other file argument. A bare slug is not a file.
     criteria) case "${1:-}" in */*|*.json) sr_guard_input "$1" ;; esac ;;
@@ -1794,6 +1822,8 @@ case "$cmd" in
   impact) cmd_impact "$@" ;;
   carryover) cmd_carryover "$@" ;;
   intake) cmd_intake "$@" ;;
+  intake-draft) cmd_intake_draft "$@" ;;
+  now) cmd_now "$@" ;;
   carryforward) cmd_carryforward "$@" ;;
   remap) cmd_remap "$@" ;;
   notes) cmd_notes "$@" ;;

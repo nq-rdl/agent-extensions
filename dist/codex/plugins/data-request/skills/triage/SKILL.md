@@ -68,7 +68,7 @@ Load the stored entry first; offer the session entry on resume and reconcile con
 Recheck affected evidence/artifacts, not every stage. See [references/ledger.rst](references/ledger.rst).
 
 1. **Probe the environment** every session: `gh auth status` (or its MCP fallback), repository
-   access, proxy egress, the pixi solve (skip it and say why when the child has no
+   access, proxy egress, the tools a render needs (`copier --version`, `git`, `pixi`), the pixi solve (skip it and say why when the child has no
    `pyproject.toml`) and hooks such as the PII gate. Report what you observed. Never copy an
    earlier failure or call CI red without reading the current run. Name each missing capability.
 2. **Read everything before proposing work**: the issue body, all comments, linked

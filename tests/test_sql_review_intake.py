@@ -596,3 +596,68 @@ class Intake(unittest.TestCase):
             bootstrap = (REPO / tree / ("data-request-bootstrap" if tree == "skills" else "bootstrap") / "SKILL.md").read_text()
             self.assertIn("answers.intake.json", bootstrap)
             self.assertIn("Do not ask the engineer", bootstrap)
+
+
+class IntakeDraftStaging(unittest.TestCase):
+    """The interview keeps its answers in a staged draft, so a restart asks nothing twice."""
+
+    def setUp(self):
+        self._tmp = tempfile.TemporaryDirectory()
+        self.addCleanup(self._tmp.cleanup)
+        self.p = Project(self._tmp.name, init=False)
+        self.root = self.p.root
+        self.draft = self.root / "answers.intake.draft.json"
+
+    def stage(self, value, name="answers.intake.draft.json"):
+        return run(["intake-draft", name], self.root, stdin=json.dumps(value))
+
+    def test_now_prints_a_utc_stamp_that_the_sidecar_schema_accepts(self):
+        r = run(["now"], self.root)
+        self.assertEqual(r.returncode, 0, r.stderr)
+        stamp = r.stdout.strip()
+        self.assertRegex(stamp, r"^\d{4}-\d\d-\d\dT\d\d:\d\d:\d\dZ$")
+        value = intake()
+        value["decisions"][0]["confirmed_at"] = stamp
+        value["decisions"][0].pop("decided")
+        self.assertEqual(self.stage(value).returncode, 0)
+
+    def test_a_partial_draft_is_staged_and_read_back_without_a_project_store(self):
+        self.assertFalse((self.root / ".sqlreview").exists())
+        value = {"schemaVersion": 1, "approval_number": "THHSAQUIRE-8675309", "decisions": [], "open_questions": []}
+        r = self.stage(value)
+        self.assertEqual(r.returncode, 0, r.stderr)
+        self.assertEqual(r.stdout.strip(), "staged\t0\t0")
+        self.assertEqual(json.loads(self.draft.read_text()), value)
+        value["decisions"] = intake()["decisions"]
+        value["open_questions"] = ["Which subcodes count?"]
+        self.assertEqual(self.stage(value).stdout.strip(), "staged\t1\t1")
+        read = run(["intake", "answers.intake.draft.json", "1"], self.root)
+        self.assertEqual(read.returncode, 0, read.stderr)
+        self.assertEqual([a["upstream"]["topic"] for a in json.loads(read.stdout)["assumptions"]], ["cohort"])
+        self.assertEqual(sorted(p.name for p in self.root.iterdir() if p.is_file()), ["answers.intake.draft.json"])
+
+    def test_an_invalid_draft_keeps_the_last_good_one_and_echoes_no_value(self):
+        good = intake()
+        self.assertEqual(self.stage(good).returncode, 0)
+        before = self.draft.read_text()
+        bad = intake()
+        bad["decisions"][0]["confirmed_by"] = "secret@example.com"
+        bad["decisions"][0]["text"] = "ZZTEST-90210-VALUE"
+        r = self.stage(bad)
+        self.assertEqual(r.returncode, 4, r.stderr)
+        self.assertNotIn("ZZTEST-90210-VALUE", r.stdout + r.stderr)
+        self.assertNotIn("secret@example.com", r.stdout + r.stderr)
+        self.assertEqual(self.draft.read_text(), before)
+        self.assertEqual(self.stage("not an object").returncode, 4)
+        self.assertEqual(self.draft.read_text(), before)
+
+    def test_only_the_draft_name_is_written_and_never_through_a_symlink(self):
+        for name in ("answers.intake.json", "other.json", "sub/answers.intake.draft.json"):
+            r = self.stage(intake(), name)
+            self.assertEqual(r.returncode, 2, (name, r.stderr))
+        self.assertFalse((self.root / "answers.intake.json").exists())
+        (self.root / "elsewhere.json").write_text("{}")
+        self.draft.symlink_to("elsewhere.json")
+        r = self.stage(intake())
+        self.assertEqual(r.returncode, 2, r.stderr)
+        self.assertEqual((self.root / "elsewhere.json").read_text(), "{}")
