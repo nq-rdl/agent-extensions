@@ -202,13 +202,19 @@ class ScaffoldStates(unittest.TestCase):
 
     def test_fresh_render_recipe(self):
         recipe = rst_term(self.states, "Fresh render")
-        for token in ("copier copy", "--vcs-ref", "--data-file answers.yaml",
-                      "gh:nq-rdl/data-analysis-scaffold", "co-development", "byte-identical", "Re-lock pixi",
-                      "``--trust`` runs the template's tasks", "pinned release tag", "list each one in the PR body",
+        for token in ("skills/setup/references/scaffold-render.rst", "co-development", "byte-identical",
+                      "Re-lock pixi", "list each one in the PR body",
                       "``.seed-manifest.yml``", "``scripts/template_sync.py``", "``src/service_desk/``"):
             with self.subTest(token=token):
                 self.assertIn(token, recipe)
         self.assertNotRegex(recipe, r"run[^.]*copier update")
+        # The command itself lives in the one shared render procedure that intake also cites.
+        shared = body(REPO / "skills" / "data-request-setup" / "references" / "scaffold-render.rst")
+        for token in ("copier copy", "--vcs-ref", "--data-file answers.yaml",
+                      "gh:nq-rdl/data-analysis-scaffold", "``--trust`` runs the template's", "pinned release tag"):
+            with self.subTest(shared_token=token):
+                self.assertIn(token, shared)
+        self.assertNotRegex(shared, r"run[^.]*copier update")
 
     def test_agents_still_never_run_copier_update(self):
         never = md_section(body(TRIAGE / "SKILL.md"), "Never infer permission")

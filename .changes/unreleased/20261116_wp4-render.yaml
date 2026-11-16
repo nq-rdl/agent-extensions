@@ -1,0 +1,3 @@
+kind: Fixed
+body: Intake and triage share one scaffold render procedure that passes framework_ref, seed_mode and project_slug explicitly
+time: 2026-11-16T00:00:01Z

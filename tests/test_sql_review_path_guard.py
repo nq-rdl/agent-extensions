@@ -346,6 +346,7 @@ SQLREVIEW_INPUTS = {
     "publish": [[SLUG, "review", D]],
     "publish-questions": [[SLUG, D]],
     "intake": [["sql/v1/missing.json", "1", D], [D, "1"]],
+    "intake-draft": [[D]],
     "notes": [[D], ["sql/v1/q.sql", "--against", D], ["sql/v1/q.sql", "--questions", D]],
     "ledger": [["check", D], ["set", "nq-rdl/x#1", D], ["get", "nq-rdl/x#1", "--against", D],
                ["--session", "check", D]],

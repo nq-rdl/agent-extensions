@@ -67,6 +67,35 @@ governance approval when the analyst supplies them. Draft each proposed decision
 wording and cite where it came from in `rationale`. The analyst's answer is the confirmation;
 a draft built from request text is only a proposal until they answer.
 
+On a re-run, or when the enquiry says "as per request <prior>", read the prior request's SQL
+and the current build outputs (delivered columns and grain) before you propose a cohort or a
+grain. Cite the file in `rationale`. Issue wording alone is not evidence. A prior request's
+decisions are proposals: the analyst confirms each one again in this pass. A written, dated
+review by the analyst (an enquiry comment) is evidence too: name it in `decided`, and still
+ask for confirmation here.
+
+## Keep the interview state
+
+A session can restart in the middle of the interview. Keep every answer in
+`answers.intake.draft.json`, beside `answers.yaml`. These helper commands need no `.sqlreview/`:
+
+```bash
+S="${PLUGIN_ROOT}/skills/setup/scripts"
+bash "$S/sqlreview.sh" intake answers.intake.draft.json 1    # start of the pass: read a draft back
+bash "$S/sqlreview.sh" now                                   # right after each answer: confirmed_at
+bash "$S/sqlreview.sh" intake-draft answers.intake.draft.json < next.json    # after each batch
+```
+
+- At the start, read back a draft that exists. Its decisions and open questions are answered:
+  do not ask them again. Ask only what it lacks. With no draft on a re-run, start one from the current sidecar.
+- After each answered batch, write the whole document (all earlier answers and this batch) to
+  `next.json`, then stage it. A stage that fails leaves the old draft: fix the document and stage again.
+- Use `schemaVersion: 1` until the analyst confirms a criterion.
+  Then use `schemaVersion: 2` and keep every confirmed criterion in `criteria`. A draft may omit `fingerprints`:
+  only `intake-draft` and a read back of the draft accept that. When the pass starts from a schema 2 sidecar,
+  keep `schemaVersion: 2`, its `criteria` and its `fingerprints` in the draft.
+- The draft is not the sidecar. Never commit it. Delete it after the final sidecar validates.
+
 ## The interview
 
 Ask about research decisions only, in this order. Each topic maps to a schema `topic`:
@@ -126,7 +155,7 @@ answer confirms it.
 
 - `confirmed_by` is the analyst's handle: GitHub login when known, else
   `git config user.name`, else ask. Never an email, and never the agent's identity.
-- `confirmed_at` is the UTC time of the analyst's answer (`YYYY-MM-DDTHH:MM:SSZ`).
+- `confirmed_at` is the UTC time of the analyst's answer (`YYYY-MM-DDTHH:MM:SSZ`), from the `now` helper.
 - `decided` only when the evidence names who made the decision (for example a requester's
   dated reply); omit it otherwise. Never infer a decider or date from prose.
 - `approval_number` matches `answers.yaml` exactly.
@@ -164,34 +193,24 @@ choice fits the clinical unit, ask which to use and keep the exact unit in the s
 ## Render the scaffold (after approval)
 
 A `request-template` copy is a thin seed. Rendering the scaffold over it gives the project
-its pipeline, validator and DVC layout, which a supplied cohort needs. Do it once, after the
-sidecar validates, and only when the analyst approves:
+its pipeline, validator and DVC layout, which a supplied cohort needs. Render once, after the
+sidecar validates, and only when the analyst approves.
 
 1. Skip this section when `.copier-answers.yml` already records `nq-rdl/data-analysis-scaffold`:
    the project is rendered. A later answers change goes to the engineer as `copier update`.
-2. Pin the release: list tags with `git ls-remote --tags
-   https://github.com/nq-rdl/data-analysis-scaffold.git` and propose the newest `v*` tag,
-   v0.5.1 or later: the first release whose rendered validator checks the sidecar. Never
-   render from a branch.
-3. Show the analyst the command, the tag and the engineer-owned values it will use, and ask
-   for approval. The approval covers committing `answers.yaml` and the sidecar on a branch
-   first, so the render is a separate, reviewable diff:
-
-   ```bash
-   copier copy --trust --overwrite --defaults --vcs-ref <tag> --data-file answers.yaml \
-     gh:nq-rdl/data-analysis-scaffold .
-   ```
-
-   `copier copy`, not `recopy` or `update`: the seed's `.copier-answers.yml` names the
-   retired `rdl-service-desk/data-science-template`, which copier 9.15 cannot render.
-   `--trust` runs the template's post-generation task.
-4. Check the result with `git status` and `git diff`: `answers.yaml` and
-   `answers.intake.json` unchanged; `.copier-answers.yml` names the scaffold and the tag; the
-   seed's release workflows under `.github/` unchanged. Then run the rendered validator
-   (`python scripts/validate_answers.py answers.yaml`). If the rendered `scripts/` has no
-   `analyst_intake.py`, report that the sidecar was not validated.
-5. Commit the render only when the analyst asks. `pixi run setup` (DVC remote and
-   credentials) is the analyst's or engineer's, on the VM; do not run it.
+2. Follow `${PLUGIN_ROOT}/skills/setup/references/scaffold-render.rst`. It is the one
+   render procedure, shared with triage. It probes the tools, lists the tags again just before
+   you ask (v0.5.1 or later, never a branch), and passes `framework_ref`, `seed_mode=no` and
+   `project_slug` with `--data`, so no seed answer decides them. It uses `copier copy`, not
+   `recopy` or `update`, because the seed names the retired `data-science-template`.
+3. Show the analyst the command, the tag and the explicit values, and ask for approval. The
+   approval covers committing `answers.yaml` and the sidecar on a branch first.
+4. Check the result as that reference says: `answers.yaml` and `answers.intake.json` unchanged,
+   `.copier-answers.yml` naming the scaffold, the tag and the passed values, and the seed's
+   `.github/workflows/` files unchanged. If the rendered `scripts/` has no `analyst_intake.py`,
+   report that the sidecar was not validated.
+5. Commit the render only when the analyst asks. Re-locking pixi is its own commit. `pixi run
+   setup` (DVC remote and credentials) is the analyst's or engineer's, on the VM; do not run it.
 
 ## A cohort supplied by the requester
 
@@ -216,9 +235,12 @@ Write `answers.intake.json` as one complete document (`approval_number`, `decisi
 `schemaVersion: 1`. With them, add `criteria` and `fingerprints` and write `schemaVersion: 2`,
 but only after confirming the installed `validate-answers` accepts schema 2: an older release
 reports `intake.schemaVersion`. If it does not and no schema 2 sidecar exists, write schema 1 without `criteria` and tell the
-analyst the scaffold release is needed. If a schema 2 sidecar already exists, keep it as is,
-write nothing and stop: report that the validator needs upgrading. Never downgrade a sidecar
+analyst the scaffold release is needed. Keep the draft in that case: it holds the confirmed criteria.
+If a schema 2 sidecar already exists, keep it as is, write nothing and stop: report that the validator needs upgrading. Never downgrade a sidecar
 or drop its confirmed criteria.
+
+If `answers.yaml` does not parse (`yaml.safe_load`), show the analyst the line and column, propose a
+repair and write it only after they confirm it. Repair before you fingerprint.
 
 Fingerprints record the free text the itemisation was made from. After writing `answers.yaml`,
 and before writing the new sidecar, run `validate-answers answers.yaml --fingerprints` on a copy of `answers.yaml` in a new temporary directory with no sidecar beside it,
@@ -240,7 +262,8 @@ needs upgrading.
 After writing the sidecar, run `validate-answers answers.yaml` in place, which validates the new sidecar
 with the answers. On failure, fix the named fields and run it again; do not hand over
 an invalid sidecar. A warning that the free text changed since itemisation means a later edit
-to the four answers: re-run this pass.
+to the four answers: re-run this pass. When the sidecar validates, delete
+`answers.intake.draft.json`.
 
 ## Re-run: walk what changed
 

@@ -596,3 +596,158 @@ class Intake(unittest.TestCase):
             bootstrap = (REPO / tree / ("data-request-bootstrap" if tree == "skills" else "bootstrap") / "SKILL.md").read_text()
             self.assertIn("answers.intake.json", bootstrap)
             self.assertIn("Do not ask the engineer", bootstrap)
+
+
+class IntakeDraftStaging(unittest.TestCase):
+    """The interview keeps its answers in a staged draft, so a restart asks nothing twice."""
+
+    def setUp(self):
+        self._tmp = tempfile.TemporaryDirectory()
+        self.addCleanup(self._tmp.cleanup)
+        self.p = Project(self._tmp.name, init=False)
+        self.root = self.p.root
+        self.draft = self.root / "answers.intake.draft.json"
+
+    def stage(self, value, name="answers.intake.draft.json"):
+        return run(["intake-draft", name], self.root, stdin=json.dumps(value))
+
+    def test_now_prints_a_utc_stamp_that_the_sidecar_schema_accepts(self):
+        r = run(["now"], self.root)
+        self.assertEqual(r.returncode, 0, r.stderr)
+        stamp = r.stdout.strip()
+        self.assertRegex(stamp, r"^\d{4}-\d\d-\d\dT\d\d:\d\d:\d\dZ$")
+        value = intake()
+        value["decisions"][0]["confirmed_at"] = stamp
+        value["decisions"][0].pop("decided")
+        self.assertEqual(self.stage(value).returncode, 0)
+
+    def test_a_partial_draft_is_staged_and_read_back_without_a_project_store(self):
+        self.assertFalse((self.root / ".sqlreview").exists())
+        value = {"schemaVersion": 1, "approval_number": "THHSAQUIRE-8675309", "decisions": [], "open_questions": []}
+        r = self.stage(value)
+        self.assertEqual(r.returncode, 0, r.stderr)
+        self.assertEqual(r.stdout.strip(), "staged\t0\t0")
+        self.assertEqual(json.loads(self.draft.read_text()), value)
+        value["decisions"] = intake()["decisions"]
+        value["open_questions"] = ["Which subcodes count?"]
+        self.assertEqual(self.stage(value).stdout.strip(), "staged\t1\t1")
+        read = run(["intake", "answers.intake.draft.json", "1"], self.root)
+        self.assertEqual(read.returncode, 0, read.stderr)
+        self.assertEqual([a["upstream"]["topic"] for a in json.loads(read.stdout)["assumptions"]], ["cohort"])
+        self.assertEqual(sorted(p.name for p in self.root.iterdir() if p.is_file()), ["answers.intake.draft.json"])
+
+    def test_an_invalid_draft_keeps_the_last_good_one_and_echoes_no_value(self):
+        good = intake()
+        self.assertEqual(self.stage(good).returncode, 0)
+        before = self.draft.read_text()
+        bad = intake()
+        bad["decisions"][0]["confirmed_by"] = "secret@example.com"
+        bad["decisions"][0]["text"] = "ZZTEST-90210-VALUE"
+        r = self.stage(bad)
+        self.assertEqual(r.returncode, 4, r.stderr)
+        self.assertNotIn("ZZTEST-90210-VALUE", r.stdout + r.stderr)
+        self.assertNotIn("secret@example.com", r.stdout + r.stderr)
+        self.assertEqual(self.draft.read_text(), before)
+        self.assertEqual(self.stage("not an object").returncode, 4)
+        self.assertEqual(self.draft.read_text(), before)
+
+    def test_only_the_draft_name_is_written_and_never_through_a_symlink(self):
+        for name in ("answers.intake.json", "other.json", "sub/answers.intake.draft.json"):
+            r = self.stage(intake(), name)
+            self.assertEqual(r.returncode, 2, (name, r.stderr))
+        self.assertFalse((self.root / "answers.intake.json").exists())
+        (self.root / "elsewhere.json").write_text("{}")
+        self.draft.symlink_to("elsewhere.json")
+        r = self.stage(intake())
+        self.assertEqual(r.returncode, 2, r.stderr)
+        self.assertEqual((self.root / "elsewhere.json").read_text(), "{}")
+
+    def test_a_directory_at_the_draft_name_is_refused_and_nothing_is_written_inside_it(self):
+        self.draft.mkdir()
+        r = self.stage(intake())
+        self.assertEqual(r.returncode, 2, r.stdout + r.stderr)
+        self.assertEqual(list(self.draft.iterdir()), [])
+        self.assertEqual(sorted(p.name for p in self.root.iterdir() if p.name != ".git"), ["answers.intake.draft.json"])
+
+    def test_a_successful_stage_writes_nothing_to_stderr(self):
+        r = self.stage(intake())
+        self.assertEqual(r.returncode, 0, r.stderr)
+        self.assertEqual(r.stdout, "staged\t1\t1\n")
+        self.assertEqual(r.stderr, "")
+
+    @staticmethod
+    def partial_criteria():
+        """Mid-interview: two criteria confirmed, the rest still open, the free text not yet fingerprinted."""
+        value = criteria_intake()
+        value["criteria"] = value["criteria"][:2]
+        value.pop("fingerprints")
+        value["open_questions"].append("Which exclusions apply?")
+        return value
+
+    def test_a_schema_2_draft_with_partial_criteria_stages_and_reads_back_unchanged(self):
+        value = self.partial_criteria()
+        r = self.stage(value)
+        self.assertEqual(r.returncode, 0, r.stderr)
+        self.assertEqual((r.stdout, r.stderr), ("staged\t1\t2\n", ""))
+        self.assertEqual(json.loads(self.draft.read_text()), value)
+        read = run(["intake", "answers.intake.draft.json", "1"], self.root)
+        self.assertEqual(read.returncode, 0, read.stderr)
+        out = json.loads(read.stdout)
+        self.assertEqual(out["criteria"], value["criteria"])
+        self.assertIsNone(out["fingerprints"])
+        self.assertIs(out["draft"], True)
+
+    def test_a_draft_resumed_from_a_schema_2_sidecar_keeps_it_verbatim(self):
+        value = criteria_intake()
+        self.assertEqual(self.stage(value).returncode, 0)
+        self.assertEqual(json.loads(self.draft.read_text()), value)
+        out = json.loads(run(["intake", "answers.intake.draft.json", "1"], self.root).stdout)
+        self.assertEqual((out["criteria"], out["fingerprints"]), (value["criteria"], value["fingerprints"]))
+
+    def test_the_confirmed_sidecar_path_stays_strict_for_a_partial_schema_2_document(self):
+        value = self.partial_criteria()
+        for name in ("answers.intake.json", "other.json"):
+            (self.root / name).write_text(json.dumps(value))
+            r = run(["intake", name, "1"], self.root)
+            self.assertEqual(r.returncode, 4, (name, r.stdout))
+            self.assertEqual(r.stdout, "")
+        # A staged draft is never imported into a scope, even when it would pass the strict rules.
+        self.assertEqual(self.stage(criteria_intake()).returncode, 0)
+        (self.root / "scope-draft.json").write_text(json.dumps(scope_doc(sql_sha256=None, approval_number="THHSAQUIRE-042")))
+        (self.root / "answers.intake.json").write_text(self.draft.read_text())
+        self.assertEqual(run(["intake", "answers.intake.json", "1", "scope-draft.json"], self.root).returncode, 0)
+        r = run(["intake", "answers.intake.draft.json", "1", "scope-draft.json"], self.root)
+        self.assertEqual(r.returncode, 4, r.stdout)
+        self.assertEqual(r.stdout, "")
+
+    def test_a_draft_keeps_every_other_criterion_rule(self):
+        self.assertEqual(self.stage(intake()).returncode, 0)
+        before = self.draft.read_text()
+        for fault in ("unconfirmed", "schema1-criteria", "fingerprints-short", "replaced-by-missing"):
+            with self.subTest(fault=fault):
+                value = criteria_intake()
+                if fault == "unconfirmed":
+                    value.pop("fingerprints")
+                    del value["criteria"][0]["confirmed_by"]
+                else:
+                    criteria_fault(value, fault)
+                r = self.stage(value)
+                self.assertEqual(r.returncode, 4, r.stdout)
+                self.assertEqual(self.draft.read_text(), before)
+
+    def test_a_killed_stage_leaves_no_temp_file(self):
+        import signal
+        import time
+        script = REPO / "skills/data-request-setup/scripts/sqlreview.sh"
+        for sig in (signal.SIGTERM, signal.SIGINT):
+            with self.subTest(signal=sig.name):
+                proc = subprocess.Popen(["bash", str(script), "intake-draft", "answers.intake.draft.json"], cwd=self.root,
+                                        stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+                for _ in range(100):
+                    if any(p.name.startswith(".answers.intake.draft.") for p in self.root.iterdir()):
+                        break
+                    time.sleep(0.05)
+                proc.send_signal(sig)
+                proc.communicate()
+                self.assertNotEqual(proc.returncode, 0)
+                self.assertEqual(sorted(p.name for p in self.root.iterdir() if p.name != ".git"), [])

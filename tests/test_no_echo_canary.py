@@ -331,6 +331,38 @@ class Canary(unittest.TestCase):
         self.assertEqual((r.stdout, r.stderr.strip()),
                          ("", "sqlreview: cannot merge intake: the draft is not a regular file"))
 
+    # --- the staged intake draft and the clock: fixed lines, no value on any channel ---------------
+    def test_intake_draft_rejection_names_no_value(self):
+        bad = sidecar(CANARY)
+        bad["decisions"][0]["confirmed_by"] = f"{CANARY}@example.org"
+        for doc in (bad, CANARY, {"decisions": CANARY}):
+            with self.subTest(doc=str(doc)[:20]):
+                r = self.run_script(SR, "intake-draft", "answers.intake.draft.json", stdin=json.dumps(doc))
+                self.assertClean(r, 4)
+                self.assertEqual(r.stderr.strip(), "sqlreview: invalid analyst intake draft; correct the document and stage it again")
+                self.assertFalse((self.root / "answers.intake.draft.json").exists())
+
+    def test_intake_draft_refuses_other_names_and_symlinks_with_fixed_lines(self):
+        for name in (f"{CANARY}.json", f"sub/{CANARY}/answers.intake.draft.json"):
+            with self.subTest(name=name):
+                r = self.run_script(SR, "intake-draft", name, stdin=json.dumps(sidecar()))
+                self.assertClean(r, None)
+                self.assertEqual(r.returncode, 2)
+        (self.root / "elsewhere.json").write_text("{}")
+        (self.root / "answers.intake.draft.json").symlink_to("elsewhere.json")
+        r = self.run_script(SR, "intake-draft", "answers.intake.draft.json", stdin=json.dumps(sidecar()))
+        self.assertClean(r, 2)
+
+    def test_intake_draft_success_line_has_counts_only(self):
+        r = self.run_script(SR, "intake-draft", "answers.intake.draft.json", stdin=json.dumps(sidecar(CANARY)))
+        self.assertClean(r, 0)
+        self.assertEqual(r.stdout.strip(), "staged\t1\t0")
+
+    def test_now_prints_a_stamp_only(self):
+        r = self.run_script(SR, "now")
+        self.assertClean(r, 0)
+        self.assertRegex(r.stdout.strip(), r"^\d{4}-\d\d-\d\dT\d\d:\d\d:\d\dZ$")
+
     def test_intake_missing_sidecar_without_a_draft_is_the_legacy_empty_result(self):
         r = self.run_script(SR, "intake", self.root / "absent.json", "1")
         self.assertEqual(json.loads(r.stdout), {"present": False, "assumptions": [], "analyst_questions": []})

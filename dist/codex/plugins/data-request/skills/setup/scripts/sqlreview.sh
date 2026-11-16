@@ -70,7 +70,15 @@
 #   intake FILE REVISION [DRAFT]              read analyst answers sidecar; optional collision-safe scope draft merge
 #                                              missing FILE is a legacy no-op (with DRAFT it prints the draft unchanged,
 #                                              or exits 4 when the draft is not a readable file); invalid intake exits 4;
-#                                              never writes; a refused merge names the draft field and its rule
+#                                              never writes; a refused merge names the draft field and its rule.
+#                                              FILE named answers.intake.draft.json is read as a draft
+#                                              (criteria may lack fingerprints, output adds "draft": true; no DRAFT merge)
+#   intake-draft answers.intake.draft.json      stage the interview so far: read a sidecar-shaped JSON document on stdin,
+#                                              validate it as a draft (see intake), then atomically replace the draft in the
+#                                              current directory; prints "staged<TAB>decisions<TAB>questions". Needs no
+#                                              .sqlreview/. Only that file name is written, never through a symlink;
+#                                              exit 4 for an invalid document (the old draft stays), 2 for any other name
+#   now                                        print the current UTC time as YYYY-MM-DDTHH:MM:SSZ, for confirmed_at
 #   carryforward SLUG scope|review DRAFT       draft items whose previous-revision confirmation may be carried (JSON)
 #   remap SLUG [DRAFT]                         atomically remap unchanged location/logic ranges in a draft (JSON report)
 #                                              default: review.draft.json, else scope.draft.json; seed from published JSON
@@ -1345,10 +1353,22 @@ cmd_impact() (
 #   scope-before-sql    the scope was confirmed before the SQL existed (sql_sha256 null, no baseline)
 #   intent-unchanged    the SQL changed, but the scope item has no location: it states intent
 # Every other matching item is walked, as is every new or reworded item.
+# Validate one sidecar-shaped file and print its import JSON (empty on failure). DRAFT (true or false)
+# relaxes only the rule that confirmed criteria need fingerprints: the interview fingerprints at its end.
+sr_intake_eval() {
+  jq -se 'if length == 1 then .[0] else error("expected one intake object") end' "$1" 2>/dev/null |
+    jq -L "$SR_SCRIPT_DIR" --arg source "$1" --argjson revision "$2" --argjson draft "$3" \
+      -f "$SR_SCRIPT_DIR/sqlreview-intake.jq" 2>/dev/null
+}
+
 cmd_intake() {
   [ $# -eq 2 ] || [ $# -eq 3 ] || usage
   sr_need_jq
   case "$2" in ''|*[!0-9]*|0) sr_die 1 "revision must be an integer >= 1" ;; esac
+  # The staged interview draft is read back under the draft rules and is never imported into a scope.
+  local out draft=false
+  case "$1" in answers.intake.draft.json|*/answers.intake.draft.json) draft=true ;; esac
+  [ $# -eq 2 ] || [ "$draft" = false ] || sr_die 4 "cannot merge intake: a staged interview draft is not the sidecar"
   if [ ! -e "$1" ]; then
     # A legacy no-op. With DRAFT it prints the draft as it is, the same output that the merge gives
     # when the sidecar adds nothing. It must not print nothing: the documented pattern writes the output
@@ -1364,10 +1384,7 @@ cmd_intake() {
     return 0
   fi
   [ -f "$1" ] || sr_die 4 "intake must be a regular JSON file"
-  local out
-  out="$(jq -se --arg source "$1" --argjson revision "$2" '
-    if length == 1 then .[0] else error("expected one intake object") end
-  ' "$1" 2>/dev/null | jq -L "$SR_SCRIPT_DIR" --arg source "$1" --argjson revision "$2" -f "$SR_SCRIPT_DIR/sqlreview-intake.jq" 2>/dev/null)" || sr_die 4 "invalid analyst intake; run validate-answers and correct the sidecar"
+  out="$(sr_intake_eval "$1" "$2" "$draft")" || sr_die 4 "invalid analyst intake; run validate-answers and correct the sidecar"
   [ -n "$out" ] || sr_die 4 "invalid analyst intake; expected one JSON object"
   if [ $# -eq 3 ]; then
     # Name the first draft field that blocks the merge, and its rule. The lines are fixed text: no value.
@@ -1408,6 +1425,31 @@ cmd_intake() {
     printf '%s\n' "$out"
   fi
 }
+
+# The interview's resume point. The draft is a sidecar-shaped file that `intake` reads back with the draft rules.
+# A document that fails them never replaces the last good draft, and no diagnostic carries a value.
+# A subshell, like the other commands that trap EXIT: the trap then runs while `tmp` is still set.
+cmd_intake_draft() (
+  [ $# -eq 1 ] || usage
+  sr_need_jq
+  [ "$1" = answers.intake.draft.json ] || sr_die 2 "the draft file name must be answers.intake.draft.json in the current directory"
+  sr_no_symlinks "$1" || exit 2
+  # mv would move the new file into a directory of that name and still report success.
+  [ ! -e "$1" ] || [ -f "$1" ] || sr_die 2 "the draft file name is taken by something that is not a regular file"
+  local tmp counts checked
+  tmp="$(mktemp "./.answers.intake.draft.XXXXXX")" || sr_die 2 "cannot stage draft"
+  trap 'rm -f "$tmp"' EXIT
+  trap 'exit 2' HUP INT TERM
+  cat > "$tmp" || sr_die 2 "cannot stage draft"
+  # Draft rules: schema 1, or schema 2 with confirmed criteria whose fingerprints may still be missing.
+  checked="$(sr_intake_eval "$tmp" 1 true)" && [ -n "$checked" ] ||
+    sr_die 4 "invalid analyst intake draft; correct the document and stage it again"
+  counts="$(jq -r '[(.decisions | length), (.open_questions | length)] | @tsv' "$tmp")" || sr_die 2 "cannot stage draft"
+  mv -f "$tmp" "$1" || sr_die 2 "cannot stage draft"
+  printf 'staged\t%s\n' "$counts"
+)
+
+cmd_now() { [ $# -eq 0 ] || usage; sr_now; }
 
 cmd_carryover() (
   [ $# -eq 2 ] || usage
@@ -2035,6 +2077,7 @@ _sr_guard_command_inputs() { # COMMAND ARGS...
     check) [ $# -lt 1 ] || [ "$1" = --stdin ] || sr_guard_input "$1" ;;
     # The sidecar and the optional drafts file are both read, and the sidecar's content is copied into
     # drafts. Guarded here, not in cmd_intake, because criteria reads the sidecar at the git top level.
+    intake-draft) [ $# -lt 1 ] || sr_guard_input "$1" ;;
     intake) [ $# -lt 1 ] || sr_guard_input "$1" helper-render; [ $# -lt 3 ] || sr_guard_input "$3" ;;
     # A scope draft given by path is read like any other file argument. A bare slug is not a file.
     criteria) case "${1:-}" in */*|*.json) sr_guard_input "$1" ;; esac ;;
@@ -2061,6 +2104,7 @@ _sr_guard_command_inputs() { # COMMAND ARGS...
     materialize) ;;        # input: none
     migrate-questions) ;;  # input: none
     move) ;;               # input: in-command
+    now) ;;                # input: none
     publish) ;;            # input: in-command
     questions) ;;          # input: none
     render) ;;             # input: none
@@ -2099,6 +2143,8 @@ case "$cmd" in
   impact) cmd_impact "$@" ;;
   carryover) cmd_carryover "$@" ;;
   intake) cmd_intake "$@" ;;
+  intake-draft) cmd_intake_draft "$@" ;;
+  now) cmd_now "$@" ;;
   carryforward) cmd_carryforward "$@" ;;
   remap) cmd_remap "$@" ;;
   notes) cmd_notes "$@" ;;
