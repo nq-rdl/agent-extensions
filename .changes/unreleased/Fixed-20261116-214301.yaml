@@ -1,0 +1,3 @@
+kind: Fixed
+body: '`sqlreview.sh notes` reads an analysis-notes header that opens with the `inputs:` section (#567)'
+time: 2026-11-16T21:43:01Z

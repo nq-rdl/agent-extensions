@@ -1,0 +1,3 @@
+kind: Fixed
+body: '`recurring-decisions.sh match` skips analyst-intake items and still matches the other items'
+time: 2026-11-16T21:43:09Z
