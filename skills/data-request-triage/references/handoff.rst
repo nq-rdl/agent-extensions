@@ -159,7 +159,9 @@ prepares and publishes the release. Never direct the engineer to release.
    ledger on the agreed branch. The ledger commit moves the PR head. Confirm with
    ``git diff --name-only "$PR_HEAD" "$NEW_HEAD"``, with ``NEW_HEAD`` set to the new head
    SHA, that it changed only ``.sqlreview/ledger.json``. If it did, the gate result and
-   its waivers also hold for the new head. Any other change needs the gate again. The comment then names the head that
+   the waivers read at the checked head also hold for the new head. A ``ledger waivers``
+   run for the new head shows them as ``lapsed``, because each waiver names the checked
+   head. That is expected, and no new waiver is needed. Any other change needs the gate again. The comment then names the head that
    includes the ledger commit, so the head it names does not move.
 4. **Ready.** The human marks the PR ready for review. This takes it out of draft. Ask
    for it when steps 1 to 3 pass. Mark it ready yourself only on an explicit

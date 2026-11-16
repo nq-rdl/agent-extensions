@@ -172,6 +172,11 @@ class HandoffContracts(unittest.TestCase):
         comment = handoff.index("**Comment**")
         self.assertLess(record, comment)
         self.assertIn("names the head that includes the ledger commit", handoff)
+        # A ledger-only commit carries the gate result and the waivers to the new head.
+        for token in ('git diff --name-only "$PR_HEAD" "$NEW_HEAD"', "changed only ``.sqlreview/ledger.json``",
+                      "Any other change needs the gate again", "shows them as ``lapsed``",
+                      "no new waiver is needed"):
+            self.assertIn(token, handoff)
 
     def test_pr_text_refresh_and_output_coverage_are_gate_steps(self):
         # #568: every extract output appears in the runbook, the data dictionary and the UAT checklist.
