@@ -244,6 +244,18 @@ class VerdictProbeTemplate(unittest.TestCase):
                 self.assertNotIn("COUNT(", section)
                 self.assertNotIn(" NOT IN (", section)
 
+    def test_template_compares_one_type_and_handles_null(self):
+        for tree in TREES:
+            with self.subTest(tree=tree):
+                text = self.performance(tree)
+                section = text.split("Verdict probes", 2)[2]
+                # Both the C1 check and the canary need the NULL branch and the common type.
+                self.assertEqual(section.count("IS NULL AND d.v IS NULL"), 2)
+                self.assertEqual(section.count("DATALENGTH(CAST(d.v AS NVARCHAR(<max_len>)))"), 2)
+                self.assertNotIn("DATALENGTH(d.v)", section)
+                self.assertNotIn("DATALENGTH(s.lbl)", section)
+                self.assertNotIn("DATALENGTH(c.v)", section)
+
     def test_plausibility_offers_the_verdict_before_the_count(self):
         for tree in TREES:
             with self.subTest(tree=tree):
