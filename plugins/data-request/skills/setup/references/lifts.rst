@@ -72,9 +72,9 @@ Capture a candidate before draft, from map or bootstrap, as soon as a gap is
 verified. Draft adds a candidate for each request-local TypedTable, spec or handler
 it writes. Run ``sqlreview.sh lifts-uncovered SLUG`` to list request-local TypedTable
 classes in the pipeline file and its sibling ``.py`` files that no entry names. The
-command is read-only and prints ``{slug, uncovered}``. An entry covers a class when
-its ``need``, ``shortfall``, a unit ``symbol`` or its optional ``local_units`` array
-names that class as a whole word. ``local_units`` is a nonempty array of identifiers.
+command is read-only and prints a JSON object with ``slug`` and ``uncovered``. An
+entry covers a class when its ``need``, ``shortfall``, a unit ``symbol`` or its
+optional ``local_units`` array names that class as a whole word. ``local_units`` is a nonempty array of identifiers.
 
 Read-only release stale check
 -----------------------------
