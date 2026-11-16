@@ -1341,7 +1341,10 @@ cmd_carryforward() (
          | . as $r | {kind, id, basis,
              lines: ([($d[$r.kind] // []) | if type == "array" then .[] else empty end
                       | select(type == "object" and (if $r.kind == "criteria_status" then .criterion else .id end) == $r.id)][0]
-                     | .location.lines? // null)}]}' --arg document "$kind"
+                     | .location.lines? // null)}]}' --arg document "$kind" || exit $?
+  # Exit 6 keeps the contract that unproved evidence is unavailable. The JSON above still lists every item
+  # in walk, because a failed re-proof touches every item.
+  [ "$CF_REPROOF_FAILED" = false ] || return 6
 )
 
 # The carry questions list many items. A dialog cannot show each item's stored text and rationale, so this

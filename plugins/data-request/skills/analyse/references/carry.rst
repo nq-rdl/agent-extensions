@@ -43,8 +43,8 @@ the walk by your own judgement.
 ``walk``
    The items that the change touches. This includes changed text or rationale, governed lines
    that the diff changes or cannot re-locate, and a criteria row whose state or intake changed.
-   When ``reproof_failed`` is true, git cannot supply the recorded SQL with its SHA, so every
-   item is in ``walk``. Walk each item.
+   When ``reproof_failed`` is true (exit 6), git cannot supply the recorded SQL with its SHA,
+   so every item is in ``walk``. Walk each item.
 ``carry_question``
    Every other item. A ``carry`` row keeps the earlier confirmation. A ``bulk`` row keeps its
    wording, but the SQL changed under it because it has no location. Its answer is a fresh

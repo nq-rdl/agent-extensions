@@ -121,7 +121,7 @@ class Move(unittest.TestCase):
                 self.assertEqual(r.returncode, 6, r.stdout + r.stderr)
         # carryforward reports the failed re-proof: every item is touched and walked, none carries.
         r = run(["carryforward", "new", "review", str(draft)], self.p.root)
-        self.assertEqual(r.returncode, 0, r.stdout + r.stderr)
+        self.assertEqual(r.returncode, 6, r.stdout + r.stderr)
         out = json.loads(r.stdout)
         self.assertTrue(out["reproof_failed"])
         self.assertEqual((out["carry"], out["carry_question"]), ([], []))
@@ -225,7 +225,7 @@ class SkillContract(unittest.TestCase):
             "Each option says what gets recorded", "exact new text counts as the re-ask",
             "never to the header comment lines", "path moved with identical bytes", "`clear` fields",
             "walks only the rows that the change touches", "`criteria-lines-unchanged`",
-            "`sql_status: \"not-implemented\"`", "ask **one** carry question"))
+            "`sql_status: \"not-implemented\"`", "Ask **one** carry question"))
 
 
 if __name__ == "__main__":

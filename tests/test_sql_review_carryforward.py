@@ -485,7 +485,9 @@ class CarryForwardHelper(Base):
 
     def test_a_failed_re_proof_makes_every_item_touched(self):
         self.edit_prior_sha()
-        out = self.carryforward("review", self.draft_doc(SQL_V1, by=0))
+        r = self.carryforward("review", self.draft_doc(SQL_V1, by=0), expected=6)
+        self.assertIn("full SHA mismatch", r.stderr)
+        out = json.loads(r.stdout)
         self.assertTrue(out["reproof_failed"])
         self.assertEqual((out["carry"], out["bulk"], out["carry_question"]), ([], [], []))
         self.assertEqual(sorted(w["id"] for w in out["walk"]), ["A1", "A2", "A3", "L1"])

@@ -251,7 +251,7 @@ bash "$S/sqlreview.sh" impact "$SLUG"    # HINTS ONLY: identifiers from the chan
    `walk` items, and ask **one** carry question for the `carry_question` items. The question lists
    each id with its confirmed text from `carry-list`. On **Carry all**, copy each `carry` item's
    `set` fields (with `carried_basis`) onto it verbatim, and give each `bulk` item fresh
-   `confirmed_*` from the answer. Re-run the pre-presentation lint before each question batch,
+   `confirmed_*` from the answer. Re-run the pre-presentation lint before each `bulk`/`walk` question batch,
    including stored and newly drafted items. Reworded carried items need fresh confirmation.
    Confirm / reword / drop the `walk` items and any item the human names, and add new ones.
    Do not add items to the walk by judgement: tell the human about an indirect effect in the
