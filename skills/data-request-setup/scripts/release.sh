@@ -85,6 +85,7 @@
 #                            criteria_status hold the table (no-owning-scope). Runs no Python.
 #                            Exit 10 when held.
 #
+# -h or --help (alone or after any subcommand) prints this text and exits 0, also outside a project.
 # Exit codes: 0 ok · 1 usage · 2 error (unknown ref or slug, no jq or git) · 3 not initialised ·
 # 4 invalid record · 10 at least one review does not apply to REF (evidence), or the criteria
 # table is held (criteria) · 11 release held by the amend gate (evidence): a part in
@@ -97,8 +98,9 @@ SR_SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd -P)"
 # shellcheck source=sqlreview-lifts.sh
 . "$SR_SCRIPT_DIR/sqlreview-lifts.sh"   # for _sr_release_tag, the stable X.Y.Z rule
 
+help_text() { awk 'NR > 1 && !/^#/ { exit } NR > 1' "$0" | sed 's/^# \{0,1\}//'; }
 usage() {
-  awk 'NR > 1 && !/^#/ { exit } NR > 1' "$0" | sed 's/^# \{0,1\}//' >&2
+  help_text >&2
   exit 1
 }
 
@@ -749,6 +751,10 @@ EOT
 cmd="${1:-}"
 [ -n "$cmd" ] || usage
 shift
+# -h or --help, alone or after a subcommand, prints this text on stdout and exits 0. It runs before
+# any project lookup, so it works outside a request repository.
+case "$cmd" in -h|--help|help) help_text; exit 0 ;; esac
+for arg in "$@"; do case "$arg" in -h|--help) help_text; exit 0 ;; esac; done
 # File arguments go through the shared guard (#516): no data/, no unreviewed sql/, nothing outside the project.
 case "$cmd" in
   # A release record is checked or rendered anywhere (it is not project input), so only data/ and unreviewed

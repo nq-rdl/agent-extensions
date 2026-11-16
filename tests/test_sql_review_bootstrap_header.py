@@ -302,6 +302,12 @@ class BootstrapHeader(unittest.TestCase):
         self.assertEqual(r.returncode, 2, r.stdout + r.stderr)
 
 
+try:  # `unittest discover -s tests` puts tests/ on sys.path; `-m unittest tests.x` does not
+    import skill_references
+except ModuleNotFoundError:
+    from tests import skill_references
+
+
 class BootstrapContract(unittest.TestCase):
     def test_prepublication_comparison_and_resolution_in_all_targets(self):
         for path in (REPO / "skills/data-request-bootstrap/SKILL.md",
@@ -312,6 +318,12 @@ class BootstrapContract(unittest.TestCase):
                 check = body.index('sqlreview.sh" notes')
                 publish = body.index('sqlreview.sh" publish "$SLUG" scope')
                 self.assertLess(check, publish)
+                # How to read scope_check lives in a linked reference, beside the gate in SKILL.md.
+                self.assertIn("](references/header-check.rst)", body)
+                self.assertIn("Do not publish while a mismatch is unaddressed", body)
+                self.assertIn("Compare every open scope", body)
+                self.assertEqual(skill_references.problems(path.parent), [])
+                body += (path.parent / "references" / "header-check.rst").read_text()
                 for phrase in ("--against", "--questions", "question_checks", "unmatched_header",
                                "both identities", "provisional", "Do not close", "semantic"):
                     self.assertIn(phrase, body)

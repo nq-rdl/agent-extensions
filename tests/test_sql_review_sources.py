@@ -349,6 +349,7 @@ class Sources(unittest.TestCase):
             self.assertIn("file\t.gitignore", r.stdout)
             self.assertEqual((p.root / ".sqlreview/.gitignore").read_text().splitlines(),
                              ["/reviews/**/source.sql", "/reviews/**/scope.source.sql", "/reviews/**/history/*.sql",
+                              "/reviews/**/*.draft.json",
                               "*.sql", "*.csv", "*.tsv", "*.parquet", "*.xlsx", "*.xls", "!templates/**"])
 
 

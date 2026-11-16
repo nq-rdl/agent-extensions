@@ -44,6 +44,26 @@ library issue that would retire it. Treat the epic and every library issue as pu
 * ``library_issue`` (URL or null), ``related_issues``, and ``retired_by`` (an object with
   ``unit`` and ``version`` when retired).
 
+Upstream marker schema
+----------------------
+
+Every helper reads one ``upstream`` object with these keys:
+
+* ``source`` tells where the item came from: ``analyst-intake``, ``house-default`` or
+  ``recurring-decision``.
+* ``decision`` names the listed decision of a scope or review item.
+* ``id`` names the listed decision of a ``criteria_status`` row.
+
+An item that states a listed decision has ``decision``. An imported house default, such as
+``tuh-facility``, has ``decision`` and the source ``house-default``. A ``criteria_status`` row,
+such as ``broad-first-pass``, has the source ``recurring-decision`` and ``id``. An item that the
+intake helper imported has the source ``analyst-intake``, ``file`` and ``intake_id``. It has no
+``decision``.
+
+``match`` and ``marked`` skip an item whose marker has no ``decision``. They still score
+every other item. They refuse a marker that is not an object, a ``decision`` that is not a
+nonempty string, and a marker with neither ``decision`` nor ``source``.
+
 Recorded house default
 ----------------------
 
