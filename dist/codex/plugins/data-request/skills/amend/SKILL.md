@@ -290,9 +290,9 @@ Return the classification, the governance status (request ID, reason, open quest
 changed paths, the regenerated SQL, the record entry, the checks run with their results and
 any blocker. Regenerated SQL or a renamed validation or UAT output column leaves an existing
 `.sqlreview/` review stale in meaning, even where its fingerprint still matches: its outputs
-and steps describe the previous output. Before the next release, re-run `$data-request:analyse`
-on each changed SQL file with a full re-walk (walk every item and publish with
-`--reconfirm-all`), because carry-forward keeps items whose SQL lines did not change. A passing
+and steps describe the previous output. Before the next release, hand the re-check to `$data-request:analyse` and `$data-request:bootstrap`.
+They walk only the items that the diff touches, then ask one carry question that lists every other item
+with its confirmed text. The carry rules are in `${PLUGIN_ROOT}/skills/analyse/references/carry.rst`. A passing
 check is not release approval.
 
 For a split request, end with this short summary for the analyst:
@@ -308,7 +308,7 @@ A handed-off part is an open delivery gate. Do not start `$data-request:release`
 engineer completes each handed-off part, or the analyst withdraws it on the deliverable PR. Only
 the two forms in *Close a handed-off part* (step 2) close a part. `$data-request:release`
 enforces this gate in its step 0 (*Amend gate*). The
-done parts already make the review stale. One full re-walk after the engineer's change can
+done parts already make the review stale. One touched-item walk after the engineer's change can
 cover all parts.
 
 ## Resume a split request

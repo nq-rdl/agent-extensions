@@ -126,7 +126,7 @@ Before you regenerate SQL, add or update one row test for each rule the fix chan
 fails on the old logic. A string-replace edit of a long builder can hide a shadowed variable, a reused module
 constant name or a missed output column. Run the child's unit suite in `tests/` and its framework suite in
 `tests_framework/` before every push, and prefer structural asserts over exact SQL strings. After any builder
-edit, run the scaffold's `amend regenerate` with no argument and commit the regenerated SQL. Read
+edit, run `pixi run --environment framework amend regenerate <sql>` for each SQL file that imports it, and commit the regenerated SQL. Read
 `${CLAUDE_PLUGIN_ROOT}/skills/guardrails/references/house-conventions.rst` for the conventions behind these steps.
 When you cite a rule, quote its file and line, and keep your own recommendation separate.
 

@@ -21,10 +21,18 @@ class DraftConventions(unittest.TestCase):
         for tree, prefix in TREES:
             with self.subTest(tree=tree):
                 text = read(tree, prefix, "draft/SKILL.md")
-                for phrase in ("amend record --builder", "--server", "repo-local inputs",
-                               "sql/v<N>/<name>_request.sql", "amend regenerate",
+                for phrase in ("pixi run --environment framework amend record <sql> --builder MODULE:FUNCTION --server <alias>",
+                               "repo-local inputs",
+                               "sql/v<N>/<name>_request.sql",
+                               "pixi run --environment framework amend regenerate <sql>",
                                "Copy confirmed scope wording verbatim"):
                     self.assertIn(phrase, text)
+
+    def test_fix_uses_the_framework_environment_form(self):
+        for tree, prefix in TREES:
+            with self.subTest(tree=tree):
+                text = read(tree, prefix, "fix/SKILL.md")
+                self.assertIn("pixi run --environment framework amend regenerate <sql>", text)
 
     def test_draft_and_fix_name_both_suites(self):
         for tree, prefix in TREES:

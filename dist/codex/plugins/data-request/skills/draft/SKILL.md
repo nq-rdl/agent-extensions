@@ -109,10 +109,11 @@ Do not reword it, or the SQL header check fails.
 Builder SQL is generated, so commit it through the scaffold's amend guard:
 
 1. Write the SQL to `sql/v<N>/<name>_request.sql`. The `_request.sql` suffix is the naming rule.
-2. Run the scaffold's `amend record --builder` for it. Pass `--server` with an alias from the server
-   configuration and list the builder's repo-local inputs. The guard accepts both being absent, so check them.
-3. After any edit to a builder, even a docstring, run `amend regenerate` with no argument. Every SQL file
-   that imports the builder changes provenance.
+2. Run `pixi run --environment framework amend record <sql> --builder MODULE:FUNCTION --server <alias>`.
+   The `--server` value is an alias from the server configuration. List the builder's repo-local inputs
+   too. The guard accepts both being absent, so check them.
+3. After any edit to a builder, even a docstring, run `pixi run --environment framework amend regenerate <sql>`
+   for every SQL file that imports the builder. Their provenance changes.
 4. Commit only after steps 2 and 3. A block that names missing provenance means step 2 was skipped.
 
 ## Tests before a push
