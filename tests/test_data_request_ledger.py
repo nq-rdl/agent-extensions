@@ -17,10 +17,10 @@ def entry(ticket=TICKET):
     return dict(ticket=ticket, enquiry='ENQ9003', repo='rdl-service-desk/THHSAQUIRE-9903',
                 approval='THHSAQUIRE-9903', branch='triage/903', owner='engineer-handle',
                 stage='validate', stages_done=['intake', 'map', 'draft'],
-                evidence_revision={'ticket': '2026-09-29', 'sql': 'abc123'},
+                evidence_revision={'ticket': '2026-09-29', 'sql_commit': 'abc123'},
                 stage_evidence={'intake': {'sources': ['ticket'], 'artifacts': []},
                                 'map': {'sources': ['ticket'], 'artifacts': []},
-                                'draft': {'sources': ['sql'], 'artifacts': []}},
+                                'draft': {'sources': ['sql_commit'], 'artifacts': []}},
                 decisions=[{'decision': 'Use supplied cohort',
                             'decided': {'by': 'analyst-handle', 'role': 'Requester',
                                         'at': '2026-09-29', 'source': 'unlinked (verbal)'}}],
@@ -117,7 +117,7 @@ class Ledger(unittest.TestCase):
         self.save()
         before = self.dest.read_bytes()
         mutations = [('stage', 'unknown'), ('stages_done', ['draft', 'draft']),
-                     ('stage_evidence', {}), ('evidence_revision', {'sql': 1}),
+                     ('stage_evidence', {}), ('evidence_revision', {'sql_commit': 1}),
                      ('owner', 'someone@example.com'), ('decisions', [{'decision': 'x', 'decided': {'by': 'a'}}]),
                      ('verification', {'status': 'verified'}), ('ticket', '../bad#1')]
         for key, value in mutations:
@@ -140,7 +140,7 @@ class Ledger(unittest.TestCase):
     def test_changed_evidence_rechecks_only_affected_completed_stages(self):
         self.save()
         current = self.root / 'current.json'
-        current.write_text(json.dumps({'ticket': '2026-09-30', 'sql': 'abc123'}))
+        current.write_text(json.dumps({'ticket': '2026-09-30', 'sql_commit': 'abc123'}))
         result = json.loads(self.run_helper('get', TICKET, '--against', str(current)).stdout)
         self.assertEqual(result['recheck'], ['intake', 'map'])
         self.assertEqual(result['entry']['owner'], 'engineer-handle')
@@ -313,6 +313,25 @@ class Ledger(unittest.TestCase):
     def test_invalid_current_evidence_fails_instead_of_rechecking_everything(self):
         self.save(); current = self.root / 'current.json'; current.write_text('{bad')
         self.run_helper('get', TICKET, '--against', str(current), ok=False)
+
+
+    def test_the_documented_example_entry_validates(self):
+        """The example in ledger.rst is the shape agents copy, so it must pass the schema as written."""
+        import re
+        import yaml
+        rst = (REPO / 'skills/data-request-triage/references/ledger.rst').read_text()
+        block = re.search(r"Example entry[^\n]*\n\n\.\. code-block:: yaml\n\n((?:   [^\n]*\n|\n)+)", rst)
+        self.assertIsNotNone(block, 'ledger.rst needs the example entry')
+        # Placeholders stand for values the agent fills in; substitute synthetic ones.
+        example = block.group(1).replace("'<64 lowercase hex characters>'", "'" + 'a' * 64 + "'")
+        example = example.replace('<owner>/<repo>', 'example-org/example-request')
+        doc = yaml.safe_load(example)
+        self.assertNotIn('sql', doc['evidence_revision'], 'the scaffold sweep refuses a field named sql')
+        self.assertIn('sql_commit', doc['evidence_revision'])
+        self.assertTrue(doc['gate_waivers'], 'the example shows a gate waiver')
+        store = self.root / 'example.json'
+        store.write_text(json.dumps({'schemaVersion': 1, 'entries': [doc]}, default=str))
+        self.run_helper('check', str(store))
 
 
 if __name__ == '__main__':
