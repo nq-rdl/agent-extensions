@@ -8,6 +8,7 @@ an unresolvable path fails closed, and the message names the rule, never file co
 import hashlib
 import json
 import os
+import shutil
 import subprocess
 import tempfile
 import unittest
@@ -333,9 +334,9 @@ class PathGuard(unittest.TestCase):
 SCRIPTS = SCRIPT.parent
 D = "data/secret.json"
 SLUG = "sql__v1__q"
-# Every subcommand and the arguments that hand it a refused data/ file. NOINPUT marks commands
-# whose only inputs are slugs and project SQL paths, or that only write a path; the walk below
-# fails when a dispatch entry is in neither table, so a new subcommand needs a decision here.
+# The arguments that hand each file-reading subcommand a refused data/ file. sqlreview.sh declares
+# every subcommand's input class in _sr_guard_command_inputs; the walk below reads those arms, so a
+# command declared as reading input needs variants here, and an undeclared command fails the walk.
 SQLREVIEW_INPUTS = {
     "check": [[D]],
     "lint": [[D], ["--ste", D]],
@@ -346,6 +347,7 @@ SQLREVIEW_INPUTS = {
     "publish": [[SLUG, "review", D]],
     "publish-questions": [[SLUG, D]],
     "intake": [["sql/v1/missing.json", "1", D], [D, "1"]],
+    "intake-draft": [[D]],
     "notes": [[D], ["sql/v1/q.sql", "--against", D], ["sql/v1/q.sql", "--questions", D]],
     "ledger": [["check", D], ["set", "nq-rdl/x#1", D], ["get", "nq-rdl/x#1", "--against", D],
                ["--session", "check", D]],
@@ -355,8 +357,6 @@ SQLREVIEW_INPUTS = {
     "move": [["sql/v1/q.sql", D]],
     "criteria": [[D]],
 }
-SQLREVIEW_NOINPUT = {"init", "status", "roles", "guard", "lifts-stale", "materialize", "delta", "impact",
-                     "questions", "migrate-questions", "render", "discard-draft"}
 RELEASE_INPUTS = {"check": [[D]], "render": [[D]], "amend-check": [[D], ["--name", "r", D]]}
 # criteria reads a --fingerprints file of four sha256 strings that it validates strictly, so no value can pass through.
 # fetch-command takes no argument and reads only the remotes.
@@ -365,12 +365,40 @@ RECURRING_INPUTS = {"match": [[D], ["--any-kind", D]], "marked": [[D], ["sql/v1/
 RECURRING_NOINPUT = {"list"}
 
 
-def dispatched(script, pattern):
+def dispatched(script, pattern, text=None):
     """Command names in a script's final dispatch `case`."""
     import re
-    text = (SCRIPTS / script).read_text()
+    text = (SCRIPTS / script).read_text() if text is None else text
     tail = text[text.rindex('case "$cmd" in'):]
     return {m.group(1) for m in re.finditer(pattern, tail, re.M)}
+
+
+SQLREVIEW_DISPATCH = r"^  ([a-z][a-z-]*)\) .*cmd_"
+
+
+def guard_declarations(text):
+    """{command: "none" | "input"} from the arms of sqlreview.sh's _sr_guard_command_inputs."""
+    import re
+    start = text.index("_sr_guard_command_inputs() {")
+    body = text[start:text.index("\n}\n", start)]
+    declared = {}
+    for arm in re.finditer(r"^    ([a-z-][a-z|-]*)\)(.*)$", body, re.M):
+        kind = "none" if re.search(r"#\s*input: none\s*$", arm.group(2)) else "input"
+        for name in arm.group(1).split("|"):
+            declared[name] = kind
+    return declared
+
+
+def sqlreview_noinput(text=None):
+    """Dispatched sqlreview.sh commands declared "input: none"; fails on any undeclared command."""
+    text = (SCRIPTS / "sqlreview.sh").read_text() if text is None else text
+    declared = guard_declarations(text)
+    commands = dispatched("sqlreview.sh", SQLREVIEW_DISPATCH, text)
+    missing = commands - set(declared)
+    if missing:
+        raise AssertionError(f"sqlreview.sh: {sorted(missing)} dispatched without an input class in "
+                             "_sr_guard_command_inputs")
+    return {c for c in commands if declared[c] == "none"}
 
 
 class RootDiscovery(unittest.TestCase):
@@ -501,7 +529,7 @@ class EveryEntryPoint(unittest.TestCase):
                     self.assert_refused(script, command, args)
 
     def test_sqlreview(self):
-        self.walk("sqlreview.sh", r"^  ([a-z][a-z-]*)\) .*cmd_", SQLREVIEW_INPUTS, SQLREVIEW_NOINPUT)
+        self.walk("sqlreview.sh", SQLREVIEW_DISPATCH, SQLREVIEW_INPUTS, sqlreview_noinput())
 
     def test_release(self):
         self.walk("release.sh", r"^  ([a-z][a-z-]*)\) cmd_", RELEASE_INPUTS, RELEASE_NOINPUT)
@@ -513,6 +541,51 @@ class EveryEntryPoint(unittest.TestCase):
         self.p.write_json(SLUG, "scope.json", scope_doc(SLUG, "sql/v1/q.sql"))
         self.assert_refused("sqlreview.sh", "publish-questions", [SLUG, D])
         self.assertFalse((self.root / ".sqlreview/reviews" / SLUG / "questions.json").exists())
+
+
+class GuardDeclarations(unittest.TestCase):
+    """Each sqlreview.sh subcommand declares its input class beside its guard, not in a list here."""
+
+    UNDECLARED = '  zz-undeclared) cmd_zz_undeclared "$@" ;;\n'
+
+    def with_undeclared(self, text):
+        anchor = '  init) cmd_init "$@" ;;\n'
+        self.assertIn(anchor, text)
+        func = 'cmd_zz_undeclared() { printf "ran\\n"; }\n'
+        entry = '[ $# -ge 1 ] || usage\ncmd="$1"; shift\n'
+        self.assertIn(entry, text)
+        return text.replace(entry, func + entry, 1).replace(anchor, anchor + self.UNDECLARED, 1)
+
+    def test_every_dispatched_command_is_declared(self):
+        noinput = sqlreview_noinput()
+        self.assertIn("init", noinput)
+        self.assertNotIn("check", noinput)
+        self.assertNotIn("slug", noinput)
+
+    def test_an_undeclared_subcommand_fails_the_walk(self):
+        text = self.with_undeclared((SCRIPTS / "sqlreview.sh").read_text())
+        self.assertIn("zz-undeclared", dispatched("sqlreview.sh", SQLREVIEW_DISPATCH, text))
+        with self.assertRaisesRegex(AssertionError, "zz-undeclared"):
+            sqlreview_noinput(text)
+
+    def test_a_declared_reader_without_variants_fails_the_walk(self):
+        text = (SCRIPTS / "sqlreview.sh").read_text().replace(
+            "    delta) ;;", '    zz-reader) [ $# -lt 1 ] || sr_guard_input "$1" ;;\n    delta) ;;', 1)
+        text = text.replace('  init) cmd_init "$@" ;;\n', '  init) cmd_init "$@" ;;\n  zz-reader) cmd_zz "$@" ;;\n', 1)
+        commands = dispatched("sqlreview.sh", SQLREVIEW_DISPATCH, text)
+        self.assertEqual(commands - set(SQLREVIEW_INPUTS) - sqlreview_noinput(text), {"zz-reader"})
+
+    def test_the_dispatcher_refuses_an_undeclared_subcommand(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            skill = Path(tmp) / "setup"
+            shutil.copytree(SCRIPTS.parent, skill, symlinks=True)
+            script = skill / "scripts" / "sqlreview.sh"
+            script.write_text(self.with_undeclared(script.read_text()))
+            r = subprocess.run(["bash", str(script), "zz-undeclared"], cwd=tmp, capture_output=True, text=True,
+                               timeout=60, env={k: v for k, v in os.environ.items() if not k.startswith("SQLREVIEW_")})
+            self.assertEqual(r.returncode, 1, r.stdout + r.stderr)
+            self.assertEqual(r.stdout, "")
+            self.assertIn("unknown command: zz-undeclared", r.stderr)
 
 
 class ReviewedTreePasses(unittest.TestCase):

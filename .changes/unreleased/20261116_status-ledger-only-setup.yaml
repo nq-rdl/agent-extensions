@@ -1,0 +1,3 @@
+kind: Fixed
+body: status exits 3 and names /data-request:setup when .sqlreview/ holds no config.json, such as a triage ledger alone
+time: 2026-11-16T10:00:01+00:00

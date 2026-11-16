@@ -202,13 +202,19 @@ class ScaffoldStates(unittest.TestCase):
 
     def test_fresh_render_recipe(self):
         recipe = rst_term(self.states, "Fresh render")
-        for token in ("copier copy", "--vcs-ref", "--data-file answers.yaml",
-                      "gh:nq-rdl/data-analysis-scaffold", "co-development", "byte-identical", "Re-lock pixi",
-                      "``--trust`` runs the template's tasks", "pinned release tag", "list each one in the PR body",
+        for token in ("skills/setup/references/scaffold-render.rst", "co-development", "byte-identical",
+                      "Re-lock pixi", "list each one in the PR body",
                       "``.seed-manifest.yml``", "``scripts/template_sync.py``", "``src/service_desk/``"):
             with self.subTest(token=token):
                 self.assertIn(token, recipe)
         self.assertNotRegex(recipe, r"run[^.]*copier update")
+        # The command itself lives in the one shared render procedure that intake also cites.
+        shared = body(REPO / "skills" / "data-request-setup" / "references" / "scaffold-render.rst")
+        for token in ("copier copy", "--vcs-ref", "--data-file answers.yaml",
+                      "gh:nq-rdl/data-analysis-scaffold", "``--trust`` runs the template's", "pinned release tag"):
+            with self.subTest(shared_token=token):
+                self.assertIn(token, shared)
+        self.assertNotRegex(shared, r"run[^.]*copier update")
 
     def test_agents_still_never_run_copier_update(self):
         never = md_section(body(TRIAGE / "SKILL.md"), "Never infer permission")
@@ -280,7 +286,7 @@ class DefaultsAndPriorVersions(unittest.TestCase):
 
 
 class HandOffToReview(unittest.TestCase):
-    """#368: gate, assign, comment, move, record; triage-only posts nothing."""
+    """#368: gate, refresh, record, ready, assign, comment, move; triage-only posts nothing."""
 
     def setUp(self):
         self.handoff = rst_section("handoff.rst", "Hand-off to review")
@@ -299,11 +305,11 @@ class HandOffToReview(unittest.TestCase):
 
     def test_steps_in_order(self):
         labels = re.findall(r"^\d+\. \*\*(\w+)\.?\*\*", self.handoff, re.M)
-        self.assertEqual(labels, ["Gate", "Assign", "Comment", "Move", "Record"])
+        self.assertEqual(labels, ["Gate", "Refresh", "Record", "Ready", "Assign", "Comment", "Move"])
 
     def test_gate_reviewer_comment_board_and_record(self):
         text = flat(self.handoff)
-        for token in ("out of draft", "green on the current head", "SQL review status is ``current``",
+        for token in ("out of draft", "green on the checked head", "SQL review status is ``current``",
                       "``/data-request:analyse`` re-ran", "--reconfirm-all", "Actions toolset",
                       "open delivery gate", "Never guess a reviewer", "tracking issue",
                       "service-desk request issue", "**In-Review**", "head SHA", "reviewer",
@@ -354,7 +360,7 @@ class SpecKitDirectMode(unittest.TestCase):
         # rdl-team:house-style reuses only {"decision": "generativeMode", "value": "direct", by, at, scope}
         # (PR #402's directAuthorised()). Triage cannot know the unit's worktree path, so it records the
         # repository owner/name and the main session translates it into the unit's physicalWorktree.
-        handoff = [yaml.safe_load(m) for m in re.findall(r'\{"decision": "generativeMode"[^}]*\}',
+        handoff = [yaml.safe_load(m) for m in re.findall(r'\{\s*"decision": "generativeMode"[^}]*\}',
                                                          (REFS / "handoff.rst").read_text())]
         # The ledger example is one YAML entry; read its decisions as data, not by text shape.
         # Anchor on the "Example entry" lead-in so another YAML block elsewhere cannot be picked up.

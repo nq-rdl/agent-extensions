@@ -1,0 +1,3 @@
+kind: Added
+body: Triage ledger gate_waivers record a human waiver of a known CI failure for one check on one head commit
+time: 2026-11-16T09:00:02Z
