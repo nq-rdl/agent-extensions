@@ -286,7 +286,7 @@ class DefaultsAndPriorVersions(unittest.TestCase):
 
 
 class HandOffToReview(unittest.TestCase):
-    """#368: gate, assign, comment, move, record; triage-only posts nothing."""
+    """#368: gate, refresh, record, ready, assign, comment, move; triage-only posts nothing."""
 
     def setUp(self):
         self.handoff = rst_section("handoff.rst", "Hand-off to review")
@@ -305,11 +305,11 @@ class HandOffToReview(unittest.TestCase):
 
     def test_steps_in_order(self):
         labels = re.findall(r"^\d+\. \*\*(\w+)\.?\*\*", self.handoff, re.M)
-        self.assertEqual(labels, ["Gate", "Assign", "Comment", "Move", "Record"])
+        self.assertEqual(labels, ["Gate", "Refresh", "Record", "Ready", "Assign", "Comment", "Move"])
 
     def test_gate_reviewer_comment_board_and_record(self):
         text = flat(self.handoff)
-        for token in ("out of draft", "green on the current head", "SQL review status is ``current``",
+        for token in ("out of draft", "green on the checked head", "SQL review status is ``current``",
                       "``/data-request:analyse`` re-ran", "--reconfirm-all", "Actions toolset",
                       "open delivery gate", "Never guess a reviewer", "tracking issue",
                       "service-desk request issue", "**In-Review**", "head SHA", "reviewer",
@@ -360,7 +360,7 @@ class SpecKitDirectMode(unittest.TestCase):
         # rdl-team:house-style reuses only {"decision": "generativeMode", "value": "direct", by, at, scope}
         # (PR #402's directAuthorised()). Triage cannot know the unit's worktree path, so it records the
         # repository owner/name and the main session translates it into the unit's physicalWorktree.
-        handoff = [yaml.safe_load(m) for m in re.findall(r'\{"decision": "generativeMode"[^}]*\}',
+        handoff = [yaml.safe_load(m) for m in re.findall(r'\{\s*"decision": "generativeMode"[^}]*\}',
                                                          (REFS / "handoff.rst").read_text())]
         # The ledger example is one YAML entry; read its decisions as data, not by text shape.
         # Anchor on the "Example entry" lead-in so another YAML block elsewhere cannot be picked up.

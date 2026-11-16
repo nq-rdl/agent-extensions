@@ -1,0 +1,3 @@
+kind: Fixed
+body: Hand-off records the ledger before the PR comment, so the comment names a head that does not move
+time: 2026-11-16T09:00:08Z

@@ -1,0 +1,3 @@
+kind: Fixed
+body: status names the move into sql/v<N>/ before any other step when the bound SQL path is outside a reviewed directory
+time: 2026-11-16T10:00:04+00:00

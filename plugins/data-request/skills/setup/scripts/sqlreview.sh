@@ -16,8 +16,17 @@
 #                                              with each field and rule, and so does an amendment
 #                                              in .sqlreview/ledger.json whose record file is missing; an
 #                                              empty project names bootstrap; --verbose: why invalid/missing,
-#                                              and the move that migrates a legacy-encoded slug); exit 3 when not initialised
-#                                              missing bundled templates: JSON missing_templates, else one stderr line
+#                                              and the move that migrates a legacy-encoded slug); exit 3 when not initialised,
+#                                              which includes a .sqlreview/ without config.json (a triage ledger alone);
+#                                              a current review names the operator run, UAT and the triage hand-off
+#                                              before explain until its own ledger entry has a handoff object (the
+#                                              entry whose artifact records its sql_path, else the only one), open lift
+#                                              entries before that; a bound path outside sql/v<N>/ names the move first
+#                                              missing bundled templates: JSON missing_templates, else one stderr line;
+#                                              DATA_REQUEST_EXPECT_BUILD set and not matched: one stderr line
+#   version [--json] [--expect DIGEST]         the plugin name, version and build digest of the tree this helper
+#                                              runs from (the SHA-256 over its skills/, hooks/ and manifest files);
+#                                              --expect: exit 10 unless the digest starts with DIGEST (12-64 hex)
 #   slug PATH                                  slug for a project path; exit 5 on a conflicting binding. Readable:
 #                                              sql/v1/cohort_pipeline/x.sql -> sql__v1__cohort_pipeline__x; an existing
 #                                              legacy-encoded reviews/sql__v1__cohort%5Fpipeline__x/ is kept
@@ -119,6 +128,18 @@ usage() {
 }
 
 # ---------------------------------------------------------------------------------------------
+# True when a project config.json differs from the bundled default only in the keys that `roles` and `guard`
+# set: the two role names (nonempty strings) and guard.require_lift_for_string_sql (a boolean). Those are
+# project settings, so init --diff reports the file as the same and setup asks no Keep or Replace for it.
+_init_settings_only() { # <bundled config> <project config>
+  jq -ne --slurpfile a "$1" --slurpfile b "$2" '
+    ($b | length) == 1 and ($b[0] | type) == "object" and ($a[0] | del(.roles, .guard)) == ($b[0] | del(.roles, .guard))
+    and ($b[0].roles | type) == "object" and ($b[0].roles | keys) == ($a[0].roles | keys)
+    and all($b[0].roles[]; type == "string" and test("\\S"))
+    and ($b[0].guard | type) == "object" and ($b[0].guard | keys) == ($a[0].guard | keys)
+    and ($b[0].guard.require_lift_for_string_sql | type) == "boolean"' >/dev/null 2>&1
+}
+
 cmd_init() {
   local mode="create" json=0 apply=() root target f fdir state rc=0 any=0 entries="[]"
   while [ $# -gt 0 ]; do
@@ -190,6 +211,7 @@ cmd_init() {
   for f in $files; do
     if [ ! -f "$target/$f" ]; then state="new"; any=1
     elif cmp -s "$SR_ASSETS/$f" "$target/$f"; then state="same"
+    elif [ "$f" = config.json ] && _init_settings_only "$SR_ASSETS/$f" "$target/$f"; then state="same"
     else state="differs"; any=1
     fi
     if [ "$json" = 1 ]; then
@@ -270,6 +292,99 @@ EOF
 }
 
 # ---------------------------------------------------------------------------------------------
+# With DATA_REQUEST_EXPECT_BUILD set, one stderr line when the loaded plugin build does not match it. The digest
+# is computed only then, so a normal status run (and the session-start hook, which clears it) pays nothing.
+_status_build_check() {
+  local want root got
+  [ -n "${DATA_REQUEST_EXPECT_BUILD:-}" ] || return 0
+  if ! want="$(sr_build_expect "$DATA_REQUEST_EXPECT_BUILD")"; then
+    printf 'sqlreview: DATA_REQUEST_EXPECT_BUILD is not 12 to 64 hexadecimal characters, so the plugin build was not checked\n' >&2
+    return 0
+  fi
+  root="$(sr_plugin_root)" || {
+    printf 'sqlreview: this helper does not run from a plugin tree, so DATA_REQUEST_EXPECT_BUILD was not checked\n' >&2
+    return 0
+  }
+  got="$(sr_build_digest "$root")" || return 0
+  case "$got" in "$want"*) ;; *)
+    printf 'sqlreview: the loaded plugin build %s does not match DATA_REQUEST_EXPECT_BUILD %s. Run sqlreview.sh version for the full digest\n' \
+      "$(printf '%s' "$got" | cut -c1-12)" "$want" >&2 ;;
+  esac
+}
+
+# ---------------------------------------------------------------------------------------------
+# The ledger holds one entry per ticket, so a hand-off counts only for the reviews of its own ticket. A ticket
+# belongs to a review when a stage artifact of the entry records the review's sql_path. One jq call per run sets:
+#   SR_HANDOFF_MAP  "<H|N><tab><path>" lines: H when every entry that records the path has a handoff object
+#   SR_HANDOFF_ONE  1 when the ledger has exactly one entry and it has a handoff object (that ticket is the project)
+# An invalid or unreadable ledger gives no hand-off.
+_status_handoffs() {
+  local f="$SR_ROOT/$SR_DIR/ledger.json" out
+  SR_HANDOFF=0 SR_HANDOFF_ONE=0 SR_HANDOFF_MAP="$SR_NL"
+  [ -f "$f" ] && [ ! -L "$f" ] || return 0
+  out="$(jq -r '[.entries[]? | objects] as $e
+    | (if ($e | length) == 1 and ($e[0].handoff | type) == "object" then "1" else "0" end),
+      ([$e[] | (.handoff | type == "object") as $h
+        | [.stage_evidence | objects | .[] | objects | .artifacts | arrays | .[] | objects | .path | strings
+           | select(length > 0 and (test("[\\t\\r\\n]") | not))] | unique[] | {p: ., h: $h}]
+       | group_by(.p)[] | (if all(.[]; .h) then "H" else "N" end) + "\t" + .[0].p)' "$f" 2>/dev/null)" || return 0
+  case "$out" in 1*) SR_HANDOFF_ONE=1 ;; esac
+  SR_HANDOFF_MAP="$SR_NL${out#*"$SR_NL"}$SR_NL"
+  case "$out" in *"$SR_NL"*) ;; *) SR_HANDOFF_MAP="$SR_NL" ;; esac
+}
+
+# Sets SR_HANDOFF for one review: its own tickets decide when any entry records its path, else the one-entry rule.
+_status_handoff_for() { # <sql_path>
+  SR_HANDOFF="$SR_HANDOFF_ONE"
+  [ -n "$1" ] || return 0
+  case "$SR_HANDOFF_MAP" in
+    *"${SR_NL}H${SR_TAB}$1${SR_NL}"*) SR_HANDOFF=1 ;;
+    *"${SR_NL}N${SR_TAB}$1${SR_NL}"*) SR_HANDOFF=0 ;;
+  esac
+}
+
+# ---------------------------------------------------------------------------------------------
+# Which plugin build runs this helper. A session proves its build by comparing this digest with the one that
+# `sqlreview.sh version` prints from plugins/data-request in a checkout of the commit under test.
+cmd_version() {
+  local json=0 has_expect=0 expect="" want="" root="" name="data-request" ver="" digest="" manifest
+  while [ $# -gt 0 ]; do
+    case "$1" in
+      --json) json=1 ;;
+      --expect) [ $# -ge 2 ] || usage; has_expect=1; expect="$2"; shift ;;
+      *) usage ;;
+    esac
+    shift
+  done
+  if [ "$has_expect" = 1 ]; then
+    want="$(sr_build_expect "$expect")" || sr_die 1 "--expect needs 12 to 64 hexadecimal characters of a build digest"
+  fi
+  sr_need_jq
+  if root="$(sr_plugin_root)"; then
+    manifest="$root/.claude-plugin/plugin.json"
+    [ -f "$manifest" ] || manifest="$root/.codex-plugin/plugin.json"
+    IFS="$SR_TAB" read -r name ver <<EOF
+$(jq -r '[(.name // "data-request" | tostring), (.version // "unknown" | tostring)] | join("\t")' "$manifest" 2>/dev/null)
+EOF
+    [ -n "$name" ] || name="data-request"
+    [ -n "$ver" ] || ver="unknown"
+    digest="$(sr_build_digest "$root")" || sr_die 2 "cannot compute the build digest of the plugin tree"
+  fi
+  if [ "$json" = 1 ]; then
+    jq -n --arg name "$name" --arg ver "$ver" --arg digest "$digest" \
+      '{plugin: $name, version: (if $ver == "" then null else $ver end), build: (if $digest == "" then null else $digest end)}'
+  elif [ -n "$digest" ]; then
+    printf '%s %s build %s\n' "$name" "$ver" "$digest"
+  else
+    printf '%s source checkout: not a plugin build, so it has no build digest\n' "$name"
+  fi
+  [ "$has_expect" = 1 ] || return 0
+  [ -n "$digest" ] || sr_die 2 "no build digest: this helper does not run from a plugin tree"
+  case "$digest" in "$want"*) return 0 ;; esac
+  sr_die 10 "the loaded build $(printf '%s' "$digest" | cut -c1-12) does not match the expected build $want"
+}
+
+# ---------------------------------------------------------------------------------------------
 cmd_status() {
   local json=0 verbose=0 d slug state reason migrate next schema lifts rows="[]" f missing="" seen=0 amend shown
   while [ $# -gt 0 ]; do
@@ -278,6 +393,12 @@ cmd_status() {
   done
   sr_need_jq
   sr_require_root
+  # Initialisation keys on config.json, not on the directory: ledger set creates .sqlreview/ before setup.
+  [ -f "$SR_ROOT/$SR_DIR/config.json" ] ||
+    sr_die 3 "not initialised: $SR_DIR/ has no config.json, and a triage ledger alone does not initialise the project. $SR_SETUP_HINT"
+  _status_build_check
+  # One jq call per run reads which reviews have a recorded triage hand-off (_status_handoff_for, then sr_next).
+  _status_handoffs
   SR_CHECKED="$SR_NL"
   SR_CHECK_TMP="$(mktemp)" || sr_die 2 "mktemp failed"
   trap 'rm -f "$SR_CHECK_TMP"' EXIT
@@ -309,6 +430,9 @@ EOF
         else lifts='{"invalid":true}'; fi
       fi
       reason="" migrate=""
+      # Open lift entries: candidate or confirmed, from the counts above, with no further process.
+      case "$lifts" in *'"candidate":'*|*'"confirmed":'*) SR_LIFTS_OPEN=1 ;; *) SR_LIFTS_OPEN=0 ;; esac
+      _status_handoff_for "$SR_SQL_PATH"
       next="$(sr_next "$slug" "$state" "$SR_SQL_PATH")"
       [ "$verbose" = 1 ] && reason="$(sr_state_reason "$slug" "$state")"
       # A legacy-encoded slug (#353) of the path it records can be migrated to the readable one.
@@ -1988,6 +2112,7 @@ _sr_guard_command_inputs() { # COMMAND ARGS...
     slug) ;;               # input: in-command
     snapshot) ;;           # input: in-command
     status) ;;             # input: none
+    version) ;;            # input: none
     -h|--help|help) ;;     # input: none
     *) printf 'sqlreview: unknown command: %s\n' "$c" >&2; usage ;;
   esac
@@ -2000,6 +2125,7 @@ _sr_guard_command_inputs "$cmd" "$@"
 case "$cmd" in
   init) cmd_init "$@" ;;
   status) cmd_status "$@" ;;
+  version) cmd_version "$@" ;;
   slug) cmd_slug "$@" ;;
   check) cmd_check "$@" ;;
   ledger) . "$SR_SCRIPT_DIR/sqlreview-ledger.sh"; cmd_ledger "$@" ;;
