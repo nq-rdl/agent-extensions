@@ -83,10 +83,10 @@ bash "$S/sqlreview.sh" intake-draft answers.intake.draft.json < next.json    # a
 ```
 
 - At the start, read back a draft that exists. Its decisions and open questions are answered:
-  do not ask them again. Ask only what it lacks. A re-run starts the draft from the current sidecar.
+  do not ask them again. Ask only what it lacks. With no draft on a re-run, start one from the current sidecar.
 - After each answered batch, write the whole document (all earlier answers and this batch) to
   `next.json` with `schemaVersion: 1`, then stage it. A stage that fails leaves the old draft:
-  fix the named rule and stage again.
+  run `intake` on `next.json`, follow its message, fix the document and stage again.
 - The draft is not the sidecar. Never commit it. Delete it after the final sidecar validates.
 
 ## The interview

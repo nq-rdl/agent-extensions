@@ -1160,6 +1160,8 @@ cmd_intake_draft() {
   [ ! -e "$1" ] || [ -f "$1" ] || sr_die 2 "the draft file name is taken by something that is not a regular file"
   local tmp counts
   tmp="$(mktemp "./.answers.intake.draft.XXXXXX")" || sr_die 2 "cannot stage draft"
+  trap 'rm -f "$tmp"' EXIT
+  trap 'exit 2' HUP INT TERM
   cat > "$tmp" || { rm -f "$tmp"; sr_die 2 "cannot stage draft"; }
   if ! (cmd_intake "$tmp" 1 >/dev/null 2>&1); then
     rm -f "$tmp"

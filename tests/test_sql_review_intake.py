@@ -668,3 +668,17 @@ class IntakeDraftStaging(unittest.TestCase):
         self.assertEqual(r.returncode, 2, r.stdout + r.stderr)
         self.assertEqual(list(self.draft.iterdir()), [])
         self.assertEqual(sorted(p.name for p in self.root.iterdir() if p.name != ".git"), ["answers.intake.draft.json"])
+
+    def test_a_killed_stage_leaves_no_temp_file(self):
+        import signal
+        import time
+        script = REPO / "skills/data-request-setup/scripts/sqlreview.sh"
+        proc = subprocess.Popen(["bash", str(script), "intake-draft", "answers.intake.draft.json"], cwd=self.root,
+                                stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+        for _ in range(100):
+            if any(p.name.startswith(".answers.intake.draft.") for p in self.root.iterdir()):
+                break
+            time.sleep(0.05)
+        proc.send_signal(signal.SIGTERM)
+        proc.communicate()
+        self.assertEqual(sorted(p.name for p in self.root.iterdir() if p.name != ".git"), [])
