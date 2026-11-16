@@ -337,7 +337,7 @@ Each confirmation question in the interview and in a walk follows these rules:
 - An option that shows the exact new text counts as the re-ask of a reworded item.
 - For an output-shape decision, show one example row.
 - Never use a multi-select question to collect confirmations. `[No preference]` or no answer confirms nothing.
-- When a carry list has more than four items, use `carry-list`, as `${CLAUDE_PLUGIN_ROOT}/skills/analyse/references/carry.rst` says.
+- Before a carry question, run `carry-list`, as `${CLAUDE_PLUGIN_ROOT}/skills/analyse/references/carry.rst` says. The question lists each id with its confirmed text.
 
 Set each item's `location` to the governed SQL lines it describes, never to the header comment
 lines that `notes` reports. An item that governs the whole SQL has `location: null`.
