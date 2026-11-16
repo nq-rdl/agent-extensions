@@ -107,8 +107,8 @@ without repeating exact population counts.
 Read guardrails `references/delivery.rst` before proposing delivery: estimate rows
 for each output at its final grain and check text length bands. Reason from grain and join
 multiplicity first. Where the estimate must sit under a limit, ask the verdict form
-(answer pass or fail, no numbers) before you ask for a count. Use probe counts only when
-they are already available under the disclosure rule. Record oversized/potentially long-cell outputs as limitations;
+(answer pass or fail, no numbers). That is the default, and a count needs the exception. Use probe counts only when
+a recorded `count_exception` covers them. Record oversized/potentially long-cell outputs as limitations;
 near-limit estimates (within 10%) are undecided. Put the delivery choice to the
 engineer, flagged for the analyst; carry unverified evidence and choices to draft. Any operator run follows
 `${PLUGIN_ROOT}/skills/guardrails/references/operator-handover.rst`.

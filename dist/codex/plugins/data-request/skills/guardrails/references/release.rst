@@ -182,6 +182,27 @@ suppression; it warns that suppression does not protect against differencing.
 The following are RDL probe conventions decided by JoshKgh on 2026-09-30,
 not claims that the guideline mandates these particular tiers.
 
+Default and count exception
+~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+Decided by the Data Engineer: a probe, a plausibility check and a UAT checklist
+return a verdict, ``PASS`` or ``FAIL``, by default. The verdict probe in
+``performance.rst`` is the default route. No count reaches the agent unless the
+Data Engineer approves a **count exception** for that specific probe or check
+before it runs.
+
+* **Record.** Write the approval in the header of the saved probe file, or in the
+  results file of that check, in the field ``count_exception``. The value holds the
+  approver handle, the date and the probe identifier. A later session checks that field.
+* **No self-approval.** The agent never grants, assumes or infers a count exception.
+  A plan-level or general go-ahead is not an exception. A count exception for one probe
+  does not cover another probe or a rerun with changed SQL.
+* **Controls.** The floor, rounding, suppression and perimeter rules below apply in
+  full to every count that an approved exception allows.
+* **No field, no counts.** Without the field, ask the operator for the verdict
+  form only. If counts arrive anyway, treat them as exact counts that reached you
+  and follow the paragraph below.
+
 Perimeter and fact kinds
 ~~~~~~~~~~~~~~~~~~~~~~~~
 

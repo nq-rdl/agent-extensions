@@ -100,9 +100,10 @@ and assume the other labels share its format. Use this output table:
 Column | Expected labels/format and source | Proposed probe | Bound/cost | Status
 
 Qualify columns by result-set name and cite SQL lines. For each, propose a
-**verdict probe** first (see "Verdict probes" below): the operator answers pass or
-fail against the expected labels, with no numbers. Where the disclosure rule in
-``release.rst`` allows counts and a distribution is needed, the fallback is a
+**verdict probe** by default (see "Verdict probes" below): the operator answers pass or
+fail against the expected labels, with no numbers. Only where the Data Engineer has
+approved a count exception for that probe (``release.rst``, "Default and count
+exception") and a distribution is needed, the fallback is a
 **count-only** distinct-value distribution (raw category value and row count),
 including NULL, blank and unmapped categories. Preserve **raw spelling**, case
 and trailing spaces: case-insensitive grouping can hide the uppercase surprise.
@@ -164,7 +165,7 @@ Verdict probes
 --------------
 
 A verdict probe answers one question per check with ``PASS`` or ``FAIL``. It returns
-no counts, no labels and no rows. Offer it first for every plausibility question
+no counts, no labels and no rows. It is the default for every plausibility question
 and checklist item where a verdict is enough. Write the question as "answer pass or
 fail, no numbers". The operator runs the saved file, and the pasted block is the
 only result. See ``operator-handover.rst`` for the hand-over steps.

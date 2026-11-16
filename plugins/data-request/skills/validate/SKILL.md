@@ -34,10 +34,10 @@ does not establish cohort correctness, and a static index assessment is not a pl
 ## Pre-run plausibility: operator proposals only
 
 Read guardrails `references/performance.rst`, **Pre-run plausibility** and **Verdict probes**.
-Return a proposed probe for **each label column** across all final outputs. Offer the verdict
-probe first, and word the question as "answer pass or fail, no numbers", with the labels checked
-against the data-dictionary set. Keep the count-only distribution as the second option, only where
-the disclosure rule allows it. Use each column's inventory table, and show exclusions or unresolved metadata explicitly. Include expected raw labels/format from the
+Return a proposed probe for **each label column** across all final outputs. The verdict
+probe is the default, and word the question as "answer pass or fail, no numbers", with the labels checked
+against the data-dictionary set. Propose the count-only distribution only where the Data Engineer has approved a recorded
+`count_exception` for that probe. Never assume one. Use each column's inventory table, and show exclusions or unresolved metadata explicitly. Include expected raw labels/format from the
 scope and data dictionary, SQL location, bounds/cost and suppression parameter. Propose an
 age-band probe only for expensive requests with cited cost evidence; otherwise state why omitted.
 

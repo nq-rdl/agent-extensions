@@ -27,8 +27,8 @@ The hand-over template
    and only then push. Name each file. Never write ``git add -A``, ``git add .`` or
    ``git commit -a``, because they stage unrelated and untracked files.
 8. **Verdict block.** Ask the operator to paste back one value-free block. It holds
-   a pass or fail verdict for each named check and the commit that was run. It holds no counts,
-   no patient values and no paths that name a request.
+   a pass or fail verdict for each named check and the commit that was run. It holds no counts
+   unless a recorded count exception covers that probe, no patient values and no paths that name a request.
 9. **Hold line.** State that the agent pushes nothing while the operator run is open.
    An agent push moves the remote and breaks the operator push. Write the hold in the
    hand-over and lift it only when the operator reports back.

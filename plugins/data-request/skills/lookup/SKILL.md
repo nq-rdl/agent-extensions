@@ -101,8 +101,9 @@ for the agent to invent a replacement query or run one.
 
 Where the analyst already holds a candidate code or label and needs only to know whether
 the source contains it, offer a verdict probe first (guardrails `references/performance.rst`,
-**Verdict probes**): answer pass or fail, no numbers. Use the count-only discovery grid only
-to discover codes that the analyst does not yet hold. Hand the run to the operator with the
+**Verdict probes**): answer pass or fail, no numbers. Use the discovery grid only
+to discover codes that the analyst does not yet hold. Population counts in the grid need a count exception
+recorded and approved by the Data Engineer for that probe (guardrails `references/release.rst`). Without one, the grid returns codes and labels only. Hand the run to the operator with the
 steps in `${CLAUDE_PLUGIN_ROOT}/skills/guardrails/references/operator-handover.rst`. Write a
 miss as "not found by probe P<n>, and the search stopped because <reason>", never as absence.
 

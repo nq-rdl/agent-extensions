@@ -221,5 +221,36 @@ class VerdictFirstWording(unittest.TestCase):
         validate = self.flat(self.ROOTS[0], "validate")
         self.assertIn("count-only distribution", validate)
         self.assertIn("Probe disclosure control", validate)
-        self.assertIn("Use probe counts only when they are already available under the disclosure rule",
+        self.assertIn("Use probe counts only when a recorded `count_exception` covers them",
                       self.flat(self.ROOTS[0], "map"))
+
+
+class CountExceptionRule(unittest.TestCase):
+    def test_verdict_by_default_and_count_only_by_recorded_approval(self):
+        for tree in TREES:
+            text = " ".join((tree / "references/release.rst").read_text().split())
+            section = text.split("Default and count exception", 1)[1].split("Perimeter and fact kinds", 1)[0]
+            with self.subTest(tree=str(tree)):
+                for token in ("Decided by the Data Engineer", "return a verdict", "by default",
+                              "No count reaches the agent unless the Data Engineer approves a **count exception**",
+                              "for that specific probe or check before it runs",
+                              "``count_exception``", "approver handle, the date and the probe identifier",
+                              "The agent never grants, assumes or infers a count exception",
+                              "A plan-level or general go-ahead is not an exception",
+                              "apply in full to every count that an approved exception allows"):
+                    self.assertIn(token, section)
+
+    def test_skills_state_the_default_and_no_self_approval(self):
+        for tree in TREES:
+            text = " ".join((tree / "SKILL.md").read_text().split())
+            with self.subTest(tree=str(tree)):
+                self.assertIn("Data Engineer approved for that probe before it ran", text)
+                self.assertIn("The agent never grants one", text)
+        for root in ("skills/data-request-%s", "plugins/data-request/skills/%s",
+                     "dist/codex/plugins/data-request/skills/%s"):
+            for leaf in ("validate", "map"):
+                text = (REPO / (root % leaf) / "SKILL.md").read_text()
+                with self.subTest(root=root, leaf=leaf):
+                    self.assertIn("`count_exception`", text)
+        lookup = " ".join((REPO / "skills/data-request-lookup/SKILL.md").read_text().split())
+        self.assertIn("count exception recorded and approved by the Data Engineer", lookup)
