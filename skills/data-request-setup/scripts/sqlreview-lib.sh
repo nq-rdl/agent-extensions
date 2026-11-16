@@ -657,7 +657,7 @@ sr_reviewed_rel() { # <relative path>
 # moved on, names bootstrap as the rescope step. Cheap: a few jq and hash calls,
 # because status runs from a SessionStart hook with a 5-second timeout.
 # The caller sets two flags once per run or per review, so this function starts no process for them:
-#   SR_HANDOFF=1     an entry of .sqlreview/ledger.json has a handoff object (the triage hand-off is recorded)
+#   SR_HANDOFF=1     this review's ticket in .sqlreview/ledger.json has a handoff object (_status_handoff_for)
 #   SR_LIFTS_OPEN=1  this review's lifts.json has a candidate or confirmed entry (not yet closed out)
 # A current review names the operator run, UAT and the hand-off before explain, and open lift entries first.
 # A bound SQL path that the path guard refuses names the move into sql/v<N>/ before any other step.

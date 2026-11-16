@@ -595,6 +595,38 @@ class StatusStageOrder(StatusNext):
         self.review()
         self.write_ledger(ledger_entry(handoff=HANDOFF))
         self.assertEqual(self.row()["next"], f"/data-request:explain {SQL} to walk the analyst through the review")
+        # One ticket covers the whole project, so an artifact that names another SQL file does not unbind it.
+        self.write_ledger(ledger_entry(handoff=HANDOFF, stage_evidence=self.evidence("sql/v1/other.sql")))
+        self.assertEqual(self.row()["next"], f"/data-request:explain {SQL} to walk the analyst through the review")
+
+    @staticmethod
+    def evidence(*paths):
+        """Stage evidence whose draft stage records each path as an artifact."""
+        stages = ledger_entry()["stage_evidence"]
+        stages["draft"] = dict(stages["draft"], artifacts=[{"path": p, "sha256": "0" * 64} for p in paths])
+        return stages
+
+    def test_another_tickets_handoff_does_not_count_for_this_review(self):
+        self.sql(SQL_V1)
+        self.review()
+        explain = f"/data-request:explain {SQL} to walk the analyst through the review"
+        a, b = "example-org/service-desk#1", "example-org/service-desk#2"
+        cases = [
+            # No entry names this SQL, so nothing ties a hand-off to this review.
+            ("no association", [ledger_entry(ticket=a, handoff=HANDOFF), ledger_entry(ticket=b)], OPERATOR_NEXT),
+            # The hand-off belongs to the ticket of another SQL file. This review's ticket has none.
+            ("other ticket", [ledger_entry(ticket=a, handoff=HANDOFF, stage_evidence=self.evidence("sql/v1/other.sql")),
+                              ledger_entry(ticket=b, stage_evidence=self.evidence(SQL))], OPERATOR_NEXT),
+            # Every ticket that names this SQL must record a hand-off.
+            ("one of two", [ledger_entry(ticket=a, handoff=HANDOFF, stage_evidence=self.evidence(SQL)),
+                            ledger_entry(ticket=b, stage_evidence=self.evidence(SQL))], OPERATOR_NEXT),
+            ("own ticket", [ledger_entry(ticket=a, stage_evidence=self.evidence("sql/v1/other.sql")),
+                            ledger_entry(ticket=b, handoff=HANDOFF, stage_evidence=self.evidence(SQL))], explain),
+        ]
+        for name, entries, want in cases:
+            with self.subTest(name):
+                self.assertEqual(run(["ledger", "check", str(self.write_ledger(*entries))], self.p.root).returncode, 0)
+                self.assertEqual(self.row()["next"], want)
 
     def test_an_explain_marker_for_the_current_review_keeps_the_walkthrough_steps(self):
         # A walkthrough already started means the hand-off happened before the ledger recorded it.

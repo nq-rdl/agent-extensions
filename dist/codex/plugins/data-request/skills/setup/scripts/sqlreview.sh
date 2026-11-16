@@ -19,7 +19,8 @@
 #                                              and the move that migrates a legacy-encoded slug); exit 3 when not initialised,
 #                                              which includes a .sqlreview/ without config.json (a triage ledger alone);
 #                                              a current review names the operator run, UAT and the triage hand-off
-#                                              before explain until a ledger entry has a handoff object, and open lift
+#                                              before explain until its own ledger entry has a handoff object (the
+#                                              entry whose artifact records its sql_path, else the only one), open lift
 #                                              entries before that; a bound path outside sql/v<N>/ names the move first
 #                                              missing bundled templates: JSON missing_templates, else one stderr line;
 #                                              DATA_REQUEST_EXPECT_BUILD set and not matched: one stderr line
@@ -293,6 +294,37 @@ _status_build_check() {
 }
 
 # ---------------------------------------------------------------------------------------------
+# The ledger holds one entry per ticket, so a hand-off counts only for the reviews of its own ticket. A ticket
+# belongs to a review when a stage artifact of the entry records the review's sql_path. One jq call per run sets:
+#   SR_HANDOFF_MAP  "<H|N><tab><path>" lines: H when every entry that records the path has a handoff object
+#   SR_HANDOFF_ONE  1 when the ledger has exactly one entry and it has a handoff object (that ticket is the project)
+# An invalid or unreadable ledger gives no hand-off.
+_status_handoffs() {
+  local f="$SR_ROOT/$SR_DIR/ledger.json" out
+  SR_HANDOFF=0 SR_HANDOFF_ONE=0 SR_HANDOFF_MAP="$SR_NL"
+  [ -f "$f" ] && [ ! -L "$f" ] || return 0
+  out="$(jq -r '[.entries[]? | objects] as $e
+    | (if ($e | length) == 1 and ($e[0].handoff | type) == "object" then "1" else "0" end),
+      ([$e[] | (.handoff | type == "object") as $h
+        | [.stage_evidence | objects | .[] | objects | .artifacts | arrays | .[] | objects | .path | strings
+           | select(length > 0 and (test("[\\t\\r\\n]") | not))] | unique[] | {p: ., h: $h}]
+       | group_by(.p)[] | (if all(.[]; .h) then "H" else "N" end) + "\t" + .[0].p)' "$f" 2>/dev/null)" || return 0
+  case "$out" in 1*) SR_HANDOFF_ONE=1 ;; esac
+  SR_HANDOFF_MAP="$SR_NL${out#*"$SR_NL"}$SR_NL"
+  case "$out" in *"$SR_NL"*) ;; *) SR_HANDOFF_MAP="$SR_NL" ;; esac
+}
+
+# Sets SR_HANDOFF for one review: its own tickets decide when any entry records its path, else the one-entry rule.
+_status_handoff_for() { # <sql_path>
+  SR_HANDOFF="$SR_HANDOFF_ONE"
+  [ -n "$1" ] || return 0
+  case "$SR_HANDOFF_MAP" in
+    *"${SR_NL}H${SR_TAB}$1${SR_NL}"*) SR_HANDOFF=1 ;;
+    *"${SR_NL}N${SR_TAB}$1${SR_NL}"*) SR_HANDOFF=0 ;;
+  esac
+}
+
+# ---------------------------------------------------------------------------------------------
 # Which plugin build runs this helper. A session proves its build by comparing this digest with the one that
 # `sqlreview.sh version` prints from plugins/data-request in a checkout of the commit under test.
 cmd_version() {
@@ -346,12 +378,8 @@ cmd_status() {
   [ -f "$SR_ROOT/$SR_DIR/config.json" ] ||
     sr_die 3 "not initialised: $SR_DIR/ has no config.json, and a triage ledger alone does not initialise the project. $SR_SETUP_HINT"
   _status_build_check
-  # One jq call per run: the triage hand-off is recorded when a ledger entry has a handoff object (sr_next).
-  SR_HANDOFF=0
-  if [ -f "$SR_ROOT/$SR_DIR/ledger.json" ] && [ ! -L "$SR_ROOT/$SR_DIR/ledger.json" ] &&
-     jq -e 'any(.entries[]? | objects; .handoff | type == "object")' "$SR_ROOT/$SR_DIR/ledger.json" >/dev/null 2>&1; then
-    SR_HANDOFF=1
-  fi
+  # One jq call per run reads which reviews have a recorded triage hand-off (_status_handoff_for, then sr_next).
+  _status_handoffs
   SR_CHECKED="$SR_NL"
   SR_CHECK_TMP="$(mktemp)" || sr_die 2 "mktemp failed"
   trap 'rm -f "$SR_CHECK_TMP"' EXIT
@@ -385,6 +413,7 @@ EOF
       reason="" migrate=""
       # Open lift entries: candidate or confirmed, from the counts above, with no further process.
       case "$lifts" in *'"candidate":'*|*'"confirmed":'*) SR_LIFTS_OPEN=1 ;; *) SR_LIFTS_OPEN=0 ;; esac
+      _status_handoff_for "$SR_SQL_PATH"
       next="$(sr_next "$slug" "$state" "$SR_SQL_PATH")"
       [ "$verbose" = 1 ] && reason="$(sr_state_reason "$slug" "$state")"
       # A legacy-encoded slug (#353) of the path it records can be migrated to the readable one.
