@@ -132,7 +132,8 @@ In review order, one step per turn, pausing each time with AskUserQuestion — o
 2. **Inputs** — each source and what one row of it means.
 3. **Each logic step** — Read and show the SQL lines it covers; then the assumptions and
    limitations whose `location` falls in those lines, **by id** (`A1`, `L2`), with the decision,
-   its rationale and who confirmed it — this is the cross-reference (#128 §1.2). If the SQL
+   its rationale and who confirmed it — this is the cross-reference (#128 §1.2). For an item with
+   `sql_status: "not-implemented"`, say "not implemented by this SQL" beside it. If the SQL
    explained opens with a query-builder analysis-notes header, run
    `bash "$S/sqlreview.sh" notes "<that SQL>" --against ".sqlreview/reviews/$SLUG/review.json"`
    once and name the review id each header item matches. A header item with `match: null` is

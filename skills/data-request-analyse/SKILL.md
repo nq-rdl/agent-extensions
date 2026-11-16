@@ -234,7 +234,7 @@ bash "$S/sqlreview.sh" impact "$SLUG"    # HINTS ONLY: identifiers from the chan
    # → {document, prior_revision, remapped: [{kind, id, from, to}], walk: [{kind, id, lines, why}]}
    bash "$S/sqlreview.sh" carryforward "$SLUG" review ".sqlreview/reviews/$SLUG/review.draft.json"
    # → {prior_revision, revision, sql_unchanged, sql_body_unchanged, carry: [{kind, id, basis, set}],
-   #    bulk: [{kind, id, text, rationale, location, why}], walk: [{kind, id, why}],
+   #    bulk: [{kind, id, text, rationale, location, why, not_implemented?}], walk: [{kind, id, why}],
    #    carry_question: [{kind, id, basis, lines}], reproof_failed}
    ```
 

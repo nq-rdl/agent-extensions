@@ -1646,7 +1646,10 @@ cmd_carryforward() (
        first_binding: ($ctx.prior != null and $ctx.prior_absent and $ctx.cur_sha != ""),
        reproof_failed: $ctx.reproof_failed,
        carry: [$rows[] | select(.basis != null) | {kind, id, basis, set}],
-       bulk: [$rows[] | select(.basis == null and .bulk) | {kind, id, text, rationale, location, why} + cleared(.)],
+       bulk: [$rows[] | select(.basis == null and .bulk) | . as $r | {kind, id, text, rationale, location, why} + cleared(.)
+         + (if ([($d[$r.kind] // []) | if type == "array" then .[] else empty end
+                 | select(type == "object" and .id == $r.id)][0].sql_status?) == "not-implemented"
+            then {not_implemented: true} else {} end)],
        walk: [$rows[] | select(.basis == null and (.bulk | not)) | {kind, id, why} + cleared(.)],
        # The decided re-walk rule: every item the change does not touch goes into ONE carry question. A carry row
        # keeps its set fields on "carry all"; a bulk row (basis null) gets a fresh confirmation from that answer.

@@ -121,6 +121,19 @@ class Decisions(unittest.TestCase):
         self.assertEqual(r.returncode, 4)
         self.assertIn("L1: decided.by", r.stdout)
 
+    def test_render_shows_an_item_this_sql_does_not_implement(self):
+        # scope.md and review.md must not show a not-implemented item as an ordinary confirmed one.
+        for kind in ("scope", "review"):
+            with self.subTest(kind=kind):
+                doc = self.doc(kind)
+                doc["assumptions"][0]["sql_status"] = "not-implemented"
+                self.p.write_json("q", kind + ".json", doc)
+                self.assertEqual(run(["render", "q", kind], self.p.root).returncode, 0)
+                text = (self.d / f"{kind}.md").read_text()
+                row = next(line for line in text.splitlines() if line.startswith("| A1 |"))
+                self.assertIn("Use supplied dates [not implemented by this SQL]", row)
+                self.assertEqual(text.count("not implemented by this SQL"), 1)
+
     def test_render_linked_decision_keeps_confirmation_visible(self):
         self.p.write_json("q", "scope.json", self.doc())
         self.assertEqual(run(["render", "q", "scope"], self.p.root).returncode, 0)

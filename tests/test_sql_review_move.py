@@ -235,7 +235,13 @@ class SkillContract(unittest.TestCase):
             "``header_settled``", "Delete the file after the answer",
             "decided by the Data Engineer", "``carry_question``", "**Carry all** / **Name the items to re-walk**",
             "Do not add items to the walk by your own judgement", "``reproof_failed``", "not-implemented",
-            "For an item with ``not_implemented: true``, the question shows \"not implemented by this SQL\""))
+            "For an item with ``not_implemented: true`` (a ``carry_question`` or ``bulk`` row), the question shows \"not implemented by this SQL\""))
+
+    def test_every_item_reader_shows_the_not_implemented_mark(self):
+        self.assert_tokens("data-request-explain", "explain", "SKILL.md", (
+            "For an item with `sql_status: \"not-implemented\"`, say \"not implemented by this SQL\" beside it",))
+        self.assert_tokens("data-request-release", "release", "SKILL.md", (
+            "An evidence item with `not_implemented: true` is not implemented by this SQL",))
 
     def test_analyse_names_the_two_move_outcomes(self):
         self.assert_tokens("data-request-analyse", "analyse", "SKILL.md", (

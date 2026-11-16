@@ -505,6 +505,22 @@ class CarryForwardHelper(Base):
         self.assertEqual(sorted(question), ["A1", "A2", "L1"])
         self.assertIs(question["L1"]["not_implemented"], True)
         self.assertNotIn("not_implemented", question["A2"])
+        # A bulk row shows its text too: after a body change, A1 (no location) is bulk.
+        self.sql.write_text(GOVERNED_EDIT)
+        bulk_draft = json.loads(json.dumps(draft))
+        bulk_draft["sql_sha256"] = sha(GOVERNED_EDIT)
+        bulk_draft["assumptions"][0]["sql_status"] = "not-implemented"
+        v1["assumptions"][0]["sql_status"] = "not-implemented"
+        (self.d / "review.json").unlink()
+        self.sql.write_text(SQL_V1)
+        self.publish(review_doc("q", "q.sql", revision=1, sql_sha256=sha(SQL_V1), **v1))
+        self.sql.write_text(GOVERNED_EDIT)
+        bulk = {b["id"]: b for b in self.carryforward("review", bulk_draft)["bulk"]}
+        self.assertIs(bulk["A1"]["not_implemented"], True)
+        self.sql.write_text(SQL_V1)
+        (self.d / "review.json").unlink()
+        v1["assumptions"][0].pop("sql_status")
+        self.publish(review_doc("q", "q.sql", revision=1, sql_sha256=sha(SQL_V1), **v1))
         r = run(["carry-list", "q", "carryforward", str(self.draft)], self.p.root)
         self.assertEqual(r.returncode, 0, r.stdout + r.stderr)
         items = {i["id"]: i for l in json.loads(r.stdout)["lists"] for i in l["items"]}
