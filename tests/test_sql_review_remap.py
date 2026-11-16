@@ -127,6 +127,28 @@ class Remap(unittest.TestCase):
         self.assertEqual(self.read(), original)
         self.assertIn("ambiguous", out["walk"][0]["why"])
 
+    def test_pure_insertion_across_repeated_go_batches_remaps_unique_ranges(self):
+        # GO lines repeat in every batch, so each range shares a line with the inserted batch. A range whose
+        # whole governed text occurs once in the baseline and once in the current SQL has one alignment only.
+        text = "SELECT a FROM t1;\nGO\nSELECT b FROM t2;\nGO\nSELECT c FROM t3;\nGO\n"
+        doc = review_doc("q", "q.sql", sql_sha256=sha(text),
+                         assumptions=[item("A1", "Second batch", location={"lines": [3, 4]})],
+                         limitations=[item("L1", "Batch separator only", location={"lines": [4, 4]})],
+                         logic=[{"step": 1, "title": "One", "lines": [1, 2], "description": "First batch"},
+                                {"step": 2, "title": "Two", "lines": [3, 4], "description": "Second batch"},
+                                {"step": 3, "title": "Three", "lines": [5, 6], "description": "Third batch"}])
+        self.seed(doc, text)
+        self.sql.write_text("SELECT z FROM t0;\nGO\n" + text)
+        self.stage()
+        out = self.remap()
+        doc = self.read()
+        self.assertEqual(doc["assumptions"][0]["location"]["lines"], [5, 6])
+        self.assertEqual([s["lines"] for s in doc["logic"]], [[3, 4], [5, 6], [7, 8]])
+        # A lone GO line occurs in every batch: still ambiguous, left for the human.
+        self.assertEqual(doc["limitations"][0]["location"]["lines"], [4, 4])
+        self.assertEqual([(r["kind"], r["id"]) for r in out["walk"]], [("limitations", "L1")])
+        self.assertIn("ambiguous", out["walk"][0]["why"])
+
     def test_retry_is_byte_idempotent(self):
         self.sql.write_text("-- header\n-- rationale\n" + SQL_V1)
         self.stage()

@@ -110,20 +110,18 @@ skips the pixi solve and records why; that is not a solve failure.
 Fresh render
    The step that moves a legacy-template repository onto the current scaffold.
    Propose it in triage; run it only in co-development, on an agreed branch.
-   Render the current scaffold tag from its canonical URL into a scratch
-   directory: ``copier copy --vcs-ref <tag> --defaults --trust --data-file
-   answers.yaml gh:nq-rdl/data-analysis-scaffold <scratch>`` (copier 9.18.2 in
-   September 2026), with an ``answers.yaml`` that parses and uses the scaffold's
-   layout. ``--trust`` runs the template's tasks: use it only with the canonical
-   ``gh:nq-rdl/data-analysis-scaffold`` at a pinned release tag. Keep the
-   request's values byte-identical. Take the template's generic tree onto the
-   branch and carry only request-specific files and workflows. Drop only files
-   that the template replaces or that the new scaffold's checks reject, and list
-   each one in the PR body. One render dropped ``template-sync.yml`` and
-   ``scripts/template_sync.py``, ``release.yaml`` and its test,
-   ``.seed-manifest.yml``, ``src/service_desk/``, and the ``data/`` README and
-   ``DO NOT RELEASE`` files. Re-lock pixi in a separate commit. Record the
-   scaffold tag and ``framework_ref`` in the PR body.
+   Render into a scratch directory with the one shared procedure in
+   ``${CLAUDE_PLUGIN_ROOT}/skills/setup/references/scaffold-render.rst``. It lists the
+   tags again before you ask, and it passes ``framework_ref``, ``seed_mode`` and
+   ``project_slug`` explicitly, so no seed answer decides them. Use an ``answers.yaml``
+   that parses and uses the scaffold's layout, and keep the request's values
+   byte-identical. Take the template's generic tree onto the branch and carry only
+   request-specific files and workflows. Drop only files that the template replaces or
+   that the new scaffold's checks reject, and list each one in the PR body. One render
+   dropped ``template-sync.yml`` and ``scripts/template_sync.py``, ``release.yaml`` and
+   its test, ``.seed-manifest.yml``, ``src/service_desk/``, and the ``data/`` README and
+   ``DO NOT RELEASE`` files. Re-lock pixi in a separate commit. Record the scaffold tag
+   and ``framework_ref`` in the PR body.
 
 Before you propose a manual port of the current layout, look for an open
 bootstrap or scaffold PR. In one child, a scaffold PR applied the scaffold while

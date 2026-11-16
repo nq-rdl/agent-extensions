@@ -64,4 +64,15 @@ def header_candidates($doc; $sql; $actor; $path; $sha; $safe; $start; $history):
             end
         end
     ] as $rows
-  | . + {header_carry_over:[$rows[] | select(.basis == "header-decision")], header_walk:[$rows[] | select(.basis == null)]};
+  # Settled: the draft item already holds a confirmation for this revision, a fresh answer or a carry from
+  # the previous one. The walk leaves it out, so it is not asked twice. header_carry_over keeps every row,
+  # because publish re-proves a header-decision item from that list.
+  | ($doc.revision) as $rev
+  | [("assumptions", "limitations") as $kind | ($doc[$kind] // [])[]
+      | select(.status == "confirmed" and (.confirmed_revision == $rev or
+          (.carried_from_revision != null and .carried_from_revision == $rev - 1)))
+      | {kind:$kind, id}] as $settled
+  | . + {header_carry_over:[$rows[] | select(.basis == "header-decision")],
+         header_walk:[$rows[] | select(.basis == null) | . as $r
+           | select(any($settled[]; .kind == $r.kind and .id == $r.id) | not)],
+         header_settled:$settled};

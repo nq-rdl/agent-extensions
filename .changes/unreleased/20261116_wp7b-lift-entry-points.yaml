@@ -1,0 +1,3 @@
+kind: Added
+body: Lift names a gap-capture entry point before draft, plus a lifts-uncovered check for request-local TypedTable classes
+time: 2026-11-16T00:00:01Z

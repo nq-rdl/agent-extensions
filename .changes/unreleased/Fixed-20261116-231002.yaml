@@ -1,0 +1,3 @@
+kind: Fixed
+body: '`sqlreview.sh discard-draft` keeps a draft at the published revision that has other content'
+time: 2026-11-16T23:10:02Z

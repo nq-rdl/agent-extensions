@@ -127,7 +127,7 @@ class PopulationScopeRoundTrip(unittest.TestCase):
                 source.write_text(original)
                 d = scope_doc(schemaVersion=2, sql_sha256=None, assumptions=[],
                               limitations=[], open_questions=[],
-                              intent="Adults at index surgery; no stated sex limit. SQL is not yet written.")
+                              intent="Adults at index surgery. No stated sex limit. SQL is not yet written.")
                 draft = p.write_json(d["slug"], "scope.draft.json", d)
                 draft.write_text(invoke("intake", str(source), "1", str(draft)))
                 d = json.loads(draft.read_text())
@@ -136,9 +136,9 @@ class PopulationScopeRoundTrip(unittest.TestCase):
                 invoke("publish", d["slug"], "scope", str(draft))
                 # Synthetic engineer confirmation of a defect, separate from analyst answers.
                 d["revision"] = 2
-                d["intent"] = "Adults at index surgery; no stated sex limit. SQL assessment at revision abc."
+                d["intent"] = "Adults at index surgery. No stated sex limit. SQL assessment at revision abc."
                 d["limitations"] = [item("L-population-age", "The adult restriction is missing from SQL.",
-                                          revision=2, rationale="Scope requires adults at index surgery; SQL lines 10-20 omit the filter.",
+                                          revision=2, rationale="Scope requires adults at index surgery. SQL lines 10-20 omit the filter.",
                                           confirmed_by="engineer-login")]
                 draft.write_text(json.dumps(d))
                 carry = json.loads(invoke("carryforward", d["slug"], "scope", str(draft)))
@@ -169,7 +169,7 @@ class PopulationScopeRoundTrip(unittest.TestCase):
             ("Age at index surgery is at least 18.", "Recorded requester limit at abc. Applied at SQL lines 10-12.", [], "intent"),
             ("Use the index surgery as the age anchor.", "RDL chooses the first eligible surgery to implement the agreed age boundary.", [], "assumptions"),
             ("The adult restriction is missing from SQL.", "Confirmed scope at abc says age at index surgery is at least 18. SQL lines 10-20 omit it.", [], "limitations"),
-            ("The age limit is unclear; SQL is not yet written.", "Request wording at abc says adult service but gives no age anchor.",
+            ("The age limit is unclear. SQL is not yet written.", "Request wording at abc says adult service but gives no age anchor.",
              ["Analyst question: Does adult mean age at index surgery is at least 18?"], "limitations"),
         )
         for tree in TREES:
@@ -188,7 +188,7 @@ class PopulationScopeRoundTrip(unittest.TestCase):
                     # they are not live analyst consent or automatic detection.
                     sex_answer = "No stated sex limit. Request wording at abc has no sex restriction."
                     facility = item("L-population-facility", "The facility set is unresolved.",
-                                    rationale="Request wording at abc says whole HHS; TUH alone does not apply.",
+                                    rationale="Request wording at abc says whole HHS. TUH alone does not apply.",
                                     confirmed_by="engineer-login")
                     d = scope_doc(schemaVersion=2, sql_sha256=None, assumptions=[],
                                   limitations=[facility], intent=sex_answer, open_questions=questions)

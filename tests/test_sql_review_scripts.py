@@ -425,7 +425,8 @@ class Move(unittest.TestCase):
             for name in ("review.json", "scope.json"):
                 j = json.loads((d / name).read_text())
                 self.assertEqual((j["sql_path"], j["slug"]), ("archive/monthly.sql", "archive__monthly"))
-            self.assertEqual(run(["delta", "archive__monthly"], p.root).returncode, 10)
+            # The fixture record has no clean commit, so the moved binding cannot be read from git (6).
+            self.assertEqual(run(["delta", "archive__monthly"], p.root).returncode, 6)
             self.assertEqual(run(["move", "nope.sql", "x.sql"], p.root).returncode, 2)
             self.assertEqual(list((p.root / ".sqlreview").rglob("*.sql")), [])  # #505: no SQL copies in the store
 
@@ -478,6 +479,81 @@ class Usage(unittest.TestCase):
             r = run(["frobnicate"], tmp)
             self.assertEqual(r.returncode, 1)
             self.assertIn("usage", (r.stdout + r.stderr).lower())
+
+
+class HelperMessages(unittest.TestCase):
+    """Help works anywhere, and refusals name the field and the rule."""
+
+    RELEASE = REPO / "skills" / "data-request-setup" / "scripts" / "release.sh"
+
+    def release(self, args, cwd):
+        e = {k: v for k, v in os.environ.items() if not k.startswith("SQLREVIEW_")}
+        return subprocess.run(["bash", str(self.RELEASE), *args], cwd=cwd, env=e,
+                              capture_output=True, text=True, timeout=60)
+
+    def test_release_subcommand_help_works_outside_a_project(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            for args in (["--help"], ["-h"], ["evidence", "--help"], ["evidence", "origin/main", "-h"],
+                         ["criteria", "--help"], ["fetch-command", "--help"], ["amend-check", "--help"]):
+                with self.subTest(args=args):
+                    r = self.release(args, tmp)
+                    self.assertEqual(r.returncode, 0, r.stderr)
+                    self.assertIn("evidence [--no-amend-hold] REF [SLUG...]", r.stdout)
+                    self.assertNotIn("not initialised", r.stderr)
+            # A real refusal outside a project still exits non-zero.
+            self.assertEqual(self.release(["evidence", "HEAD"], tmp).returncode, 3)
+
+    def intake_and_draft(self, p, mutate):
+        sidecar = {"schemaVersion": 1, "approval_number": "THHSAQUIRE-042", "decisions": [],
+                   "open_questions": ["Which wards?"]}
+        source = p.root / "answers.intake.json"
+        source.write_text(json.dumps(sidecar))
+        d = scope_doc(sql_sha256=None, approval_number="THHSAQUIRE-042")
+        mutate(d)
+        return source, p.write_json(d["slug"], "scope.draft.json", d)
+
+    def test_intake_merge_refusal_names_the_field(self):
+        cases = {
+            "open_questions": lambda d: d.pop("open_questions"),
+            "assumptions": lambda d: d.update(assumptions={"ZZTEST": 1}),
+            "kind": lambda d: d.update(kind="review"),
+            "revision": lambda d: d.update(revision=2),
+            "approval_number": lambda d: d.update(approval_number="ZZTEST-1"),
+            "intake_questions": lambda d: d.update(intake_questions=["ZZTEST"]),
+            "assumptions[].id": lambda d: d["assumptions"].append(dict(d["assumptions"][0])),
+        }
+        with tempfile.TemporaryDirectory() as tmp:
+            p = Project(tmp)
+            for field, mutate in cases.items():
+                with self.subTest(field=field):
+                    source, draft = self.intake_and_draft(p, mutate)
+                    r = run(["intake", str(source), "1", str(draft)], p.root)
+                    self.assertEqual(r.returncode, 4, r.stdout + r.stderr)
+                    self.assertEqual(r.stdout, "")
+                    self.assertIn(f"draft field {field}:", r.stderr)
+                    self.assertNotIn("ZZTEST", r.stderr)
+
+    def test_init_ignores_drafts(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            p = Project(tmp)
+            lines = (p.root / ".sqlreview" / ".gitignore").read_text().splitlines()
+            self.assertIn("/reviews/**/*.draft.json", lines)
+            d = p.review_dir("q")
+            (d / "questions.draft.json").write_text("{}")
+            status = git(p.root, "status", "--porcelain", "--untracked-files=all").stdout
+            self.assertNotIn("questions.draft.json", status)
+
+    def test_setup_states_publish_lint_and_discard_guard(self):
+        text = " ".join((REPO / "skills" / "data-request-setup" / "SKILL.md").read_text().split())
+        self.assertIn("`publish` runs `lint` and `lint --ste` on a scope or review itself", text)
+        self.assertIn("Pass `--unpublished` only when the engineer agrees to lose that work", text)
+
+    def test_setup_states_the_string_sql_false_positive_procedure(self):
+        text = " ".join((REPO / "skills" / "data-request-setup" / "SKILL.md").read_text().split())
+        self.assertIn("measure false positives on three backlog enquiries", text)
+        self.assertIn("show the engineer the file and line numbers only", text)
+        self.assertIn("A false positive is a hit that the engineer says is not SQL built from strings", text)
+        self.assertIn("git -C \"<earlier request repository>\" grep -nEi", text)
 
 
 if __name__ == "__main__":

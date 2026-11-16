@@ -1,0 +1,3 @@
+kind: Fixed
+body: init --diff reports no drift for the role names and string-SQL guard that the setup helpers set
+time: 2026-11-16T10:00:06+00:00
