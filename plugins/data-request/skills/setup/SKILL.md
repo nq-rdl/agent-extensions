@@ -194,7 +194,8 @@ project templates; SQL glob filtering and section flags are not configuration op
 `publish` runs `lint` and `lint --ste` on a scope or review itself. A new hit refuses the publish
 (exit 4) and names the item, the field and the rule. Some hits are only `lint-warning` lines on
 stderr. These are a `decision-source` hit and a hit that the published revision already had. A hit
-in verbatim analyst-intake, lift or notes-header text is also a warning. `discard-draft` keeps a draft that may hold
+in verbatim analyst-intake, lift or notes-header text is also a warning. This includes every field of
+an analyst-intake item and each analyst question. `discard-draft` keeps a draft that may hold
 unpublished work (exit 4). Pass `--unpublished` only when the engineer agrees to lose that work.
 
 Questions have an independent per-slug `questions.json` store: stable IDs, scope/review

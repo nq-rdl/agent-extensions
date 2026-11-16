@@ -482,7 +482,68 @@ class Publish(unittest.TestCase):
         self.assertEqual(result.returncode, 4, result.stdout + result.stderr)
         self.assertIn("L1\ttext\tsentence-length", result.stdout)
 
+    # A synthetic code in analyst-intake text. The engineer cannot reword it: a later intake merge
+    # refuses a changed analyst answer and adds the original question again.
+    INTAKE = {"schemaVersion": 1, "approval_number": "THHSAQUIRE-042",
+              "open_questions": ["Does code 90000001 cover every ward?"],
+              "decisions": [{"id": "age", "topic": "cohort", "text": "Adults only.", "rationale": "The study asks for adults.",
+                             "confirmed_by": "analyst-login", "confirmed_role": "analyst",
+                             "confirmed_at": "2026-10-13T02:00:00Z",
+                             "decided": {"by": "requester-login", "role": "requester", "at": "2026-10-01",
+                                         "source": "email ref 90000002"}}]}
+
+    def intake_merge(self, doc, sidecar):
+        side = self.workspace / "answers.intake.json"
+        side.write_text(json.dumps(sidecar))
+        self.draft.parent.mkdir(parents=True, exist_ok=True)
+        self.draft.write_text(json.dumps(doc))
+        result = self.run_helper("intake", str(side), str(doc["revision"]), str(self.draft))
+        self.assertEqual(result.returncode, 0, result.stderr)
+        return json.loads(result.stdout)
+
+    def test_first_publish_warns_for_every_verbatim_intake_field(self):
+        doc = scope_doc("q", "q.sql", open_questions=[])
+        result = self.publish(self.intake_merge(doc, self.INTAKE))
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        self.assertIn("lint-warning\tA-intake-age\tdecided.source\tcode-value", result.stderr)
+        self.assertIn("lint-warning\t-\topen_questions[0]\tcode-value", result.stderr)
+        self.assertIn("lint-warning\t-\tintake_questions[0]\tcode-value", result.stderr)
+
+    def test_republish_after_an_intake_merge_keeps_a_published_question_that_moved(self):
+        # Published before publish ran the lint. The merge sorts open_questions, so the new analyst
+        # question moves the published one to another index.
+        self.final.mkdir(parents=True)
+        (self.final / "scope.json").write_text(json.dumps(
+            scope_doc("q", "q.sql", open_questions=["Zz: does code 90000003 cover every ward?"])))
+        doc = scope_doc("q", "q.sql", revision=2, open_questions=["Zz: does code 90000003 cover every ward?"])
+        merged = self.intake_merge(doc, dict(self.INTAKE, open_questions=["Which wards?"], decisions=[]))
+        self.assertEqual(merged["open_questions"][1], "Zz: does code 90000003 cover every ward?")
+        result = self.publish(merged)
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        self.assertIn("lint-warning\t-\topen_questions[1]\tcode-value", result.stderr)
+        # A new question with a code is still refused.
+        nxt = dict(merged, revision=3, open_questions=merged["open_questions"] + ["Zz: is 90000004 a ward?"],
+                   assumptions=[dict(a, confirmed_revision=3) for a in merged["assumptions"]])
+        result = self.publish(nxt)
+        self.assertEqual(result.returncode, 4, result.stdout + result.stderr)
+        self.assertIn("-\topen_questions[2]\tcode-value", result.stdout)
+
     # --- discard-draft ---------------------------------------------------------------------------
+    def test_discard_draft_keeps_a_changed_draft_at_the_published_revision(self):
+        # The revision was not bumped, so publish refused the draft. Its edits are not published.
+        self.assertEqual(self.publish(scope_doc("q", "q.sql")).returncode, 0)
+        draft = self.final / "scope.draft.json"
+        draft.write_text(json.dumps(scope_doc("q", "q.sql", intent="Weekly admission counts.")))
+        self.assertEqual(self.run_helper("publish", "q", "scope", str(draft)).returncode, 4)
+        result = self.run_helper("discard-draft", "q", "scope")
+        self.assertEqual(result.returncode, 4, result.stdout + result.stderr)
+        self.assertTrue(draft.is_file())
+        # The published content, less the helper-owned header history, is safe to discard.
+        published = json.loads((self.final / "scope.json").read_text())
+        published.pop("header_revisions", None)
+        draft.write_text(json.dumps(published, indent=1))
+        self.assertEqual(self.run_helper("discard-draft", "q", "scope").returncode, 0)
+
     def test_discard_draft_refuses_a_draft_newer_than_the_published_record(self):
         self.final.mkdir(parents=True)
         draft = self.final / "scope.draft.json"

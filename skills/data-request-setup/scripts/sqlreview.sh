@@ -45,8 +45,9 @@
 #   discard-draft [--unpublished] SLUG scope|review|lifts|questions
 #                                              remove only reviews/SLUG/<kind>.draft.json; absent is a no-op. Exit 4
 #                                              keeps a draft that may hold unpublished work: a revision newer than
-#                                              the published record (or none published), or a questions draft that
-#                                              differs from questions.json. --unpublished removes it anyway
+#                                              the published record (or none published), the same revision with
+#                                              other content, or a questions draft that differs from questions.json.
+#                                              --unpublished removes it anyway
 #   roles ENGINEER ANALYST                     update only the two confirmed role names in config.json
 #   guard string-sql on|off                    set only guard.require_lift_for_string_sql in config.json
 #   lifts-stale SLUG --tag TAG                  read-only JSON nudges for units newly present at a stable library tag
@@ -658,11 +659,14 @@ sr_publish_cleanup() {
 #   decision-source      always: an honest verbal source cannot link a written one
 #   unchanged            the published revision has the same hit (same id, field, rule and detail).
 #                        For a review, the published scope counts too: carried scope wording stays.
-#   verbatim             text or rationale of an analyst-intake item, of a linked lift limitation
-#                        (publish fixes that wording) or of an item whose text is a notes-header item
-#                        of the bound SQL (library text)
+#                        An open question has no id and intake sorts the list, so a question that
+#                        the published revision has at any index is unchanged.
+#   verbatim             any field of an analyst-intake item (intake refuses a changed answer), an
+#                        analyst question (intake_questions), text or rationale of a linked lift
+#                        limitation (publish fixes that wording) or of an item whose text is a
+#                        notes-header item of the bound SQL (library text)
 _publish_lint() { # <staged doc> <bound SQL or ""> <published doc>...
-  local doc="$1" sql="$2" new prior="" more header="[]" rc hits old
+  local doc="$1" sql="$2" new prior="" more header="[]" rc hits old asked="[]"
   shift 2
   new="$(_publish_lint_rows "$doc")" || return 2
   [ -n "$new" ] || return 0
@@ -671,20 +675,36 @@ _publish_lint() { # <staged doc> <bound SQL or ""> <published doc>...
     more="$(_publish_lint_rows "$old")" || return 2
     prior="$prior${more:+$more
 }"
+    more="$(jq -c --argjson a "$asked" '$a + [.open_questions // [] | arrays | .[] | strings]' "$old" 2>/dev/null)" || return 2
+    asked="$more"
   done
   if [ -n "$sql" ] && [ -f "$sql" ]; then
     header="$(_notes_scan "$sql" | jq -R -s '[split("\n")[] | split("\u001f") | select(.[0] == "I") | .[4]]' 2>/dev/null)" || header="[]"
   fi
-  hits="$(jq -r -n --arg new "$new" --arg prior "$prior" --argjson header "$header" --slurpfile doc "$doc" '
+  hits="$(jq -r -n -L "$SR_SCRIPT_DIR" --arg new "$new" --arg prior "$prior" --argjson header "$header" \
+      --argjson asked "$asked" --slurpfile doc "$doc" '
+    include "sqlreview-code-values";
     def rows($s): $s | split("\n") | map(select(. != "") | split("\t"));
-    ($doc[0] | [(.assumptions // [], .limitations // []) | arrays | .[] | objects
-      | select(.upstream?.source? == "analyst-intake" or has("lift_id")
-               or (.text as $t | ($t | type) == "string" and ($header | index([$t])) != null))
-      | .id | strings]) as $verbatim
-    | (rows($prior) | map(join("\t"))) as $old
+    # Row ids are redacted by lint, so the ids they are compared with are redacted too.
+    def ids(f): [(.assumptions // [], .limitations // []) | arrays | .[] | objects | select(f) | .id | strings
+      | code_value_redact];
+    $doc[0] as $d
+    | ($d | ids(.upstream?.source? == "analyst-intake")) as $intake
+    | ($d | ids(has("lift_id") or (.text as $t | ($t | type) == "string" and ($header | index([$t])) != null))) as $verbatim
+    | ($d.intake_questions // [] | if type == "array" then . else [] end) as $analyst
+    # The question that a row "-" <list>[N] names, or null.
+    | def question:
+        if .[0] != "-" then null
+        else ([.[1] | capture("^(?<k>open_questions|intake_questions)\\[(?<n>[0-9]+)\\]$")][0]) as $m
+          | if $m == null then null else ($d[$m.k] | if type == "array" then .[$m.n | tonumber] else null end) end
+        end;
+    (rows($prior) | map(join("\t"))) as $old
     | rows($new)[]
+    | question as $q
     | (if .[2] == "decision-source" or ((. | join("\t")) as $l | $old | index([$l]) != null)
+         or ($intake | index([.[0]])) != null
          or ((.[1] == "text" or .[1] == "rationale") and ($verbatim | index([.[0]])) != null)
+         or ($q != null and (($analyst | index([$q])) != null or ($asked | index([$q])) != null))
        then "warn" else "refuse" end) + "\t" + (.[0:3] | join("\t"))
   ' 2>/dev/null)" || return 2
   printf '%s\n' "$hits" | awk -F '\t' '$1 == "warn" { print "lint-warning\t" $2 "\t" $3 "\t" $4 }' >&2
@@ -999,8 +1019,10 @@ cmd_materialize() (
 # Remove a draft only at its canonical path, after the same slug and symlink checks as publish,
 # so callers never pass a constructed path to rm. A draft that may hold unpublished work stays
 # (exit 4) unless --unpublished: a scope, review or lifts draft whose revision is newer than the published
-# record (or with no published record, or no readable revision), and a questions draft that differs
-# from questions.json. A failed publish in a command chain therefore cannot lose the draft.
+# record (or with no published record, or no readable revision), or at the published revision with other
+# content (publish refuses it, so its edits are not published; header_revisions is helper-owned and does
+# not count), and a questions draft that differs from questions.json. A failed publish in a command
+# chain therefore cannot lose the draft.
 cmd_discard_draft() (
   local unpublished=false
   if [ "${1:-}" = --unpublished ]; then unpublished=true; shift; fi
@@ -1025,8 +1047,10 @@ cmd_discard_draft() (
       { [ -f "$published" ] && jq -e -n --slurpfile d "$draft" --slurpfile p "$published" '
           ($d | length) == 1 and ($p | length) == 1
           and ($d[0].revision | type) == "number" and ($p[0].revision | type) == "number"
-          and $d[0].revision <= $p[0].revision' >/dev/null 2>&1; } ||
-        sr_die 4 "discard-draft refused: the draft revision is newer than the published $kind, or none is published, or the draft has no readable revision; publish it first, or pass --unpublished to discard it"
+          and ($d[0].revision < $p[0].revision
+               or ($d[0].revision == $p[0].revision
+                   and ($d[0] | del(.header_revisions)) == ($p[0] | del(.header_revisions))))' >/dev/null 2>&1; } ||
+        sr_die 4 "discard-draft refused: the draft revision is newer than the published $kind, or has other content at the same revision, or none is published, or the draft has no readable revision; publish it first, or pass --unpublished to discard it"
     fi
   fi
   rm -f -- "$draft" || sr_die 2 "cannot remove draft"
