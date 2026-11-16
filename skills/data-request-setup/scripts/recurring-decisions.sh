@@ -5,25 +5,29 @@
 #
 #   list                  the list as JSON: {updated, tracking_issue, decisions: [...]}
 #   match [--any-kind] DRAFT
-#                         HINTS ONLY: scope/review items whose text or rationale contains a whole-word
+#                         HINTS ONLY: scope/review items (not analyst-intake ones) whose text or rationale has a whole-word
 #                         term from every term group of a listed decision. Only items in the list of
 #                         the decision's kind (assumptions or limitations) match; --any-kind drops
 #                         that filter. JSON {updated, tracking_issue, matches: [{kind, id, decision,
 #                         title, status, expected_kind, marked, evidence, library_issue,
 #                         related_issues, tracking_issue, proposal, retired_by, house_default?}]}
 #                         `evidence` links to the library issue rows that name the prior enquiries.
-#   marked RECORD...      marked items grouped by decision, for /data-request:lift. JSON
+#   marked RECORD...      items whose upstream names a decision, grouped by decision, for /data-request:lift. JSON
 #                         {decisions: [{decision, known, title, status, evidence, library_issue,
 #                         related_issues, tracking_issue, retired_by, house_default?, items: [{file, kind, id, text}]}]}
 #
+# An upstream marker is {source?, decision?}: match and marked skip a marker with a source and no
+# decision (analyst-intake), and refuse a marker with neither. Schema: ../references/recurring-decisions.rst.
+# -h or --help prints this text and exits 0.
 # SQLREVIEW_RECURRING_DECISIONS overrides the list path (tests and local trials).
 # Exit codes: 0 ok · 1 usage · 2 error (missing file, no jq) · 4 invalid list, document or marker.
 set -u
 RD_DIR="$(cd "$(dirname "$0")" && pwd -P)"
 RD_LIST="${SQLREVIEW_RECURRING_DECISIONS:-$RD_DIR/../assets/recurring-decisions.json}"
 
+help_text() { awk 'NR > 1 && !/^#/ { exit } NR > 1' "$0" | sed 's/^# \{0,1\}//'; }
 usage() {
-  awk 'NR > 1 && !/^#/ { exit } NR > 1' "$0" | sed 's/^# \{0,1\}//' >&2
+  help_text >&2
   exit 1
 }
 die() { printf 'recurring-decisions: %s\n' "$1" >&2; exit "${2:-2}"; }
@@ -71,8 +75,12 @@ def doc_errors:
       elif (.[$k] | type) != "array" then "\($k) must be an array"
       else .[$k][]
         | if type != "object" then "\($k): every item must be an object"
-          elif has("upstream") and ((.upstream | type) != "object" or (.upstream.decision | str | not))
-          then "\(.id // "?"): upstream must be an object with a nonempty decision id"
+          # One marker schema: source names the origin, decision names a listed decision.
+          # A provenance-only marker (such as analyst-intake) has a source and no decision.
+          elif has("upstream") and ((.upstream | type) != "object"
+               or (if .upstream | has("decision") then (.upstream.decision | str | not)
+                   else (.upstream.source | str | not) end))
+          then "\(.id // "?"): upstream must be an object with a nonempty decision, or a nonempty source and no decision"
           else empty end
       end
   end;
@@ -118,6 +126,8 @@ cmd_match() {
     | {updated: $l.updated, tracking_issue: $l.tracking_issue,
        matches: [("assumptions", "limitations") as $k
          | (.[$k] // [])[] | . as $i
+         # A provenance-only marker (analyst-intake) is not a recurring decision: skip that item.
+         | select((has("upstream") and (.upstream | has("decision") | not)) | not)
          | $l.decisions[] | select(. as $d | ($any or $k == $d.kind + "s") and ($i | hit($d)))
          | {kind: $k, id: $i.id, decision: .id, expected_kind: .kind,
             marked: ($i.upstream.decision == .id), proposal}
@@ -131,7 +141,7 @@ cmd_marked() {
   for f in "$@"; do
     check_doc "$f"
     more="$(jq -c --arg file "$f" '[("assumptions", "limitations") as $k | (.[$k] // [])[]
-      | select(has("upstream")) | {decision: .upstream.decision, file: $file, kind: $k, id, text}]' "$f" 2>/dev/null)" \
+      | select(.upstream.decision? | type == "string" and length > 0) | {decision: .upstream.decision, file: $file, kind: $k, id, text}]' "$f" 2>/dev/null)" \
       || die "marked failed on $f"
     rows="$(jq -cn --argjson a "$rows" --argjson b "$more" '$a + $b')"
   done
@@ -147,6 +157,9 @@ cmd_marked() {
 cmd="${1:-}"
 [ -n "$cmd" ] || usage
 shift
+# Help needs no list and no project: print it on stdout and exit 0.
+case "$cmd" in -h|--help|help) help_text; exit 0 ;; esac
+for f in "$@"; do case "$f" in -h|--help) help_text; exit 0 ;; esac; done
 # File arguments go through the shared guard (#516): no data/, no unreviewed sql/, nothing outside the project.
 . "$(cd "$(dirname "$0")" && pwd -P)/sqlreview-lib.sh"
 case "$cmd" in

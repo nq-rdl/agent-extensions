@@ -389,13 +389,147 @@ class Publish(unittest.TestCase):
         self.assertNotEqual(self.publish(scope_doc("q", "q.sql")).returncode, 0)
         self.assertEqual(outside.read_text(), "keep")
 
+    # --- publish runs the lint itself --------------------------------------------------------
+    LONG = ("The cohort includes every admitted patient whose first recorded stay in the reporting "
+            "period ends with a discharge to home, to another ward, or to a hospice.")  # 27 words
+
+    def test_publish_refuses_an_ste_hit(self):
+        doc = scope_doc("q", "q.sql")
+        doc["assumptions"][0]["rationale"] = self.LONG
+        result = self.publish(doc)
+        self.assertEqual(result.returncode, 4, result.stdout + result.stderr)
+        self.assertIn("A1\trationale\tsentence-length", result.stdout)
+        self.assertIn("lint", result.stderr)
+        self.assertNotIn("published", result.stdout)
+        self.assertFalse((self.final / "scope.json").exists())
+        self.assertTrue(self.draft.is_file())
+
+    def test_publish_refuses_provisional_wording(self):
+        doc = scope_doc("q", "q.sql")
+        doc["assumptions"][0]["text"] = "The ward list is proposed by the requester."
+        result = self.publish(doc)
+        self.assertEqual(result.returncode, 4, result.stdout + result.stderr)
+        self.assertIn("A1\ttext\tprovisional-wording", result.stdout)
+        self.assertFalse((self.final / "scope.json").exists())
+
+    def test_publish_warns_for_verbatim_analyst_intake_text(self):
+        doc = scope_doc("q", "q.sql")
+        doc["assumptions"].append(dict(doc["assumptions"][0], id="A-intake-age", text=self.LONG, upstream={
+            "source": "analyst-intake", "file": "answers.intake.json", "intake_id": "age", "role": "analyst"}))
+        result = self.publish(doc)
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        self.assertIn("lint-warning\tA-intake-age\ttext\tsentence-length", result.stderr)
+        self.assertTrue((self.final / "scope.json").is_file())
+
+    def test_publish_warns_for_a_hit_the_published_revision_already_had(self):
+        doc = scope_doc("q", "q.sql")
+        doc["intent"] = self.LONG
+        self.final.mkdir(parents=True)
+        (self.final / "scope.json").write_text(json.dumps(doc))
+        nxt = scope_doc("q", "q.sql", revision=2, intent=self.LONG)
+        result = self.publish(nxt)
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        self.assertIn("lint-warning\t-\tintent\tsentence-length", result.stderr)
+        # A changed field gets no such pass.
+        changed = scope_doc("q", "q.sql", revision=3, intent=self.LONG.replace("hospice", "nursing home"))
+        result = self.publish(changed)
+        self.assertEqual(result.returncode, 4, result.stdout + result.stderr)
+        self.assertIn("-\tintent\tsentence-length", result.stdout)
+
+    def test_review_publish_keeps_wording_carried_from_the_published_scope(self):
+        scope = scope_doc("q", "q.sql")
+        scope["assumptions"][0]["rationale"] = self.LONG
+        self.final.mkdir(parents=True)
+        (self.final / "scope.json").write_text(json.dumps(scope))  # published before publish ran the lint
+        self.project.sql("q.sql", "select 1;\n")
+        self.project.commit()
+        fp = json.loads(self.run_helper("fingerprint", "q.sql").stdout)
+        review = review_doc("q", **fp)
+        review["assumptions"][0]["rationale"] = self.LONG
+        result = self.publish(review)
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        self.assertIn("lint-warning\tA1\trationale\tsentence-length", result.stderr)
+
+    def test_publish_warns_and_does_not_refuse_an_unlinked_decision_source(self):
+        doc = scope_doc("q", "q.sql")
+        doc["assumptions"][0]["decided"] = {"by": "requester-login", "role": "requester",
+                                            "at": "2026-09-14", "source": "unlinked (verbal)"}
+        result = self.publish(doc)
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        self.assertIn("lint-warning\tA1\tdecided.source\tdecision-source", result.stderr)
+
+    def test_publish_lint_names_no_value(self):
+        doc = scope_doc("q", "q.sql")
+        doc["assumptions"][0]["text"] = "Stays that ZZTEST don't end are excluded; ZZTEST they're open."
+        result = self.publish(doc)
+        self.assertEqual(result.returncode, 4, result.stdout + result.stderr)
+        self.assertNotIn("ZZTEST", result.stdout + result.stderr)
+        self.assertNotIn("don't", result.stdout + result.stderr)
+
+    def test_review_publish_warns_for_library_header_text(self):
+        header = "/*\nassumptions:\n  - " + self.LONG + "\n*/\n"
+        self.project.sql("q.sql", header + "select 1;\n")
+        self.project.commit()
+        fp = json.loads(self.run_helper("fingerprint", "q.sql").stdout)
+        review = review_doc("q", **fp)
+        review["assumptions"][0]["text"] = self.LONG
+        result = self.publish(review)
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        self.assertIn("lint-warning\tA1\ttext\tsentence-length", result.stderr)
+        review = review_doc("q", revision=2, **fp)
+        review["limitations"][0]["text"] = self.LONG.replace("hospice", "nursing home")  # not header text
+        result = self.publish(review)
+        self.assertEqual(result.returncode, 4, result.stdout + result.stderr)
+        self.assertIn("L1\ttext\tsentence-length", result.stdout)
+
+    # --- discard-draft ---------------------------------------------------------------------------
+    def test_discard_draft_refuses_a_draft_newer_than_the_published_record(self):
+        self.final.mkdir(parents=True)
+        draft = self.final / "scope.draft.json"
+        draft.write_text(json.dumps(scope_doc("q", "q.sql")))
+        result = self.run_helper("discard-draft", "q", "scope")
+        self.assertEqual(result.returncode, 4, result.stdout + result.stderr)
+        self.assertIn("--unpublished", result.stderr)
+        self.assertTrue(draft.is_file())
+        self.assertEqual(self.publish(scope_doc("q", "q.sql")).returncode, 0)
+        draft.write_text(json.dumps(scope_doc("q", "q.sql", revision=2)))
+        self.assertEqual(self.run_helper("discard-draft", "q", "scope").returncode, 4)
+        self.assertTrue(draft.is_file())
+        for broken in ("{not json", "[]", json.dumps({"revision": "2"})):
+            with self.subTest(draft=broken):
+                draft.write_text(broken)
+                self.assertEqual(self.run_helper("discard-draft", "q", "scope").returncode, 4)
+                self.assertTrue(draft.is_file())
+        forced = self.run_helper("discard-draft", "--unpublished", "q", "scope")
+        self.assertEqual(forced.returncode, 0, forced.stderr)
+        self.assertFalse(draft.exists())
+        # The published revision itself, or an older one, is safe to discard.
+        draft.write_text(json.dumps(scope_doc("q", "q.sql")))
+        self.assertEqual(self.run_helper("discard-draft", "q", "scope").returncode, 0)
+        self.assertFalse(draft.exists())
+
+    def test_discard_draft_questions_kind(self):
+        self.final.mkdir(parents=True)
+        draft = self.final / "questions.draft.json"
+        store = {"schemaVersion": 1, "kind": "questions", "slug": "q", "questions": []}
+        draft.write_text(json.dumps(store))
+        self.assertEqual(self.run_helper("discard-draft", "q", "questions").returncode, 4)
+        (self.final / "questions.json").write_text(json.dumps(store, indent=2))
+        result = self.run_helper("discard-draft", "q", "questions")
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertEqual(result.stdout, "discarded\t.sqlreview/reviews/q/questions.draft.json\n")
+        draft.write_text(json.dumps(dict(store, questions=[{"id": "Q1"}])))
+        self.assertEqual(self.run_helper("discard-draft", "q", "questions").returncode, 4)
+        self.assertEqual(self.run_helper("discard-draft", "--unpublished", "q", "questions").returncode, 0)
+        self.assertFalse(draft.exists())
+
     def test_discard_draft_removes_only_the_canonical_draft(self):
         self.final.mkdir(parents=True)
         draft = self.final / "scope.draft.json"
         draft.write_text("{}")
         keep = self.final / "review.draft.json"
         keep.write_text("{}")
-        result = self.run_helper("discard-draft", "q", "scope")
+        result = self.run_helper("discard-draft", "--unpublished", "q", "scope")
         self.assertEqual(result.returncode, 0, result.stderr)
         self.assertEqual(result.stdout, "discarded\t.sqlreview/reviews/q/scope.draft.json\n")
         self.assertFalse(draft.exists())
@@ -410,7 +544,7 @@ class Publish(unittest.TestCase):
         outside.write_text("keep")
         self.assertNotEqual(self.run_helper("discard-draft", "../q", "scope").returncode, 0)
         self.assertNotEqual(self.run_helper("discard-draft", "..", "scope").returncode, 0)
-        self.assertNotEqual(self.run_helper("discard-draft", "q", "questions").returncode, 0)
+        self.assertNotEqual(self.run_helper("discard-draft", "q", "notes").returncode, 0)
         self.final.mkdir(parents=True)
         (self.final / "review.draft.json").symlink_to(outside)
         self.assertNotEqual(self.run_helper("discard-draft", "q", "review").returncode, 0)

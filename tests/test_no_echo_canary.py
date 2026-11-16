@@ -425,7 +425,9 @@ class Canary(unittest.TestCase):
 
     def test_discard_draft_never_reads_or_prints_the_draft(self):
         self.write(".sqlreview/reviews/q/review.draft.json", review(purpose=CANARY))
-        r = self.run_script(SR, "discard-draft", "q", "review")
+        # No published review: the draft may hold unpublished work, so only --unpublished removes it.
+        self.assertClean(self.run_script(SR, "discard-draft", "q", "review"), 4)
+        r = self.run_script(SR, "discard-draft", "--unpublished", "q", "review")
         self.assertClean(r, 0)
         self.assertFalse((self.root / ".sqlreview/reviews/q/review.draft.json").exists())
         self.write(".sqlreview/reviews/q/scope.draft.json", CANARY)
