@@ -1,0 +1,3 @@
+kind: Added
+body: Draft gives the pixi run amend record and amend regenerate commands, with their flags, for committing builder SQL
+time: 2026-11-16T00:00:01Z

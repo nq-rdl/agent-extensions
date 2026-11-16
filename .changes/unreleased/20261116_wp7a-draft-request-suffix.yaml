@@ -1,0 +1,3 @@
+kind: Added
+body: Draft writes request SQL to sql/v<N>/<name>_request.sql, the suffix the runner discovers
+time: 2026-11-16T00:00:02Z
