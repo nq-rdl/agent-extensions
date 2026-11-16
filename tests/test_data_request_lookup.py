@@ -188,5 +188,21 @@ class LookupContract(unittest.TestCase):
                 self.assertIn("`answers.intake.json` is handover tier", flat)
 
 
+class LookupVerdictRoute(unittest.TestCase):
+    def texts(self):
+        for tree in TREES:
+            yield tree, (tree / "SKILL.md").read_text()
+
+    def test_verdict_probe_is_offered_first_and_misses_are_worded(self):
+        for tree, text in self.texts():
+            flat = " ".join(text.split())
+            with self.subTest(tree=str(tree)):
+                self.assertIn("offer a verdict probe first", flat)
+                self.assertIn("not found by probe P<n>", flat)
+                self.assertIn("operator-handover.rst", flat)
+                self.assertLess(flat.index("offer a verdict probe first"),
+                                flat.index("Before handoff, check that the probe"))
+
+
 if __name__ == "__main__":
     unittest.main()

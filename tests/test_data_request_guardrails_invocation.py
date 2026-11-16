@@ -51,5 +51,36 @@ class GuardrailsInvocation(unittest.TestCase):
                 self.assertIn("Skill", tools)
 
 
+
+HANDOVER_TOKENS = ("branch", "fast-forward", "pull request head", "HEAD", "exact path", "git add -A",
+                   "commit, and only then push", "scaffold version", "extract runner", "verdict")
+CITING_LEAVES = ("map", "validate")
+
+
+class OperatorHandover(unittest.TestCase):
+    def reference(self, target):
+        base = {"canonical": REPO / "skills" / "data-request-guardrails",
+                "claude": REPO / "plugins" / "data-request" / "skills" / "guardrails",
+                "codex": REPO / "dist" / "codex" / "plugins" / "data-request" / "skills" / "guardrails"}[target]
+        return base / "references" / "operator-handover.rst"
+
+    def test_reference_names_every_handover_step(self):
+        for target in ("canonical", "claude", "codex"):
+            text = " ".join(self.reference(target).read_text().split())
+            for token in HANDOVER_TOKENS:
+                with self.subTest(target=target, token=token):
+                    self.assertIn(token, text)
+            self.assertIn("never ask the operator to run a probe with the extract runner", text.lower())
+
+    def test_guardrails_and_leaves_cite_the_reference(self):
+        paths = [copies(leaf) for leaf in CITING_LEAVES]
+        for found in paths:
+            for target, path in found.items():
+                with self.subTest(path=str(path)):
+                    self.assertIn("operator-handover.rst", path.read_text())
+        guard = REPO / "skills" / "data-request-guardrails" / "SKILL.md"
+        self.assertIn("references/operator-handover.rst", guard.read_text())
+
+
 if __name__ == "__main__":
     unittest.main()

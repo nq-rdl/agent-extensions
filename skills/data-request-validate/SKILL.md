@@ -34,9 +34,11 @@ does not establish cohort correctness, and a static index assessment is not a pl
 
 ## Pre-run plausibility: operator proposals only
 
-Read guardrails `references/performance.rst`, **Pre-run plausibility**. Return a proposed
-count-only probe for **each label column** across all final outputs, using its inventory table;
-show exclusions or unresolved metadata explicitly. Include expected raw labels/format from the
+Read guardrails `references/performance.rst`, **Pre-run plausibility** and **Verdict probes**.
+Return a proposed probe for **each label column** across all final outputs. Offer the verdict
+probe first, and word the question as "answer pass or fail, no numbers", with the labels checked
+against the data-dictionary set. Keep the count-only distribution as the second option, only where
+the disclosure rule allows it. Use each column's inventory table, and show exclusions or unresolved metadata explicitly. Include expected raw labels/format from the
 scope and data dictionary, SQL location, bounds/cost and suppression parameter. Propose an
 age-band probe only for expensive requests with cited cost evidence; otherwise state why omitted.
 
@@ -47,7 +49,8 @@ static validation does not establish plausibility. Check proposals and any cited
 against **Probe disclosure control** in
 `${CLAUDE_PLUGIN_ROOT}/skills/guardrails/references/release.rst`, including the
 boundary table and probe-sentence lint contract. The authorised operator runs approved probes
-before the delivery run; retain unresolved thresholds/bounds as reasons not to run.
+before the delivery run, through the hand-over steps in
+`${CLAUDE_PLUGIN_ROOT}/skills/guardrails/references/operator-handover.rst`, never through the extract runner; retain unresolved thresholds/bounds as reasons not to run.
 
 Return findings with severity, SQL location, rule/requirement, observed evidence,
 effect on the result and a proposed correction. Distinguish **observed problems**,

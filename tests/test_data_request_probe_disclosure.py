@@ -196,3 +196,30 @@ class ProbeDisclosure(unittest.TestCase):
         performance = (TREES[0] / "references/performance.rst").read_text()
         self.assertIn("release.rst#probe-disclosure-control", performance)
         self.assertIn("take MIN and MAX samples per group", performance)
+
+
+class VerdictFirstWording(unittest.TestCase):
+    ROOTS = ("skills/data-request-%s", "plugins/data-request/skills/%s",
+             "dist/codex/plugins/data-request/skills/%s")
+
+    def flat(self, root, leaf):
+        return " ".join((REPO / (root % leaf) / "SKILL.md").read_text().split())
+
+    def test_skills_offer_the_verdict_route_first(self):
+        wanted = (("validate", ("answer pass or fail, no numbers", "Verdict probes")),
+                  ("map", ("answer pass or fail, no numbers", "grain and join")),
+                  ("lookup", ("verdict probe first", "answer pass or fail, no numbers")),
+                  ("guardrails", ("answer pass or fail, no numbers", "verdict probe")))
+        for leaf, tokens in wanted:
+            for root in self.ROOTS:
+                text = self.flat(root, leaf)
+                for token in tokens:
+                    with self.subTest(leaf=leaf, root=root, token=token):
+                        self.assertIn(token, text)
+
+    def test_disclosure_rule_and_count_route_remain(self):
+        validate = self.flat(self.ROOTS[0], "validate")
+        self.assertIn("count-only distribution", validate)
+        self.assertIn("Probe disclosure control", validate)
+        self.assertIn("Use probe counts only when they are already available under the disclosure rule",
+                      self.flat(self.ROOTS[0], "map"))

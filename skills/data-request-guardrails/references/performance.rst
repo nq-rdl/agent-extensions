@@ -100,6 +100,9 @@ and assume the other labels share its format. Use this output table:
 Column | Expected labels/format and source | Proposed probe | Bound/cost | Status
 
 Qualify columns by result-set name and cite SQL lines. For each, propose a
+**verdict probe** first (see "Verdict probes" below): the operator answers pass or
+fail against the expected labels, with no numbers. Where the disclosure rule in
+``release.rst`` allows counts and a distribution is needed, the fallback is a
 **count-only** distinct-value distribution (raw category value and row count),
 including NULL, blank and unmapped categories. Preserve **raw spelling**, case
 and trailing spaces: case-insensitive grouping can hide the uppercase surprise.
@@ -156,6 +159,71 @@ with no automatic exclusion. Unrun or suppressed probes do not establish
 plausibility. Keep later UAT and ``validation_counts`` checks; machine checking
 scope expectations against those counts in data-analysis-scaffold is a follow-up,
 not implemented here. This guidance changes no runtime permissions.
+
+Verdict probes
+--------------
+
+A verdict probe answers one question per check with ``PASS`` or ``FAIL``. It returns
+no counts, no labels and no rows. Offer it first for every plausibility question
+and checklist item where a verdict is enough. Write the question as "answer pass or
+fail, no numbers". The operator runs the saved file, and the pasted block is the
+only result. See ``operator-handover.rst`` for the hand-over steps.
+
+Rules for the template:
+
+* **One indexed read.** Read the source once into a minimal ``#temp`` table with
+  the indexed bounds. Every check reads that table.
+* **One row per check.** Each check returns a name and ``PASS`` or ``FAIL``. A check
+  fails when it finds one offending row.
+* **NOT EXISTS, never NOT IN.** ``NOT IN`` over a nullable key returns no rows
+  when the list holds a NULL. That gives a false ``PASS``.
+* **Cut labels before free text.** Compare only the label part. Cut a free-text
+  tail such as ``Other: ...`` to its prefix before the comparison. The probe never
+  returns the tail.
+* **Self-checking.** Check ``C0`` fails the whole probe when the source is empty,
+  because an empty source passes every other check. Check ``C9`` is a canary that
+  tests a literal bad value. It must read ``PASS``, which shows that the logic
+  detects the bad value. A ``FAIL`` on ``C9`` means the probe logic is broken.
+* **Funnel form.** To find where a failure starts, add the stages cumulatively.
+  Each stage repeats the conditions of the earlier stages. The first ``FAIL`` names the stage.
+
+Template. Replace each ``<placeholder>`` from the evidence and keep the shape.
+
+.. code-block:: sql
+
+   SET NOCOUNT ON;
+   SELECT <key_col>, <label_col> AS lbl
+   INTO #probe_src
+   FROM <schema>.<table>
+   WHERE <indexed_bound>;
+
+   SELECT chk, CASE WHEN bad = 1 THEN 'FAIL' ELSE 'PASS' END AS verdict
+   FROM (
+     SELECT 'C0 source has rows' AS chk,
+            CASE WHEN EXISTS (SELECT 1 FROM #probe_src) THEN 0 ELSE 1 END AS bad
+     UNION ALL
+     SELECT 'C1 labels in expected set',
+            CASE WHEN EXISTS (
+              SELECT 1 FROM #probe_src s
+              WHERE NOT EXISTS (
+                SELECT 1 FROM (VALUES (<expected_1>), (<expected_2>)) AS d(v)
+                WHERE d.v = CASE WHEN s.lbl LIKE 'Other:%' THEN 'Other:' ELSE s.lbl END
+                      COLLATE <binary_collation>)
+            ) THEN 1 ELSE 0 END
+     UNION ALL
+     SELECT 'C9 canary: bad value is detected',
+            CASE WHEN EXISTS (
+              SELECT 1 FROM (VALUES ('<known_bad_value>')) AS c(v)
+              WHERE NOT EXISTS (
+                SELECT 1 FROM (VALUES (<expected_1>), (<expected_2>)) AS d(v)
+                WHERE d.v = c.v COLLATE <binary_collation>)
+            ) THEN 0 ELSE 1 END
+   ) AS r
+   ORDER BY chk;
+
+Report a result in words. Write "not found by probe P<n>, and the search stopped
+because <reason>", never "absent". A ``PASS`` covers only the bounds and the
+source that the probe read.
 
 Read isolation
 --------------
