@@ -213,6 +213,11 @@ class UncoveredLocalUnits(unittest.TestCase):
         self.p.write_json('pipeline.py', 'lifts.json', self.doc)
         self.assertEqual(self.uncovered()['uncovered'], [])
 
+    def test_name_after_a_newline_or_tab_is_covered(self):
+        self.doc['lifts'][0]['shortfall'] = 'Existing gap\nLocalVisits handles lookups\tWrappedVisits'
+        self.p.write_json('pipeline.py', 'lifts.json', self.doc)
+        self.assertEqual(self.uncovered()['uncovered'], [])
+
     def test_report_writes_nothing(self):
         before = {str(p): p.read_bytes() for p in (self.p.root / '.sqlreview').rglob('*') if p.is_file()}
         self.uncovered()

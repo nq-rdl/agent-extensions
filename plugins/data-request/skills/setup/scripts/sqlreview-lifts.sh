@@ -120,7 +120,7 @@ cmd_lifts_uncovered() { # SLUG -> request-local TypedTable classes that no ledge
 $(_sr_typed_table_classes "$file")"
   done
   # An entry covers a class when its local_units, need, shortfall or unit symbols name it as a whole token.
-  covered="$(jq -c '[.lifts[] | ((.local_units // []) + [.need, .shortfall] + [(.units // [])[] | .symbol])
+  covered="$(jq -r '[.lifts[] | ((.local_units // []) + [.need, .shortfall] + [(.units // [])[] | .symbol])
     | map(strings) | join(" ")] | join(" ")' "$ledger")"
   while IFS= read -r name; do
     [ -n "$name" ] || continue
