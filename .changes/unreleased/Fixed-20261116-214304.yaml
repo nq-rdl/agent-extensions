@@ -1,0 +1,3 @@
+kind: Fixed
+body: 'Plain `sqlreview.sh lint` skips a provisional status word inside quotes or backticks'
+time: 2026-11-16T21:43:04Z
