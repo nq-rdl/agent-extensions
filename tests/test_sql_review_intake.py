@@ -661,3 +661,10 @@ class IntakeDraftStaging(unittest.TestCase):
         r = self.stage(intake())
         self.assertEqual(r.returncode, 2, r.stderr)
         self.assertEqual((self.root / "elsewhere.json").read_text(), "{}")
+
+    def test_a_directory_at_the_draft_name_is_refused_and_nothing_is_written_inside_it(self):
+        self.draft.mkdir()
+        r = self.stage(intake())
+        self.assertEqual(r.returncode, 2, r.stdout + r.stderr)
+        self.assertEqual(list(self.draft.iterdir()), [])
+        self.assertEqual(sorted(p.name for p in self.root.iterdir() if p.name != ".git"), ["answers.intake.draft.json"])

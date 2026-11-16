@@ -1156,6 +1156,8 @@ cmd_intake_draft() {
   sr_need_jq
   [ "$1" = answers.intake.draft.json ] || sr_die 2 "the draft file name must be answers.intake.draft.json in the current directory"
   sr_no_symlinks "$1" || exit 2
+  # mv would move the new file into a directory of that name and still report success.
+  [ ! -e "$1" ] || [ -f "$1" ] || sr_die 2 "the draft file name is taken by something that is not a regular file"
   local tmp counts
   tmp="$(mktemp "./.answers.intake.draft.XXXXXX")" || sr_die 2 "cannot stage draft"
   cat > "$tmp" || { rm -f "$tmp"; sr_die 2 "cannot stage draft"; }
