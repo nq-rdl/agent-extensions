@@ -30,7 +30,8 @@
 # (no valid sidecar, an unknown criterion or a stamp that is not UTC) the row is walked
 # (an absent reason, flag or upstream equals an absent one, so gaining or dropping an upstream is a
 # change, as at publish, R21). A row states what the SQL does, so any SQL body change walks every row, like a
-# changed assumption: the engineer confirms or changes each state, never in bulk. The SQL body is unchanged when
+# changed assumption: the engineer confirms or changes each state, never in bulk. An unchanged body carries a
+# located row only when the line map re-locates its prior lines to its new lines (cf_lines_kept). The SQL body is unchanged when
 # the SQL sha256 is equal at both revisions (an explicit absence at both counts) or only the leading comment header changed. The set fields are the assumption ones minus status (confirmed_by, confirmed_at,
 # confirmed_revision, carried_from_revision, carried_basis) plus the prior row's upstream when present;
 # a new criterion or a changed row does not qualify and goes to the walk list for fresh confirmation.
@@ -96,7 +97,9 @@ def carry_criteria_rows($ctx):
   | ($ctx.criteria // null) as $cs
   | (($ctx.prior_sha != "" and $ctx.prior_sha == $ctx.cur_sha) or (($ctx.prior_absent // false) and ($ctx.cur_absent // false))
      or ($ctx.body_unchanged // false)) as $body
-  | ($ctx.cur | cf_sql_lines) as $cur_lines | ($ctx.base | cf_sql_lines) as $base_lines
+  | ($ctx.cur | cf_sql_lines) as $cur_lines
+  | (if $ctx.base != null then ($ctx.base | cf_sql_lines)
+     elif $ctx.prior_sha != "" and $ctx.prior_sha == $ctx.cur_sha then $cur_lines else null end) as $base_lines
   | [ ($d.criteria_status // [] | if type == "array" then .[] else empty end) | select(type == "object") | . as $i
       | ([($p.criteria_status // [] | if type == "array" then .[] else empty end)
           | select(type == "object" and .criterion == $i.criterion)][0]) as $m
@@ -113,7 +116,14 @@ def carry_criteria_rows($ctx):
            then {why: "\($i.criterion) was reworded or re-confirmed in answers.intake.json after revision \($pr): rescope with the engineer and confirm the row afresh"}
            else (["state", "reason", "flag", "upstream"] | map(select($m[.] != $i[.])) | .[0]) as $f
              | if $f != null then {why: "\($f) differs from revision \($pr)"}
-               elif $body then {basis: "criteria-unchanged"}
+               # An unchanged body proves the row only where its location is unchanged too: a location that is
+               # added, removed or moved must be proved by the line map, or the row gets a fresh confirmation.
+               elif $body then
+                 if $pl == null and $nl == null then {basis: "criteria-unchanged"}
+                 elif $pl == null or $nl == null then {why: "location added or removed since revision \($pr)"}
+                 elif ($pl | cf_range | not) or ($nl | cf_range | not) then {why: "location lines are not a valid range"}
+                 elif cf_lines_kept($pl; $nl; $base_lines; $cur_lines; $ctx.delta) then {basis: "criteria-unchanged"}
+                 else {why: "the line map cannot prove the location of \($i.criterion) since revision \($pr)"} end
                # The decided re-walk rule: a body change walks only the rows it touches. A row with no
                # location in either revision cannot show that, so it goes into the one carry question as a
                # fresh confirmation (bulk), never a carry.

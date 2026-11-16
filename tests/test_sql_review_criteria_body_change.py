@@ -231,6 +231,38 @@ class CriteriaBodyChange(Base):
         self.assertEqual({r["confirmed_revision"] for r in published}, {1})
         self.assertEqual({r["carried_basis"] for r in published}, {BASIS})
 
+    def test_a_location_change_with_an_unchanged_body_needs_a_line_map_proof(self):
+        # SQL_18 lines: 4 SELECT (D1), 5 FROM (N1), 6 WHERE age filter (I1).
+        where = {"N1": [5, 5], "I1": [6, 6], "D1": [4, 4]}
+        located = [dict(r, location={"lines": where[r["criterion"]]}) for r in STATUS_V1]
+        self.publish(2, SQL_18, [dict(r, confirmed_revision=2) for r in located])
+        # Same SQL. D1 moves to unrelated lines, I1 loses its location and N1 keeps it.
+        moved = {"D1": {"location": {"lines": [5, 5]}}, "I1": {"location": None}}
+        draft = [dict(r, **moved.get(r["criterion"], {})) for r in located]
+        draft = [{k: v for k, v in r.items() if v is not None} for r in draft]
+        cases = {"sql-unchanged": SQL_18, "header-only": SQL_18_HEADER}
+        for name, sql in cases.items():
+            with self.subTest(name):
+                self.write_sql(sql)
+                out = self.carryforward(3, sql, draft)
+                self.assertTrue(out["sql_body_unchanged"])
+                self.assertEqual({(c["id"], c["basis"]) for c in out["carry"]}, {("N1", BASIS)})
+                self.assertEqual({w["id"] for w in out["walk"]}, {"D1", "I1"})
+                claim = [dict(r, carried_from_revision=2, carried_basis=BASIS) for r in draft]
+                r = self.publish(3, sql, claim, expected=4)
+                text = r.stdout + r.stderr
+                self.assertIn("D1: cannot carry", text)
+                self.assertIn("I1: cannot carry", text)
+                self.assertNotIn("N1: cannot carry", text)
+                self.assertNotIn(LEAK_CANARY, text)
+        # A header that shifts every line: the line map re-locates an unchanged range, so it still carries.
+        shifted = "-- extra header line\n" + SQL_18
+        self.write_sql(shifted)
+        draft = [dict(r, location={"lines": [where[r["criterion"]][0] + 1] * 2}) for r in located]
+        out = self.carryforward(3, shifted, draft)
+        self.assertTrue(out["sql_body_unchanged"])
+        self.assertEqual({c["id"] for c in out["carry"]}, {"N1", "I1", "D1"})
+
     def test_reconfirmed_state_after_a_body_change_reaches_the_release_table(self):
         self.write_sql(SQL_16)
         self.assert_refused(2, SQL_16, self.carried(2))
