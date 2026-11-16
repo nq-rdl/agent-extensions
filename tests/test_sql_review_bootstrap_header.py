@@ -312,6 +312,10 @@ class BootstrapContract(unittest.TestCase):
                 check = body.index('sqlreview.sh" notes')
                 publish = body.index('sqlreview.sh" publish "$SLUG" scope')
                 self.assertLess(check, publish)
+                # How to read scope_check lives in a linked reference, beside the gate in SKILL.md.
+                self.assertIn("](references/header-check.rst)", body)
+                self.assertIn("Do not publish while a mismatch is unaddressed", body)
+                body += (path.parent / "references" / "header-check.rst").read_text()
                 for phrase in ("--against", "--questions", "question_checks", "unmatched_header",
                                "both identities", "provisional", "Do not close", "semantic"):
                     self.assertIn(phrase, body)
