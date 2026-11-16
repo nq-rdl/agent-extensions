@@ -13,6 +13,11 @@ from pathlib import Path
 
 import yaml
 
+try:  # `unittest discover -s tests` puts tests/ on sys.path; `-m unittest tests.x` does not
+    import skill_references
+except ModuleNotFoundError:
+    from tests import skill_references
+
 REPO = Path(__file__).resolve().parent.parent
 CANON = REPO / "skills" / "data-request-guardrails"
 SKILL = CANON / "SKILL.md"
@@ -25,8 +30,8 @@ LIFTS_COPIES = (
     REPO / "plugins" / "data-request" / "skills" / "setup" / "references" / "lifts.rst",
     REPO / "dist" / "codex" / "plugins" / "data-request" / "skills" / "setup" / "references" / "lifts.rst",
 )
-REFERENCES = ("performance.rst", "sources.rst", "checklist.rst", "release.rst", "modelling.rst",
-              "library.rst", "decision-authority.rst", "grain.rst", "delivery.rst", "supplied-cohorts.rst")
+# Discovered from the directory: a new reference needs only its file and a SKILL.md link.
+REFERENCES = skill_references.references(CANON)
 # The sentence guardrails, lifts.rst and map share for proposal-only entries (#372).
 PROPOSAL_ONLY = ("A proposal-only entry authorises no hand SQL: none is committed or run, "
                  "except exempt probes, until a writable run publishes the entry.")
@@ -66,11 +71,8 @@ def shipped_files():
 
 class Packaging(unittest.TestCase):
     def test_references_are_rst_and_linked_from_skill(self):
-        self.assertEqual({p.name for p in REFS.iterdir()}, set(REFERENCES))
-        text = body(SKILL)
-        for name in REFERENCES:
-            with self.subTest(ref=name):
-                self.assertIn(f"](references/{name})", text)
+        self.assertGreaterEqual(len(REFERENCES), 10)
+        self.assertEqual(skill_references.problems(CANON), [])
 
     def test_references_packaged_for_claude_and_codex(self):
         for root in (CLAUDE_COPY, CODEX_COPY):
