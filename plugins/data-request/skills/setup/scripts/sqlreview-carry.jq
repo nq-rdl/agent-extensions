@@ -129,6 +129,15 @@ def carry_rows($ctx):
     ]
   + (if $doc == "scope" then carry_criteria_rows($ctx) else [] end);
 
+# The carried_* fields a draft row still holds when carryforward walks or bulks it. A walked row gets a
+# fresh confirmation, so these fields must go first: check and publish refuse a fresh row that claims a carry.
+# $row is a carry_rows output row; the draft item is found by id (by criterion for a criteria_status row).
+def carry_clear($row):
+  ((.[$row.kind] // []) | if type == "array" then . else [] end
+    | map(select(type == "object" and (if $row.kind == "criteria_status" then .criterion else .id end) == $row.id))
+    | .[0] // {}) as $i
+  | [("carried_basis", "carried_from_revision") as $f | select($i[$f] != null) | $f];
+
 # Publish's verdict: one violation line per carried item (carried_from_revision set; for a criteria_status
 # row, carried_from_revision or carried_basis set) that does not qualify or does not copy the prior confirmation exactly. carried_basis is optional (documents
 # written before #366 lack it) but, when present, must name the basis publish proves.

@@ -60,6 +60,36 @@ class CarryOver(unittest.TestCase):
         self.assertEqual([(w["kind"], w["id"]) for w in out["walk"]], [("assumptions", "A3"), ("limitations", "L1")])
         self.assertEqual(list((self.p.root / ".sqlreview").rglob("*.sql")), [])  # #505: no SQL copies in the store
 
+    def test_carry_list_writes_every_item_and_prints_a_short_summary(self):
+        # A long carry question shows the count, ids, bases and lines, and points to a file with the full text.
+        self.scope()
+        self.sql.write_text(SQL_V1.replace("adm.stays", "adm.stays_v2"))
+        committed(self.p)
+        r = run(["carry-list", "q", "carryover", str(self.draft)], self.p.root)
+        self.assertEqual(r.returncode, 0, r.stdout + r.stderr)
+        out = json.loads(r.stdout)
+        self.assertEqual(out["file"], ".sqlreview/reviews/q/carry-list.md")
+        self.assertEqual([(l["list"], l["count"]) for l in out["lists"]], [("carry_over", 1), ("carry_over_intent", 1)])
+        self.assertEqual(out["lists"][0]["items"], [{"kind": "assumptions", "id": "A2", "basis": "lines-unchanged",
+                                                     "lines": [5, 7]}])
+        self.assertEqual(out["lists"][1]["items"][0]["lines"], None)
+        self.assertNotIn("Only completed stays", r.stdout)  # the text stays in the file, not the summary
+        text = (self.d / "carry-list.md").read_text()
+        for needle in ("## carry_over: 1 items", "### A2 (assumptions)", "- Basis: lines-unchanged", "- Location: lines 5-7",
+                       "- Text: Months are calendar months", "- Rationale: Dashboard convention.",
+                       "## carry_over_intent: 1 items", "- Text: Only completed stays",
+                       "- Location: the whole SQL (no location)"):
+            self.assertIn(needle, text)
+        self.assertNotIn("A3", text)  # a walked item is not in a carry list
+        self.assertEqual(list((self.p.root / ".sqlreview").rglob("*.sql")), [])
+
+    def test_carry_list_refuses_bad_input(self):
+        self.scope()
+        self.assertEqual(run(["carry-list", "q", "sideways", str(self.draft)], self.p.root).returncode, 1)
+        self.assertEqual(run(["carry-list", "q", "carryover"], self.p.root).returncode, 1)
+        self.assertEqual(run(["carry-list", "q", "carryover", str(self.d / "nope.json")], self.p.root).returncode, 2)
+        self.assertFalse((self.d / "carry-list.md").exists())
+
     def test_changed_sql_carries_over_located_items_on_lines_and_intent_items_on_intent(self):
         self.scope()
         self.sql.write_text(SQL_V1.replace("adm.stays", "adm.stays_v2"))  # line 2 only

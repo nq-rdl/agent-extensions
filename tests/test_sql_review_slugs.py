@@ -198,7 +198,7 @@ class LegacyEncodedReview(unittest.TestCase):
         self.assertFalse((self.reviews() / LEGACY).exists())
         d = self.reviews() / READABLE
         self.assertFalse((d / "rebind-required").exists(), "binding unchanged: no re-analysis forced")
-        self.assertFalse((d / "review.md").exists(), "stale render removed")
+        self.assertIn(f"`{PATH}`", (d / "review.md").read_text(), "render rebuilt from the rebound JSON")
         self.assertTrue((d / "source.sql").is_file())
         self.assertTrue((d / "history" / "1.sql").is_file())
         for name in ("review.json", "scope.json"):

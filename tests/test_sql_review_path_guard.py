@@ -341,6 +341,7 @@ SQLREVIEW_INPUTS = {
     "lint": [[D], ["--ste", D]],
     "carryover": [[SLUG, D]],
     "carryforward": [[SLUG, "scope", D]],
+    "carry-list": [[SLUG, "carryover", D], [SLUG, "carryforward", D]],
     "remap": [[SLUG, D]],
     "publish": [[SLUG, "review", D]],
     "publish-questions": [[SLUG, D]],

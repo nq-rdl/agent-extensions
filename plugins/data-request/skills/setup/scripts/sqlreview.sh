@@ -54,6 +54,10 @@
 #                                              or exits 4 when the draft is not a readable file); invalid intake exits 4;
 #                                              never writes
 #   carryforward SLUG scope|review DRAFT       draft items whose previous-revision confirmation may be carried (JSON)
+#                                              walk/bulk rows name carried_* fields to clear; first_binding: SQL now exists
+#   carry-list SLUG carryover|carryforward DRAFT  write each carry question's items (id, basis, location, stored
+#                                              text and rationale) to reviews/SLUG/carry-list.md; print the
+#                                              count, ids, bases and lines of each list (JSON)
 #   remap SLUG [DRAFT]                         atomically remap unchanged location/logic ranges in a draft (JSON report)
 #                                              default: review.draft.json, else scope.draft.json; seed from published JSON
 #                                              changed/ambiguous ranges stay untouched in walk; never publish or confirm
@@ -73,7 +77,9 @@
 #                                              Review --against + explicit human HANDLE adds header_carry_over and
 #                                              header_walk with git-source evidence; never sets confirmed_*.
 #                                              Needs no .sqlreview/. Exit 4: malformed header, "line N: why" on stderr
-#   move OLDPATH NEWPATH                       rebind a review directory after the SQL moved (to the readable slug)
+#   move OLDPATH NEWPATH                       rebind a review directory after the SQL moved (to the readable slug);
+#                                              identical bytes keep carried evidence, changed bytes force reassessment;
+#                                              re-renders the markdown it replaces
 #   move PATH PATH                             migrate a legacy-encoded slug to the readable one (no rebind needed)
 #   move --slug OLDSLUG NEWPATH                rebind a legacy review whose slug no current path derives
 #   questions SLUG [scope|review]                  read shared question store (legacy projection if unmigrated)
@@ -971,6 +977,20 @@ cmd_snapshot() (
 )
 
 # ---------------------------------------------------------------------------------------------
+# The move marker, rebind-required, records how the SQL bytes compared when `move` ran.
+#   sql-identical  the new file held every recorded sql_sha256: delta, impact, remap and carryforward
+#                  still compare, and read the archived pre-move binding from git (history/, #505)
+#   anything else  (sql-changed, or the empty marker of an older helper) the review needs reassessment
+#                  before any comparison. A symlinked marker also blocks: it is never read.
+_rebind_blocks() { # <slug> -> 0 when the marker forces reassessment
+  local m="$SR_REVIEWS/$1/rebind-required" line=""
+  [ -e "$m" ] || [ -L "$m" ] || return 1
+  [ -f "$m" ] && [ ! -L "$m" ] || return 0
+  IFS= read -r line < "$m" || true
+  [ "$line" != sql-identical ]
+}
+
+# ---------------------------------------------------------------------------------------------
 # Shared by delta and impact: sets SR_BASE, SR_CUR, SR_SQL_PATH; returns 0 unchanged, 10 changed.
 _delta_prepare() {
   local slug="$1" kind="${2:-}" doc
@@ -999,8 +1019,13 @@ EOF
   SR_BASE="$work/base.sql"
   SR_CUR="$SR_ROOT/$SR_SQL_PATH"
   [ -f "$SR_CUR" ] || sr_die 2 "the reviewed SQL no longer exists: $SR_SQL_PATH (moved? see: sqlreview.sh move)"
-  sr_source_auth "$(sr_binding_doc "$SR_REVIEWS/$1" "$(jq -r .kind "$doc" 2>/dev/null)" "$doc")" "$SR_BASE" || exit $?
-  local binding
+  local bdoc binding
+  bdoc="$(sr_binding_doc "$SR_REVIEWS/$1" "$(jq -r .kind "$doc" 2>/dev/null)" "$doc")" || exit 2
+  # After a byte-identical move the current revision is read from its archived pre-move binding. It still
+  # names the old path, so the record needs a new revision at the new path (SR_MOVED, see cmd_delta).
+  SR_MOVED=false
+  [ "$bdoc" = "$doc" ] || [ "$(jq -r '.sql_path // ""' "$bdoc" 2>/dev/null)" = "$SR_SQL_PATH" ] || SR_MOVED=true
+  sr_source_auth "$bdoc" "$SR_BASE" || exit $?
   sr_binding "$doc" "$SR_CUR" "$SR_BASE"; binding=$?
   [ "$binding" = 10 ] && { printf 'header-only revision; SQL body unchanged\n'; return 0; }
   [ "$binding" = 0 ] && return 0
@@ -1013,7 +1038,7 @@ cmd_delta() (
   case "${2:-}" in ""|scope|review) ;; *) usage ;; esac
   sr_require_root
   sr_safe_slug "$1"
-  if [ -f "$SR_REVIEWS/$1/rebind-required" ]; then
+  if _rebind_blocks "$1"; then
     printf 'SQL path moved; binding requires reassessment before comparison\n'; return 10
   fi
   work="$(sr_source_workspace)" || exit 2
@@ -1022,11 +1047,17 @@ cmd_delta() (
   _delta_prepare "$@"; rc=$?
   printf 'baseline_sha256=%s current_sha256=%s sql_path=%s\n' "$(sr_sha256 "$SR_BASE")" "$(sr_sha256 "$SR_CUR")" "$SR_SQL_PATH"
   if [ "$rc" -eq 0 ] && cmp -s "$SR_BASE" "$SR_CUR"; then
-    printf 'unchanged since the reviewed source\n'; return 0
+    printf 'unchanged since the reviewed source\n'
+  else
+    local diff_rc
+    diff -u -L "reviewed ($1 recorded source)" -L "current ($SR_SQL_PATH)" "$SR_BASE" "$SR_CUR"; diff_rc=$?
+    [ "$diff_rc" -le 1 ] || sr_die 2 "cannot diff the reviewed source against current SQL"
   fi
-  local diff_rc
-  diff -u -L "reviewed ($1 recorded source)" -L "current ($SR_SQL_PATH)" "$SR_BASE" "$SR_CUR"; diff_rc=$?
-  [ "$diff_rc" -le 1 ] || sr_die 2 "cannot diff the reviewed source against current SQL"
+  # Exit 10, not 0: republishing the moved record as it is would fail, because its commit has no SQL at the new path.
+  if [ "$SR_MOVED" = true ]; then
+    printf 'SQL path moved with identical bytes: publish a new revision at the new path; carryforward carries unchanged items\n'
+    return 10
+  fi
   return "$rc"
 )
 
@@ -1035,7 +1066,7 @@ cmd_impact() (
   local rc changed idents ident work diff_rc
   sr_require_root
   sr_safe_slug "$1"
-  if [ -f "$SR_REVIEWS/$1/rebind-required" ]; then
+  if _rebind_blocks "$1"; then
     printf 'SQL path moved; binding requires reassessment before comparison\n'; return 10
   fi
   work="$(sr_source_workspace)" || exit 2
@@ -1270,14 +1301,66 @@ cmd_carryforward() (
   [ -n "$sql" ] || sql="$(jq -r '.sql_path // "" | strings' "$draft")"
   sr_safe_sql "$sql"
   _carry_context "$slug" "$kind" "$sql"
-  _carry_jq "$draft" 'carry_rows($ctx) as $rows
-    | {document: $document, prior_revision: ($ctx.prior.revision // null),
+  # first_binding: the previous scope was confirmed before the SQL existed and the SQL now exists. Its intent
+  # items carry, so the skill reads the SQL against each one. clear: carried_* fields a walked row must drop.
+  _carry_jq "$draft" '. as $d | carry_rows($ctx) as $rows
+    | def cleared($r): ($d | carry_clear($r)) as $c | if ($c | length) > 0 then {clear: $c} else {} end;
+    {document: $document, prior_revision: ($ctx.prior.revision // null),
        revision: (if $ctx.prior == null then 1 else $ctx.prior.revision + 1 end),
        sql_unchanged: ($ctx.prior_sha != "" and $ctx.prior_sha == $ctx.cur_sha),
        sql_body_unchanged: (($ctx.prior_sha != "" and $ctx.prior_sha == $ctx.cur_sha) or $ctx.body_unchanged),
+       first_binding: ($ctx.prior != null and $ctx.prior_absent and $ctx.cur_sha != ""),
        carry: [$rows[] | select(.basis != null) | {kind, id, basis, set}],
-       bulk: [$rows[] | select(.basis == null and .bulk) | {kind, id, text, rationale, location, why}],
-       walk: [$rows[] | select(.basis == null and (.bulk | not)) | {kind, id, why}]}' --arg document "$kind"
+       bulk: [$rows[] | select(.basis == null and .bulk) | {kind, id, text, rationale, location, why} + cleared(.)],
+       walk: [$rows[] | select(.basis == null and (.bulk | not)) | {kind, id, why} + cleared(.)]}' --arg document "$kind"
+)
+
+# The carry questions list many items. A dialog cannot show each item's stored text and rationale, so this
+# writes them, verbatim, to reviews/SLUG/carry-list.md. The question then shows the count, ids, bases and
+# lines, and points to the file. Read-only for records: it reads what carryover or carryforward reads.
+cmd_carry_list() (
+  [ $# -eq 3 ] || usage
+  sr_need_jq
+  sr_require_root
+  local slug="$1" mode="$2" draft="$3" kind rows dest tmp
+  sr_safe_slug "$slug"
+  [ -f "$draft" ] || sr_die 2 "no such draft: $draft"
+  jq -e 'type == "object"' "$draft" >/dev/null 2>&1 || sr_die 4 "invalid JSON: $draft"
+  case "$mode" in
+    carryover) rows="$(cmd_carryover "$slug" "$draft")" || exit $? ;;
+    carryforward)
+      kind="$(jq -r '.kind // ""' "$draft")"
+      case "$kind" in scope|review) ;; *) sr_die 4 "carry-list carryforward needs a scope or review draft" ;; esac
+      rows="$(cmd_carryforward "$slug" "$kind" "$draft")" || exit $? ;;
+    *) usage ;;
+  esac
+  dest="$SR_REVIEWS/$slug/carry-list.md"
+  sr_no_symlinks "$dest" || exit 2
+  [ ! -d "$dest" ] || sr_die 2 "carry-list.md is a directory"
+  tmp="$(mktemp "$SR_REVIEWS/$slug/.carry-list.XXXXXX")" || sr_die 2 "mktemp failed"
+  trap 'rm -f "$tmp"' EXIT
+  printf '%s\n' "$rows" | jq -r --arg slug "$slug" --arg mode "$mode" '
+    def lists: if $mode == "carryover" then [["carry_over", .carry_over], ["carry_over_intent", .carry_over_intent]]
+      else [["bulk", .bulk]] end;
+    def where: if (.location | type) == "object" and (.location.lines | type) == "array"
+      then "lines \(.location.lines[0])-\(.location.lines[1])" else "the whole SQL (no location)" end;
+    def decided: if (.decided | type) == "object"
+      then ["- Decided: \(.decided.by // "unknown") (\(.decided.role // "unknown"), \(.decided.at // "no date")), source \(.decided.source // "none")"]
+      else [] end;
+    ["# Carry list for \($slug) (\($mode))", "",
+     "This file shows each item that one carry question covers, with its stored text and rationale verbatim.",
+     "The answer to a question confirms every item in its list. Delete this file after the answer.", ""]
+    + [lists[] | .[0] as $name | (.[1] // []) as $items
+       | "## \($name): \($items | length) items", "",
+         ($items[] | (["### \(.id) (\(.kind))", "", "- Basis: \(.basis // "none, the SQL changed under the item")",
+           "- Location: \(where)"] + decided + ["- Text: \(.text)", "- Rationale: \(.rationale // "none")", ""])[])
+      ] | .[]' > "$tmp" 2>/dev/null || sr_die 4 "carry-list cannot render the rows: check the draft with sqlreview.sh check"
+  mv "$tmp" "$dest" || sr_die 2 "cannot write carry-list.md"
+  printf '%s\n' "$rows" | jq --arg file "${dest#"$SR_ROOT"/}" --arg mode "$mode" '
+    (if $mode == "carryover" then [["carry_over", .carry_over], ["carry_over_intent", .carry_over_intent]]
+     else [["bulk", .bulk]] end) as $lists
+    | {file: $file, lists: [$lists[] | {list: .[0], count: (.[1] // [] | length),
+        items: [(.[1] // [])[] | {kind, id, basis: (.basis // null), lines: (.location.lines? // null)}]}]}'
 )
 
 # Draft range plumbing only: diff authentic baseline bytes against frozen current SQL.
@@ -1317,7 +1400,7 @@ cmd_remap() (
   cmd_check "$prior" >/dev/null || sr_die 4 "published $kind is invalid"
   sql="$(jq -r .sql_path "$prior")"
   sr_safe_sql "$sql"
-  [ ! -f "$SR_REVIEWS/$slug/rebind-required" ] || sr_die 6 "SQL path moved; reassess before remapping"
+  ! _rebind_blocks "$slug" || sr_die 6 "SQL path moved; reassess before remapping"
   [ -f "$SR_ROOT/$sql" ] || sr_die 2 "no such SQL: $sql"
   jq -e --arg s "$slug" --arg k "$kind" --arg p "$sql" '
     .slug == $s and .kind == $k and .sql_path == $p' "$input" >/dev/null || sr_die 4 "draft slug/kind/sql_path must match published source"
@@ -1625,10 +1708,29 @@ _move_archive_history() { # <new slug>
   done
 }
 
+# How the new file compares with every recorded sql_sha256 of the review: identical, changed (a
+# mismatch or no regular file) or unbound (no record names a hash). Only the bytes are compared here.
+# Every later carry still reads the old SQL from git at the recorded commit and checks its SHA.
+_move_bytes() { # <old slug> <new path>
+  local f want have="" bound=false
+  for f in scope.json review.json; do
+    [ -f "$SR_REVIEWS/$1/$f" ] || continue
+    want="$(jq -r '.sql_sha256 // "" | strings' "$SR_REVIEWS/$1/$f" 2>/dev/null)" || want=changed
+    [ -n "$want" ] || continue
+    bound=true
+    if [ -z "$have" ]; then
+      if [ -f "$SR_ROOT/$2" ] && [ ! -L "$SR_ROOT/$2" ]; then have="$(sr_sha256 "$SR_ROOT/$2")" || have=none
+      else have=none; fi
+    fi
+    [ "$have" = "$want" ] || { printf 'changed\n'; return 0; }
+  done
+  if [ "$bound" = true ]; then printf 'identical\n'; else printf 'unbound\n'; fi
+}
+
 cmd_move() {
   sr_need_jq
   sr_require_root
-  local oldrel="" newrel oldslug newslug f tmp rebind=1
+  local oldrel="" newrel oldslug newslug f tmp rebind=1 bytes="" kind renders=""
   if [ "${1:-}" = "--slug" ]; then
     # Legacy reviews (e.g. schema 1 with a hand-chosen slug) are named by no current path.
     [ $# -eq 3 ] || usage
@@ -1665,10 +1767,27 @@ cmd_move() {
       [ "$(jq -r '.sql_path // "" | strings' "$SR_REVIEWS/$oldslug/$f" 2>/dev/null)" = "$newrel" ] || rebind=1
     done
   fi
+  # A move to a file with the recorded bytes keeps carried evidence: the marker says so, and delta, remap
+  # and carryforward still compare. Changed or missing bytes, or an earlier changed move, force reassessment.
+  [ "$rebind" = 0 ] || bytes="$(_move_bytes "$oldslug" "$newrel")"
+  for kind in review scope lifts; do
+    [ ! -f "$SR_REVIEWS/$oldslug/$kind.md" ] || renders="$renders $kind"
+  done
   [ "$oldslug" = "$newslug" ] || mv "$SR_REVIEWS/$oldslug" "$SR_REVIEWS/$newslug" || sr_die 2 "move failed"
-  [ "$rebind" = 0 ] || touch "$SR_REVIEWS/$newslug/rebind-required" || sr_die 2 "cannot mark stale"
+  case "$bytes" in
+    changed) printf 'sql-changed\n' > "$SR_REVIEWS/$newslug/rebind-required" || sr_die 2 "cannot mark stale"
+      printf 'sqlreview: SQL bytes changed or missing at the new path: reassess the review before any comparison\n' >&2 ;;
+    identical)
+      [ -e "$SR_REVIEWS/$newslug/rebind-required" ] ||
+        printf 'sql-identical\n' > "$SR_REVIEWS/$newslug/rebind-required" || sr_die 2 "cannot mark stale"
+      if _rebind_blocks "$newslug"; then
+        printf 'sqlreview: SQL bytes unchanged, but an earlier move still requires reassessment\n' >&2
+      else
+        printf 'sqlreview: SQL bytes unchanged at the new path: carried evidence still compares with the recorded commit; publish a new revision at the new path\n' >&2
+      fi ;;
+  esac
   _move_archive_history "$newslug" || sr_die 2 "cannot archive the pre-move source binding; review needs repair"
-  # Renders are rebuilt from the rebound JSON; only these three fixed names in the slug directory go.
+  # Renders are rebuilt from the rebound JSON below; only these three fixed names in the slug directory go.
   (
     cd "$SR_REVIEWS/$newslug" || exit 2
     rm -f -- review.md scope.md lifts.md
@@ -1677,6 +1796,12 @@ cmd_move() {
     [ -f "$SR_REVIEWS/$newslug/$f" ] || continue
     tmp="$(mktemp "$SR_REVIEWS/$newslug/.move.XXXXXX")" || sr_die 2 "mktemp failed"
     jq --arg p "$newrel" --arg s "$newslug" '.sql_path = $p | .slug = $s' "$SR_REVIEWS/$newslug/$f" > "$tmp" && mv "$tmp" "$SR_REVIEWS/$newslug/$f" || { rm -f "$tmp"; sr_die 2 "rebind failed; review needs repair"; }
+  done
+  # Re-render only what the move removed. A render that fails does not undo the move: name the command.
+  for kind in $renders; do
+    [ -f "$SR_REVIEWS/$newslug/$kind.json" ] || continue
+    ( cmd_render "$newslug" "$kind" ) >/dev/null 2>&1 ||
+      printf 'sqlreview: render required: run sqlreview.sh render %s %s\n' "$newslug" "$kind" >&2
   done
   printf 'moved\t%s\t%s\t%s\n' "$oldslug" "$newslug" "$newrel"
 }
@@ -1756,7 +1881,7 @@ _sr_guard_command_inputs() { # COMMAND ARGS...
     criteria) case "${1:-}" in */*|*.json) sr_guard_input "$1" ;; esac ;;
     lint) for a in "$@"; do last="$a"; done; [ -z "$last" ] || sr_guard_input "$last" ;;
     carryover|remap|publish-questions) [ $# -lt 2 ] || sr_guard_input "$2" ;;
-    carryforward) [ $# -lt 3 ] || sr_guard_input "$3" ;;
+    carryforward|carry-list) [ $# -lt 3 ] || sr_guard_input "$3" ;;
     notes) for a in "$@"; do case "$prev" in --against|--questions) sr_guard_input "$a" ;; esac; prev="$a"; done ;;
     ledger)
       [ "${1:-}" != --session ] || shift
@@ -1795,6 +1920,7 @@ case "$cmd" in
   carryover) cmd_carryover "$@" ;;
   intake) cmd_intake "$@" ;;
   carryforward) cmd_carryforward "$@" ;;
+  carry-list) cmd_carry_list "$@" ;;
   remap) cmd_remap "$@" ;;
   notes) cmd_notes "$@" ;;
   move) cmd_move "$@" ;;

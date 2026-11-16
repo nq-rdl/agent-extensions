@@ -441,6 +441,25 @@ class HeaderCarry(unittest.TestCase):
         self.sql.write_text(SQL_V1)
         self.walked()
 
+    def test_items_settled_for_this_revision_leave_the_header_walk(self):
+        # An item that carryover or carryforward already settled is not asked again: header_walk omits it and
+        # header_settled names it. header_carry_over keeps its rows, because publish re-proves them.
+        self.sql.write_text(SQL_V1)
+        a1 = self.doc["assumptions"][0]
+        self.doc["revision"] = 2
+        self.doc["assumptions"] = [
+            dict(a1, status="confirmed", confirmed_by="engineer-login", confirmed_at="2026-09-25T00:00:00Z",
+                 confirmed_revision=2),
+            dict(a1, id="A2", text="Carried from revision 1", status="confirmed", confirmed_by="engineer-login",
+                 confirmed_at="2026-09-20T00:00:00Z", confirmed_revision=1, carried_from_revision=1,
+                 carried_basis="sql-unchanged"),
+            dict(a1, id="A3", text="Confirmed at an earlier revision only", status="confirmed",
+                 confirmed_by="engineer-login", confirmed_at="2026-09-20T00:00:00Z", confirmed_revision=1),
+            dict(a1, id="A4", text="Still a candidate")]
+        out = self.notes()
+        self.assertEqual([i["id"] for i in out["header_walk"]], ["A3", "A4"])
+        self.assertEqual(out["header_settled"], [{"kind": "assumptions", "id": "A1"}, {"kind": "assumptions", "id": "A2"}])
+
     def test_missing_header_without_actor_retains_legacy_notes_shape(self):
         self.sql.write_text(SQL_V1)
         self.assertEqual(self.notes(None), {"present": False, "lines": None, "assumptions": [], "limitations": []})

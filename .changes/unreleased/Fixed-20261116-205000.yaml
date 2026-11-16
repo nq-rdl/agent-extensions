@@ -1,0 +1,3 @@
+kind: Fixed
+body: notes --confirmed-by leaves items that already hold a confirmation for this revision out of header_walk
+time: 2026-11-16T02:05:00Z

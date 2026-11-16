@@ -326,6 +326,17 @@ class ScopePublish(Base):
                                    limitations=[fresh(l1, 2)]), expected=6)
         self.assertIn("full SHA mismatch", r.stderr)
 
+    def test_a_first_binding_is_flagged_for_a_check_against_the_sql(self):
+        # The scope was confirmed before the SQL existed. Its intent items still carry, but the flag tells
+        # the skill to read the SQL against each carried item before it accepts the carry.
+        self.sql.unlink()
+        a1 = item("A1", "Only completed stays", 1, rationale="Open stays lack a discharge date.")
+        self.publish(self.scope(1, sql=None, assumptions=[a1]))
+        self.sql = self.p.sql("q.sql", SQL_V1)
+        out = self.carryforward("scope", self.scope(2, assumptions=[dict(a1, status="candidate")]))
+        self.assertTrue(out["first_binding"])
+        self.assertEqual([(c["id"], c["basis"]) for c in out["carry"]], [("A1", "intent-unchanged")])
+
     def test_scope_written_before_the_sql_carries_null_location_items(self):
         self.sql.unlink()
         a1 = item("A1", "Only completed stays", 1, rationale="Open stays lack a discharge date.")
@@ -409,6 +420,30 @@ class CarryForwardHelper(Base):
         self.assertIsNone(out["prior_revision"])
         self.assertEqual(out["carry"], [])
         self.assertEqual([w["id"] for w in out["walk"]], ["A1"])
+
+    def test_walked_and_bulk_rows_name_the_carried_fields_to_clear(self):
+        # A row carried in an earlier pass keeps carried_* fields in the draft. When the row is walked
+        # instead, those fields must go, or check and publish refuse the fresh confirmation.
+        self.sql.write_text(GOVERNED_EDIT)
+        a1, a2 = self.v1["assumptions"]
+        l1, = self.v1["limitations"]
+        draft = review_doc("q", "q.sql", revision=2, sql_sha256=sha(GOVERNED_EDIT),
+                           assumptions=[carried(a1, 2, carried_basis="sql-unchanged"),
+                                        carried(a2, 2, carried_basis="lines-unchanged")],
+                           limitations=[self.candidate(l1)])
+        out = self.carryforward("review", draft)
+        walk = {w["id"]: w for w in out["walk"]}
+        bulk = {b["id"]: b for b in out["bulk"]}
+        self.assertEqual(walk["A2"]["clear"], ["carried_basis", "carried_from_revision"])
+        self.assertEqual(bulk["A1"]["clear"], ["carried_basis", "carried_from_revision"])
+        self.assertEqual(out["carry"][0]["id"], "L1")
+        self.assertNotIn("clear", out["carry"][0])
+        self.assertFalse(out["first_binding"])
+        r = run(["carry-list", "q", "carryforward", str(self.draft)], self.p.root)
+        self.assertEqual(r.returncode, 0, r.stdout + r.stderr)
+        listed = json.loads(r.stdout)["lists"]
+        self.assertEqual([(l["list"], [i["id"] for i in l["items"]]) for l in listed], [("bulk", ["A1"])])
+        self.assertIn("- Text: Only completed stays", (self.d / "carry-list.md").read_text())
 
     def test_errors(self):
         self.assertEqual(run(["carryforward", "q", "review"], self.p.root).returncode, 1)

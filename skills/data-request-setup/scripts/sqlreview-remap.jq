@@ -2,8 +2,17 @@
 # never search for a matching slice (repeated SQL can make that a false proof).
 # If a governed line also occurs in an edit, the diff alignment is ambiguous:
 # conservatively leave that range for the human, even if diff chose to keep it.
+# One exception: the whole governed text occurs exactly once in the baseline and exactly
+# once in the current SQL. Then only one alignment exists, so a shared line such as a
+# repeated GO separator does not block the remap. The diff still supplies the offset.
 # Inputs: authenticated $prior/$base, frozen $cur, zero-context $delta.
 include "sqlreview-carry";
+
+# How many times the line slice $s occurs in the line array. Slices are materialised with
+# map(.): jq 1.6 can compare two views of one backing array as equal at different offsets.
+def remap_count($s):
+  . as $lines | ($s | length) as $n | ($s | map(.)) as $m
+  | [range(0; ($lines | length) - $n + 1) as $i | select(($lines[$i:$i + $n] | map(.)) == $m)] | length;
 
 def remap_valid:
   type == "object"
@@ -46,7 +55,9 @@ def remap_result:
         else ([ $segments[] | select($old[0] >= .from and $old[1] <= .to) ][0]) as $segment
           | if $segment == null then . + {why: "governed lines changed or an insertion splits the range"}
             else ($old | map(. + $segment.shift)) as $new
-              | if any($b[$old[0] - 1:$old[1]][]; . as $line | $edited | index($line) != null)
+              | ($b[$old[0] - 1:$old[1]] | map(.)) as $slice
+              | if any($slice[]; . as $line | $edited | index($line) != null)
+                   and (($b | remap_count($slice)) != 1 or ($c | remap_count($slice)) != 1)
                 then . + {why: "ambiguous alignment: governed text also occurs in the edit"}
                 elif $r.lines != $old and $r.lines != $new then . + {why: "draft range differs from both baseline and computed range; keep the manual edit"}
                 elif $b[$old[0] - 1:$old[1]] != $c[$new[0] - 1:$new[1]] then error("diff map does not preserve governed bytes")
