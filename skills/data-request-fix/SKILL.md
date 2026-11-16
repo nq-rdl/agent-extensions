@@ -84,10 +84,11 @@ put the decision and its reason in the pull request.
 
 The existing `.sqlreview/` review is stale in meaning: its purpose, grain, outputs,
 assumptions and limitations describe the old logic, even where a fingerprint still matches.
-Before the first release, re-run `/data-request:analyse` on each changed SQL file with a
-full re-walk: walk every item and publish with `--reconfirm-all`. Carry-forward would
-otherwise keep items whose SQL lines did not change, although their meaning did. A passing
-local check or `/data-request:validate` does not replace it.
+Before the first release, hand the re-check to `/data-request:analyse` and `/data-request:bootstrap`.
+They walk only the items that the diff touches. Then they ask one carry question that lists every other
+item with its confirmed text. Do not tell the engineer to re-confirm every item. The carry rules are in
+`${CLAUDE_PLUGIN_ROOT}/skills/analyse/references/carry.rst`. A passing local check or
+`/data-request:validate` does not replace this re-check.
 
 ## Identifier and export defects
 
@@ -120,6 +121,14 @@ without the value; validated machine metadata is exempt (SQL path/bound slug, fi
 and ISO timestamps at known locations). Preserve that metadata; never reword it to clear lint.
 Reworded confirmed items need fresh human confirmation via bootstrap
 or analyse; do not edit final JSON or create `.sqlreview/` just for a small correction.
+
+Before you regenerate SQL, add or update one row test for each rule the fix changes. Run it, and confirm it
+fails on the old logic. A string-replace edit of a long builder can hide a shadowed variable, a reused module
+constant name or a missed output column. Run the child's unit suite in `tests/` and its framework suite in
+`tests_framework/` before every push, and prefer structural asserts over exact SQL strings. After any builder
+edit, run `pixi run --environment framework amend regenerate <sql>` for each SQL file that imports it, and commit the regenerated SQL. Read
+`${CLAUDE_PLUGIN_ROOT}/skills/guardrails/references/house-conventions.rst` for the conventions behind these steps.
+When you cite a rule, quote its file and line, and keep your own recommendation separate.
 
 Make the smallest source change that resolves the reported defect, preserving
 unrelated edits. When the fix changes a filter, join or meaning in pipeline or

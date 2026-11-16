@@ -1,0 +1,109 @@
+"""Draft, fix and house-conventions rules: build conventions, decision ownership, check-first list."""
+from pathlib import Path
+import re
+import unittest
+
+
+ROOT = Path(__file__).resolve().parents[1]
+TREES = (
+    ("skills", "data-request-"),
+    ("plugins/data-request/skills", ""),
+    ("dist/codex/plugins/data-request/skills", ""),
+)
+
+
+def read(tree, prefix, rel):
+    return " ".join((ROOT / tree / f"{prefix}{rel}").read_text().split())
+
+
+class DraftConventions(unittest.TestCase):
+    def test_draft_names_amend_record_and_request_suffix(self):
+        for tree, prefix in TREES:
+            with self.subTest(tree=tree):
+                text = read(tree, prefix, "draft/SKILL.md")
+                for phrase in ("pixi run --environment framework amend record <sql> --builder MODULE:FUNCTION --server <alias>",
+                               "Add `--input <file>` (repeatable)",
+                               "and after the static",
+                               "sql/v<N>/<name>_request.sql",
+                               "pixi run --environment framework amend regenerate <sql>",
+                               "Copy confirmed scope wording verbatim"):
+                    self.assertIn(phrase, text)
+
+    def test_fix_uses_the_framework_environment_form(self):
+        for tree, prefix in TREES:
+            with self.subTest(tree=tree):
+                text = read(tree, prefix, "fix/SKILL.md")
+                self.assertIn("pixi run --environment framework amend regenerate <sql>", text)
+
+    def test_draft_and_fix_name_both_suites(self):
+        for tree, prefix in TREES:
+            for skill in ("draft", "fix"):
+                with self.subTest(tree=tree, skill=skill):
+                    text = read(tree, prefix, f"{skill}/SKILL.md")
+                    for phrase in ("tests_framework/", "tests/", "unit suite", "framework suite",
+                                   "before every push", "structural asserts"):
+                        self.assertIn(phrase, text)
+
+    def test_fix_asks_for_a_row_test_before_regenerating(self):
+        for tree, prefix in TREES:
+            with self.subTest(tree=tree):
+                text = read(tree, prefix, "fix/SKILL.md")
+                self.assertIn("one row test for each rule the fix changes", text)
+                self.assertLess(text.index("one row test for each rule"), text.index("Make the smallest source change"))
+
+    def test_draft_and_fix_cite_house_conventions_and_quote_rules(self):
+        for tree, prefix in TREES:
+            for skill in ("draft", "fix"):
+                with self.subTest(tree=tree, skill=skill):
+                    text = read(tree, prefix, f"{skill}/SKILL.md")
+                    self.assertIn("references/house-conventions.rst", text)
+                    self.assertIn("quote its file and line", text)
+
+    def test_draft_requires_evidence_for_constants_and_check_first(self):
+        for tree, prefix in TREES:
+            with self.subTest(tree=tree):
+                text = read(tree, prefix, "draft/SKILL.md")
+                for phrase in ("check-first list", "references/library.rst", "name the path you searched",
+                               "cites a probe id or a library default",
+                               "Do not override a library default without a probe"):
+                    self.assertIn(phrase, text)
+
+
+class HouseConventions(unittest.TestCase):
+    def test_reference_states_ownership_isolation_naming_and_suites(self):
+        for tree, prefix in TREES:
+            with self.subTest(tree=tree):
+                text = read(tree, prefix, "guardrails/references/house-conventions.rst")
+                for phrase in ("The analyst owns cohort decisions", "wards, locations and facility sets",
+                               "The engineer owns technical decisions", "engineer and DBA decision",
+                               "engineer input", "quote the file and the line",
+                               "<name>_request.sql", "tests_framework/", "Run both suites before every push",
+                               "structural asserts", "probe location"):
+                    self.assertIn(phrase, text)
+
+    def test_reference_has_no_request_detail(self):
+        text = (ROOT / "skills/data-request-guardrails/references/house-conventions.rst").read_text()
+        self.assertIsNone(re.search(r"THHS|ENQ-?\d|\bF-?\d{2,3}\b", text))
+
+
+class LibraryCheckFirst(unittest.TestCase):
+    def test_library_reference_lists_routes_to_check(self):
+        for tree, prefix in TREES:
+            with self.subTest(tree=tree):
+                text = read(tree, prefix, "guardrails/references/library.rst")
+                for phrase in ("Check the library first", "``mssql`` module", "create_code_set_table",
+                               "extract_mssql_schema.py", "Coded result rows", "string_agg",
+                               "SuppliedCohort", "Name the path you searched"):
+                    self.assertIn(phrase, text)
+
+
+class StyleRules(unittest.TestCase):
+    def test_new_prose_is_simplified_technical_english(self):
+        for rel in ("skills/data-request-guardrails/references/house-conventions.rst",):
+            text = (ROOT / rel).read_text()
+            self.assertNotIn(";", text)
+            self.assertIsNone(re.search(r"\b\w+n't\b|\b(?:e\.g\.|i\.e\.)", text))
+
+
+if __name__ == "__main__":
+    unittest.main()
