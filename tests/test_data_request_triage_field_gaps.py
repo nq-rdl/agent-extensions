@@ -304,12 +304,13 @@ class HandOffToReview(unittest.TestCase):
     def test_gate_reviewer_comment_board_and_record(self):
         text = flat(self.handoff)
         for token in ("out of draft", "green on the current head", "SQL review status is ``current``",
-                      "``/data-request:analyse`` re-ran", "--reconfirm-all", "Actions toolset",
+                      "``/data-request:analyse`` re-ran", "walked every item the change can affect", "Actions toolset",
                       "open delivery gate", "Never guess a reviewer", "tracking issue",
                       "service-desk request issue", "**In-Review**", "head SHA", "reviewer",
                       "board state"):
             with self.subTest(token=token):
                 self.assertIn(token, text)
+        self.assertNotIn("--reconfirm-all", text)
 
     def test_writes_need_authorisation_and_triage_only_posts_nothing(self):
         text = flat(self.handoff)

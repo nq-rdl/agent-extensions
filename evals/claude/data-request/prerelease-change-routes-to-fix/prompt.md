@@ -1,5 +1,5 @@
 ---
-description: "A confirmed pre-release logic change goes to fix, not amend: no AMD- entry, runbook and UAT checklist in the same change, stale review, full analyse re-walk"
+description: "A confirmed pre-release logic change goes to fix, not amend: no AMD- entry, runbook and UAT checklist in the same change, stale review, analyse walks every affected item"
 tags: [fix, pre-release]
 runs: 3
 max_turns: 10
@@ -37,5 +37,5 @@ End your reply with one fenced `yaml` block with exactly these top-level keys:
 - `amd_entry`: `none`, or the `AMD-` entry you would add to `specs/amendments.md`
 - `runbook_uat`: `same change`, `after release` or `no change`
 - `review`: `stale` or `current`
-- `analyse`: `rerun --reconfirm-all`, `rerun` or `not needed`
+- `analyse`: `walk affected items`, `rerun --reconfirm-all`, `rerun` or `not needed`
 - `renamed`: a list of `old -> new` column renames the runbook and UAT checklist must follow

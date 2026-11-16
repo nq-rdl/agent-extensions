@@ -8,14 +8,15 @@ pass:
 
       Change the key in `src/cohort/ed.py`, regenerate `sql/v1/ed_request.sql`, and update
       `docs/runbook.md`, `specs/uat-checklist.md` and `sql/validation/ed_checks.sql` in the same
-      change. The review is stale in meaning: re-run `/data-request:analyse` and re-walk every item.
+      change. The review is stale in meaning: re-run `/data-request:analyse` and walk every item the
+      change can affect.
 
       ```yaml
       workflow: fix
       amd_entry: none
       runbook_uat: same change
       review: stale
-      analyse: rerun --reconfirm-all
+      analyse: walk affected items
       renamed:
         - distinct_mrn -> distinct_patient_key
       ```
@@ -26,13 +27,13 @@ pass:
       amd_entry: 'none'
       runbook_uat: same change
       review: stale
-      analyse: "rerun --reconfirm-all"
+      analyse: "walk affected items"
       renamed:
         distinct_mrn: distinct_patient_key
       ```
 fail:
   - name: right words, wrong answers
-    fails: [workflow-fix, no-amd-entry, runbook-uat-same-change, review-stale, analyse-full-rewalk, renamed-column]
+    fails: [workflow-fix, no-amd-entry, runbook-uat-same-change, review-stale, analyse-walks-affected, renamed-column]
     reply: |
       Yes, this is an amendment for /data-request:amend, not a pre-release fix. Leave the runbook
       and UAT checklist alone until after release. The review is not stale, so there is no need
@@ -47,12 +48,12 @@ fail:
       renamed: []
       ```
   - name: prose only, no yaml block
-    fails: [workflow-fix, no-amd-entry, runbook-uat-same-change, review-stale, analyse-full-rewalk, renamed-column]
+    fails: [workflow-fix, no-amd-entry, runbook-uat-same-change, review-stale, analyse-walks-affected, renamed-column]
     reply: |
       workflow: fix. amd_entry: none. runbook_uat: same change. review: stale.
-      analyse: rerun --reconfirm-all. renamed: distinct_mrn -> distinct_patient_key.
+      analyse: walk affected items. renamed: distinct_mrn -> distinct_patient_key.
   - name: plain re-run keeps carried items
-    fails: [analyse-full-rewalk]
+    fails: [analyse-walks-affected]
     reply: |
       ```yaml
       workflow: fix
@@ -60,6 +61,17 @@ fail:
       runbook_uat: same change
       review: stale
       analyse: rerun
+      renamed: [distinct_mrn -> distinct_patient_key]
+      ```
+  - name: full re-walk re-confirms every item
+    fails: [analyse-walks-affected]
+    reply: |
+      ```yaml
+      workflow: fix
+      amd_entry: none
+      runbook_uat: same change
+      review: stale
+      analyse: rerun --reconfirm-all
       renamed: [distinct_mrn -> distinct_patient_key]
       ```
   - name: amendment entry added before any release
@@ -70,7 +82,7 @@ fail:
       amd_entry: AMD-001 re-key on site code plus MRN
       runbook_uat: same change
       review: stale
-      analyse: rerun --reconfirm-all
+      analyse: walk affected items
       renamed: [distinct_mrn -> distinct_patient_key]
       ```
   - name: duplicate workflow key hedges
@@ -82,7 +94,7 @@ fail:
       amd_entry: none
       runbook_uat: same change
       review: stale
-      analyse: rerun --reconfirm-all
+      analyse: walk affected items
       renamed: [distinct_mrn -> distinct_patient_key]
       ```
   - name: rename reversed
@@ -93,7 +105,7 @@ fail:
       amd_entry: none
       runbook_uat: same change
       review: stale
-      analyse: rerun --reconfirm-all
+      analyse: walk affected items
       renamed: [distinct_patient_key -> distinct_mrn]
       ```
   - name: right draft, wrong final block
@@ -106,7 +118,7 @@ fail:
       amd_entry: none
       runbook_uat: same change
       review: stale
-      analyse: rerun --reconfirm-all
+      analyse: walk affected items
       renamed: [distinct_mrn -> distinct_patient_key]
       ```
 
@@ -117,6 +129,6 @@ fail:
       amd_entry: none
       runbook_uat: no change
       review: current
-      analyse: rerun --reconfirm-all
+      analyse: walk affected items
       renamed: [distinct_mrn -> distinct_patient_key]
       ```

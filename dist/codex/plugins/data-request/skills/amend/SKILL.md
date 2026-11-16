@@ -291,9 +291,9 @@ changed paths, the regenerated SQL, the record entry, the checks run with their 
 any blocker. Regenerated SQL or a renamed validation or UAT output column leaves an existing
 `.sqlreview/` review stale in meaning, even where its fingerprint still matches: its outputs
 and steps describe the previous output. Before the next release, re-run `$data-request:analyse`
-on each changed SQL file with a full re-walk (walk every item and publish with
-`--reconfirm-all`), because carry-forward keeps items whose SQL lines did not change. A passing
-check is not release approval.
+on each changed SQL file and walk every item the change can affect. Carry-forward keeps an item
+whose SQL lines did not change and does not ask about it again. A passing check is not release
+approval.
 
 For a split request, end with this short summary for the analyst:
 

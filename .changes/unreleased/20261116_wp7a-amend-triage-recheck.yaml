@@ -1,0 +1,3 @@
+kind: Changed
+body: Amend and triage no longer require --reconfirm-all after a pre-release logic change, matching the fix rule
+time: 2026-11-16T00:00:14Z
