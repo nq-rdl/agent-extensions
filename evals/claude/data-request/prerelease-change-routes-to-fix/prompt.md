@@ -37,5 +37,5 @@ End your reply with one fenced `yaml` block with exactly these top-level keys:
 - `amd_entry`: `none`, or the `AMD-` entry you would add to `specs/amendments.md`
 - `runbook_uat`: `same change`, `after release` or `no change`
 - `review`: `stale` or `current`
-- `analyse`: `rerun carry` (touched items walked, one carry question for the rest), `rerun` or `not needed`
+- `analyse`: `rerun carry` (touched items walked, one carry question for the rest; rules in `skills/analyse/references/carry.rst`), `rerun` or `not needed`
 - `renamed`: a list of `old -> new` column renames the runbook and UAT checklist must follow

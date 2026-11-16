@@ -22,7 +22,8 @@ class DraftConventions(unittest.TestCase):
             with self.subTest(tree=tree):
                 text = read(tree, prefix, "draft/SKILL.md")
                 for phrase in ("pixi run --environment framework amend record <sql> --builder MODULE:FUNCTION --server <alias>",
-                               "repo-local inputs",
+                               "Add `--input <file>` (repeatable)",
+                               "and after the static",
                                "sql/v<N>/<name>_request.sql",
                                "pixi run --environment framework amend regenerate <sql>",
                                "Copy confirmed scope wording verbatim"):
