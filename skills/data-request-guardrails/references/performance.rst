@@ -184,8 +184,9 @@ Rules for the template:
   returns the tail.
 * **Exact spelling.** Compare under a binary collation and compare ``DATALENGTH`` as
   well, because ``=`` ignores trailing spaces. Apply the collation to the cut as well.
-* **One type, and NULL.** Cast both sides of the comparison to the same ``NVARCHAR(<max_len>)``
+* **One type, and NULL.** Cast both sides of the comparison to the same ``NVARCHAR(MAX)``
   type, because ``DATALENGTH`` differs between ``varchar`` and ``nvarchar`` for equal text.
+  Use ``MAX`` and never a bounded length, because a bounded cast cuts a longer bad label to a valid one.
   Treat NULL as a separate branch: ``=`` on NULL is unknown, so a NULL passes only when
   NULL is in the expected set. Use the same comparison in the canary.
 * **Limit checks.** To test a row limit, fail when a row exists beyond the limit:
@@ -219,9 +220,9 @@ Template. Replace each ``<placeholder>`` from the evidence and keep the shape.
               WHERE NOT EXISTS (
                 SELECT 1 FROM (VALUES (<expected_1>), (<expected_2>)) AS d(v)
                 WHERE (s.lbl IS NULL AND d.v IS NULL)
-                   OR (CAST(d.v AS NVARCHAR(<max_len>)) = CAST(s.lbl AS NVARCHAR(<max_len>)) COLLATE <binary_collation>
-                       AND DATALENGTH(CAST(d.v AS NVARCHAR(<max_len>)))
-                         = DATALENGTH(CAST(s.lbl AS NVARCHAR(<max_len>)))))
+                   OR (CAST(d.v AS NVARCHAR(MAX)) = CAST(s.lbl AS NVARCHAR(MAX)) COLLATE <binary_collation>
+                       AND DATALENGTH(CAST(d.v AS NVARCHAR(MAX)))
+                         = DATALENGTH(CAST(s.lbl AS NVARCHAR(MAX)))))
             ) THEN 1 ELSE 0 END
      UNION ALL
      SELECT 'C9 canary: bad value is detected',
@@ -230,9 +231,9 @@ Template. Replace each ``<placeholder>`` from the evidence and keep the shape.
               WHERE NOT EXISTS (
                 SELECT 1 FROM (VALUES (<expected_1>), (<expected_2>)) AS d(v)
                 WHERE (c.v IS NULL AND d.v IS NULL)
-                   OR (CAST(d.v AS NVARCHAR(<max_len>)) = CAST(c.v AS NVARCHAR(<max_len>)) COLLATE <binary_collation>
-                       AND DATALENGTH(CAST(d.v AS NVARCHAR(<max_len>)))
-                         = DATALENGTH(CAST(c.v AS NVARCHAR(<max_len>)))))
+                   OR (CAST(d.v AS NVARCHAR(MAX)) = CAST(c.v AS NVARCHAR(MAX)) COLLATE <binary_collation>
+                       AND DATALENGTH(CAST(d.v AS NVARCHAR(MAX)))
+                         = DATALENGTH(CAST(c.v AS NVARCHAR(MAX)))))
             ) THEN 0 ELSE 1 END
    ) AS r
    ORDER BY chk;

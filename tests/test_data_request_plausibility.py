@@ -251,7 +251,8 @@ class VerdictProbeTemplate(unittest.TestCase):
                 section = text.split("Verdict probes", 2)[2]
                 # Both the C1 check and the canary need the NULL branch and the common type.
                 self.assertEqual(section.count("IS NULL AND d.v IS NULL"), 2)
-                self.assertEqual(section.count("DATALENGTH(CAST(d.v AS NVARCHAR(<max_len>)))"), 2)
+                self.assertEqual(section.count("DATALENGTH(CAST(d.v AS NVARCHAR(MAX)))"), 2)
+                self.assertNotRegex(section, r"NVARCHAR\((?!MAX\))")
                 self.assertNotIn("DATALENGTH(d.v)", section)
                 self.assertNotIn("DATALENGTH(s.lbl)", section)
                 self.assertNotIn("DATALENGTH(c.v)", section)
