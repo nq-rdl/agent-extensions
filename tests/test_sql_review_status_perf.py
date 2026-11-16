@@ -139,12 +139,13 @@ class PreflightBudget(unittest.TestCase):
             (root / "project").mkdir()
             event = {"hook_event_name": "SessionStart", "cwd": str(root / "project")}
             start = time.monotonic()
-            # The hook also runs the stub for other subcommands, so run it with the temporary directory as its
-            # working directory: anything the stub writes by a relative name stays in the directory that is removed.
+            # The hook runs the stub for status (in the event directory, root/project) and for version (in the hook's
+            # own working directory). Run the hook in root so a relative write from either call stays in root,
+            # which is removed whole.
             r = run_hook(PREFLIGHT, event, env_for(root / "plugin", SQLREVIEW_PREFLIGHT_BUDGET=budget), cwd=root)
             took = time.monotonic() - start
             self.marker_written = (helper.parent / "marker-written").exists()
-            self.strays = sorted(p.name for p in root.glob("pipe:*"))
+            self.strays = sorted(p.name for p in root.rglob("pipe:*"))
             return r, took
 
     def test_status_blocked_in_a_child_is_stopped_at_the_budget(self):
