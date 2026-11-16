@@ -663,9 +663,9 @@ sr_publish_cleanup() {
 #                        the published revision has at any index is unchanged.
 #   verbatim             any field of an analyst-intake item (intake refuses a changed answer), an
 #                        analyst question (intake_questions), text or rationale of a linked lift
-#                        limitation (publish fixes that wording), or the text of an item that
-#                        equals a notes-header item of the bound SQL (library text). The rationale
-#                        of a header item is analyst wording and is not exempt
+#                        limitation (publish fixes that wording), or text or rationale of an item
+#                        whose text equals a notes-header item of the bound SQL (both are copied
+#                        from the header). Each exemption covers only its own item
 _publish_lint() { # <staged doc> <bound SQL or ""> <published doc>...
   local doc="$1" sql="$2" new prior="" more header="[]" rc hits old asked="[]"
   shift 2
@@ -708,7 +708,7 @@ _publish_lint() { # <staged doc> <bound SQL or ""> <published doc>...
     | (if .[2] == "decision-source" or ((. | join("\t")) as $l | $old | index([$l]) != null)
          or ($intake | index([$id])) != null
          or ((.[1] == "text" or .[1] == "rationale") and ($verbatim | index([$id])) != null)
-         or (.[1] == "text" and ($headertext | index([$id])) != null)
+         or ((.[1] == "text" or .[1] == "rationale") and ($headertext | index([$id])) != null)
          or ($q != null and (($analyst | index([$q])) != null or ($asked | index([$q])) != null))
        then "warn" else "refuse" end) + "\t" + (.[0:3] | join("\t"))
   ' 2>/dev/null)" || return 2
