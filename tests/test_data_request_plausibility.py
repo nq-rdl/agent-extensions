@@ -228,7 +228,6 @@ class PopulationScopeRoundTrip(unittest.TestCase):
                     self.assertEqual(final["open_questions"], questions)
 
 
-
 class VerdictProbeTemplate(unittest.TestCase):
     def performance(self, tree):
         return " ".join(path(tree, "guardrails", "references/performance.rst").read_text().split())
@@ -239,8 +238,8 @@ class VerdictProbeTemplate(unittest.TestCase):
                 text = self.performance(tree)
                 section = text.split("Verdict probes", 2)[2]
                 for token in ("PASS", "FAIL", "NOT EXISTS, never NOT IN", "Cut labels before free text",
-                              "C0 source has rows", "canary", "Funnel form", "one indexed read".title().lower(),
-                              "not found by probe P<n>"):
+                              "C0 source has rows", "canary", "Funnel form", "one indexed read",
+                              "not found by probe P<n>", "binary collation", "DATALENGTH", "Limit checks"):
                     self.assertIn(token.lower(), section.lower())
                 self.assertNotIn("COUNT(", section)
                 self.assertNotIn(" NOT IN (", section)

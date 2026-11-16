@@ -51,7 +51,6 @@ class GuardrailsInvocation(unittest.TestCase):
                 self.assertIn("Skill", tools)
 
 
-
 HANDOVER_TOKENS = ("branch", "fast-forward", "pull request head", "HEAD", "exact path", "git add -A",
                    "commit, and only then push", "scaffold version", "extract runner", "verdict")
 CITING_LEAVES = ("map", "validate")

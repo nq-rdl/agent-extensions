@@ -200,6 +200,7 @@ class LookupVerdictRoute(unittest.TestCase):
                 self.assertIn("offer a verdict probe first", flat)
                 self.assertIn("not found by probe P<n>", flat)
                 self.assertIn("operator-handover.rst", flat)
+                self.assertIn("counts need a recorded count exception", flat)
                 self.assertLess(flat.index("offer a verdict probe first"),
                                 flat.index("Before handoff, check that the probe"))
 

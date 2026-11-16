@@ -54,8 +54,9 @@ it overwrites the workbook and adds probe output to tracked data.
   operator to run that file with their own client.
 * Make the probe a verdict probe where a verdict is enough. See "Verdict probes"
   in ``performance.rst``.
-* The operator pastes back the verdict block from item 8. The agent never reads or
-  repeats any other output.
+* The operator pastes back the verdict block from item 8. The agent asks for that
+  block only. If other output arrives, follow "Default and count exception" in
+  ``release.rst`` and repeat none of it.
 
 A probe proposal is not run authority. Disclosure rules for what may come back are in
 ``release.rst``, "Probe disclosure control". This page changes none of them.

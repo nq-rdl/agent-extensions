@@ -64,7 +64,8 @@ authorisation; validate never connects to a database. Before proposing or report
 one, read `Probe disclosure control <release.rst#probe-disclosure-control>`_ for
 its perimeter, formatter and combined-disclosure review. Keep each probe:
 
-* **Aggregate-only.** It returns counts, ranges and codes, never patient rows.
+* **Aggregate-only.** It returns verdicts by default. It returns counts, ranges and codes only
+  under a count exception (``release.rst``). It never returns patient rows.
 * **Disclosure-controlled.** Parameterise ``@min_cell`` using the effective floor
   in ``release.rst``, "Probe disclosure control"; apply that section before output.
 * **One bounded scan.** Group on narrow keys within the disclosure-control limits
@@ -138,11 +139,11 @@ rows. Record any NOLOCK or READ UNCOMMITTED use; never introduce either silently
 
 Apply ``release.rst``, "Probe disclosure control", to label distributions as well
 as fill counts; an unknown assessment threshold leaves the proposal not runnable.
-Return only safe category labels and controlled counts, no identifiers, dates of
-birth, exact ages or patient examples.
+Return only safe category labels, and controlled counts only under a count exception.
+Return no identifiers, dates of birth, exact ages or patient examples.
 
-For **expensive requests only**, add an age-band count probe before the operator
-run: cite estimated rows, a prior runtime or another recorded cost assessment.
+For **expensive requests only**, add an age-band probe before the operator
+run (a verdict by default, with counts only under a count exception): cite estimated rows, a prior runtime or another recorded cost assessment.
 When cost is unknown, ask whether the run is expensive; omit the age-band probe
 pending evidence, without dropping label proposals. Use the scoped age anchor
 (for example age at index surgery, not age today), verified age calculation and
@@ -157,7 +158,7 @@ operator action separately. When results return, tag evidence OBSERVED or INFERR
 with server/database, bound, date and SQL revision as above. Compare safe values
 with the expected labels and data dictionary; route surprises to the analyst
 with no automatic exclusion. Unrun or suppressed probes do not establish
-plausibility. Keep later UAT and ``validation_counts`` checks; machine checking
+plausibility. Keep later UAT and ``validation_counts`` checks, which return a verdict by default; machine checking
 scope expectations against those counts in data-analysis-scaffold is a follow-up,
 not implemented here. This guidance changes no runtime permissions.
 
@@ -181,8 +182,12 @@ Rules for the template:
 * **Cut labels before free text.** Compare only the label part. Cut a free-text
   tail such as ``Other: ...`` to its prefix before the comparison. The probe never
   returns the tail.
-* **Self-checking.** Check ``C0`` fails the whole probe when the source is empty,
-  because an empty source passes every other check. Check ``C9`` is a canary that
+* **Exact spelling.** Compare under a binary collation and compare ``DATALENGTH`` as
+  well, because ``=`` ignores trailing spaces. Apply the collation to the cut as well.
+* **Limit checks.** To test a row limit, fail when a row exists beyond the limit:
+  ``EXISTS (SELECT 1 FROM #probe_src ORDER BY (SELECT NULL) OFFSET <limit> ROWS FETCH NEXT 1 ROWS ONLY)``.
+* **Self-checking.** Check ``C0`` fails when the source is empty, because an empty
+  source passes every other check. The probe verdict is ``FAIL`` when any row is ``FAIL``. Check ``C9`` is a canary that
   tests a literal bad value. It must read ``PASS``, which shows that the logic
   detects the bad value. A ``FAIL`` on ``C9`` means the probe logic is broken.
 * **Funnel form.** To find where a failure starts, add the stages cumulatively.
@@ -193,7 +198,8 @@ Template. Replace each ``<placeholder>`` from the evidence and keep the shape.
 .. code-block:: sql
 
    SET NOCOUNT ON;
-   SELECT <key_col>, <label_col> AS lbl
+   SELECT CASE WHEN <label_col> COLLATE <binary_collation> LIKE 'Other:%'
+               THEN 'Other:' ELSE <label_col> END AS lbl
    INTO #probe_src
    FROM <schema>.<table>
    WHERE <indexed_bound>;
@@ -208,8 +214,8 @@ Template. Replace each ``<placeholder>`` from the evidence and keep the shape.
               SELECT 1 FROM #probe_src s
               WHERE NOT EXISTS (
                 SELECT 1 FROM (VALUES (<expected_1>), (<expected_2>)) AS d(v)
-                WHERE d.v = CASE WHEN s.lbl LIKE 'Other:%' THEN 'Other:' ELSE s.lbl END
-                      COLLATE <binary_collation>)
+                WHERE d.v = s.lbl COLLATE <binary_collation>
+                      AND DATALENGTH(d.v) = DATALENGTH(s.lbl))
             ) THEN 1 ELSE 0 END
      UNION ALL
      SELECT 'C9 canary: bad value is detected',
@@ -217,7 +223,8 @@ Template. Replace each ``<placeholder>`` from the evidence and keep the shape.
               SELECT 1 FROM (VALUES ('<known_bad_value>')) AS c(v)
               WHERE NOT EXISTS (
                 SELECT 1 FROM (VALUES (<expected_1>), (<expected_2>)) AS d(v)
-                WHERE d.v = c.v COLLATE <binary_collation>)
+                WHERE d.v = c.v COLLATE <binary_collation>
+                      AND DATALENGTH(d.v) = DATALENGTH(c.v))
             ) THEN 0 ELSE 1 END
    ) AS r
    ORDER BY chk;
