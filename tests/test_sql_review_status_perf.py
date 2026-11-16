@@ -139,8 +139,13 @@ class PreflightBudget(unittest.TestCase):
             (root / "project").mkdir()
             event = {"hook_event_name": "SessionStart", "cwd": str(root / "project")}
             start = time.monotonic()
-            r = run_hook(PREFLIGHT, event, env_for(root / "plugin", SQLREVIEW_PREFLIGHT_BUDGET=budget))
-            return r, time.monotonic() - start
+            # The hook also runs the stub for other subcommands, so run it with the temporary directory as its
+            # working directory: anything the stub writes by a relative name stays in the directory that is removed.
+            r = run_hook(PREFLIGHT, event, env_for(root / "plugin", SQLREVIEW_PREFLIGHT_BUDGET=budget), cwd=root)
+            took = time.monotonic() - start
+            self.marker_written = (helper.parent / "marker-written").exists()
+            self.strays = sorted(p.name for p in root.glob("pipe:*"))
+            return r, took
 
     def test_status_blocked_in_a_child_is_stopped_at_the_budget(self):
         # Bash defers its TERM trap until the child returns, so signalling only the status shell
@@ -156,9 +161,14 @@ class PreflightBudget(unittest.TestCase):
     def test_a_status_that_finished_as_the_budget_expired_is_not_reported_as_a_timeout(self):
         # Review finding 10: the watchdog can create its marker just after status exits. The stub makes that
         # outcome certain: it creates the marker itself, then prints a valid summary and exits 0.
-        body = ('out="$(readlink "/proc/$$/fd/1")"\n: > "$out.timeout"\n'
+        # Only the status call writes to the hook's output file. The version call writes to a pipe, where readlink
+        # gives a relative name such as pipe:[N], so the stub leaves the marker only beside a real absolute file.
+        body = ('out="$(readlink "/proc/$$/fd/1")"\n'
+                'case "$out" in /*) [ -f "$out" ] && : > "$out.timeout" && : > "$(dirname "$0")/marker-written" ;; esac\n'
                 'printf \'%s\\n\' \'{"schemaVersion":2,"reviews":[],"counts":{"total":0},"amendments":[]}\'\nexit 0\n')
         r, _ = self.run_stub(body, budget="30")
+        self.assertEqual(self.strays, [], "the stub must not write a marker named after a pipe")
+        self.assertTrue(self.marker_written, "the stub never created the marker where the hook looks for it")
         self.assertEqual(r.returncode, 0, r.stderr)
         ctx = json.loads(r.stdout)["hookSpecificOutput"]["additionalContext"]
         self.assertIn("is initialised (schema 2) with no reviews yet", ctx)
