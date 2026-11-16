@@ -295,6 +295,10 @@ requires reassessment.
    # → {prior_revision, revision, sql_unchanged, carry: [{kind, id, basis, set}], walk: [{kind, id, why}]}
    ```
 
+   After `sqlreview.sh move` with identical bytes, `delta` exits 10 with `path moved with identical
+   bytes`. `remap` and `carryforward` still compare with the recorded commit, so unchanged items carry.
+   Publish the new revision at the new path. `requires reassessment` means the bytes changed.
+
    Remap changes only draft ranges, never confirmations, revisions or fingerprints. Its `walk`
    ranges (changed, split by an insertion, or ambiguous repeated text) stay untouched; reassess
    their current lines with the human before carryforward. It preserves new/manual ranges and
@@ -302,12 +306,30 @@ requires reassessment.
    not a published JSON.
 
    Copy each `carry` item's `set` fields onto it verbatim; it keeps the confirmation a human gave
-   at `confirmed_revision` and is not asked again. Re-run the pre-presentation lint before each `walk` batch,
+   at `confirmed_revision` and is not asked again. Remove the `clear` fields of each `walk` row
+   before you record its fresh answer. When `first_binding` is true, read the SQL against each
+   carried item, as `${CLAUDE_PLUGIN_ROOT}/skills/analyse/references/carry.rst` says. Re-run the pre-presentation lint before each `walk` batch,
    including new items; reworded carried items need fresh confirmation. Walk **only** the `walk` items
    (confirm / reword / drop, showing text and rationale, with `why`), plus any `carry` item the SQL diff or framing
    change still implicates, and ask for new ones. When the engineer asks for a full re-walk, walk
    every item and publish with `--reconfirm-all`. Never set `carried_from_revision` by hand.
 4. Continue at *Write* with `revision` incremented.
+
+## Walk questions
+
+Each confirmation question in the interview and in a walk follows these rules:
+
+- Ask about one item or one change per question. Lead with the action.
+- Define each id when the question first names it, for example `A3 (assumption)`.
+- Show the stored `text` and `rationale` verbatim. Never shorten them. Give a long item its own question.
+- Each option says what gets recorded, for example **Confirm: record A3 as written**.
+- An option that shows the exact new text counts as the re-ask of a reworded item.
+- For an output-shape decision, show one example row.
+- Never use a multi-select question to collect confirmations. `[No preference]` or no answer confirms nothing.
+- When a carry list has more than four items, use `carry-list`, as `${CLAUDE_PLUGIN_ROOT}/skills/analyse/references/carry.rst` says.
+
+Set each item's `location` to the governed SQL lines it describes, never to the header comment
+lines that `notes` reports. An item that governs the whole SQL has `location: null`.
 
 ## Fresh scope → interview
 

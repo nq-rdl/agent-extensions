@@ -38,6 +38,14 @@ Update path: ``carryforward``
 ``carry`` items keep their confirmation. Copy each ``set`` onto the item verbatim,
 ``carried_basis`` included, and do not ask again.
 
+A ``walk`` or ``bulk`` row can list ``clear`` fields, such as ``carried_basis``. The draft item
+still holds them from an earlier carry. Remove them before you record the fresh answer, or
+``check`` and ``publish`` refuse the item.
+
+When ``first_binding`` is true, the previous scope was confirmed before the SQL existed. Read the
+SQL against each carried item. Move to the walk any item the SQL contradicts, such as an item
+that names a table the SQL does not read.
+
 ``bulk`` items keep their wording, but the SQL changed under them: no location, or a location
 added or removed. Move to the walk any bulk item the hunks or hints implicate. Then put the rest
 in **one** AskUserQuestion. It shows a one-line summary of the SQL delta, then each item's id,
@@ -49,8 +57,8 @@ Scope to review: ``carryover``
 ------------------------------
 
 Before any question, check the SQL against each row. Move to the walk any item the SQL
-contradicts. The rows come in two lists, asked as two questions, each listing every item's id,
-text, rationale, basis and ``location`` lines:
+contradicts. The rows come in two lists, asked as two questions. Each question shows every
+item's id, text, rationale, basis and ``location`` lines, or uses ``carry-list`` (below):
 
 ``carry_over``
    The SQL under the item did not change (``sql-unchanged``, ``sql-body-unchanged``,
@@ -67,10 +75,28 @@ Moving an item to the walk does not erase a decision origin that still applies.
 Carry over confirms the listed items, their locations included, from that answer. It does not
 replace decision origin with confirmation provenance. Walk moves them to the per-item walk.
 
+Long lists: ``carry-list``
+--------------------------
+
+A carry question must show what it confirms. When a list has more than four items, run
+``carry-list`` before you ask. Use ``carryover`` for the scope lists and ``carryforward`` for the
+``bulk`` list of an update:
+
+.. code-block:: bash
+
+   bash "$S/sqlreview.sh" carry-list "$SLUG" carryover ".sqlreview/reviews/$SLUG/review.draft.json"
+
+It writes ``reviews/<slug>/carry-list.md`` with each item's stored text and rationale verbatim.
+It prints the count, ids, bases and lines of each list. The question shows that summary and the
+file path, not the full text. Ask the human to read the file before they answer. The answer
+confirms the listed items only. Delete the file after the answer.
+
 Header to review: ``notes --against --confirmed-by``
 ---------------------------------------------------
 
 ``header_carry_over`` is eligibility for a fresh answer, not an old confirmation.
+``header_settled`` lists the items that already hold a confirmation for this revision.
+``header_walk`` leaves them out. Do not ask them again.
 An explicit named engineer attribution must match the intended human handle exactly.
 Show every kind/id, text, rationale, governed location, independent ``decided`` and
 ``evidence.commit`` / ``committed_at`` in ONE question: **Carry over all (Recommended)** /

@@ -139,6 +139,11 @@ If `reviews/$SLUG/review.json` exists (or `--update`):
 bash "$S/sqlreview.sh" delta "$SLUG"     # exit 0 → check review-content changes before completion below · 10 changed · 6 reviewed SQL not readable from git → full review below (retain revision history) · 2 missing SQL → stop/rebind
 ```
 
+After `sqlreview.sh move`, `delta` exits 10 in two ways. `path moved with identical bytes`: take
+*Changed SQL* below. `remap` and `carryforward` still read the old SQL from git and check its SHA,
+so unchanged items carry. Publish the new revision at the new path, then run `snapshot`.
+`requires reassessment`: the bytes changed, so reassess every item.
+
 ### Unchanged SQL: complete publication before stopping
 
 Only when the grain precheck requires no review-content change, use this exit-0
@@ -330,10 +335,11 @@ bash "$S/sqlreview.sh" notes "<sql path>" \
   --against ".sqlreview/reviews/$SLUG/review.draft.json" --confirmed-by "<human handle>"
 # → header_carry_over: [{kind, id, text, rationale, location, basis:"header-decision",
 #                      decided:{by,role,at,source}, evidence:{commit,committed_at,precision,...}}]
-#   header_walk: [{kind,id,text,rationale,location,why}]
+#   header_walk: [{kind,id,text,rationale,location,why}], header_settled: [{kind,id}]
 ```
 
-Exclude items already settled by carryforward or an answered scope question. Check indirect
+Exclude items already settled by carryforward or an answered scope question. `header_settled`
+names the draft items that already hold a confirmation for this revision. `header_walk` omits them. Check indirect
 SQL effects yourself; move affected items to the walk even if their line bytes match. Ask the
 remaining `header_carry_over` as **ONE** question: **Carry over all (Recommended)** / **Walk each
 individually**. List every kind/id, text, rationale, governed `location`, `decided` and observed
