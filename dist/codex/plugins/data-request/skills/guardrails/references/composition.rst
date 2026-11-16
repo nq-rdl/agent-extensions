@@ -34,4 +34,4 @@ The ``falls_service_cohort.py`` Indigenous-status lookup in
 
 A query-builder issue tracked the active-current and display-resolution
 enhancement behind this example. It closed for the v0.6.0 release.
-The issue is a discovery pointer, not proof that a request's installed version has it.
+A closed issue is a discovery pointer, not proof that a request's installed version has it.

@@ -120,8 +120,9 @@ supplied cohort loaded at run time: see [docs/SUPPLIED_COHORTS.md](https://githu
 Scaffold v0.5.0 defaulted to query-builder v0.5.0; scaffold v0.5.3 defaults to v0.8.0, but an older render keeps its own pin, so read the actual pin. Amending or fixing an already-delivered
 enquiry is exempt: it stays on its delivered pin, with no backport. Agents never re-pin or run `copier update` unasked.
 
-Confirm the constitution rules that apply to raw SQL in the current `.specify/memory/constitution.md` of query-builder and
-the scaffold. [references/composition.rst](references/composition.rst) lists them and gives a before-and-after example.
+Do not build request SQL with f-strings or string concatenation, and do not add raw SQL to a request pipeline. Confirm the
+constitution rules that apply in the current `.specify/memory/constitution.md` of query-builder and the scaffold.
+[references/composition.rst](references/composition.rst) lists them and gives a before-and-after example.
 
 ## Record assumptions and limitations where the logic makes them
 

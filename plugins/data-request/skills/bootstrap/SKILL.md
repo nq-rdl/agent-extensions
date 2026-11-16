@@ -417,7 +417,8 @@ Verify the header contract against query-builder's canonical
 https://github.com/nq-rdl/query-builder/blob/main/docs/ANALYSIS_NOTES.md when syntax is uncertain.
 
 For a rejected question draft and for `scope_check` (`unmatched_header`, `rationale_differences`,
-`question_checks`), follow [references/header-check.rst](references/header-check.rst). Put each mismatch
+`question_checks`), follow [references/header-check.rst](references/header-check.rst). Compare every open scope
+question with the header decisions, even when the header item already matches a scope item. Put each mismatch
 to the engineer. Do not publish while a mismatch is unaddressed.
 
 ```bash

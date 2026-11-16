@@ -73,6 +73,7 @@ class Packaging(unittest.TestCase):
     def test_references_are_rst_and_linked_from_skill(self):
         self.assertGreaterEqual(len(REFERENCES), 10)
         self.assertEqual(skill_references.problems(CANON), [])
+        self.assertIn("Do not build request SQL with f-strings or string concatenation", body(SKILL))
 
     def test_references_packaged_for_claude_and_codex(self):
         for root in (CLAUDE_COPY, CODEX_COPY):
