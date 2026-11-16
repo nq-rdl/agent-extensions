@@ -49,3 +49,4 @@ Tests and pushes
   for hand-off.
 * Prefer structural asserts, such as a parsed SQL tree, over exact SQL strings. A
   re-pin can change quoting and temp-table names without any change in logic.
+* Give each new module constant a name that no existing variable uses.
