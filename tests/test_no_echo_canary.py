@@ -459,6 +459,38 @@ class Canary(unittest.TestCase):
         self.assertNotEqual(r.returncode, 0)
         self.assertClean(r, argv=False)  # argv: jq --arg values (F-4)
 
+    def test_publish_lint_lines_name_no_value(self):
+        # A refused hit (stdout), a warning (stderr) and the refusal line, all with canary text.
+        long = " ".join([CANARY] * 26) + "."
+        doc = scope(intent=CANARY + " don't " + long, open_questions=[CANARY + " code 90000001?"],
+                    assumptions=[item("A1", CANARY + " text; " + long, rationale=CANARY + " tbc",
+                                      decided={"by": "requester-login", "role": "requester", "at": "2026-11-01",
+                                               "source": "unlinked " + CANARY})])
+        r = self.run_script(SR, "publish", "q", "scope", self.write(".sqlreview/reviews/q/scope.draft.json", doc))
+        self.assertClean(r, 4, argv=False)  # argv: jq --arg values (F-4)
+        self.assertIn("A1\ttext\tsentence-length", r.stdout)
+        self.assertIn("lint-warning\tA1\tdecided.source\tdecision-source", r.stderr)
+
+    def test_notes_unknown_section_names_the_line_only(self):
+        sql = self.write("q.sql", "/*\nzz_" + CANARY.lower().replace("-", "_") + ":\n  - " + CANARY + "\n*/\nSELECT 1;\n")
+        r = self.run_script(SR, "notes", sql)
+        self.assertClean(r, 4)
+        self.assertIn("line 2: unknown section", r.stderr)
+
+    def test_intake_merge_refusals_name_the_field_only(self):
+        side = self.write("answers.intake.json", sidecar())
+        for over in ({"kind": CANARY}, {"revision": 2}, {"assumptions": CANARY}, {"open_questions": CANARY},
+                     {"approval_number": CANARY}, {"intake_questions": [CANARY]},
+                     {"assumptions": [item(CANARY), item(CANARY)]}):
+            with self.subTest(field=next(iter(over))):
+                r = self.run_script(SR, "intake", side, "1", self.write("d.json", scope(intent=CANARY, **over)))
+                self.assertClean(r, 4, argv=False)
+                self.assertIn("cannot merge intake: draft field " + next(iter(over)), r.stderr)
+        changed = item("A-intake-age", CANARY, upstream={"source": "analyst-intake", "approval_number": APPROVAL})
+        r = self.run_script(SR, "intake", side, "1", self.write("d.json", scope(assumptions=[changed])))
+        self.assertClean(r, 4, argv=False)
+        self.assertIn("cannot merge intake: draft field assumptions[].id", r.stderr)
+
     # --- intentional outputs: allowed on stdout, never on stderr ---------------------------------
     def test_delta_and_impact_print_the_sql_text_by_design(self):
         self.write("q.sql", f"SELECT '{CANARY}';\n")
