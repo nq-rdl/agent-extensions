@@ -308,7 +308,7 @@ A handed-off part is an open delivery gate. Do not start `$data-request:release`
 engineer completes each handed-off part, or the analyst withdraws it on the deliverable PR. Only
 the two forms in *Close a handed-off part* (step 2) close a part. `$data-request:release`
 enforces this gate in its step 0 (*Amend gate*). The
-done parts already make the review stale. One full re-walk after the engineer's change can
+done parts already make the review stale. One re-check after the engineer's change can
 cover all parts.
 
 ## Resume a split request
