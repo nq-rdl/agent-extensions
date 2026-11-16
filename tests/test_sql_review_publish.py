@@ -482,6 +482,18 @@ class Publish(unittest.TestCase):
         self.assertEqual(result.returncode, 4, result.stdout + result.stderr)
         self.assertIn("L1\ttext\tsentence-length", result.stdout)
 
+    def test_review_publish_refuses_a_hit_in_the_rationale_of_a_header_item(self):
+        header = "/*\nassumptions:\n  - " + self.LONG + "\n*/\n"
+        self.project.sql("q.sql", header + "select 1;\n")
+        self.project.commit()
+        fp = json.loads(self.run_helper("fingerprint", "q.sql").stdout)
+        review = review_doc("q", **fp)
+        review["assumptions"][0]["text"] = self.LONG
+        review["assumptions"][0]["rationale"] = self.LONG  # analyst wording, not library text
+        result = self.publish(review)
+        self.assertEqual(result.returncode, 4, result.stdout + result.stderr)
+        self.assertIn("A1\trationale\tsentence-length", result.stdout)
+
     # A synthetic code in analyst-intake text. The engineer cannot reword it: a later intake merge
     # refuses a changed analyst answer and adds the original question again.
     INTAKE = {"schemaVersion": 1, "approval_number": "THHSAQUIRE-042",

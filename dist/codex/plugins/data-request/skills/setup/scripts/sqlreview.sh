@@ -663,8 +663,9 @@ sr_publish_cleanup() {
 #                        the published revision has at any index is unchanged.
 #   verbatim             any field of an analyst-intake item (intake refuses a changed answer), an
 #                        analyst question (intake_questions), text or rationale of a linked lift
-#                        limitation (publish fixes that wording) or of an item whose text is a
-#                        notes-header item of the bound SQL (library text)
+#                        limitation (publish fixes that wording), or the text of an item that
+#                        equals a notes-header item of the bound SQL (library text). The rationale
+#                        of a header item is analyst wording and is not exempt
 _publish_lint() { # <staged doc> <bound SQL or ""> <published doc>...
   local doc="$1" sql="$2" new prior="" more header="[]" rc hits old asked="[]"
   shift 2
@@ -690,7 +691,8 @@ _publish_lint() { # <staged doc> <bound SQL or ""> <published doc>...
       | code_value_redact];
     $doc[0] as $d
     | ($d | ids(.upstream?.source? == "analyst-intake")) as $intake
-    | ($d | ids(has("lift_id") or (.text as $t | ($t | type) == "string" and ($header | index([$t])) != null))) as $verbatim
+    | ($d | ids(has("lift_id"))) as $verbatim
+    | ($d | ids(.text as $t | ($t | type) == "string" and ($header | index([$t])) != null)) as $headertext
     | ($d.intake_questions // [] | if type == "array" then . else [] end) as $analyst
     # The question that a row "-" <list>[N] names, or null.
     | def question:
@@ -704,6 +706,7 @@ _publish_lint() { # <staged doc> <bound SQL or ""> <published doc>...
     | (if .[2] == "decision-source" or ((. | join("\t")) as $l | $old | index([$l]) != null)
          or ($intake | index([.[0]])) != null
          or ((.[1] == "text" or .[1] == "rationale") and ($verbatim | index([.[0]])) != null)
+         or (.[1] == "text" and ($headertext | index([.[0]])) != null)
          or ($q != null and (($analyst | index([$q])) != null or ($asked | index([$q])) != null))
        then "warn" else "refuse" end) + "\t" + (.[0:3] | join("\t"))
   ' 2>/dev/null)" || return 2
