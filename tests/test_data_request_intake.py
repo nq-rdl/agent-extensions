@@ -128,6 +128,14 @@ class IntakeContracts(unittest.TestCase):
                               "read a draft back", "do not ask them again", "After each answered batch",
                               "The draft is not the sidecar", "Never commit it", "Delete it after the final sidecar validates"):
                     self.assertIn(token, state)
+                # A confirmed criterion moves the draft to schema 2; a schema 2 sidecar is never staged as schema 1.
+                for token in ("Use `schemaVersion: 1` until the analyst confirms a criterion",
+                              "Then use `schemaVersion: 2` and keep every confirmed criterion",
+                              "A draft may omit `fingerprints`",
+                              "keep `schemaVersion: 2`, its `criteria` and its `fingerprints` in the draft"):
+                    self.assertIn(token, state)
+                self.assertNotIn("with `schemaVersion: 1`, then stage it", state)
+                self.assertIn("Keep the draft in that case", body)
                 self.assertIn("from the `now` helper", body)
                 gather = body.split("## Gather the evidence", 1)[1].split("## Keep the interview state", 1)[0]
                 for token in ("read the prior request's SQL and the current build outputs", "as per request <prior>",

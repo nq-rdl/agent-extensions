@@ -89,8 +89,11 @@ bash "$S/sqlreview.sh" intake-draft answers.intake.draft.json < next.json    # a
 - At the start, read back a draft that exists. Its decisions and open questions are answered:
   do not ask them again. Ask only what it lacks. With no draft on a re-run, start one from the current sidecar.
 - After each answered batch, write the whole document (all earlier answers and this batch) to
-  `next.json` with `schemaVersion: 1`, then stage it. A stage that fails leaves the old draft:
-  run `intake` on `next.json`, follow its message, fix the document and stage again.
+  `next.json`, then stage it. A stage that fails leaves the old draft: fix the document and stage again.
+- Use `schemaVersion: 1` until the analyst confirms a criterion.
+  Then use `schemaVersion: 2` and keep every confirmed criterion in `criteria`. A draft may omit `fingerprints`:
+  only `intake-draft` and a read back of the draft accept that. When the pass starts from a schema 2 sidecar,
+  keep `schemaVersion: 2`, its `criteria` and its `fingerprints` in the draft.
 - The draft is not the sidecar. Never commit it. Delete it after the final sidecar validates.
 
 ## The interview
@@ -232,8 +235,8 @@ Write `answers.intake.json` as one complete document (`approval_number`, `decisi
 `schemaVersion: 1`. With them, add `criteria` and `fingerprints` and write `schemaVersion: 2`,
 but only after confirming the installed `validate-answers` accepts schema 2: an older release
 reports `intake.schemaVersion`. If it does not and no schema 2 sidecar exists, write schema 1 without `criteria` and tell the
-analyst the scaffold release is needed. If a schema 2 sidecar already exists, keep it as is,
-write nothing and stop: report that the validator needs upgrading. Never downgrade a sidecar
+analyst the scaffold release is needed. Keep the draft in that case: it holds the confirmed criteria.
+If a schema 2 sidecar already exists, keep it as is, write nothing and stop: report that the validator needs upgrading. Never downgrade a sidecar
 or drop its confirmed criteria.
 
 If `answers.yaml` does not parse (`yaml.safe_load`), show the analyst the line and column, propose a
