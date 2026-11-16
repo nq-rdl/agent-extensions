@@ -835,6 +835,10 @@ cmd_publish() (
   fi
   mv "$tmp" "$dest" || sr_die 2 "cannot publish document"
   committed=true
+  # The carry-list file only serves the question just answered: a stale copy must not stay in the store.
+  if [ -f "$SR_REVIEWS/$slug/carry-list.md" ] && [ ! -L "$SR_REVIEWS/$slug/carry-list.md" ]; then
+    rm -f -- "$SR_REVIEWS/$slug/carry-list.md" || true
+  fi
   printf '%s\n' "$check_out"
   printf 'published\t%s\n' "${dest#"$SR_ROOT"/}"
 )
@@ -1816,9 +1820,13 @@ cmd_move() {
   # A move to a file with the recorded bytes keeps carried evidence: the marker says so, and delta, remap
   # and carryforward still compare. Changed or missing bytes, or an earlier changed move, force reassessment.
   [ "$rebind" = 0 ] || bytes="$(_move_bytes "$oldslug" "$newrel")"
-  for kind in review scope lifts; do
-    [ ! -f "$SR_REVIEWS/$oldslug/$kind.md" ] || renders="$renders $kind"
-  done
+  # A render of changed SQL would read as a current report on bytes it never described, so only a
+  # move that keeps the recorded bytes (or a legacy slug rename) renders again.
+  if [ "$bytes" != changed ]; then
+    for kind in review scope lifts; do
+      [ ! -f "$SR_REVIEWS/$oldslug/$kind.md" ] || renders="$renders $kind"
+    done
+  fi
   [ "$oldslug" = "$newslug" ] || mv "$SR_REVIEWS/$oldslug" "$SR_REVIEWS/$newslug" || sr_die 2 "move failed"
   case "$bytes" in
     changed) printf 'sql-changed\n' > "$SR_REVIEWS/$newslug/rebind-required" || sr_die 2 "cannot mark stale"

@@ -93,6 +93,12 @@ class Check(unittest.TestCase):
         self.assert_ok(review_doc(revision=3, assumptions=[item("A1", "x", 2, carried_from_revision=2)]))
         self.assert_ok(scope_doc(revision=2, assumptions=[item("A1", "x", 1, carried_from_revision=1)]))
 
+    def test_sql_status_accepts_only_not_implemented(self):
+        self.assert_ok(review_doc(assumptions=[item("A1", "x", 1, sql_status="not-implemented")]))
+        for bad in ("not_implemented", "", None, True):
+            with self.subTest(bad=bad):
+                self.assert_violation(review_doc(assumptions=[item("A1", "x", 1, sql_status=bad)]), "sql_status")
+
     def test_accepts_a_fresh_item_with_null_carried_from(self):
         self.assert_ok(review_doc(revision=2, assumptions=[item("A1", "x", 2, carried_from_revision=None)]))
 

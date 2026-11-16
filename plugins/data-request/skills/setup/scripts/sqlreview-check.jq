@@ -31,6 +31,7 @@ def items($kind; $rev):
       | (if (.text | nonempty | not) then "\($id): empty text" else empty end),
         (if (.rationale | nonempty | not) then "\($id): rationale must be a nonempty string" else empty end),
         (if .location != null and ((.location | type) != "object" or (.location.lines | line_range | not)) then "\($id): location must be null or an object with a line range" else empty end),
+        (if has("sql_status") and .sql_status != "not-implemented" then "\($id): sql_status must be absent or not-implemented" else empty end),
         (if has("decided") then
           if (.decided | type) != "object" then "\($id): decided must be an object"
           else (["by", "role", "at", "source"][] as $key

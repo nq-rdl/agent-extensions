@@ -175,6 +175,27 @@ class Move(unittest.TestCase):
                 self.assertIn("`new.sql`", text)
                 self.assertNotIn("`q.sql`", text)
 
+    def test_changed_bytes_leave_no_render_that_looks_current(self):
+        self.reviewed()
+        r, moved = self.move(change=SQL_V1 + "-- trailing\n")
+        for kind in ("scope", "review"):
+            with self.subTest(kind=kind):
+                self.assertFalse((moved / (kind + ".md")).exists())
+
+    def test_publish_removes_the_carry_list_file(self):
+        self.reviewed()
+        lst = self.reviews / "q" / "carry-list.md"
+        lst.write_text("stale\n")
+        fp = json.loads(run(["fingerprint", "q.sql"], self.p.root).stdout)
+        a = dict(item("A1", "Discharge date marks completion", location={"lines": [3, 3]}),
+                 carried_from_revision=1, carried_basis="sql-unchanged")
+        l = dict(item("L1", "Monthly grain", location=None), carried_from_revision=1, carried_basis="sql-unchanged")
+        self.publish("q", "review", review_doc("q", **fp, revision=2, assumptions=[a], limitations=[l],
+            logic=[{"step": 1, "title": "Filter", "lines": [1, 4], "description": "Filter stays"}],
+            changes=[{"revision": 1, "at": "2026-09-15T00:00:00Z", "by": "engineer-login", "summary": "first"},
+                     {"revision": 2, "at": "2026-11-16T00:00:00Z", "by": "engineer-login", "summary": "again"}]))
+        self.assertFalse(lst.exists())
+
     def test_a_failed_render_is_named_and_does_not_fail_the_move(self):
         self.reviewed()
         (self.p.root / ".sqlreview" / "config.json").unlink()

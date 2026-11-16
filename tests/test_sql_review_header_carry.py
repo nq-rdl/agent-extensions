@@ -460,6 +460,15 @@ class HeaderCarry(unittest.TestCase):
         self.assertEqual([i["id"] for i in out["header_walk"]], ["A3", "A4"])
         self.assertEqual(out["header_settled"], [{"kind": "assumptions", "id": "A1"}, {"kind": "assumptions", "id": "A2"}])
 
+    def test_a_draft_without_a_revision_does_not_break_the_walk(self):
+        self.sql.write_text(SQL_V1)
+        a1 = self.doc["assumptions"][0]
+        self.doc.pop("revision", None)
+        self.doc["assumptions"] = [dict(a1, carried_from_revision=1, carried_basis="sql-unchanged")]
+        out = self.notes()
+        self.assertEqual(out["header_settled"], [])
+        self.assertEqual([i["id"] for i in out["header_walk"]], ["A1"])
+
     def test_missing_header_without_actor_retains_legacy_notes_shape(self):
         self.sql.write_text(SQL_V1)
         self.assertEqual(self.notes(None), {"present": False, "lines": None, "assumptions": [], "limitations": []})

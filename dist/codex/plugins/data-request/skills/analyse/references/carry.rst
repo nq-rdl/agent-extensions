@@ -116,6 +116,8 @@ Header to review: ``notes --against --confirmed-by``
 ``header_carry_over`` is eligibility for a fresh answer, not an old confirmation.
 ``header_settled`` lists the items that already hold a confirmation for this revision.
 ``header_walk`` leaves them out. Do not ask them again.
+Set the new ``revision`` in the draft before you run ``notes``: the settled list compares each item
+with the draft revision, so it is only right for a draft that already has the new number.
 An explicit named engineer attribution must match the intended human handle exactly.
 Show every kind/id, text, rationale, governed location, independent ``decided`` and
 ``evidence.commit`` / ``committed_at`` in ONE question: **Carry over all (Recommended)** /
