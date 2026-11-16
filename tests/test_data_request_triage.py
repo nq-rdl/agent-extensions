@@ -15,6 +15,11 @@ from unittest.mock import patch
 
 import yaml
 
+try:  # `unittest discover -s tests` puts tests/ on sys.path; `-m unittest tests.x` does not
+    import skill_references
+except ModuleNotFoundError:
+    from tests import skill_references
+
 REPO = Path(__file__).resolve().parent.parent
 BUNDLE = REPO / "registry" / "bundles" / "data-request.yaml"
 CANON = REPO / "skills" / "data-request-triage"
@@ -185,16 +190,10 @@ class ModelSelection(unittest.TestCase):
 
 
 class References(unittest.TestCase):
-    EXPECTED = {"subagent.rst", "ledger.rst", "repositories.rst", "checks.rst", "comments.rst", "handoff.rst"}
-
     def test_references_exist_are_rst_and_linked_with_when_to_read(self):
-        refs = CANON / "references"
-        self.assertEqual({p.name for p in refs.iterdir()}, self.EXPECTED)
-        text = body(SKILL)
-        for name in self.EXPECTED:
-            with self.subTest(ref=name):
-                link = re.search(r"\]\(references/" + re.escape(name) + r"\)([^\n]*)", text)
-                self.assertIsNotNone(link, f"SKILL.md does not link references/{name}")
+        # Discovered from the directory: a new reference needs only its file and a SKILL.md link.
+        self.assertGreaterEqual(len(skill_references.references(CANON)), 6)
+        self.assertEqual(skill_references.problems(CANON), [])
 
     def test_ledger_schema_fields(self):
         ledger = (CANON / "references" / "ledger.rst").read_text()

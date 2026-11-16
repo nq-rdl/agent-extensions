@@ -1899,9 +1899,12 @@ Header revision history: metadata changed without changing its corresponding SQL
   printf 'rendered\t%s\n' "${out#"$SR_ROOT"/}"
 }
 
-# The file arguments each subcommand reads, all through sr_guard_input (#516). Commands whose
-# only inputs are slugs and project-relative SQL paths (resolved by sr_relpath/sr_safe_sql) need no
-# entry; tests/test_sql_review_path_guard.py lists every command and fails on a missing one.
+# The input class of every subcommand, declared once here (#516). An arm with a body guards the file
+# arguments it names through sr_guard_input. An arm marked "input: in-command" reads a file that its
+# command guards itself. An arm marked "input: none" takes only slugs, project-relative SQL paths
+# (resolved by sr_relpath/sr_safe_sql) or a path it writes. A new subcommand adds its own arm here:
+# an undeclared command is refused as unknown, and tests/test_sql_review_path_guard.py reads these
+# arms to drive its walk.
 _sr_guard_command_inputs() { # COMMAND ARGS...
   local c="$1" a prev="" last=""; shift
   case "$c" in
@@ -1924,6 +1927,25 @@ _sr_guard_command_inputs() { # COMMAND ARGS...
         set) [ $# -lt 3 ] || sr_guard_input "$3" outside-ok ;;
         get) [ "${3:-}" != --against ] || [ $# -lt 4 ] || sr_guard_input "$4" outside-ok ;;
       esac ;;
+    delta) ;;              # input: none
+    discard-draft) ;;      # input: none
+    fingerprint) ;;        # input: in-command
+    guard) ;;              # input: none
+    impact) ;;             # input: none
+    init) ;;               # input: none
+    lifts-stale) ;;        # input: none
+    materialize) ;;        # input: none
+    migrate-questions) ;;  # input: none
+    move) ;;               # input: in-command
+    publish) ;;            # input: in-command
+    questions) ;;          # input: none
+    render) ;;             # input: none
+    roles) ;;              # input: none
+    slug) ;;               # input: in-command
+    snapshot) ;;           # input: in-command
+    status) ;;             # input: none
+    -h|--help|help) ;;     # input: none
+    *) printf 'sqlreview: unknown command: %s\n' "$c" >&2; usage ;;
   esac
 }
 
