@@ -49,18 +49,20 @@ def ifingerprints:
   type == "object"
   and (keys == ["cohort_entry_event", "exclusion_criteria", "inclusion_criteria", "requested_data_elements"])
   and all(.[]; type == "string" and test("\\Asha256:[0-9a-f]{64}\\z"));
-def icriteria_valid:
+# $draft is true only for the staged interview draft: the free text is fingerprinted at the end of the
+# pass, so confirmed criteria may wait for fingerprints there. Every other rule applies to a draft too.
+def icriteria_valid($draft):
   (if has("criteria") then .criteria | type == "array" and icriteria_list else true end)
   and (if has("fingerprints") then .fingerprints | ifingerprints else true end)
-  and (if (.criteria | type == "array" and length > 0) then has("fingerprints") else true end);
-def intake_valid:
+  and ($draft or (if (.criteria | type == "array" and length > 0) then has("fingerprints") else true end));
+def intake_valid($draft):
   type == "object" and (.schemaVersion == 1 or .schemaVersion == 2) and (.approval_number | ine)
   and (.decisions | type == "array" and all(.[]; idecision)
     and (map(.id) | length == (unique | length))
     and ([.[] | select(.topic == "grain")] | length <= 1))
   and (.open_questions | type == "array" and all(.[]; ine))
-  and (if .schemaVersion == 1 then ((has("criteria") or has("fingerprints")) | not) else icriteria_valid end);
-if intake_valid then
+  and (if .schemaVersion == 1 then ((has("criteria") or has("fingerprints")) | not) else icriteria_valid($draft) end);
+if intake_valid($draft) then
   . as $intake | {present: true, approval_number,
     assumptions: [.decisions[] | . as $item |
       {id: ("A-intake-" + .id), text, rationale, location: null, status: "confirmed",
@@ -72,4 +74,6 @@ if intake_valid then
     analyst_questions: [.open_questions[] | "Analyst question: " + .]}
     # Schema 2 only; the criteria and fingerprints are passed through verbatim for the callers.
     + (if .schemaVersion == 2 then {criteria: (.criteria // []), fingerprints: (.fingerprints // null)} else {} end)
+    # A draft read back says so, so no caller can take it for the confirmed sidecar.
+    + (if $draft then {draft: true} else {} end)
 else error("invalid analyst intake fields; run validate-answers and correct the sidecar") end

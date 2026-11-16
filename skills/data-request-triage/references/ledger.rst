@@ -42,6 +42,7 @@ path, not a path in the user's child repository. In the child root (or with
   bash "$S/sqlreview.sh" ledger --session get 'rdl-service-desk/service-desk#903'
   bash "$S/sqlreview.sh" ledger --session set 'rdl-service-desk/service-desk#903' /private/staging/entry.json
   bash "$S/sqlreview.sh" ledger get 'rdl-service-desk/service-desk#903' --against /private/staging/current-revisions.json
+  bash "$S/sqlreview.sh" ledger waivers 'rdl-service-desk/service-desk#903' "$PR_HEAD"
 
 ``set`` takes one JSON entry, not the whole store. The wrapper is
 ``{"schemaVersion":1,"entries":[...]}``. Every entry and the existing store must
@@ -54,6 +55,13 @@ temp file beside the final file and renames it atomically. Failure preserves the
 old store. A busy ``.ledger.lock`` fails: reload, reconcile and retry; after a
 crash, remove a stale lock only after verifying that no writer remains.
 Do not directly Write/Edit the final store.
+A refusal names each failing field, never its value. A ticket must be the fully
+qualified form ``owner/repo#N``.
+
+``waivers`` prints one row for each gate waiver of the ticket. The head is the full
+40-character SHA. A ``waived`` row holds the gate, check, ``by``, date and source for
+that head. A ``lapsed`` row holds a waiver for another head. The hand-off gate in
+``handoff.rst`` reads these rows.
 
 ``set`` also refuses a store that is empty, is not valid JSON or has no ``entries`` array. ``status`` and the
 release hold name that state. To recover, run ``git restore --source=HEAD -- .sqlreview/ledger.json`` from the
@@ -77,14 +85,14 @@ Example entry (the same shape is returned as text; convert to JSON for ``set``):
    stage: validate
    stages_done: [intake, map, draft]
    evidence_revision:
-     ticket: '2026-09-29'    # actual last body/comment revision read
+     ticket: '2026-09-29T04:12:00Z'  # newest updated_at of the issue body or a comment you read
      mapping: query-builder-v1.2.3
-     sql: child-commit-sha
+     sql_commit: child-commit-sha
    stage_evidence:
      intake: {sources: [ticket], artifacts: []}
      map: {sources: [ticket, mapping], artifacts: []}
      draft:
-       sources: [ticket, mapping, sql]
+       sources: [ticket, mapping, sql_commit]
        artifacts:
          - {path: sql/v1/cohort.sql, sha256: '<64 lowercase hex characters>'}
    decisions:
@@ -106,6 +114,15 @@ Example entry (the same shape is returned as text; convert to JSON for ``set``):
      reviewer: reviewer-handle
      board_state: In-Review
      date: '2026-09-29'
+   gate_waivers:            # optional; only a human waives a check
+     - gate: ci
+       check: unit-tests
+       head_sha: 0123456789abcdef0123456789abcdef01234567
+       issue: example-org/example-scaffold#12
+       by: engineer-handle
+       at: '2026-09-29'
+       source: 'https://github.com/<owner>/<repo>/pull/4#issuecomment-1001'
+       reason: Known scaffold test failure, not caused by this request
    verification: {status: partial, commands: ['mapping check: pass'], at: '2026-09-29'}
 
 Rules
@@ -114,15 +131,31 @@ Rules
 Required: ticket, enquiry, stage, stages_done, evidence_revision, stage_evidence,
 decisions, blockers, depends_on, next_action and verification. Repo, approval,
 branch, owner and handoff may be omitted until known; never invent them.
-For unresolved intake use ``stages_done: []`` and ``stage_evidence: {}``.
+For unresolved intake, ``stages_done`` is an empty list and ``stage_evidence`` is an empty object.
 Every completed stage needs a nonempty ``sources`` list naming recorded revision
 keys and an ``artifacts`` list (empty only when no local artifact is expected).
 Paths are child-relative, traversal-free, non-symlink paths; digests are SHA-256.
 The helper never reads a ``data/`` path or a ``sql/`` path outside ``sql/v<N>/``.
 It marks that stage for recheck and prints a fixed message. List such a file only as a source revision.
-Allowed stages: intake, bootstrap, map, draft, validate, analyse, lift, report,
-review, fix, amend, release, parked. Verification status is unverified, partial or
+Allowed stages: intake, bootstrap, map, draft, validate, analyse, run, uat, handoff,
+lift, report, review, fix, amend, release, parked. ``run`` is the authorised operator run,
+``uat`` is the recorded UAT and ``handoff`` is the hand-off to review. Verification status is unverified, partial or
 verified; commands record only actual runs and their results.
+
+Name the SQL commit revision ``sql_commit``. The scaffold data-plane sweep refuses a
+field named ``sql``. Ledgers saved with the old key ``sql`` stay readable, and ``get --against``
+compares either key. ``set`` saves the key as ``sql_commit`` in every entry of the store,
+and says so on stderr. An entry with both keys is refused.
+For the ``ticket`` revision in ``evidence_revision``, copy the newest ``updated_at``
+of the issue body or of a comment you read, as GitHub gives it.
+
+``gate_waivers`` is optional. Each waiver has exactly the fields ``gate``, ``check``,
+``head_sha``, ``issue``, ``by``, ``at``, ``source`` and ``reason``. ``gate`` is ``ci``, the
+only gate that can be waived. ``check`` is the CI check name. ``head_sha`` is the full SHA
+that the waiver applies to. ``issue`` is the known-failure issue as ``owner/repo#N``.
+``by`` is the human login that waived the check. Agent and bot logins are refused.
+``source`` is the link to the waiver comment or review that the human wrote on GitHub. One check
+has at most one waiver for each head. A new head needs a new waiver.
 
 Decisions use #434/#437's independent ``decided: {by,role,at,source}`` origin;
 ``role`` is a display label, ``by`` a human handle, not a confirmer inferred from

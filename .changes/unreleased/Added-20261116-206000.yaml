@@ -1,0 +1,3 @@
+kind: Added
+body: carry-list writes the items of a long carry question to a file and prints their count, ids, bases and lines
+time: 2026-11-16T02:06:00Z

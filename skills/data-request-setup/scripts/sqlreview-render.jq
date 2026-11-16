@@ -27,10 +27,12 @@ def question_list(a): if (a | length) == 0 then "_none_" else (a | map(
       + (if (.closed.source | ascii_downcase | startswith("unlinked")) then " [UNLINKED]" else "" end) else "" end)
   + (if .decided != null then " · Decision: \(decision | cell)" else "" end)
 ) | join("\n")) end;
+# An item this SQL does not implement must never read as an ordinary confirmed item.
+def item_text: .text + (if .sql_status == "not-implemented" then " [not implemented by this SQL]" else "" end);
 def table(a; heading):
   if (a | length) == 0 then "_none recorded_"
   else "| ID | \(heading) | Rationale | Lines | Decision and source | Confirmed by | Revision |\n|---|---|---|---|---|---|---|\n"
-       + (a | map("| \(.id | cell) | \(.text | cell) | \((.rationale // "") + intake_note | cell) | \(lines(.location.lines) | cell) | \(decision | cell) | \(.confirmed_by // "" | cell) | \((.confirmed_revision // "" | tostring) + (if .carried_from_revision != null then " (carried)" else "" end) + (if .carried_basis == "header-decision" then " (header-decision carry-over)" else "" end) | cell) |") | join("\n"))
+       + (a | map("| \(.id | cell) | \(item_text | cell) | \((.rationale // "") + intake_note | cell) | \(lines(.location.lines) | cell) | \(decision | cell) | \(.confirmed_by // "" | cell) | \((.confirmed_revision // "" | tostring) + (if .carried_from_revision != null then " (carried)" else "" end) + (if .carried_basis == "header-decision" then " (header-decision carry-over)" else "" end) | cell) |") | join("\n"))
   end;
 def criteria_note: if .state == "flagged" and .flag != null then "`\(.flag.output).\(.flag.column)`" else (.reason // "") end;
 def criteria_table(a):

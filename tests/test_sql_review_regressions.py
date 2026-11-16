@@ -206,14 +206,17 @@ class ReviewRegressions(unittest.TestCase):
         self.assertEqual((self.d / 'history/review/1.json').read_bytes(), original)
         self.assertFalse(list(self.d.rglob('*.sql')))
 
-    def test_move_invalidates_unchanged_sql_and_removes_render(self):
+    def test_move_of_unchanged_sql_needs_a_new_revision_and_re_renders(self):
         self.reviewed()
         self.assertEqual(run(['render', 'q', 'review'], self.p.root).returncode, 0)
         (self.p.root / 'q.sql').rename(self.p.root / 'renamed.sql')
         result = run(['move', 'q.sql', 'renamed.sql'], self.p.root)
         self.assertEqual(result.returncode, 0, result.stderr)
-        self.assertEqual(run(['delta', 'renamed'], self.p.root).returncode, 10)
-        self.assertFalse((self.p.root / '.sqlreview/reviews/renamed/review.md').exists())
+        # Identical bytes: delta still compares, and exits 10 because the record names the pre-move commit.
+        delta = run(['delta', 'renamed'], self.p.root)
+        self.assertEqual(delta.returncode, 10)
+        self.assertIn('path moved with identical bytes', delta.stdout)
+        self.assertIn('`renamed.sql`', (self.p.root / '.sqlreview/reviews/renamed/review.md').read_text())
         status = json.loads(run(['status', '--json'], self.p.root).stdout)
         self.assertEqual(status['reviews'][0]['state'], 'stale')
 

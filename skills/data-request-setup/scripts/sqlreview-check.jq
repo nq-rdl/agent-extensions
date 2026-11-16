@@ -31,6 +31,7 @@ def items($kind; $rev):
       | (if (.text | nonempty | not) then "\($id): empty text" else empty end),
         (if (.rationale | nonempty | not) then "\($id): rationale must be a nonempty string" else empty end),
         (if .location != null and ((.location | type) != "object" or (.location.lines | line_range | not)) then "\($id): location must be null or an object with a line range" else empty end),
+        (if has("sql_status") and .sql_status != "not-implemented" then "\($id): sql_status must be absent or not-implemented" else empty end),
         (if has("decided") then
           if (.decided | type) != "object" then "\($id): decided must be an object"
           else (["by", "role", "at", "source"][] as $key
@@ -92,7 +93,7 @@ def criteria_status_findings($rev):
          end),
         (if has("upstream") and ((.upstream | type) != "object" or (.upstream.source | ine | not) or (.upstream.id | ine | not))
          then "\($id)\tupstream\tinvalid" else empty end),
-        # Confirmation as for scope assumptions (items above); the basis of a carried row is criteria-unchanged.
+        # Confirmation as for scope assumptions (items above); the basis of a carried row is criteria-unchanged or criteria-lines-unchanged.
         (if (.confirmed_by | nonempty | not) then "\($id)\tconfirmed_by\trequired" else empty end),
         (if (.confirmed_at | nonempty | not) then "\($id)\tconfirmed_at\trequired" else empty end),
         (.confirmed_revision as $cr | .carried_from_revision as $cf
@@ -102,8 +103,12 @@ def criteria_status_findings($rev):
            elif $cr == $rev then (if $cf != null then "\($id)\tcarried_from_revision\tinvalid" else empty end)
            elif ($cf | integer | not) or $cf != $rev - 1 or $cf < $cr then "\($id)\tcarried_from_revision\tinvalid"
            else empty end),
-        (if .carried_basis == null then empty
-         elif .carried_from_revision == null or .carried_basis != "criteria-unchanged" then "\($id)\tcarried_basis\tinvalid"
+        # A row may record the SQL lines that apply it, so a body change walks only the rows it touches.
+        (if .location != null and ((.location | type) != "object" or (.location.lines | line_range | not))
+         then "\($id)\tlocation\tinvalid" else empty end),
+        (.carried_basis as $cb | if $cb == null then empty
+         elif .carried_from_revision == null or (["criteria-unchanged", "criteria-lines-unchanged"] | index([$cb])) == null
+         then "\($id)\tcarried_basis\tinvalid"
          else empty end)
       end)
   end;

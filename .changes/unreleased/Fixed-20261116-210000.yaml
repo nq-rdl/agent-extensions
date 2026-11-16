@@ -1,0 +1,3 @@
+kind: Fixed
+body: carryforward lists every item the change does not touch in one carry_question, so a change walks only what it touches
+time: 2026-11-16T03:10:00Z
