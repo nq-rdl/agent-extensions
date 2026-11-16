@@ -515,6 +515,24 @@ class PluginBuild(unittest.TestCase):
             self.assertIn("does not match DATA_REQUEST_EXPECT_BUILD", ctx)
             self.assertIn(build_digest(PLUGIN)[:12], ctx)
 
+    def test_the_preflight_hook_says_so_when_the_expected_build_cannot_be_checked(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            p = Project(tmp, init=False)
+            # The canonical source is not a plugin build: a requested check must not pass in silence.
+            r = run_hook(PREFLIGHT, {"cwd": str(p.root)}, env_for(plugin_root=None, DATA_REQUEST_EXPECT_BUILD="0" * 12))
+            ctx = decision(r)["additionalContext"]
+            self.assertIn("not a plugin build", ctx)
+            self.assertIn("DATA_REQUEST_EXPECT_BUILD", ctx)
+
+    def test_the_preflight_hook_reads_the_store_that_sqlreview_root_names(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            (Path(tmp) / "outer").mkdir()
+            outer = Project(Path(tmp) / "outer")
+            inner = Path(tmp) / "ledger-only"
+            (inner / ".sqlreview").mkdir(parents=True)
+            r = run_hook(PREFLIGHT, {"cwd": str(outer.root)}, env_for(SQLREVIEW_ROOT=str(inner)))
+            self.assertIn("without config.json", decision(r)["additionalContext"])
+
     def test_status_warns_on_stderr_when_the_build_differs(self):
         with tempfile.TemporaryDirectory() as tmp:
             p = Project(tmp)

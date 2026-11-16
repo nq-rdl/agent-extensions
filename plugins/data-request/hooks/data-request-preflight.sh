@@ -75,7 +75,9 @@ if [ "$rc" -eq 124 ]; then
   ctx="SQL Review: status did not finish in the $budget-second session-start budget, so this summary is not available. Run sqlreview.sh status to see each review and its next command."
 elif [ "$rc" -eq 3 ]; then
   # Status exits 3 for a .sqlreview/ without config.json too. Find the store it saw: the nearest one above cwd.
+  # SQLREVIEW_ROOT names the store when set, as it does for the helper.
   store=""; d="$(cd "$cwd" && pwd -P)"
+  [ -z "${SQLREVIEW_ROOT:-}" ] || { d=""; [ ! -d "$SQLREVIEW_ROOT/.sqlreview" ] || store="$SQLREVIEW_ROOT/.sqlreview"; }
   while [ -n "$d" ]; do
     [ ! -d "$d/.sqlreview" ] || { store="$d/.sqlreview"; break; }
     [ "$d" != / ] || break
@@ -147,6 +149,10 @@ if [ -n "$build" ]; then
       esac
     fi
   fi
+fi
+# A requested check that finds no plugin build (a source checkout) says so instead of passing in silence.
+if [ -z "$line" ] && [ -n "$expect" ] && [ "$rc" -ne 124 ]; then
+  line="Plugin build warning: DATA_REQUEST_EXPECT_BUILD is set, but this helper is not a plugin build (a source checkout), so the build was not checked."
 fi
 # The build line joins any other context. Alone, it prints only when a session asked for a build check.
 if [ -n "$line" ] && { [ -n "$ctx" ] || [ -n "$expect" ]; }; then

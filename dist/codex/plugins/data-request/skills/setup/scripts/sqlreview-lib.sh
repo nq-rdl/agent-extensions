@@ -662,7 +662,7 @@ sr_reviewed_rel() { # <relative path>
 # A current review names the operator run, UAT and the hand-off before explain, and open lift entries first.
 # A bound SQL path that the path guard refuses names the move into sql/v<N>/ before any other step.
 sr_next() { # <slug> <state> <sql_path>
-  local d="$SR_REVIEWS/$1" state="$2" sql="$3" scope srev="" bound="" intake="" why="" gap="" follow="" ex pre=""
+  local d="$SR_REVIEWS/$1" state="$2" sql="$3" scope srev="" bound="" intake="" intake_only=n why="" gap="" follow="" ex pre=""
   # The path is free text from the record. A hint that names it is a paste-ready command, so an unsafe
   # path (anything beyond letters, digits and _ . / -) gets a fixed text and no command.
   if [ "$sql" = "$SR_UNSAFE" ] || { [ -n "$sql" ] && ! sr_path_printable "$sql"; }; then
@@ -727,7 +727,8 @@ EOF2
     elif [ "$state" = stale ] && [ -f "$d/review.json" ] && [ "$bound" = n ]; then
       why="The SQL"; gap=", which has no SQL binding"
     fi
-    if [ "$intake" = y ]; then why="${why:+$why and the analyst intake}"; why="${why:-The analyst intake}"; fi
+    intake_only=n
+    if [ "$intake" = y ]; then [ -n "$why" ] || intake_only=y; why="${why:+$why and the analyst intake}"; why="${why:-The analyst intake}"; fi
     if [ -n "$why" ]; then
       # Bootstrap binds the scope to committed SQL, so a commit comes before it, not after.
       if [ -f "$d/review.json" ]; then follow="/data-request:analyse $sql --update"
@@ -735,7 +736,7 @@ EOF2
       else follow="/data-request:draft to write $sql"; fi
       # An intake change alone may need new SQL. A draft after the rescope would change the body and name a
       # second rescope, so the hint offers the draft first.
-      [ "$why" != "The analyst intake" ] ||
+      [ "$intake_only" != y ] ||
         follow="$follow (when the new intake needs SQL changes, run /data-request:draft first, so one rescope covers both)"
       printf '%s changed after scope revision %s%s: %srun /data-request:bootstrap %s to publish scope revision %s, then %s\n' \
         "$why" "$srev" "$gap" "$pre" "$sql" "$((srev + 1))" "$follow"
