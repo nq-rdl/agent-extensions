@@ -20,7 +20,7 @@ Before the render
 1. Probe the tools and report each result: ``copier --version`` (9.15 or later), ``git`` and
    ``pixi``. Name any that is missing and stop. A missing tool is a capability the session lacks.
 2. Read the tags again just before you ask the analyst or the engineer: ``git ls-remote --tags
-   https://github.com/nq-rdl/data-analysis-scaffold.git``. A list from an earlier turn or
+   https://github.com/nq-rdl/data-analysis-scaffold/``. A list from an earlier turn or
    session is stale. Propose the newest ``v*`` tag, v0.5.1 or later. Never render from a branch.
 3. Read the chosen tag's ``copier.yaml`` and note the default of ``framework_ref``. Use that
    value. Do not use the seed's value or a value from memory.
