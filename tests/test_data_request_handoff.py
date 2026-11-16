@@ -175,7 +175,7 @@ class HandoffContracts(unittest.TestCase):
         # A ledger-only commit carries the gate result and the waivers to the new head.
         for token in ('git diff --name-only "$PR_HEAD" "$NEW_HEAD"', "changed only ``.sqlreview/ledger.json``",
                       "Any other change needs the gate again", "shows them as ``lapsed``",
-                      "no new waiver is needed"):
+                      "no new waiver is needed", "That commit moves the head again", "tell the reviewer the new head"):
             self.assertIn(token, handoff)
 
     def test_pr_text_refresh_and_output_coverage_are_gate_steps(self):

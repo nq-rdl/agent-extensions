@@ -30,7 +30,9 @@ def decision:
    end);
 # Only a CI check can be waived. The waiver holds for one check on one head commit.
 def waiver:
-  type == "object" and keys == ["at", "by", "check", "gate", "head_sha", "issue", "reason", "source"] and
+  # The waivers command prints tab-separated rows, so no field may hold a tab or a line break.
+  def plain: type == "string" and (test("[\\t\\r\\n]") | not);
+  type == "object" and all(.[]; plain) and keys == ["at", "by", "check", "gate", "head_sha", "issue", "reason", "source"] and
   .gate == "ci" and (.check | nonempty) and (.head_sha | type == "string" and test("^[0-9a-f]{40}$")) and
   (.issue | ticket) and (.by | human) and (.at | nonempty) and (.source | comment_url) and (.reason | nonempty);
 # One [field, passed] pair per rule, so a refusal can name the field and never the value.

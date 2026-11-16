@@ -187,7 +187,9 @@ prepares and publishes the release. Never direct the engineer to release.
 7. **Move** (human only): list the child tracking issue card and the service-desk
    request issue card, each to **In-Review** on the Service Desk Request Tracking
    project board. The human moves them. Make no write to service-desk. When the human
-   reports the move, update the board state in the ledger record.
+   reports the move, update the board state in the ledger record. That commit moves the
+   head again. Check as in step 3 that it changed only ``.sqlreview/ledger.json``, and tell the
+   reviewer the new head.
 
 Steps 2 to 6 each write only on an explicit instruction from the human. Step 7 is never an agent
 write, whatever the instruction. In triage-only mode, post nothing: return the

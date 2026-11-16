@@ -173,6 +173,15 @@ class LedgerGateWaivers(unittest.TestCase):
                 self.assertIn("field gate_waivers", r.stderr)
                 self.assertFalse(self.dest.exists())
 
+    def test_a_tab_or_newline_in_a_waiver_field_is_refused(self):
+        # The waivers command prints tab-separated rows, so a control character could forge or split a row.
+        for field in ("check", "at", "by"):
+            for bad in ("x\twaived", "x\ny"):
+                with self.subTest(field=field, bad=bad):
+                    r = self.save(self.with_waivers(waiver(**{field: bad})), ok=False)
+                    self.assertEqual(r.returncode, 4)
+                    self.assertIn("field gate_waivers", r.stderr)
+
     def test_a_duplicate_waiver_for_one_check_and_head_is_refused(self):
         r = self.save(self.with_waivers(waiver(), waiver(reason="again")), ok=False)
         self.assertEqual(r.returncode, 4)
