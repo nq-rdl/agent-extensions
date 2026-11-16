@@ -30,6 +30,14 @@ API, silently publish a lift candidate under the pipeline path, following
 inspected unit/resolver/tests and shortfall first. No entry means no hand SQL;
 leave classification and confirmation for `/data-request:lift` at close-out.
 
+Before you propose any new code, config format, helper or text parser, follow the check-first list in
+`${CLAUDE_PLUGIN_ROOT}/skills/guardrails/references/library.rst` and name the path you searched.
+Every new reference constant cites a probe id or a library default. Do not override a library default
+without a probe. When you cite a rule, quote its file and line, and keep your own recommendation separate.
+Read `${CLAUDE_PLUGIN_ROOT}/skills/guardrails/references/house-conventions.rst`. It says who owns each
+decision. Ward, location and facility sets are cohort decisions for the analyst. Column naming, read
+isolation and the form of UAT are engineer decisions: ask for any that the scope leaves unrecorded.
+
 Use the evidenced grain and requested finer outputs, not the bare answers default;
 follow guardrails `references/grain.rst` for source-citing records and drift handling.
 Establish the population, exclusions, output grain, anchor, window boundaries and
@@ -88,6 +96,27 @@ instant, never a role label, recorder or inferred approval. Preserve any indepen
 known decision origin/source. Unknown attribution stays unknown and is walked in analyse.
 Include real engineer login/date and decision evidence in the generated SQL header and
 analyst hand-off per the shared authority rule.
+
+Copy confirmed scope wording verbatim into each `record_assumption` and `record_limitation` text.
+Do not reword it, or the SQL header check fails.
+
+## Commit builder SQL
+
+Builder SQL is generated, so commit it through the scaffold's amend guard:
+
+1. Write the SQL to `sql/v<N>/<name>_request.sql`. The `_request.sql` suffix is the naming rule.
+2. Run the scaffold's `amend record --builder` for it. Pass `--server` with an alias from the server
+   configuration and list the builder's repo-local inputs. The guard accepts both being absent, so check them.
+3. After any edit to a builder, even a docstring, run `amend regenerate` with no argument. Every SQL file
+   that imports the builder changes provenance.
+4. Commit only after steps 2 and 3. A block that names missing provenance means step 2 was skipped.
+
+## Tests before a push
+
+Put child tests that import the child's source in `tests_framework/`. The `tests/` folder holds the
+offline suite. Run both the unit suite and the framework suite before every push. Never push with a test red.
+Prefer structural asserts, such as a parsed SQL tree, over exact SQL strings, because a re-pin changes
+quoting and temp-table names. Give each new module constant a name that no existing variable uses.
 
 Return the path, implemented cohort definition, evidence locations for mappings and
 conversions, and any unresolved limitations. Perform a static check using

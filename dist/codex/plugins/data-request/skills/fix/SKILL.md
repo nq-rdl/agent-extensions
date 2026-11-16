@@ -123,6 +123,14 @@ and ISO timestamps at known locations). Preserve that metadata; never reword it 
 Reworded confirmed items need fresh human confirmation via bootstrap
 or analyse; do not edit final JSON or create `.sqlreview/` just for a small correction.
 
+Before you regenerate SQL, add or update one row test for each rule the fix changes. Run it, and confirm it
+fails on the old logic. A string-replace edit of a long builder can hide a shadowed variable, a reused module
+constant name or a missed output column. Run the child's unit suite in `tests/` and its framework suite in
+`tests_framework/` before every push, and prefer structural asserts over exact SQL strings. After any builder
+edit, run the scaffold's `amend regenerate` with no argument and commit the regenerated SQL. Read
+`${PLUGIN_ROOT}/skills/guardrails/references/house-conventions.rst` for the conventions behind these steps.
+When you cite a rule, quote its file and line, and keep your own recommendation separate.
+
 Make the smallest source change that resolves the reported defect, preserving
 unrelated edits. When the fix changes a filter, join or meaning in pipeline or
 resolver code, add or update its `record_assumption()` / `record_limitation()` call
