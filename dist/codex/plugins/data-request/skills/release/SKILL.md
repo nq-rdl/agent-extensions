@@ -141,6 +141,8 @@ are not unresolved questions. Label these as current handoff evidence against th
 question status at the historical tag. Reconcile obsolete intake copies with their owner;
 do not silently update `answers.yaml` or convert engineer choices into analyst answers.
 
+An evidence item with `not_implemented: true` is not implemented by this SQL. Say so wherever the notes show it.
+
 A claim that needs a missing manifest, schema or validation result is a question, not a fact.
 Say which source is missing.
 

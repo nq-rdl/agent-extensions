@@ -139,6 +139,11 @@ If `reviews/$SLUG/review.json` exists (or `--update`):
 bash "$S/sqlreview.sh" delta "$SLUG"     # exit 0 → check review-content changes before completion below · 10 changed · 6 reviewed SQL not readable from git → full review below (retain revision history) · 2 missing SQL → stop/rebind
 ```
 
+After `sqlreview.sh move`, `delta` exits 10 in two ways. `path moved with identical bytes`: take
+*Changed SQL* below. `remap` and `carryforward` still read the old SQL from git and check its SHA,
+so unchanged items carry. Publish the new revision at the new path, then run `snapshot`.
+`requires reassessment`: the bytes changed, so reassess every item.
+
 ### Unchanged SQL: complete publication before stopping
 
 Only when the grain precheck requires no review-content change, use this exit-0
@@ -228,7 +233,8 @@ bash "$S/sqlreview.sh" impact "$SLUG"    # HINTS ONLY: identifiers from the chan
    # → {document, prior_revision, remapped: [{kind, id, from, to}], walk: [{kind, id, lines, why}]}
    bash "$S/sqlreview.sh" carryforward "$SLUG" review ".sqlreview/reviews/$SLUG/review.draft.json"
    # → {prior_revision, revision, sql_unchanged, sql_body_unchanged, carry: [{kind, id, basis, set}],
-   #    bulk: [{kind, id, text, rationale, location, why}], walk: [{kind, id, why}]}
+   #    bulk: [{kind, id, text, rationale, location, why, not_implemented?}], walk: [{kind, id, why}],
+   #    carry_question: [{kind, id, basis, lines}], reproof_failed}
    ```
 
    `remap` edits only draft ranges, never confirmations or fingerprints. Its `walk` ranges
@@ -238,13 +244,15 @@ bash "$S/sqlreview.sh" impact "$SLUG"    # HINTS ONLY: identifiers from the chan
    With no draft argument, it seeds or updates `review.draft.json` from the published record
    (scope when no review exists); set the next revision and fresh fingerprint yourself.
 
-   Copy each `carry` item's `set` fields (with `carried_basis`) onto it verbatim; do not ask
-   again. Re-run the pre-presentation lint before each `bulk`/`walk` question batch, including
-   stored and newly drafted items; reworded carried items need fresh confirmation.
-   Ask the `bulk` items once, with their `location` lines, as
-   [references/carry.rst](references/carry.rst) describes. Confirm / reword / drop the `walk` items
-   (hint-flagged first), plus any `carry` item the hunks or hints implicate indirectly, and add
-   new ones. When the human asks for a full re-walk, walk every item and publish with `--reconfirm-all`.
+   Then apply the re-walk rule in [references/carry.rst](references/carry.rst): walk only the
+   `walk` items, and ask **one** carry question for the `carry_question` items. The question lists
+   each id with its confirmed text from `carry-list`. On **Carry all**, copy each `carry` item's
+   `set` fields (with `carried_basis`) onto it verbatim, and give each `bulk` item fresh
+   `confirmed_*` from the answer. Re-run the pre-presentation lint before each `bulk`/`walk` question batch,
+   including stored and newly drafted items. Reworded carried items need fresh confirmation.
+   Confirm / reword / drop the `walk` items and any item the human names, and add new ones.
+   Do not add items to the walk by judgement: tell the human about an indirect effect in the
+   carry question. When the human asks for a full re-walk, walk every item and publish with `--reconfirm-all`.
    Seed new header items as in *Rendered header* below, `--against` the published `review.json`.
 4. Set `revision` to the previous value + 1, append to `changes[]` `{revision, at, by, summary}`.
    Then *Confirm, write, render* below.
@@ -298,14 +306,15 @@ omits; `present: false` is not evidence of no assumptions.
 
 Apply the pre-presentation lint above before each batch below, the carry-over question included (#394).
 
-The human-in-the-loop trigger (#130 §1.1). On an update, items `carryforward` listed under
-`carry` are already settled: leave them out of everything below. First, when a scope exists,
+The human-in-the-loop trigger (#130 §1.1). On an update, items settled by the one carry
+question are already settled: leave them out of everything below. First, when a scope exists,
 find what bootstrap already settled:
 
 ```bash
 bash "$S/sqlreview.sh" carryover "$SLUG" ".sqlreview/reviews/$SLUG/review.draft.json"
 # → {scope_revision, sql_unchanged, sql_body_unchanged, scope_before_sql, carry_over: [{kind, id,
-#    scope_id, basis, text, rationale, location, decided?}], carry_over_intent: [same], walk: [{kind, id, why, decided?}]}
+#    scope_id, basis, text, rationale, location, decided?}], carry_over_intent: [same], walk: [{kind, id, why, decided?}],
+#    not_implemented: [{kind, id, scope_id}]}
 ```
 
 `carry_over` and `carry_over_intent` list draft items whose list, text and rationale match a
@@ -316,6 +325,8 @@ not change) with **Carry over all (Recommended)**, `carry_over_intent` (the SQL 
 after the scope) with a delta summary and no recommended option. Every item shows its `location`.
 Copy each row's optional `decided` onto the draft item verbatim, including matched scope items
 returned under `walk`; never replace it with the new confirmer or confirmation timestamp.
+`not_implemented` names scope items marked not implemented by this SQL: they are in `walk`, and
+the review never carries them as confirmed.
 Do not invent an origin when absent.
 
 ### Named dated header decisions (#431)
@@ -330,10 +341,11 @@ bash "$S/sqlreview.sh" notes "<sql path>" \
   --against ".sqlreview/reviews/$SLUG/review.draft.json" --confirmed-by "<human handle>"
 # → header_carry_over: [{kind, id, text, rationale, location, basis:"header-decision",
 #                      decided:{by,role,at,source}, evidence:{commit,committed_at,precision,...}}]
-#   header_walk: [{kind,id,text,rationale,location,why}]
+#   header_walk: [{kind,id,text,rationale,location,why}], header_settled: [{kind,id}]
 ```
 
-Exclude items already settled by carryforward or an answered scope question. Check indirect
+Exclude items already settled by carryforward or an answered scope question. `header_settled`
+names the draft items that already hold a confirmation for this revision. `header_walk` omits them. Check indirect
 SQL effects yourself; move affected items to the walk even if their line bytes match. Ask the
 remaining `header_carry_over` as **ONE** question: **Carry over all (Recommended)** / **Walk each
 individually**. List every kind/id, text, rationale, governed `location`, `decided` and observed

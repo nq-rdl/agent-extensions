@@ -1,0 +1,3 @@
+kind: Fixed
+body: Intake reads prior SQL and build outputs before proposing on a re-run, and triage rechecks tags and pin floors
+time: 2026-11-16T00:00:04Z

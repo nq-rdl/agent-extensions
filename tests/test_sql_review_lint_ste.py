@@ -83,6 +83,24 @@ class LintSte(unittest.TestCase):
         r = self.lint(doc)
         self.assertEqual((r.returncode, r.stdout), (0, ""))
 
+    def test_provisional_wording_skips_quoted_status(self):
+        quoted = [item("A1", 'The library marks the schema as "unconfirmed".', rationale="It says `proposed` there."),
+                  item("A2", "The library marks the schema as “unconfirmed”.")]
+        r = self.lint(scope_doc(intent=SHORT, assumptions=quoted))
+        self.assertEqual((r.returncode, r.stdout), (0, ""), r.stderr)
+        bare = scope_doc(intent=SHORT, assumptions=[item("A1", 'The schema is unconfirmed and "final".')])
+        r = self.lint(bare)
+        self.assertEqual((r.returncode, r.stdout), (10, "A1\ttext\tunconfirmed\n"))
+
+    def test_bootstrap_boundary_wording_passes_both_lints(self):
+        text = "Provisional implementation only: Q7 stays open until the analyst answers it."
+        rationale = "The header choice is the engineer's boundary, not the analyst's research answer."
+        doc = scope_doc(intent=SHORT, assumptions=[item("A1", text, rationale=rationale.replace("engineer's", "engineer"))])
+        for flags in ((), ("--ste",)):
+            with self.subTest(flags=flags):
+                r = self.lint(doc, *flags)
+                self.assertEqual((r.returncode, r.stdout), (0, ""), r.stderr)
+
     def test_errors(self):
         with tempfile.TemporaryDirectory() as tmp:
             self.assertEqual(run(["lint", "--ste", f"{tmp}/nope.json"], tmp).returncode, 2)

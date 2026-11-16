@@ -1,0 +1,3 @@
+kind: Added
+body: Intake stages answers.intake.draft.json after every answered batch, so a restart asks nothing twice
+time: 2026-11-16T00:00:02Z

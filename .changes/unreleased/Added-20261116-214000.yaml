@@ -1,0 +1,3 @@
+kind: Added
+body: carryover never carries a scope item marked not implemented by this SQL
+time: 2026-11-16T03:14:00Z

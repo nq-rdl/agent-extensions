@@ -1,0 +1,3 @@
+kind: Fixed
+body: '`sqlreview.sh init` writes a `.sqlreview/.gitignore` that ignores working drafts'
+time: 2026-11-16T21:43:07Z

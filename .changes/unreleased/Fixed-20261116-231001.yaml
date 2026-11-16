@@ -1,0 +1,3 @@
+kind: Fixed
+body: '`sqlreview.sh publish` only warns for a hit in any analyst-intake field or in an open question already published'
+time: 2026-11-16T23:10:01Z

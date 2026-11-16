@@ -119,32 +119,9 @@ supplied cohort loaded at run time: see [docs/SUPPLIED_COHORTS.md](https://githu
 Scaffold v0.5.0 defaulted to query-builder v0.5.0; scaffold v0.5.3 defaults to v0.8.0, but an older render keeps its own pin, so read the actual pin. Amending or fixing an already-delivered
 enquiry is exempt: it stays on its delivered pin, with no backport. Agents never re-pin or run `copier update` unasked.
 
-Confirm the applicable rules in the current `.specify/memory/constitution.md`:
-
-- `nq-rdl/query-builder` Constitution:
-  core packages must not construct SQL with f-strings or string concatenation.
-  Its narrow exception for commented resolver SQL that PyPika cannot express does
-  not authorise raw SQL in a request pipeline.
-- `nq-rdl/data-analysis-scaffold` Constitution:
-  raw f-string SQL construction is prohibited outside template scripts.
-
-The `falls_service_cohort.py` Indigenous-status lookup in
-[#325](https://github.com/nq-rdl/agent-extensions/issues/325) illustrates the change:
-
-```python
-# Before: _build_indigenous_status_sql(...) hand-builds an SQL f-string.
-# After: compose verified library units (schematic; check pinned signatures).
-# resolver is a configured IEMRResolver instance.
-query = (
-    CohortQuery(resolver)
-    .add(EncounterIdAnchor(...))
-    .add(WithIndigenousStatus(...))
-)
-```
-
-`nq-rdl/query-builder` issue #109 tracked the active-current and display-resolution
-enhancement behind this example; it closed for the v0.6.0 release.
-The issue is a discovery pointer, not proof that a request's installed version has it.
+Do not build request SQL with f-strings or string concatenation, and do not add raw SQL to a request pipeline. Confirm the
+constitution rules that apply in the current `.specify/memory/constitution.md` of query-builder and the scaffold.
+[references/composition.rst](references/composition.rst) lists them and gives a before-and-after example.
 
 ## Record assumptions and limitations where the logic makes them
 

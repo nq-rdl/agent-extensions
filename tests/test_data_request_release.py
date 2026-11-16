@@ -659,6 +659,19 @@ class Evidence(unittest.TestCase):
         self.assertEqual([i["id"] for i in rev["limitations"]], ["L1"])
         self.assertEqual(rev["open_questions"], ["Is the diagnosis also a source?"])
 
+    def test_evidence_marks_an_item_this_sql_does_not_implement(self):
+        path = self.p.root / ".sqlreview/reviews" / SLUG / "review.json"
+        doc = json.loads(path.read_text())
+        doc["assumptions"][0]["sql_status"] = "not-implemented"
+        path.write_text(json.dumps(doc, indent=2))
+        self.p.commit("mark A1")
+        self.p.tag("v1.0.0")
+        r = self.p.evidence("v1.0.0")
+        self.assertEqual(r.returncode, 0, r.stderr)
+        _, rev = self.only(r)
+        self.assertIs(rev["assumptions"][0]["not_implemented"], True)
+        self.assertNotIn("not_implemented", rev["limitations"][0])
+
     def test_changed_sql_at_the_tag_makes_the_review_stale(self):
         self.p.write(SQL_PATH, SQL_V2)
         self.p.commit("widen criteria")

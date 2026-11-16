@@ -1,0 +1,3 @@
+kind: Fixed
+body: Hand-off keeps the PR a draft through the gate, and the human marks it ready for review
+time: 2026-11-16T09:00:06Z
