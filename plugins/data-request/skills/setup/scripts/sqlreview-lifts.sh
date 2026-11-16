@@ -97,3 +97,38 @@ cmd_lifts_stale() {
   done < <(jq -c '.lifts[]' "$ledger")
   jq -n --arg slug "$slug" --arg tag "$tag" --argjson entries "$entries" '{slug: $slug, tag: $tag, entries: $entries}'
 }
+
+_sr_typed_table_classes() { # FILE -> class names whose base list names TypedTable, wrapped lines included
+  local pat='class[[:space:]]+[A-Za-z_][A-Za-z0-9_]*[[:space:]]*\([^)]*TypedTable[^)]*\)'
+  tr '\n' ' ' < "$1" | grep -oE "$pat" | sed -E 's/^class[[:space:]]+([A-Za-z_][A-Za-z0-9_]*).*/\1/' || true
+}
+
+cmd_lifts_uncovered() { # SLUG -> request-local TypedTable classes that no ledger entry names
+  [ $# -eq 1 ] || usage
+  local slug="$1" ledger sql dir file names covered found='[]' name
+  sr_need_jq; sr_require_root; sr_safe_slug "$slug"
+  ledger="$SR_REVIEWS/$slug/lifts.json"
+  sr_no_symlinks "$ledger" || exit 2
+  [ -f "$ledger" ] || sr_die 2 "missing lift ledger for $slug"
+  cmd_check "$ledger" >/dev/null || sr_die 4 "invalid lift ledger for $slug"
+  sql="$(jq -r '.sql_path' "$ledger")"
+  dir="$(dirname -- "$SR_ROOT/$sql")"
+  names=""
+  for file in "$SR_ROOT/$sql" "$dir"/*.py; do
+    [ -f "$file" ] && [ ! -L "$file" ] || continue
+    names="$names
+$(_sr_typed_table_classes "$file")"
+  done
+  # An entry covers a class when its local_units, need, shortfall or unit symbols name it as a whole token.
+  covered="$(jq -r '[.lifts[] | ((.local_units // []) + [.need, .shortfall] + [(.units // [])[] | .symbol])
+    | map(strings) | join(" ")] | join(" ")' "$ledger")"
+  while IFS= read -r name; do
+    [ -n "$name" ] || continue
+    if ! jq -en --arg text "$covered" --arg name "$name" '$text | test("(^|[^A-Za-z0-9_])" + $name + "([^A-Za-z0-9_]|$)")' >/dev/null; then
+      found="$(printf '%s' "$found" | jq -c --arg n "$name" 'if index($n) then . else . + [$n] end')"
+    fi
+  done <<EOF2
+$names
+EOF2
+  jq -n --arg slug "$slug" --argjson found "$found" '{slug: $slug, uncovered: $found}'
+}

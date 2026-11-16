@@ -35,6 +35,21 @@ so inspect the pin as it is. Discover releases through the shared tag-list polic
 at `${CLAUDE_PLUGIN_ROOT}/skills/guardrails/references/library.rst`; a latest tag
 is a discovery aid, not evidence that the request's pin contains a unit.
 
+## Entry points
+
+Lift has two entry points. Use the earlier one whenever a gap is known.
+
+- **Gap capture** runs before draft, from map or bootstrap. A verified source fact the library
+  lacks, a request-local TypedTable, a request-local spec or a handler becomes a `candidate`
+  entry at once. Search the open library issues first and cite a match in the entry's `shortfall` text. Capture is
+  silent and needs no human question. Close-out settles the classification later.
+- **Close-out** runs after analyse and before hand-off. It confirms every candidate, files the
+  library work and records the delivery limitations.
+
+Run `sqlreview.sh lifts-uncovered SLUG` at either point. It lists request-local TypedTable
+classes that no ledger entry names. Add a candidate for each class it lists, or record a
+`local_units` name on the entry that already covers it.
+
 ## Classify-only mode
 
 Use it for a read-only run, such as a read-only subagent, or when the human asks
@@ -90,6 +105,16 @@ Never fill any confirmation field without the human's answered question.
 The entry revision, not an unrelated newly appended candidate, binds the answer.
 
 ## File and record delivery
+
+Before filing, run a consumer fit check. Read the proposed library change against the
+request's own call sites, its pinned `framework_ref` and its output columns. A change that
+does not fit the request yet is a defect to fix in the issue before merge, not after. Record
+the result as one line in the entry's `shortfall` text.
+
+Two ledger rules affect the order of work. One publish may move an entry up to two statuses,
+so a confirmed candidate can reach `filed` in a single publish when all evidence is present.
+A workaround that spans several places lists the first range in `lines` and the others in
+`extra_lines`. Add `anchor` with a CTE or marker name when line numbers will move.
 
 For confirmed library candidates, search the owning library's open and closed
 issues for equivalent work before creating anything. Reuse a matching issue after

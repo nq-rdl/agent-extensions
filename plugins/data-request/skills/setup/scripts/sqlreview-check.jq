@@ -142,6 +142,15 @@ def lift_document($rev):
        else empty end),
       (if (.workaround | type) != "object" or (.workaround.file | path_ok | not) or
           (.workaround.lines | line_range | not) then "\($id): workaround requires file and lines" else empty end),
+      (if (.workaround | type) == "object" and (.workaround | has("extra_lines")) and
+          ((.workaround.extra_lines | type) != "array" or (.workaround.extra_lines | length) == 0 or
+           (.workaround.extra_lines | all(.[]; line_range) | not))
+        then "\($id): workaround extra_lines must be a nonempty array of line ranges" else empty end),
+      (if (.workaround | type) == "object" and (.workaround | has("anchor")) and (.workaround.anchor | nonempty | not)
+        then "\($id): workaround anchor must be a nonempty string" else empty end),
+      (if has("local_units") and ((.local_units | type) != "array" or (.local_units | length) == 0 or
+          (.local_units | all(.[]; type == "string" and test("^[A-Za-z_][A-Za-z0-9_]*$")) | not))
+        then "\($id): local_units must be a nonempty array of identifiers" else empty end),
       (.classification as $c | if $c != null and (["new-capability", "existing-unit-gap", "request-specific"] | index($c)) == null then "\($id): invalid classification" else empty end),
       (.status as $s | if (["candidate", "confirmed", "filed", "released", "recomposed"] | index($s)) == null then "\($id): invalid status" else empty end),
       (if .status == "candidate" then
