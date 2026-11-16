@@ -130,6 +130,44 @@ class LedgerSqlCommitKey(unittest.TestCase):
         self.assertIn("sql_commit", r.stderr)
         self.assertFalse(self.dest.exists())
 
+    CLASH = "field evidence_revision has both sql and sql_commit (rule: use sql_commit only)"
+
+    def assert_clash_refused(self, r, *values):
+        self.assertEqual(r.returncode, 4, r.stderr)
+        self.assertIn(self.CLASH, r.stderr)
+        self.assertEqual(r.stdout, "")
+        for text in (*values, str(self.root)):
+            self.assertNotIn(text, r.stderr)
+
+    def test_a_stored_entry_with_both_keys_is_refused_on_every_read(self):
+        # A completed stage names sql. A comparison that preferred sql_commit would miss the change to sql.
+        current = self.root / "current.json"
+        current.write_text(json.dumps({"ticket": "2026-09-29", "sql": "ZZTEST-NEW"}))
+        for old in ("ZZTEST-OLD", "abc123"):
+            doc = legacy_entry()
+            doc["evidence_revision"].update(sql=old, sql_commit="abc123")
+            self.write_store(doc)
+            before = self.dest.read_bytes()
+            for args in (("check", str(self.dest)), ("get", TICKET), ("get", TICKET, "--against", str(current)),
+                         ("waivers", TICKET, "0" * 40)):
+                with self.subTest(sql=old, args=args):
+                    self.assert_clash_refused(self.run_helper(*args, ok=False), old, "ZZTEST-NEW")
+            with self.subTest(sql=old, args="set"):
+                # A write for another ticket must not carry the clashing entry forward.
+                other = "rdl-service-desk/service-desk#904"
+                self.draft.write_text(json.dumps(entry(other)))
+                self.assert_clash_refused(self.run_helper("set", other, str(self.draft), ok=False), old)
+                self.assertEqual(self.dest.read_bytes(), before)
+
+    def test_current_revisions_with_both_keys_are_refused(self):
+        current = self.root / "current.json"
+        for stored in (entry(), legacy_entry()):
+            for sql in ("ZZTEST-NEW", "abc123"):
+                with self.subTest(stored=stored["evidence_revision"], sql=sql):
+                    self.write_store(stored)
+                    current.write_text(json.dumps({"ticket": "2026-09-29", "sql": sql, "sql_commit": "abc123"}))
+                    self.assert_clash_refused(self.run_helper("get", TICKET, "--against", str(current), ok=False), sql)
+
 
 def waiver(**changes):
     doc = {"gate": "ci", "check": "unit-tests", "head_sha": "0123456789abcdef0123456789abcdef01234567",

@@ -47,7 +47,7 @@ def entry_checks:
    ["owner", (if has("owner") then (.owner | identity) else true end)],
    ["stage", (.stage | stage)],
    ["stages_done", (.stages_done | type == "array" and all(.[]; stage) and length == (unique | length))],
-   ["evidence_revision", (.evidence_revision | revisions)],
+   ["evidence_revision", (.evidence_revision | revisions and ((has("sql") and has("sql_commit")) | not))],
    ["stage_evidence", (.stage_evidence | type == "object") and
      ((.stages_done | type) == "array") and
      all(.stages_done[]; . as $stage |
@@ -85,6 +85,9 @@ def store_errors:
 # and every write saves the key as sql_commit.
 def sql_key_clash: type == "object" and (.evidence_revision | type == "object" and has("sql") and has("sql_commit"));
 def legacy_sql_key: type == "object" and (.evidence_revision | type == "object" and has("sql"));
+# A revisions object that holds both keys is ambiguous: no read may choose one of them.
+def revisions_clash: type == "object" and has("sql") and has("sql_commit");
+def store_clash: type == "object" and (.entries | type == "array" and any(.[]; sql_key_clash));
 def rename_sql_key:
   if legacy_sql_key and (sql_key_clash | not) then
     .evidence_revision |= with_entries(if .key == "sql" then .key = "sql_commit" else . end) |
@@ -95,9 +98,12 @@ def rename_sql_key:
   else . end;
 if $mode == "entry" then entry
 elif $mode == "entry-errors" then entry_errors | join(", ")
+elif $mode == "entry-clash" then sql_key_clash
+elif $mode == "store-clash" then store_clash
+elif $mode == "revisions-clash" then revisions_clash
 elif $mode == "sql-key" then (if sql_key_clash then "clash" elif legacy_sql_key then "legacy" else "ok" end)
 elif $mode == "rename-entry" then rename_sql_key
 elif $mode == "rename-store" then .entries |= map(rename_sql_key)
 elif $mode == "store-errors" then store_errors | join(", ")
-elif $mode == "revisions" then revisions
+elif $mode == "revisions" then revisions and (revisions_clash | not)
 else store end

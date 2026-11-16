@@ -6,6 +6,11 @@ ledger_check() {
   [ -f "$file" ] || sr_die 4 "ledger input is not a regular file: $file"
   # Slurp and require exactly one JSON value (jq otherwise accepts a JSON stream).
   jq -e -s 'length == 1' "$file" >/dev/null 2>&1 || sr_die 4 "invalid ledger $mode schema: not exactly one JSON value"
+  # sql and sql_commit name one SQL revision. A stored entry, draft or revisions file that holds both
+  # is refused before any comparison, so no read can prefer one key and miss a change to the other.
+  if jq -e --arg mode "$mode-clash" -f "$SR_SCRIPT_DIR/sqlreview-ledger.jq" "$file" >/dev/null 2>&1; then
+    sr_die 4 "invalid ledger $mode schema: field evidence_revision has both sql and sql_commit (rule: use sql_commit only)"
+  fi
   jq -e --arg mode "$mode" -f "$SR_SCRIPT_DIR/sqlreview-ledger.jq" "$file" >/dev/null 2>&1 && return 0
   # Name the failing fields, never their values or the file path (rule: Entry fields in triage ledger.rst).
   local fields=''
