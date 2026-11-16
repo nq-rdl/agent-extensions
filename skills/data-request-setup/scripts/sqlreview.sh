@@ -703,10 +703,12 @@ _publish_lint() { # <staged doc> <bound SQL or ""> <published doc>...
     (rows($prior) | map(join("\t"))) as $old
     | rows($new)[]
     | question as $q
+    # Bind the row id first: inside "$ids | index(...)" the input is the id array, not the row.
+    | .[0] as $id
     | (if .[2] == "decision-source" or ((. | join("\t")) as $l | $old | index([$l]) != null)
-         or ($intake | index([.[0]])) != null
-         or ((.[1] == "text" or .[1] == "rationale") and ($verbatim | index([.[0]])) != null)
-         or (.[1] == "text" and ($headertext | index([.[0]])) != null)
+         or ($intake | index([$id])) != null
+         or ((.[1] == "text" or .[1] == "rationale") and ($verbatim | index([$id])) != null)
+         or (.[1] == "text" and ($headertext | index([$id])) != null)
          or ($q != null and (($analyst | index([$q])) != null or ($asked | index([$q])) != null))
        then "warn" else "refuse" end) + "\t" + (.[0:3] | join("\t"))
   ' 2>/dev/null)" || return 2

@@ -421,6 +421,37 @@ class Publish(unittest.TestCase):
         self.assertIn("lint-warning\tA-intake-age\ttext\tsentence-length", result.stderr)
         self.assertTrue((self.final / "scope.json").is_file())
 
+    def test_publish_refuses_an_unrelated_hit_beside_an_analyst_intake_item(self):
+        doc = scope_doc("q", "q.sql")
+        doc["assumptions"].append(dict(doc["assumptions"][0], id="A-intake-age", upstream={
+            "source": "analyst-intake", "file": "answers.intake.json", "intake_id": "age", "role": "analyst"}))
+        doc["assumptions"][0]["rationale"] = self.LONG  # engineer wording on another item
+        result = self.publish(doc)
+        self.assertEqual(result.returncode, 4, result.stdout + result.stderr)
+        self.assertIn("A1\trationale\tsentence-length", result.stdout)
+        self.assertFalse((self.final / "scope.json").exists())
+
+    def test_publish_refuses_an_unrelated_hit_beside_a_verbatim_lift_item(self):
+        doc = scope_doc("q", "q.sql")
+        doc["assumptions"].append(dict(doc["assumptions"][0], id="A2", lift_id="LIFT-1"))
+        doc["assumptions"][0]["rationale"] = self.LONG  # engineer wording on another item
+        result = self.publish(doc)
+        self.assertEqual(result.returncode, 4, result.stdout + result.stderr)
+        self.assertIn("A1\trationale\tsentence-length", result.stdout)
+
+    def test_review_publish_refuses_an_unrelated_hit_beside_a_header_item(self):
+        header = "/*\nassumptions:\n  - " + self.LONG + "\n*/\n"
+        self.project.sql("q.sql", header + "select 1;\n")
+        self.project.commit()
+        fp = json.loads(self.run_helper("fingerprint", "q.sql").stdout)
+        review = review_doc("q", **fp)
+        review["assumptions"][0]["text"] = self.LONG  # library header text
+        review["limitations"][0]["text"] = self.LONG.replace("hospice", "nursing home")  # not header text
+        result = self.publish(review)
+        self.assertEqual(result.returncode, 4, result.stdout + result.stderr)
+        self.assertIn("L1\ttext\tsentence-length", result.stdout)
+        self.assertNotIn("A1\ttext", result.stdout)
+
     def test_publish_warns_for_a_hit_the_published_revision_already_had(self):
         doc = scope_doc("q", "q.sql")
         doc["intent"] = self.LONG
