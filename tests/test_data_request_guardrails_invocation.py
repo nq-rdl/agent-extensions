@@ -71,6 +71,20 @@ class OperatorHandover(unittest.TestCase):
                     self.assertIn(token, text)
             self.assertIn("never ask the operator to run a probe with the extract runner", text.lower())
 
+    def test_lookup_grid_is_allowed_only_without_counts(self):
+        for target in ("canonical", "claude", "codex"):
+            with self.subTest(target=target):
+                text = " ".join(self.reference(target).read_text().split())
+                for token in ("lookup discovery grid", "only when a verdict cannot answer the lookup question",
+                              "codes, labels and matched-term provenance only", "no count, row total, frequency",
+                              "rank by frequency", "needs a recorded ``count_exception``",
+                              "Plausibility checks stay verdict-only"):
+                    self.assertIn(token, text)
+                rel = " ".join(self.reference(target).with_name("release.rst").read_text().split())
+                for token in ("Lookup discovery grid", "holds no count, row total, frequency",
+                              "needs a recorded ``count_exception``"):
+                    self.assertIn(token, rel)
+
     def test_guardrails_and_leaves_cite_the_reference(self):
         paths = [copies(leaf) for leaf in CITING_LEAVES]
         for found in paths:

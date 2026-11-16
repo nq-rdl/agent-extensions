@@ -57,6 +57,12 @@ it overwrites the workbook and adds probe output to tracked data.
 * The operator pastes back the verdict block from item 8. The agent asks for that
   block only. If other output arrives, follow "Default and count exception" in
   ``release.rst`` and repeat none of it.
+* One other paste-back is allowed: a lookup discovery grid, only when a verdict cannot
+  answer the lookup question. It holds codes, labels and matched-term provenance only.
+  It holds no count, row total, frequency, rank by frequency or other column that comes
+  from the population. The lookup skill's disclosure controls apply. A grid with a count
+  needs a recorded ``count_exception``. Without one, stop and hand off.
+  Plausibility checks stay verdict-only.
 
 A probe proposal is not run authority. Disclosure rules for what may come back are in
 ``release.rst``, "Probe disclosure control". This page changes none of them.

@@ -191,6 +191,10 @@ before it runs.
 * **No field, no counts.** Without the field, ask the operator for the verdict
   form only. If counts arrive anyway, treat them as exact counts that reached you
   and follow the paragraph below.
+* **Lookup discovery grid.** A lookup that a verdict cannot answer may return a discovery
+  grid with codes, labels and matched-term provenance only. The grid holds no count, row
+  total, frequency, rank by frequency or other column that comes from the population.
+  A grid with a count needs a recorded ``count_exception``. Plausibility checks stay verdict-only.
 
 Probe disclosure control
 ------------------------
