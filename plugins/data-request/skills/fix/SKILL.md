@@ -83,10 +83,11 @@ put the decision and its reason in the pull request.
 
 The existing `.sqlreview/` review is stale in meaning: its purpose, grain, outputs,
 assumptions and limitations describe the old logic, even where a fingerprint still matches.
-Before the first release, re-run `/data-request:analyse` on each changed SQL file with a
-full re-walk: walk every item and publish with `--reconfirm-all`. Carry-forward would
-otherwise keep items whose SQL lines did not change, although their meaning did. A passing
-local check or `/data-request:validate` does not replace it.
+Before the first release, hand the re-check to `/data-request:analyse` and `/data-request:bootstrap`.
+They walk only the items that the diff touches. Then they ask one carry question that lists every other
+item with its confirmed text. Do not tell the engineer to re-confirm every item. The carry rules are in
+`${CLAUDE_PLUGIN_ROOT}/skills/analyse/references/carry.rst`. A passing local check or
+`/data-request:validate` does not replace this re-check.
 
 ## Identifier and export defects
 

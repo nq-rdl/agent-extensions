@@ -135,18 +135,19 @@ class FixOwnsPreReleaseChanges(unittest.TestCase):
                 text = flat(section(frontmatter(path)[1], "## Pre-release logic change"))
                 self.assertIn("Do not add an `AMD-` entry to `specs/amendments.md`", text)
 
-    def test_review_is_stale_and_analyse_re_walks_every_item(self):
+    def test_review_is_stale_and_analyse_walks_only_touched_items(self):
         for target, path in FIX.items():
             with self.subTest(target=target):
                 text = flat(section(frontmatter(path)[1], "## Pre-release logic change"))
                 self.assertIn("`.sqlreview/` review is stale in meaning", text)
                 self.assertIn("even where a fingerprint still matches", text)
-                self.assertIn("re-run `/data-request:analyse` on each changed SQL file with a "
-                              "full re-walk", text)
-                # analyse's carry-forward keeps unchanged-line items unless every item is re-walked.
-                self.assertIn("`--reconfirm-all`", text)
-                self.assertIn("Carry-forward would otherwise keep items", text)
-                self.assertIn("does not replace it", text)
+                self.assertIn("hand the re-check to `/data-request:analyse` and `/data-request:bootstrap`", text)
+                self.assertIn("walk only the items that the diff touches", text)
+                self.assertIn("one carry question that lists every other item with its confirmed text", text)
+                self.assertIn("skills/analyse/references/carry.rst", text)
+                self.assertNotIn("--reconfirm-all", text)
+                self.assertNotIn("full re-walk", text)
+                self.assertIn("does not replace this re-check", text)
 
 
 class AmendSupportsPreReleasePresentation(unittest.TestCase):
