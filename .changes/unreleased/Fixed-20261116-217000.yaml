@@ -1,0 +1,3 @@
+kind: Fixed
+body: sqlreview move leaves no rendered report behind when the moved SQL bytes changed
+time: 2026-11-16T03:17:00Z

@@ -93,6 +93,12 @@ class Check(unittest.TestCase):
         self.assert_ok(review_doc(revision=3, assumptions=[item("A1", "x", 2, carried_from_revision=2)]))
         self.assert_ok(scope_doc(revision=2, assumptions=[item("A1", "x", 1, carried_from_revision=1)]))
 
+    def test_sql_status_accepts_only_not_implemented(self):
+        self.assert_ok(review_doc(assumptions=[item("A1", "x", 1, sql_status="not-implemented")]))
+        for bad in ("not_implemented", "", None, True):
+            with self.subTest(bad=bad):
+                self.assert_violation(review_doc(assumptions=[item("A1", "x", 1, sql_status=bad)]), "sql_status")
+
     def test_accepts_a_fresh_item_with_null_carried_from(self):
         self.assert_ok(review_doc(revision=2, assumptions=[item("A1", "x", 2, carried_from_revision=None)]))
 
@@ -326,6 +332,17 @@ class ScopePublish(Base):
                                    limitations=[fresh(l1, 2)]), expected=6)
         self.assertIn("full SHA mismatch", r.stderr)
 
+    def test_a_first_binding_is_flagged_for_a_check_against_the_sql(self):
+        # The scope was confirmed before the SQL existed. Its intent items still carry, but the flag tells
+        # the skill to read the SQL against each carried item before it accepts the carry.
+        self.sql.unlink()
+        a1 = item("A1", "Only completed stays", 1, rationale="Open stays lack a discharge date.")
+        self.publish(self.scope(1, sql=None, assumptions=[a1]))
+        self.sql = self.p.sql("q.sql", SQL_V1)
+        out = self.carryforward("scope", self.scope(2, assumptions=[dict(a1, status="candidate")]))
+        self.assertTrue(out["first_binding"])
+        self.assertEqual([(c["id"], c["basis"]) for c in out["carry"]], [("A1", "intent-unchanged")])
+
     def test_scope_written_before_the_sql_carries_null_location_items(self):
         self.sql.unlink()
         a1 = item("A1", "Only completed stays", 1, rationale="Open stays lack a discharge date.")
@@ -409,6 +426,140 @@ class CarryForwardHelper(Base):
         self.assertIsNone(out["prior_revision"])
         self.assertEqual(out["carry"], [])
         self.assertEqual([w["id"] for w in out["walk"]], ["A1"])
+
+    def test_walked_and_bulk_rows_name_the_carried_fields_to_clear(self):
+        # A row carried in an earlier pass keeps carried_* fields in the draft. When the row is walked
+        # instead, those fields must go, or check and publish refuse the fresh confirmation.
+        self.sql.write_text(GOVERNED_EDIT)
+        a1, a2 = self.v1["assumptions"]
+        l1, = self.v1["limitations"]
+        draft = review_doc("q", "q.sql", revision=2, sql_sha256=sha(GOVERNED_EDIT),
+                           assumptions=[carried(a1, 2, carried_basis="sql-unchanged"),
+                                        carried(a2, 2, carried_basis="lines-unchanged")],
+                           limitations=[self.candidate(l1)])
+        out = self.carryforward("review", draft)
+        walk = {w["id"]: w for w in out["walk"]}
+        bulk = {b["id"]: b for b in out["bulk"]}
+        self.assertEqual(walk["A2"]["clear"], ["carried_basis", "carried_from_revision"])
+        self.assertEqual(bulk["A1"]["clear"], ["carried_basis", "carried_from_revision"])
+        self.assertEqual(out["carry"][0]["id"], "L1")
+        self.assertNotIn("clear", out["carry"][0])
+        self.assertFalse(out["first_binding"])
+        r = run(["carry-list", "q", "carryforward", str(self.draft)], self.p.root)
+        self.assertEqual(r.returncode, 0, r.stdout + r.stderr)
+        listed = json.loads(r.stdout)["lists"]
+        self.assertEqual([(l["list"], [i["id"] for i in l["items"]]) for l in listed], [("carry_question", ["A1", "L1"])])
+        self.assertIn("- Text: Only completed stays", (self.d / "carry-list.md").read_text())
+
+    def test_a_change_that_touches_two_items_walks_two_and_asks_one_carry_question(self):
+        # Decided re-walk rule: walk only what the diff touches, then one carry question for all the rest.
+        items = dict(
+            assumptions=[item("A1", "Stays come from the admissions table", rationale="Source.", location={"lines": [2, 2]}),
+                         item("A2", "Discharge date marks completion", rationale="Ward convention.", location={"lines": [3, 3]}),
+                         item("A3", "Months come from the stay", rationale="Grain.", location={"lines": [5, 5]}),
+                         item("A4", "Only completed stays", rationale="Whole query.")],
+            limitations=[item("L1", "One source table", rationale="Scope.", location={"lines": [6, 6]}),
+                         item("L2", "Monthly grain only", rationale="No daily data.", location={"lines": [7, 7]})])
+        (self.d / "review.json").unlink()
+        self.publish(review_doc("q", "q.sql", revision=1, sql_sha256=sha(SQL_V1), **items))
+        two = SQL_V1.replace("adm.stays", "adm.stays_v2").replace("IS NOT NULL", "IS NOT NULL AND ward <> 'X'")
+        self.sql.write_text(two)
+        draft = review_doc("q", "q.sql", revision=2, sql_sha256=sha(two),
+                           **{k: [self.candidate(i) for i in v] for k, v in items.items()})
+        out = self.carryforward("review", draft)
+        self.assertEqual(sorted(w["id"] for w in out["walk"]), ["A1", "A2"])
+        question = {q["id"]: q for q in out["carry_question"]}
+        self.assertEqual(sorted(question), ["A3", "A4", "L1", "L2"])
+        self.assertEqual(question["A3"]["basis"], "lines-unchanged")
+        self.assertIsNone(question["A4"]["basis"])  # a whole-SQL item: the answer is a fresh confirmation
+        r = run(["carry-list", "q", "carryforward", str(self.draft)], self.p.root)
+        self.assertEqual(r.returncode, 0, r.stdout + r.stderr)
+        self.assertEqual([(l["list"], l["count"]) for l in json.loads(r.stdout)["lists"]], [("carry_question", 4)])
+        text = (self.d / "carry-list.md").read_text()
+        for needle in ("### A3 (assumptions)", "- Text: Months come from the stay", "- Text: Only completed stays",
+                       "- Text: Monthly grain only"):
+            self.assertIn(needle, text)
+        self.assertNotIn("### A1", text)
+        # "Carry all": carried rows copy their set fields, the whole-SQL item gets the answer's confirmation.
+        carry = {(c["kind"], c["id"]): c["set"] for c in out["carry"]}
+        doc = json.loads(json.dumps(draft))
+        for k in ("assumptions", "limitations"):
+            for it in doc[k]:
+                it.update(carry.get((k, it["id"]), {"status": "confirmed", "confirmed_by": "engineer-login",
+                                                    "confirmed_at": "2026-09-23T00:00:00Z", "confirmed_revision": 2}))
+        self.publish(doc)
+
+    def test_the_carry_question_shows_the_not_implemented_mark(self):
+        # "Carry all" keeps the mark, so the human must see it beside the item before the answer.
+        v1 = items_v1()
+        v1["limitations"][0]["sql_status"] = "not-implemented"
+        (self.d / "review.json").unlink()
+        self.publish(review_doc("q", "q.sql", revision=1, sql_sha256=sha(SQL_V1), **v1))
+        a1, a2 = v1["assumptions"]
+        l1, = v1["limitations"]
+        draft = review_doc("q", "q.sql", revision=2, sql_sha256=sha(SQL_V1),
+                           assumptions=[self.candidate(a1), self.candidate(a2)],
+                           limitations=[self.candidate(l1, sql_status="not-implemented")])
+        out = self.carryforward("review", draft)
+        question = {q["id"]: q for q in out["carry_question"]}
+        self.assertEqual(sorted(question), ["A1", "A2", "L1"])
+        self.assertIs(question["L1"]["not_implemented"], True)
+        self.assertNotIn("not_implemented", question["A2"])
+        # A bulk row shows its text too: after a body change, A1 (no location) is bulk.
+        self.sql.write_text(GOVERNED_EDIT)
+        bulk_draft = json.loads(json.dumps(draft))
+        bulk_draft["sql_sha256"] = sha(GOVERNED_EDIT)
+        bulk_draft["assumptions"][0]["sql_status"] = "not-implemented"
+        v1["assumptions"][0]["sql_status"] = "not-implemented"
+        (self.d / "review.json").unlink()
+        self.sql.write_text(SQL_V1)
+        self.publish(review_doc("q", "q.sql", revision=1, sql_sha256=sha(SQL_V1), **v1))
+        self.sql.write_text(GOVERNED_EDIT)
+        bulk = {b["id"]: b for b in self.carryforward("review", bulk_draft)["bulk"]}
+        self.assertIs(bulk["A1"]["not_implemented"], True)
+        self.sql.write_text(SQL_V1)
+        (self.d / "review.json").unlink()
+        v1["assumptions"][0].pop("sql_status")
+        self.publish(review_doc("q", "q.sql", revision=1, sql_sha256=sha(SQL_V1), **v1))
+        r = run(["carry-list", "q", "carryforward", str(self.draft)], self.p.root)
+        self.assertEqual(r.returncode, 0, r.stdout + r.stderr)
+        items = {i["id"]: i for l in json.loads(r.stdout)["lists"] for i in l["items"]}
+        self.assertIs(items["L1"]["not_implemented"], True)
+        self.assertNotIn("not_implemented", items["A2"])
+        text = (self.d / "carry-list.md").read_text()
+        mark = "- SQL status: not implemented by this SQL"
+        l1_section = text.split("### L1 (limitations)")[1]
+        self.assertIn(mark, l1_section)
+        self.assertEqual(text.count(mark), 1)
+
+    def test_a_failed_re_proof_makes_every_item_touched(self):
+        self.edit_prior_sha()
+        r = self.carryforward("review", self.draft_doc(SQL_V1, by=0), expected=6)
+        self.assertIn("full SHA mismatch", r.stderr)
+        out = json.loads(r.stdout)
+        self.assertTrue(out["reproof_failed"])
+        self.assertEqual((out["carry"], out["bulk"], out["carry_question"]), ([], [], []))
+        self.assertEqual(sorted(w["id"] for w in out["walk"]), ["A1", "A2", "A3", "L1"])
+        self.assertIn("cannot be re-proved", out["walk"][0]["why"])
+
+    def test_a_range_that_cannot_be_relocated_is_touched(self):
+        # The draft range still points at equal bytes, but the diff does not map the old range there.
+        text = "SELECT 1;\nSELECT 2;\nSELECT 3;\nSELECT 2;\n"
+        (self.d / "review.json").unlink()
+        a1 = item("A1", "Second select", location={"lines": [2, 2]})
+        self.sql.write_text(text)
+        self.publish(review_doc("q", "q.sql", revision=1, sql_sha256=sha(text), assumptions=[a1], limitations=[]))
+        moved = "SELECT 0;\n" + text  # the diff maps line 2 to line 3; line 5 holds a copy
+        self.sql.write_text(moved)
+        out = self.carryforward("review", review_doc("q", "q.sql", revision=2, sql_sha256=sha(moved),
+                                                     assumptions=[self.candidate(a1, location={"lines": [5, 5]})],
+                                                     limitations=[]))
+        self.assertEqual([w["id"] for w in out["walk"]], ["A1"])
+
+    def edit_prior_sha(self):
+        prior = json.loads((self.d / "review.json").read_text())
+        prior["sql_sha256"] = "0" * 64
+        (self.d / "review.json").write_text(json.dumps(prior))
 
     def test_errors(self):
         self.assertEqual(run(["carryforward", "q", "review"], self.p.root).returncode, 1)

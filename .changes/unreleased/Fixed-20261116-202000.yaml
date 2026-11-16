@@ -1,0 +1,3 @@
+kind: Fixed
+body: remap aligns a range across repeated GO separators when its governed text occurs once in each SQL version
+time: 2026-11-16T02:02:00Z

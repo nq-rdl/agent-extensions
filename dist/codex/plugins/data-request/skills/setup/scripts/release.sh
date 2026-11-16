@@ -355,7 +355,8 @@ rl_review_row() ( # <slug> <commit>
     return 0
   }
   jq -c --argjson question_doc "$question_doc" --arg slug "$slug" --arg applies "$applies" --arg at "$at" --arg body_at "$body_at" --arg body_note "$body_note" --argjson inref "$inref" --argjson others "$others" '
-    def items: [(. // [])[] | {id, text, rationale, confirmed_revision}];
+    def items: [(. // [])[] | {id, text, rationale, confirmed_revision}
+      + (if .sql_status == "not-implemented" then {not_implemented: true} else {} end)];
     {slug: $slug, kind, sql_path, revision, applies: $applies,
      sql_sha256_reviewed: .sql_sha256, sql_sha256_at_ref: (if $at == "" then null else $at end),
      sql_body_sha256_reviewed: (.sql_body_sha256 // null), sql_body_sha256_at_ref: (if $body_at == "" then null else $body_at end),

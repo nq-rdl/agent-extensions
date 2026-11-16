@@ -249,13 +249,17 @@ bash "$S/sqlreview.sh" criteria ".sqlreview/reviews/$SLUG/scope.draft.json"
 ```
 
 Fix each finding and run it again. Publish runs the same check and refuses with exit 4. On the update
-path, `carryforward` lists each unchanged row as `criteria_status` with basis `criteria-unchanged`:
-copy its `set` fields and keep its confirmation. A changed row, a new criterion and a row that gains
+path, `carryforward` lists each unchanged row as `criteria_status` with basis `criteria-unchanged`
+(or `criteria-lines-unchanged` after a body change): copy its `set` fields and keep its confirmation. A changed row, a new criterion and a row that gains
 or loses `upstream` are confirmed afresh. A row also needs a fresh confirmation when the analyst reworded
 or re-confirmed its criterion in `answers.intake.json` after the previous scope was recorded. `carryforward`
-walks that row with a rescope note, and `status` names this bootstrap step. A row carries only when the SQL body is unchanged. After
-any SQL body change, `carryforward` puts every row in `walk`. Ask the engineer to confirm or change
-each state, one row at a time, never in bulk. Publish refuses a row that claims a carry.
+walks that row with a rescope note, and `status` names this bootstrap step.
+
+Give each row a `location`: the SQL lines that apply the criterion, or `null` when no single range applies it. Rows follow
+the re-walk rule (decided by the Data Engineer). After a SQL body change, `carryforward` walks only the rows that the change touches.
+A located row whose lines the diff re-locates unchanged carries with `criteria-lines-unchanged`. A row with no location goes into
+the one carry question as a fresh confirmation. A marker-only or other change still puts every untouched row in that question,
+never in a skip. Ask each walked row on its own. Publish refuses a row that claims a carry it cannot prove.
 
 ## Existing scope → update path (#127 §2)
 
@@ -291,8 +295,13 @@ requires reassessment.
    bash "$S/sqlreview.sh" remap "$SLUG" ".sqlreview/reviews/$SLUG/scope.draft.json"
    # → {document, prior_revision, remapped: [{kind, id, from, to}], walk: [{kind, id, lines, why}]}
    bash "$S/sqlreview.sh" carryforward "$SLUG" scope ".sqlreview/reviews/$SLUG/scope.draft.json"
-   # → {prior_revision, revision, sql_unchanged, carry: [{kind, id, basis, set}], walk: [{kind, id, why}]}
+   # → {prior_revision, revision, sql_unchanged, carry: [{kind, id, basis, set}], walk: [{kind, id, why}], bulk, carry_question, first_binding, reproof_failed}
+   bash "$S/sqlreview.sh" carry-list "$SLUG" carryforward ".sqlreview/reviews/$SLUG/scope.draft.json"
    ```
+
+   After `sqlreview.sh move` with identical bytes, `delta` exits 10 with `path moved with identical bytes`. `remap` and
+   `carryforward` still compare with the recorded commit, so unchanged items carry. Publish the new revision at the
+   new path. `requires reassessment` means the bytes changed.
 
    Remap changes only draft ranges, never confirmations, revisions or fingerprints. Its `walk`
    ranges (changed, split by an insertion, or ambiguous repeated text) stay untouched; reassess
@@ -300,13 +309,31 @@ requires reassessment.
    is safe to retry. The explicit draft must be directly inside this slug's review directory,
    not a published JSON.
 
-   Copy each `carry` item's `set` fields onto it verbatim; it keeps the confirmation a human gave
-   at `confirmed_revision` and is not asked again. Re-run the pre-presentation lint before each `walk` batch,
-   including new items; reworded carried items need fresh confirmation. Walk **only** the `walk` items
-   (confirm / reword / drop, showing text and rationale, with `why`), plus any `carry` item the SQL diff or framing
-   change still implicates, and ask for new ones. When the engineer asks for a full re-walk, walk
-   every item and publish with `--reconfirm-all`. Never set `carried_from_revision` by hand.
+   Apply the re-walk rule in `${CLAUDE_PLUGIN_ROOT}/skills/analyse/references/carry.rst`. Walk **only** the `walk` items and
+   rows and the items the engineer names (confirm / reword / drop, with text, rationale and `why`), and ask for new ones.
+   Ask **one** carry question for every `carry_question` item and row, with each id and its confirmed text from `carry-list`.
+   For an item with `not_implemented: true`, the question shows "not implemented by this SQL" beside that item.
+   On **Carry all**, copy each `carry` item's `set` fields verbatim and give each `bulk` item fresh `confirmed_*`. Remove
+   the `clear` fields of each walked row. When `first_binding` is true, read the SQL against each carried item. Re-run the
+   pre-presentation lint before each `walk` batch. Reworded carried items need fresh confirmation. Tell the engineer about
+   a framing change that may affect a listed item in the carry question. Do not add it to the walk by judgement. When the
+   engineer asks for a full re-walk, walk every item and publish with `--reconfirm-all`. Never set `carried_from_revision` by hand.
 4. Continue at *Write* with `revision` incremented.
+
+## Walk questions
+
+Each confirmation question in the interview and in a walk follows these rules.
+- Ask about one item or one change per question. Lead with the action. Define each id when the question first names
+  it, for example `A3 (assumption)`. Show the stored `text` and `rationale` verbatim. Never shorten them. Give a long
+  item its own question. Each option says what gets recorded, for example **Confirm: record A3 as written**.
+- An option that shows the exact new text counts as the re-ask of a reworded item. For an output-shape decision, show
+  one example row. Never use a multi-select question to collect confirmations. `[No preference]` or no answer
+  confirms nothing. Before a carry question, run `carry-list`, as `${CLAUDE_PLUGIN_ROOT}/skills/analyse/references/carry.rst` says.
+
+Set each item's `location` to the governed SQL lines it describes, never to the header comment lines that `notes`
+reports. An item that governs the whole SQL has `location: null`. When this SQL does not implement an imported intake
+item, confirm that with the engineer and set `sql_status: "not-implemented"` on the item. The review then never
+carries it as confirmed.
 
 ## Fresh scope → interview
 

@@ -105,6 +105,13 @@ directory identifies them. ``materialize``, ``delta`` and carry-forward read a
 revision from its history entry when one exists, so every recorded revision
 stays readable from git after any number of moves.
 
+``move`` compares the file at the new path with each recorded ``sql_sha256``.
+Identical bytes write ``sql-identical`` to the ``rebind-required`` marker.
+``delta``, ``impact``, ``remap`` and carry-forward then still compare, and
+unchanged items carry. Changed or missing bytes write ``sql-changed``, which
+blocks comparison until the review is reassessed. An older empty marker counts
+as changed. ``move`` re-renders the markdown files that it removes.
+
 Legacy records with a clean immutable commit and a full hash work unchanged.
 Records with a dirty or null commit report ``no-baseline`` and need
 reassessment. Existing SQL copies under ``.sqlreview/`` are removed by the

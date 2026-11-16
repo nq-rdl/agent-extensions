@@ -1,0 +1,3 @@
+kind: Added
+body: A criteria_status row may record its SQL lines, so a SQL body change walks only the rows it touches
+time: 2026-11-16T03:11:00Z

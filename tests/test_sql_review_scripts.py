@@ -425,7 +425,8 @@ class Move(unittest.TestCase):
             for name in ("review.json", "scope.json"):
                 j = json.loads((d / name).read_text())
                 self.assertEqual((j["sql_path"], j["slug"]), ("archive/monthly.sql", "archive__monthly"))
-            self.assertEqual(run(["delta", "archive__monthly"], p.root).returncode, 10)
+            # The fixture record has no clean commit, so the moved binding cannot be read from git (6).
+            self.assertEqual(run(["delta", "archive__monthly"], p.root).returncode, 6)
             self.assertEqual(run(["move", "nope.sql", "x.sql"], p.root).returncode, 2)
             self.assertEqual(list((p.root / ".sqlreview").rglob("*.sql")), [])  # #505: no SQL copies in the store
 
