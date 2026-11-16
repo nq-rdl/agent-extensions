@@ -317,6 +317,7 @@ requires reassessment.
    Apply the re-walk rule in `${PLUGIN_ROOT}/skills/analyse/references/carry.rst`. Walk **only** the `walk` items and
    rows and the items the engineer names (confirm / reword / drop, with text, rationale and `why`), and ask for new ones.
    Ask **one** carry question for every `carry_question` item and row, with each id and its confirmed text from `carry-list`.
+   For an item with `not_implemented: true`, the question shows "not implemented by this SQL" beside that item.
    On **Carry all**, copy each `carry` item's `set` fields verbatim and give each `bulk` item fresh `confirmed_*`. Remove
    the `clear` fields of each walked row. When `first_binding` is true, read the SQL against each carried item. Re-run the
    pre-presentation lint before each `walk` batch. Reworded carried items need fresh confirmation. Tell the engineer about

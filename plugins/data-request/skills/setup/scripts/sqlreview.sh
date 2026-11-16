@@ -1650,11 +1650,12 @@ cmd_carryforward() (
        walk: [$rows[] | select(.basis == null and (.bulk | not)) | {kind, id, why} + cleared(.)],
        # The decided re-walk rule: every item the change does not touch goes into ONE carry question. A carry row
        # keeps its set fields on "carry all"; a bulk row (basis null) gets a fresh confirmation from that answer.
+       # "Carry all" keeps a not-implemented mark, so the question must show it beside the item.
        carry_question: [$rows[] | select(.basis != null or .bulk)
-         | . as $r | {kind, id, basis,
-             lines: ([($d[$r.kind] // []) | if type == "array" then .[] else empty end
-                      | select(type == "object" and (if $r.kind == "criteria_status" then .criterion else .id end) == $r.id)][0]
-                     | .location.lines? // null)}]}' --arg document "$kind" || exit $?
+         | . as $r | ([($d[$r.kind] // []) | if type == "array" then .[] else empty end
+                      | select(type == "object" and (if $r.kind == "criteria_status" then .criterion else .id end) == $r.id)][0]) as $i
+         | {kind, id, basis, lines: ($i.location.lines? // null)}
+           + (if $r.kind != "criteria_status" and $i.sql_status? == "not-implemented" then {not_implemented: true} else {} end)]}' --arg document "$kind" || exit $?
   # Exit 6 keeps the contract that unproved evidence is unavailable. The JSON above still lists every item
   # in walk, because a failed re-proof touches every item.
   [ "$CF_REPROOF_FAILED" = false ] || return 6
@@ -1697,12 +1698,14 @@ cmd_carry_list() (
                  rationale: null, location: ($row.location // null)}
         else ([($d[.kind] // [])[] | select(type == "object" and .id == $r.id)][0] // {}) as $item
           | . + {text: ($item.text // .text), rationale: ($item.rationale // .rationale),
-                 location: ($item.location // .location // null), decided: ($item.decided // .decided // null)}
+                 location: ($item.location // .location // null), decided: ($item.decided // .decided // null),
+                 not_implemented: (.not_implemented // false)}
         end;
     def lists: if $mode == "carryover" then [["carry_over", .carry_over], ["carry_over_intent", .carry_over_intent]]
       else [["carry_question", [.carry_question[] | from_draft]]] end;
     def where: if (.location | type) == "object" and (.location.lines | type) == "array"
       then "lines \(.location.lines[0])-\(.location.lines[1])" else "the whole SQL (no location)" end;
+    def sql_status: if .not_implemented == true then ["- SQL status: not implemented by this SQL"] else [] end;
     def decided: if (.decided | type) == "object"
       then ["- Decided: \(.decided.by // "unknown") (\(.decided.role // "unknown"), \(.decided.at // "no date")), source \(.decided.source // "none")"]
       else [] end;
@@ -1712,14 +1715,15 @@ cmd_carry_list() (
     + [lists[] | .[0] as $name | (.[1] // []) as $items
        | "## \($name): \($items | length) items", "",
          ($items[] | (["### \(.id) (\(.kind))", "", "- Basis: \(.basis // "none: the SQL changed under the item, so the answer is a fresh confirmation")",
-           "- Location: \(where)"] + decided + ["- Text: \(.text)", "- Rationale: \(.rationale // "none")", ""])[])
+           "- Location: \(where)"] + sql_status + decided + ["- Text: \(.text)", "- Rationale: \(.rationale // "none")", ""])[])
       ] | .[]' > "$tmp" 2>/dev/null || sr_die 4 "carry-list cannot render the rows: check the draft with sqlreview.sh check"
   mv "$tmp" "$dest" || sr_die 2 "cannot write carry-list.md"
   printf '%s\n' "$rows" | jq --arg file "${dest#"$SR_ROOT"/}" --arg mode "$mode" '
     (if $mode == "carryover" then [["carry_over", .carry_over], ["carry_over_intent", .carry_over_intent]]
      else [["carry_question", .carry_question]] end) as $lists
     | {file: $file, lists: [$lists[] | {list: .[0], count: (.[1] // [] | length),
-        items: [(.[1] // [])[] | {kind, id, basis: (.basis // null), lines: (.location.lines? // .lines // null)}]}]}'
+        items: [(.[1] // [])[] | {kind, id, basis: (.basis // null), lines: (.location.lines? // .lines // null)}
+                 + (if .not_implemented == true then {not_implemented: true} else {} end)]}]}'
 )
 
 # Draft range plumbing only: diff authentic baseline bytes against frozen current SQL.

@@ -234,7 +234,8 @@ class SkillContract(unittest.TestCase):
             "carry-list", "more than four items", "``clear`` fields", "``first_binding`` is true",
             "``header_settled``", "Delete the file after the answer",
             "decided by the Data Engineer", "``carry_question``", "**Carry all** / **Name the items to re-walk**",
-            "Do not add items to the walk by your own judgement", "``reproof_failed``", "not-implemented"))
+            "Do not add items to the walk by your own judgement", "``reproof_failed``", "not-implemented",
+            "For an item with ``not_implemented: true``, the question shows \"not implemented by this SQL\""))
 
     def test_analyse_names_the_two_move_outcomes(self):
         self.assert_tokens("data-request-analyse", "analyse", "SKILL.md", (
@@ -246,7 +247,8 @@ class SkillContract(unittest.TestCase):
             "Each option says what gets recorded", "exact new text counts as the re-ask",
             "never to the header comment lines", "path moved with identical bytes", "`clear` fields",
             "walks only the rows that the change touches", "`criteria-lines-unchanged`",
-            "`sql_status: \"not-implemented\"`", "Ask **one** carry question"))
+            "`sql_status: \"not-implemented\"`", "Ask **one** carry question",
+            "For an item with `not_implemented: true`, the question shows \"not implemented by this SQL\""))
 
 
 if __name__ == "__main__":

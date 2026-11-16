@@ -52,8 +52,9 @@ the walk by your own judgement.
 
 Run ``carry-list "$SLUG" carryforward <draft>`` before you ask. The one question lists each
 item's id and its confirmed text, copied verbatim from ``carry-list.md``. Ids alone are not
-enough. Options: **Carry all** / **Name the items to re-walk**. Do not mark either option
-recommended. When the impact hints or your reading show an indirect effect on a listed item,
+enough. For an item with ``not_implemented: true``, the question shows "not implemented by
+this SQL" beside that item. **Carry all** keeps that mark. Options: **Carry all** / **Name the
+items to re-walk**. Do not mark either option recommended. When the impact hints or your reading show an indirect effect on a listed item,
 say so in the question. The human decides whether to re-walk it.
 
 On **Carry all**, copy each ``carry`` row's ``set`` onto the item verbatim, ``carried_basis``

@@ -489,6 +489,33 @@ class CarryForwardHelper(Base):
                                                     "confirmed_at": "2026-09-23T00:00:00Z", "confirmed_revision": 2}))
         self.publish(doc)
 
+    def test_the_carry_question_shows_the_not_implemented_mark(self):
+        # "Carry all" keeps the mark, so the human must see it beside the item before the answer.
+        v1 = items_v1()
+        v1["limitations"][0]["sql_status"] = "not-implemented"
+        (self.d / "review.json").unlink()
+        self.publish(review_doc("q", "q.sql", revision=1, sql_sha256=sha(SQL_V1), **v1))
+        a1, a2 = v1["assumptions"]
+        l1, = v1["limitations"]
+        draft = review_doc("q", "q.sql", revision=2, sql_sha256=sha(SQL_V1),
+                           assumptions=[self.candidate(a1), self.candidate(a2)],
+                           limitations=[self.candidate(l1, sql_status="not-implemented")])
+        out = self.carryforward("review", draft)
+        question = {q["id"]: q for q in out["carry_question"]}
+        self.assertEqual(sorted(question), ["A1", "A2", "L1"])
+        self.assertIs(question["L1"]["not_implemented"], True)
+        self.assertNotIn("not_implemented", question["A2"])
+        r = run(["carry-list", "q", "carryforward", str(self.draft)], self.p.root)
+        self.assertEqual(r.returncode, 0, r.stdout + r.stderr)
+        items = {i["id"]: i for l in json.loads(r.stdout)["lists"] for i in l["items"]}
+        self.assertIs(items["L1"]["not_implemented"], True)
+        self.assertNotIn("not_implemented", items["A2"])
+        text = (self.d / "carry-list.md").read_text()
+        mark = "- SQL status: not implemented by this SQL"
+        l1_section = text.split("### L1 (limitations)")[1]
+        self.assertIn(mark, l1_section)
+        self.assertEqual(text.count(mark), 1)
+
     def test_a_failed_re_proof_makes_every_item_touched(self):
         self.edit_prior_sha()
         r = self.carryforward("review", self.draft_doc(SQL_V1, by=0), expected=6)
