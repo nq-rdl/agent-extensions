@@ -6,8 +6,12 @@
 # of date, #514). Each handed-off amendment part, each amendment record that fails its checks and each
 # ledger amendment whose record is missing adds one line too. Runs `sqlreview.sh status --json` from the
 # event's cwd. Advisory only: any failure (no helper, no cwd, no jq) is a silent
-# no-op, and an uninitialised project only gets a hint when it actually contains SQL files. When status
-# runs past its budget (SQLREVIEW_PREFLIGHT_BUDGET seconds, default 4), one line says so.
+# no-op, and an uninitialised project only gets a hint when it actually contains SQL files or a .sqlreview/
+# that holds no config.json (a triage ledger saved before setup). When status runs past its budget
+# (SQLREVIEW_PREFLIGHT_BUDGET seconds, default 4), one line says so.
+# A last line names the loaded plugin build (`sqlreview.sh version`: version and content digest), so a session
+# can prove which build it runs. With DATA_REQUEST_EXPECT_BUILD set (a digest prefix of 12 to 64 hex
+# characters), that line warns when the build differs, and it prints even when nothing else does.
 set -u
 input="$(cat 2>/dev/null)" || exit 0
 field() {
@@ -46,7 +50,8 @@ out="$(mktemp 2>/dev/null)" || exit 0
 trap 'rm -f "$out" "$out.timeout"' EXIT
 (cd "$cwd" || exit 1
   set -m
-  bash "$helper" status --json >"$out" 2>/dev/null </dev/null & pid=$!
+  # The hook checks the expected build itself (below), so status does not compute the digest a second time.
+  DATA_REQUEST_EXPECT_BUILD="" bash "$helper" status --json >"$out" 2>/dev/null </dev/null & pid=$!
   set +m
   # The watchdog stops its own sleep when stopped, so no process outlives the hook.
   ( s=""; trap 'kill "$s" 2>/dev/null; exit 0' TERM
@@ -69,9 +74,22 @@ ctx=""
 if [ "$rc" -eq 124 ]; then
   ctx="SQL Review: status did not finish in the $budget-second session-start budget, so this summary is not available. Run sqlreview.sh status to see each review and its next command."
 elif [ "$rc" -eq 3 ]; then
-  has_sql="$(cd "$cwd" && { git ls-files -- '*.sql' '**/*.sql' 2>/dev/null; find . -name .git -prune -o -type f -name '*.sql' -print 2>/dev/null; } | head -1)"
-  [ -n "$has_sql" ] || exit 0
-  ctx="SQL Review: this project contains SQL files but has no .sqlreview/ directory. /data-request:setup initialises it (once per project); then /data-request:bootstrap, :analyse and :explain use it."
+  # Status exits 3 for a .sqlreview/ without config.json too. Find the store it saw: the nearest one above cwd.
+  # SQLREVIEW_ROOT names the store when set, as it does for the helper.
+  store=""; d="$(cd "$cwd" && pwd -P)"
+  [ -z "${SQLREVIEW_ROOT:-}" ] || { d=""; [ ! -d "$SQLREVIEW_ROOT/.sqlreview" ] || store="$SQLREVIEW_ROOT/.sqlreview"; }
+  while [ -n "$d" ]; do
+    [ ! -d "$d/.sqlreview" ] || { store="$d/.sqlreview"; break; }
+    [ "$d" != / ] || break
+    d="$(dirname "$d")"
+  done
+  if [ -n "$store" ] && [ ! -f "$store/config.json" ]; then
+    ctx="SQL Review: this project has a .sqlreview/ directory without config.json (a triage ledger saved before setup), so it is not initialised. Run /data-request:setup first. It keeps the ledger and adds config.json and templates/. Then /data-request:bootstrap, :analyse and :explain use it."
+  else
+    has_sql="$(cd "$cwd" && { git ls-files -- '*.sql' '**/*.sql' 2>/dev/null; find . -name .git -prune -o -type f -name '*.sql' -print 2>/dev/null; } | head -1)"
+    [ -z "$has_sql" ] ||
+      ctx="SQL Review: this project contains SQL files but has no .sqlreview/ directory. /data-request:setup initialises it (once per project); then /data-request:bootstrap, :analyse and :explain use it."
+  fi
 elif [ "$rc" -eq 0 ] && [ -n "$status" ]; then
   ctx="$(printf '%s' "$status" | jq -r '
     . as $r
@@ -103,6 +121,43 @@ elif [ "$rc" -eq 0 ] && [ -n "$status" ]; then
          elif .ledger_invalid == true then "release held: ledger entries missing or invalid"
          elif (.invalid // []) | length > 0 then "invalid: " + ([.invalid[] | "\(.field) \(.rule)"] | join(", "))
          else "handed off: " + (.handed_off | join(" ")) end)): \(.next)" ] | join(""))' 2>/dev/null)"
+fi
+# The loaded plugin build, when there is context to add it to or a build check was asked for. Skipped after a
+# status timeout: the budget is spent, and the hook must finish in 5 s.
+build=""
+expect="${DATA_REQUEST_EXPECT_BUILD:-}"
+if [ "$rc" -ne 124 ] && { [ -n "$ctx" ] || [ -n "$expect" ]; }; then
+  build="$(bash "$helper" version --json 2>/dev/null </dev/null |
+    jq -r 'select(.build != null) | "\(.plugin) \(.version) build \(.build)"' 2>/dev/null)"
+fi
+line=""
+if [ -n "$build" ]; then
+  digest="${build##* }"
+  short="$(printf '%s' "$digest" | cut -c1-12)"
+  line="Plugin build: ${build% *} $short (sqlreview.sh version prints the full digest)."
+  if [ -n "$expect" ]; then
+    want="$(printf '%s' "$expect" | tr '[:upper:]' '[:lower:]')"
+    case "$want" in
+      ""|*[!0-9a-f]*) want="" ;;
+      *) [ "${#want}" -ge 12 ] && [ "${#want}" -le 64 ] || want="" ;;
+    esac
+    if [ -z "$want" ]; then
+      line="$line DATA_REQUEST_EXPECT_BUILD is not 12 to 64 hexadecimal characters, so the build was not checked."
+    else
+      case "$digest" in "$want"*) line="$line It matches DATA_REQUEST_EXPECT_BUILD." ;;
+        *) line="Plugin build warning: the loaded build ${build% *} $short does not match DATA_REQUEST_EXPECT_BUILD $want. The skills and helpers in this session are not the build under test. Load that build before you rely on them." ;;
+      esac
+    fi
+  fi
+fi
+# A requested check that finds no plugin build (a source checkout) says so instead of passing in silence.
+if [ -z "$line" ] && [ -n "$expect" ] && [ "$rc" -ne 124 ]; then
+  line="Plugin build warning: DATA_REQUEST_EXPECT_BUILD is set, but this helper is not a plugin build (a source checkout), so the build was not checked."
+fi
+# The build line joins any other context. Alone, it prints only when a session asked for a build check.
+if [ -n "$line" ] && { [ -n "$ctx" ] || [ -n "$expect" ]; }; then
+  ctx="${ctx:+$ctx
+}$line"
 fi
 [ -n "$ctx" ] || exit 0
 jq -nc --arg c "$ctx" '{hookSpecificOutput:{hookEventName:"SessionStart",additionalContext:$c}}'
