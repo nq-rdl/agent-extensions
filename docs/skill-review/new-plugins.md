@@ -202,7 +202,7 @@ Scratch harness and raw results (not committed):
   release, bootstrap) with a routing suite, not by line count.
 - Completed since hand-off: the #310 delegation contract now covers every
   `references/subagent.rst`, checked by `tests/test_delegation_handoff.py`.
-- `prerelease-change-routes-to-fix` rarely loads fix, so `analyse-full-rewalk` (now `analyse-walks-affected`)
+- `prerelease-change-routes-to-fix` rarely loads fix, so `analyse-full-rewalk`
   is a guess; make the case require the skill (or score it only under
   `with-without`).
 - The `claude plugin eval` harness does not expand a leading slash command in

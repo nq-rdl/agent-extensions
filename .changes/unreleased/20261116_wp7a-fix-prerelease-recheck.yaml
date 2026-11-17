@@ -1,3 +1,0 @@
-kind: Changed
-body: Fix walks every item a pre-release logic change can affect in the re-check, because a carried item is not asked again
-time: 2026-11-16T00:00:13Z

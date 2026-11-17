@@ -85,9 +85,9 @@ put the decision and its reason in the pull request.
 The existing `.sqlreview/` review is stale in meaning: its purpose, grain, outputs,
 assumptions and limitations describe the old logic, even where a fingerprint still matches.
 Before the first release, hand the re-check to `/data-request:analyse` and `/data-request:bootstrap`.
-A `carry` item keeps its confirmation and is not asked again, even when the logic change alters what it
-means. So the engineer moves into the walk every item that the logic change can affect, `carry` items
-included. Only the remaining `bulk` items go into the one carry question. Do not tell the engineer to
+They walk only the items that the diff touches. Then they ask one carry question that lists every other
+item with its confirmed text. When the logic change has an indirect effect on a listed item, have analyse
+state it in the carry question, so the human can name that item for a re-walk. Do not tell the engineer to
 re-confirm every item. The carry rules are in `${CLAUDE_PLUGIN_ROOT}/skills/analyse/references/carry.rst`.
 A passing local check or `/data-request:validate` does not replace this re-check.
 

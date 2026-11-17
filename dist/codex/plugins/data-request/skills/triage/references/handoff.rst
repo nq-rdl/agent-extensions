@@ -125,7 +125,8 @@ prepares and publishes the release. Never direct the engineer to release.
    1 to 3 are recorded for this run. Missing evidence is a failed gate, never a passed check.
    ``current`` only means the SQL bytes match the reviewed SQL: also confirm that
    ``/data-request:analyse`` re-ran
-   after any pre-release logic change and walked every item the change can affect. Name every
+   after any pre-release logic change: it walked the touched items and asked one carry question
+   that lists every other item with its confirmed text. Name every
    open delivery gate, including known governance restrictions. Flag approval-sensitive
    requested outputs in at most one limitation, plus known restricted fields and flagged
    decisions for analyst review. The data analyst checks the delivered elements against

@@ -8,7 +8,7 @@ carries: a full logic change is allowed only while no release exists (confirmed,
 inferred from absent signals; an unclear status means ask and edit nothing), the runbook
 and UAT checklist change together with the SQL (renamed validation/UAT columns included),
 and the existing `.sqlreview` review is stale in meaning so `/data-request:analyse`
-re-runs and walks every item the change can affect. They also own and grade the `prerelease-*` eval cases in
+re-runs with a touched-item walk and one carry question. They also own and grade the `prerelease-*` eval cases in
 Python always and in Node when it is on PATH. No model call is made.
 """
 
@@ -31,7 +31,7 @@ SUITE = REPO / "evals/claude/data-request"
 CASES = {
     "prerelease-change-routes-to-fix": {
         "workflow-fix", "no-amd-entry", "runbook-uat-same-change", "review-stale",
-        "analyse-walks-affected", "renamed-column"},
+        "analyse-touched-carry", "renamed-column"},
     "prerelease-unclear-asks": {"release-unconfirmed", "asks-first", "no-edits"},
     # #534: settle the release state from repository evidence before asking.
     "prerelease-state-evident": {"release-unreleased", "no-question", "workflow-amend"},
@@ -135,22 +135,15 @@ class FixOwnsPreReleaseChanges(unittest.TestCase):
                 text = flat(section(frontmatter(path)[1], "## Pre-release logic change"))
                 self.assertIn("Do not add an `AMD-` entry to `specs/amendments.md`", text)
 
-    def test_review_is_stale_and_analyse_walks_every_affected_item(self):
+    def test_review_is_stale_and_analyse_walks_only_touched_items(self):
         for target, path in FIX.items():
             with self.subTest(target=target):
                 text = flat(section(frontmatter(path)[1], "## Pre-release logic change"))
                 self.assertIn("`.sqlreview/` review is stale in meaning", text)
                 self.assertIn("even where a fingerprint still matches", text)
                 self.assertIn("hand the re-check to `/data-request:analyse` and `/data-request:bootstrap`", text)
-                # carry.rst: a `carry` item keeps its confirmation and is not asked again, so an item
-                # whose meaning the change touches must be walked even when its lines did not change.
-                self.assertIn("A `carry` item keeps its confirmation and is not asked again", text)
-                self.assertIn("moves into the walk every item that the logic change can affect, "
-                              "`carry` items included", text)
-                self.assertIn("Only the remaining `bulk` items go into the one carry question", text)
-                self.assertIn("Do not tell the engineer to re-confirm every item", text)
-                self.assertNotIn("walk only the items that the diff touches", text)
-                self.assertNotIn("lists every other item", text)
+                self.assertIn("walk only the items that the diff touches", text)
+                self.assertIn("one carry question that lists every other item with its confirmed text", text)
                 self.assertIn("skills/analyse/references/carry.rst", text)
                 self.assertNotIn("--reconfirm-all", text)
                 self.assertNotIn("full re-walk", text)
@@ -196,16 +189,16 @@ class AmendSupportsPreReleasePresentation(unittest.TestCase):
                 # A changelog line that mentions the old name is history, not a blocker.
                 self.assertNotIn("no old name remains", validate)
 
-    def test_review_is_stale_and_analyse_walks_every_affected_item(self):
+    def test_review_is_stale_and_analyse_walks_only_touched_items(self):
         for target, path in AMEND.items():
             with self.subTest(target=target):
                 report = flat(section(frontmatter(path)[1], "## Report"))
                 self.assertIn("renamed validation or UAT output column", report)
                 self.assertIn("stale in meaning, even where its fingerprint still matches", report)
-                self.assertIn("re-run `/data-request:analyse` on each changed SQL file and walk every "
-                              "item the change can affect", report)
-                self.assertIn("does not ask about it again", report)
-                # The fix rule replaced the full re-walk: re-confirming every item is not required.
+                self.assertIn("hand the re-check to `/data-request:analyse` and `/data-request:bootstrap`", report)
+                self.assertIn("walk only the items that the diff touches", report)
+                self.assertIn("one carry question that lists every other item with its confirmed text", report)
+                self.assertIn("skills/analyse/references/carry.rst", report)
                 self.assertNotIn("--reconfirm-all", report)
                 # The pre-#390 wording made the re-run optional.
                 self.assertNotIn("recommend `/data-request:analyse` when a refreshed", report)
