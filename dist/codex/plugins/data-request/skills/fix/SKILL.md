@@ -127,8 +127,9 @@ or analyse; do not edit final JSON or create `.sqlreview/` just for a small corr
 
 Before you regenerate SQL, add or update one row test for each rule the fix changes. Run it, and confirm it
 fails on the old logic. A string-replace edit of a long builder can hide a shadowed variable, a reused module
-constant name or a missed output column. After any builder edit, run `pixi run amend regenerate` with no
-argument, which regenerates every generated SQL file at its newest version, and commit the regenerated SQL.
+constant name or a missed output column. After any builder edit, run
+`pixi run --environment framework amend regenerate` with no argument, which regenerates every generated SQL
+file at its newest version, and commit the regenerated SQL.
 Read `${PLUGIN_ROOT}/skills/guardrails/references/house-conventions.rst` for the test and citation rules.
 
 Make the smallest source change that resolves the reported defect, preserving

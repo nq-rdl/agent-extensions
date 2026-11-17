@@ -21,22 +21,32 @@ class DraftConventions(unittest.TestCase):
         for tree, prefix in TREES:
             with self.subTest(tree=tree):
                 text = read(tree, prefix, "draft/SKILL.md")
-                for phrase in ("pixi run amend record sql/v<N>/<name>_request.sql --builder MODULE:FUNCTION "
-                               "--server ALIAS --input FILE", "the scaffold default alias",
+                for phrase in ("pixi run --environment framework amend record sql/v<N>/<name>_request.sql "
+                               "--builder MODULE:FUNCTION", "--server ALIAS --input FILE",
+                               "the scaffold default alias",
                                "Repeat `--input` once for each repo-local input",
-                               "run `pixi run amend regenerate` with no argument",
+                               "run `pixi run --environment framework amend regenerate`",
+                               "with no argument",
                                "every generated SQL file at its newest version",
+                               "and after the static", "validate` check passes",
                                "Copy confirmed scope wording verbatim"):
                     self.assertIn(phrase, text)
-                self.assertLess(text.index("pixi run amend record"), text.index("pixi run amend regenerate"))
+                self.assertLess(text.index("amend record"), text.index("amend regenerate"))
+
+    def test_fix_uses_the_framework_environment_form(self):
+        # A builder regenerates through the extract runtime, which the default environment lacks.
+        for tree, prefix in TREES:
+            with self.subTest(tree=tree):
+                text = read(tree, prefix, "fix/SKILL.md")
+                self.assertIn("`pixi run --environment framework amend regenerate` with no argument", text)
 
     def test_fix_asks_for_a_row_test_before_regenerating(self):
         for tree, prefix in TREES:
             with self.subTest(tree=tree):
                 text = read(tree, prefix, "fix/SKILL.md")
                 self.assertIn("one row test for each rule the fix changes", text)
-                self.assertIn("After any builder edit, run `pixi run amend regenerate` with no argument", text)
-                self.assertLess(text.index("one row test for each rule"), text.index("pixi run amend regenerate"))
+                self.assertIn("`pixi run --environment framework amend regenerate` with no argument", text)
+                self.assertLess(text.index("one row test for each rule"), text.index("amend regenerate"))
                 self.assertLess(text.index("one row test for each rule"), text.index("Make the smallest source change"))
 
     def test_draft_and_fix_point_to_house_conventions_without_restating_them(self):

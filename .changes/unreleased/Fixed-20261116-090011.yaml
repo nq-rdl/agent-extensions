@@ -1,0 +1,3 @@
+kind: Fixed
+body: ledger get --against treats sql and sql_commit as one SQL revision, so old ledgers resume unchanged
+time: 2026-11-16T09:00:11Z

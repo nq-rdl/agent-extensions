@@ -1,0 +1,3 @@
+kind: Added
+body: The preflight hook names the loaded plugin build and warns when it differs from DATA_REQUEST_EXPECT_BUILD
+time: 2026-11-16T10:00:08+00:00

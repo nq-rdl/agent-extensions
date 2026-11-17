@@ -441,6 +441,54 @@ class Helper(unittest.TestCase):
         for command in ("match", "marked"):
             self.helper(command, self.root / "broken.json", expected=4)
 
+    # The intake helper writes upstream {source: analyst-intake, ...} with no decision key.
+    INTAKE_UPSTREAM = {"source": "analyst-intake", "file": "answers.intake.json", "intake_id": "age",
+                       "role": "analyst", "topic": "cohort"}
+
+    def test_match_skips_intake_items_and_scores_the_rest(self):
+        draft = self.write("scope.draft.json", {"kind": "scope", "assumptions": [
+            item("A-intake-age", "The URN is the raw episode MRN.", "No merge chain.",
+                 upstream=self.INTAKE_UPSTREAM),
+            item("A1", "The URN is the raw episode MRN.", "No merge chain."),
+            item("A2", "Facility scope is TUH.", "House default.",
+                 upstream={"decision": "tuh-facility", "source": "house-default"}),
+        ], "limitations": []})
+        r = run(HELPER, ["match", str(draft)], self.root)
+        self.assertEqual(r.returncode, 0, r.stdout + r.stderr)
+        matches = json.loads(r.stdout)["matches"]
+        self.assertIn(("A1", "raw-episode-mrn", False), {(m["id"], m["decision"], m["marked"]) for m in matches})
+        # A provenance-only marker names no listed decision: match skips that item.
+        self.assertNotIn("A-intake-age", {m["id"] for m in matches})
+
+    def test_marked_ignores_provenance_only_markers(self):
+        scope = self.write("scope.json", {"kind": "scope", "assumptions": [
+            item("A-intake-age", "Adults only.", upstream=self.INTAKE_UPSTREAM),
+            item("A1", "URN is the raw episode MRN.", upstream={"decision": "raw-episode-mrn"}),
+        ], "limitations": []})
+        decisions = self.helper("marked", scope)["decisions"]
+        self.assertEqual([d["decision"] for d in decisions], ["raw-episode-mrn"])
+
+    def test_marker_needs_a_decision_or_a_source(self):
+        for upstream in ({"source": ""}, {"source": "analyst-intake", "decision": ""}, {"decision": 3}):
+            with self.subTest(upstream=upstream):
+                doc = self.write("doc.json", {"assumptions": [item("A1", "x", upstream=upstream)]})
+                r = self.helper("match", doc, expected=4)
+                self.assertIn("upstream", r.stderr)
+
+    def test_reference_documents_one_upstream_schema(self):
+        text = " ".join(REFERENCE.read_text().split())
+        self.assertIn("Upstream marker schema", text)
+        for source in ("analyst-intake", "house-default", "recurring-decision"):
+            self.assertIn(f"``{source}``", text)
+        self.assertIn("skip an item whose marker has no ``decision``", text)
+
+    def test_help_prints_usage_and_exits_0(self):
+        for flag in ("-h", "--help"):
+            with self.subTest(flag=flag):
+                r = run(HELPER, [flag], self.root)
+                self.assertEqual(r.returncode, 0, r.stderr)
+                self.assertIn("match [--any-kind] DRAFT", r.stdout)
+
     def test_usage_and_missing_file(self):
         self.helper(expected=1)
         self.helper("bogus", expected=1)

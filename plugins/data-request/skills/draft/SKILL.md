@@ -106,14 +106,15 @@ Do not reword it, or the SQL header check fails.
 Builder SQL is generated, so commit it through the scaffold's amend guard:
 
 1. Write the SQL to `sql/v<N>/<name>_request.sql`. The `_request.sql` suffix is the naming rule.
-2. Run `pixi run amend record sql/v<N>/<name>_request.sql --builder MODULE:FUNCTION --server ALIAS
-   --input FILE` for it. Take `ALIAS` from the server configuration. Without `--server`, the guard records
-   the scaffold default alias. Repeat `--input` once for each repo-local input of the builder. The guard
-   accepts both being absent, so check them.
-3. After any edit to a builder, even a docstring, run `pixi run amend regenerate` with no argument. It
-   regenerates every generated SQL file at its newest version. Every SQL file that imports the builder
-   changes provenance.
-4. Commit only after steps 2 and 3. A block that names missing provenance means step 2 was skipped.
+2. Run `pixi run --environment framework amend record sql/v<N>/<name>_request.sql --builder MODULE:FUNCTION
+   --server ALIAS --input FILE` for it. Take `ALIAS` from the server configuration. Without `--server`, the
+   guard records the scaffold default alias. Repeat `--input` once for each repo-local input of the builder.
+   The guard accepts both being absent, so check them.
+3. After any edit to a builder, even a docstring, run `pixi run --environment framework amend regenerate`
+   with no argument. It regenerates every generated SQL file at its newest version. Every SQL file that
+   imports the builder changes provenance.
+4. Commit only after steps 2 and 3, and after the static `/data-request:validate` check passes. A block that
+   names missing provenance means step 2 was skipped.
 
 Return the path, implemented cohort definition, evidence locations for mappings and
 conversions, and any unresolved limitations. Perform a static check using

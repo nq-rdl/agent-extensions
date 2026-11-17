@@ -1,0 +1,3 @@
+kind: Fixed
+body: '`sqlreview.sh publish` runs lint and lint --ste itself and refuses a new hit in a scope or review'
+time: 2026-11-16T21:43:03Z

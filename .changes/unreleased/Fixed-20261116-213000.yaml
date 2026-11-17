@@ -1,0 +1,3 @@
+kind: Fixed
+body: carryforward reports reproof_failed and walks every item when git cannot re-prove the recorded SQL
+time: 2026-11-16T03:13:00Z

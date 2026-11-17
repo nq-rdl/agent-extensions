@@ -1,0 +1,3 @@
+kind: Fixed
+body: analyse and bootstrap walk only the touched items, then ask one carry question with each id and its confirmed text
+time: 2026-11-16T03:15:00Z

@@ -2,6 +2,9 @@
 # never search for a matching slice (repeated SQL can make that a false proof).
 # If a governed line also occurs in an edit, the diff alignment is ambiguous:
 # conservatively leave that range for the human, even if diff chose to keep it.
+# One exception: the whole governed text occurs exactly once in the baseline and exactly
+# once in the current SQL. Then only one alignment exists, so a shared line such as a
+# repeated GO separator does not block the remap. The diff still supplies the offset.
 # Inputs: authenticated $prior/$base, frozen $cur, zero-context $delta.
 include "sqlreview-carry";
 
@@ -13,30 +16,25 @@ def remap_valid:
     and (map(.id) | length == (unique | length)))
   and ((.logic // []) | type == "array" and all(.[];
     type == "object" and (.step | type == "number" and . >= 1 and . == floor) and (.lines | cf_range))
-    and (map(.step) | length == (unique | length)));
+    and (map(.step) | length == (unique | length)))
+  # A criteria_status row may record the SQL lines that apply it (the decided re-walk rule).
+  and ((.criteria_status // []) | type == "array" and all(.[];
+    type == "object" and (.location == null or ((.location | type == "object") and (.location.lines | cf_range)))));
 
 def remap_ranges:
   [ ("assumptions", "limitations") as $k | .[$k] | to_entries[]
     | select(.value.location != null)
     | {kind: $k, id: .value.id, path: [$k, .key, "location", "lines"], lines: .value.location.lines} ]
   + [ (.logic // []) | to_entries[]
-      | {kind: "logic", id: .value.step, path: ["logic", .key, "lines"], lines: .value.lines} ];
+      | {kind: "logic", id: .value.step, path: ["logic", .key, "lines"], lines: .value.lines} ]
+  + [ (.criteria_status // []) | to_entries[] | select(.value.location != null)
+      | {kind: "criteria_status", id: .value.criterion, path: ["criteria_status", .key, "location", "lines"],
+         lines: .value.location.lines} ];
 
 def remap_result:
   ($base | cf_sql_lines) as $b | ($cur | cf_sql_lines) as $c
-  | ($delta | split("\n")) as $diff
-  | [ $diff[] | select(startswith("@@ "))
-      | capture("^@@ -(?<o>[0-9]+)(,(?<ol>[0-9]+))? \\+(?<n>[0-9]+)(,(?<nl>[0-9]+))? @@")
-      | {o: (.o | tonumber), ol: ((.ol // "1") | tonumber),
-         n: (.n | tonumber), nl: ((.nl // "1") | tonumber)} ] as $hunks
-  # Zero-length hunk starts name the line BEFORE the insertion/deletion.
-  | (reduce ($hunks + [{o: (($b | length) + 1), ol: 1, n: (($c | length) + 1), nl: 1}])[] as $h
-      ({o: 1, n: 1, segments: []};
-       ($h.o + (if $h.ol == 0 then 1 else 0 end)) as $start
-       | .segments += [{from: .o, to: ($start - 1), shift: (.n - .o)}]
-       | .o = ($start + $h.ol)
-       | .n = ($h.n + (if $h.nl == 0 then 1 else 0 end) + $h.nl)) | .segments) as $segments
-  | [ $diff[2:][] | select(startswith("+") or startswith("-")) | .[1:] ] as $edited
+  | cf_segments($delta; $b | length; $c | length) as $segments
+  | cf_edited($delta) as $edited
   | . as $draft
   | [ remap_ranges[] | . as $r
       | ([ $prior[0] | remap_ranges[] | select(.kind == $r.kind and .id == $r.id) ]) as $matches
@@ -46,7 +44,9 @@ def remap_result:
         else ([ $segments[] | select($old[0] >= .from and $old[1] <= .to) ][0]) as $segment
           | if $segment == null then . + {why: "governed lines changed or an insertion splits the range"}
             else ($old | map(. + $segment.shift)) as $new
-              | if any($b[$old[0] - 1:$old[1]][]; . as $line | $edited | index($line) != null)
+              | ($b[$old[0] - 1:$old[1]] | map(.)) as $slice
+              | if any($slice[]; . as $line | $edited | index($line) != null)
+                   and (($b | cf_count($slice)) != 1 or ($c | cf_count($slice)) != 1)
                 then . + {why: "ambiguous alignment: governed text also occurs in the edit"}
                 elif $r.lines != $old and $r.lines != $new then . + {why: "draft range differs from both baseline and computed range; keep the manual edit"}
                 elif $b[$old[0] - 1:$old[1]] != $c[$new[0] - 1:$new[1]] then error("diff map does not preserve governed bytes")

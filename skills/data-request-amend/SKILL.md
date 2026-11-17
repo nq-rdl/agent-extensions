@@ -290,7 +290,8 @@ any blocker. Regenerated SQL or a renamed validation or UAT output column leaves
 `.sqlreview/` review stale in meaning, even where its fingerprint still matches: its outputs
 and steps describe the previous output. Before the next release, re-run `/data-request:analyse`
 on each changed SQL file and walk every item the change can affect. Carry-forward keeps an item
-whose SQL lines did not change and does not ask about it again. A passing check is not release
+whose SQL lines did not change and does not ask about it again. The carry rules are in
+`${CLAUDE_PLUGIN_ROOT}/skills/analyse/references/carry.rst`. A passing check is not release
 approval.
 
 For a split request, end with this short summary for the analyst:

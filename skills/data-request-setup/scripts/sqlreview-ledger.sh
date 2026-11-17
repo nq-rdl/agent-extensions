@@ -5,9 +5,40 @@ ledger_check() {
   sr_no_symlinks "$(sr_abspath "$file")" || exit 2
   [ -f "$file" ] || sr_die 4 "ledger input is not a regular file: $file"
   # Slurp and require exactly one JSON value (jq otherwise accepts a JSON stream).
-  jq -e -s 'length == 1' "$file" >/dev/null 2>&1 &&
-    jq -e --arg mode "$mode" -f "$SR_SCRIPT_DIR/sqlreview-ledger.jq" "$file" >/dev/null 2>&1 ||
-    sr_die 4 "invalid ledger $mode schema: $file"
+  jq -e -s 'length == 1' "$file" >/dev/null 2>&1 || sr_die 4 "invalid ledger $mode schema: not exactly one JSON value"
+  # sql and sql_commit name one SQL revision. A stored entry, draft or revisions file that holds both
+  # is refused before any comparison, so no read can prefer one key and miss a change to the other.
+  if jq -e --arg mode "$mode-clash" -f "$SR_SCRIPT_DIR/sqlreview-ledger.jq" "$file" >/dev/null 2>&1; then
+    sr_die 4 "invalid ledger $mode schema: field evidence_revision has both sql and sql_commit (rule: use sql_commit only)"
+  fi
+  jq -e --arg mode "$mode" -f "$SR_SCRIPT_DIR/sqlreview-ledger.jq" "$file" >/dev/null 2>&1 && return 0
+  # Name the failing fields, never their values or the file path (rule: Entry fields in triage ledger.rst).
+  local fields=''
+  case "$mode" in
+    entry|store) fields="$(jq -r --arg mode "$mode-errors" -f "$SR_SCRIPT_DIR/sqlreview-ledger.jq" "$file" 2>/dev/null)" || fields='' ;;
+  esac
+  [ -n "$fields" ] || fields='unreadable'
+  sr_die 4 "invalid ledger $mode schema: field $fields (rule: see Entry fields in the triage ledger reference)"
+}
+
+# Old ledgers name the SQL revision key sql. The scaffold sweep refuses a field named sql, so a write
+# saves it as sql_commit. An entry that holds both keys is ambiguous and is refused.
+ledger_sql_key() {
+  local file="$1" state
+  state="$(jq -r --arg mode sql-key -f "$SR_SCRIPT_DIR/sqlreview-ledger.jq" "$file")" || sr_die 2 "cannot read ledger draft"
+  case "$state" in
+    clash) sr_die 4 "invalid ledger entry schema: field evidence_revision has both sql and sql_commit (rule: use sql_commit only)" ;;
+    legacy) printf 'sqlreview: ledger field evidence_revision key sql is saved as sql_commit (rule: the scaffold sweep refuses a field named sql)\n' >&2 ;;
+  esac
+}
+
+# One row per waiver: waived for the head given, lapsed for any other head. Fields only, never the reason.
+ledger_waivers() {
+  local saved="$1" head="$2"
+  printf '%s' "$saved" | jq -r --arg head "$head" '
+    (.gate_waivers // [])[] |
+    if .head_sha == $head then ["waived", .gate, .check, .by, .at, .source]
+    else ["lapsed", .gate, .check, "head \(.head_sha[0:12])"] end | join("\t")'
 }
 
 ledger_resume() {
@@ -37,18 +68,21 @@ ledger_resume() {
   done <<EOF
 $artifact_rows
 EOF
+  # sql and sql_commit name the same SQL revision, so old and new ledgers and revision files compare.
   printf '%s' "$saved" | jq --slurpfile current "$current" --argjson bad "$bad" '
+    def revision($rev; $key):
+      if $key == "sql" or $key == "sql_commit" then ($rev.sql_commit // $rev.sql) else $rev[$key] end;
     . as $entry |
     [.stages_done[] | . as $stage | select(
       ($bad | index($stage)) != null or
       any($entry.stage_evidence[$stage].sources[]; . as $source |
-        $current[0][$source] != $entry.evidence_revision[$source]))] as $recheck |
+        revision($current[0]; $source) != revision($entry.evidence_revision; $source)))] as $recheck |
     {entry: $entry, recheck: $recheck, unchanged: ($entry.stages_done - $recheck)}'
 }
 
 cmd_ledger() (
   sr_need_jq
-  local session=0 action dest dir lock tmp='' root saved ticket draft ancestor
+  local session=0 action dest dir lock tmp='' root saved ticket draft ancestor staged
   if [ "${1:-}" = --session ]; then session=1; shift; fi
   [ $# -ge 1 ] || usage
   action="$1"; shift
@@ -60,10 +94,12 @@ cmd_ledger() (
   case "$action" in
     get) [ $# -eq 1 ] || { [ $# -eq 3 ] && [ "$2" = --against ]; } || usage ;;
     set) [ $# -eq 2 ] || usage ;;
+    waivers) [ $# -eq 2 ] || usage
+      jq -en --arg head "$2" '$head | test("^[0-9a-f]{40}$")' >/dev/null || sr_die 4 "invalid head commit (rule: the full 40-character lowercase SHA)" ;;
     *) usage ;;
   esac
   ticket="$1"
-  jq -en --arg ticket "$ticket" '$ticket | test("^[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+#[1-9][0-9]*$")' >/dev/null || sr_die 4 "invalid ledger ticket"
+  jq -en --arg ticket "$ticket" '$ticket | test("^[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+#[1-9][0-9]*$")' >/dev/null || sr_die 4 "invalid ledger ticket (rule: the fully qualified form owner/repo#N)"
   if [ "$session" = 1 ]; then
     root="${XDG_STATE_HOME:-${HOME:?HOME is required}/.local/state}"
     case "$root" in /*) ;; *) sr_die 2 "session state root must be absolute" ;; esac
@@ -79,11 +115,13 @@ cmd_ledger() (
     dest="$root/$SR_DIR/ledger.json"
   fi
   sr_no_symlinks "$dest" || exit 2
-  if [ "$action" = get ]; then
+  if [ "$action" = get ] || [ "$action" = waivers ]; then
     [ -e "$dest" ] || sr_die 6 "no stored ledger: $dest"
     ledger_check "$dest" store
     saved="$(jq -ce --arg ticket "$ticket" '.entries[] | select(.ticket == $ticket)' "$dest")" || sr_die 6 "no ledger entry for $ticket"
-    if [ $# -eq 3 ]; then
+    if [ "$action" = waivers ]; then
+      ledger_waivers "$saved" "$2"
+    elif [ $# -eq 3 ]; then
       SR_ROOT="$(sr_init_root)"
       ledger_resume "$saved" "$3"
     else printf '%s\n' "$saved"; fi
@@ -91,6 +129,7 @@ cmd_ledger() (
   fi
   draft="$2"
   ledger_check "$draft" entry
+  ledger_sql_key "$draft"
   jq -e --arg ticket "$ticket" '.ticket == $ticket' "$draft" >/dev/null || sr_die 4 "ledger draft ticket does not match $ticket"
   # Lock prevents two per-ticket updates from losing each other. Never remove another writer's lock.
   umask 077
@@ -108,6 +147,9 @@ cmd_ledger() (
   else
     jq -n --slurpfile draft "$draft" '{schemaVersion: 1, entries: $draft}' > "$tmp" || sr_die 2 "cannot stage ledger"
   fi
+  # Every entry in the written store uses sql_commit, so the whole file passes the scaffold sweep.
+  staged="$(jq --arg mode rename-store -f "$SR_SCRIPT_DIR/sqlreview-ledger.jq" "$tmp")" || sr_die 2 "cannot stage ledger"
+  printf '%s\n' "$staged" > "$tmp" || sr_die 2 "cannot stage ledger"
   ledger_check "$tmp" store
   mv -f "$tmp" "$dest" || sr_die 2 "cannot replace ledger"
   printf 'saved\t%s\t%s\n' "$ticket" "$dest"

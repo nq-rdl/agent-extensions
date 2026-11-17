@@ -31,6 +31,7 @@ def items($kind; $rev):
       | (if (.text | nonempty | not) then "\($id): empty text" else empty end),
         (if (.rationale | nonempty | not) then "\($id): rationale must be a nonempty string" else empty end),
         (if .location != null and ((.location | type) != "object" or (.location.lines | line_range | not)) then "\($id): location must be null or an object with a line range" else empty end),
+        (if has("sql_status") and .sql_status != "not-implemented" then "\($id): sql_status must be absent or not-implemented" else empty end),
         (if has("decided") then
           if (.decided | type) != "object" then "\($id): decided must be an object"
           else (["by", "role", "at", "source"][] as $key
@@ -92,7 +93,7 @@ def criteria_status_findings($rev):
          end),
         (if has("upstream") and ((.upstream | type) != "object" or (.upstream.source | ine | not) or (.upstream.id | ine | not))
          then "\($id)\tupstream\tinvalid" else empty end),
-        # Confirmation as for scope assumptions (items above); the basis of a carried row is criteria-unchanged.
+        # Confirmation as for scope assumptions (items above); the basis of a carried row is criteria-unchanged or criteria-lines-unchanged.
         (if (.confirmed_by | nonempty | not) then "\($id)\tconfirmed_by\trequired" else empty end),
         (if (.confirmed_at | nonempty | not) then "\($id)\tconfirmed_at\trequired" else empty end),
         (.confirmed_revision as $cr | .carried_from_revision as $cf
@@ -102,8 +103,12 @@ def criteria_status_findings($rev):
            elif $cr == $rev then (if $cf != null then "\($id)\tcarried_from_revision\tinvalid" else empty end)
            elif ($cf | integer | not) or $cf != $rev - 1 or $cf < $cr then "\($id)\tcarried_from_revision\tinvalid"
            else empty end),
-        (if .carried_basis == null then empty
-         elif .carried_from_revision == null or .carried_basis != "criteria-unchanged" then "\($id)\tcarried_basis\tinvalid"
+        # A row may record the SQL lines that apply it, so a body change walks only the rows it touches.
+        (if .location != null and ((.location | type) != "object" or (.location.lines | line_range | not))
+         then "\($id)\tlocation\tinvalid" else empty end),
+        (.carried_basis as $cb | if $cb == null then empty
+         elif .carried_from_revision == null or (["criteria-unchanged", "criteria-lines-unchanged"] | index([$cb])) == null
+         then "\($id)\tcarried_basis\tinvalid"
          else empty end)
       end)
   end;
@@ -137,6 +142,15 @@ def lift_document($rev):
        else empty end),
       (if (.workaround | type) != "object" or (.workaround.file | path_ok | not) or
           (.workaround.lines | line_range | not) then "\($id): workaround requires file and lines" else empty end),
+      (if (.workaround | type) == "object" and (.workaround | has("extra_lines")) and
+          ((.workaround.extra_lines | type) != "array" or (.workaround.extra_lines | length) == 0 or
+           (.workaround.extra_lines | all(.[]; line_range) | not))
+        then "\($id): workaround extra_lines must be a nonempty array of line ranges" else empty end),
+      (if (.workaround | type) == "object" and (.workaround | has("anchor")) and (.workaround.anchor | nonempty | not)
+        then "\($id): workaround anchor must be a nonempty string" else empty end),
+      (if has("local_units") and ((.local_units | type) != "array" or (.local_units | length) == 0 or
+          (.local_units | all(.[]; type == "string" and test("^[A-Za-z_][A-Za-z0-9_]*$")) | not))
+        then "\($id): local_units must be a nonempty array of identifiers" else empty end),
       (.classification as $c | if $c != null and (["new-capability", "existing-unit-gap", "request-specific"] | index($c)) == null then "\($id): invalid classification" else empty end),
       (.status as $s | if (["candidate", "confirmed", "filed", "released", "recomposed"] | index($s)) == null then "\($id): invalid status" else empty end),
       (if .status == "candidate" then

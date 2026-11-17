@@ -1,0 +1,3 @@
+kind: Fixed
+body: sqlreview publish removes a stale carry-list.md from the review directory
+time: 2026-11-16T03:18:00Z

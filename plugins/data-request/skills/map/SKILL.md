@@ -101,10 +101,13 @@ without repeating exact population counts.
 ## Mapping output
 
 Read guardrails `references/delivery.rst` before proposing delivery: estimate rows
-for each output from available probe counts at its final grain and check text
-length bands. Record oversized/potentially long-cell outputs as limitations;
+for each output at its final grain and check text length bands. Reason from grain and join
+multiplicity first. Where the estimate must sit under a limit, ask the verdict form
+(answer pass or fail, no numbers). That is the default, and a count needs the exception. Use probe counts only when
+a recorded `count_exception` covers them. Record oversized/potentially long-cell outputs as limitations;
 near-limit estimates (within 10%) are undecided. Put the delivery choice to the
-engineer, flagged for the analyst; carry unverified evidence and choices to draft.
+engineer, flagged for the analyst; carry unverified evidence and choices to draft. Any operator run follows
+`${CLAUDE_PLUGIN_ROOT}/skills/guardrails/references/operator-handover.rst`.
 
 Return one row per requested element (event, date or output) and candidate:
 requested concept → table/column or resolver → source grain and join keys →

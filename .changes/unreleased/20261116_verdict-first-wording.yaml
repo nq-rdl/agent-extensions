@@ -1,0 +1,3 @@
+kind: Changed
+body: Validate, map and lookup ask for a pass or fail verdict before any count in plausibility checks
+time: 2026-11-16T00:00:03Z

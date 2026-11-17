@@ -64,7 +64,8 @@ authorisation; validate never connects to a database. Before proposing or report
 one, read `Probe disclosure control <release.rst#probe-disclosure-control>`_ for
 its perimeter, formatter and combined-disclosure review. Keep each probe:
 
-* **Aggregate-only.** It returns counts, ranges and codes, never patient rows.
+* **Aggregate-only.** It returns verdicts by default. It returns counts, ranges and codes only
+  under a count exception (``release.rst``). It never returns patient rows.
 * **Disclosure-controlled.** Parameterise ``@min_cell`` using the effective floor
   in ``release.rst``, "Probe disclosure control"; apply that section before output.
 * **One bounded scan.** Group on narrow keys within the disclosure-control limits
@@ -100,6 +101,10 @@ and assume the other labels share its format. Use this output table:
 Column | Expected labels/format and source | Proposed probe | Bound/cost | Status
 
 Qualify columns by result-set name and cite SQL lines. For each, propose a
+**verdict probe** by default (see "Verdict probes" below): the operator answers pass or
+fail against the expected labels, with no numbers. Only where the Data Engineer has
+approved a count exception for that probe (``release.rst``, "Default and count
+exception") and a distribution is needed, the fallback is a
 **count-only** distinct-value distribution (raw category value and row count),
 including NULL, blank and unmapped categories. Preserve **raw spelling**, case
 and trailing spaces: case-insensitive grouping can hide the uppercase surprise.
@@ -134,11 +139,11 @@ rows. Record any NOLOCK or READ UNCOMMITTED use; never introduce either silently
 
 Apply ``release.rst``, "Probe disclosure control", to label distributions as well
 as fill counts; an unknown assessment threshold leaves the proposal not runnable.
-Return only safe category labels and controlled counts, no identifiers, dates of
-birth, exact ages or patient examples.
+Return only safe category labels, and controlled counts only under a count exception.
+Return no identifiers, dates of birth, exact ages or patient examples.
 
-For **expensive requests only**, add an age-band count probe before the operator
-run: cite estimated rows, a prior runtime or another recorded cost assessment.
+For **expensive requests only**, add an age-band probe before the operator
+run (a verdict by default, with counts only under a count exception): cite estimated rows, a prior runtime or another recorded cost assessment.
 When cost is unknown, ask whether the run is expensive; omit the age-band probe
 pending evidence, without dropping label proposals. Use the scoped age anchor
 (for example age at index surgery, not age today), verified age calculation and
@@ -153,9 +158,89 @@ operator action separately. When results return, tag evidence OBSERVED or INFERR
 with server/database, bound, date and SQL revision as above. Compare safe values
 with the expected labels and data dictionary; route surprises to the analyst
 with no automatic exclusion. Unrun or suppressed probes do not establish
-plausibility. Keep later UAT and ``validation_counts`` checks; machine checking
+plausibility. Keep later UAT and ``validation_counts`` checks, which return a verdict by default; machine checking
 scope expectations against those counts in data-analysis-scaffold is a follow-up,
 not implemented here. This guidance changes no runtime permissions.
+
+Verdict probes
+--------------
+
+A verdict probe answers one question per check with ``PASS`` or ``FAIL``. It returns
+no counts, no labels and no rows. It is the default for every plausibility question
+and checklist item where a verdict is enough. Write the question as "answer pass or
+fail, no numbers". The operator runs the saved file, and the pasted block is the
+only result. See ``operator-handover.rst`` for the hand-over steps.
+
+Rules for the template:
+
+* **One indexed read.** Read the source once into a minimal ``#temp`` table with
+  the indexed bounds. Every check reads that table.
+* **One row per check.** Each check returns a name and ``PASS`` or ``FAIL``. A check
+  fails when it finds one offending row.
+* **NOT EXISTS, never NOT IN.** ``NOT IN`` over a nullable key returns no rows
+  when the list holds a NULL. That gives a false ``PASS``.
+* **Cut labels before free text.** Compare only the label part. Cut a free-text
+  tail such as ``Other: ...`` to its prefix before the comparison. The probe never
+  returns the tail.
+* **Exact spelling.** Compare under a binary collation and compare ``DATALENGTH`` as
+  well, because ``=`` ignores trailing spaces. Apply the collation to the cut as well.
+* **One type, and NULL.** Cast both sides of the comparison to the same ``NVARCHAR(MAX)``
+  type, because ``DATALENGTH`` differs between ``varchar`` and ``nvarchar`` for equal text.
+  Use ``MAX`` and never a bounded length, because a bounded cast cuts a longer bad label to a valid one.
+  Treat NULL as a separate branch: ``=`` on NULL is unknown, so a NULL passes only when
+  NULL is in the expected set. Use the same comparison in the canary.
+* **Limit checks.** To test a row limit, fail when a row exists beyond the limit:
+  ``EXISTS (SELECT 1 FROM #probe_src ORDER BY (SELECT NULL) OFFSET <limit> ROWS FETCH NEXT 1 ROWS ONLY)``.
+* **Self-checking.** Check ``C0`` fails when the source is empty, because an empty
+  source passes every other check. The probe verdict is ``FAIL`` when any row is ``FAIL``. Check ``C9`` is a canary that
+  tests a literal bad value. It must read ``PASS``, which shows that the logic
+  detects the bad value. A ``FAIL`` on ``C9`` means the probe logic is broken.
+* **Funnel form.** To find where a failure starts, add the stages cumulatively.
+  Each stage repeats the conditions of the earlier stages. The first ``FAIL`` names the stage.
+
+Template. Replace each ``<placeholder>`` from the evidence and keep the shape.
+
+.. code-block:: sql
+
+   SET NOCOUNT ON;
+   SELECT CASE WHEN <label_col> COLLATE <binary_collation> LIKE 'Other:%'
+               THEN 'Other:' ELSE <label_col> END AS lbl
+   INTO #probe_src
+   FROM <schema>.<table>
+   WHERE <indexed_bound>;
+
+   SELECT chk, CASE WHEN bad = 1 THEN 'FAIL' ELSE 'PASS' END AS verdict
+   FROM (
+     SELECT 'C0 source has rows' AS chk,
+            CASE WHEN EXISTS (SELECT 1 FROM #probe_src) THEN 0 ELSE 1 END AS bad
+     UNION ALL
+     SELECT 'C1 labels in expected set',
+            CASE WHEN EXISTS (
+              SELECT 1 FROM #probe_src s
+              WHERE NOT EXISTS (
+                SELECT 1 FROM (VALUES (<expected_1>), (<expected_2>)) AS d(v)
+                WHERE (s.lbl IS NULL AND d.v IS NULL)
+                   OR (CAST(d.v AS NVARCHAR(MAX)) = CAST(s.lbl AS NVARCHAR(MAX)) COLLATE <binary_collation>
+                       AND DATALENGTH(CAST(d.v AS NVARCHAR(MAX)))
+                         = DATALENGTH(CAST(s.lbl AS NVARCHAR(MAX)))))
+            ) THEN 1 ELSE 0 END
+     UNION ALL
+     SELECT 'C9 canary: bad value is detected',
+            CASE WHEN EXISTS (
+              SELECT 1 FROM (VALUES ('<known_bad_value>')) AS c(v)
+              WHERE NOT EXISTS (
+                SELECT 1 FROM (VALUES (<expected_1>), (<expected_2>)) AS d(v)
+                WHERE (c.v IS NULL AND d.v IS NULL)
+                   OR (CAST(d.v AS NVARCHAR(MAX)) = CAST(c.v AS NVARCHAR(MAX)) COLLATE <binary_collation>
+                       AND DATALENGTH(CAST(d.v AS NVARCHAR(MAX)))
+                         = DATALENGTH(CAST(c.v AS NVARCHAR(MAX)))))
+            ) THEN 0 ELSE 1 END
+   ) AS r
+   ORDER BY chk;
+
+Report a result in words. Write "not found by probe P<n>, and the search stopped
+because <reason>", never "absent". A ``PASS`` covers only the bounds and the
+source that the probe read.
 
 Read isolation
 --------------

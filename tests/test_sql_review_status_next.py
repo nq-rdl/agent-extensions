@@ -44,6 +44,24 @@ def sidecar(text="Include adults aged 18 and over."):
          "confirmed_by": "analyst-login", "confirmed_role": "analyst", "confirmed_at": "2026-09-29T10:00:00Z"}]}
 
 
+OPERATOR_NEXT = (f"the authorised operator run of {SQL} and UAT, then /data-request:triage to record the hand-off "
+                 f"in the ledger, then /data-request:explain {SQL}")
+INTAKE_DRAFT_HINT = " (when the new intake needs SQL changes, run /data-request:draft first, so one rescope covers both)"
+
+
+def ledger_entry(**over):
+    """A schema-1 triage ledger entry, as `ledger set` stores it."""
+    try:
+        from test_data_request_ledger import entry
+    except ModuleNotFoundError:
+        from tests.test_data_request_ledger import entry
+    return dict(entry(), **over)
+
+
+HANDOFF = {"pr": "example-org/extract-example#4", "head_sha": "a" * 40, "reviewer": "reviewer-handle",
+           "board_state": "In-Review", "date": "2026-09-29"}
+
+
 class StatusNext(unittest.TestCase):
     def setUp(self):
         self.tmp = tempfile.TemporaryDirectory()
@@ -104,8 +122,10 @@ class StatusNext(unittest.TestCase):
         self.reviewed(SLUG, SQL)
 
     def assert_rescope(self, row, why, then, pre=""):
+        # An intake change alone may need new SQL, so the hint offers the draft before the one rescope.
+        hint = INTAKE_DRAFT_HINT if why == "The analyst intake" else ""
         self.assertEqual(row["next"], f"{why} changed after scope revision 3: {pre}run /data-request:bootstrap {SQL} "
-                                      f"to publish scope revision 4, then {then}")
+                                      f"to publish scope revision 4, then {then}{hint}")
 
     # --- scope only -------------------------------------------------------------------------
     def test_scoped_without_sql_names_draft_then_analyse(self):
@@ -163,13 +183,14 @@ class StatusNext(unittest.TestCase):
         self.assertEqual(row["next"], f"/data-request:bootstrap {SQL} to bind the scope to the SQL, "
                                       f"then /data-request:analyse {SQL}")
 
-    def test_current_review_over_an_unbound_scope_before_a_body_change_names_explain(self):
+    def test_current_review_over_an_unbound_scope_before_a_body_change_names_no_rescope(self):
         self.scope()
         self.sql(SQL_V1)
         self.review()
         row = self.row()
         self.assertEqual(row["state"], "current")
-        self.assertEqual(row["next"], f"/data-request:explain {SQL} to walk the analyst through the review")
+        # No rescope: the stage order after analyse applies (no hand-off is recorded yet).
+        self.assertEqual(row["next"], OPERATOR_NEXT)
 
     def test_stale_review_over_an_unbound_scope_names_the_rescope(self):
         self.scope()                    # framed before the SQL existed: no binding to compare
@@ -365,6 +386,10 @@ class StatusNext(unittest.TestCase):
     def test_current_review_names_explain_resume_or_release(self):
         self.sql(SQL_V1)
         self.review()
+        # Without a recorded hand-off the operator run, UAT and hand-off come first (StatusStageOrder).
+        self.assertEqual(self.row()["next"], OPERATOR_NEXT)
+        self.p.root.joinpath(".sqlreview", "ledger.json").write_text(
+            json.dumps({"schemaVersion": 1, "entries": [ledger_entry(handoff=HANDOFF)]}))
         self.assertEqual(self.row()["next"], f"/data-request:explain {SQL} to walk the analyst through the review")
         marker = self.p.review_dir(SLUG) / "explain.json"
         base = {"sql_sha256": sha(SQL_V1), "review_revision": 1, "at": "2026-09-30T00:00:00Z", "by": "analyst-login"}
@@ -509,13 +534,173 @@ class StatusNext(unittest.TestCase):
         self.reviewed("other", "other.sql")
         ctx = decision(run_hook(PREFLIGHT, {"cwd": str(self.p.root)}, env_for()))["additionalContext"]
         lines = ctx.splitlines()
-        # One summary line, then one line for the review that needs action. The plain current
-        # review needs no engineer action, so it adds no line.
-        self.assertEqual(len(lines), 2, ctx)
+        # One summary line, one line for the review that needs action, then the plugin build line. The
+        # plain current review needs no engineer action, so it adds no line.
+        self.assertEqual(len(lines), 3, ctx)
+        self.assertTrue(lines[2].startswith("Plugin build: data-request "), ctx)
         self.assertIn(f"- next for {SLUG} (current): The SQL changed after scope revision 3: "
                       f"run /data-request:bootstrap {SQL} to publish scope revision 4", lines[1])
         self.assertNotIn("other", ctx)
 
+
+
+
+class StatusStageOrder(StatusNext):
+    """The next command follows the stage order after analyse, setup before anything, and the path guard.
+
+    It reuses StatusNext's fixtures. The inherited tests are not run again here.
+    """
+
+    def write_ledger(self, *entries):
+        path = self.p.root / ".sqlreview" / "ledger.json"
+        path.write_text(json.dumps({"schemaVersion": 1, "entries": list(entries)}, indent=2))
+        return path
+
+    # --- setup first ------------------------------------------------------------------------
+    def test_a_ledger_only_store_is_not_initialised(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            p = Project(tmp, init=False)
+            (p.root / ".sqlreview").mkdir()
+            (p.root / ".sqlreview" / "ledger.json").write_text(json.dumps({"schemaVersion": 1, "entries": [ledger_entry()]}))
+            for args in (["status"], ["status", "--json"]):
+                with self.subTest(args=args):
+                    r = run(args, p.root)
+                    self.assertEqual(r.returncode, 3, r.stdout + r.stderr)
+                    self.assertEqual(r.stdout, "")
+                    self.assertIn("not initialised", r.stderr)
+                    self.assertIn("config.json", r.stderr)
+                    self.assertIn("/data-request:setup", r.stderr)
+                    self.assertNotIn(tmp, r.stderr)
+            # The preflight hook names setup for a ledger-only store even when the project has no SQL yet.
+            ctx = decision(run_hook(PREFLIGHT, {"cwd": str(p.root)}, env_for()))["additionalContext"]
+            self.assertIn("/data-request:setup", ctx)
+            self.assertIn("ledger", ctx)
+            self.assertNotIn("has no .sqlreview/ directory", ctx)
+            # Setup completes the ledger-only tree, and status then names the first bootstrap.
+            self.assertEqual(run(["init"], p.root).returncode, 0)
+            self.assertEqual(run(["status"], p.root).returncode, 0)
+
+    # --- after analyse: operator run, UAT and hand-off before explain -----------------------
+    def test_current_review_without_a_recorded_handoff_names_the_operator_run_uat_and_handoff(self):
+        self.sql(SQL_V1)
+        self.review()
+        self.assertEqual(self.row()["state"], "current")
+        self.assertEqual(self.row()["next"], OPERATOR_NEXT)
+        # A ledger entry without a handoff object is no hand-off.
+        self.write_ledger(ledger_entry())
+        self.assertEqual(self.row()["next"], OPERATOR_NEXT)
+
+    def test_current_review_with_a_recorded_handoff_names_explain(self):
+        self.sql(SQL_V1)
+        self.review()
+        self.write_ledger(ledger_entry(handoff=HANDOFF))
+        self.assertEqual(self.row()["next"], f"/data-request:explain {SQL} to walk the analyst through the review")
+        # One ticket covers the whole project, so an artifact that names another SQL file does not unbind it.
+        self.write_ledger(ledger_entry(handoff=HANDOFF, stage_evidence=self.evidence("sql/v1/other.sql")))
+        self.assertEqual(self.row()["next"], f"/data-request:explain {SQL} to walk the analyst through the review")
+
+    @staticmethod
+    def evidence(*paths):
+        """Stage evidence whose draft stage records each path as an artifact."""
+        stages = ledger_entry()["stage_evidence"]
+        stages["draft"] = dict(stages["draft"], artifacts=[{"path": p, "sha256": "0" * 64} for p in paths])
+        return stages
+
+    def test_another_tickets_handoff_does_not_count_for_this_review(self):
+        self.sql(SQL_V1)
+        self.review()
+        explain = f"/data-request:explain {SQL} to walk the analyst through the review"
+        a, b = "example-org/service-desk#1", "example-org/service-desk#2"
+        cases = [
+            # No entry names this SQL, so nothing ties a hand-off to this review.
+            ("no association", [ledger_entry(ticket=a, handoff=HANDOFF), ledger_entry(ticket=b)], OPERATOR_NEXT),
+            # The hand-off belongs to the ticket of another SQL file. This review's ticket has none.
+            ("other ticket", [ledger_entry(ticket=a, handoff=HANDOFF, stage_evidence=self.evidence("sql/v1/other.sql")),
+                              ledger_entry(ticket=b, stage_evidence=self.evidence(SQL))], OPERATOR_NEXT),
+            # Every ticket that names this SQL must record a hand-off.
+            ("one of two", [ledger_entry(ticket=a, handoff=HANDOFF, stage_evidence=self.evidence(SQL)),
+                            ledger_entry(ticket=b, stage_evidence=self.evidence(SQL))], OPERATOR_NEXT),
+            ("own ticket", [ledger_entry(ticket=a, stage_evidence=self.evidence("sql/v1/other.sql")),
+                            ledger_entry(ticket=b, handoff=HANDOFF, stage_evidence=self.evidence(SQL))], explain),
+        ]
+        for name, entries, want in cases:
+            with self.subTest(name):
+                self.assertEqual(run(["ledger", "check", str(self.write_ledger(*entries))], self.p.root).returncode, 0)
+                self.assertEqual(self.row()["next"], want)
+
+    def test_an_explain_marker_for_the_current_review_keeps_the_walkthrough_steps(self):
+        # A walkthrough already started means the hand-off happened before the ledger recorded it.
+        self.sql(SQL_V1)
+        self.review()
+        marker = self.p.review_dir(SLUG) / "explain.json"
+        marker.write_text(json.dumps({"sql_sha256": sha(SQL_V1), "review_revision": 1, "at": "2026-09-30T00:00:00Z",
+                                      "by": "analyst-login", "completed": False, "last_step": "logic"}))
+        self.assertEqual(self.row()["next"], f"/data-request:explain {SQL} to resume the walkthrough")
+
+    def test_open_lift_entries_put_the_lift_close_out_first(self):
+        self.sql(SQL_V1)
+        self.review()
+        doc = ledger()
+        doc.update(slug=SLUG, sql_path=SQL)
+        doc["lifts"][0]["workaround"]["file"] = SQL
+        draft = self.p.write_json(SLUG, "lifts.draft.json", doc)
+        r = run(["publish", SLUG, "lifts", str(draft)], self.p.root)
+        self.assertEqual(r.returncode, 0, r.stderr)
+        self.assertEqual(self.row()["state"], "current")
+        self.assertEqual(self.row()["next"], "/data-request:lift to close out the open lift entries, then " + OPERATOR_NEXT)
+        # A filed entry is closed out, so the stage order resumes.
+        lifts = self.p.review_dir(SLUG) / "lifts.json"
+        stored = json.loads(lifts.read_text())
+        stored["lifts"][0]["status"] = "released"
+        lifts.write_text(json.dumps(stored))
+        self.assertNotIn("/data-request:lift", self.row()["next"] or "")
+
+    # --- the path guard ---------------------------------------------------------------------
+    def test_a_binding_the_path_guard_refuses_names_the_move_first(self):
+        for old in ("sql/monthly.sql", "sql/pipeline_a/monthly.sql", "SQL/monthly.sql", "data/monthly.sql"):
+            with self.subTest(path=old), tempfile.TemporaryDirectory() as tmp:
+                p = Project(tmp)
+                p.sql(old, SQL_V1)
+                slug = old[:-len(".sql")].replace("/", "__")
+                p.write_json(slug, "scope.json", scope_doc(slug, old))
+                p.commit("sources")
+                rows = {row["slug"]: row for row in json.loads(run(["status", "--json"], p.root).stdout)["reviews"]}
+                self.assertEqual(rows[slug]["state"], "scoped")
+                self.assertEqual(rows[slug]["next"],
+                                 f"{old} is outside a reviewed sql/v<N>/ directory, so the helpers refuse it: "
+                                 f"git mv {old} sql/v<N>/<name>_request.sql, then run "
+                                 f"sqlreview.sh move '{old}' sql/v<N>/<name>_request.sql")
+
+    def test_a_reviewed_version_directory_keeps_the_usual_next_step(self):
+        rel = "sql/v2.1/monthly_request.sql"
+        self.sql(SQL_V1, rel=rel)
+        self.p.write_json("sql__v2.1__monthly_request", "scope.json", scope_doc("sql__v2.1__monthly_request", rel))
+        self.p.commit("scope")
+        self.assertEqual(self.row("sql__v2.1__monthly_request")["next"],
+                         f"/data-request:bootstrap {rel} to bind the scope to the SQL, then /data-request:analyse {rel}")
+
+    # --- intake change with a draft to come -------------------------------------------------
+    def test_an_intake_only_change_offers_the_draft_before_the_rescope(self):
+        self.sql(SQL_V1)
+        source, imported = self.import_intake()
+        self.scope(SQL_V1, assumptions=scope_doc(revision=3)["assumptions"] + imported)
+        self.commit_sidecar(sidecar("Include adults aged 16 and over."))
+        self.assertEqual(self.row()["next"],
+                         f"The analyst intake changed after scope revision 3: run /data-request:bootstrap {SQL} "
+                         f"to publish scope revision 4, then /data-request:analyse {SQL}" + INTAKE_DRAFT_HINT)
+
+    def test_a_sql_change_gets_no_draft_hint(self):
+        self.sql(SQL_V1)
+        self.scope(SQL_V1)
+        self.sql(SQL_V2)
+        self.assertNotIn("/data-request:draft", self.row()["next"])
+
+
+# Run only the new tests in StatusStageOrder: the inherited ones already run in StatusNext.
+for _name in [n for n in dir(StatusNext) if n.startswith("test_")]:
+    if _name not in StatusStageOrder.__dict__:
+        setattr(StatusStageOrder, _name, None)
+del _name
 
 
 class StatusAmendment(unittest.TestCase):

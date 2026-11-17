@@ -515,7 +515,7 @@ class AnalyseSkillContract(unittest.TestCase):
             with self.subTest(path=str(path.relative_to(REPO))):
                 text = " ".join(path.read_text().split())
                 for token in ("sql-body-unchanged", "scope-before-sql", "intent-unchanged", "``location`` lines",
-                              "Carry these N forward", "Carry over all (Recommended)", "neither recommended",
+                              "Name the items to re-walk", "Carry over all (Recommended)", "neither recommended",
                               "summary of the SQL delta", "nested ``/*``", "lone CR",
                               "compares the draft's line numbers"):
                     self.assertIn(token, text)

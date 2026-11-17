@@ -58,7 +58,13 @@ hands a ``/speckit.*`` command back to the human.
 
   .. code-block:: json
 
-     {"decision": "generativeMode", "value": "direct", "by": "engineer-handle", "at": "2026-11-04T09:30:00Z", "scope": "nq-rdl/query-builder"}
+     {
+       "decision": "generativeMode",
+       "value": "direct",
+       "by": "engineer-handle",
+       "at": "2026-11-04T09:30:00Z",
+       "scope": "nq-rdl/query-builder"
+     }
 
   ``by`` is the GitHub login of the human who authorised it, never an email
   address, and ``at`` is when. Record ``scope`` as the repository
@@ -81,8 +87,8 @@ runbook's Delivery section must point here. The engineer hands over; the analyst
 explains, accepts for release preparation, sends back or amends presentation, then
 prepares and publishes the release. Never direct the engineer to release.
 
-1. **Gate.** Continue only when the PR is out of draft, its CI is green on the
-   current head commit (read the run for that SHA, not an older one), and its
+1. **Gate.** The PR stays a draft through this step. Continue only when its CI is
+   green on the checked head commit (read the run for that SHA, not an older one), and its
    SQL review status is ``current``. Match the review to the SQL that actually ran,
    using the recorded run commit and SQL fingerprint, not just the current SQL in the PR.
    ``release.sh evidence`` reads review records from the working tree, not the PR, and
@@ -106,7 +112,7 @@ prepares and publishes the release. Never direct the engineer to release.
    or locally committed but unpushed reviews. Retain any differing review draft and
    stop for the engineer to complete its unpublished work. Run
    ``bash "$S/release.sh" evidence --no-amend-hold "<run commit>"`` with ``S`` set to the installed
-   setup scripts only after these checks pass. The flag stops the engineer's own hand-off from
+   setup scripts only after these checks pass. The flag stops the hand-off by the engineer from
    being held by a handed-off amend part: the script then never exits 11 and
    prints each open part as an ``amend note:`` on stderr. This mode verifies no commit, so it needs
    no fetch. Where a later step needs one, use the command that ``release.sh fetch-command``
@@ -125,15 +131,48 @@ prepares and publishes the release. Never direct the engineer to release.
    decisions for analyst review. The data analyst checks the delivered elements against
    the approval before release. An unchecked approval does not by itself prevent review;
    a known restriction remains a release gate. When the run-evidence or PR gate fails,
-   report which part failed and stop. Re-read the PR head before steps 2 and 3; if it
+   report which part failed and stop. Re-read the PR head before each later step. If it
    changed, recheck the gate on the new SHA. Without ``gh``, reading CI runs can need
    the GitHub MCP Actions toolset; if it is not enabled, say so.
-2. **Assign** the PR to the reviewer the human names. Read ``roles.analyst`` from
-   ``.sqlreview/config.json`` for the receiving role, not a person's login; if missing,
+
+   **Known CI failure.** A red check passes the gate only when a waiver in the
+   ``gate_waivers`` of the ledger names it for the checked head. Read the waivers with
+   ``bash "$S/sqlreview.sh" ledger waivers "$TICKET" "$PR_HEAD"``, with ``TICKET`` set
+   to the ticket of the entry. A ``waived`` row names the check, the login in ``by``, the
+   date and the source comment. Open that comment.
+   Confirm that its author is the login in ``by`` and that it names the check and the head.
+   A ``lapsed`` row is a waiver for another head, and it does not pass the gate.
+   A new failure that no waiver names stops the hand-off. Never write a waiver on your own.
+   Record one only after the human writes the waiver comment on the deliverable PR.
+   Never write or post that comment for the human, whatever the instruction.
+   ``ledger.rst`` gives the waiver fields.
+2. **Refresh** the PR title and body so that they describe the current outputs, run plan
+   and open gates. Draft the new text for the human, or write it on their explicit
+   instruction.
+   Then check output coverage. Every output that an ``-- @extract:`` marker names in the
+   reviewed SQL must appear in the runbook outputs, the data dictionary and the UAT
+   checklist.
+   Each must show its delivery kind (sheet, file or internal). A missing or extra output stops
+   the hand-off. Name each such output and the document that omits it.
+3. **Record** the hand-off in the ledger before the comment: PR, the checked head SHA,
+   reviewer, board state ``pending`` and date, with ``stage: handoff``. Commit and push the
+   ledger on the agreed branch. The ledger commit moves the PR head. Confirm with
+   ``git diff --name-only "$PR_HEAD" "$NEW_HEAD"``, with ``NEW_HEAD`` set to the new head
+   SHA, that it changed only ``.sqlreview/ledger.json``. If it did, the gate result and
+   the waivers read at the checked head also hold for the new head. A ``ledger waivers``
+   run for the new head shows them as ``lapsed``, because each waiver names the checked
+   head. That is expected, and no new waiver is needed. Any other change needs the gate again. The comment then names the head that
+   includes the ledger commit, so the head it names does not move.
+4. **Ready.** The human marks the PR ready for review. This takes it out of draft. Ask
+   for it when steps 1 to 3 pass. Mark it ready yourself only on an explicit
+   instruction from the human.
+5. **Assign** the PR to the reviewer the human names. Read ``roles.analyst`` from
+   ``.sqlreview/config.json`` for the receiving role, not the login of a person; if missing,
    ask for the role and reviewer. Never guess a reviewer. Re-resolve the child
    repository through the API before this write.
-3. **Comment** on the deliverable PR, addressed to the reviewer: what is
-   handed over, run commit and head SHA, review slugs/revisions and SQL fingerprints,
+6. **Comment** on the deliverable PR, addressed to the reviewer: what is
+   handed over, run commit, the checked head SHA and the head that includes the ledger
+   commit, review slugs/revisions and SQL fingerprints,
    counts-only QA, links to the run manifest, DVC pointers and UAT evidence, open questions,
    flagged decisions, known governance restrictions and the limitations the requester
    must hear. For each real technical choice include ``Engineer decision (<login>, <date>),
@@ -141,16 +180,18 @@ prepares and publishes the release. Never direct the engineer to release.
    preserve original decision provenance, separate from later confirmation.
    List agent-applied technical defaults separately, never as human decisions.
    Include offered extras (not built), not additional unrequested extracts.
+   List each waiver in the hand-off comment with its check, ``by``, date, issue and source.
    Keep row-level data, identifiers and small cell counts out. This PR comment is the
    hand-off. Do not post it on the child issue or the service-desk issue. Draft it for
    the human, or post it when the human authorises that post.
-4. **Move** (human only): list the child tracking issue card and the service-desk
+7. **Move** (human only): list the child tracking issue card and the service-desk
    request issue card, each to **In-Review** on the Service Desk Request Tracking
-   project board. The human moves them. Make no write to service-desk.
-5. **Record** the hand-off in the ledger: PR, head SHA, reviewer, board state as the
-   human reports it (``pending`` until then) and date.
+   project board. The human moves them. Make no write to service-desk. When the human
+   reports the move, update the board state in the ledger record. That commit moves the
+   head again. Check as in step 3 that it changed only ``.sqlreview/ledger.json``, and tell the
+   reviewer the new head.
 
-Steps 2 and 3 each need the human's explicit instruction. Step 4 is never an agent
+Steps 2 to 6 each write only on an explicit instruction from the human. Step 7 is never an agent
 write, whatever the instruction. In triage-only mode, post nothing: return the
-paste-ready PR comment, the reviewer to assign, and the list of board moves (card,
-board and target state) for the human.
+paste-ready PR comment, the new PR title and body, the reviewer to assign, and the list of
+board moves (card, board and target state) for the human.

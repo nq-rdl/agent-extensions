@@ -1,0 +1,3 @@
+kind: Fixed
+body: carryforward walks a located item when the diff cannot re-locate its range, as remap does
+time: 2026-11-16T03:12:00Z
