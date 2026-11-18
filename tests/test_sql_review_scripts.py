@@ -96,6 +96,11 @@ class Project:
         p.write_text(text)
         return p
 
+    def commit(self, message="source"):
+        git(self.root, "add", "-A")
+        git(self.root, "commit", "-q", "-m", message)
+        return git(self.root, "rev-parse", "HEAD").stdout.strip()
+
     def review_dir(self, slug):
         d = self.root / ".sqlreview" / "reviews" / slug
         d.mkdir(parents=True, exist_ok=True)
@@ -185,16 +190,18 @@ class Status(unittest.TestCase):
             p.sql("reports/monthly.sql", SQL_V1)
             p.sql("reports/weekly.sql", SQL_V1)
             p.sql("audits/gone.sql", SQL_V1)
+            p.commit("initial maintained SQL")
             for slug, path in (("reports__monthly", "reports/monthly.sql"), ("reports__weekly", "reports/weekly.sql"),
-                               ("audits__gone", "audits/gone.sql"), ("reports__nobase", "reports/nobase.sql")):
-                p.write_json(slug, "review.json", review_doc(slug, path))
-            run(["snapshot", "reports__monthly", "reports/monthly.sql"], p.root)
-            run(["snapshot", "reports__weekly", "reports/weekly.sql"], p.root)
-            run(["snapshot", "audits__gone", "audits/gone.sql"], p.root)
+                               ("audits__gone", "audits/gone.sql")):
+                fp = json.loads(run(["fingerprint", path], p.root).stdout)
+                p.write_json(slug, "review.json", review_doc(slug, **fp))
+                self.assertEqual(run(["snapshot", slug, path], p.root).returncode, 0)
             (p.root / "reports" / "weekly.sql").write_text(SQL_V2)
             (p.root / "audits" / "gone.sql").unlink()
             p.sql("reports/nobase.sql", SQL_V1)
-            p.write_json("reports__planned", "scope.json", scope_doc("reports__planned", "reports/planned.sql"))
+            p.commit("changed maintained sources")
+            p.write_json("reports__nobase", "review.json", review_doc("reports__nobase", "reports/nobase.sql"))
+            p.write_json("reports__planned", "scope.json", scope_doc("reports__planned", "reports/planned.sql", sql_sha256=None))
             j = json.loads(run(["status", "--json"], p.root).stdout)
             states = {r["slug"]: r["state"] for r in j["reviews"]}
             self.assertEqual(states, {
@@ -203,7 +210,7 @@ class Status(unittest.TestCase):
             })
             self.assertEqual(j["schemaVersion"], 2)
             text = run(["status"], p.root).stdout
-            self.assertRegex(text, r"(?m)^reports__weekly\tstale\treports/weekly.sql\t1\tlifts=\{\}$")
+            self.assertRegex(text, r"(?m)^reports__weekly\tstale\treports/weekly.sql\t1\tlifts=\{\}\tnext=/data-request:analyse reports/weekly.sql --update$")
 
 
 class Slug(unittest.TestCase):
@@ -289,24 +296,25 @@ class Fingerprint(unittest.TestCase):
             self.assertEqual(j["git_commit"], head)
             self.assertFalse(j["git_dirty"])
             f.write_text(SQL_V2)
-            self.assertTrue(json.loads(run(["fingerprint", "reports/monthly.sql"], p.root).stdout)["git_dirty"])
+            self.assertEqual(run(["fingerprint", "reports/monthly.sql"], p.root).returncode, 2)
             self.assertEqual(run(["fingerprint", "nope.sql"], p.root).returncode, 2)
 
     def test_without_git(self):
         with tempfile.TemporaryDirectory() as tmp:
             p = Project(tmp, git_repo=False)
             p.sql("q.sql", SQL_V1)
-            j = json.loads(run(["fingerprint", "q.sql"], p.root).stdout)
-            self.assertIsNone(j["git_commit"])
+            self.assertEqual(run(["fingerprint", "q.sql"], p.root).returncode, 2)
 
 
 class SnapshotDelta(unittest.TestCase):
     def _reviewed(self, p, path="reports/monthly.sql", slug="reports__monthly"):
         p.sql(path, SQL_V1)
-        p.write_json(slug, "review.json", review_doc(slug, path))
+        p.commit("reviewed maintained source")
+        fp = json.loads(run(["fingerprint", path], p.root).stdout)
+        p.write_json(slug, "review.json", review_doc(slug, **fp))
         r = run(["snapshot", slug, path], p.root)
         self.assertEqual(r.returncode, 0, r.stderr)
-        self.assertEqual((p.root / ".sqlreview" / "reviews" / slug / "source.sql").read_text(), SQL_V1)
+        self.assertEqual(list((p.root / ".sqlreview").rglob("*.sql")), [])
 
     def test_unchanged_exits_0_changed_exits_10(self):
         with tempfile.TemporaryDirectory() as tmp:
@@ -315,29 +323,35 @@ class SnapshotDelta(unittest.TestCase):
             r = run(["delta", "reports__monthly"], p.root)
             self.assertEqual(r.returncode, 0, r.stderr)
             (p.root / "reports" / "monthly.sql").write_text(SQL_V2)
+            p.commit("changed maintained source")
             r = run(["delta", "reports__monthly"], p.root)
             self.assertEqual(r.returncode, 10)
             self.assertIn("-WITH stays AS", r.stdout)
             self.assertIn("+WITH completed AS", r.stdout)
             self.assertIn("baseline_sha256=", r.stdout)
 
-    def test_baseline_is_bytes_not_git(self):
-        # dirty, untracked, reverted-to-HEAD and no-git all behave the same: bytes vs bytes.
+    def test_read_only_commands_ignore_dirty_tree_and_fingerprint_refuses_it(self):
         with tempfile.TemporaryDirectory() as tmp:
             p = Project(tmp)
-            f = p.sql("reports/monthly.sql", SQL_V2)          # HEAD will hold V2
-            git(p.root, "add", "-A")
-            git(p.root, "commit", "-q", "-m", "v2")
-            f.write_text(SQL_V1)                               # reviewed content is the dirty V1
-            p.write_json("reports__monthly", "review.json", review_doc())
-            run(["snapshot", "reports__monthly", "reports/monthly.sql"], p.root)
-            self.assertEqual(run(["delta", "reports__monthly"], p.root).returncode, 0)
-            git(p.root, "checkout", "--", "reports/monthly.sql")   # revert to HEAD → differs from baseline
+            self._reviewed(p)
+            f = p.root / "reports/monthly.sql"
+            f.write_text(SQL_V2)
+            # An uncommitted edit is a working-tree change to diff, never a refusal.
             self.assertEqual(run(["delta", "reports__monthly"], p.root).returncode, 10)
+            self.assertIn("stale", run(["status"], p.root).stdout)
+            self.assertEqual(run(["fingerprint", "reports/monthly.sql"], p.root).returncode, 2)
+            git(p.root, "checkout", "--", "reports/monthly.sql")
+            self.assertEqual(run(["delta", "reports__monthly"], p.root).returncode, 0)
+            p.sql("untracked.sql", SQL_V1)
+            self.assertEqual(run(["fingerprint", "untracked.sql"], p.root).returncode, 2)
+            self.assertEqual(run(["delta", "reports__monthly"], p.root).returncode, 0)
+            self.assertIn("current", run(["status"], p.root).stdout)
         with tempfile.TemporaryDirectory() as tmp:
             p = Project(tmp, git_repo=False)
-            self._reviewed(p, "untracked.sql", "untracked")
-            self.assertEqual(run(["delta", "untracked"], p.root).returncode, 0)
+            p.sql("q.sql", SQL_V1)
+            p.write_json("q", "review.json", review_doc("q", "q.sql"))
+            self.assertEqual(run(["fingerprint", "q.sql"], p.root).returncode, 2)
+            self.assertEqual(run(["snapshot", "q", "q.sql"], p.root).returncode, 2)
 
     def test_no_baseline_exits_6_missing_sql_exits_2(self):
         with tempfile.TemporaryDirectory() as tmp:
@@ -346,7 +360,7 @@ class SnapshotDelta(unittest.TestCase):
             p.write_json("reports__monthly", "review.json", review_doc())
             r = run(["delta", "reports__monthly"], p.root)
             self.assertEqual(r.returncode, 6)
-            self.assertIn("baseline", r.stderr)
+            self.assertIn("immutable source evidence", r.stderr)
             self._reviewed(p)
             (p.root / "reports" / "monthly.sql").unlink()
             self.assertEqual(run(["delta", "reports__monthly"], p.root).returncode, 2)
@@ -361,11 +375,14 @@ class Impact(unittest.TestCase):
         with tempfile.TemporaryDirectory() as tmp:
             p = Project(tmp)
             p.sql("q.sql", self.SQL)
-            p.write_json("q", "review.json", review_doc("q", "q.sql"))
+            p.commit("maintained source")
+            fp = json.loads(run(["fingerprint", "q.sql"], p.root).stdout)
+            p.write_json("q", "review.json", review_doc("q", **fp))
             run(["snapshot", "q", "q.sql"], p.root)
             # Line 2 changes: the projected columns now name month and ward_id, which unchanged
             # lines 7, 9 and 10 depend on. `wards` is untouched and must not be traced.
             (p.root / "q.sql").write_text(self.SQL.replace("SELECT * FROM adm.stays", "SELECT id, ward_id, month FROM adm.stays"))
+            p.commit("changed projection")
             r = run(["impact", "q"], p.root)
             self.assertEqual(r.returncode, 0, r.stderr)
             self.assertIn("heuristic", r.stdout.lower())
@@ -381,7 +398,10 @@ class Impact(unittest.TestCase):
             p.sql("q.sql", SQL_V1)
             p.write_json("q", "review.json", review_doc("q", "q.sql"))
             self.assertEqual(run(["impact", "q"], p.root).returncode, 6)
-            run(["snapshot", "q", "q.sql"], p.root)
+            p.commit("maintained source")
+            fp = json.loads(run(["fingerprint", "q.sql"], p.root).stdout)
+            p.write_json("q", "review.json", review_doc("q", **fp))
+            self.assertEqual(run(["snapshot", "q", "q.sql"], p.root).returncode, 0)
             r = run(["impact", "q"], p.root)
             self.assertEqual(r.returncode, 0)
             self.assertIn("no change", r.stdout.lower())
@@ -405,8 +425,10 @@ class Move(unittest.TestCase):
             for name in ("review.json", "scope.json"):
                 j = json.loads((d / name).read_text())
                 self.assertEqual((j["sql_path"], j["slug"]), ("archive/monthly.sql", "archive__monthly"))
-            self.assertEqual(run(["delta", "archive__monthly"], p.root).returncode, 10)
+            # The fixture record has no clean commit, so the moved binding cannot be read from git (6).
+            self.assertEqual(run(["delta", "archive__monthly"], p.root).returncode, 6)
             self.assertEqual(run(["move", "nope.sql", "x.sql"], p.root).returncode, 2)
+            self.assertEqual(list((p.root / ".sqlreview").rglob("*.sql")), [])  # #505: no SQL copies in the store
 
 
 class Render(unittest.TestCase):
@@ -457,6 +479,81 @@ class Usage(unittest.TestCase):
             r = run(["frobnicate"], tmp)
             self.assertEqual(r.returncode, 1)
             self.assertIn("usage", (r.stdout + r.stderr).lower())
+
+
+class HelperMessages(unittest.TestCase):
+    """Help works anywhere, and refusals name the field and the rule."""
+
+    RELEASE = REPO / "skills" / "data-request-setup" / "scripts" / "release.sh"
+
+    def release(self, args, cwd):
+        e = {k: v for k, v in os.environ.items() if not k.startswith("SQLREVIEW_")}
+        return subprocess.run(["bash", str(self.RELEASE), *args], cwd=cwd, env=e,
+                              capture_output=True, text=True, timeout=60)
+
+    def test_release_subcommand_help_works_outside_a_project(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            for args in (["--help"], ["-h"], ["evidence", "--help"], ["evidence", "origin/main", "-h"],
+                         ["criteria", "--help"], ["fetch-command", "--help"], ["amend-check", "--help"]):
+                with self.subTest(args=args):
+                    r = self.release(args, tmp)
+                    self.assertEqual(r.returncode, 0, r.stderr)
+                    self.assertIn("evidence [--no-amend-hold] REF [SLUG...]", r.stdout)
+                    self.assertNotIn("not initialised", r.stderr)
+            # A real refusal outside a project still exits non-zero.
+            self.assertEqual(self.release(["evidence", "HEAD"], tmp).returncode, 3)
+
+    def intake_and_draft(self, p, mutate):
+        sidecar = {"schemaVersion": 1, "approval_number": "THHSAQUIRE-042", "decisions": [],
+                   "open_questions": ["Which wards?"]}
+        source = p.root / "answers.intake.json"
+        source.write_text(json.dumps(sidecar))
+        d = scope_doc(sql_sha256=None, approval_number="THHSAQUIRE-042")
+        mutate(d)
+        return source, p.write_json(d["slug"], "scope.draft.json", d)
+
+    def test_intake_merge_refusal_names_the_field(self):
+        cases = {
+            "open_questions": lambda d: d.pop("open_questions"),
+            "assumptions": lambda d: d.update(assumptions={"ZZTEST": 1}),
+            "kind": lambda d: d.update(kind="review"),
+            "revision": lambda d: d.update(revision=2),
+            "approval_number": lambda d: d.update(approval_number="ZZTEST-1"),
+            "intake_questions": lambda d: d.update(intake_questions=["ZZTEST"]),
+            "assumptions[].id": lambda d: d["assumptions"].append(dict(d["assumptions"][0])),
+        }
+        with tempfile.TemporaryDirectory() as tmp:
+            p = Project(tmp)
+            for field, mutate in cases.items():
+                with self.subTest(field=field):
+                    source, draft = self.intake_and_draft(p, mutate)
+                    r = run(["intake", str(source), "1", str(draft)], p.root)
+                    self.assertEqual(r.returncode, 4, r.stdout + r.stderr)
+                    self.assertEqual(r.stdout, "")
+                    self.assertIn(f"draft field {field}:", r.stderr)
+                    self.assertNotIn("ZZTEST", r.stderr)
+
+    def test_init_ignores_drafts(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            p = Project(tmp)
+            lines = (p.root / ".sqlreview" / ".gitignore").read_text().splitlines()
+            self.assertIn("/reviews/**/*.draft.json", lines)
+            d = p.review_dir("q")
+            (d / "questions.draft.json").write_text("{}")
+            status = git(p.root, "status", "--porcelain", "--untracked-files=all").stdout
+            self.assertNotIn("questions.draft.json", status)
+
+    def test_setup_states_publish_lint_and_discard_guard(self):
+        text = " ".join((REPO / "skills" / "data-request-setup" / "SKILL.md").read_text().split())
+        self.assertIn("`publish` runs `lint` and `lint --ste` on a scope or review itself", text)
+        self.assertIn("Pass `--unpublished` only when the engineer agrees to lose that work", text)
+
+    def test_setup_states_the_string_sql_false_positive_procedure(self):
+        text = " ".join((REPO / "skills" / "data-request-setup" / "SKILL.md").read_text().split())
+        self.assertIn("measure false positives on three backlog enquiries", text)
+        self.assertIn("show the engineer the file and line numbers only", text)
+        self.assertIn("A false positive is a hit that the engineer says is not SQL built from strings", text)
+        self.assertIn("git -C \"<earlier request repository>\" grep -nEi", text)
 
 
 if __name__ == "__main__":

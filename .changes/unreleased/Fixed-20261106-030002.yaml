@@ -1,0 +1,3 @@
+kind: Fixed
+body: data-request source check and status treat .sqlreview/amendments/ records as store files, not uncommitted source
+time: 2026-11-06T03:00:02.000000+10:00

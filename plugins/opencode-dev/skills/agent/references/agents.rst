@@ -355,7 +355,7 @@ This path is relative to where the config file is located. So this works for bot
 Use the `model` config to override the model for this agent. Useful for using different models optimized for different tasks. For example, a faster model for planning, a more capable model for implementation.
 
 :::tip
-If you don’t specify a model, primary agents use the [model globally configured](https://opencode.ai/docs/config/#models) while subagents will use the model of the primary agent that invoked the subagent.
+If you don’t specify a model, primary agents use the [model globally configured](https://opencode.ai/docs/config/) while subagents will use the model of the primary agent that invoked the subagent.
 :::
 
 ```json title="opencode.json"

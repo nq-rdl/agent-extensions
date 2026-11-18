@@ -11,8 +11,14 @@ No model call is made; the behavioural side lives in evals/claude/data-request/.
 import re
 import unittest
 from pathlib import Path
+from unittest.mock import patch
 
 import yaml
+
+try:  # `unittest discover -s tests` puts tests/ on sys.path; `-m unittest tests.x` does not
+    import skill_references
+except ModuleNotFoundError:
+    from tests import skill_references
 
 REPO = Path(__file__).resolve().parent.parent
 BUNDLE = REPO / "registry" / "bundles" / "data-request.yaml"
@@ -131,11 +137,33 @@ class Composition(unittest.TestCase):
             text = path.read_text()
             with self.subTest(path=path.name):
                 # SQL-bound publication/confirmation/mechanics belong to other stages.
-                # #435 deliberately permits only the shared helper's independent ledger calls.
-                self.assertNotRegex(text, r'sqlreview\.sh" (?!ledger\b)')
+                # Independent ledger calls and the exact hand-off source-evidence
+                # gate compose helpers without restating a stage's procedure.
+                allowed = r'ledger\b'
+                if path == CANON / "references" / "handoff.rst":
+                    allowed += "|" + re.escape(
+                        'fingerprint "$(jq -r .sql_path "$path")" >/dev/null || exit $?'
+                    ) + r'(?=\n|\Z)'
+                self.assertNotRegex(text, rf'sqlreview\.sh" (?!(?:{allowed}))')
                 for owned in ("carryforward", "confirmed_revision", "DATEADD",
                               "CREATE TABLE", "scope.draft.json"):
                     self.assertNotIn(owned, text)
+
+    def test_evidence_exception_still_rejects_stage_and_other_fingerprint_calls(self):
+        handoff = CANON / "references" / "handoff.rst"
+        gate = 'bash "$S/sqlreview.sh" fingerprint "$(jq -r .sql_path "$path")" >/dev/null || exit $?'
+        cases = [(handoff, 'bash "$S/sqlreview.sh" ' + command)
+                 for command in ('publish "$SLUG" review draft.json', 'snapshot "$SLUG" q.sql',
+                                 'notes q.sql', 'fingerprint q.sql')]
+        cases += [(CANON / "SKILL.md", gate), (handoff, gate + '; echo continued')]
+        for path, command in cases:
+            with self.subTest(path=path.name, command=command):
+                with patch(__name__ + ".skill_files", return_value=[path]), \
+                     patch.object(Path, "read_text", return_value=command):
+                    result = unittest.TestResult()
+                    Composition("test_does_not_restate_stage_procedures").run(result)
+                self.assertEqual(result.errors, [])
+                self.assertEqual(len(result.failures), 1)
 
     def test_skill_md_is_lean(self):
         self.assertLessEqual(len(SKILL.read_text().splitlines()), 140)
@@ -162,16 +190,10 @@ class ModelSelection(unittest.TestCase):
 
 
 class References(unittest.TestCase):
-    EXPECTED = {"subagent.rst", "ledger.rst", "repositories.rst", "checks.rst", "comments.rst", "handoff.rst"}
-
     def test_references_exist_are_rst_and_linked_with_when_to_read(self):
-        refs = CANON / "references"
-        self.assertEqual({p.name for p in refs.iterdir()}, self.EXPECTED)
-        text = body(SKILL)
-        for name in self.EXPECTED:
-            with self.subTest(ref=name):
-                link = re.search(r"\]\(references/" + re.escape(name) + r"\)([^\n]*)", text)
-                self.assertIsNotNone(link, f"SKILL.md does not link references/{name}")
+        # Discovered from the directory: a new reference needs only its file and a SKILL.md link.
+        self.assertGreaterEqual(len(skill_references.references(CANON)), 6)
+        self.assertEqual(skill_references.problems(CANON), [])
 
     def test_ledger_schema_fields(self):
         ledger = (CANON / "references" / "ledger.rst").read_text()

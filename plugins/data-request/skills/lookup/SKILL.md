@@ -3,14 +3,14 @@ license: CC-BY-4.0
 description: >-
   Help a Data Analyst discover source codes for an order field, clinical event or
   event set, medication, diagnosis or procedure, or pathology task assay. Choose
-  the lookup family and direction, generate a count-only probe for a human to run,
+  the lookup family and direction, generate a probe for a human to run,
   then write a private lookup record for mapping. Never runs a database query or
   chooses the clinical code set for the analyst. Use when an analyst needs a source
   code and has no confirmed code list.
 argument-hint: '<lookup question or private lookup record>'
 user-invocable: true
 compatibility: >-
-  RDL request repositories; query-builder lookup depends on nq-rdl/query-builder#231
+  RDL request repositories; query-builder lookup depends on a query-builder issue
   (open and unmerged when authored). No released command version is assumed;
   verify the installed pin, help and private lookup documentation before use.
 allowed-tools: Bash, Write, Read, Glob, Grep, AskUserQuestion
@@ -36,17 +36,17 @@ store allowed by the disclosure section below; never copy them into this catalog
 ## Verify the private reference first
 
 The command and lookup documentation depend on
-[query-builder #231](https://github.com/nq-rdl/query-builder/issues/231).
+a query-builder issue.
 That issue is a proposal, not proof of an installed capability. Its private home
-is spec 020, `specs/020-iemr-code-lookup/` on branch `020-iemr-code-lookup`.
-Read that spec and its research; verify against the installed dependency pin,
+is the query-builder code-lookup design that the issue links.
+Read that design and its research; verify against the installed dependency pin,
 implementation, tests and current dataops DDL before generating a probe.
 Record exact source paths and revisions; draft docs do not establish released support.
 
 Use the private docs for the table chains and all storage/read rules. The private
 supporting sources are `rdl-ide-settings/snippets/SQL/`, the child-repository
-lookup probes located through private query-builder #231 and spec 020, query-builder
-spec 017 research R12/R13 (merged in nq-rdl/query-builder#198), and the dataops
+lookup probes located through the private query-builder issue and its code-lookup design,
+the merged query-builder research on code lookups, and the dataops
 catalogue YAML/DDL. Historical snippets and probes are evidence to reconcile,
 not authority to copy SQL blindly.
 
@@ -99,7 +99,16 @@ for the agent to invent a replacement query or run one.
 
 ## Human run and paste-back
 
-Before handoff, check that the probe returns only codes, labels and counts, with
+Where the analyst already holds a candidate code or label and needs only to know whether
+the source contains it, offer a verdict probe first (guardrails `references/performance.rst`,
+**Verdict probes**): answer pass or fail, no numbers. Use the discovery grid only
+to discover codes that the analyst does not yet hold. Population counts in the grid need a count exception
+recorded and approved by the Data Engineer for that probe (guardrails `references/release.rst`). Without one, the grid returns codes and labels only. If the script returns population counts and no
+count exception is recorded, stop and hand off to the engineer. Hand the run to the operator with the
+steps in `${CLAUDE_PLUGIN_ROOT}/skills/guardrails/references/operator-handover.rst`. Write a
+miss as "not found by probe P<n>, and the search stopped because <reason>", never as absence.
+
+Before handoff, check that the probe returns only codes, labels and counts, where counts need a recorded count exception, with
 matched-term provenance so short-term collisions remain visible. No patient
 values, patient dates, identifiers, staff/person keys or free-text results.
 Read **Probe disclosure control** in
@@ -120,8 +129,8 @@ The authorised human runs the saved script in SSMS and pastes the labelled grids
 back, formatted under that disclosure section. The agent runs no query, including
 through a database tool or connection helper. Ask for missing grid labels or run
 provenance; no paste-back means no observed code evidence. If exact population
-counts are pasted, do not repeat or commit them: ask for formatted output and
-apply the section before writing any text. Unexpected patient data must not be
+counts are pasted without a recorded count exception, do not repeat or commit them: ask for the
+codes-and-labels or verdict form and apply the section before writing any text. Unexpected patient data must not be
 reproduced or stored as a lookup record: stop and return the unsafe probe to the engineer.
 
 Check term collisions and distinguish no hit, suppressed count and missing grid.
@@ -152,8 +161,8 @@ the following fields (no live values belong in this public template):
   pasted-grid location. Use an operator handle, never an email or workstation
   identity, following intake's actor rule. Never invent execution or approval.
 - **Candidates:** one row per code with its label, source table/resolver, matched
-  term or expansion origin, labelled-grid citation and disclosure-controlled count
-  as shown, classified as structural or population under the disclosure section.
+  term or expansion origin, labelled-grid citation and, where a count exception allowed one,
+  the disclosure-controlled count as shown, classified as structural or population under the disclosure section.
   Keep schema names and code values here privately, not in the skill.
 - **Disposition:** selected, rejected or unresolved, with rationale; analyst
   decisions retain actual actor/date/source. Record no hits, missing grids,

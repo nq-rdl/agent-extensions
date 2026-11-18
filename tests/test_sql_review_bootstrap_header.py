@@ -117,9 +117,10 @@ class BootstrapHeader(unittest.TestCase):
                             "\n    rationale: " + self.scope["assumptions"][0]["rationale"] +
                             "\nlimitations:\n  - " + self.scope["limitations"][0]["text"] +
                             "\n    consequence: " + self.scope["limitations"][0]["rationale"] + "\n*/\n" + SQL_V1)
+        self.p.commit()
         fp = run(["fingerprint", "q.sql"], self.p.root)
         self.assertEqual(fp.returncode, 0, fp.stderr)
-        self.scope.update({k: v for k, v in json.loads(fp.stdout).items() if k in ("sql_sha256", "sql_body_sha256")})
+        self.scope.update(json.loads(fp.stdout))
         self.draft.write_text(json.dumps(self.scope))
         out = self.compared()
         self.assertEqual(out["unmatched_header"], [])
@@ -301,6 +302,12 @@ class BootstrapHeader(unittest.TestCase):
         self.assertEqual(r.returncode, 2, r.stdout + r.stderr)
 
 
+try:  # `unittest discover -s tests` puts tests/ on sys.path; `-m unittest tests.x` does not
+    import skill_references
+except ModuleNotFoundError:
+    from tests import skill_references
+
+
 class BootstrapContract(unittest.TestCase):
     def test_prepublication_comparison_and_resolution_in_all_targets(self):
         for path in (REPO / "skills/data-request-bootstrap/SKILL.md",
@@ -311,13 +318,19 @@ class BootstrapContract(unittest.TestCase):
                 check = body.index('sqlreview.sh" notes')
                 publish = body.index('sqlreview.sh" publish "$SLUG" scope')
                 self.assertLess(check, publish)
+                # How to read scope_check lives in a linked reference, beside the gate in SKILL.md.
+                self.assertIn("](references/header-check.rst)", body)
+                self.assertIn("Do not publish while a mismatch is unaddressed", body)
+                self.assertIn("Compare every open scope", body)
+                self.assertEqual(skill_references.problems(path.parent), [])
+                body += (path.parent / "references" / "header-check.rst").read_text()
                 for phrase in ("--against", "--questions", "question_checks", "unmatched_header",
                                "both identities", "provisional", "Do not close", "semantic"):
                     self.assertIn(phrase, body)
                 self.assertRegex(body, r"[/\$]data-request:fix")
                 self.assertIn('if [ -f "<sql path>" ]', body)
                 self.assertIn("malformed", body)
-                self.assertIn("no warning", body)
+                self.assertIn("nothing to report", body)
 
     def test_no_sql_still_allows_scope_publication(self):
         with tempfile.TemporaryDirectory() as tmp:

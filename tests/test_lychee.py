@@ -158,6 +158,8 @@ class ConfigTests(unittest.TestCase):
             "^https://developers\\.redhat\\.com/?$",
             # #301: the private RDL Planning board (README.md) answers 404 anonymously.
             "^https://github\\.com/orgs/nq-rdl/projects/1/?$",
+            # #555: OpenCode share links in CLI examples answer 410 once the share expires.
+            "^https://opncd\\.ai/s/",
         }
         self.assertEqual(set(old["exclude"]) - set(current["exclude"]), removed)
         self.assertEqual(set(current["exclude"]) - set(old["exclude"]), added)

@@ -1,0 +1,3 @@
+kind: Fixed
+body: data-request raw-data guard decides on the project's physical data/00_raw path, symlinks and glob segments
+time: 2026-11-06T04:00:02.000000+10:00

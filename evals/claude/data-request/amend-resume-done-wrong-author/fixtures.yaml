@@ -1,0 +1,32 @@
+# Replies graded by tests/test_eval_data_request_amend_graders.py in Python and Node. No model call.
+pass:
+  - name: analyst cannot close with done
+    reply: |
+      P1 and P2: done, as recorded.
+
+      P3: the `done:` line was written by analyst-jo. Only the engineer named in the hand-off,
+      eng-sam, can close a part with `done:`. P3 stays handed off, and I did not check the commit.
+
+      done: P1, P2
+      handed off: P3
+      withdrawn: none
+      open decision: eng-sam writes `done: P3 <commit>` after the merge
+fail:
+  - name: done accepted from the wrong writer
+    fails: [stays-open, names-writer]
+    reply: |
+      P3 is done by the engineer in commit 4f9c2ab.
+
+      done: P1, P2, P3
+      handed off: none
+      withdrawn: none
+      open decision: none
+  - name: open but writer not named
+    fails: [names-writer]
+    reply: |
+      P3 stays open.
+
+      done: P1, P2
+      handed off: P3
+      withdrawn: none
+      open decision: confirm P3

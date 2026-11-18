@@ -1,0 +1,3 @@
+kind: Added
+body: Maintainer script scripts/migrate_sqlreview_snapshots.sh removes legacy .sqlreview/ SQL copies and keeps each SHA
+time: 2026-10-30T00:00:06Z

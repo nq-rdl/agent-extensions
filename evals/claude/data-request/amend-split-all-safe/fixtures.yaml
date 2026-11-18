@@ -1,0 +1,40 @@
+# Replies graded by tests/test_eval_data_request_amend_graders.py in Python and Node. No model call.
+pass:
+  - name: two safe parts
+    reply: |
+      P1: call the MRN column URN
+      classification: analyst-safe
+
+      P2: drop the AgeAtAdmit column
+      classification: analyst-safe
+
+      Both parts keep the rows and keys and only change names or which surfaced columns are shown.
+      Change src/cohort/falls.py: `.select("MRN", "EncounterId", "AdmitDateTime",
+      "DischargeDateTime", "WardCd", "SexCd", rename={"MRN": "URN"})`, then regenerate the SQL.
+      Add AMD-002 and AMD-003 to specs/amendments.md and check the row count and key set.
+
+      done: P1 rename, P2 drop AgeAtAdmit (checks pending until the operator run)
+      handed off: none
+      open decision: none
+fail:
+  - name: drop treated as engineer work
+    fails: [all-safe, no-hand-off]
+    reply: |
+      P1: call the MRN column URN
+      classification: analyst-safe
+
+      P2: drop the AgeAtAdmit column
+      classification: engineer-required
+
+      amendment hand-off: 1 of 2 parts need the data engineer
+      part: P2
+      requested change: drop AgeAtAdmit
+      handed off: P2
+  - name: no summary line
+    fails: [no-hand-off]
+    reply: |
+      P1: call the MRN column URN
+      classification: analyst-safe
+
+      P2: drop the AgeAtAdmit column
+      classification: analyst-safe

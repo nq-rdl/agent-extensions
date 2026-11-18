@@ -9,10 +9,16 @@ not parked as analyst questions. Keep human decisions distinct from agent defaul
 Read-only stale lift check
 -------------------------
 
-For each existing ``lifts.json``, read the stale-check contract at
-``${CLAUDE_PLUGIN_ROOT}/skills/setup/references/lifts.rst``. Discover the latest
-stable tag of the entry's owning library through the shared tag-list policy at
-``${CLAUDE_PLUGIN_ROOT}/skills/guardrails/references/library.rst``. Run the shared
+For each existing ``lifts.json``, read the stale-check contract::
+
+  ${CLAUDE_PLUGIN_ROOT}/skills/setup/references/lifts.rst
+
+Discover the latest stable tag of the entry's owning library through the shared tag-list
+policy::
+
+  ${CLAUDE_PLUGIN_ROOT}/skills/guardrails/references/library.rst
+
+Run the shared
 helper's ``lifts-stale SLUG --tag TAG`` in the child's read-only checkout/scratch
 view; it never edits a ledger. Mixed-library ledgers need a run per library's
 latest tag, using only matching-library rows from each result.
@@ -48,6 +54,11 @@ Interpretation checks
   half-open window (on or after the start, before the day after the end) to the
   engineer, proceed and flag when it implements the requested full-day range.
   A different research window is not a technical default.
+* **Pins and tags.** List the library and scaffold tags again just before you state
+  or ask for a pin. A list from an earlier turn is stale. Compare the child's
+  ``framework_ref`` with the floor that ``/data-request:guardrails`` states. A pin
+  below the floor is a blocker: report the pin and the missing APIs. Search the
+  library's open issues for the APIs the request needs, and cite what you find.
 * **Time zone.** ieMR stores UTC, while HBCIS and BI-Reporting store AEST.
   Decide the delivery time zone explicitly, and verify each field through
   ``/data-request:guardrails``.

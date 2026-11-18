@@ -8,6 +8,7 @@ No model call is made; the behavioural side lives in evals/claude/data-request/f
 """
 
 import re
+import textwrap
 import unittest
 from pathlib import Path
 
@@ -113,7 +114,7 @@ class LedgerDefaultLocation(unittest.TestCase):
         where = flat(rst_section("ledger.rst", "Where it lives"))
         self.assertIn(".sqlreview/ledger.json", where)
         self.assertIn("agrees work on that child branch", where)
-        self.assertIn("use this default without asking", where)
+        self.assertIn("use this default; do not make them choose a location", where)
         self.assertIn("no writable agreed branch yet, use the session file", where)
         self.assertIn("triage-only mode, return the entries as text", where)
         self.assertIn("save with ``--session``", where)
@@ -201,13 +202,19 @@ class ScaffoldStates(unittest.TestCase):
 
     def test_fresh_render_recipe(self):
         recipe = rst_term(self.states, "Fresh render")
-        for token in ("copier copy", "--vcs-ref", "--data-file answers.yaml",
-                      "gh:nq-rdl/data-analysis-scaffold", "co-development", "byte-identical", "Re-lock pixi",
-                      "``--trust`` runs the template's tasks", "pinned release tag", "list each one in the PR body",
+        for token in ("skills/setup/references/scaffold-render.rst", "co-development", "byte-identical",
+                      "Re-lock pixi", "list each one in the PR body",
                       "``.seed-manifest.yml``", "``scripts/template_sync.py``", "``src/service_desk/``"):
             with self.subTest(token=token):
                 self.assertIn(token, recipe)
         self.assertNotRegex(recipe, r"run[^.]*copier update")
+        # The command itself lives in the one shared render procedure that intake also cites.
+        shared = body(REPO / "skills" / "data-request-setup" / "references" / "scaffold-render.rst")
+        for token in ("copier copy", "--vcs-ref", "--data-file answers.yaml",
+                      "gh:nq-rdl/data-analysis-scaffold", "``--trust`` runs the template's", "pinned release tag"):
+            with self.subTest(shared_token=token):
+                self.assertIn(token, shared)
+        self.assertNotRegex(shared, r"run[^.]*copier update")
 
     def test_agents_still_never_run_copier_update(self):
         never = md_section(body(TRIAGE / "SKILL.md"), "Never infer permission")
@@ -279,7 +286,7 @@ class DefaultsAndPriorVersions(unittest.TestCase):
 
 
 class HandOffToReview(unittest.TestCase):
-    """#368: gate, assign, comment, move, record; triage-only posts nothing."""
+    """#368: gate, refresh, record, ready, assign, comment, move; triage-only posts nothing."""
 
     def setUp(self):
         self.handoff = rst_section("handoff.rst", "Hand-off to review")
@@ -298,17 +305,19 @@ class HandOffToReview(unittest.TestCase):
 
     def test_steps_in_order(self):
         labels = re.findall(r"^\d+\. \*\*(\w+)\.?\*\*", self.handoff, re.M)
-        self.assertEqual(labels, ["Gate", "Assign", "Comment", "Move", "Record"])
+        self.assertEqual(labels, ["Gate", "Refresh", "Record", "Ready", "Assign", "Comment", "Move"])
 
     def test_gate_reviewer_comment_board_and_record(self):
         text = flat(self.handoff)
-        for token in ("out of draft", "green on the current head", "SQL review status is ``current``",
-                      "``/data-request:analyse`` re-ran", "--reconfirm-all", "Actions toolset",
+        for token in ("out of draft", "green on the checked head", "SQL review status is ``current``",
+                      "``/data-request:analyse`` re-ran", "it walked the touched items and asked one carry question",
+                      "lists every other item with its confirmed text", "Actions toolset",
                       "open delivery gate", "Never guess a reviewer", "tracking issue",
                       "service-desk request issue", "**In-Review**", "head SHA", "reviewer",
                       "board state"):
             with self.subTest(token=token):
                 self.assertIn(token, text)
+        self.assertNotIn("--reconfirm-all", text)
 
     def test_writes_need_authorisation_and_triage_only_posts_nothing(self):
         text = flat(self.handoff)
@@ -353,15 +362,22 @@ class SpecKitDirectMode(unittest.TestCase):
         # rdl-team:house-style reuses only {"decision": "generativeMode", "value": "direct", by, at, scope}
         # (PR #402's directAuthorised()). Triage cannot know the unit's worktree path, so it records the
         # repository owner/name and the main session translates it into the unit's physicalWorktree.
-        for name in ("handoff.rst", "ledger.rst"):
+        handoff = [yaml.safe_load(m) for m in re.findall(r'\{\s*"decision": "generativeMode"[^}]*\}',
+                                                         (REFS / "handoff.rst").read_text())]
+        # The ledger example is one YAML entry; read its decisions as data, not by text shape.
+        # Anchor on the "Example entry" lead-in so another YAML block elsewhere cannot be picked up.
+        example = (REFS / "ledger.rst").read_text().split("Example entry", 1)[1]
+        example = example.split(".. code-block:: yaml\n", 1)[1]
+        example = re.split(r"\n(?=\S)", example.lstrip("\n"), maxsplit=1)[0]
+        ledger = [d for d in yaml.safe_load(textwrap.dedent(example))["decisions"]
+                  if d.get("decision") == "generativeMode"]
+        for name, objs in (("handoff.rst", handoff), ("ledger.rst", ledger)):
             with self.subTest(ref=name):
-                objs = [yaml.safe_load(m) for m in re.findall(r'\{"decision": "generativeMode"[^}]*\}',
-                                                              (REFS / name).read_text())]
                 self.assertTrue(objs, f"{name} has no generativeMode decision object")
                 for obj in objs:
                     self.assertEqual(set(obj), {"decision", "value", "by", "at", "scope"})
                     self.assertEqual(obj["value"], "direct")
-                    self.assertEqual(obj["scope"], "<owner/name>")
+                    self.assertEqual(obj["scope"], "nq-rdl/query-builder")  # owner/name, not a guessed path
         spec = flat(rst_section("handoff.rst", "Library work through spec-kit"))
         self.assertRegex(spec, r"``scope`` as the repository ``owner/name``")
         self.assertRegex(spec, r"(?i)keep these five keys exactly")

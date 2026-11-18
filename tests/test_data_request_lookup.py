@@ -42,13 +42,13 @@ class LookupContract(unittest.TestCase):
                 for phrase in ("order field", "clinical event code or event set", "medication",
                                "ICD-10-AM, ACHI, SNOMED CT", "pathology task",
                                "Forward", "Reverse", "short date window",
-                               "rdl-ide-settings/snippets/SQL/", "R12/R13", "dataops",
+                               "rdl-ide-settings/snippets/SQL/", "code-lookup design", "dataops",
                                "analyst-intake.rst", "data-request:intake"):
                     self.assertIn(phrase, text)
-                self.assertIn("https://github.com/nq-rdl/query-builder/issues/231", text)
                 self.assertIn("Read each very large table only through a temp table of keys", text)
-                self.assertIn("merged in nq-rdl/query-builder#198", text)
-                self.assertIn("specs/020-iemr-code-lookup/", text)
+                for private in ("query-builder#198", "query-builder#231", "query-builder #231",
+                                "nq-rdl/query-builder/issues/231", "specs/020", "spec 020", "spec 017", "R12/R13"):
+                    self.assertNotIn(private, text)
                 self.assertNotIn("https://github.com/nq-rdl/agent-extensions/issues/469", text)
                 self.assertIn("State no local rule", text)
                 self.assertIn("Use when an analyst needs a source code", text)
@@ -186,6 +186,23 @@ class LookupContract(unittest.TestCase):
                 self.assertIn("cite its record in the `rationale` of a `topic: codes` decision", flat)
                 self.assertIn("Cite the record, not its counts", flat)
                 self.assertIn("`answers.intake.json` is handover tier", flat)
+
+
+class LookupVerdictRoute(unittest.TestCase):
+    def texts(self):
+        for tree in TREES:
+            yield tree, (tree / "SKILL.md").read_text()
+
+    def test_verdict_probe_is_offered_first_and_misses_are_worded(self):
+        for tree, text in self.texts():
+            flat = " ".join(text.split())
+            with self.subTest(tree=str(tree)):
+                self.assertIn("offer a verdict probe first", flat)
+                self.assertIn("not found by probe P<n>", flat)
+                self.assertIn("operator-handover.rst", flat)
+                self.assertIn("counts need a recorded count exception", flat)
+                self.assertLess(flat.index("offer a verdict probe first"),
+                                flat.index("Before handoff, check that the probe"))
 
 
 if __name__ == "__main__":

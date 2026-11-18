@@ -13,6 +13,11 @@ from pathlib import Path
 
 import yaml
 
+try:  # `unittest discover -s tests` puts tests/ on sys.path; `-m unittest tests.x` does not
+    import skill_references
+except ModuleNotFoundError:
+    from tests import skill_references
+
 REPO = Path(__file__).resolve().parent.parent
 CANON = REPO / "skills" / "data-request-guardrails"
 SKILL = CANON / "SKILL.md"
@@ -25,8 +30,8 @@ LIFTS_COPIES = (
     REPO / "plugins" / "data-request" / "skills" / "setup" / "references" / "lifts.rst",
     REPO / "dist" / "codex" / "plugins" / "data-request" / "skills" / "setup" / "references" / "lifts.rst",
 )
-REFERENCES = ("performance.rst", "sources.rst", "checklist.rst", "release.rst", "modelling.rst",
-              "library.rst", "decision-authority.rst", "grain.rst", "delivery.rst")
+# Discovered from the directory: a new reference needs only its file and a SKILL.md link.
+REFERENCES = skill_references.references(CANON)
 # The sentence guardrails, lifts.rst and map share for proposal-only entries (#372).
 PROPOSAL_ONLY = ("A proposal-only entry authorises no hand SQL: none is committed or run, "
                  "except exempt probes, until a writable run publishes the entry.")
@@ -66,11 +71,9 @@ def shipped_files():
 
 class Packaging(unittest.TestCase):
     def test_references_are_rst_and_linked_from_skill(self):
-        self.assertEqual({p.name for p in REFS.iterdir()}, set(REFERENCES))
-        text = body(SKILL)
-        for name in REFERENCES:
-            with self.subTest(ref=name):
-                self.assertIn(f"](references/{name})", text)
+        self.assertGreaterEqual(len(REFERENCES), 10)
+        self.assertEqual(skill_references.problems(CANON), [])
+        self.assertIn("Do not build request SQL with f-strings or string concatenation", body(SKILL))
 
     def test_references_packaged_for_claude_and_codex(self):
         for root in (CLAUDE_COPY, CODEX_COPY):
@@ -114,9 +117,10 @@ class Baseline(unittest.TestCase):
                     self.assertNotIn("query-builder-plugins", text)
                 self.assertNotIn("qb_plugins", text)
 
-    def test_compatibility_names_the_v060_api_floor(self):
-        compat = frontmatter(SKILL)["compatibility"]
-        for token in ("query-builder 0.6.0", "record_assumption", "record_limitation"):
+    def test_compatibility_names_the_v080_floor(self):
+        compat = " ".join(frontmatter(SKILL)["compatibility"].split())
+        for token in ("query-builder 0.8.0 is the floor", "identifier-literal gate", "since 0.7.2",
+                      "record_assumption", "record_limitation", "need query-builder 0.6.0 or later"):
             with self.subTest(token=token):
                 self.assertIn(token, compat)
         self.assertNotIn("0.4.0", compat)
@@ -157,6 +161,16 @@ class LegacyOrg(unittest.TestCase):
         # register_result exists at v0.4.1 and v0.5.0; only the analysis-notes API is new in v0.6.0.
         self.assertRegex(self.text, r"Below `v0\.6\.0`, `record_assumption` and `record_limitation` are absent")
         self.assertRegex(self.text, r"`v0\.1\.1`[^.]*lacks `register_result`")
+
+    def test_pin_below_v080_is_a_blocker_and_points_at_supplied_cohorts(self):
+        text = " ".join(self.text.split())
+        self.assertIn("on `nq-rdl/query-builder` below `v0.8.0`, as a **blocker**", text)
+        self.assertNotIn("below `v0.6.0`, as a **blocker**", text)
+        for token in ("`SuppliedCohort`/`load_supplied()`", "since `v0.7.2`", "identifier-literal gate", "check_case_fast()",
+                      "docs/SUPPLIED_COHORTS.md", "blob/v0.8.0/docs/SUPPLIED_COHORTS.md",
+                      "literal `VALUES` rows on `PERSONAL`, `SENSITIVE` or `HEALTH` columns", "`IN`/`=`/`LIKE`/`CASE` comparisons"):
+            with self.subTest(token=token):
+                self.assertIn(token, text)
 
     def test_scaffold_default_and_delivered_enquiries(self):
         self.assertIn("Scaffold v0.5.0 defaulted to query-builder v0.5.0", self.text)

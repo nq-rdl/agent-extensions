@@ -12,7 +12,7 @@ user-invocable: true
 compatibility: >-
   RDL request repos; verify the repository's SQL dialect, Python environment and installed library versions at use time.
   record_assumption/record_limitation need query-builder 0.6.0 or later.
-allowed-tools: Bash, Read, Glob, Grep, Write, Edit, AskUserQuestion
+allowed-tools: Bash, Read, Glob, Grep, Write, Edit, AskUserQuestion, Skill
 metadata:
   repo: https://github.com/nq-rdl/agent-extensions
 ---
@@ -22,7 +22,7 @@ metadata:
 The **Data Engineer** applies technical fixes and settled pre-release changes.
 The Data Analyst resolves any missing research decision with the requester.
 
-Arguments: `$ARGUMENTS`. Read `${CLAUDE_PLUGIN_ROOT}/skills/guardrails/SKILL.md`
+Arguments: `$ARGUMENTS`. Invoke `/data-request:guardrails`
 and apply the rules relevant to the affected SQL or source mappings. This action
 works without `.sqlreview/`; a small correction does not require setup, bootstrap
 or a formal review before editing.
@@ -43,7 +43,8 @@ or business meaning.
 A reported “defect” that is really a presentation change request goes to `/data-request:amend`
 before or after release. Other released change requests use amend's engineer hand-off;
 before the first release, a logic change uses *Pre-release logic change* below.
-If you cannot tell whether it is released, ask, and make no edit in either skill until answered.
+Settle whether it is released from the evidence (*Pre-release logic change*). If you cannot
+tell, ask, and make no edit in either skill until answered.
 
 ## Pre-release logic change
 
@@ -51,10 +52,16 @@ An extract is released when a version exists under `data/Released/v*/`, a releas
 exists or any version of it reached the requester. A `data/Review/` pointer is a release
 candidate, not a release; if its data reached the requester, for UAT or otherwise, the
 extract is released. Treat an extract as unreleased only on positive confirmation: the
-human, or the service-desk issue, says that nothing was delivered. Absent signals do not
-prove it: legacy or seed repositories and manual deliveries leave no `data/Released/v*/`
-or tag. If you cannot tell, ask, and make no edit here or in `/data-request:amend` until
-answered: the release state determines the amendment baseline and record.
+human, the deliverable PR, the ledger or the service-desk issue says that nothing was delivered.
+Absent signals do not prove it: legacy or seed repositories and manual deliveries leave no
+`data/Released/v*/` or tag.
+
+Settle the state from repository evidence before you ask, as guardrails
+`references/release.rst`, **Release state from evidence**, describes. When the signals agree,
+do not ask. State the result in one line with what you read. Ask one question only for the
+gap that the evidence cannot close. If you cannot tell, ask, and make no edit here or in
+`/data-request:amend` until answered: the release state determines the amendment baseline
+and record.
 
 While no release exists, a full logic change is allowed here: population, keys, grain,
 joins, filters, deduplication or source mappings. Make it only for a settled decision,
@@ -77,10 +84,12 @@ put the decision and its reason in the pull request.
 
 The existing `.sqlreview/` review is stale in meaning: its purpose, grain, outputs,
 assumptions and limitations describe the old logic, even where a fingerprint still matches.
-Before the first release, re-run `/data-request:analyse` on each changed SQL file with a
-full re-walk: walk every item and publish with `--reconfirm-all`. Carry-forward would
-otherwise keep items whose SQL lines did not change, although their meaning did. A passing
-local check or `/data-request:validate` does not replace it.
+Before the first release, hand the re-check to `/data-request:analyse` and `/data-request:bootstrap`.
+They walk only the items that the diff touches. Then they ask one carry question that lists every other
+item with its confirmed text. When the logic change has an indirect effect on a listed item, have analyse
+state it in the carry question, so the human can name that item for a re-walk. Do not tell the engineer to
+re-confirm every item. The carry rules are in `${CLAUDE_PLUGIN_ROOT}/skills/analyse/references/carry.rst`.
+A passing local check or `/data-request:validate` does not replace this re-check.
 
 ## Identifier and export defects
 
@@ -113,6 +122,13 @@ without the value; validated machine metadata is exempt (SQL path/bound slug, fi
 and ISO timestamps at known locations). Preserve that metadata; never reword it to clear lint.
 Reworded confirmed items need fresh human confirmation via bootstrap
 or analyse; do not edit final JSON or create `.sqlreview/` just for a small correction.
+
+Before you regenerate SQL, add or update one row test for each rule the fix changes. Run it, and confirm it
+fails on the old logic. A string-replace edit of a long builder can hide a shadowed variable, a reused module
+constant name or a missed output column. After any builder edit, run
+`pixi run --environment framework amend regenerate` with no argument, which regenerates every generated SQL
+file at its newest version, and commit the regenerated SQL.
+Read `${CLAUDE_PLUGIN_ROOT}/skills/guardrails/references/house-conventions.rst` for the test and citation rules.
 
 Make the smallest source change that resolves the reported defect, preserving
 unrelated edits. When the fix changes a filter, join or meaning in pipeline or

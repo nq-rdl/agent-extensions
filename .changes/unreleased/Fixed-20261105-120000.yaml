@@ -1,0 +1,3 @@
+kind: Fixed
+body: 'data-request: status names a commit before analyse or bootstrap when any source is uncommitted, not only the SQL'
+time: 2026-11-05T12:00:00.000000000Z

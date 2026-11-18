@@ -1,0 +1,3 @@
+kind: Fixed
+body: 'sqlreview.sh refuses SQL and file paths under data/ or outside a reviewed sql/v<N>/ directory, after it resolves symlinks and parent directory links'
+time: 2026-11-04T07:00:00.000000000Z

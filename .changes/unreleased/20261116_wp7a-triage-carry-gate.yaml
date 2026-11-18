@@ -1,0 +1,3 @@
+kind: Fixed
+body: Triage's hand-off gate checks for analyse's touched-item walk and carry question, not --reconfirm-all
+time: 2026-11-16T00:00:15Z

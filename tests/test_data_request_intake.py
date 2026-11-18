@@ -15,7 +15,9 @@ TREES = (REPO / "skills", REPO / "plugins/data-request/skills", REPO / "dist/cod
 CASES = {
     "intake-grain-not-default": {"grain", "grain_owner", "technical_note_recorded", "writes_scope",
                                  "needs_setup_first"},
+    "intake-itemise-criteria": {"inclusion_ids", "new_wording", "kept_id", "new_id", "dropped"},
 }
+CRITERIA_FIELDS = ("cohort_entry_event", "inclusion_criteria", "exclusion_criteria", "requested_data_elements")
 
 
 def flat(path):
@@ -50,7 +52,8 @@ class IntakeContracts(unittest.TestCase):
                               "data-request:lookup`", "not its counts", "Leave open", "open_questions",
                               "Never an email", "confirm nothing"):
                     self.assertIn(token, body)
-                self.assertNotIn("sqlreview.sh", body)
+                # Intake never touches the store: only the clock and the draft staging helpers are named.
+                self.assertEqual(set(re.findall(r'sqlreview\.sh" ([a-z-]+)', body)), {"intake", "now", "intake-draft"})
 
     def test_interview_covers_research_topics_and_asks_grain(self):
         body = flat(skill(TREES[0], "intake"))
@@ -87,17 +90,66 @@ class IntakeContracts(unittest.TestCase):
             with self.subTest(tree=tree):
                 body = flat(skill(tree, "intake"))
                 render = body.split("## Render the scaffold (after approval)", 1)[1].split("## A cohort supplied", 1)[0]
-                for token in ("only when the analyst approves", "Never render from a branch",
-                              "copier copy --trust --overwrite --defaults --vcs-ref <tag> --data-file answers.yaml",
-                              "gh:nq-rdl/data-analysis-scaffold", "not `recopy` or `update`",
-                              "data-science-template", "already records `nq-rdl/data-analysis-scaffold`",
-                              "`answers.intake.json` unchanged", "analyst_intake.py", "v0.5.1 or later",
-                              "report that the sidecar was not validated", "do not run it"):
+                for token in ("only when the analyst approves", "scaffold-render.rst", "shared with triage",
+                              "`framework_ref`, `seed_mode=no` and `project_slug`", "with `--data`",
+                              "lists the tags again just before you ask", "never a branch",
+                              "not `recopy` or `update`", "data-science-template",
+                              "already records `nq-rdl/data-analysis-scaffold`",
+                              "`answers.intake.json` unchanged", "`.github/workflows/` files unchanged",
+                              "analyst_intake.py", "v0.5.1 or later",
+                              "report that the sidecar was not validated", "Re-locking pixi is its own commit",
+                              "do not run it"):
                     self.assertIn(token, render)
+                self.assertNotIn("copier copy --trust", render)  # the command lives in one reference only
                 cohort = body.split("## A cohort supplied by the requester", 1)[1].split("## Write and validate", 1)[0]
                 for token in ("by shape only", "Never ask for, open, read, copy or print the file",
                               "data/00_raw/", "dvc add", "dvc push", "only the `.dvc` pointer"):
                     self.assertIn(token, cohort)
+
+    def test_one_render_reference_passes_the_answers_that_matter(self):
+        for tree in TREES:
+            with self.subTest(tree=tree):
+                ref = flat(skill(tree, "setup", "references/scaffold-render.rst"))
+                for token in ("--data framework_ref=", "--data seed_mode=no", "--data project_slug=",
+                              "copier copy --trust --defaults --vcs-ref <tag> --data-file answers.yaml",
+                              "gh:nq-rdl/data-analysis-scaffold", "``copier --version``", "Read the tags again just before",
+                              "yaml.safe_load", "Repair before you compute fingerprints", "A seed value that came through is a failed render",
+                              "``release.yaml``", "``template-sync.yml``", "``copier-runner.yml``",
+                              "Re-lock pixi as its own named step and its own commit"):
+                    self.assertIn(token, ref)
+                self.assertIn("scaffold-render.rst", flat(skill(tree, "triage", "references/repositories.rst")))
+
+    def test_interview_state_is_staged_after_every_batch(self):
+        for tree in TREES:
+            with self.subTest(tree=tree):
+                body = flat(skill(tree, "intake"))
+                state = body.split("## Keep the interview state", 1)[1].split("## The interview", 1)[0]
+                for token in ("answers.intake.draft.json", "sqlreview.sh\" intake-draft", "sqlreview.sh\" now",
+                              "read a draft back", "do not ask them again", "After each answered batch",
+                              "The draft is not the sidecar", "Never commit it", "Delete it after the final sidecar validates"):
+                    self.assertIn(token, state)
+                # A confirmed criterion moves the draft to schema 2; a schema 2 sidecar is never staged as schema 1.
+                for token in ("Use `schemaVersion: 1` until the analyst confirms a criterion",
+                              "Then use `schemaVersion: 2` and keep every confirmed criterion",
+                              "A draft may omit `fingerprints`",
+                              "keep `schemaVersion: 2`, its `criteria` and its `fingerprints` in the draft"):
+                    self.assertIn(token, state)
+                self.assertNotIn("with `schemaVersion: 1`, then stage it", state)
+                self.assertIn("Keep the draft in that case", body)
+                self.assertIn("from the `now` helper", body)
+                gather = body.split("## Gather the evidence", 1)[1].split("## Keep the interview state", 1)[0]
+                for token in ("read the prior request's SQL and the current build outputs", "as per request <prior>",
+                              "written, dated review by the analyst"):
+                    self.assertIn(token, gather)
+                self.assertIn("does not parse (`yaml.safe_load`)", body)
+
+    def test_triage_probes_copier_and_rechecks_pins(self):
+        for tree in TREES:
+            with self.subTest(tree=tree):
+                self.assertIn("`copier --version`", flat(skill(tree, "triage")))
+                checks = flat(skill(tree, "triage", "references/checks.rst"))
+                for token in ("**Pins and tags.**", "again just before you state or ask for a pin", "floor that ``/data-request:guardrails`` states"):
+                    self.assertIn(token, checks)
 
     def test_rerun_keeps_unchanged_confirmations_and_names_changed_ids(self):
         body = flat(skill(TREES[0], "intake"))
@@ -124,6 +176,69 @@ class IntakeContracts(unittest.TestCase):
         readme = flat(REPO / "README.md")
         self.assertIn("The Data Analyst runs `intake`, the analyst's interview", readme)
         self.assertIn("`bootstrap`, the engineer's interview", readme)
+
+
+class IntakeSchema2Contracts(unittest.TestCase):
+    """The scaffold's criteria design: the interview itemises criteria and writes sidecar schema 2 (tokens, not behaviour)."""
+
+    def test_skill_itemises_criteria_into_schema_2(self):
+        for tree in TREES:
+            with self.subTest(tree=tree):
+                text = flat(skill(tree, "intake"))
+                frontmatter = yaml.safe_load(skill(tree, "intake").read_text().split("---", 2)[1])
+                self.assertIn("answers.intake.json (schema 2)", " ".join(frontmatter["description"].split()))
+                self.assertNotIn("(schema 1)", " ".join(frontmatter["description"].split()))
+                interview = text.split("## The interview", 1)[1].split("## Recording a decision", 1)[0]
+                for field in CRITERIA_FIELDS:
+                    self.assertIn(f"`{field}`", interview)
+                for token in ("Itemise the four free-text answers", "the researcher's own wording",
+                              "Ask `applied_by` only where the request is unclear",
+                              "ask which item fixes the index date", "no entry event is stated",
+                              "`N`, `I`, `E` and `D`"):
+                    self.assertIn(token, interview)
+                rerun = text.split("## Re-run: walk what changed", 1)[1].split("## Hand over", 1)[0]
+                for token in ("Never renumber", "never reuse an `id`", "rewording", "change of meaning",
+                              "withdraw", "`replaced_by`", "fresh confirmation", "classify"):
+                    self.assertIn(token, rerun)
+                write = text.split("## Write and validate", 1)[1].split("## Re-run: walk what changed", 1)[0]
+                for token in ("`schemaVersion: 2`", "installed `validate-answers` accepts schema 2",
+                              "validate-answers answers.yaml --fingerprints", "store the JSON as `fingerprints`",
+                              "Never compute a fingerprint by hand", "`criteria`"):
+                    self.assertIn(token, write)
+                # A re-run that changes approval_number must not stall on the old sibling sidecar.
+                for token in ("on a copy of `answers.yaml` in a new temporary directory with no sidecar beside it",
+                              'cp answers.yaml "$T/answers.yaml"', "only the answers are validated",
+                              "a changed `approval_number`", "validates the new sidecar"):
+                    self.assertIn(token, write)
+                self.assertNotIn("while the sibling sidecar is still the last valid one", write)
+                for token in ("Add `decided` only when the enquiry names who decided and when",
+                              "never infer them", "Itemising does not edit the free text",
+                              "keep it as is, write nothing and stop", "Never downgrade a sidecar"):
+                    self.assertIn(token, text)
+                row = next(l for l in skill(tree, "intake").read_text().splitlines() if l.startswith("| research text"))
+                self.assertIn("`cohort_entry_event`", row)
+                self.assertIn("confirm nothing", text)
+                self.assertIn("open_questions", text.split("confirm nothing", 1)[1][:200])
+
+    def test_analyst_intake_reference_documents_schema_2(self):
+        for tree in TREES:
+            with self.subTest(tree=tree):
+                text = flat(skill(tree, "setup", "references/analyst-intake.rst"))
+                self.assertIn("Schema version 2", text)
+                self.assertLess(text.index("Schema version 1"), text.index("Schema version 2"))
+                self.assertLess(text.index("Schema version 2"), text.index("Scope import and updates"))
+                schema2 = text.split("Schema version 2", 1)[1].split("Scope import and updates", 1)[0]
+                for field in CRITERIA_FIELDS:
+                    self.assertIn(f"``{field}``", schema2)
+                for token in ("``criteria``", "``fingerprints``", "``applied_by``", "``replaced_by``",
+                              "``withdrawn``", "rewording", "change of meaning", "never renumbered",
+                              "which item fixes the index date", "validate-answers answers.yaml --fingerprints",
+                              "never computed by hand", "free text changed since itemisation",
+                              "scaffold release that accepts schema 2 is a prerequisite", "sha256:",
+                              "Add ``decided`` only when the enquiry names who decided and when",
+                              "Never downgrade an existing schema 2 file"):
+                    self.assertIn(token, schema2)
+                self.assertIn("``criteria`` and ``fingerprints``", text.split("Scope import and updates", 1)[1])
 
 
 class IntakeEvalFixtures(unittest.TestCase):

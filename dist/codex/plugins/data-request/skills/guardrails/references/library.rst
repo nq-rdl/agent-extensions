@@ -25,3 +25,30 @@ Core discovery paths: ``clinical/specifications.py``, ``clinical/resolver.py``,
 ``clinical/query.py``, ``pypika_queries/queries.py``. Since v0.5.0, source resolvers
 live in the core package at ``resolvers/iemr/resolver.py`` and
 ``resolvers/hbcis/resolver.py``; the separate plugins package is archived.
+
+Check the library first
+=======================
+
+Before proposing new code, a config format, a helper or a text parser, search for an
+existing route. Search the request's pinned library source and the child's own
+``sql/README.md``. Name the path you searched in the proposal. A route that exists is
+used. A missing route is a library gap, so file or cite it as a lift candidate.
+
+Check these, in this order:
+
+#. **T-SQL helpers.** The pinned library's ``mssql`` module ships date arithmetic,
+   safe casts and similar helpers. Do not write a request-local copy.
+#. **Code lists.** Use ``create_code_set_table`` and the child's documented code-list
+   route. Reference code values are schema, so never invent a config format for them.
+#. **Schema extraction.** Use ``extract_mssql_schema.py`` for column metadata before
+   you read a table by hand. It is ``scripts/extract_mssql_schema.py`` in the
+   query-builder repository at the pinned tag. It is not part of the installed package,
+   so read or run it from a checkout of that tag.
+#. **Coded result rows.** A multi-select or per-option answer often has its own coded
+   rows. Check for them and for ``string_agg`` before you parse concatenated text with
+   ``LIKE`` terms.
+#. **Supplied cohorts.** Use ``SuppliedCohort``, as ``supplied-cohorts.rst`` describes.
+
+Verify each name against the pinned tag, because names move between releases. A library
+default is not overridden without a probe that shows why. A new reference constant
+cites the probe or the library default that supports it.

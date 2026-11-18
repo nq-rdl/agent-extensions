@@ -1,0 +1,3 @@
+kind: Fixed
+body: Tests prove data-request commands leave no SQL copies under .sqlreview and the explain walk shows a line diff
+time: 2026-11-05T00:00:00Z

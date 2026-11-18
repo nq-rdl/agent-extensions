@@ -138,6 +138,31 @@ class Notes(unittest.TestCase):
     def test_crlf_line_endings(self):
         self.assertEqual(self.parsed((HEADER + BODY).replace("\n", "\r\n")), EXPECTED)
 
+    # --- inputs: the supplied-cohort section that query-builder renders first -----------------
+    INPUTS = ("/*\n"                                              # 1
+              "inputs:\n"                                         # 2
+              "  - supplied cohort sample_cohort\n"               # 3
+              "    file: sample_cohort.csv\n"                     # 4
+              "    table: #SampleCohort\n"                        # 5
+              "    key: study_id\n")                              # 6
+
+    def test_header_with_inputs_first_yields_its_assumptions(self):
+        sql = self.INPUTS + HEADER[len("/*\n"):] + BODY
+        self.assertEqual(self.parsed(sql), shift(EXPECTED, 5) | {"lines": [1, 14]})
+
+    def test_inputs_only_header_is_present_with_no_items(self):
+        sql = self.INPUTS + "  - supplied cohort second_cohort\n*/\n" + SQL_V1
+        self.assertEqual(self.parsed(sql), {"present": True, "lines": [1, 8], "assumptions": [], "limitations": []})
+
+    def test_inputs_section_rules(self):
+        self.assert_malformed("/*\ninputs:\nassumptions:\n  - A\n*/\n", 2, "empty")
+        self.assert_malformed("/*\nassumptions:\n  - A\ninputs:\n  - B\n*/\n", 4, "inputs")
+        self.assert_malformed("/*\ninputs:\n  - A\ninputs:\n  - B\n*/\n", 4, "inputs")
+        self.assert_malformed("/*\ninputs:\n    file: a.csv\n*/\n", 3, "without an item")
+
+    def test_unknown_first_section_fails_closed(self):
+        self.assert_malformed("/*\noutputs:\n  - A\nassumptions:\n  - B\n*/\n" + SQL_V1, 2, "unknown section")
+
     # --- malformed header: exit 4, one diagnostic naming the line, nothing on stdout -----------
     def assert_malformed(self, sql, line, fragment):
         r = self.notes(sql)
@@ -224,6 +249,7 @@ class Notes(unittest.TestCase):
                  ".sqlreview/reviews/reports__monthly/review.json"], p.root)
         self.assertEqual(r.returncode, 0, r.stderr)
         self.assertTrue(all(i["match"] is None for i in json.loads(r.stdout)["assumptions"]))
+        self.assertEqual(list((p.root / ".sqlreview").rglob("*.sql")), [])  # #505: no SQL copies in the store
 
 
 class NotesContract(unittest.TestCase):

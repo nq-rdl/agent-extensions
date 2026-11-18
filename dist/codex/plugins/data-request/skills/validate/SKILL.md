@@ -21,7 +21,7 @@ Here $ARGUMENTS means the user’s supplied skill arguments. Codex does not popu
 The **Data Engineer** runs technical validation. Research questions belong to
 the Data Analyst and retain analyst attribution through the scope handoff.
 
-Read `${PLUGIN_ROOT}/skills/guardrails/SKILL.md` first. Arguments: `$ARGUMENTS`.
+Invoke `$data-request:guardrails` first. Arguments: `$ARGUMENTS`.
 Read the SQL, request and available scope; validate the actual SQL bytes, not a stale
 review snapshot. This action needs no `.sqlreview/` setup and creates no review record.
 
@@ -38,9 +38,11 @@ does not establish cohort correctness, and a static index assessment is not a pl
 
 ## Pre-run plausibility: operator proposals only
 
-Read guardrails `references/performance.rst`, **Pre-run plausibility**. Return a proposed
-count-only probe for **each label column** across all final outputs, using its inventory table;
-show exclusions or unresolved metadata explicitly. Include expected raw labels/format from the
+Read guardrails `references/performance.rst`, **Pre-run plausibility** and **Verdict probes**.
+Return a proposed probe for **each label column** across all final outputs. The verdict
+probe is the default, and word the question as "answer pass or fail, no numbers", with the labels checked
+against the data-dictionary set. Propose the count-only distribution only where the Data Engineer has approved a recorded
+`count_exception` for that probe. Never assume one. Use each column's inventory table, and show exclusions or unresolved metadata explicitly. Include expected raw labels/format from the
 scope and data dictionary, SQL location, bounds/cost and suppression parameter. Propose an
 age-band probe only for expensive requests with cited cost evidence; otherwise state why omitted.
 
@@ -51,7 +53,8 @@ static validation does not establish plausibility. Check proposals and any cited
 against **Probe disclosure control** in
 `${PLUGIN_ROOT}/skills/guardrails/references/release.rst`, including the
 boundary table and probe-sentence lint contract. The authorised operator runs approved probes
-before the delivery run; retain unresolved thresholds/bounds as reasons not to run.
+before the delivery run, through the hand-over steps in
+`${PLUGIN_ROOT}/skills/guardrails/references/operator-handover.rst`, never through the extract runner; retain unresolved thresholds/bounds as reasons not to run.
 
 Return findings with severity, SQL location, rule/requirement, observed evidence,
 effect on the result and a proposed correction. Distinguish **observed problems**,

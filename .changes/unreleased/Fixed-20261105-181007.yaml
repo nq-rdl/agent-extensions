@@ -1,0 +1,3 @@
+kind: Fixed
+body: 'data-request: amend-check reads standard input directly and leaves no temporary file'
+time: 2026-11-05T18:10:07.000000000Z

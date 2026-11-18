@@ -95,7 +95,8 @@ class ReleaseCheck(unittest.TestCase):
         with tempfile.TemporaryDirectory() as tmp:
             f = Path(tmp) / "release.json"
             f.write_text(json.dumps(record()))
-            r = subprocess.run(["bash", str(RELEASE), "render", str(f)], capture_output=True,
+            # The file must sit inside the project (here the cwd), as the shared path guard requires.
+            r = subprocess.run(["bash", str(RELEASE), "render", f.name], capture_output=True, cwd=tmp,
                                text=True, env=clean_env(), timeout=60)
         self.assertEqual(r.returncode, 0, r.stderr)
 

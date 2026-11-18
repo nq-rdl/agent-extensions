@@ -11,6 +11,7 @@ copy, the way an installed plugin runs, and asserts the permissionDecision / add
 
 import json
 import os
+import shutil
 import subprocess
 import tempfile
 import unittest
@@ -21,9 +22,17 @@ try:  # `unittest discover -s tests` puts tests/ on sys.path; `-m unittest tests
 except ModuleNotFoundError:
     from tests.test_sql_review_scripts import SQL_V1, SQL_V2, Project, item, review_doc, run as run_helper, scope_doc
 
+try:
+    from test_sql_review_criteria_status import row as criteria_row, sidecar as criteria_sidecar
+    from test_sql_review_sources import committed
+except ModuleNotFoundError:
+    from tests.test_sql_review_criteria_status import row as criteria_row, sidecar as criteria_sidecar
+    from tests.test_sql_review_sources import committed
+
 REPO = Path(__file__).resolve().parent.parent
 PLUGIN = REPO / "plugins" / "data-request"
 GUARD = REPO / "hooks" / "data-request-guard.sh"
+SKILLS_SETUP = REPO / "skills" / "data-request-setup" / "scripts"
 PREFLIGHT = REPO / "hooks" / "data-request-preflight.sh"
 
 
@@ -129,14 +138,82 @@ class GuardHook(unittest.TestCase):
                 self.assertEqual(d["permissionDecision"], "deny")
                 self.assertIn("Write", d["permissionDecisionReason"])
 
-    def test_drafts_state_and_snapshot_are_exempt(self):
+    def test_drafts_and_state_are_exempt(self):
         for name, content in (("review.draft.json", json.dumps(review_doc(assumptions=[item("A1", "x", status="pending")]))),
-                              ("explain.json", "{}"), ("source.sql", SQL_V1)):
+                              ("explain.json", "{}")):
             with self.subTest(name):
                 self.assert_passthrough(run_hook(GUARD, write_event(self.reviews / "s" / name, content, self.root), self.env))
                 if name == "explain.json":  # checked whole for its analyst identity (#419)
                     continue
                 self.assert_passthrough(run_hook(GUARD, edit_event(self.reviews / "s" / name, self.root), self.env))
+
+    def test_legacy_snapshot_paths_are_denied(self):
+        for name in ("source.sql", "scope.source.sql", "history/1.sql"):
+            for event in (write_event(self.reviews / "s" / name, SQL_V1, self.root),
+                          edit_event(self.reviews / "s" / name, self.root)):
+                with self.subTest(name=name, tool=event["tool_name"]):
+                    result = decision(run_hook(GUARD, event, self.env))
+                    self.assertEqual(result["permissionDecision"], "deny")
+                    self.assertIn("legacy SQL snapshot", result["permissionDecisionReason"])
+
+    def test_any_sql_or_table_file_in_the_store_is_denied(self):
+        store = self.root / ".sqlreview"
+        probes = [store / "rendered.sql", self.reviews / "x" / "review.draft.sql", self.reviews / "x" / "out.csv",
+                  self.reviews / "x" / "SOURCE.SQL", self.reviews / "x" / "source.sql ", self.reviews / "x" / "source.sql.",
+                  self.reviews / "x" / "a.tsv", self.reviews / "x" / "a.parquet", self.reviews / "x" / "A.XLSX",
+                  self.reviews / "x" / "a.xls", store / "releases" / "v1" / "rows.csv", store / "amendments" / "q.sql"]
+        for path in probes:
+            for event in (write_event(path, "ZZTEST-001", self.root), edit_event(path, self.root)):
+                with self.subTest(name=path.name, tool=event["tool_name"]):
+                    result = decision(run_hook(GUARD, event, self.env))
+                    self.assertEqual(result["permissionDecision"], "deny")
+
+    def test_trailing_blanks_and_dots_in_a_record_name_get_the_same_check(self):
+        # Some volumes ignore trailing blanks and dots, so review.json. is review.json there. The name check
+        # trims them for the authoritative documents as it does for SQL and table files.
+        store = self.root / ".sqlreview"
+        unconfirmed = json.dumps(review_doc(assumptions=[item("A1", "x", status="pending")]))
+        records = ("reviews/s/review.json", "reviews/s/scope.json", "reviews/s/explain.json",
+                   "releases/v1/release.json", "amendments/q.json", "reviews/s/review.md",
+                   "reviews/s/questions.json", "ledger.json", "config.json")
+        def verdict(path):
+            r = run_hook(GUARD, edit_event(path, self.root), self.env)
+            return decision(r)["permissionDecision"] if r.stdout.strip() else "allow"
+        for rel in records:
+            plain = verdict(store / rel)
+            self.assertIn(plain, ("deny", "ask"), rel)
+            for tail in (".", " ", "..", ". ", " ."):
+                with self.subTest(rel=rel, tail=repr(tail)):
+                    self.assertEqual(verdict(store / (rel + tail)), plain)
+        for tail in (".", " "):
+            with self.subTest(write="review.json", tail=repr(tail)):
+                d = decision(run_hook(GUARD, write_event(self.reviews / "s" / ("review.json" + tail), unconfirmed, self.root), self.env))
+                self.assertEqual(d["permissionDecision"], "deny")
+                self.assertIn("AskUserQuestion", d["permissionDecisionReason"])
+        self.assert_passthrough(run_hook(GUARD, write_event(self.reviews / "s" / "review.draft.json.", unconfirmed, self.root), self.env))
+        self.assert_passthrough(run_hook(GUARD, write_event(self.reviews / "s" / "notes.json.", "{}", self.root), self.env))
+
+    def test_json_under_reviews_and_anything_under_templates_still_pass(self):
+        store = self.root / ".sqlreview"
+        self.assert_passthrough(run_hook(GUARD, write_event(self.reviews / "x" / "notes.json", "{}", self.root), self.env))
+        self.assert_passthrough(run_hook(GUARD, write_event(store / "templates" / "review.md", "# t", self.root), self.env))
+        for name in ("example.sql", "rows.csv"):
+            self.assert_passthrough(run_hook(GUARD, write_event(store / "templates" / name, "x", self.root), self.env))
+
+    def test_init_gitignore_lists_the_sql_and_table_patterns(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            r = subprocess.run(["bash", str(SKILLS_SETUP / "sqlreview.sh"), "init"], cwd=tmp, capture_output=True, text=True,
+                               env=self.env, timeout=60)
+            self.assertEqual(r.returncode, 0, r.stderr)
+            lines = (Path(tmp) / ".sqlreview" / ".gitignore").read_text().splitlines()
+            for pattern in ("*.sql", "*.csv", "*.tsv", "*.parquet", "*.xlsx", "*.xls", "!templates/**"):
+                self.assertIn(pattern, lines)
+            subprocess.run(["git", "init", "-q"], cwd=tmp, check=True)
+            ignored = lambda rel: subprocess.run(["git", "check-ignore", "-q", rel], cwd=tmp).returncode == 0
+            self.assertTrue(ignored(".sqlreview/reviews/x/out.csv"))
+            self.assertTrue(ignored(".sqlreview/rendered.sql"))
+            self.assertFalse(ignored(".sqlreview/templates/review.md"))
+            self.assertFalse(ignored(".sqlreview/templates/example.sql"))
 
     def test_rendered_markdown_is_denied(self):
         for name in ("review.md", "scope.md"):
@@ -193,6 +270,76 @@ class GuardHook(unittest.TestCase):
         self.assert_passthrough(run_hook(GUARD, write_event(self.root / "x.sql", "select 1", self.root), env))
 
 
+class GuardCarriedCriteria(unittest.TestCase):
+    """F1: a direct Write of scope.json must not carry a criteria_status row. The guard runs the shape check only,
+    so a carried row would skip the sidecar check and the carry proof that `sqlreview.sh publish` runs."""
+
+    BASIS = "criteria-unchanged"
+
+    def setUp(self):
+        self.tmp = tempfile.TemporaryDirectory()
+        self.addCleanup(self.tmp.cleanup)
+        self.p = Project(self.tmp.name)
+        self.root = self.p.root
+        self.env = env_for()
+        self.scope_path = self.root / ".sqlreview" / "reviews" / "q" / "scope.json"
+        (self.root / "answers.intake.json").write_text(json.dumps(criteria_sidecar()))
+        self.p.sql("q.sql", SQL_V1)
+
+    def doc(self, status, revision=2):
+        return scope_doc("q", "q.sql", revision=revision, assumptions=[], criteria_status=status)
+
+    def guard(self, doc):
+        r = run_hook(GUARD, write_event(self.scope_path, json.dumps(doc), self.root), self.env)
+        return decision(r) if r.stdout.strip() else None
+
+    def carried(self, criterion="I9", **over):
+        d = criteria_row(criterion, "applied", 1)
+        d.update(carried_from_revision=1, carried_basis=self.BASIS)
+        d.update(over)
+        return d
+
+    def test_a_direct_write_with_a_carried_criteria_row_is_denied_with_the_publish_step(self):
+        for name, over in (("carried_from_revision and carried_basis", {}),
+                           ("carried_from_revision only", {"carried_basis": None}),
+                           ("carried_basis only", {"carried_from_revision": None})):
+            with self.subTest(name):
+                row = {k: v for k, v in self.carried(**over).items() if v is not None}
+                d = self.guard(self.doc([criteria_row("N1", "applied", 2), row]))
+                self.assertIsNotNone(d)
+                self.assertEqual(d["permissionDecision"], "deny")
+                self.assertIn("sqlreview.sh publish", d["permissionDecisionReason"])
+                self.assertIn("criteria_status", d["permissionDecisionReason"])
+
+    def test_a_direct_write_with_a_carried_criteria_row_is_denied_in_a_review_document_too(self):
+        review = review_doc(slug="q", sql_path="q.sql")
+        review["criteria_status"] = [self.carried("N1")]
+        path = self.root / ".sqlreview" / "reviews" / "q" / "review.json"
+        d = decision(run_hook(GUARD, write_event(path, json.dumps(review), self.root), self.env))
+        self.assertEqual(d["permissionDecision"], "deny")
+        self.assertIn("sqlreview.sh publish", d["permissionDecisionReason"])
+
+    def test_a_direct_write_without_a_carried_criteria_row_behaves_as_before(self):
+        self.assertIsNone(self.guard(self.doc([criteria_row("N1", "applied", 2), criteria_row("I1", "applied", 2)])))
+        # The shape check still runs: a row without a reason for a state that needs one is denied by it.
+        bad = self.doc([criteria_row("I1", "not-applied", 2)])
+        d = self.guard(bad)
+        self.assertEqual(d["permissionDecision"], "deny")
+        self.assertIn("rejected by sqlreview.sh check", d["permissionDecisionReason"])
+
+    def test_publish_of_the_same_draft_runs_the_checks_the_guard_skips(self):
+        # The guard only checked the shape. Publish checks the rows against the sidecar: I9 is not a criterion.
+        draft = self.doc([criteria_row("N1", "applied", 2), self.carried("I9")])
+        draft["git_commit"] = committed(self.p)
+        path = self.root / ".sqlreview" / "reviews" / "q" / "scope.draft.json"
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text(json.dumps(draft))
+        r = run_helper(["publish", "q", "scope", str(path)], self.root)
+        self.assertEqual(r.returncode, 4, r.stdout + r.stderr)
+        self.assertIn("I9", r.stdout)
+        self.assertFalse((path.parent / "scope.json").exists())
+
+
 class PreflightHook(unittest.TestCase):
     def test_header_only_states_report_slugs_and_next_steps(self):
         import hashlib
@@ -204,35 +351,44 @@ class PreflightHook(unittest.TestCase):
                 sql = p.sql("q.sql", old)
                 doc = (review_doc if kind == "review" else scope_doc)(
                     "q", "q.sql", sql_sha256=hashlib.sha256(old.encode()).hexdigest())
+                p.commit()
+                doc.update(json.loads(run_helper(["fingerprint", "q.sql"], p.root).stdout))
                 p.write_json("q", f"{kind}.json", doc)
-                baseline = p.review_dir("q") / ("source.sql" if kind == "review" else "scope.source.sql")
-                baseline.write_text(old)
                 sql.write_text(old.replace("original", "corrected"))
+                p.commit("corrected header")
                 status = json.loads(run_helper(["status", "--json"], p.root).stdout)
                 self.assertEqual(status["reviews"][0]["state"], state)
                 # Both canonical and installed hook entrypoints must expose the new states.
-                for hook in (PREFLIGHT, PLUGIN / "hooks/data-request-preflight.sh"):
-                    r = run_hook(hook, {"cwd": str(p.root)}, env_for())
-                    self.assertEqual(r.returncode, 0, r.stderr)
-                    ctx = decision(r)["additionalContext"]
-                    self.assertIn("1 " + state, ctx)
-                    self.assertIn("(q)", ctx)
-                    self.assertIn(workflow, ctx)
-                    self.assertIn("inspect", ctx.lower())
-                    self.assertIn("record", ctx.lower())
-                    self.assertIn("header revision", ctx.lower())
+                with tempfile.TemporaryDirectory() as cache:
+                    installed = Path(cache) / "data-request"
+                    shutil.copytree(PLUGIN, installed)
+                    shutil.copytree(REPO / "skills/data-request-setup/scripts", installed / "skills/setup/scripts", dirs_exist_ok=True)
+                    shutil.copy2(PREFLIGHT, installed / "hooks/data-request-preflight.sh")
+                    hooks = (PREFLIGHT, installed / "hooks/data-request-preflight.sh")
+                    for hook in hooks:
+                        r = run_hook(hook, {"cwd": str(p.root)}, env_for(installed))
+                        self.assertEqual(r.returncode, 0, r.stderr)
+                        ctx = decision(r)["additionalContext"]
+                        self.assertIn("1 " + state, ctx)
+                        self.assertIn("(q)", ctx)
+                        self.assertIn(workflow, ctx)
+                        self.assertIn("inspect", ctx.lower())
+                        self.assertIn("record", ctx.lower())
+                        self.assertIn("header revision", ctx.lower())
 
     def test_initialised_project_reports_counts_and_stale_slugs(self):
         with tempfile.TemporaryDirectory() as tmp:
             p = Project(tmp)
             p.sql("reports/monthly.sql", SQL_V1)
             p.sql("reports/weekly.sql", SQL_V1)
-            p.write_json("reports__monthly", "review.json", review_doc())
-            p.write_json("reports__weekly", "review.json", review_doc("reports__weekly", "reports/weekly.sql"))
+            p.commit()
+            p.write_json("reports__monthly", "review.json", review_doc(**json.loads(run_helper(["fingerprint", "reports/monthly.sql"], p.root).stdout)))
+            p.write_json("reports__weekly", "review.json", review_doc("reports__weekly", **json.loads(run_helper(["fingerprint", "reports/weekly.sql"], p.root).stdout)))
             run_helper(["snapshot", "reports__monthly", "reports/monthly.sql"], p.root)
             run_helper(["snapshot", "reports__weekly", "reports/weekly.sql"], p.root)
             (p.root / "reports" / "weekly.sql").write_text(SQL_V2)
-            r = run_hook(PREFLIGHT, {"hook_event_name": "SessionStart", "cwd": str(p.root)}, env_for())
+            p.commit("weekly source change")
+            r = run_hook(PREFLIGHT, {"hook_event_name": "SessionStart", "cwd": str(p.root)}, env_for(None))
             self.assertEqual(r.returncode, 0, r.stderr)
             out = json.loads(r.stdout)["hookSpecificOutput"]
             self.assertEqual(out["hookEventName"], "SessionStart")
@@ -266,6 +422,129 @@ class PreflightHook(unittest.TestCase):
             self.assertEqual((r.returncode, r.stdout.strip()), (0, ""))
             r = run_hook(PREFLIGHT, {"cwd": str(Path(tmp) / "does-not-exist")}, env_for())
             self.assertEqual((r.returncode, r.stdout.strip()), (0, ""))
+
+
+def build_digest(root):
+    """The build digest that `sqlreview.sh version` prints, computed independently.
+
+    One "<sha256>  <path>" line per regular file under skills/, hooks/ and the manifest directory, sorted by
+    path in byte order, then the SHA-256 of those lines. Files the host adds at the plugin root (an in-use
+    marker) are outside the digest, so an installed copy matches the committed tree.
+    """
+    import hashlib
+    root = Path(root)
+    rels = sorted(str(f.relative_to(root)) for d in ("skills", "hooks", ".claude-plugin", ".codex-plugin")
+                  if (root / d).is_dir() for f in (root / d).rglob("*") if f.is_file())
+    manifest = "".join(f"{hashlib.sha256((root / r).read_bytes()).hexdigest()}  {r}\n" for r in rels)
+    return hashlib.sha256(manifest.encode()).hexdigest()
+
+
+class PluginBuild(unittest.TestCase):
+    """`sqlreview.sh version` and the preflight hook name the loaded plugin build (version and content digest)."""
+
+    VERSION = (REPO / "VERSION").read_text().strip()
+
+    def version(self, root, *args, env=None):
+        e = {k: v for k, v in os.environ.items() if not k.startswith(("SQLREVIEW_", "DATA_REQUEST_"))}
+        e.update(env or {})
+        return subprocess.run(["bash", str(Path(root) / "skills/setup/scripts/sqlreview.sh"), "version", *args],
+                              capture_output=True, text=True, env=e, timeout=60, cwd=root)
+
+    def installed(self, tmp):
+        """A copy of the plugin as the host caches it, with a marker file at its root."""
+        dest = Path(tmp) / "cache" / "data-request"
+        shutil.copytree(PLUGIN, dest)
+        (dest / ".in_use").write_text("session\n")
+        return dest
+
+    def test_version_prints_the_plugin_version_and_build_digest(self):
+        r = self.version(PLUGIN)
+        self.assertEqual(r.returncode, 0, r.stderr)
+        self.assertEqual(r.stdout, f"data-request {self.VERSION} build {build_digest(PLUGIN)}\n")
+        j = json.loads(self.version(PLUGIN, "--json").stdout)
+        self.assertEqual((j["plugin"], j["version"], j["build"]), ("data-request", self.VERSION, build_digest(PLUGIN)))
+
+    def test_an_installed_copy_has_the_same_build_and_an_edit_changes_it(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            dest = self.installed(tmp)
+            self.assertEqual(self.version(dest).stdout, self.version(PLUGIN).stdout)
+            with (dest / "skills/setup/SKILL.md").open("a") as fh:
+                fh.write("\nlocal edit\n")
+            r = self.version(dest)
+            self.assertEqual(r.returncode, 0, r.stderr)
+            self.assertNotIn(build_digest(PLUGIN), r.stdout)
+            self.assertIn(build_digest(dest), r.stdout)
+
+    def test_expect_compares_a_digest_prefix(self):
+        digest = build_digest(PLUGIN)
+        for expect in (digest, digest[:12], digest[:12].upper()):
+            with self.subTest(expect=expect):
+                r = self.version(PLUGIN, "--expect", expect)
+                self.assertEqual(r.returncode, 0, r.stdout + r.stderr)
+        r = self.version(PLUGIN, "--expect", "0" * 12)
+        self.assertEqual(r.returncode, 10, r.stdout + r.stderr)
+        self.assertIn("does not match", r.stderr)
+        for bad in ("abc", "not-a-digest-value", ""):
+            with self.subTest(bad=bad):
+                self.assertEqual(self.version(PLUGIN, "--expect", bad).returncode, 1)
+
+    def test_the_canonical_source_is_not_a_plugin_build(self):
+        r = subprocess.run(["bash", str(SKILLS_SETUP / "sqlreview.sh"), "version"], capture_output=True, text=True)
+        self.assertEqual(r.returncode, 0, r.stderr)
+        self.assertIn("not a plugin build", r.stdout)
+        r = subprocess.run(["bash", str(SKILLS_SETUP / "sqlreview.sh"), "version", "--expect", "0" * 12],
+                           capture_output=True, text=True)
+        self.assertEqual(r.returncode, 2, r.stdout + r.stderr)
+
+    def test_the_preflight_hook_names_the_build(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            p = Project(tmp)
+            ctx = decision(run_hook(PREFLIGHT, {"cwd": str(p.root)}, env_for()))["additionalContext"]
+            self.assertIn(f"Plugin build: data-request {self.VERSION} build {build_digest(PLUGIN)[:12]}", ctx)
+            self.assertNotIn("does not match", ctx)
+            ctx = decision(run_hook(PREFLIGHT, {"cwd": str(p.root)},
+                                    env_for(DATA_REQUEST_EXPECT_BUILD=build_digest(PLUGIN)[:12])))["additionalContext"]
+            self.assertNotIn("does not match", ctx)
+
+    def test_the_preflight_hook_warns_when_the_build_differs_from_the_expected_build(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            # Even a project with no SQL and no .sqlreview/ gets the warning: the check is about the session.
+            p = Project(tmp, init=False)
+            ctx = decision(run_hook(PREFLIGHT, {"cwd": str(p.root)},
+                                    env_for(DATA_REQUEST_EXPECT_BUILD="0" * 12)))["additionalContext"]
+            self.assertIn("does not match DATA_REQUEST_EXPECT_BUILD", ctx)
+            self.assertIn(build_digest(PLUGIN)[:12], ctx)
+
+    def test_the_preflight_hook_says_so_when_the_expected_build_cannot_be_checked(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            p = Project(tmp, init=False)
+            # The canonical source is not a plugin build: a requested check must not pass in silence.
+            r = run_hook(PREFLIGHT, {"cwd": str(p.root)}, env_for(plugin_root=None, DATA_REQUEST_EXPECT_BUILD="0" * 12))
+            ctx = decision(r)["additionalContext"]
+            self.assertIn("not a plugin build", ctx)
+            self.assertIn("DATA_REQUEST_EXPECT_BUILD", ctx)
+
+    def test_the_preflight_hook_reads_the_store_that_sqlreview_root_names(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            (Path(tmp) / "outer").mkdir()
+            outer = Project(Path(tmp) / "outer")
+            inner = Path(tmp) / "ledger-only"
+            (inner / ".sqlreview").mkdir(parents=True)
+            r = run_hook(PREFLIGHT, {"cwd": str(outer.root)}, env_for(SQLREVIEW_ROOT=str(inner)))
+            self.assertIn("without config.json", decision(r)["additionalContext"])
+
+    def test_status_warns_on_stderr_when_the_build_differs(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            p = Project(tmp)
+            helper = PLUGIN / "skills/setup/scripts/sqlreview.sh"
+            e = {k: v for k, v in os.environ.items() if not k.startswith(("SQLREVIEW_", "DATA_REQUEST_"))}
+            r = subprocess.run(["bash", str(helper), "status"], cwd=p.root, capture_output=True, text=True,
+                               env=dict(e, DATA_REQUEST_EXPECT_BUILD="0" * 12))
+            self.assertEqual(r.returncode, 0, r.stderr)
+            self.assertIn("does not match DATA_REQUEST_EXPECT_BUILD", r.stderr)
+            self.assertNotIn("DATA_REQUEST", r.stdout)
+            r = subprocess.run(["bash", str(helper), "status"], cwd=p.root, capture_output=True, text=True, env=e)
+            self.assertNotIn("DATA_REQUEST", r.stderr)
 
 
 class PluginCopies(unittest.TestCase):
