@@ -85,9 +85,10 @@ The existing `.sqlreview/` review is stale in meaning: its purpose, grain, outpu
 assumptions and limitations describe the old logic, even where a fingerprint still matches.
 Before the first release, hand the re-check to `/data-request:analyse` and `/data-request:bootstrap`.
 They walk only the items that the diff touches. Then they ask one carry question that lists every other
-item with its confirmed text. Do not tell the engineer to re-confirm every item. The carry rules are in
-`${CLAUDE_PLUGIN_ROOT}/skills/analyse/references/carry.rst`. A passing local check or
-`/data-request:validate` does not replace this re-check.
+item with its confirmed text. When the logic change has an indirect effect on a listed item, have analyse
+state it in the carry question, so the human can name that item for a re-walk. Do not tell the engineer to
+re-confirm every item. The carry rules are in `${CLAUDE_PLUGIN_ROOT}/skills/analyse/references/carry.rst`.
+A passing local check or `/data-request:validate` does not replace this re-check.
 
 ## Identifier and export defects
 
@@ -123,11 +124,10 @@ or analyse; do not edit final JSON or create `.sqlreview/` just for a small corr
 
 Before you regenerate SQL, add or update one row test for each rule the fix changes. Run it, and confirm it
 fails on the old logic. A string-replace edit of a long builder can hide a shadowed variable, a reused module
-constant name or a missed output column. Run the child's unit suite in `tests/` and its framework suite in
-`tests_framework/` before every push, and prefer structural asserts over exact SQL strings. After any builder
-edit, run `pixi run --environment framework amend regenerate <sql>` for each SQL file that imports it, and commit the regenerated SQL. Read
-`${CLAUDE_PLUGIN_ROOT}/skills/guardrails/references/house-conventions.rst` for the conventions behind these steps.
-When you cite a rule, quote its file and line, and keep your own recommendation separate.
+constant name or a missed output column. After any builder edit, run
+`pixi run --environment framework amend regenerate` with no argument, which regenerates every generated SQL
+file at its newest version, and commit the regenerated SQL.
+Read `${CLAUDE_PLUGIN_ROOT}/skills/guardrails/references/house-conventions.rst` for the test and citation rules.
 
 Make the smallest source change that resolves the reported defect, preserving
 unrelated edits. When the fix changes a filter, join or meaning in pipeline or

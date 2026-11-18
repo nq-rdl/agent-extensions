@@ -37,10 +37,11 @@ leave classification and confirmation for `$data-request:lift` at close-out.
 Before you propose any new code, config format, helper or text parser, follow the check-first list in
 `${PLUGIN_ROOT}/skills/guardrails/references/library.rst` and name the path you searched.
 Every new reference constant cites a probe id or a library default. Do not override a library default
-without a probe. When you cite a rule, quote its file and line, and keep your own recommendation separate.
-Read `${PLUGIN_ROOT}/skills/guardrails/references/house-conventions.rst`. It says who owns each
-decision. Ward, location and facility sets are cohort decisions for the analyst. Column naming, read
-isolation and the form of UAT are engineer decisions: ask for any that the scope leaves unrecorded.
+without a probe.
+Read `${PLUGIN_ROOT}/skills/guardrails/references/house-conventions.rst` for the test and citation
+rules and for who owns each decision. Ward, location and facility sets are cohort decisions for the
+analyst. Column naming, read isolation and the form of UAT are engineer decisions: ask for any that the
+scope leaves unrecorded.
 
 Use the evidenced grain and requested finer outputs, not the bare answers default;
 follow guardrails `references/grain.rst` for source-citing records and drift handling.
@@ -109,20 +110,15 @@ Do not reword it, or the SQL header check fails.
 Builder SQL is generated, so commit it through the scaffold's amend guard:
 
 1. Write the SQL to `sql/v<N>/<name>_request.sql`. The `_request.sql` suffix is the naming rule.
-2. Run `pixi run --environment framework amend record <sql> --builder MODULE:FUNCTION --server <alias>`.
-   The `--server` value is an alias from the server configuration. Add `--input <file>` (repeatable)
-   for each repo-local file the builder reads. The guard accepts a record without them, so check them.
-3. After any edit to a builder, even a docstring, run `pixi run --environment framework amend regenerate <sql>`
-   for every SQL file that imports the builder. Their provenance changes.
+2. Run `pixi run --environment framework amend record sql/v<N>/<name>_request.sql --builder MODULE:FUNCTION
+   --server ALIAS --input FILE` for it. Take `ALIAS` from the server configuration. Without `--server`, the
+   guard records the scaffold default alias. Repeat `--input` once for each repo-local input of the builder.
+   The guard accepts both being absent, so check them.
+3. After any edit to a builder, even a docstring, run `pixi run --environment framework amend regenerate`
+   with no argument. It regenerates every generated SQL file at its newest version. Every SQL file that
+   imports the builder changes provenance.
 4. Commit only after steps 2 and 3, and after the static `$data-request:validate` check passes. A block that
    names missing provenance means step 2 was skipped.
-
-## Tests before a push
-
-Put child tests that import the child's source in `tests_framework/`. The `tests/` folder holds the
-offline suite. Run both the unit suite and the framework suite before every push. Never push with a test red.
-Prefer structural asserts, such as a parsed SQL tree, over exact SQL strings, because a re-pin changes
-quoting and temp-table names. Give each new module constant a name that no existing variable uses.
 
 Return the path, implemented cohort definition, evidence locations for mappings and
 conversions, and any unresolved limitations. Perform a static check using

@@ -1,0 +1,3 @@
+kind: Added
+body: Fix adds a row test for each changed rule and confirms it fails on the old logic before regenerating SQL
+time: 2026-11-16T00:00:09Z

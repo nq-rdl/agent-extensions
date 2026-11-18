@@ -1,0 +1,3 @@
+kind: Added
+body: House conventions prefer structural asserts over exact SQL strings, which a re-pin can change
+time: 2026-11-16T00:00:08Z

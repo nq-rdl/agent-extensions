@@ -1,3 +1,3 @@
 kind: Added
-body: Draft and fix name tests and tests_framework, both suites before a push, structural asserts and a row test per rule
-time: 2026-11-16T00:00:02Z
+body: House conventions require the tests/ and tests_framework/ suites to pass before every push
+time: 2026-11-16T00:00:07Z
