@@ -62,7 +62,7 @@ class Publish(unittest.TestCase):
 
     def test_builder_publication_without_snapshots(self):
         fp = self.generated()
-        self.assertEqual(set(fp), {"sql_path", "sql_sha256", "sql_body_sha256", "git_commit", "git_dirty"})
+        self.assertEqual(set(fp), {"sql_path", "sql_sha256", "sql_body_sha256", "sql_normalised_sha256", "fingerprint_library_version", "git_commit", "git_dirty"})
         for kind in ("scope", "review"):
             result = self.publish(self.generated_doc(fp, kind), "sql__v1__request")
             self.assertEqual(result.returncode, 0, result.stdout + result.stderr)

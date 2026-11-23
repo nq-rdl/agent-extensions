@@ -1,0 +1,3 @@
+kind: Added
+body: Data-request status reports layout-only SQL changes, and rebind keeps the confirmations with the old and new fingerprints (#586)
+time: 2026-11-23T00:00:01Z

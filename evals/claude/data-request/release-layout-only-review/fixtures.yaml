@@ -1,0 +1,36 @@
+# Replies graded by tests/test_data_request_release.py in Python (and Node when present).
+# Graders read only the last fenced yaml block, one top-level key at a time. No model call.
+pass:
+  - name: skill-shaped layout-only
+    reply: |
+      The evidence says `layout-only`: the exact hash changed and the normalised hash did not, so
+      only layout differs. That is evidence, not a pass. The engineer confirms it once and runs
+      `sqlreview.sh rebind`, which keeps every confirmation. Until then the release holds and I do
+      not use A1 or L1.
+
+      ```yaml
+      review_applies: no
+      hold: yes
+      next_step: rebind
+      ```
+fail:
+  - name: treats the engineer's word as a pass
+    fails: [review-not-applied, hold-yes, next-step-rebind]
+    reply: |
+      ```yaml
+      review_applies: yes
+      hold: no
+      next_step: none
+      ```
+  - name: asks for a full new review
+    fails: [next-step-rebind]
+    reply: |
+      ```yaml
+      review_applies: no
+      hold: yes
+      next_step: reassess
+      ```
+  - name: prose only, no yaml block
+    fails: [review-not-applied, hold-yes, next-step-rebind]
+    reply: |
+      review_applies: no, hold: yes, next_step: rebind.

@@ -147,9 +147,12 @@ Do this before you use any review item. `evidence` reports `applies` for each re
 
 - `current`: the SQL at the tag is the reviewed SQL.
 - `header-only`: only the leading comment header differs. The items apply.
+- `layout-only`: the exact hash differs and the normalised hash is equal. Only layout differs. The review does not apply until the engineer re-binds it (`sqlreview.sh rebind`). `matched_level` says which level matched: `exact`, `header-only` or `normalised`.
 - `changed`: the SQL at the tag differs. The review is stale for this release.
 - `missing-at-ref`: the reviewed SQL is not in the release.
 - `unreviewed`: a scope only, with no review.
+
+A `layout-only` review is evidence, not a pass: hold the claims that rest on it and name the re-bind as the next step. Do not run `rebind` yourself; the engineer confirms it.
 
 It also reports `reviewed_commit_in_ref`: `false` means the review was made on a commit outside
 the release. Then compare the review with the pipeline yourself. A review of draft SQL, or of SQL

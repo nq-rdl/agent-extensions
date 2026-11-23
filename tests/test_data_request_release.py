@@ -2435,6 +2435,8 @@ class CriteriaRender(unittest.TestCase):
 CASES = {
     "release-current-review": {"review-current", "hold-no", "include-a1-l1", "internal-l2-l3"},
     "release-stale-review": {"review-stale", "hold-yes", "no-review-items"},
+    # #586: layout-only is evidence, not a pass; the engineer re-binds first.
+    "release-layout-only-review": {"review-not-applied", "hold-yes", "next-step-rebind"},
     "release-output-differs": {"hold-yes", "blocker-inclusion-rule", "blocker-grain",
                                "blocker-missing-element"},
     "release-technical-limitation": {"include-l4", "internal-l3", "claims-no-sql-jargon",

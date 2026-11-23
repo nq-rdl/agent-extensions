@@ -49,6 +49,12 @@ def items($kind; $rev):
         (.confirmed_revision as $cr | .carried_from_revision as $cf
          | if ($cr | integer | not) then "\($id): confirmed_revision must be an integer >= 1 — re-confirm for this revision"
            elif ($rev | integer | not) then empty
+           # Carried from another version directory (#586): the predecessor's revision is its own number.
+           elif .carried_from_slug != null then
+             (if (.carried_from_slug | type) != "string" or (.carried_from_slug | test("^[A-Za-z0-9_%.-]+$") | not) or .carried_from_slug == "." or .carried_from_slug == ".."
+              then "\($id): carried_from_slug must be a review slug"
+              elif ($cf | integer | not) or $cf < $cr then "\($id): carried_from_revision must be an integer >= confirmed_revision \($cr)"
+              else empty end)
            elif $cr > $rev then "\($id): confirmed_revision \($cr) != revision \($rev) — re-confirm for this revision"
            elif $cr == $rev then (if $cf != null then "\($id): carried_from_revision on an item confirmed at revision \($rev) — remove it, or re-confirm for this revision" else empty end)
            elif $cf == null then "\($id): confirmed_revision \($cr) != revision \($rev) — re-confirm for this revision, or carry it forward with carried_from_revision (sqlreview.sh carryforward)"
@@ -60,7 +66,7 @@ def items($kind; $rev):
            elif $cb == "header-decision" then
              if .carried_from_revision != null or .confirmed_revision != $rev then "\($id): header-decision requires a fresh answered confirmation for this revision" else empty end
            elif .carried_from_revision == null then "\($id): carried_basis on an item that is not carried — remove it"
-           elif (["sql-unchanged", "sql-absent", "sql-body-unchanged", "intent-unchanged", "lines-unchanged"] | index([$cb])) == null
+           elif (["sql-unchanged", "sql-absent", "sql-body-unchanged", "intent-unchanged", "lines-unchanged", "sql-normalised-unchanged"] | index([$cb])) == null
            then "\($id): unknown carried_basis"
            else empty end)
     );
@@ -196,6 +202,11 @@ else
     (if .kind == "scope" and .sql_sha256 != null and (.sql_sha256 | (type == "string" and test("^[0-9a-f]{64}$")) | not) then "scope sql_sha256 must be null or a SHA256" else empty end),
     (("sql_body_sha256") as $key | if has($key) and .[$key] != null and (.[$key] | (type == "string" and test("^[0-9a-f]{64}$")) | not) then "\($key) must be null or a SHA256" else empty end),
     (if has("header_revisions") and ((.header_revisions | type) != "array" or (.header_revisions | all(.[]; type == "object" and (.sql_sha256 | type == "string" and test("^[0-9a-f]{64}$")) and (.at | nonempty)) | not)) then "header_revisions must contain full SHA256 and timestamp" else empty end),
+    (if has("sql_normalised_sha256") and .sql_normalised_sha256 != null and (.sql_normalised_sha256 | (type == "string" and test("^[0-9a-f]{64}$")) | not) then "sql_normalised_sha256 must be null or a SHA256" else empty end),
+    (if has("fingerprint_library_version") and .fingerprint_library_version != null and (.fingerprint_library_version | (type == "string" and test("^[0-9A-Za-z.+_-]{1,40}$")) | not) then "fingerprint_library_version must be null or a version string" else empty end),
+    (if has("layout_rebinds") and ((.layout_rebinds | type) != "array" or (.layout_rebinds | all(.[]; type == "object" and (.at | nonempty) and (.confirmed_by | nonempty)
+        and (.from | type == "object" and (.sql_sha256 | type == "string" and test("^[0-9a-f]{64}$")))
+        and (.to | type == "object" and (.sql_sha256 | type == "string" and test("^[0-9a-f]{64}$")))) | not)) then "layout_rebinds must hold the confirming engineer, a timestamp and the old and new SHA256" else empty end),
     (.revision as $rev
   | req("schemaVersion"), req("kind"), req("slug"), req("sql_path"), req("revision"),
     (if .kind != "lifts" then req("assumptions"), req("limitations") else empty end),

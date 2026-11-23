@@ -118,7 +118,11 @@ prepares and publishes the release. Never direct the engineer to release.
    no fetch. Where a later step needs one, use the command that ``release.sh fetch-command``
    prints. It names the project root with ``-C``, so it runs from any directory. Name those notes in the hand-off as open delivery gates. The release run keeps the strict hold. Any ``changed``, ``missing-at-ref``,
    ``unreviewed``, ``unavailable`` or invalid review, or unproven run provenance
-   stops the hand-off. A header-only
+   stops the hand-off. A ``layout-only``
+   result is not a pass either: the engineer runs ``sqlreview.sh rebind`` first (the exact hash changed and
+   the normalised one did not). State the ``matched_level`` of each review in the hand-off: ``exact``,
+   ``header-only`` or ``normalised``. A record that ``rebind`` re-bound lists its ``layout_rebinds``; name them.
+   A header-only
    result needs proof that only the leading comments differ. Compare the run manifest
    and maintained pipeline too: a matching committed file alone does not prove it ran.
    Confirm DVC pointers and their corresponding objects are pushed, and that UAT sections

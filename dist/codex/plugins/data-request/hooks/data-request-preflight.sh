@@ -106,6 +106,8 @@ elif [ "$rc" -eq 0 ] && [ -n "$status" ]; then
              (.counts["header-only"] // 0 | select(. > 0) | "\(.) header-only (\(names("header-only"))) — /data-request:analyse: inspect the header diff and notes, then record the header revision if confirmations remain unchanged"),
              (.counts.scoped // 0 | select(. > 0) | "\(.) scoped (bootstrap only)"),
              (.counts["scoped-header-only"] // 0 | select(. > 0) | "\(.) scoped-header-only (\(names("scoped-header-only"))) — /data-request:bootstrap: inspect the header diff and notes, then record the header revision if confirmations remain unchanged"),
+             (.counts["layout-only"] // 0 | select(. > 0) | "\(.) layout-only (\(names("layout-only"))) — the layout changed, the normalised fingerprint did not: /data-request:analyse asks the engineer once, then sqlreview.sh rebind"),
+             (.counts["scoped-layout-only"] // 0 | select(. > 0) | "\(.) scoped-layout-only (\(names("scoped-layout-only"))) — /data-request:analyse (sqlreview.sh rebind after the engineer confirms)"),
              (.counts.stale // 0 | select(. > 0) | "\(.) stale (\(names("stale")))"),
              (.counts["no-baseline"] // 0 | select(. > 0) | "\(.) without a clean recorded commit (\(names("no-baseline")))"),
              (.counts.missing // 0 | select(. > 0) | "\(.) whose SQL is missing (\(names("missing")))") ] | join(", "))

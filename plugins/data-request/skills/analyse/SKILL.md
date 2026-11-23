@@ -36,8 +36,12 @@ S="${CLAUDE_PLUGIN_ROOT}/skills/setup/scripts"
 bash "$S/sqlreview.sh" status --json                # exit 3 → stop: not initialised, run /data-request:setup first
 SLUG="$(bash "$S/sqlreview.sh" slug "<sql path>")"  # exit 5 → bound to another path: offer `sqlreview.sh move OLD NEW`;
                                                     # a stderr legacy-review note → offer its `move --slug OLD_SLUG NEW`
-bash "$S/sqlreview.sh" fingerprint "<sql path>"     # {sql_path, sql_sha256, sql_body_sha256, git_commit, git_dirty:false} — embed as-is
+bash "$S/sqlreview.sh" fingerprint "<sql path>"     # {sql_path, sql_sha256, sql_body_sha256, sql_normalised_sha256, fingerprint_library_version, git_commit, git_dirty:false} — embed as-is
 ```
+
+`sql_normalised_sha256` is query-builder's `script_fingerprint(level="normalised")`, read through the
+child's own environment. It is `null` when the library or that function is not available. Embed the
+`null` as it is: a record with no normalised value never reaches `layout-only`.
 
 Commit the SQL and its builder, configuration and pins first. `fingerprint` refuses uncommitted
 changes outside `.sqlreview/`, so the recorded `git_commit` identifies every input of the review.
@@ -206,6 +210,24 @@ increment the revision and append to `changes[]`. Then follow *Confirm, write, r
 including confirmation/carry gates and publish → snapshot → render. Do not change SQL
 or record a confirmation the human did not give for a new or reworded item to make this
 update possible.
+
+### Layout-only SQL: re-bind once
+
+When `status` reports `layout-only` (or `scoped-layout-only`), the exact hash changed and the normalised
+hash did not, so the statements and marker lines are the same and only layout moved, such as the CTE
+layout of a query-builder re-pin. Show the engineer the `delta` hunks and ask **one** question
+(AskUserQuestion): **Re-bind: only the layout changed** / **Reassess instead**. Do not recommend either.
+Never answer it for them. On **Re-bind**, run, with the engineer's login:
+
+```bash
+bash "$S/sqlreview.sh" rebind "$SLUG" --confirmed-by "<engineer login>"
+```
+
+`rebind` keeps every confirmation exactly as it was. It never refreshes one. It records the old and new
+fingerprints and the library versions in `layout_rebinds`. Item `location.lines` still use the previous
+layout's line numbers, so re-locate them in the next update. Exit 10 means the normalised hash differs or is
+absent: this is not layout-only, so continue below as a changed SQL. A record with no normalised value is
+never treated as layout-only. Commit the `.sqlreview/` records after a re-bind.
 
 ### Changed SQL: reassess the review
 

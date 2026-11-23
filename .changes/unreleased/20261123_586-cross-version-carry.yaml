@@ -1,0 +1,3 @@
+kind: Added
+body: Data-request carryforward takes --from to carry a review into the first revision of another sql/v<N>/ slug (#586)
+time: 2026-11-23T00:00:02Z
