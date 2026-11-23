@@ -22,12 +22,19 @@
 #                            is read from REF, never the working tree. applies:
 #                              current         the SQL at REF is the reviewed SQL
 #                              header-only     only the leading comment header differs
+#                              layout-only     the exact hash differs and the normalised hash (query-builder
+#                                              script_fingerprint) is equal: the SQL differs in layout only. The review
+#                                              does not apply until the engineer runs sqlreview.sh rebind (exit 10).
+#                                              Never reported when the record or the library has no normalised value
 #                              changed         the SQL at REF differs: the review is stale for REF
 #                              missing-at-ref  REF has no file at sql_path: the review may describe a draft
 #                              unreviewed      scope only, no review
 #                              unavailable     the reviewed SQL cannot be read from git at the
 #                                              review's git_commit, or its SHA differs: reassess
 #                              invalid         the record fails sqlreview.sh check
+#                            matched_level: "exact" (current), "header-only", "normalised" (layout-only) or null;
+#                            sql_normalised_sha256_reviewed/_at_ref and layout_rebinds (each rebind: engineer, time,
+#                            old and new sql_sha256 and library versions) say how a rebound record got its binding.
 #                            reviewed_commit_in_ref: whether the review's git_commit is an ancestor of
 #                            REF (null when the review has none or git cannot tell).
 #                            other_paths_changed_since_review: committed paths in the whole repository, outside
@@ -302,7 +309,7 @@ rl_review_row() ( # <slug> <commit>
   # input policy now refuses must not block the release: structural check only (#516).
   sr_safe_path "$sql"
   reviewed="$(jq -r '.sql_sha256 // ""' "$doc")"
-  local rc
+  local rc norm_at="" level=null
   tmp="$(sr_source_workspace)" || return 2
   trap 'rm -rf "$tmp"' EXIT
   trap 'exit 2' HUP INT TERM
@@ -322,7 +329,13 @@ rl_review_row() ( # <slug> <commit>
         body_at="$(sr_body_sha256 "$tmp/release.sql")" || { body_at=""; body_note="The SQL body hash could not be computed at the ref."; }
         if [ "$kind" != scope ]; then
           sr_binding "$doc" "$tmp/release.sql" "$tmp/recorded.sql"; binding=$?
-          case "$binding" in 0) applies=current ;; 10) applies=header-only ;; *) applies=changed ;; esac
+          case "$binding" in 0) applies=current level='"exact"' ;; 10) applies=header-only level='"header-only"' ;; *) applies=changed ;; esac
+          # Layout-only (#586): the exact hash differs and query-builder's normalised hash is equal. Never when either
+          # value is absent. It is evidence, not a pass: the engineer re-binds the record (sqlreview.sh rebind) first.
+          if sr_normalised "$tmp/release.sql"; then norm_at="$SR_NORM_SHA"; fi
+          if [ "$binding" = 1 ] && [ -n "$norm_at" ] && [ "$norm_at" = "$(jq -r '.sql_normalised_sha256 // "" | strings' "$doc")" ]; then
+            applies=layout-only level='"normalised"'
+          fi
         fi ;;
       6) [ "$kind" = scope ] || applies=missing-at-ref ;;
       *) return 2 ;;
@@ -354,13 +367,18 @@ rl_review_row() ( # <slug> <commit>
       '{slug: $slug, kind: $kind, sql_path: null, revision: null, applies: "invalid"}'
     return 0
   }
-  jq -c --argjson question_doc "$question_doc" --arg slug "$slug" --arg applies "$applies" --arg at "$at" --arg body_at "$body_at" --arg body_note "$body_note" --argjson inref "$inref" --argjson others "$others" '
+  jq -c --argjson question_doc "$question_doc" --arg slug "$slug" --arg applies "$applies" --arg at "$at" --arg body_at "$body_at" --arg body_note "$body_note" --arg norm_at "$norm_at" --argjson level "$level" --argjson inref "$inref" --argjson others "$others" '
     def items: [(. // [])[] | {id, text, rationale, confirmed_revision}
       + (if .sql_status == "not-implemented" then {not_implemented: true} else {} end)];
     {slug: $slug, kind, sql_path, revision, applies: $applies,
      sql_sha256_reviewed: .sql_sha256, sql_sha256_at_ref: (if $at == "" then null else $at end),
      sql_body_sha256_reviewed: (.sql_body_sha256 // null), sql_body_sha256_at_ref: (if $body_at == "" then null else $body_at end),
      sql_body_sha256_note: (if $body_note == "" then null else $body_note end),
+     matched_level: $level,
+     sql_normalised_sha256_reviewed: (.sql_normalised_sha256 // null),
+     sql_normalised_sha256_at_ref: (if $norm_at == "" then null else $norm_at end),
+     layout_rebinds: [(.layout_rebinds // [])[] | {at, confirmed_by, from_sql_sha256: .from.sql_sha256, to_sql_sha256: .to.sql_sha256,
+                                                  from_library_version: .from.library_version, to_library_version: .to.library_version}],
      reviewed_commit: .git_commit, reviewed_commit_in_ref: $inref, other_paths_changed_since_review: $others,
      assumptions: (.assumptions | items), limitations: (.limitations | items),
      questions: $question_doc.questions,

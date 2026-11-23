@@ -32,6 +32,28 @@ A ``basis`` is the evidence that an item's confirmation still holds.
 
 Changed text or rationale never carries. ``--reconfirm-all`` refuses every carried item.
 
+``sql-normalised-unchanged``
+   Across version directories only (below). The whole script is unchanged at the normalised level
+   (query-builder ``script_fingerprint``): the same statements and marker lines, in another layout.
+
+Across version directories: ``carryforward --from``
+---------------------------------------------------
+
+A review's slug comes from the SQL path, so ``sql/v2/q.sql`` starts with no scope. For its first revision
+(a slug with no published record of that kind), carry from the predecessor:
+
+.. code-block:: bash
+
+   bash "$S/sqlreview.sh" carryforward "$SLUG" review <draft> --from "$PREDECESSOR_SLUG"
+
+The helper compares the **whole script**: every item carries when the predecessor's SQL and the new SQL have
+equal normalised fingerprints (``sql-normalised-unchanged``, or ``sql-unchanged`` for identical bytes), and
+none carries otherwise. An absent normalised value, on either side or in the library, carries nothing. Text,
+rationale, ``decided`` and the not-implemented mark must equal the predecessor's. A ``criteria_status`` row never
+carries across directories. The ``set`` fields add ``carried_from_slug``; copy them verbatim. Every row that does
+not carry is in ``walk``. ``publish`` proves each carried item again from the predecessor's record and its SQL in
+git. The helper does not decide per batch: see the issue for the per-batch case.
+
 Update path: ``carryforward``
 -----------------------------
 

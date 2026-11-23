@@ -208,7 +208,10 @@ strings. Closing alone requires no carry-forward or new scope/review revision.
 
 `fingerprint` records both `sql_sha256` (original full-file provenance) and `sql_body_sha256`
 (exact body bytes after conservative leading comments). `header-only` and `scoped-header-only`
-remain body-bound; `publish` records helper-owned full header hashes and timestamps in
+remain body-bound. `layout-only` and `scoped-layout-only` mean the exact hash differs and the normalised
+hash (query-builder's `script_fingerprint`, read through the child's environment) does not; the engineer
+re-binds with `sqlreview.sh rebind SLUG --confirmed-by LOGIN`, which keeps every confirmation. An absent normalised value is
+never read as layout-only. `publish` records helper-owned full header hashes and timestamps in
 `header_revisions`, and `render` notes them even with customised templates. Keep original
 confirmation provenance and JSON history. Legacy records need their SQL in git at the recorded
 commit with the original full SHA. Missing evidence requires reassessment, never an assumed match.

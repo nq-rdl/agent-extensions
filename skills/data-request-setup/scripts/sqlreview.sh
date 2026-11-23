@@ -62,7 +62,15 @@
 #   lifts-stale SLUG --tag TAG                  read-only JSON nudges for units newly present at a stable library tag
 #                                              uses authenticated gh GETs; unavailable evidence is unknown, never absent
 #   lifts-uncovered SLUG                        read-only JSON list of request-local TypedTable classes no ledger entry names
-#   fingerprint SQL                            committed SQL at a clean HEAD: hashes, git_commit, git_dirty:false
+#   fingerprint SQL                            committed SQL at a clean HEAD: hashes, git_commit, git_dirty:false.
+#                                              Also sql_normalised_sha256 and fingerprint_library_version from
+#                                              query-builder's script_fingerprint (null when it is unavailable)
+#   rebind SLUG --confirmed-by HANDLE          re-bind a review and its scope after a layout-only change: the exact hash
+#                                              differs and the normalised hash is equal. One explicit engineer
+#                                              confirmation; keeps every item confirmation, appends layout_rebinds
+#                                              (old and new fingerprints, library versions); exit 10 when the
+#                                              normalised hash differs or is absent, 6 when git cannot supply the
+#                                              recorded SQL, 2 on a dirty tree
 #   materialize SLUG scope|review REVISION OUTPUT  git show + SHA check of that revision into an external file; caller deletes it
 #   snapshot SLUG SQL                          verify the final review against the committed SQL; no SQL writes
 #   delta SLUG [scope|review]                  body binding + full hashes; exit 0 full/header-only, 10 body change, 6 no baseline
@@ -932,6 +940,17 @@ cmd_publish() (
     [ ! -f "$dest" ] || history_doc="$dest"
     jq -e --slurpfile old "$history_doc" '.header_revisions == ($old[0].header_revisions // [])' "$tmp" >/dev/null || sr_die 4 "header_revisions is helper-owned; retain or omit the published history"
   fi
+  # layout_rebinds is helper-owned in the same way (#586): rebind writes it, a draft retains or omits it.
+  if jq -e 'has("layout_rebinds")' "$tmp" >/dev/null; then
+    local rebinds_doc=/dev/null
+    [ ! -f "$dest" ] || rebinds_doc="$dest"
+    jq -e --slurpfile old "$rebinds_doc" '.layout_rebinds == ($old[0].layout_rebinds // [])' "$tmp" >/dev/null || sr_die 4 "layout_rebinds is helper-owned; retain or omit the published history"
+  fi
+  if [ -f "$dest" ] && jq -e 'has("layout_rebinds")' "$dest" >/dev/null; then
+    local rebinds_kept
+    rebinds_kept="$(jq --slurpfile old "$dest" '.layout_rebinds = $old[0].layout_rebinds' "$tmp")" || sr_die 2 "cannot preserve layout re-bind history"
+    printf '%s\n' "$rebinds_kept" > "$tmp"
+  fi
   if [ -f "$dest" ] && jq -e 'has("header_revisions")' "$dest" >/dev/null; then
     local inherited
     inherited="$(jq --slurpfile old "$dest" '.header_revisions = $old[0].header_revisions' "$tmp")" || sr_die 2 "cannot preserve header history"
@@ -994,6 +1013,9 @@ cmd_publish() (
     if [ "$needs_carry" = true ]; then
       # A carried confirmation must be proved from the prior revision and its SQL.
       local violations
+      # Items carried from another version directory name their predecessor (#586); one predecessor per document.
+      CF_FROM="$(jq -r '[(.assumptions[], .limitations[]) | select(type == "object") | .carried_from_slug | strings] | unique | if length > 1 then "MANY" else (.[0] // "") end' "$tmp")" || sr_die 2 "cannot inspect carried confirmations"
+      [ "$CF_FROM" != MANY ] || sr_die 4 "carried items name more than one predecessor slug"
       _carry_context "$slug" "$kind" "$rel"
       violations="$(_carry_jq "$tmp" 'carry_violations($ctx; $reconfirm_all)' --argjson reconfirm_all "$reconfirm_all")" || sr_die 2 "carry-forward check failed to run"
       if [ -n "$violations" ]; then printf '%s\n' "$violations"; sr_die 4 "carried confirmations refused; re-confirm those items for this revision"; fi
@@ -1101,8 +1123,102 @@ cmd_fingerprint() (
   sr_source_show HEAD "$rel" "$tmp/committed.sql" || exit 2
   sha="$(sr_sha256 "$tmp/committed.sql")"
   body="$(sr_body_sha256 "$tmp/committed.sql" || true)"
+  # The normalised value comes from query-builder (sr_normalised). Absent is null, and null is never "layout-only".
+  sr_normalised "$tmp/committed.sql" || true
   jq -n --arg p "$rel" --arg sha "$sha" --arg body "$body" --arg c "$SR_SOURCE_COMMIT" \
-    '{sql_path: $p, sql_sha256: $sha, sql_body_sha256: (if $body == "" then null else $body end), git_commit: $c, git_dirty: false}'
+    --arg norm "$SR_NORM_SHA" --arg lib "$SR_NORM_VERSION" \
+    '{sql_path: $p, sql_sha256: $sha, sql_body_sha256: (if $body == "" then null else $body end),
+      sql_normalised_sha256: (if $norm == "" then null else $norm end),
+      fingerprint_library_version: (if $lib == "" then null else $lib end),
+      git_commit: $c, git_dirty: false}'
+)
+
+# ---------------------------------------------------------------------------------------------
+# rebind SLUG --confirmed-by HANDLE (#586): re-bind a scope and review after a layout-only change.
+# "Layout-only" is query-builder's claim: the exact hash differs and the normalised hash (script_fingerprint,
+# level "normalised") is equal. The helper never decides that a person confirmed it: the engineer's explicit
+# answer reaches it as --confirmed-by. It keeps every item confirmation (confirmed_by, confirmed_at,
+# confirmed_revision, carried_*) untouched and never refreshes one. It replaces the binding (sql_sha256,
+# sql_body_sha256, git_commit) with the committed SQL at HEAD and appends the old and new fingerprints and the
+# library versions to layout_rebinds. All records are checked before any is written.
+#   exit 10  the normalised hash differs, or is absent, or the library is unavailable: this is not layout-only
+#   exit 6   git cannot supply the recorded SQL, or the recorded normalised value does not match it
+cmd_rebind() (
+  [ $# -eq 3 ] && [ "$2" = --confirmed-by ] || usage
+  sr_need_jq
+  sr_require_root
+  local slug="$1" who="$3" kind doc sql work rc at head binding rec old_ver new_ver new_sha new_body staged="" dest count=0 note
+  sr_safe_slug "$slug"
+  case "$who" in ""|*[!A-Za-z0-9_.-]*) sr_die 2 "--confirmed-by needs the engineer's login (letters, digits, dot, underscore, hyphen)" ;; esac
+  [ -d "$SR_REVIEWS/$slug" ] || sr_die 2 "no review directory for slug '$slug'"
+  sr_no_symlinks "$SR_REVIEWS/$slug/rebind-required" || exit 2
+  [ ! -e "$SR_REVIEWS/$slug/rebind-required" ] ||
+    sr_die 2 "the SQL path moved and the review awaits reassessment (rebind-required); run /data-request:analyse, not rebind"
+  sr_source_clean || exit 2
+  work="$(sr_source_workspace)" || exit 2
+  trap 'rm -rf "$work"' EXIT
+  trap 'exit 2' HUP INT TERM
+  at="$(sr_now)"
+  for kind in scope review; do
+    doc="$SR_REVIEWS/$slug/$kind.json"
+    sr_no_symlinks "$doc" || exit 2
+    [ -f "$doc" ] || continue
+    cmd_check "$doc" >/dev/null || sr_die 4 "$kind.json is invalid; see sqlreview.sh check"
+    jq -e '.sql_sha256 | type == "string"' "$doc" >/dev/null 2>&1 || continue   # a scope with no SQL binding
+    sr_no_symlinks "$SR_REVIEWS/$slug/history/$kind/$(jq -r .revision "$doc").json" || exit 2
+    [ ! -e "$SR_REVIEWS/$slug/history/$kind/$(jq -r .revision "$doc").json" ] ||
+      sr_die 2 "$kind.json was moved at this revision; reassess it with /data-request:analyse instead of rebinding"
+    sql="$(jq -r '.sql_path // "" | strings' "$doc")"
+    sr_safe_sql "$sql"
+    sr_source_auth "$doc" "$work/$kind.recorded.sql"; rc=$?
+    [ "$rc" = 0 ] || exit "$rc"
+    sr_source_show HEAD "$sql" "$work/$kind.current.sql" || exit 2
+    head="$SR_SOURCE_COMMIT"
+    sr_binding "$doc" "$work/$kind.current.sql" "$work/$kind.recorded.sql"; binding=$?
+    case "$binding" in
+      0) printf 'unchanged\t%s\t%s\tthe exact hash already matches\n' "$slug" "$kind"; continue ;;
+      10) printf 'unchanged\t%s\t%s\theader-only: only the leading comment differs, use /data-request:analyse to record it\n' "$slug" "$kind"; continue ;;
+    esac
+    rec="$(jq -r '.sql_normalised_sha256 // "" | strings' "$doc")"
+    [ -n "$rec" ] || sr_die 10 "$kind.json records no normalised fingerprint, so the change cannot be called layout-only; reassess with /data-request:analyse --update"
+    # The recorded value must be the one the library gives for the recorded SQL, so a wrong or stale value cannot rebind.
+    sr_normalised "$work/$kind.recorded.sql" ||
+      sr_die 10 "the normalised fingerprint is unavailable (query-builder script_fingerprint not found in the child's environment)"
+    [ "$SR_NORM_SHA" = "$rec" ] || sr_die 6 "the recorded normalised fingerprint of $kind.json does not match its recorded SQL; reassess"
+    sr_normalised "$work/$kind.current.sql" || sr_die 10 "the normalised fingerprint is unavailable"
+    [ "$SR_NORM_SHA" = "$rec" ] ||
+      sr_die 10 "the SQL differs from the reviewed SQL at the normalised level, so this is not a layout-only change; reassess with /data-request:analyse --update"
+    new_ver="$SR_NORM_VERSION"
+    old_ver="$(jq -r '.fingerprint_library_version // "" | strings' "$doc")"
+    new_sha="$(sr_sha256 "$work/$kind.current.sql")" || exit 2
+    new_body="$(sr_body_sha256 "$work/$kind.current.sql" || true)"
+    jq --arg at "$at" --arg who "$who" --arg sha "$new_sha" --arg body "$new_body" --arg head "$head" \
+      --arg oldver "$old_ver" --arg newver "$new_ver" --arg norm "$rec" '
+      def nul: if . == "" then null else . end;
+      .layout_rebinds = ((.layout_rebinds // []) + [{
+        at: $at, confirmed_by: $who, revision: .revision,
+        from: {sql_sha256, sql_body_sha256: (.sql_body_sha256 // null), sql_normalised_sha256: $norm, git_commit,
+               library_version: ($oldver | nul)},
+        to: {sql_sha256: $sha, sql_body_sha256: ($body | nul), sql_normalised_sha256: $norm, git_commit: $head,
+             library_version: ($newver | nul)}}])
+      | .sql_sha256 = $sha | .sql_body_sha256 = ($body | nul) | .git_commit = $head | .git_dirty = false
+      | .fingerprint_library_version = ($newver | nul)' "$doc" > "$work/$kind.rebound.json" || sr_die 2 "cannot build the re-bound $kind record"
+    cmd_check "$work/$kind.rebound.json" >/dev/null || sr_die 4 "the re-bound $kind record is invalid"
+    staged="$staged $kind"
+    count=$((count + 1))
+  done
+  if [ "$count" = 0 ]; then printf 'nothing to rebind\n'; return 0; fi
+  sr_source_clean || exit 2
+  [ "$(git -C "$SR_ROOT" rev-parse --verify HEAD)" = "$head" ] || sr_die 2 "source commit changed during the re-bind"
+  for kind in $staged; do
+    dest="$SR_REVIEWS/$slug/$kind.json"
+    sr_no_symlinks "$dest" || exit 2
+    note="$(mktemp "$SR_REVIEWS/$slug/.$kind.rebind.XXXXXX")" || sr_die 2 "mktemp failed"
+    cp "$work/$kind.rebound.json" "$note" && mv "$note" "$dest" || { rm -f "$note"; sr_die 2 "cannot write the re-bound $kind record"; }
+    printf 'rebound\t%s\t%s\t%s\n' "$slug" "$kind" "$(jq -r '.layout_rebinds[-1] | "\(.from.sql_sha256) -> \(.to.sql_sha256)"' "$dest")"
+    cmd_render "$slug" "$kind" >/dev/null || printf 'warning: could not re-render %s.md\n' "$kind" >&2
+  done
+  printf 'note: every confirmation is unchanged. Item locations still use the line numbers of the previous layout; re-locate them in the next /data-request:analyse --update.\n'
 )
 
 # ---------------------------------------------------------------------------------------------
@@ -1553,8 +1669,20 @@ cmd_carryover() (
 # carry rules re-locate each range with it, as remap does. With CF_SOFT_REPROOF=true (carryforward only) a
 # recorded SQL that git cannot supply or that fails its SHA check sets CF_REPROOF_FAILED instead of exiting:
 # every item is then touched and walked. publish never sets it, so a carried claim is still refused (#505).
+# CF_FROM (set by the caller, #586) names a predecessor slug under another version directory: the first revision of
+# the new slug then carries from that slug's published record, compared as a whole script (sqlreview-carry.jq).
 _carry_context() { # <slug> <scope|review> <sql_path>
-  local d="$SR_REVIEWS/$1" auth
+  local d="$SR_REVIEWS/${CF_FROM:-$1}" auth rec
+  CF_CROSS=false CF_NORM_SAME=false
+  if [ -n "${CF_FROM:-}" ]; then
+    sr_safe_slug "$CF_FROM"
+    [ "$CF_FROM" != "$1" ] || sr_die 4 "the predecessor must be another slug"
+    sr_no_symlinks "$SR_REVIEWS/$1/$2.json" || exit 2
+    [ ! -e "$SR_REVIEWS/$1/$2.json" ] || sr_die 4 "a cross-directory carry applies to the first revision of a slug; $1 already has a $2.json"
+    sr_no_symlinks "$d/$2.json" || exit 2
+    [ -f "$d/$2.json" ] || sr_die 4 "no published $2 for the predecessor slug"
+    CF_CROSS=true
+  fi
   CF_KIND="$2" CF_PRIOR=/dev/null CF_BASE=/dev/null CF_CUR=/dev/null CF_DELTA=/dev/null
   CF_HAVE_BASE=false CF_HAVE_CUR=false CF_HAVE_DELTA=false CF_REPROOF_FAILED=false CF_PRIOR_SHA="" CF_CUR_SHA=""
   CF_BODY_SAME=false CF_PRIOR_ABSENT=false CF_CUR_ABSENT=false CF_CRITERIA=null
@@ -1587,6 +1715,13 @@ _carry_context() { # <slug> <scope|review> <sql_path>
     LC_ALL=C diff -U 0 "$CF_BASE" "$CF_CUR" > "$CF_DELTA"; diff_rc=$?
     [ "$diff_rc" -le 1 ] || sr_die 2 "cannot diff the recorded SQL against the current SQL"
     CF_HAVE_DELTA=true
+    # Whole-script comparison at the normalised level (#586). The predecessor's recorded value must be what the
+    # library gives for its authenticated SQL, and the current SQL must give the same. Absent counts as different.
+    if [ "$CF_CROSS" = true ]; then
+      rec="$(jq -r '.sql_normalised_sha256 // "" | strings' "$CF_PRIOR")"
+      if [ -n "$rec" ] && sr_normalised "$CF_BASE" && [ "$SR_NORM_SHA" = "$rec" ] &&
+         sr_normalised "$CF_CUR" && [ "$SR_NORM_SHA" = "$rec" ]; then CF_NORM_SAME=true; fi
+    fi
   fi
 }
 
@@ -1612,19 +1747,23 @@ _carry_jq() { # <draft> <filter> [jq options...]
     --argjson have_base "$CF_HAVE_BASE" --argjson have_cur "$CF_HAVE_CUR" --arg prior_sha "$CF_PRIOR_SHA" --arg cur_sha "$CF_CUR_SHA" \
     --argjson body_same "$CF_BODY_SAME" --argjson criteria "$CF_CRITERIA" --argjson prior_absent "$CF_PRIOR_ABSENT" --argjson cur_absent "$CF_CUR_ABSENT" --arg cf_kind "$CF_KIND" \
     --rawfile delta "$CF_DELTA" --argjson have_delta "$CF_HAVE_DELTA" --argjson reproof_failed "$CF_REPROOF_FAILED" \
+    --argjson cross "$CF_CROSS" --arg from_slug "${CF_FROM:-}" --argjson norm_same "$CF_NORM_SAME" \
     "include \"sqlreview-carry\";
      {kind: \$cf_kind, prior: \$prior[0], base: (if \$have_base then \$base else null end), cur: (if \$have_cur then \$cur else null end),
       prior_sha: (if \$reproof_failed then \"\" else \$prior_sha end), cur_sha: \$cur_sha, prior_absent: \$prior_absent, cur_absent: \$cur_absent,
       body_unchanged: \$body_same, criteria: \$criteria, delta: (if \$have_delta then \$delta else null end),
-      reproof_failed: \$reproof_failed} as \$ctx | $filter" "$draft"
+      reproof_failed: \$reproof_failed, cross: \$cross, from_slug: \$from_slug, norm_same: \$norm_same} as \$ctx | $filter" "$draft"
 }
 
 # Which draft items may keep the confirmation of the previous published revision (#348). Read-only.
 cmd_carryforward() (
-  [ $# -eq 3 ] || usage
+  # carryforward SLUG KIND DRAFT [--from PREDECESSOR_SLUG] (#586): the first revision of a slug in another sql/v<N>/.
+  [ $# -eq 3 ] || { [ $# -eq 5 ] && [ "$4" = --from ]; } || usage
   sr_need_jq
   sr_require_root
   local slug="$1" kind="$2" draft="$3" sql work
+  CF_FROM=""
+  [ $# -lt 5 ] || CF_FROM="$5"
   work="$(sr_source_workspace)" || exit 2
   trap 'rm -rf "$work"' EXIT
   trap 'exit 2' HUP INT TERM
@@ -1641,7 +1780,9 @@ cmd_carryforward() (
   _carry_jq "$draft" '. as $d | carry_rows($ctx) as $rows
     | def cleared($r): ($d | carry_clear($r)) as $c | if ($c | length) > 0 then {clear: $c} else {} end;
     {document: $document, prior_revision: ($ctx.prior.revision // null),
-       revision: (if $ctx.prior == null then 1 else $ctx.prior.revision + 1 end),
+       revision: (if $ctx.prior == null or $ctx.cross then 1 else $ctx.prior.revision + 1 end),
+       cross_directory: $ctx.cross, from_slug: (if $ctx.cross then $ctx.from_slug else null end),
+       sql_normalised_unchanged: $ctx.norm_same,
        sql_unchanged: ($ctx.prior_sha != "" and $ctx.prior_sha == $ctx.cur_sha),
        sql_body_unchanged: (($ctx.prior_sha != "" and $ctx.prior_sha == $ctx.cur_sha) or $ctx.body_unchanged),
        first_binding: ($ctx.prior != null and $ctx.prior_absent and $ctx.cur_sha != ""),
@@ -1669,7 +1810,7 @@ cmd_carryforward() (
 # writes them, verbatim, to reviews/SLUG/carry-list.md. The question then shows the count, ids, bases and
 # lines, and points to the file. Read-only for records: it reads what carryover or carryforward reads.
 cmd_carry_list() (
-  [ $# -eq 3 ] || usage
+  [ $# -eq 3 ] || { [ $# -eq 5 ] && [ "$4" = --from ]; } || usage
   sr_need_jq
   sr_require_root
   local slug="$1" mode="$2" draft="$3" kind rows dest tmp
@@ -1681,7 +1822,7 @@ cmd_carry_list() (
     carryforward)
       kind="$(jq -r '.kind // ""' "$draft")"
       case "$kind" in scope|review) ;; *) sr_die 4 "carry-list carryforward needs a scope or review draft" ;; esac
-      rows="$(cmd_carryforward "$slug" "$kind" "$draft")" || exit $? ;;
+      rows="$(cmd_carryforward "$slug" "$kind" "$draft" ${4:+"$4" "$5"})" || exit $? ;;
     *) usage ;;
   esac
   dest="$SR_REVIEWS/$slug/carry-list.md"
@@ -2244,6 +2385,11 @@ cmd_render() {
 
 Header revision history: metadata changed without changing its corresponding SQL body; full-file header hashes and timestamps are recorded in $kind.json. Changed assumption text still requires confirmation."
   fi
+  if jq -e '(.layout_rebinds // []) | length > 0' "$doc" >/dev/null 2>&1; then
+    rendered="$rendered
+
+Layout re-bind history: the SQL layout changed with the same normalised fingerprint, and the engineer re-bound this record. Every confirmation is unchanged. The old and new fingerprints and library versions are recorded in $kind.json."
+  fi
   printf '%s\n' "$rendered" > "$out" || sr_die 2 "cannot write rendered report"
   unknown="$(grep -o '{{[A-Za-z0-9_]*}}' "$out" | sort -u || true)"
   if [ -n "$unknown" ]; then
@@ -2291,6 +2437,7 @@ _sr_guard_command_inputs() { # COMMAND ARGS...
     lifts-stale) ;;        # input: none
     lifts-uncovered) ;;    # input: none
     materialize) ;;        # input: none
+    rebind) ;;             # input: none
     migrate-questions) ;;  # input: none
     move) ;;               # input: in-command
     now) ;;                # input: none
@@ -2328,6 +2475,7 @@ case "$cmd" in
   lifts-uncovered) cmd_lifts_uncovered "$@" ;;
   fingerprint) cmd_fingerprint "$@" ;;
   materialize) cmd_materialize "$@" ;;
+  rebind) cmd_rebind "$@" ;;
   snapshot) cmd_snapshot "$@" ;;
   delta) cmd_delta "$@" ;;
   impact) cmd_impact "$@" ;;

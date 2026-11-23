@@ -139,6 +139,51 @@ def carry_criteria_rows($ctx):
         else . + {basis: null, bulk: (.bulk // false)} end
     ];
 
+# Across version directories (#586). A new slug under another sql/v<N>/ has no earlier revision of its own, so
+# its first revision may carry from a predecessor slug (carryforward --from). Only the WHOLE script is compared:
+#   sql-unchanged             the full SHA equals the predecessor's
+#   sql-normalised-unchanged  the normalised fingerprint (query-builder script_fingerprint) of the predecessor's
+#                             recorded SQL, of the current SQL and the one the predecessor recorded are all equal
+# Items carry only on one of those, otherwise every item is walked. An absent normalised value (a record
+# or a library without it) never counts. The location is not compared: a layout change moves lines, and the
+# location is where the item points in the new file. The item's text, rationale, decided provenance and
+# not-implemented mark must equal the predecessor's. The set fields add carried_from_slug. A criteria_status row
+# is never carried across directories: it states what the SQL does and depends on the intake.
+# $ctx adds cross (boolean), from_slug (string) and norm_same (boolean).
+def carry_cross_rows($ctx):
+  . as $d
+  | $ctx.prior as $p
+  | ($ctx.kind // $d.kind) as $doc
+  | ($ctx.prior_sha != "" and $ctx.cur_sha != "" and $ctx.prior_sha == $ctx.cur_sha) as $unchanged
+  | ($p.revision // null) as $pr
+  | [ ("assumptions", "limitations") as $k
+      | ($d[$k] // [] | if type == "array" then .[] else empty end) | select(type == "object") | . as $i
+      | ([($p[$k] // [])[] | select(type == "object" and .id == $i.id)][0]) as $m
+      | {kind: $k, id: $i.id}
+        + (if $ctx.reproof_failed // false then {why: "the predecessor's recorded SQL cannot be re-proved from git"}
+           elif $p == null then {why: "no published \($doc) to carry from"}
+           elif $m == null then {why: "no item \($i.id) in \($k) of \($ctx.from_slug) revision \($pr)"}
+           elif $m.text != $i.text then {why: "text differs from \($ctx.from_slug) revision \($pr)"}
+           elif $m.rationale != $i.rationale then {why: "rationale differs from \($ctx.from_slug) revision \($pr)"}
+           elif $m.decided != $i.decided then {why: "decided provenance differs from \($ctx.from_slug) revision \($pr)"}
+           elif $m.sql_status != $i.sql_status then {why: "the not-implemented mark differs from \($ctx.from_slug) revision \($pr)"}
+           elif $unchanged then {basis: "sql-unchanged"}
+           elif $ctx.norm_same then {basis: "sql-normalised-unchanged"}
+           else {why: "the SQL differs from \($ctx.from_slug) at the normalised level, or the normalised fingerprint is unavailable"} end)
+      | if has("basis") then
+          . + {set: ({status: "confirmed", confirmed_by: $m.confirmed_by, confirmed_at: $m.confirmed_at,
+                     confirmed_revision: $m.confirmed_revision, carried_from_revision: $pr, carried_from_slug: $ctx.from_slug,
+                     carried_basis: .basis}
+                     + (if $m | has("upstream") then {upstream: $m.upstream} else {} end)
+                     + (if $m | has("decided") then {decided: $m.decided} else {} end))}
+        else . + {basis: null, bulk: false, text: $i.text, rationale: $i.rationale, location: $i.location} end
+    ]
+  + (if $doc == "scope" then
+       [ ($d.criteria_status // [] | if type == "array" then .[] else empty end) | select(type == "object")
+         | {kind: "criteria_status", id: .criterion, basis: null, bulk: false,
+            why: "a criteria row is not carried across version directories: confirm it for this scope"} ]
+     else [] end);
+
 # Input: a (draft) scope/review document. $ctx:
 #   {kind: "scope"|"review", prior: document|null,
 #    base: string|null (prior baseline SQL, only when it is evidence), cur: string|null (current SQL),
@@ -149,7 +194,7 @@ def carry_criteria_rows($ctx):
 #   {kind, id, basis, set} when it qualifies ·
 #   {kind, id, basis: null, bulk, why, text, rationale, location} when it must be asked
 #   (a criteria_status row has just {kind, id, basis: null, bulk: false, why}).
-def carry_rows($ctx):
+def carry_rows_same($ctx):
   . as $d
   | $ctx.prior as $p
   | ($ctx.kind // $d.kind) as $doc
@@ -198,6 +243,9 @@ def carry_rows($ctx):
     ]
   + (if $doc == "scope" then carry_criteria_rows($ctx) else [] end);
 
+def carry_rows($ctx):
+  if ($ctx.cross // false) then carry_cross_rows($ctx) else carry_rows_same($ctx) end;
+
 # The carried_* fields a draft row still holds when carryforward walks or bulks it. A walked row gets a
 # fresh confirmation, so these fields must go first: check and publish refuse a fresh row that claims a carry.
 # $row is a carry_rows output row; the draft item is found by id (by criterion for a criteria_status row).
@@ -218,7 +266,11 @@ def carry_violations($ctx; $reconfirm_all):
      | ([$rows[] | select(.kind == $k and .id == $i.id)][0]) as $r
      | if $reconfirm_all then "\($i.id): --reconfirm-all refuses carried confirmations — re-confirm for this revision"
        elif $r.basis == null then "\($i.id): cannot carry the confirmation forward: \($r.why) — re-confirm for this revision"
-       elif ($i | {status, confirmed_by, confirmed_at, confirmed_revision, carried_from_revision}) != ($r.set | del(.carried_basis, .upstream, .decided))
+       elif ($ctx.cross // false) and $i.carried_from_slug != $ctx.from_slug
+       then "\($i.id): carried_from_slug must be \($ctx.from_slug) — every carried item of a cross-directory carry names the predecessor"
+       elif ($ctx.cross // false | not) and $i.carried_from_slug != null
+       then "\($i.id): carried_from_slug needs the predecessor review (sqlreview.sh carryforward --from)"
+       elif ($i | {status, confirmed_by, confirmed_at, confirmed_revision, carried_from_revision}) != ($r.set | del(.carried_basis, .upstream, .decided, .carried_from_slug))
        then "\($i.id): a carried item must copy confirmed_by, confirmed_at and confirmed_revision from revision \($r.set.carried_from_revision) exactly (sqlreview.sh carryforward prints them)"
        elif ($r.set.upstream.source == "analyst-intake" or $r.set.upstream.source == "house-default")
             and ($i.upstream != $r.set.upstream or $i.decided != $r.set.decided)

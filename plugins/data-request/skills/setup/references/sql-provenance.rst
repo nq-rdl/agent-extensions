@@ -62,6 +62,27 @@ recorded ``git_commit`` therefore identifies the SQL and every other input, such
 as builders, configuration and pins. A later non-SQL change shows as a path
 difference from that commit. ``release.sh evidence`` lists these paths.
 
+Normalised fingerprint
+----------------------
+
+``fingerprint`` also prints ``sql_normalised_sha256`` and ``fingerprint_library_version``, from
+query-builder's ``script_fingerprint(level="normalised")``. The helper does not implement the normal form: it
+runs the library through the child's environment (``pixi run -e framework python``, else ``python3``). The
+environment variable ``SQLREVIEW_NORMALISE_CMD`` replaces that command (a shell command that reads the SQL on
+stdin and prints ``<sha256> [<version>]``); a project file never sets it. When the library or the function is not
+available the value is ``null``, and ``null`` is never read as "layout-only".
+
+``status`` reports ``layout-only`` (``scoped-layout-only`` for a scope) when the exact hash differs and the
+recorded normalised value equals that of the working-tree SQL. It runs the library only for a record that is
+otherwise stale. ``rebind SLUG --confirmed-by LOGIN`` then replaces ``sql_sha256``, ``sql_body_sha256`` and
+``git_commit`` with those of HEAD, keeps every confirmation, and appends
+``{at, confirmed_by, revision, from, to}`` to the helper-owned ``layout_rebinds`` (each side holds
+``sql_sha256``, ``sql_body_sha256``, ``sql_normalised_sha256``, ``git_commit`` and ``library_version``). It
+needs a clean tree, checks the recorded normalised value against the recorded SQL from git, and writes
+nothing unless every record qualifies. A header-only record, a moved record and a record with a history entry for
+its revision are left to ``analyse``. ``release.sh evidence`` reports ``applies: layout-only`` for such SQL at a
+ref, with ``matched_level`` ``normalised``, and does not pass it.
+
 Reading old SQL
 ---------------
 

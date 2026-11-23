@@ -450,6 +450,60 @@ EOF
 
 sr_now() { date -u +%Y-%m-%dT%H:%M:%SZ; }
 
+# The normalised fingerprint of a script (#586). The normal form is defined by query-builder's
+# pypika_queries.script_fingerprint, and it is NOT re-implemented here: this helper asks the library.
+# SQLREVIEW_NORMALISE_CMD (environment only, never a project file) names a shell command that reads the SQL
+# on stdin and prints "<sha256> [<library version>]". Without it the helper runs the library through the
+# child's own environment: `pixi run -e framework python`, else `python3` where no pixi is installed.
+# An unavailable library, an older release without the function or any failure leaves the value absent, and
+# an absent value is never read as "layout-only": every caller then behaves as before the normalised level existed.
+SR_NORM_PY='import sys
+from importlib import metadata
+from pypika_queries.script_fingerprint import script_fingerprint
+try:
+    version = metadata.version("query-builder")
+except Exception:
+    version = ""
+sha = script_fingerprint(sys.stdin.buffer.read().decode("utf-8"), level="normalised")
+print(sha, version)'
+sr_default_normalise() {
+  if command -v pixi >/dev/null 2>&1; then
+    pixi run --frozen -e framework python -c "$SR_NORM_PY"
+  elif command -v python3 >/dev/null 2>&1; then
+    python3 -c "$SR_NORM_PY"
+  else
+    return 1
+  fi
+}
+# Sets SR_NORM_SHA and SR_NORM_VERSION (the latter may be empty). Returns 1 with both empty when unavailable.
+sr_normalised() { # <file>
+  local out sha ver
+  SR_NORM_SHA="" SR_NORM_VERSION=""
+  [ -f "$1" ] || return 1
+  if [ -n "${SQLREVIEW_NORMALISE_CMD:-}" ]; then
+    out="$(sh -c "$SQLREVIEW_NORMALISE_CMD" < "$1" 2>/dev/null)" || return 1
+  else
+    out="$( (cd "${SR_ROOT:-.}" && sr_default_normalise) < "$1" 2>/dev/null)" || return 1
+  fi
+  read -r sha ver _ <<EOT
+$out
+EOT
+  case "$sha" in *[!0-9a-f]*|"") return 1 ;; esac
+  [ "${#sha}" = 64 ] || return 1
+  case "$ver" in *[!0-9A-Za-z.+_-]*) ver="" ;; esac
+  [ "${#ver}" -le 40 ] || ver=""
+  SR_NORM_SHA="$sha" SR_NORM_VERSION="$ver"
+}
+# True when DOC records a normalised fingerprint and the SQL FILE has the same one. The caller has
+# already seen the exact fingerprint differ. A record without the value, or no library, is never true.
+sr_layout_only() { # <doc> <file>
+  local rec
+  rec="$(jq -r '.sql_normalised_sha256 // "" | strings' "$1" 2>/dev/null)" || return 1
+  [ -n "$rec" ] || return 1
+  sr_normalised "$2" || return 1
+  [ "$SR_NORM_SHA" = "$rec" ]
+}
+
 . "$SR_SCRIPT_DIR/sqlreview-source.sh"
 
 # The authoritative document of a review directory: review.json, else scope.json, else nothing.
@@ -471,6 +525,8 @@ sr_doc_for() { # <slug> -> path
 #   missing      the SQL file is gone
 #   no-baseline  review.json without a clean recorded git_commit, so old SQL cannot be read
 #   stale        the SQL differs from the recorded sql_sha256
+#   layout-only  the exact hash differs and the normalised hash (query-builder's script_fingerprint) does not:
+#                scoped-layout-only for a scope. Never reported when the normalised value is absent (#586)
 #   current      identical
 sr_state() { # <slug>
   sr_safe_slug "$1"
@@ -508,7 +564,8 @@ EOF
         if [ ! -f "$SR_ROOT/$sql" ]; then state="missing"
         else
           sr_binding "$doc" "$SR_ROOT/$sql" /dev/null; bound=$?
-          case "$bound" in 0) ;; 10) state="scoped-header-only" ;; *) state="stale" ;; esac
+          case "$bound" in 0) ;; 10) state="scoped-header-only" ;;
+            *) if sr_layout_only "$doc" "$SR_ROOT/$sql"; then state="scoped-layout-only"; else state="stale"; fi ;; esac
         fi
       fi ;;
     lifts) state="lifts" ;;
@@ -518,7 +575,8 @@ EOF
       elif [ -f "$d/rebind-required" ]; then state="stale"
       else
         sr_binding "$doc" "$SR_ROOT/$sql" /dev/null; bound=$?
-        case "$bound" in 0) state="current" ;; 10) state="header-only" ;; *) state="stale" ;; esac
+        case "$bound" in 0) state="current" ;; 10) state="header-only" ;;
+          *) if sr_layout_only "$doc" "$SR_ROOT/$sql"; then state="layout-only"; else state="stale"; fi ;; esac
       fi ;;
   esac
   printf '%s\t%s\t%s\n' "$state" "$sql" "$rev"
@@ -723,7 +781,7 @@ EOF2
     if [ "$state" = stale ] && [ ! -f "$d/review.json" ]; then why="The SQL"
     elif [ -f "$d/review.json" ] && [ "$bound" = y ] && [ -f "$SR_ROOT/$sql" ]; then
       sr_binding "$scope" "$SR_ROOT/$sql" /dev/null >/dev/null 2>&1
-      [ $? -eq 1 ] && why="The SQL"
+      [ $? -eq 1 ] && ! sr_layout_only "$scope" "$SR_ROOT/$sql" && why="The SQL"
     elif [ "$state" = stale ] && [ -f "$d/review.json" ] && [ "$bound" = n ]; then
       why="The SQL"; gap=", which has no SQL binding"
     fi
@@ -749,6 +807,8 @@ EOF2
       elif [ "$bound" = n ]; then
         printf '%s/data-request:bootstrap %s to bind the scope to the SQL, then /data-request:analyse %s\n' "$pre" "$sql" "$sql"
       else printf '%s/data-request:analyse %s to review the SQL\n' "$pre" "$sql"; fi ;;
+    layout-only|scoped-layout-only)
+      printf '%ssqlreview.sh rebind %s --confirmed-by <engineer handle>, after the engineer confirms that only the layout changed (/data-request:analyse %s --update walks it)\n' "$pre" "$1" "$sql" ;;
     scoped-header-only) printf '%s/data-request:bootstrap %s to record the header revision of the scope\n' "$pre" "$sql" ;;
     stale|no-baseline) printf '%s/data-request:analyse %s --update\n' "$pre" "$sql" ;;
     header-only) printf '%s/data-request:analyse %s to record the header revision of the review\n' "$pre" "$sql" ;;
