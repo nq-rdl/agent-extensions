@@ -104,7 +104,9 @@
 #                                              legacy projection. A declared missing store fails; stage fresh questions.
 #                                              Review --against + explicit human HANDLE adds header_carry_over and
 #                                              header_walk with git-source evidence; never sets confirmed_*.
-#                                              Needs no .sqlreview/. Exit 4: malformed header or unknown first section,
+#                                              Needs no .sqlreview/. Reader: query-builder describe_script where installed (SQLREVIEW_DESCRIBE_CMD,
+#                                              SQLREVIEW_NOTES_READER=jq; output field reader), else this grammar. Exit 4: malformed header, unknown first section,
+#                                              a script the library refuses, or a header only the grammar finds;
 #                                              "line N: why" on stderr
 #   move OLDPATH NEWPATH                       rebind a review directory after the SQL moved (to the readable slug)
 #                                              identical bytes keep carried evidence, changed bytes force reassessment,
@@ -1903,8 +1905,54 @@ _notes_present() { # <parsed JSON>
   printf '%s' "$1" | jq -r .present
 }
 
+# The structure of a script, from query-builder's own reader (pypika_queries.script_format.describe_script, #585),
+# so that the header and batch rules are not written a second time here. SQLREVIEW_DESCRIBE_CMD (environment only,
+# never a project file) names a shell command that reads the SQL on stdin and follows the same contract as the
+# default call: exit 0 and the manifest JSON on stdout, exit 4 and the reason on stderr for a script the reader
+# refuses, any other exit for "no reader here". Without it the helper runs the library through the child's own
+# environment: `pixi run -e framework python` where the project has a pixi manifest, else `python3`.
+# SQLREVIEW_NOTES_READER=jq skips the library and reads with the jq grammar below.
+SR_DESCRIBE_PY='import sys
+try:
+    from pypika_queries.script_format import describe_script
+except ImportError:
+    sys.exit(3)
+try:
+    manifest = describe_script(sys.stdin.buffer.read().decode("utf-8"))
+except ValueError as exc:
+    sys.stderr.write(str(exc) + "\n")
+    sys.exit(4)
+sys.stdout.write(manifest.to_json())'
+_notes_describe_default() {
+  local root="${SR_ROOT:-.}"
+  if command -v pixi >/dev/null 2>&1 && { [ -f "$root/pixi.toml" ] || [ -f "$root/pyproject.toml" ]; }; then
+    pixi run --frozen -e framework python -c "$SR_DESCRIBE_PY"
+  elif command -v python3 >/dev/null 2>&1; then
+    python3 -c "$SR_DESCRIBE_PY"
+  else
+    return 1
+  fi
+}
+# Prints the manifest JSON. Returns 0 read, 1 no reader available (the caller falls back to the jq grammar),
+# 4 the reader refused the script (the reason is on stderr: the caller must stop, never fall back).
+_notes_describe() { # <sql file>
+  local out rc errf reason
+  [ "${SQLREVIEW_NOTES_READER:-}" != jq ] || return 1
+  errf="$(mktemp "${TMPDIR:-/tmp}/sr-describe.XXXXXX")" || return 1
+  if [ -n "${SQLREVIEW_DESCRIBE_CMD:-}" ]; then
+    out="$(sh -c "$SQLREVIEW_DESCRIBE_CMD" < "$1" 2>"$errf")"; rc=$?
+  else
+    out="$( (cd "${SR_ROOT:-.}" && _notes_describe_default) < "$1" 2>"$errf")"; rc=$?
+  fi
+  reason="$(head -c 400 "$errf" | tr -d '\000-\010\013-\037' | head -n 1)"; rm -f "$errf"
+  if [ "$rc" = 4 ]; then printf '%s\n' "${reason:-no reason given}" >&2; return 4; fi
+  [ "$rc" = 0 ] || return 1
+  printf '%s' "$out" | jq -e 'type == "object" and has("format_version") and (.notes | type == "array") and (.batches | type == "array")' >/dev/null 2>&1 || return 1
+  printf '%s\n' "$out"
+}
+
 cmd_notes() {
-  local sql="" against="" questions="" confirmer="" recs errs parsed
+  local sql="" against="" questions="" confirmer="" recs errs parsed manifest="" reader=jq awkjson disagree libreason rc
   while [ $# -gt 0 ]; do
     case "$1" in
       --against) [ $# -ge 2 ] || usage; against="$2"; shift ;;
@@ -1925,21 +1973,60 @@ cmd_notes() {
     jq -e 'type == "object"' "$against" >/dev/null 2>&1 || sr_die 4 "invalid JSON: $against"
   fi
   [ -z "$questions" ] || { [ -n "$against" ] && [ "$(jq -r .kind "$against")" = scope ]; } || usage
+  # The library reads first. Its refusal is an error here, never a fallback: a script the library cannot read
+  # must not come back as "no header" from a second grammar (#567).
+  libreason="$(mktemp "${TMPDIR:-/tmp}/sr-reason.XXXXXX")" || sr_die 2 "cannot create a temporary file"
+  manifest="$(_notes_describe "$sql" 2>"$libreason")"; rc=$?
+  if [ "$rc" = 4 ]; then
+    reason_text="$(cat "$libreason")"; rm -f "$libreason"
+    sr_die 4 "query-builder's script reader refused $sql: $reason_text"
+  fi
+  rm -f "$libreason"
+  [ "$rc" = 0 ] && reader=library
   recs="$(_notes_scan "$sql")" || sr_die 2 "cannot read $sql"
   errs="$(printf '%s\n' "$recs" | awk 'BEGIN { FS = "\037" } $1 == "E" { printf "line %s: %s\n", $2, $3 }')"
-  [ -z "$errs" ] || sr_die 4 "malformed analysis-notes header in $sql: $errs"
-  parsed="$(printf '%s\n' "$recs" | jq -R -s --slurpfile against "${against:-/dev/null}" '
+  if [ "$reader" = library ]; then
+    # The library read the header; the jq grammar only supplies line numbers. Where it rejects the header or reads it
+    # differently, the lines are left empty and the difference is reported (sqlreview-manifest.jq).
+    if [ -n "$errs" ]; then awkjson=null
+    else awkjson="$(printf '%s\n' "$recs" | jq -R -s -c 'split("\n") | map(select(. != "") | split("\u001f"))')" || sr_die 2 "cannot parse notes"; fi
+    recs="$(printf '%s' "$manifest" | jq -r -L "$SR_SCRIPT_DIR" --argjson awk "$awkjson" -f "$SR_SCRIPT_DIR/sqlreview-manifest.jq" 2>&1)" ||
+      sr_die 4 "malformed analysis-notes header in $sql: $(printf '%s' "$recs" | head -n 1)"
+    disagree="$(printf '%s\n' "$recs" | awk 'BEGIN { FS = "\037" } $1 == "D" { print $2 }' | jq -R -s -c 'split("\n") | map(select(. != ""))')"
+    [ "$disagree" = "[]" ] || printf 'warning: the jq grammar and the query-builder reader differ on the notes header of %s; line numbers are omitted: %s\n' "$sql" "$disagree" >&2
+  else
+    [ -z "$errs" ] || sr_die 4 "malformed analysis-notes header in $sql: $errs"
+    disagree="[]"
+  fi
+  parsed="$(printf '%s\n' "$recs" | jq -R -s --slurpfile against "${against:-/dev/null}" --arg reader "$reader" --argjson disagree "$disagree" '
     (split("\n") | map(select(. != "") | split("\u001f"))) as $recs
     | ($against[0] // null) as $doc
     | ([$recs[] | select(.[0] == "H")][0]) as $h
-    | def items($k): [$recs[] | select(.[0] == "I" and .[1] == $k)
-        | {text: .[4], rationale: (if .[5] == "1" then .[6] else null end), lines: [(.[2] | tonumber), (.[3] | tonumber)]}
+    | def num: if . == "" then null else tonumber end;
+      def items($k): [$recs[] | select(.[0] == "I" and .[1] == $k)]
+        | to_entries | map(.key as $n | .value
+        | {text: .[4], rationale: (if .[5] == "1" then .[6] else null end),
+           lines: (if .[2] == "" then null else [(.[2] | num), (.[3] | num)] end),
+           note_id: (($k | rtrimstr("s")) + "-" + (($n + 1) | tostring)), batch: null}
         | if $doc == null then . else . as $i
             | ([($doc[$k] // [] | arrays)[] | select(type == "object" and .text == $i.text)][0]) as $m
             | . + {match: (if $m == null then null else {id: $m.id, rationale_same: ($m.rationale == $i.rationale)} end)}
-          end];
-    {present: ($h != null), lines: (if $h == null then null else [($h[1] | tonumber), ($h[2] | tonumber)] end),
-     assumptions: items("assumptions"), limitations: items("limitations")}')" || sr_die 2 "cannot parse notes"
+          end);
+    {reader: $reader, present: ($h != null),
+     lines: (if $h == null or $h[1] == "" then null else [($h[1] | num), ($h[2] | num)] end),
+     assumptions: items("assumptions"), limitations: items("limitations")}
+    + (if $reader == "library" then {disagreements: $disagree} else {} end)')" || sr_die 2 "cannot parse notes"
+  if [ "$reader" = library ]; then
+    # What only the manifest knows: the batches (index, kind, start line, table, extract label, delivery), the
+    # supplied declarations and the input notes with the batch each governs. A note's batch is known only for a
+    # supplied input; for every other note it is null, and this helper never infers one.
+    parsed="$(printf '%s' "$manifest" | jq --argjson p "$parsed" '
+      . as $m
+      | ($p | (.assumptions, .limitations) |= map(. as $i | .batch = ([$m.notes[] | select(.id == $i.note_id) | .batch][0])))
+      + {library_version: $m.library_version, format_version: $m.format_version, batches: $m.batches,
+         supplied: $m.supplied,
+         inputs: [$m.notes[] | select(.section == "input") | {note_id: .id, text, batch}]}')" || sr_die 2 "cannot parse notes"
+  fi
   if [ -n "$against" ] && [ "$(jq -r .kind "$against")" = scope ]; then
     _scope_notes "$against" "$questions" "$parsed"
   elif [ -n "$against" ] && [ "$(jq -r .kind "$against")" = review ] &&
@@ -2048,7 +2135,9 @@ _header_decisions() ( # SQL DRAFT intended-human-confirmer parsed-notes
       if git -C "$root" show "$commit:$source_rel" > "$tmp/sql" 2>/dev/null; then
         # Our own render of a committed blob: mark it so the inner notes accepts it outside the project.
         sr_write_render_marker "$tmp/sql" || row_safe=false
-        bash "$SR_SCRIPT_DIR/sqlreview.sh" notes "$tmp/sql" > "$tmp/notes" 2>/dev/null || { printf 'null\n' > "$tmp/notes"; row_safe=false; }
+        # One revision per commit: read it with the jq grammar, which needs no interpreter start. Only its text,
+        # rationale and line numbers are compared, and the manifest reader gives the same text (#585).
+        SQLREVIEW_NOTES_READER=jq bash "$SR_SCRIPT_DIR/sqlreview.sh" notes "$tmp/sql" > "$tmp/notes" 2>/dev/null || { printf 'null\n' > "$tmp/notes"; row_safe=false; }
         start="$(sr_body_start "$tmp/sql")" || { start=0; row_safe=false; }
       else
         printf 'null\n' > "$tmp/notes"; start=0; row_safe=false

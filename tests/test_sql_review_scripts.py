@@ -21,6 +21,8 @@ ASSETS = REPO / "skills" / "data-request-setup" / "assets" / "sqlreview"
 
 def run(args, cwd, env=None, stdin=None):
     e = {k: v for k, v in os.environ.items() if not k.startswith("SQLREVIEW_")}
+    # The jq grammar reads notes unless a test names a reader: a library installed on the machine must not change a result.
+    e["SQLREVIEW_NOTES_READER"] = "jq"
     e.update(env or {})
     return subprocess.run(
         ["bash", str(SCRIPT), *args], cwd=cwd, env=e, input=stdin,

@@ -1,0 +1,263 @@
+{
+  "format_version": 1,
+  "batches": [
+    {
+      "index": 1,
+      "kind": "ddl",
+      "start_line": 1,
+      "table": "#ExampleCohort",
+      "extract_label": null,
+      "extract_name": null,
+      "delivery": null,
+      "supplied": null
+    },
+    {
+      "index": 2,
+      "kind": "index",
+      "start_line": 22,
+      "table": "#ExampleCohort",
+      "extract_label": null,
+      "extract_name": null,
+      "delivery": null,
+      "supplied": null
+    },
+    {
+      "index": 3,
+      "kind": "supplied-load",
+      "start_line": 24,
+      "table": "#ExampleCohort",
+      "extract_label": null,
+      "extract_name": null,
+      "delivery": null,
+      "supplied": "example_cohort"
+    },
+    {
+      "index": 4,
+      "kind": "supplied-unmatched",
+      "start_line": 27,
+      "table": null,
+      "extract_label": null,
+      "extract_name": null,
+      "delivery": null,
+      "supplied": "example_cohort"
+    },
+    {
+      "index": 5,
+      "kind": "ddl",
+      "start_line": 30,
+      "table": "#dx_QB",
+      "extract_label": null,
+      "extract_name": null,
+      "delivery": null,
+      "supplied": null
+    },
+    {
+      "index": 6,
+      "kind": "insert",
+      "start_line": 35,
+      "table": "#dx_QB",
+      "extract_label": null,
+      "extract_name": null,
+      "delivery": null,
+      "supplied": null
+    },
+    {
+      "index": 7,
+      "kind": "index",
+      "start_line": 37,
+      "table": "#dx_QB",
+      "extract_label": null,
+      "extract_name": null,
+      "delivery": null,
+      "supplied": null
+    },
+    {
+      "index": 8,
+      "kind": "ddl",
+      "start_line": 39,
+      "table": "#people_QB",
+      "extract_label": null,
+      "extract_name": null,
+      "delivery": null,
+      "supplied": null
+    },
+    {
+      "index": 9,
+      "kind": "insert",
+      "start_line": 44,
+      "table": "#people_QB",
+      "extract_label": null,
+      "extract_name": null,
+      "delivery": null,
+      "supplied": null
+    },
+    {
+      "index": 10,
+      "kind": "index",
+      "start_line": 46,
+      "table": "#people_QB",
+      "extract_label": null,
+      "extract_name": null,
+      "delivery": null,
+      "supplied": null
+    },
+    {
+      "index": 11,
+      "kind": "guard",
+      "start_line": 48,
+      "table": null,
+      "extract_label": null,
+      "extract_name": null,
+      "delivery": null,
+      "supplied": null
+    },
+    {
+      "index": 12,
+      "kind": "output",
+      "start_line": 50,
+      "table": null,
+      "extract_label": "people",
+      "extract_name": "people",
+      "delivery": "sheet",
+      "supplied": null
+    },
+    {
+      "index": 13,
+      "kind": "output",
+      "start_line": 53,
+      "table": null,
+      "extract_label": "diagnoses internal",
+      "extract_name": "diagnoses",
+      "delivery": "internal",
+      "supplied": null
+    },
+    {
+      "index": 14,
+      "kind": "output",
+      "start_line": 56,
+      "table": null,
+      "extract_label": "detail file",
+      "extract_name": "detail",
+      "delivery": "file",
+      "supplied": null
+    },
+    {
+      "index": 15,
+      "kind": "drop",
+      "start_line": 59,
+      "table": "#ExampleCohort",
+      "extract_label": null,
+      "extract_name": null,
+      "delivery": null,
+      "supplied": null
+    },
+    {
+      "index": 16,
+      "kind": "drop",
+      "start_line": 61,
+      "table": "#dx_QB",
+      "extract_label": null,
+      "extract_name": null,
+      "delivery": null,
+      "supplied": null
+    },
+    {
+      "index": 17,
+      "kind": "drop",
+      "start_line": 63,
+      "table": "#people_QB",
+      "extract_label": null,
+      "extract_name": null,
+      "delivery": null,
+      "supplied": null
+    }
+  ],
+  "supplied": [
+    {
+      "format": 1,
+      "name": "example_cohort",
+      "file": "example_cohort.csv",
+      "table": "#ExampleCohort",
+      "key": [
+        "study_id"
+      ],
+      "max_rows": 10000,
+      "columns": [
+        {
+          "name": "study_id",
+          "sql_type": "VARCHAR(20)",
+          "dtype": "string",
+          "sensitivity": "personal",
+          "nullable": false
+        },
+        {
+          "name": "urn",
+          "sql_type": "VARCHAR(10)",
+          "dtype": "string",
+          "sensitivity": "health",
+          "nullable": false
+        }
+      ]
+    }
+  ],
+  "notes": [
+    {
+      "id": "input-1",
+      "section": "input",
+      "text": "supplied cohort example_cohort",
+      "details": [
+        [
+          "file",
+          "example_cohort.csv"
+        ],
+        [
+          "table",
+          "#ExampleCohort"
+        ],
+        [
+          "key",
+          "study_id"
+        ],
+        [
+          "columns",
+          "study_id VARCHAR(20) personal, urn VARCHAR(10) health"
+        ]
+      ],
+      "batch": 3
+    },
+    {
+      "id": "assumption-1",
+      "section": "assumption",
+      "text": "Each person has one URN",
+      "details": [
+        [
+          "rationale",
+          "example rule"
+        ]
+      ],
+      "batch": null
+    },
+    {
+      "id": "limitation-1",
+      "section": "limitation",
+      "text": "Codes are matched exactly",
+      "details": [
+        [
+          "consequence",
+          "example effect"
+        ]
+      ],
+      "batch": null
+    }
+  ],
+  "code_sets": [
+    {
+      "table": "#dx_QB",
+      "batch": 5,
+      "values_fingerprints": [
+        "b611d70218cef3c03d3120bc0f81ff044190267687a3d5d1d07335722e31db34"
+      ],
+      "reference_inserts": 0
+    }
+  ]
+}

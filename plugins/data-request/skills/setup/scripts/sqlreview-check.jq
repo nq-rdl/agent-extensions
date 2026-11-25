@@ -10,6 +10,8 @@ include "sqlreview-noecho";
 def nonempty: type == "string" and length > 0;
 def integer: type == "number" and . >= 1 and . == floor;
 def line_range: type == "array" and length == 2 and all(.[]; integer) and .[0] <= .[1];
+# A location is its line range, plus the optional number of the batch it sits in (query-builder's script manifest, #572).
+def location_ok: . == null or (type == "object" and (.lines | line_range) and ((.batch // null) | . == null or integer));
 def path_ok: nonempty and (startswith("/") | not) and (split("/") | all(.[]; . != "" and . != "." and . != ".."));
 # sql_path is free text. Check refuses the characters that can build a command or break a line: quotes, backtick,
 # $ ; | & < >, backslash and control characters. A space stays valid. Status prints a path only when it holds
@@ -30,7 +32,7 @@ def items($kind; $rev):
         (.id | safe_id) as $id
       | (if (.text | nonempty | not) then "\($id): empty text" else empty end),
         (if (.rationale | nonempty | not) then "\($id): rationale must be a nonempty string" else empty end),
-        (if .location != null and ((.location | type) != "object" or (.location.lines | line_range | not)) then "\($id): location must be null or an object with a line range" else empty end),
+        (if (.location | location_ok | not) then "\($id): location must be null or an object with a line range and an optional batch number" else empty end),
         (if has("sql_status") and .sql_status != "not-implemented" then "\($id): sql_status must be absent or not-implemented" else empty end),
         (if has("decided") then
           if (.decided | type) != "object" then "\($id): decided must be an object"
@@ -104,7 +106,7 @@ def criteria_status_findings($rev):
            elif ($cf | integer | not) or $cf != $rev - 1 or $cf < $cr then "\($id)\tcarried_from_revision\tinvalid"
            else empty end),
         # A row may record the SQL lines that apply it, so a body change walks only the rows it touches.
-        (if .location != null and ((.location | type) != "object" or (.location.lines | line_range | not))
+        (if (.location | location_ok | not)
          then "\($id)\tlocation\tinvalid" else empty end),
         (.carried_basis as $cb | if $cb == null then empty
          elif .carried_from_revision == null or (["criteria-unchanged", "criteria-lines-unchanged"] | index([$cb])) == null

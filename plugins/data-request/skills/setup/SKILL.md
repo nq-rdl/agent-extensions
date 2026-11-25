@@ -215,6 +215,16 @@ Hints, executable/nested comments, `@extract:` markers and code after a block cl
 the body; malformed headers have no body hash. Any body edit, including whitespace or comments,
 unbinds the record. Body equality never confirms changed assumptions, rationale or decisions.
 
+`sqlreview.sh notes SQL` reads the header with query-builder's `describe_script` (nq-rdl/query-builder#501), called through
+the child's own environment (`pixi run -e framework python`, else `python3`; `SQLREVIEW_DESCRIBE_CMD` names a stand-in
+command, `SQLREVIEW_NOTES_READER=jq` forces the helper's grammar). Where the library is not installed, the grammar reads
+it. The JSON says which reader ran in `reader`. The library reader adds `library_version`, `format_version`, `batches`
+(index, kind, start_line, table, extract_name, delivery), `supplied` and `inputs`; each item has `note_id` (such as
+`assumption-2`) and `batch`, which the manifest knows only for a supplied input and is otherwise `null`. A script
+the library refuses, a header the helper cannot read, or one the grammar finds and the library does not, is exit 4,
+never `present: false`. An item whose two readings differ has `lines: null` and a warning on stderr. A review item's
+`location` may carry `batch` (a positive integer) beside `lines`; `check` validates it.
+
 `sqlreview.sh notes SQL --against SCOPE_DRAFT [--questions QUESTIONS_DRAFT]` adds `scope_check`:
 exact unmatched header items, rationale differences, and all open scope-question/header pairs.
 Bootstrap checks these before publish, warning with both identities on semantic settlement.
