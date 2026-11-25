@@ -1,0 +1,3 @@
+kind: Fixed
+body: 'data-request: intake with a missing sidecar and a draft prints the draft unchanged, so a move over the draft keeps it'
+time: 2026-11-05T18:10:01.000000000Z

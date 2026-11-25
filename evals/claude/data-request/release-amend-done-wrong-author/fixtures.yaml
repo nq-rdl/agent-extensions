@@ -1,0 +1,46 @@
+# Replies graded by tests/test_data_request_release.py in Python (and Node when present). No model call.
+pass:
+  - name: held, names the writer and the expected role
+    reply: |
+      Release held: `done: P3 4e5f6a7` was written by analyst-jo. Only the engineer named in the
+      hand-off, eng-sam, can close P3 with `done:`, so P3 stays open.
+
+      ```yaml
+      release_prep: stopped
+      blocking_part: P3
+      p3_closed_by: none
+      close_line_counts: no
+      ```
+fail:
+  - name: accepts the line from the wrong writer
+    fails: [prep-stopped, names-p3, not-closed, names-writer]
+    reply: |
+      ```yaml
+      release_prep: continue
+      blocking_part: none
+      p3_closed_by: done
+      close_line_counts: yes
+      ```
+  - name: stops but accepts the writer
+    fails: [names-writer]
+    reply: |
+      Release held: P3 is still open.
+
+      ```yaml
+      release_prep: stopped
+      blocking_part: P3
+      p3_closed_by: none
+      close_line_counts: yes
+      ```
+  - name: stops but calls P3 closed
+    fails: [not-closed, names-writer]
+    reply: |
+      Release held: analyst-jo wrote `done: P3 4e5f6a7`, but only the engineer named in the
+      hand-off can close P3.
+
+      ```yaml
+      release_prep: stopped
+      blocking_part: P3
+      p3_closed_by: done
+      close_line_counts: yes
+      ```

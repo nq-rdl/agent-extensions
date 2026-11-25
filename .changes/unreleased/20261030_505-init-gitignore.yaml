@@ -1,0 +1,3 @@
+kind: Fixed
+body: sqlreview.sh init now writes .sqlreview/.gitignore, which ignores the legacy SQL copy paths
+time: 2026-10-30T00:00:04Z

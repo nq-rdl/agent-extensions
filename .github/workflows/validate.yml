@@ -2,9 +2,9 @@ name: Validate
 
 on:
   pull_request:
-    branches: [main, 'release/*']
+    branches: [main, 'release/*', 'integration/**']
   push:
-    branches: [main]
+    branches: [main, 'integration/**']
 
 permissions:
   contents: read

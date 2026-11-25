@@ -1,0 +1,3 @@
+kind: Fixed
+body: 'The setup skill gives a concrete false-positive check for the string-SQL guard'
+time: 2026-11-16T21:43:11Z

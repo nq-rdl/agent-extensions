@@ -1,0 +1,3 @@
+kind: Fixed
+body: 'data-request: amend records a withdrawn status and closes a handed-off part only on a strict `withdrawn:` or `done:` comment (#533)'
+time: 2026-10-29T12:00:00.000000+10:00

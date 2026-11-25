@@ -1,0 +1,3 @@
+kind: Fixed
+body: move re-renders the scope, review and lifts markdown that it removes and names the command when a render fails
+time: 2026-11-16T02:01:00Z

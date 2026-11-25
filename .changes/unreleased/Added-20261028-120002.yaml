@@ -1,0 +1,3 @@
+kind: Added
+body: 'data-request: release stops while an amend part is handed off and not completed or withdrawn on the PR (#534)'
+time: 2026-10-28T12:00:02.000000+10:00

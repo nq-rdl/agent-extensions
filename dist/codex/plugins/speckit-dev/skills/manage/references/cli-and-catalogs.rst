@@ -1,4 +1,4 @@
-<!-- Source: https://github.github.io/spec-kit/reference/extensions.html + EXTENSION-USER-GUIDE.md — fetched 2026-07-04. CLI section re-verified 2026-09-28 against v1.0.12 src/specify_cli/extensions/command_*.py and catalog/command_add.py. -->
+<!-- Source: https://github.github.io/spec-kit/extensions/cli.html + https://github.github.io/spec-kit/extensions/overview.html — fetched 2026-07-04. CLI section re-verified 2026-09-28 against v1.0.12 src/specify_cli/extensions/command_*.py and catalog/command_add.py. -->
 
 specify extension — CLI & Catalog Stack
 =======================================

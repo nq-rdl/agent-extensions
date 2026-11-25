@@ -1,5 +1,7 @@
 # Build the {{placeholder}} -> text map for rendering a scope/review document into its template.
+# Loaded with `jq -L <this directory>` (sqlreview.sh render) for the criteria vocabulary.
 # Input: the document; $cfgs[0] (jq --slurpfile cfgs config.json): the project's config. Every value is a string.
+include "sqlreview-criteria";
 def lines(l): if l == null then "—" elif (l | type) == "array" then (l | map(tostring) | join("-")) else (l | tostring) end;
 def named_list(a): if (a | length) == 0 then "_none_" else (a | map("- **\(.name // "?")** — \(.description // "")") | join("\n")) end;
 def str_list(a): if (a | length) == 0 then "_none_" else (a | map("- " + (if type == "object" then (.question // .text // tostring) else tostring end)) | join("\n")) end;
@@ -25,10 +27,18 @@ def question_list(a): if (a | length) == 0 then "_none_" else (a | map(
       + (if (.closed.source | ascii_downcase | startswith("unlinked")) then " [UNLINKED]" else "" end) else "" end)
   + (if .decided != null then " · Decision: \(decision | cell)" else "" end)
 ) | join("\n")) end;
+# An item this SQL does not implement must never read as an ordinary confirmed item.
+def item_text: .text + (if .sql_status == "not-implemented" then " [not implemented by this SQL]" else "" end);
 def table(a; heading):
   if (a | length) == 0 then "_none recorded_"
   else "| ID | \(heading) | Rationale | Lines | Decision and source | Confirmed by | Revision |\n|---|---|---|---|---|---|---|\n"
-       + (a | map("| \(.id | cell) | \(.text | cell) | \((.rationale // "") + intake_note | cell) | \(lines(.location.lines) | cell) | \(decision | cell) | \(.confirmed_by // "" | cell) | \((.confirmed_revision // "" | tostring) + (if .carried_from_revision != null then " (carried)" else "" end) + (if .carried_basis == "header-decision" then " (header-decision carry-over)" else "" end) | cell) |") | join("\n"))
+       + (a | map("| \(.id | cell) | \(item_text | cell) | \((.rationale // "") + intake_note | cell) | \(lines(.location.lines) | cell) | \(decision | cell) | \(.confirmed_by // "" | cell) | \((.confirmed_revision // "" | tostring) + (if .carried_from_revision != null then " (carried)" else "" end) + (if .carried_basis == "header-decision" then " (header-decision carry-over)" else "" end) | cell) |") | join("\n"))
+  end;
+def criteria_note: if .state == "flagged" and .flag != null then "`\(.flag.output).\(.flag.column)`" else (.reason // "") end;
+def criteria_table(a):
+  if (a | length) == 0 then "_none recorded_"
+  else "| ID | State | Note |\n|---|---|---|\n"
+       + (a | sort_by(crit_status_order) | map("| \(.criterion | cell) | \(.state | cell) | \(criteria_note | cell) |") | join("\n"))
   end;
 def steps(a): if (a | length) == 0 then "_none_" else (a | map("\(.step). **\(.title // "")** (lines \(lines(.lines))) — \(.description // "")") | join("\n")) end;
 def changes(a): if (a | length) == 0 then "_none_" else (a | map("- r\(.revision) — \(.at // "") — \(.by // ""): \(.summary // "")") | join("\n")) end;
@@ -37,7 +47,7 @@ $cfgs[0] as $cfg |
   recurring: ((.recurring // false) | tostring),
   definition_lift_candidate: (($cfg.definitions.lift_candidate // "") | tostring),
   lifts_list: ((.lifts // []) | if length == 0 then "_none recorded_" else map(
-    "## \(.id): \(.need)\n\nClassification: \(.classification // "unclassified") · status: \(.status)\n\nLibrary: \(.library) @ \(.pinned_version)\n\nInspected: \(.looked_in | map(.path + " @ " + .revision) | join(", "))\n\nShortfall: \(.shortfall)\n\nWorkaround: `\(.workaround.file)` lines \(lines(.workaround.lines))\n\nIssue: \(.issue_url // "none")\n\nConfirmed: \(.confirmed_by // "pending") · \(.confirmed_at // "") · revision \(.confirmed_revision // "")"
+    "## \(.id): \(.need)\n\nClassification: \(.classification // "unclassified") · status: \(.status)\n\nLibrary: \(.library) @ \(.pinned_version)\n\nInspected: \(.looked_in | map(.path + " @ " + .revision) | join(", "))\n\nShortfall: \(.shortfall)\n\nWorkaround: `\(.workaround.file)` lines \(([.workaround.lines] + (.workaround.extra_lines // []) | map(lines(.)) | join(", ")))\((if .workaround.anchor then " (anchor: " + .workaround.anchor + ")" else "" end))\n\nIssue: \(.issue_url // "none")\n\nConfirmed: \(.confirmed_by // "pending") · \(.confirmed_at // "") · revision \(.confirmed_revision // "")"
   ) | join("\n\n") end),
   title: ((.title // .slug) | tostring),
   slug: (.slug | tostring),
@@ -52,6 +62,7 @@ $cfgs[0] as $cfg |
   grain: ((.grain // "") | tostring),
   inputs_list: named_list(.inputs // []),
   outputs_list: named_list(.outputs // []),
+  criteria: criteria_table(.criteria_status // []),
   logic_steps: steps(.logic // []),
   assumptions_table: table(.assumptions // []; "Assumption"),
   limitations_table: table(.limitations // []; "Limitation"),

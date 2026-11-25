@@ -1,0 +1,3 @@
+kind: Fixed
+body: 'data-request: fix, amend and release read the release state from repository evidence and ask only for the gap (#534)'
+time: 2026-10-29T13:00:00.000000+10:00

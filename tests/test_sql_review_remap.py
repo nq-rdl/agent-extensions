@@ -4,8 +4,11 @@ import hashlib
 import json
 import os
 import shutil
+import subprocess
 import tempfile
 import unittest
+
+from test_sql_review_sources import committed
 
 try:
     from test_sql_review_scripts import Project, SQL_V1, item, review_doc, run, scope_doc
@@ -34,22 +37,24 @@ class Remap(unittest.TestCase):
         self.seed(self.prior, SQL_V1)
 
     def seed(self, doc, sql):
+        self.sql.write_bytes(sql.encode())
+        doc = dict(doc, git_commit=committed(self.p), git_dirty=False)
         self.prior = doc
         self.kind = doc["kind"]
         self.published = self.d / (self.kind + ".json")
-        self.baseline = self.d / ("source.sql" if self.kind == "review" else "scope.source.sql")
         self.published.write_text(json.dumps(doc))
-        self.baseline.write_text(sql)
-        self.before = {p: p.read_bytes() for p in (self.published, self.baseline)}
+        self.before = {self.published: self.published.read_bytes()}
 
     def stage(self):
         draft = copy.deepcopy(self.prior)
         draft["revision"] = 2
-        draft["sql_sha256"] = sha(self.sql.read_text())
+        draft["git_commit"] = committed(self.p)
+        draft["sql_sha256"] = hashlib.sha256(self.sql.read_bytes()).hexdigest()
         self.draft.write_text(json.dumps(draft))
         return draft
 
     def remap(self, explicit=True, expected=0):
+        committed(self.p)
         args = ["remap", "q"] + ([str(self.draft)] if explicit else [])
         r = run(args, self.p.root)
         self.assertEqual(r.returncode, expected, r.stdout + r.stderr)
@@ -86,6 +91,7 @@ class Remap(unittest.TestCase):
         self.draft.write_text(json.dumps(doc))
         r = run(["publish", "q", "review", str(self.draft)], self.p.root)
         self.assertEqual(r.returncode, 0, r.stdout + r.stderr)
+        self.assertEqual(list((self.p.root / ".sqlreview").rglob("*.sql")), [])  # #505: no SQL copies in the store
 
     def test_body_only_and_mixed_changes_leave_changed_ranges_untouched(self):
         for header in ("", "-- new header\n-- more header\n"):
@@ -121,6 +127,28 @@ class Remap(unittest.TestCase):
         self.assertEqual(self.read(), original)
         self.assertIn("ambiguous", out["walk"][0]["why"])
 
+    def test_pure_insertion_across_repeated_go_batches_remaps_unique_ranges(self):
+        # GO lines repeat in every batch, so each range shares a line with the inserted batch. A range whose
+        # whole governed text occurs once in the baseline and once in the current SQL has one alignment only.
+        text = "SELECT a FROM t1;\nGO\nSELECT b FROM t2;\nGO\nSELECT c FROM t3;\nGO\n"
+        doc = review_doc("q", "q.sql", sql_sha256=sha(text),
+                         assumptions=[item("A1", "Second batch", location={"lines": [3, 4]})],
+                         limitations=[item("L1", "Batch separator only", location={"lines": [4, 4]})],
+                         logic=[{"step": 1, "title": "One", "lines": [1, 2], "description": "First batch"},
+                                {"step": 2, "title": "Two", "lines": [3, 4], "description": "Second batch"},
+                                {"step": 3, "title": "Three", "lines": [5, 6], "description": "Third batch"}])
+        self.seed(doc, text)
+        self.sql.write_text("SELECT z FROM t0;\nGO\n" + text)
+        self.stage()
+        out = self.remap()
+        doc = self.read()
+        self.assertEqual(doc["assumptions"][0]["location"]["lines"], [5, 6])
+        self.assertEqual([s["lines"] for s in doc["logic"]], [[3, 4], [5, 6], [7, 8]])
+        # A lone GO line occurs in every batch: still ambiguous, left for the human.
+        self.assertEqual(doc["limitations"][0]["location"]["lines"], [4, 4])
+        self.assertEqual([(r["kind"], r["id"]) for r in out["walk"]], [("limitations", "L1")])
+        self.assertIn("ambiguous", out["walk"][0]["why"])
+
     def test_retry_is_byte_idempotent(self):
         self.sql.write_text("-- header\n-- rationale\n" + SQL_V1)
         self.stage()
@@ -151,17 +179,46 @@ class Remap(unittest.TestCase):
         self.assertEqual(out["document"], "scope")
         self.assertEqual(self.read()["assumptions"][0]["location"]["lines"], [5, 5])
 
+    def test_a_scope_remaps_after_the_sql_moved_and_the_review_was_reassessed(self):
+        # Review finding 5: after move the scope names the new path at the old commit. The pre-move binding is
+        # archived under history/, and remap must authenticate that record, as delta and carry do.
+        (self.d / "review.json").unlink()
+        doc = scope_doc("q", "q.sql", sql_sha256=sha(SQL_V1),
+                        assumptions=self.prior["assumptions"], limitations=self.prior["limitations"])
+        self.seed(doc, SQL_V1)
+        git = lambda *a: subprocess.run(["git", "-C", str(self.p.root), *a], check=True, capture_output=True)
+        git("mv", "q.sql", "new.sql")
+        committed(self.p)
+        self.assertEqual(run(["move", "q.sql", "new.sql"], self.p.root).returncode, 0)
+        moved = self.p.root / ".sqlreview" / "reviews" / "new"
+        (moved / "rebind-required").unlink()  # what snapshot clears once the moved review is reassessed
+        (self.p.root / "new.sql").write_text("-- ZZTEST header\n-- rationale\n" + SQL_V1)
+        committed(self.p)
+        draft = json.loads((moved / "scope.json").read_text())
+        draft["revision"] = 2
+        draft["sql_sha256"] = sha((self.p.root / "new.sql").read_text())
+        draft["git_commit"] = committed(self.p)
+        (moved / "scope.draft.json").write_text(json.dumps(draft))
+        r = run(["remap", "new", str(moved / "scope.draft.json")], self.p.root)
+        self.assertEqual(r.returncode, 0, r.stdout + r.stderr)
+        out = json.loads((moved / "scope.draft.json").read_text())
+        self.assertEqual(out["assumptions"][0]["location"]["lines"], [5, 5])
+
     def test_missing_corrupt_baseline_and_invalid_range_fail_atomically(self):
         self.sql.write_text("-- header\n" + SQL_V1)
         self.stage()
         before = self.draft.read_bytes()
-        self.baseline.unlink()
+        prior = json.loads(self.published.read_text())
+        original = dict(prior)
+        prior["git_commit"] = "f" * 40
+        self.published.write_text(json.dumps(prior))
         self.remap(expected=6)
         self.assertEqual(self.draft.read_bytes(), before)
-        self.baseline.write_text("corrupt\n")
-        self.remap(expected=2)
+        prior.update(git_commit=original["git_commit"], sql_sha256="0" * 64)
+        self.published.write_text(json.dumps(prior))
+        self.remap(expected=6)
         self.assertEqual(self.draft.read_bytes(), before)
-        self.baseline.write_text(SQL_V1)
+        self.published.write_text(json.dumps(original))
         doc = self.read()
         doc["logic"][1]["lines"] = [0, 2]
         self.draft.write_text(json.dumps(doc))
@@ -256,6 +313,7 @@ class Remap(unittest.TestCase):
         stub = tools / "diff"
         stub.write_text("#!/bin/sh\nexit 2\n")
         stub.chmod(0o755)
+        committed(self.p)
         r = run(["remap", "q", str(self.draft)], self.p.root,
                 env={"PATH": str(tools) + os.pathsep + os.environ["PATH"]})
         self.assertEqual(r.returncode, 2, r.stdout + r.stderr)
@@ -270,6 +328,7 @@ class Remap(unittest.TestCase):
         stub = tools / "diff"
         stub.write_text(f'#!/bin/sh\nprintf "concurrent work" > "{self.draft}"\nexec "{shutil.which("diff")}" "$@"\n')
         stub.chmod(0o755)
+        committed(self.p)
         r = run(["remap", "q", str(self.draft)], self.p.root,
                 env={"PATH": str(tools) + os.pathsep + os.environ["PATH"]})
         self.assertEqual(r.returncode, 2, r.stdout + r.stderr)
@@ -283,6 +342,7 @@ class Remap(unittest.TestCase):
         stub = tools / "diff"
         stub.write_text(f'#!/bin/sh\nprintf "concurrent work" > "{self.draft}"\nexec "{shutil.which("diff")}" "$@"\n')
         stub.chmod(0o755)
+        committed(self.p)
         r = run(["remap", "q"], self.p.root,
                 env={"PATH": str(tools) + os.pathsep + os.environ["PATH"]})
         self.assertEqual(r.returncode, 2, r.stdout + r.stderr)
@@ -292,7 +352,7 @@ class Remap(unittest.TestCase):
         self.stage()
         saved = self.p.root / "saved.sql"
         saved.write_text(SQL_V1)
-        for path in (self.baseline, self.sql):
+        for path in (self.sql,):
             path.unlink()
             path.symlink_to(saved)
             self.remap(expected=2)

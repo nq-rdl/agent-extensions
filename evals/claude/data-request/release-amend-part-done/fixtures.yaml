@@ -1,0 +1,28 @@
+# Replies graded by tests/test_data_request_release.py in Python (and Node when present). No model call.
+pass:
+  - name: gate clear, names the comment read
+    reply: |
+      Amend gate clear: P3 read `done: P3 4e5f6a7`, and 4e5f6a7 is in v1.1.0, so P3 is closed.
+
+      ```yaml
+      release_prep: continue
+      blocking_part: none
+      p3_closed_by: done
+      ```
+fail:
+  - name: done comment ignored
+    fails: [prep-continue, no-blocker, closed-by-done]
+    reply: |
+      ```yaml
+      release_prep: stopped
+      blocking_part: P3
+      p3_closed_by: none
+      ```
+  - name: continues but credits a withdrawal
+    fails: [closed-by-done]
+    reply: |
+      ```yaml
+      release_prep: continue
+      blocking_part: none
+      p3_closed_by: withdrawn
+      ```

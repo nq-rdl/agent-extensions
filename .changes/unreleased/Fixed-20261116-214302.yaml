@@ -1,0 +1,3 @@
+kind: Fixed
+body: '`sqlreview.sh notes` exits 4 on an unknown first header section instead of reporting no header'
+time: 2026-11-16T21:43:02Z

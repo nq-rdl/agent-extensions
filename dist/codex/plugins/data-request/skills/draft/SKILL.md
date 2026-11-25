@@ -25,14 +25,23 @@ their actors. Label missing research decisions `Analyst question:` and return
 them to the analyst to consult the requester; engineer technical choices do not
 replace those answers.
 
-Read `${PLUGIN_ROOT}/skills/guardrails/SKILL.md` first, including **Engineer decisions: proceed and flag**
-in its `references/decision-authority.rst`. Arguments: `$ARGUMENTS`.
+Invoke `$data-request:guardrails` first and apply its **Engineer decisions: proceed and flag**
+in `${PLUGIN_ROOT}/skills/guardrails/references/decision-authority.rst`. Arguments: `$ARGUMENTS`.
 Use the requested SQL path, existing SQL, request and any supplied scope. Drafting
 requires no formal scope/review record. Before writing SQL outside the composition
 API, silently publish a lift candidate under the pipeline path, following
 `${PLUGIN_ROOT}/skills/setup/references/lifts.rst`. Cite the actual pin,
 inspected unit/resolver/tests and shortfall first. No entry means no hand SQL;
 leave classification and confirmation for `$data-request:lift` at close-out.
+
+Before you propose any new code, config format, helper or text parser, follow the check-first list in
+`${PLUGIN_ROOT}/skills/guardrails/references/library.rst` and name the path you searched.
+Every new reference constant cites a probe id or a library default. Do not override a library default
+without a probe.
+Read `${PLUGIN_ROOT}/skills/guardrails/references/house-conventions.rst` for the test and citation
+rules and for who owns each decision. Ward, location and facility sets are cohort decisions for the
+analyst. Column naming, read isolation and the form of UAT are engineer decisions: ask for any that the
+scope leaves unrecorded.
 
 Use the evidenced grain and requested finer outputs, not the bare answers default;
 follow guardrails `references/grain.rst` for source-citing records and drift handling.
@@ -41,7 +50,8 @@ required columns from explicit instructions or confirmed scope. Consult column-s
 metadata and dataops DDL comments for every field whose interpretation affects the
 result; use `$data-request:map` for unresolved source/resolver choices. Verify dialect and
 correctness-critical syntax using the canonical docs linked by guardrails.
-Apply guardrails **House defaults** without asking: use TUH `00200` unless the request
+Apply guardrails **House defaults**: import the recorded `tuh-facility` ruling without a fresh question, tell the engineer
+which item you used, and let the engineer override it. Use TUH `00200` unless the request
 explicitly changes the cohort's facility set (another facility/HHS/network scope). Reuse one standard assumption from setup's
 `tuh-facility` entry, its `upstream` marker and original confirmation per
 `${PLUGIN_ROOT}/skills/setup/references/recurring-decisions.rst`; do not duplicate an existing scope item.
@@ -61,6 +71,10 @@ Batch remaining questions with defaults/evidence into one analyst message; keep 
 Deliver only the narrowest supported request; offer extras in hand-off, do not build them.
 **Co-develop:** present alternatives and effects to the owning engineer or analyst, obtain the
 decision, then proceed and flag. Infer mode if absent. Neither mode manufactures confirmation fields.
+
+When the cohort is researcher-supplied, declare its shape with query-builder's `SuppliedCohort` and join to its
+`#` table; the runner loads the file at run time. Never write a cohort value into SQL, comments, specs or
+tests (use `example_rows(n)`), and never read the file under `data/00_raw/`. Follow `${PLUGIN_ROOT}/skills/guardrails/references/supplied-cohorts.rst`.
 
 Before proposing probes or carrying their evidence into headers, rationale or limitations,
 follow **Probe disclosure control** in
@@ -87,6 +101,24 @@ instant, never a role label, recorder or inferred approval. Preserve any indepen
 known decision origin/source. Unknown attribution stays unknown and is walked in analyse.
 Include real engineer login/date and decision evidence in the generated SQL header and
 analyst hand-off per the shared authority rule.
+
+Copy confirmed scope wording verbatim into each `record_assumption` and `record_limitation` text.
+Do not reword it, or the SQL header check fails.
+
+## Commit builder SQL
+
+Builder SQL is generated, so commit it through the scaffold's amend guard:
+
+1. Write the SQL to `sql/v<N>/<name>_request.sql`. The `_request.sql` suffix is the naming rule.
+2. Run `pixi run --environment framework amend record sql/v<N>/<name>_request.sql --builder MODULE:FUNCTION
+   --server ALIAS --input FILE` for it. Take `ALIAS` from the server configuration. Without `--server`, the
+   guard records the scaffold default alias. Repeat `--input` once for each repo-local input of the builder.
+   The guard accepts both being absent, so check them.
+3. After any edit to a builder, even a docstring, run `pixi run --environment framework amend regenerate`
+   with no argument. It regenerates every generated SQL file at its newest version. Every SQL file that
+   imports the builder changes provenance.
+4. Commit only after steps 2 and 3, and after the static `$data-request:validate` check passes. A block that
+   names missing provenance means step 2 was skipped.
 
 Return the path, implemented cohort definition, evidence locations for mappings and
 conversions, and any unresolved limitations. Perform a static check using

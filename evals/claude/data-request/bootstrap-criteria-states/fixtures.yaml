@@ -1,0 +1,486 @@
+fail:
+- fails:
+  - researcher-applies-gated
+  name: researcher-applies without applied_by or a question
+  reply: 'E1 has no applied_by, so it is not-applied for this iteration. One Analyst question goes to
+    the analyst through /data-request:intake.
+
+
+    ```yaml
+
+    N1: applied
+
+    I1: applied
+
+    E1: researcher-applies
+
+    E2: flagged
+
+    E2_flag: cohort.died_before_admission
+
+    D1: not-delivered
+
+    D1_reason_inputs: D2,D3
+
+    D2: delivered
+
+    D3: delivered
+
+    analyst_question: no
+
+    ```
+
+    '
+- fails:
+  - researcher-applies-gated
+  name: researcher-applies even with a question
+  reply: 'E1 has no applied_by, so it is not-applied for this iteration. One Analyst question goes to
+    the analyst through /data-request:intake.
+
+
+    ```yaml
+
+    N1: applied
+
+    I1: applied
+
+    E1: researcher-applies
+
+    E2: flagged
+
+    E2_flag: cohort.died_before_admission
+
+    D1: not-delivered
+
+    D1_reason_inputs: D2,D3
+
+    D2: delivered
+
+    D3: delivered
+
+    analyst_question: yes
+
+    ```
+
+    '
+- fails:
+  - researcher-applies-gated
+  name: E1 not-applied but no question raised
+  reply: 'E1 has no applied_by, so it is not-applied for this iteration. One Analyst question goes to
+    the analyst through /data-request:intake.
+
+
+    ```yaml
+
+    N1: applied
+
+    I1: applied
+
+    E1: not-applied
+
+    E2: flagged
+
+    E2_flag: cohort.died_before_admission
+
+    D1: not-delivered
+
+    D1_reason_inputs: D2,D3
+
+    D2: delivered
+
+    D3: delivered
+
+    analyst_question: no
+
+    ```
+
+    '
+- fails:
+  - criteria-states
+  name: entry event not applied
+  reply: 'E1 has no applied_by, so it is not-applied for this iteration. One Analyst question goes to
+    the analyst through /data-request:intake.
+
+
+    ```yaml
+
+    N1: not-doable
+
+    I1: applied
+
+    E1: not-applied
+
+    E2: flagged
+
+    E2_flag: cohort.died_before_admission
+
+    D1: not-delivered
+
+    D1_reason_inputs: D2,D3
+
+    D2: delivered
+
+    D3: delivered
+
+    analyst_question: yes
+
+    ```
+
+    '
+- fails:
+  - criteria-states
+  name: flagged exclusion recorded as applied
+  reply: 'E1 has no applied_by, so it is not-applied for this iteration. One Analyst question goes to
+    the analyst through /data-request:intake.
+
+
+    ```yaml
+
+    N1: applied
+
+    I1: applied
+
+    E1: not-applied
+
+    E2: applied
+
+    E2_flag: cohort.died_before_admission
+
+    D1: not-delivered
+
+    D1_reason_inputs: D2,D3
+
+    D2: delivered
+
+    D3: delivered
+
+    analyst_question: yes
+
+    ```
+
+    '
+- fails:
+  - criteria-states
+  name: derived element recorded as delivered
+  reply: 'E1 has no applied_by, so it is not-applied for this iteration. One Analyst question goes to
+    the analyst through /data-request:intake.
+
+
+    ```yaml
+
+    N1: applied
+
+    I1: applied
+
+    E1: not-applied
+
+    E2: flagged
+
+    E2_flag: cohort.died_before_admission
+
+    D1: delivered
+
+    D1_reason_inputs: D2,D3
+
+    D2: delivered
+
+    D3: delivered
+
+    analyst_question: yes
+
+    ```
+
+    '
+- fails:
+  - criteria-states
+  name: delivered data element left without a state
+  reply: 'E1 has no applied_by, so it is not-applied for this iteration. One Analyst question goes to
+    the analyst through /data-request:intake.
+
+
+    ```yaml
+
+    N1: applied
+
+    I1: applied
+
+    E1: not-applied
+
+    E2: flagged
+
+    E2_flag: cohort.died_before_admission
+
+    D1: not-delivered
+
+    D1_reason_inputs: D2,D3
+
+    D2: delivered
+
+    D3: not-stated
+
+    analyst_question: yes
+
+    ```
+
+    '
+- fails:
+  - flag-names-output-and-column
+  name: flag names the column only
+  reply: 'E1 has no applied_by, so it is not-applied for this iteration. One Analyst question goes to
+    the analyst through /data-request:intake.
+
+
+    ```yaml
+
+    N1: applied
+
+    I1: applied
+
+    E1: not-applied
+
+    E2: flagged
+
+    E2_flag: died_before_admission
+
+    D1: not-delivered
+
+    D1_reason_inputs: D2,D3
+
+    D2: delivered
+
+    D3: delivered
+
+    analyst_question: yes
+
+    ```
+
+    '
+- fails:
+  - flag-names-output-and-column
+  name: flag names another output
+  reply: 'E1 has no applied_by, so it is not-applied for this iteration. One Analyst question goes to
+    the analyst through /data-request:intake.
+
+
+    ```yaml
+
+    N1: applied
+
+    I1: applied
+
+    E1: not-applied
+
+    E2: flagged
+
+    E2_flag: admissions.died_before_admission
+
+    D1: not-delivered
+
+    D1_reason_inputs: D2,D3
+
+    D2: delivered
+
+    D3: delivered
+
+    analyst_question: yes
+
+    ```
+
+    '
+- fails:
+  - derived-element-reason
+  name: derived reason names no delivered input
+  reply: 'E1 has no applied_by, so it is not-applied for this iteration. One Analyst question goes to
+    the analyst through /data-request:intake.
+
+
+    ```yaml
+
+    N1: applied
+
+    I1: applied
+
+    E1: not-applied
+
+    E2: flagged
+
+    E2_flag: cohort.died_before_admission
+
+    D1: not-delivered
+
+    D1_reason_inputs: none
+
+    D2: delivered
+
+    D3: delivered
+
+    analyst_question: yes
+
+    ```
+
+    '
+- fails:
+  - researcher-applies-gated
+  name: duplicate conflicting E1
+  reply: 'E1 has no applied_by, so it is not-applied for this iteration. One Analyst question goes to
+    the analyst through /data-request:intake.
+
+
+    ```yaml
+
+    N1: applied
+
+    I1: applied
+
+    E1: not-applied
+
+    E2: flagged
+
+    E2_flag: cohort.died_before_admission
+
+    D1: not-delivered
+
+    D1_reason_inputs: D2,D3
+
+    D2: delivered
+
+    D3: delivered
+
+    analyst_question: yes
+
+    E1: researcher-applies
+
+    ```
+
+    '
+- fails:
+  - criteria-states
+  - flag-names-output-and-column
+  - derived-element-reason
+  - researcher-applies-gated
+  name: earlier correct block cannot override final answer
+  reply: 'E1 has no applied_by, so it is not-applied for this iteration. One Analyst question goes to
+    the analyst through /data-request:intake.
+
+
+    ```yaml
+
+    N1: applied
+
+    I1: applied
+
+    E1: not-applied
+
+    E2: flagged
+
+    E2_flag: cohort.died_before_admission
+
+    D1: not-delivered
+
+    D1_reason_inputs: D2,D3
+
+    D2: delivered
+
+    D3: delivered
+
+    analyst_question: yes
+
+    ```
+
+    E1 has no applied_by, so it is not-applied for this iteration. One Analyst question goes to the analyst
+    through /data-request:intake.
+
+
+    ```yaml
+
+    N1: not-doable
+
+    I1: not-applied
+
+    E1: researcher-applies
+
+    E2: applied
+
+    E2_flag: none
+
+    D1: delivered
+
+    D1_reason_inputs: none
+
+    D2: not-delivered
+
+    D3: not-delivered
+
+    analyst_question: no
+
+    ```
+
+    '
+- fails:
+  - criteria-states
+  - flag-names-output-and-column
+  - derived-element-reason
+  - researcher-applies-gated
+  name: empty answer
+  reply: ''
+pass:
+- name: correct answer
+  reply: 'E1 has no applied_by, so it is not-applied for this iteration. One Analyst question goes to
+    the analyst through /data-request:intake.
+
+
+    ```yaml
+
+    N1: applied
+
+    I1: applied
+
+    E1: not-applied
+
+    E2: flagged
+
+    E2_flag: cohort.died_before_admission
+
+    D1: not-delivered
+
+    D1_reason_inputs: D2,D3
+
+    D2: delivered
+
+    D3: delivered
+
+    analyst_question: yes
+
+    ```
+
+    '
+- name: spaces, comments and quotes
+  reply: 'E1 has no applied_by, so it is not-applied for this iteration. One Analyst question goes to
+    the analyst through /data-request:intake.
+
+
+    ```yaml
+
+    N1: applied
+
+    I1: applied
+
+    E1: ''not-applied''  # analyst question open
+
+    E2: flagged
+
+    E2_flag: "cohort.died_before_admission"
+
+    D1: not-delivered
+
+    D1_reason_inputs: D2, D3
+
+    D2: delivered
+
+    D3: delivered
+
+    analyst_question: yes
+
+    ```
+
+    '

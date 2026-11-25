@@ -1,0 +1,3 @@
+kind: Fixed
+body: 'data-request leaves invoke /data-request:guardrails, pre-approved via Skill, instead of reading its SKILL.md by path'
+time: 2026-11-04T02:01:00.000000000Z

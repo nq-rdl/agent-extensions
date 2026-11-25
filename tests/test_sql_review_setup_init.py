@@ -59,7 +59,9 @@ class InitReviewsPlaceholder(unittest.TestCase):
             j = json.loads(r.stdout)
             self.assertEqual((j["reviews"], j["counts"]["total"]), ([], 0))
             text = run(["status"], p.root)
-            self.assertEqual((text.returncode, text.stdout), (0, ""))
+            # An empty project has one line: the bootstrap step that starts the first review.
+            self.assertEqual((text.returncode, text.stdout),
+                             (0, "no reviews yet\tnext=/data-request:bootstrap <sql path> to scope the first SQL file\n"))
 
     def test_rerun_reports_no_difference_for_the_placeholder(self):
         with tempfile.TemporaryDirectory() as tmp:
@@ -98,6 +100,39 @@ class GuardHelper(unittest.TestCase):
             self.assertEqual(run(["guard", "string-sql", "on"], p.root).returncode, 4)
             self.assertEqual(cfg.read_text(), "{not json")
             cfg.write_bytes(original)
+
+
+class InitDiffSettings(unittest.TestCase):
+    """The keys that `roles` and `guard` set are project settings, so `init --diff` reports no drift for them."""
+
+    def test_helper_set_keys_are_not_drift(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            p = Project(tmp)
+            self.assertEqual(run(["guard", "string-sql", "on"], p.root).returncode, 0)
+            self.assertEqual(run(["roles", "Engineer One", "Analyst One"], p.root).returncode, 0)
+            r = run(["init", "--diff"], p.root)
+            self.assertEqual(r.returncode, 0, r.stdout + r.stderr)
+            self.assertRegex(r.stdout, r"(?m)^same\tconfig\.json$")
+            j = json.loads(run(["init", "--diff", "--json"], p.root).stdout)
+            self.assertIn({"path": "config.json", "state": "same"}, j["files"])
+
+    def test_any_other_change_is_still_drift(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            p = Project(tmp)
+            self.assertEqual(run(["guard", "string-sql", "on"], p.root).returncode, 0)
+            cfg = p.root / ".sqlreview" / "config.json"
+            doc = json.loads(cfg.read_text())
+            doc["definitions"]["assumption"] = "A local wording."
+            cfg.write_text(json.dumps(doc, indent=2) + "\n")
+            r = run(["init", "--diff"], p.root)
+            self.assertEqual(r.returncode, 10, r.stdout + r.stderr)
+            self.assertRegex(r.stdout, r"(?m)^differs\tconfig\.json$")
+            for bad in ("{not json", "[]"):
+                with self.subTest(config=bad):
+                    cfg.write_text(bad)
+                    r = run(["init", "--diff"], p.root)
+                    self.assertEqual(r.returncode, 10, r.stdout + r.stderr)
+                    self.assertRegex(r.stdout, r"(?m)^differs\tconfig\.json$")
 
 
 class SetupSkillContract(unittest.TestCase):

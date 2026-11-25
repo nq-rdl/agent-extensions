@@ -1,0 +1,3 @@
+kind: Fixed
+body: 'data-request: script errors name the field and the rule and never echo request values, SQL lines or paths'
+time: 2026-11-02T15:00:00.000000000Z

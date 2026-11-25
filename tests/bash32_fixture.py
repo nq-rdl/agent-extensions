@@ -5,6 +5,9 @@ This is not native macOS/BSD coverage. See docs/bash32-portability.md for proven
 """
 import hashlib
 import os
+import platform
+import re
+import shlex
 import shutil
 import subprocess
 import urllib.request
@@ -56,16 +59,63 @@ def static_jq():
     return path
 
 
-def run_container(tmp, target, command, *, readonly=False, payload=None):
+def run_container(tmp, target, command, *, readonly=False, payload=None, user=None):
     runtime = container_runtime()
     if not runtime:
         raise RuntimeError("Bash 3.2 needs Docker/Podman with the pinned image pulled")
     # :Z labels only the disposable copy; never relabel the working tree.
     options = "ro,Z" if readonly else "Z"
+    user_args = [] if user is None else ["--user", user]
     return subprocess.run(
         [runtime, "run", "--rm", "--pull=never", "--platform=linux/amd64",
-         "-i", "--network=none", "-v", f"{tmp}:{target}:{options}",
+         "-i", "--network=none"] + user_args + ["-v", f"{tmp}:{target}:{options}",
          BASH32_IMAGE, "bash", "-c",
          'set -euo pipefail; test "${BASH_VERSINFO[0]}.${BASH_VERSINFO[1]}" = 3.2; '
          'sed --help 2>&1 | grep BusyBox >/dev/null; ' + command],
         input=payload, capture_output=True, text=True, timeout=180)
+
+
+def copy_host_git(directory, target):
+    """Copy Linux amd64 Git and its ELF runtime, without installs or network.
+
+    Git is an external fixture dependency, not a pinned portability target.
+    The container still supplies pinned Bash 3.2/BusyBox and verified static jq.
+    Unsupported/missing Git fails the selected case; strict CI never accepts skips.
+    """
+    if platform.system() != "Linux" or platform.machine() not in ("x86_64", "amd64"):
+        raise RuntimeError("SQL-source fixture requires Linux amd64 host Git")
+    executable = shutil.which("git")
+    if not executable:
+        raise RuntimeError("SQL-source fixture requires host Git")
+    probe = subprocess.run(["ldd", executable], check=True, capture_output=True, text=True)
+    libraries = re.findall(r"(?:=>\s+|^\s*)(/[^\s]+)", probe.stdout, re.MULTILINE)
+    loaders = [path for path in libraries if Path(path).name.startswith("ld-linux-")]
+    if len(loaders) != 1 or "not found" in probe.stdout:
+        raise RuntimeError("SQL-source fixture requires complete glibc Git runtime")
+    runtime = directory / "git-runtime"
+    runtime.mkdir()
+    shutil.copyfile(executable, runtime / "git")
+    (runtime / "git").chmod(0o755)
+    for library in libraries:
+        destination = runtime / Path(library).name
+        shutil.copyfile(library, destination)
+        destination.chmod(0o755)
+    bindir = directory / "bin"
+    bindir.mkdir(exist_ok=True)
+    prefix = target + "/git-runtime"
+    command = " ".join(shlex.quote(v) for v in (
+        prefix + "/" + Path(loaders[0]).name, "--library-path", prefix, prefix + "/git",
+        # Reset inherited protected trust (runner config may contain broader paths).
+        # These command-local values follow inherited config/environment entries.
+        "-c", "safe.directory=",
+        # The host-created repository may have a different owner in the container.
+        # Trust only this disposable fixture; modern local clone checks its .git too.
+        "-c", "safe.directory=" + target + "/project",
+        "-c", "safe.directory=" + target + "/project/.git"))
+    # Local paths can use Git's transport clone (e.g. when mounted source ownership
+    # differs). Its upload-pack subprocess must also use the copied ELF runtime;
+    # the minimal container has neither host exec-path helpers nor their loader.
+    for name, subcommand in (("git", ""), ("git-upload-pack", " upload-pack")):
+        wrapper = bindir / name
+        wrapper.write_text('#!/bin/sh\nexec ' + command + subcommand + ' "$@"\n')
+        wrapper.chmod(0o755)

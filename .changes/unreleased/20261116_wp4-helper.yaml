@@ -1,0 +1,3 @@
+kind: Added
+body: The sqlreview.sh now and intake-draft commands give the interview a UTC clock and a validated draft
+time: 2026-11-16T00:00:03Z

@@ -31,12 +31,26 @@ CASES = {
     "amend-derived-column-engineer": "classified-engineer",
     "amend-new-element-governance": "classified-engineer",
     "amend-generated-sql-refused": "refused",
+    # #533: a combined request is split per part.
+    "amend-split-all-safe": "all-safe",
+    "amend-split-all-engineer": "all-engineer",
+    "amend-split-mixed": "label-engineer",
+    "amend-split-mixed-ambiguous": "ambiguous-engineer",
+    # A close line from the wrong writer leaves the part open.
+    "amend-resume-withdrawn-wrong-author": "stays-open",
+    "amend-resume-done-wrong-author": "stays-open",
 }
 EXTRA = {
     "amend-icd-code-engineer": {"hand-off"},
     "amend-derived-column-engineer": {"hand-off"},
     "amend-new-element-governance": {"hand-off", "governance-check"},
     "amend-generated-sql-refused": {"supported-route"},
+    "amend-split-all-safe": {"no-hand-off"},
+    "amend-split-all-engineer": {"one-hand-off", "nothing-done"},
+    "amend-split-mixed": {"safe-parts-continue", "hand-off-label-only", "summary"},
+    "amend-split-mixed-ambiguous": {"rename-safe", "open-question", "summary"},
+    "amend-resume-withdrawn-wrong-author": {"names-writer"},
+    "amend-resume-done-wrong-author": {"names-writer"},
 }
 MUTATING_TOOLS = {"Bash", "Write", "Edit", "NotebookEdit"}
 

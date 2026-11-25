@@ -1,0 +1,3 @@
+kind: Added
+body: release.sh evidence lists the non-SQL paths changed since the reviewed commit (#521)
+time: 2026-10-30T00:00:05Z

@@ -4,7 +4,7 @@ pass:
 
     gate: blocked
 
-    destination: child-issue
+    destination: pr-comment
 
     board: pending
 
@@ -21,7 +21,7 @@ fail:
 
     gate: wrong
 
-    destination: child-issue
+    destination: pr-comment
 
     board: pending
 
@@ -39,7 +39,7 @@ fail:
 
     gate: blocked
 
-    destination: child-issue
+    destination: pr-comment
 
     board: pending
 
@@ -72,12 +72,30 @@ fail:
     '
   fails:
   - destination
-- name: duplicate conflicting destination
+- name: hand-off on child issue
   reply: '```yaml
 
     gate: blocked
 
     destination: child-issue
+
+    board: pending
+
+    reviewer: ask
+
+    release_owner: analyst
+
+    ```
+
+    '
+  fails:
+  - destination
+- name: duplicate conflicting destination
+  reply: '```yaml
+
+    gate: blocked
+
+    destination: pr-comment
 
     board: pending
 
@@ -97,7 +115,7 @@ fail:
 
     gate: blocked
 
-    destination: child-issue
+    destination: pr-comment
 
     board: wrong
 
@@ -115,7 +133,7 @@ fail:
 
     gate: blocked
 
-    destination: child-issue
+    destination: pr-comment
 
     board: pending
 
@@ -135,7 +153,7 @@ fail:
 
     gate: blocked
 
-    destination: child-issue
+    destination: pr-comment
 
     board: pending
 
@@ -153,7 +171,7 @@ fail:
 
     gate: blocked
 
-    destination: child-issue
+    destination: pr-comment
 
     board: pending
 
@@ -173,7 +191,7 @@ fail:
 
     gate: blocked
 
-    destination: child-issue
+    destination: pr-comment
 
     board: pending
 
@@ -191,7 +209,7 @@ fail:
 
     gate: blocked
 
-    destination: child-issue
+    destination: pr-comment
 
     board: pending
 
@@ -219,7 +237,7 @@ fail:
 
     gate: blocked
 
-    destination: child-issue
+    destination: pr-comment
 
     board: pending
 
