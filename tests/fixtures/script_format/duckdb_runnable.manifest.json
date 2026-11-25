@@ -1,0 +1,68 @@
+{
+  "format_version": 1,
+  "batches": [
+    {
+      "index": 1,
+      "kind": "ddl",
+      "start_line": 1,
+      "table": "#people_QB",
+      "extract_label": null,
+      "extract_name": null,
+      "delivery": null,
+      "supplied": null
+    },
+    {
+      "index": 2,
+      "kind": "insert",
+      "start_line": 6,
+      "table": "#people_QB",
+      "extract_label": null,
+      "extract_name": null,
+      "delivery": null,
+      "supplied": null
+    },
+    {
+      "index": 3,
+      "kind": "index",
+      "start_line": 8,
+      "table": "#people_QB",
+      "extract_label": null,
+      "extract_name": null,
+      "delivery": null,
+      "supplied": null
+    },
+    {
+      "index": 4,
+      "kind": "output",
+      "start_line": 10,
+      "table": null,
+      "extract_label": "people",
+      "extract_name": "people",
+      "delivery": "sheet",
+      "supplied": null
+    },
+    {
+      "index": 5,
+      "kind": "output",
+      "start_line": 13,
+      "table": null,
+      "extract_label": "detail file",
+      "extract_name": "detail",
+      "delivery": "file",
+      "supplied": null
+    },
+    {
+      "index": 6,
+      "kind": "drop",
+      "start_line": 16,
+      "table": "#people_QB",
+      "extract_label": null,
+      "extract_name": null,
+      "delivery": null,
+      "supplied": null
+    }
+  ],
+  "supplied": [],
+  "notes": [],
+  "code_sets": []
+}

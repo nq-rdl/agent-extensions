@@ -1,0 +1,3 @@
+kind: Added
+body: sqlreview notes reads the header with query-builder's describe_script where installed, and an item location may name a batch (#585)
+time: 2026-11-23T10:00:00Z

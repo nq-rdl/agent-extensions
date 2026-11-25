@@ -1,0 +1,38 @@
+{
+  "format_version": 1,
+  "batches": [
+    {
+      "index": 1,
+      "kind": "ddl",
+      "start_line": 1,
+      "table": "#admissions_ENQ90210",
+      "extract_label": null,
+      "extract_name": null,
+      "delivery": null,
+      "supplied": null
+    },
+    {
+      "index": 2,
+      "kind": "insert",
+      "start_line": 13,
+      "table": "#admissions_ENQ90210",
+      "extract_label": null,
+      "extract_name": null,
+      "delivery": null,
+      "supplied": null
+    },
+    {
+      "index": 3,
+      "kind": "output",
+      "start_line": 18,
+      "table": null,
+      "extract_label": "admissions",
+      "extract_name": "admissions",
+      "delivery": "sheet",
+      "supplied": null
+    }
+  ],
+  "supplied": [],
+  "notes": [],
+  "code_sets": []
+}

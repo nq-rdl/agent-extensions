@@ -1,0 +1,97 @@
+{
+  "format_version": 1,
+  "batches": [
+    {
+      "index": 1,
+      "kind": "output",
+      "start_line": 1,
+      "table": null,
+      "extract_label": "summary file",
+      "extract_name": "summary",
+      "delivery": "file",
+      "supplied": null
+    },
+    {
+      "index": 2,
+      "kind": "ddl",
+      "start_line": 7,
+      "table": "#staging",
+      "extract_label": null,
+      "extract_name": null,
+      "delivery": null,
+      "supplied": null
+    },
+    {
+      "index": 3,
+      "kind": "insert",
+      "start_line": 9,
+      "table": "#staging",
+      "extract_label": null,
+      "extract_name": null,
+      "delivery": null,
+      "supplied": null
+    },
+    {
+      "index": 4,
+      "kind": "guard",
+      "start_line": 11,
+      "table": null,
+      "extract_label": null,
+      "extract_name": null,
+      "delivery": null,
+      "supplied": null
+    },
+    {
+      "index": 5,
+      "kind": "insert",
+      "start_line": 13,
+      "table": "#copy",
+      "extract_label": null,
+      "extract_name": null,
+      "delivery": null,
+      "supplied": null
+    },
+    {
+      "index": 6,
+      "kind": "output",
+      "start_line": 15,
+      "table": null,
+      "extract_label": null,
+      "extract_name": null,
+      "delivery": null,
+      "supplied": null
+    },
+    {
+      "index": 7,
+      "kind": "drop",
+      "start_line": 17,
+      "table": "#staging",
+      "extract_label": null,
+      "extract_name": null,
+      "delivery": null,
+      "supplied": null
+    },
+    {
+      "index": 8,
+      "kind": "drop",
+      "start_line": 19,
+      "table": "#copy",
+      "extract_label": null,
+      "extract_name": null,
+      "delivery": null,
+      "supplied": null
+    }
+  ],
+  "supplied": [],
+  "notes": [],
+  "code_sets": [
+    {
+      "table": "#staging",
+      "batch": 2,
+      "values_fingerprints": [
+        "08ab965bd3c3269f12582d11f999925159267e54b04ebac8d7272c839282106e"
+      ],
+      "reference_inserts": 0
+    }
+  ]
+}

@@ -56,6 +56,19 @@ def shift(expected, by):
     return out
 
 
+def legacy(parsed):
+    """The reader-independent shape these tests pin: without the fields added for the manifest reader (#585).
+
+    The jq grammar is selected here, so the helper must say so. note_id and batch are covered in
+    test_sql_review_manifest.py.
+    """
+    assert parsed.get("reader") == "jq", parsed.get("reader")
+    out = {k: v for k, v in parsed.items() if k != "reader"}
+    for kind in ("assumptions", "limitations"):
+        out[kind] = [{k: v for k, v in i.items() if k not in ("note_id", "batch")} for i in out.get(kind, [])]
+    return out
+
+
 class Notes(unittest.TestCase):
     def setUp(self):
         self._tmp = tempfile.TemporaryDirectory()
@@ -70,7 +83,7 @@ class Notes(unittest.TestCase):
     def parsed(self, text, *extra):
         r = self.notes(text, *extra)
         self.assertEqual(r.returncode, 0, r.stderr)
-        return json.loads(r.stdout)
+        return legacy(json.loads(r.stdout))
 
     # --- present / absent -------------------------------------------------------------------
     def test_full_header_items_and_lines(self):
@@ -79,7 +92,7 @@ class Notes(unittest.TestCase):
     def test_no_header_is_absent_not_an_error(self):
         r = self.notes(SQL_V1)
         self.assertEqual(r.returncode, 0, r.stderr)
-        self.assertEqual(json.loads(r.stdout), ABSENT)
+        self.assertEqual(legacy(json.loads(r.stdout)), ABSENT)
         self.assertEqual(r.stderr, "")
 
     def test_empty_file_is_absent(self):

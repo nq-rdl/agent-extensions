@@ -1,0 +1,18 @@
+{
+  "format_version": 1,
+  "batches": [
+    {
+      "index": 1,
+      "kind": "output",
+      "start_line": 1,
+      "table": null,
+      "extract_label": "admissions",
+      "extract_name": "admissions",
+      "delivery": "sheet",
+      "supplied": null
+    }
+  ],
+  "supplied": [],
+  "notes": [],
+  "code_sets": []
+}

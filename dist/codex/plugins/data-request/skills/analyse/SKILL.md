@@ -294,15 +294,26 @@ pipeline recorded ([contract](https://github.com/nq-rdl/query-builder/blob/main/
 
 ```bash
 bash "$S/sqlreview.sh" notes "<sql path>" --against ".sqlreview/reviews/$SLUG/scope.json"  # drop --against if no scope
-# → {present, lines, assumptions|limitations: [{text, rationale, lines, match}]} · exit 4 malformed → report the line, continue without it
+# → {reader, present, lines, assumptions|limitations: [{text, rationale, lines, note_id, batch, match}]}
+#   reader is "library" (query-builder's describe_script, run in the child's framework environment) or "jq" (the helper's
+#   own grammar, used where the library is not installed). The library reader also returns batches, supplied and inputs.
+#   exit 4 → the header, or the script, could not be read. Stop and report the message; it is not "no header".
 ```
+
+Exit 4 is never a clean result. Report the helper's message to the engineer and do not seed or compare header items
+until the script is fixed, or the engineer chooses to read it with `SQLREVIEW_NOTES_READER=jq` and says so. `lines` is
+`null` for an item where the two readers differ (the helper warns on stderr): put that item to the human with the
+SQL, and set its `location` yourself.
 
 Header items are candidates, not confirmed items: each still goes to the human under
 *Confirm, write, render*, never confirmed because the pipeline recorded it. Seed each with the header
 text verbatim, `"status": "candidate"` and its `rationale` (a limitation's consequence; draft one
 with the human if null); where `match` names an existing item, keep that item's id, text and
 rationale verbatim instead, so carryover/carryforward still recognise it. Set `location` to the
-SQL lines the item governs, not the header `lines`. Then review the SQL for what the header
+SQL lines the item governs, not the header `lines`. Where `batches` is present, a `location` may also carry
+`"batch": N`, the `index` of the batch it sits in (`{"lines": [3, 5], "batch": 4}`). Use the item's own `batch` where
+the manifest gives one (a supplied input names its load batch). For every other item the manifest gives `null`: choose
+the batch from `batches[].start_line` with the human, never infer it from the header. Then review the SQL for what the header
 omits; `present: false` is not evidence of no assumptions.
 
 ## Confirm, write, render

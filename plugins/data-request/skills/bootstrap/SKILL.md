@@ -438,8 +438,10 @@ fi
 ```
 
 No SQL yet: skip the comparison, not the scope. An absent analysis-notes header means no
-header mismatch; a malformed header or missing/invalid questions is not a clean result —
-stop and surface the diagnostic, retain drafts, and use `/data-request:fix` for SQL edits.
+header mismatch; a header or script that query-builder's reader or the helper cannot read (exit 4, a
+malformed header or a refused script) or missing/invalid questions is not a clean result —
+stop and surface the diagnostic, retain drafts, and use `/data-request:fix` for SQL edits. The output's `reader`
+says whether query-builder's `describe_script` (`library`) or the helper's own grammar (`jq`) read the header.
 Verify the header contract against query-builder's canonical
 https://github.com/nq-rdl/query-builder/blob/main/docs/ANALYSIS_NOTES.md when syntax is uncertain.
 
