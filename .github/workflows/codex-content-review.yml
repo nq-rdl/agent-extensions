@@ -75,7 +75,7 @@ jobs:
         id: codex
         if: steps.key.outputs.present == 'true'
         continue-on-error: true # informational — a Codex/API failure must not gate the PR
-        uses: openai/codex-action@bdf19a4a223ec2549a3e2274a0cf61556bc07675 # v1.13
+        uses: openai/codex-action@306c6a196a99dcc6582530c396a19d2672d5e9ec # v1.14
         with:
           openai-api-key: ${{ secrets.OPENAI_API_KEY }}
           model: ${{ vars.CODEX_REVIEW_MODEL || 'gpt-5.6-terra' }}
